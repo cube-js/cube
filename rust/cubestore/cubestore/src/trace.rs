@@ -73,6 +73,7 @@ pub struct MainTrace {
     pub node_name: String,
     pub ops: Vec<OpSample>,
     pub exec_memory_peak_bytes: Option<u64>,
+    pub physical_plan: Option<String>,
     pub workers: Vec<WorkerTrace>,
 }
 
@@ -87,13 +88,19 @@ pub struct QueryTrace {
 /// can write through a shared `Arc` from anywhere in the query's task.
 pub struct TraceCtx {
     ops: Mutex<Vec<OpSample>>,
+    plan_text: Mutex<Option<String>>,
 }
 
 impl TraceCtx {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             ops: Mutex::new(Vec::new()),
+            plan_text: Mutex::new(None),
         })
+    }
+
+    pub fn take_plan_text(&self) -> Option<String> {
+        self.plan_text.lock().unwrap().take()
     }
 
     fn push(&self, sample: OpSample) {
@@ -178,6 +185,13 @@ pub fn record_op(
             rows,
             count,
         });
+    }
+}
+
+/// Stash the executed physical plan text into the active trace (no-op when off).
+pub fn set_plan_text(text: String) {
+    if let Some(ctx) = current_trace() {
+        *ctx.plan_text.lock().unwrap() = Some(text);
     }
 }
 

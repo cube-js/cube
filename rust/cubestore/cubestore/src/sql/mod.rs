@@ -755,6 +755,19 @@ impl SqlServiceImpl {
             ]));
         }
 
+        fn push_plan(level: &str, node: &str, plan: &str, rows: &mut Vec<Row>) {
+            rows.push(Row::new(vec![
+                TableValue::String(level.to_string()),
+                TableValue::String(node.to_string()),
+                TableValue::String("Plan".to_string()),
+                TableValue::String(plan.to_string()),
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Null,
+            ]));
+        }
+
         let mut rows = Vec::new();
         push_ops("router", "", &trace.router.ops, &mut rows);
         if let Some(main) = &trace.main {
@@ -762,12 +775,18 @@ impl SqlServiceImpl {
             if let Some(mem) = main.exec_memory_peak_bytes {
                 push_memory("main", &main.node_name, mem, &mut rows);
             }
+            if let Some(plan) = &main.physical_plan {
+                push_plan("main", &main.node_name, plan, &mut rows);
+            }
             for w in &main.workers {
                 push_ops("worker", &w.node_name, &w.ops, &mut rows);
                 if let Some(sub) = &w.subprocess {
                     push_ops("subprocess", &w.node_name, &sub.ops, &mut rows);
                     if let Some(mem) = sub.exec_memory_peak_bytes {
                         push_memory("subprocess", &w.node_name, mem, &mut rows);
+                    }
+                    if let Some(plan) = &sub.physical_plan {
+                        push_plan("subprocess", &w.node_name, plan, &mut rows);
                     }
                 }
             }

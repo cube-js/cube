@@ -443,9 +443,9 @@ impl WorkerProcessing for WorkerProcessor {
                 let (schema, records, data_loaded_size) =
                     crate::trace::scoped(ctx.clone(), run).await?;
                 let subtrace = ctx.map(|c| SubprocessTrace {
+                    physical_plan: c.take_plan_text(),
                     ops: c.take_ops(),
                     exec_memory_peak_bytes: memory_pool.as_ref().map(|p| p.peak() as u64),
-                    physical_plan: None,
                 });
                 Ok((schema, records, data_loaded_size, subtrace))
             }
@@ -1573,6 +1573,7 @@ impl ClusterImpl {
         .await?;
         Ok(MainTrace {
             node_name,
+            physical_plan: ctx.take_plan_text(),
             ops: ctx.take_ops(),
             exec_memory_peak_bytes: memory_peak,
             workers: collector.take(),

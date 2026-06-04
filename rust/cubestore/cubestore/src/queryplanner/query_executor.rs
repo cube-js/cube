@@ -279,6 +279,7 @@ impl QueryExecutor for QueryExecutorImpl {
         // Harvest per-node DataFusion metrics of the final stages (router-level nodes
         // above ClusterSend), aggregated by node type into the active trace.
         record_plan_node_metrics(&physical_plan);
+        crate::trace::set_plan_text(pp_phys_plan(physical_plan.as_ref()));
         Ok(Some(memory_pool.peak() as u64))
     }
 
@@ -447,9 +448,10 @@ impl QueryExecutor for QueryExecutorImpl {
         }
         // TODO: stream results as they become available.
         let results = regroup_batches(results?, max_batch_rows)?;
-        // Detailed trace: record per-node elapsed_compute of the worker subplan.
+        // Detailed trace: record per-node metrics + the worker subplan text.
         if memory_pool.is_some() {
             record_plan_node_metrics(&worker_plan);
+            crate::trace::set_plan_text(pp_phys_plan(worker_plan.as_ref()));
         }
         Ok((worker_plan.schema(), results, data_loaded_size.get()))
     }
