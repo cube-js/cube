@@ -404,9 +404,11 @@ impl WorkerProcessing for WorkerProcessor {
                     );
                     let (schema, records, data_loaded_size) = res?;
                     let records = {
-                        let _g =
+                        let mut g =
                             crate::trace::OpGuard::start(OpKind::Serialize, "result.serialize");
-                        SerializedRecordBatchStream::write(schema.as_ref(), records)?
+                        let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
+                        g.set_bytes(records.iter().map(|r| r.byte_size() as u64).sum());
+                        records
                     };
                     Ok::<_, CubeError>((schema, records, data_loaded_size))
                 };
@@ -1462,23 +1464,38 @@ impl ClusterImpl {
                     tracing::Level::TRACE,
                     "Serialize chunks into SerializedRecordBatchStream"
                 );
-                let chunk_id_to_record_batches = span.in_scope(|| {
-                    let _g = crate::trace::OpGuard::start(OpKind::Serialize, "chunks.serialize");
-                    chunk_id_to_record_batches
-                    .iter()
-                    .map(
-                        |(id, b)| -> Result<(u64, Vec<SerializedRecordBatchStream>), CubeError> {
-                            Ok((
-                                *id,
-                                SerializedRecordBatchStream::write(
-                                    &b.iter().next().unwrap().schema(),
-                                    b.to_vec(),
-                                )?,
-                            ))
-                        },
-                    )
-                    .collect::<Result<HashMap<_, _>, _>>()
-                })?;
+                let chunk_id_to_record_batches = span.in_scope(
+                    || -> Result<HashMap<u64, Vec<SerializedRecordBatchStream>>, CubeError> {
+                        let mut g =
+                            crate::trace::OpGuard::start(OpKind::Serialize, "chunks.serialize");
+                        let result =
+                            chunk_id_to_record_batches
+                                .iter()
+                                .map(
+                                    |(id, b)| -> Result<
+                                        (u64, Vec<SerializedRecordBatchStream>),
+                                        CubeError,
+                                    > {
+                                        Ok((
+                                            *id,
+                                            SerializedRecordBatchStream::write(
+                                                &b.iter().next().unwrap().schema(),
+                                                b.to_vec(),
+                                            )?,
+                                        ))
+                                    },
+                                )
+                                .collect::<Result<HashMap<_, _>, _>>()?;
+                        g.set_bytes(
+                            result
+                                .values()
+                                .flatten()
+                                .map(|r| r.byte_size() as u64)
+                                .sum(),
+                        );
+                        Ok(result)
+                    },
+                )?;
                 let pool_result = {
                     let _ipc_guard = crate::trace::OpGuard::start(OpKind::Transport, "ipc.select");
                     pool.process(WorkerMessage::Select(

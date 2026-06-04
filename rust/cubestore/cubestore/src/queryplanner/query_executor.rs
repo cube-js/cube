@@ -2334,6 +2334,10 @@ pub struct SerializedRecordBatchStream {
 }
 
 impl SerializedRecordBatchStream {
+    pub fn byte_size(&self) -> usize {
+        self.record_batch_file.len()
+    }
+
     pub fn write(
         schema: &Schema,
         record_batches: Vec<RecordBatch>,
