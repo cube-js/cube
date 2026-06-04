@@ -768,10 +768,37 @@ impl SqlServiceImpl {
             ]));
         }
 
+        // Transport (wire + queue) at a boundary = parent's round-trip − child's wall.
+        fn push_transport(level: &str, node: &str, label: &str, us: u64, rows: &mut Vec<Row>) {
+            rows.push(Row::new(vec![
+                TableValue::String(level.to_string()),
+                TableValue::String(node.to_string()),
+                TableValue::String("Transport".to_string()),
+                TableValue::String(label.to_string()),
+                TableValue::Int(us as i64),
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Int(1),
+            ]));
+        }
+
+        fn find_elapsed(ops: &[OpSample], label: &str) -> Option<u64> {
+            ops.iter().find(|o| o.label == label).map(|o| o.elapsed_us)
+        }
+
         let mut rows = Vec::new();
         push_ops("router", "", &trace.router.ops, &mut rows);
         if let Some(main) = &trace.main {
             push_ops("main", &main.node_name, &main.ops, &mut rows);
+            if let Some(rt) = find_elapsed(&trace.router.ops, "route_select_detailed") {
+                push_transport(
+                    "main",
+                    &main.node_name,
+                    "transport.entry_to_main",
+                    rt.saturating_sub(main.total_us),
+                    &mut rows,
+                );
+            }
             if let Some(mem) = main.exec_memory_peak_bytes {
                 push_memory("main", &main.node_name, mem, &mut rows);
             }
@@ -780,8 +807,26 @@ impl SqlServiceImpl {
             }
             for w in &main.workers {
                 push_ops("worker", &w.node_name, &w.ops, &mut rows);
+                if let Some(rt) = w.net_roundtrip_us {
+                    push_transport(
+                        "worker",
+                        &w.node_name,
+                        "transport.main_to_worker",
+                        rt.saturating_sub(w.total_us),
+                        &mut rows,
+                    );
+                }
                 if let Some(sub) = &w.subprocess {
                     push_ops("subprocess", &w.node_name, &sub.ops, &mut rows);
+                    if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
+                        push_transport(
+                            "subprocess",
+                            &w.node_name,
+                            "transport.ipc",
+                            rt.saturating_sub(sub.total_us),
+                            &mut rows,
+                        );
+                    }
                     if let Some(mem) = sub.exec_memory_peak_bytes {
                         push_memory("subprocess", &w.node_name, mem, &mut rows);
                     }
