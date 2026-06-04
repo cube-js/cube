@@ -42,7 +42,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
 use crate::telemetry::tracing::{TraceIdAndSpanId, TracingHelper};
-use crate::trace::{OpKind, SubprocessTrace, WorkerTrace};
+use crate::trace::{MainTrace, OpKind, SubprocessTrace, WorkerTrace};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -116,14 +116,22 @@ pub trait Cluster: DIService + Send + Sync {
         execute: bool,
     ) -> Result<String, CubeError>;
 
-    /// Runs the worker query part for real on a single worker node and returns its
-    /// detailed execution trace. Used by `EXPLAIN ANALYZE DETAILED`.
-    async fn run_analyze_detailed(
+    /// Detailed-trace path: ask a main worker to run the full router plan for real
+    /// and return the assembled `MainTrace` (its ops + collected per-worker traces).
+    async fn run_router_select_detailed(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<MainTrace, CubeError>;
+
+    /// Detailed-trace mirror of [run_select]: runs the worker part for real and
+    /// returns both the result rows (for the main to merge) and the worker's trace.
+    async fn run_select_detailed(
         &self,
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-    ) -> Result<WorkerTrace, CubeError>;
+    ) -> Result<(Vec<RecordBatch>, WorkerTrace), CubeError>;
 
     /// Like [run_select], but streams results as they are requested.
     /// This allows to send only a limited number of results, if the caller does not need all.
@@ -587,21 +595,46 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn run_analyze_detailed(
+    async fn run_router_select_detailed(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<MainTrace, CubeError> {
+        let response = self
+            .send_or_process_locally(node_name, NetworkMessage::RouterSelectDetailed(plan))
+            .await?;
+        match response {
+            NetworkMessage::RouterSelectDetailedResult(r) => r,
+            _ => panic!("unexpected result for router select detailed"),
+        }
+    }
+
+    async fn run_select_detailed(
         &self,
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-    ) -> Result<WorkerTrace, CubeError> {
+    ) -> Result<(Vec<RecordBatch>, WorkerTrace), CubeError> {
         let response = self
             .send_or_process_locally(
                 node_name,
-                NetworkMessage::AnalyzeDetailed(plan, worker_planning_params),
+                NetworkMessage::SelectDetailed(plan, worker_planning_params),
             )
             .await?;
         match response {
-            NetworkMessage::AnalyzeDetailedResult(r) => r,
-            _ => panic!("unexpected result for analyze detailed"),
+            NetworkMessage::SelectDetailedResult(r) => r.and_then(|(_, batches, trace)| {
+                // NOTE: this main-side deserialization is not traced. It runs inside
+                // ClusterSendExec on a DataFusion-spawned task where the task-local trace
+                // ctx is not visible (the worker trace itself rides the collector in the
+                // task context for that reason). Measuring it needs an explicit channel,
+                // not an OpGuard — deferred.
+                let records = batches
+                    .into_iter()
+                    .map(|b| b.read())
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok((records, trace))
+            }),
+            _ => panic!("unexpected result for select detailed"),
         }
     }
 
@@ -798,11 +831,15 @@ impl Cluster for ClusterImpl {
                     .await;
                 NetworkMessage::ExplainAnalyzeResult(res)
             }
-            NetworkMessage::AnalyzeDetailed(plan, planning_params) => {
+            NetworkMessage::RouterSelectDetailed(plan) => {
+                let res = self.run_local_router_select_detailed_main(plan).await;
+                NetworkMessage::RouterSelectDetailedResult(res)
+            }
+            NetworkMessage::SelectDetailed(plan, planning_params) => {
                 let res = self
-                    .run_local_analyze_detailed_worker(plan, planning_params)
+                    .run_local_select_detailed_worker(plan, planning_params)
                     .await;
-                NetworkMessage::AnalyzeDetailedResult(res)
+                NetworkMessage::SelectDetailedResult(res)
             }
             NetworkMessage::WarmupDownload(remote_path, expected_file_size) => {
                 let res = self
@@ -814,7 +851,8 @@ impl Cluster for ClusterImpl {
             NetworkMessage::SelectResult(_)
             | NetworkMessage::WarmupDownloadResult(_)
             | NetworkMessage::ExplainAnalyzeResult(_)
-            | NetworkMessage::AnalyzeDetailedResult(_) => {
+            | NetworkMessage::RouterSelectDetailedResult(_)
+            | NetworkMessage::SelectDetailedResult(_) => {
                 panic!("result sent to worker");
             }
             NetworkMessage::AddMemoryChunk { chunk_name, data } => {
@@ -1476,23 +1514,46 @@ impl ClusterImpl {
         res.unwrap()
     }
 
-    async fn run_local_analyze_detailed_worker(
+    async fn run_local_select_detailed_worker(
         &self,
         plan_node: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-    ) -> Result<WorkerTrace, CubeError> {
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, WorkerTrace), CubeError> {
         let ctx = crate::trace::TraceCtx::new();
         let node_name = self.server_name.clone();
-        let subprocess = crate::trace::scoped(Some(ctx.clone()), async {
+        let (schema, records, subprocess) = crate::trace::scoped(Some(ctx.clone()), async {
             self.run_local_select_worker_impl(plan_node, worker_planning_params, true)
                 .await
-                .map(|(_, _, _, subtrace)| subtrace)
+                .map(|(schema, records, _size, subtrace)| (schema, records, subtrace))
         })
         .await?;
-        Ok(WorkerTrace {
+        let worker_trace = WorkerTrace {
             node_name,
             ops: ctx.take_ops(),
             subprocess,
+        };
+        Ok((schema, records, worker_trace))
+    }
+
+    async fn run_local_router_select_detailed_main(
+        &self,
+        plan_node: SerializedPlan,
+    ) -> Result<MainTrace, CubeError> {
+        let ctx = crate::trace::TraceCtx::new();
+        let collector = crate::trace::WorkerTraceCollector::new();
+        let node_name = self.server_name.clone();
+        let cluster = self.this.upgrade().unwrap();
+        let memory_peak = crate::trace::scoped(Some(ctx.clone()), async {
+            self.query_executor
+                .execute_router_plan_detailed(plan_node, cluster, collector.clone())
+                .await
+        })
+        .await?;
+        Ok(MainTrace {
+            node_name,
+            ops: ctx.take_ops(),
+            exec_memory_peak_bytes: memory_peak,
+            workers: collector.take(),
         })
     }
 

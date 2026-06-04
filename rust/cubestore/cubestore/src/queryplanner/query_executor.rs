@@ -107,6 +107,16 @@ pub trait QueryExecutor: DIService + Send + Sync {
         cluster: Arc<dyn Cluster>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
+    /// Like [execute_router_plan], but runs under detailed tracing: the worker-trace
+    /// collector rides in the session config so ClusterSendExec records per-worker
+    /// traces. Result rows are discarded; returns the execution memory peak if known.
+    async fn execute_router_plan_detailed(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+        worker_traces: Arc<crate::trace::WorkerTraceCollector>,
+    ) -> Result<Option<u64>, CubeError>;
+
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
@@ -162,6 +172,36 @@ impl QueryExecutorImpl {
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
+    async fn execute_router_plan_detailed(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+        worker_traces: Arc<crate::trace::WorkerTraceCollector>,
+    ) -> Result<Option<u64>, CubeError> {
+        let (physical_plan, _logical_plan) = {
+            let _g = crate::trace::OpGuard::start(
+                crate::trace::OpKind::Planning,
+                "main.router_physical_plan",
+            );
+            self.router_plan(plan, cluster).await?
+        };
+        // The collector rides in the session config so ClusterSendExec can record
+        // per-worker traces through DataFusion's own task context propagation.
+        let config = self
+            .metadata_cache_factory
+            .make_session_config()
+            .with_extension(worker_traces);
+        let session_context = Arc::new(QueryPlannerImpl::make_execution_context(config));
+        {
+            let _g = crate::trace::OpGuard::start(crate::trace::OpKind::Execution, "main.execute");
+            let _results = collect(physical_plan, session_context.task_ctx()).await?;
+        }
+        // TODO(next step): per-query MemoryPool peak (finalization memory) and
+        // per-node DataFusion metrics of the final stages. Until then the main only
+        // reports the `main.execute` wall-time bucket.
+        Ok(None)
+    }
+
     #[instrument(level = "trace", skip(self, plan, cluster))]
     async fn execute_router_plan(
         &self,
@@ -1808,6 +1848,38 @@ impl ExecutionPlan for ClusterSendExec {
         let schema = self.properties.eq_properties.schema().clone();
         let node_name = node_name.to_string();
         let worker_planning_params = self.worker_planning_params();
+
+        // Detailed-trace path: when a worker-trace collector rides in the task context,
+        // pull rows + the worker's trace and record the trace. Rows still flow into the
+        // merge so the final stages execute (and can be measured) for real.
+        //
+        // FIDELITY CAVEAT: this path always materializes (non-streaming), even where prod
+        // would stream this ClusterSend. So main-side wall-time and RSS reflect the
+        // non-streaming variant; the per-query MemoryPool peak (operator reservations) is
+        // less affected, but a streaming prod path will diverge here. Streaming + trace
+        // return is a deferred follow-up.
+        if let Some(collector) = context
+            .session_config()
+            .get_extension::<crate::trace::WorkerTraceCollector>()
+        {
+            let record_batches = async move {
+                let (rows, trace) = cluster
+                    .run_select_detailed(
+                        &node_name,
+                        plan.to_serialized_plan()?,
+                        worker_planning_params,
+                    )
+                    .await?;
+                collector.push(trace);
+                Ok::<_, CubeError>(rows)
+            };
+            let stream = futures::stream::once(record_batches).flat_map(|r| match r {
+                Ok(vec) => stream::iter(vec.into_iter().map(|b| Ok(b)).collect::<Vec<_>>()),
+                Err(e) => stream::iter(vec![Err(DataFusionError::Execution(e.to_string()))]),
+            });
+            return Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)));
+        }
+
         if self.use_streaming {
             // A future that yields a stream
             let fut = async move {

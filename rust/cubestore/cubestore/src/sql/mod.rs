@@ -663,7 +663,7 @@ impl SqlServiceImpl {
 
     async fn explain_detailed(&self, statement: Statement) -> Result<Arc<DataFrame>, CubeError> {
         let ctx = crate::trace::TraceCtx::new();
-        let workers = crate::trace::scoped(Some(ctx.clone()), async move {
+        let main = crate::trace::scoped(Some(ctx.clone()), async move {
             let query_plan = self
                 .query_planner
                 .logical_plan(
@@ -672,48 +672,33 @@ impl SqlServiceImpl {
                     None,
                 )
                 .await?;
-            let serialized =
+            let (serialized, workers) =
                 match query_plan {
-                    QueryPlan::Select(serialized, _) => serialized,
+                    QueryPlan::Select(serialized, workers) => (serialized, workers),
                     QueryPlan::Meta(_) => return Err(CubeError::user(
                         "EXPLAIN ANALYZE DETAILED is not supported for selects from system tables"
                             .to_string(),
                     )),
                 };
-
-            let cluster = self.cluster.clone();
-            let executor = self.query_executor.clone();
             let serialized_plan = {
                 let _g = crate::trace::OpGuard::start(OpKind::Serialize, "plan.serialize");
                 serialized.to_serialized_plan()?
             };
-            let router_plan = {
-                let _g = crate::trace::OpGuard::start(OpKind::Planning, "router_physical_plan");
-                executor.router_plan(serialized_plan, cluster).await?.0
+            // Run the full router plan on a real main (a random worker, like prod), so
+            // the final stages execute where they actually happen. Their per-node
+            // metrics and memory peak are captured in a follow-up; for now the main
+            // reports total execution wall-time plus the per-worker sub-traces.
+            let main_node = if workers.is_empty() {
+                self.cluster.server_name().to_string()
+            } else {
+                workers[thread_rng().sample(Uniform::new(0, workers.len()))].clone()
             };
-            let mut worker_traces = Vec::new();
-            if let Some(cluster_send) = find_topmost_cluster_send_exec(&router_plan) {
-                let worker_plans = cluster_send.worker_plans()?;
-                let worker_planning_params = cluster_send.worker_planning_params();
-                let _g = crate::trace::OpGuard::start(OpKind::Transport, "fanout.analyze_detailed");
-                let futures = worker_plans
-                    .into_iter()
-                    .map(|(name, plan)| async move {
-                        self.cluster
-                            .run_analyze_detailed(
-                                &name,
-                                plan.to_serialized_plan()?,
-                                worker_planning_params,
-                            )
-                            .await
-                    })
-                    .collect::<Vec<_>>();
-                worker_traces = join_all(futures)
-                    .await
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()?;
-            }
-            Ok::<_, CubeError>(worker_traces)
+            let _g = crate::trace::OpGuard::start(OpKind::Transport, "route_select_detailed");
+            let main_trace = self
+                .cluster
+                .run_router_select_detailed(&main_node, serialized_plan)
+                .await?;
+            Ok::<_, CubeError>(main_trace)
         })
         .await?;
 
@@ -721,7 +706,7 @@ impl SqlServiceImpl {
             router: RouterTrace {
                 ops: ctx.take_ops(),
             },
-            workers,
+            main: Some(main),
         };
         Ok(Arc::new(Self::render_query_trace(&trace)))
     }
@@ -752,22 +737,32 @@ impl SqlServiceImpl {
             Column::new("bytes".to_string(), ColumnType::Int, 5),
             Column::new("count".to_string(), ColumnType::Int, 6),
         ];
+        fn push_memory(level: &str, node: &str, bytes: u64, rows: &mut Vec<Row>) {
+            rows.push(Row::new(vec![
+                TableValue::String(level.to_string()),
+                TableValue::String(node.to_string()),
+                TableValue::String("Memory".to_string()),
+                TableValue::String("exec_peak".to_string()),
+                TableValue::Null,
+                TableValue::Int(bytes as i64),
+                TableValue::Int(1),
+            ]));
+        }
+
         let mut rows = Vec::new();
         push_ops("router", "", &trace.router.ops, &mut rows);
-        for w in &trace.workers {
-            push_ops("worker", &w.node_name, &w.ops, &mut rows);
-            if let Some(sub) = &w.subprocess {
-                push_ops("subprocess", &w.node_name, &sub.ops, &mut rows);
-                if let Some(mem) = sub.exec_memory_peak_bytes {
-                    rows.push(Row::new(vec![
-                        TableValue::String("subprocess".to_string()),
-                        TableValue::String(w.node_name.clone()),
-                        TableValue::String("Memory".to_string()),
-                        TableValue::String("exec_peak".to_string()),
-                        TableValue::Null,
-                        TableValue::Int(mem as i64),
-                        TableValue::Int(1),
-                    ]));
+        if let Some(main) = &trace.main {
+            push_ops("main", &main.node_name, &main.ops, &mut rows);
+            if let Some(mem) = main.exec_memory_peak_bytes {
+                push_memory("main", &main.node_name, mem, &mut rows);
+            }
+            for w in &main.workers {
+                push_ops("worker", &w.node_name, &w.ops, &mut rows);
+                if let Some(sub) = &w.subprocess {
+                    push_ops("subprocess", &w.node_name, &sub.ops, &mut rows);
+                    if let Some(mem) = sub.exec_memory_peak_bytes {
+                        push_memory("subprocess", &w.node_name, mem, &mut rows);
+                    }
                 }
             }
         }

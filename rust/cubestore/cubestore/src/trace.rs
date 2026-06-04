@@ -19,6 +19,7 @@ pub enum OpKind {
     Deserialize,
     Metastore,
     Planning,
+    Execution,
     WarmupIo,
     ChunkLoad,
     Other,
@@ -52,17 +53,32 @@ pub struct WorkerTrace {
     pub subprocess: Option<SubprocessTrace>,
 }
 
-/// Trace of the entry node that received the query.
+/// Trace of the entry node that received the query (parse + planning).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RouterTrace {
     pub ops: Vec<OpSample>,
 }
 
-/// Whole-query trace assembled on the entry node from the per-worker traces.
+/// Trace assembled on the execution main (the worker that runs the router plan):
+/// its own ops + the per-worker traces it collected through ClusterSend. Shipped
+/// back to the entry node.
+///
+/// TODO(next step): `exec_memory_peak_bytes` is wired but not yet filled (needs a
+/// tracking MemoryPool), and `ops` does not yet include per-node DataFusion metrics
+/// of the final stages — currently only the `main.execute` wall-time bucket.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MainTrace {
+    pub node_name: String,
+    pub ops: Vec<OpSample>,
+    pub exec_memory_peak_bytes: Option<u64>,
+    pub workers: Vec<WorkerTrace>,
+}
+
+/// Whole-query trace assembled on the entry node.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct QueryTrace {
     pub router: RouterTrace,
-    pub workers: Vec<WorkerTrace>,
+    pub main: Option<MainTrace>,
 }
 
 /// Per-query sink for one process-region. Interior-mutable so recording helpers
@@ -97,6 +113,28 @@ impl TraceCtx {
 
     pub fn take_ops(&self) -> Vec<OpSample> {
         std::mem::take(&mut self.ops.lock().unwrap())
+    }
+}
+
+/// Collects per-worker traces on the execution main. Passed to `ClusterSendExec`
+/// through the `TaskContext` session config so it survives DataFusion's internal
+/// task spawning (a task-local would not).
+#[derive(Default)]
+pub struct WorkerTraceCollector {
+    traces: Mutex<Vec<WorkerTrace>>,
+}
+
+impl WorkerTraceCollector {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn push(&self, trace: WorkerTrace) {
+        self.traces.lock().unwrap().push(trace);
+    }
+
+    pub fn take(&self) -> Vec<WorkerTrace> {
+        std::mem::take(&mut self.traces.lock().unwrap())
     }
 }
 
