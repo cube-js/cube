@@ -108,6 +108,12 @@ pub fn current_trace() -> Option<Arc<TraceCtx>> {
     TRACE.try_with(|t| t.clone()).ok().flatten()
 }
 
+/// Guard factory for the `#[cuberpc::service(trace_guard = ...)]`-generated
+/// `TracedMetaStore` decorator: one sample per metastore method call.
+pub fn metastore_trace_guard(method: &'static str) -> OpGuard {
+    OpGuard::start(OpKind::Metastore, method)
+}
+
 /// Run `fut` with `ctx` as the active sink for the current process-region.
 pub async fn scoped<F>(ctx: Option<Arc<TraceCtx>>, fut: F) -> F::Output
 where

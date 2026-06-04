@@ -19,6 +19,7 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
     BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
+    TracedMetaStore,
 };
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
@@ -2170,7 +2171,7 @@ impl Config {
             self.injector
                 .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
                     let transport = ClusterMetaStoreClient::new(i.get_service_typed().await);
-                    Arc::new(MetaStoreRpcClient::new(transport))
+                    TracedMetaStore::new(Arc::new(MetaStoreRpcClient::new(transport)))
                 })
                 .await;
         } else {
@@ -2188,29 +2189,35 @@ impl Config {
                 })
                 .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
+            // Register the concrete RocksMetaStore (some code fetches it by type),
+            // then expose `dyn MetaStore` wrapped in TracedMetaStore so local calls
+            // are traced too.
             self.injector
-                .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
-                    async move |i| {
-                        let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        let metastore_fs = i.get_service("metastore_fs").await;
-                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksMetaStore::load_from_dump(
-                                &Path::new(&path),
-                                dump_dir,
-                                metastore_fs,
-                                config,
-                            )
+                .register_typed::<RocksMetaStore, RocksMetaStore, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
+                    let metastore_fs = i.get_service("metastore_fs").await;
+                    let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                        RocksMetaStore::load_from_dump(
+                            &Path::new(&path),
+                            dump_dir,
+                            metastore_fs,
+                            config,
+                        )
+                        .await
+                        .unwrap()
+                    } else {
+                        RocksMetaStore::load_from_remote(&path, metastore_fs, config)
                             .await
                             .unwrap()
-                        } else {
-                            RocksMetaStore::load_from_remote(&path, metastore_fs, config)
-                                .await
-                                .unwrap()
-                        };
-                        meta_store.add_listener(metastore_event_sender).await;
-                        meta_store
-                    },
-                )
+                    };
+                    meta_store.add_listener(metastore_event_sender).await;
+                    meta_store
+                })
+                .await;
+            self.injector
+                .register_typed::<dyn MetaStore, TracedMetaStore, _, _>(async move |i| {
+                    TracedMetaStore::new(i.get_service_typed::<RocksMetaStore>().await)
+                })
                 .await;
         };
 
