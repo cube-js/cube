@@ -41,6 +41,9 @@ pub struct OpSample {
 /// Trace assembled inside the select subprocess and shipped back over IPC.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SubprocessTrace {
+    /// Wall time the subprocess spent handling the request, for deriving the IPC
+    /// transport overhead = parent's round-trip − this total.
+    pub total_us: u64,
     pub ops: Vec<OpSample>,
     pub exec_memory_peak_bytes: Option<u64>,
     pub physical_plan: Option<String>,
@@ -50,6 +53,11 @@ pub struct SubprocessTrace {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WorkerTrace {
     pub node_name: String,
+    /// Wall time the worker node spent on its part (set on the worker).
+    pub total_us: u64,
+    /// main→worker round-trip measured by ClusterSendExec on the main (set there,
+    /// not on the worker); transport = net_roundtrip_us − total_us.
+    pub net_roundtrip_us: Option<u64>,
     pub ops: Vec<OpSample>,
     pub subprocess: Option<SubprocessTrace>,
 }
@@ -71,6 +79,8 @@ pub struct RouterTrace {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MainTrace {
     pub node_name: String,
+    /// Wall time spent on the main; entry→main transport = round-trip − total_us.
+    pub total_us: u64,
     pub ops: Vec<OpSample>,
     pub exec_memory_peak_bytes: Option<u64>,
     pub physical_plan: Option<String>,

@@ -1963,13 +1963,15 @@ impl ExecutionPlan for ClusterSendExec {
             .get_extension::<crate::trace::WorkerTraceCollector>()
         {
             let record_batches = async move {
-                let (rows, trace) = cluster
+                let started = std::time::Instant::now();
+                let (rows, mut trace) = cluster
                     .run_select_detailed(
                         &node_name,
                         plan.to_serialized_plan()?,
                         worker_planning_params,
                     )
                     .await?;
+                trace.net_roundtrip_us = Some(started.elapsed().as_micros() as u64);
                 collector.push(trace);
                 Ok::<_, CubeError>(rows)
             };

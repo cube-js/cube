@@ -440,9 +440,12 @@ impl WorkerProcessing for WorkerProcessor {
                 };
 
                 let ctx = detailed.then(crate::trace::TraceCtx::new);
+                let started = std::time::Instant::now();
                 let (schema, records, data_loaded_size) =
                     crate::trace::scoped(ctx.clone(), run).await?;
+                let total_us = started.elapsed().as_micros() as u64;
                 let subtrace = ctx.map(|c| SubprocessTrace {
+                    total_us,
                     physical_plan: c.take_plan_text(),
                     ops: c.take_ops(),
                     exec_memory_peak_bytes: memory_pool.as_ref().map(|p| p.peak() as u64),
@@ -1543,6 +1546,7 @@ impl ClusterImpl {
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, WorkerTrace), CubeError> {
         let ctx = crate::trace::TraceCtx::new();
         let node_name = self.server_name.clone();
+        let started = std::time::Instant::now();
         let (schema, records, subprocess) = crate::trace::scoped(Some(ctx.clone()), async {
             self.run_local_select_worker_impl(plan_node, worker_planning_params, true)
                 .await
@@ -1551,6 +1555,8 @@ impl ClusterImpl {
         .await?;
         let worker_trace = WorkerTrace {
             node_name,
+            total_us: started.elapsed().as_micros() as u64,
+            net_roundtrip_us: None,
             ops: ctx.take_ops(),
             subprocess,
         };
@@ -1565,6 +1571,7 @@ impl ClusterImpl {
         let collector = crate::trace::WorkerTraceCollector::new();
         let node_name = self.server_name.clone();
         let cluster = self.this.upgrade().unwrap();
+        let started = std::time::Instant::now();
         let memory_peak = crate::trace::scoped(Some(ctx.clone()), async {
             self.query_executor
                 .execute_router_plan_detailed(plan_node, cluster, collector.clone())
@@ -1573,6 +1580,7 @@ impl ClusterImpl {
         .await?;
         Ok(MainTrace {
             node_name,
+            total_us: started.elapsed().as_micros() as u64,
             physical_plan: ctx.take_plan_text(),
             ops: ctx.take_ops(),
             exec_memory_peak_bytes: memory_peak,
