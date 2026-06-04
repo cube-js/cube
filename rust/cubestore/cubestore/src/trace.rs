@@ -18,6 +18,7 @@ pub enum OpKind {
     Serialize,
     Deserialize,
     Metastore,
+    Planning,
     WarmupIo,
     ChunkLoad,
     Other,

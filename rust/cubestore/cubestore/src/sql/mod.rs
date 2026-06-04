@@ -664,16 +664,14 @@ impl SqlServiceImpl {
     async fn explain_detailed(&self, statement: Statement) -> Result<Arc<DataFrame>, CubeError> {
         let ctx = crate::trace::TraceCtx::new();
         let workers = crate::trace::scoped(Some(ctx.clone()), async move {
-            let query_plan = {
-                let _g = crate::trace::OpGuard::start(OpKind::Other, "logical_plan");
-                self.query_planner
-                    .logical_plan(
-                        DFStatement::Statement(Box::new(statement)),
-                        &InlineTables::new(),
-                        None,
-                    )
-                    .await?
-            };
+            let query_plan = self
+                .query_planner
+                .logical_plan(
+                    DFStatement::Statement(Box::new(statement)),
+                    &InlineTables::new(),
+                    None,
+                )
+                .await?;
             let serialized =
                 match query_plan {
                     QueryPlan::Select(serialized, _) => serialized,
@@ -685,12 +683,13 @@ impl SqlServiceImpl {
 
             let cluster = self.cluster.clone();
             let executor = self.query_executor.clone();
+            let serialized_plan = {
+                let _g = crate::trace::OpGuard::start(OpKind::Serialize, "plan.serialize");
+                serialized.to_serialized_plan()?
+            };
             let router_plan = {
-                let _g = crate::trace::OpGuard::start(OpKind::Other, "router.plan");
-                executor
-                    .router_plan(serialized.to_serialized_plan()?, cluster)
-                    .await?
-                    .0
+                let _g = crate::trace::OpGuard::start(OpKind::Planning, "router_physical_plan");
+                executor.router_plan(serialized_plan, cluster).await?.0
             };
             let mut worker_traces = Vec::new();
             if let Some(cluster_send) = find_topmost_cluster_send_exec(&router_plan) {
