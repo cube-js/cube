@@ -1905,6 +1905,7 @@ impl MetaStoreRpcClientTransport for ClusterMetaStoreClient {
         &self,
         method_call: MetaStoreRpcMethodCall,
     ) -> Result<MetaStoreRpcMethodResult, CubeError> {
+        let _g = crate::trace::OpGuard::start(OpKind::Metastore, method_call.variant_name());
         let m = NetworkMessage::MetaStoreCall(method_call);
         let message = self.meta_store_transport.meta_store_call(m).await?;
         Ok(match message {

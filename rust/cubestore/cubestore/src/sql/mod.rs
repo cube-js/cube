@@ -662,26 +662,27 @@ impl SqlServiceImpl {
     }
 
     async fn explain_detailed(&self, statement: Statement) -> Result<Arc<DataFrame>, CubeError> {
-        let query_plan = self
-            .query_planner
-            .logical_plan(
-                DFStatement::Statement(Box::new(statement)),
-                &InlineTables::new(),
-                None,
-            )
-            .await?;
-        let serialized = match query_plan {
-            QueryPlan::Select(serialized, _) => serialized,
-            QueryPlan::Meta(_) => {
-                return Err(CubeError::user(
-                    "EXPLAIN ANALYZE DETAILED is not supported for selects from system tables"
-                        .to_string(),
-                ))
-            }
-        };
-
         let ctx = crate::trace::TraceCtx::new();
         let workers = crate::trace::scoped(Some(ctx.clone()), async move {
+            let query_plan = {
+                let _g = crate::trace::OpGuard::start(OpKind::Other, "logical_plan");
+                self.query_planner
+                    .logical_plan(
+                        DFStatement::Statement(Box::new(statement)),
+                        &InlineTables::new(),
+                        None,
+                    )
+                    .await?
+            };
+            let serialized =
+                match query_plan {
+                    QueryPlan::Select(serialized, _) => serialized,
+                    QueryPlan::Meta(_) => return Err(CubeError::user(
+                        "EXPLAIN ANALYZE DETAILED is not supported for selects from system tables"
+                            .to_string(),
+                    )),
+                };
+
             let cluster = self.cluster.clone();
             let executor = self.query_executor.clone();
             let router_plan = {

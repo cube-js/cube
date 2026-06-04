@@ -106,6 +106,33 @@ impl RpcService {
         }
     }
 
+    fn method_call_variant_name_impl(&self) -> proc_macro2::TokenStream {
+        let method_call = self.method_call_ident();
+        let arms = self
+            .methods
+            .iter()
+            .map(|m| {
+                let variant = m.variant_ident();
+                let has_args = m.args.iter().any(|a| matches!(a, FnArg::Typed(_)));
+                if has_args {
+                    quote! { #method_call::#variant(..) => stringify!(#variant) }
+                } else {
+                    quote! { #method_call::#variant => stringify!(#variant) }
+                }
+            })
+            .collect::<Vec<_>>();
+        quote! {
+            impl #method_call {
+                /// The trait method name behind this call, for tracing/metrics labels.
+                pub fn variant_name(&self) -> &'static str {
+                    match self {
+                        #( #arms ),*
+                    }
+                }
+            }
+        }
+    }
+
     fn client_transport_trait(&self) -> proc_macro2::TokenStream {
         let method_call = self.method_call_ident();
         let method_result = self.method_result_ident();
@@ -357,6 +384,7 @@ impl ToTokens for RpcService {
         tokens.extend(vec![
             self.original_trait(),
             self.method_call_enum(),
+            self.method_call_variant_name_impl(),
             self.method_result_enum(),
             self.client_transport_trait(),
             self.client_impl(),
