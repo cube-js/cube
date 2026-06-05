@@ -696,6 +696,12 @@ mod tests {
             ]
         );
 
+        // Numeric values serialize as JSON strings, matching the legacy result set.
+        let amounts_json = serde_json::to_value(result.data[1].as_slice()).unwrap();
+        assert_eq!(amounts_json[0], "1.5");
+        assert_eq!(amounts_json[1], "2");
+        assert_eq!(amounts_json[2], serde_json::Value::Null);
+
         // Timestamps land in the dedicated variant and serialize to the ISO format.
         match &result.data[2].as_slice()[0] {
             DBResponsePrimitive::Timestamp(_) => {}
