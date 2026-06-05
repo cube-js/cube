@@ -880,8 +880,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_test.secret_number']).toBe(-1);
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.secret_number']).toBe('-1');
+        expect(row['masking_test.count']).toBe('12345');
       }
     });
 
@@ -895,7 +895,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_test.count']).not.toBe(12345);
+        expect(row['masking_test.count']).not.toBe('12345');
       }
     });
 
@@ -910,7 +910,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['masking_test.total_quantity']).not.toBeNull();
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.count']).toBe('12345');
         expect(row['masking_test.public_dim']).not.toBeNull();
       }
     });
@@ -924,8 +924,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_test.secret_number']).toBe(-1);
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.secret_number']).toBe('-1');
+        expect(row['masking_test.count']).toBe('12345');
       }
     });
 
@@ -940,7 +940,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['masking_test.public_dim']).not.toBeNull();
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.count']).toBe('12345');
       }
     });
 
@@ -956,7 +956,7 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         expect(row['masking_test.public_dim']).not.toBeNull();
         // count is masked, total_quantity is real
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.count']).toBe('12345');
         expect(row['masking_test.total_quantity']).not.toBeNull();
       }
     });
@@ -969,8 +969,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view_masked.secret_number']).toBe(-1);
-        expect(row['masking_view_masked.count']).toBe(12345);
+        expect(row['masking_view_masked.secret_number']).toBe('-1');
+        expect(row['masking_view_masked.count']).toBe('12345');
       }
     });
 
@@ -984,7 +984,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view_masked.count']).not.toBe(12345);
+        expect(row['masking_view_masked.count']).not.toBe('12345');
       }
     });
 
@@ -999,8 +999,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view.secret_number']).toBe(-1);
-        expect(row['masking_view.count']).toBe(12345);
+        expect(row['masking_view.secret_number']).toBe('-1');
+        expect(row['masking_view.count']).toBe('12345');
       }
     });
 
@@ -1019,7 +1019,7 @@ describe('Cube RBAC Engine', () => {
         expect(row['masking_view_over_hidden_cube.total_quantity']).not.toBeNull();
         expect(row['masking_view_over_hidden_cube.public_dim']).not.toBeNull();
         // count not in view memberLevel → masked
-        expect(row['masking_view_over_hidden_cube.count']).toBe(12345);
+        expect(row['masking_view_over_hidden_cube.count']).toBe('12345');
       }
     });
 
@@ -1033,7 +1033,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view_over_hidden_cube.count']).not.toBe(12345);
+        expect(row['masking_view_over_hidden_cube.count']).not.toBe('12345');
       }
     });
   });
@@ -1222,7 +1222,7 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         // mask.sql is CAST(${userAttributes.tenantId} AS INTEGER)
         // sc_test user has tenantId = '1', so masked_price should be 1
-        expect(row['sc_ua_mask_test.masked_price']).toBe(1);
+        expect(row['sc_ua_mask_test.masked_price']).toBe('1');
       }
     });
 
@@ -1235,7 +1235,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         // mask.sql is ${CUBE}.product_id * -1, so masked_product should be negative
-        expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
+        expect(Number(row['sc_cube_mask_test.masked_product'])).toBeLessThan(0);
       }
     });
 
@@ -1248,7 +1248,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         // sc_test user has tenantId = '1', so masked_status should be actual product_id
-        expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
+        expect(Number(row['yaml_ua_mask_test.masked_status'])).toBeGreaterThan(0);
       }
     });
 
@@ -1261,7 +1261,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         // mask.sql references ${orders.id} from a joined cube — the join must be resolved
-        expect(row['sc_joined_mask_test.masked_order_id']).toBeGreaterThan(0);
+        expect(Number(row['sc_joined_mask_test.masked_order_id'])).toBeGreaterThan(0);
       }
     });
 
@@ -1273,7 +1273,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_full']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_full']).toBe('-1');
       }
     });
 
@@ -1285,7 +1285,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe('-1');
       }
     });
 
@@ -1297,7 +1297,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe('-1');
       }
     });
 
@@ -1309,7 +1309,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe('-1');
       }
     });
   });
@@ -1628,7 +1628,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['sc_ua_mask_test.masked_price']).toBe(1);
+        expect(row['sc_ua_mask_test.masked_price']).toBe('1');
       }
     });
 
@@ -1640,7 +1640,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
+        expect(Number(row['sc_cube_mask_test.masked_product'])).toBeLessThan(0);
       }
     });
 
@@ -1652,7 +1652,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
+        expect(Number(row['yaml_ua_mask_test.masked_status'])).toBeGreaterThan(0);
       }
     });
 
@@ -1664,7 +1664,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['sc_joined_mask_test.masked_order_id']).toBeGreaterThan(0);
+        expect(Number(row['sc_joined_mask_test.masked_order_id'])).toBeGreaterThan(0);
       }
     });
 
@@ -1676,7 +1676,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_full']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_full']).toBe('-1');
       }
     });
 
@@ -1688,7 +1688,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe('-1');
       }
     });
 
@@ -1700,7 +1700,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe('-1');
       }
     });
 
@@ -1712,7 +1712,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe('-1');
       }
     });
   });

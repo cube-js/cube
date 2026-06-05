@@ -1182,16 +1182,20 @@ const TIMESTAMP_ITEMS: &[Item<'static>] = &[
     Item::Fixed(Fixed::Nanosecond3),
 ];
 
-// Hand-written `Serialize` mirroring serde's untagged behavior for the JSON-native
-// variants, plus a string rendering for `Timestamp`.
+// Hand-written `Serialize`. Numeric variants (`Int64`/`UInt64`/`Float64`) are
+// rendered as JSON strings, not numbers: the legacy CubeStore result set carried
+// every value as a string, and downstream consumers (and snapshots) rely on that
+// shape. The Arrow path produces real numeric primitives, so we stringify them
+// here to keep the JSON output identical to the legacy path. `Timestamp` is also
+// string-rendered; `Boolean`/`Null`/`String` map to their JSON-native forms.
 impl Serialize for DBResponsePrimitive {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             DBResponsePrimitive::Null => serializer.serialize_none(),
             DBResponsePrimitive::Boolean(b) => serializer.serialize_bool(*b),
-            DBResponsePrimitive::Int64(n) => serializer.serialize_i64(*n),
-            DBResponsePrimitive::UInt64(n) => serializer.serialize_u64(*n),
-            DBResponsePrimitive::Float64(n) => serializer.serialize_f64(*n),
+            DBResponsePrimitive::Int64(n) => serializer.collect_str(n),
+            DBResponsePrimitive::UInt64(n) => serializer.collect_str(n),
+            DBResponsePrimitive::Float64(n) => serializer.collect_str(n),
             DBResponsePrimitive::String(s) => serializer.serialize_str(s),
             DBResponsePrimitive::Timestamp(dt) => {
                 serializer.collect_str(&dt.format_with_items(TIMESTAMP_ITEMS.iter()))
