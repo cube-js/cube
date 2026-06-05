@@ -698,12 +698,11 @@ impl TestContext {
     }
 
     /// Executes the query against a live CubeStore instance: source data and
-    /// pre-aggregation tables are built in Postgres, then uploaded into
-    /// CubeStore (CREATE TABLE + INSERT, mirroring the driver's rows-based
-    /// path), and the outer query rendered in the CubeStore dialect runs
-    /// there. Requires the context to be created with
-    /// `new_with_external_cubestore` and all matched pre-aggregations to be
-    /// `external: true`.
+    /// pre-aggregation tables are built in Postgres, loaded into CubeStore as
+    /// CSV via `CREATE TABLE ... LOCATION`, and the outer query rendered in
+    /// the CubeStore dialect runs there. Requires the context to be created
+    /// with `new_with_external_cubestore` and all matched pre-aggregations to
+    /// be `external: true`.
     #[cfg(feature = "integration-cubestore")]
     pub async fn try_execute_cubestore(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
         use mysql_async::prelude::Queryable;
@@ -752,14 +751,20 @@ impl TestContext {
             .fold(sql, |s, u| s.replace(&format!("__usage_{}", u.index), ""));
         let mut final_sql = Self::inline_params(&sql, &params);
 
-        // CubeStore requires schema-qualified table names
+        // CubeStore requires schema-qualified table names. The trailing
+        // boundary group ($5) guards against one table name being a prefix
+        // of another (`visitors` vs `visitors_daily`); the regex crate has
+        // no lookahead, so the boundary char is captured and re-emitted.
         for table in &table_names {
-            let re = regex::Regex::new(&format!(r#"(FROM|JOIN)(\s+)("?){}("?)"#, table))
-                .expect("Failed to build table name regex");
+            let re = regex::Regex::new(&format!(
+                r#"(FROM|JOIN)(\s+)("?){}("?)([\s,)]|$)"#,
+                regex::escape(table)
+            ))
+            .expect("Failed to build table name regex");
             final_sql = re
                 .replace_all(
                     &final_sql,
-                    format!("${{1}}${{2}}{}.${{3}}{}${{4}}", cs_schema, table),
+                    format!("${{1}}${{2}}{}.${{3}}{}${{4}}${{5}}", cs_schema, table),
                 )
                 .into_owned();
         }
@@ -849,6 +854,35 @@ impl TestContext {
                         panic!("Failed to read pre-agg table {}: {}", table_name, e)
                     });
 
+                // Write the rows to a local CSV file and load it through
+                // `LOCATION` — the same CSV import pipeline production rollups
+                // go through.
+                let mut csv = columns.iter().map(|(n, _)| Self::csv_field(n)).join(",");
+                csv.push('\n');
+                for msg in &messages {
+                    if let tokio_postgres::SimpleQueryMessage::Row(row) = msg {
+                        let line = (0..columns.len())
+                            .map(|i| {
+                                Self::csv_field(&Self::cubestore_csv_value(
+                                    row.try_get(i).unwrap_or(None),
+                                    columns[i].1,
+                                ))
+                            })
+                            .join(",");
+                        csv.push_str(&line);
+                        csv.push('\n');
+                    }
+                }
+
+                let csv_path = std::env::temp_dir().join(format!(
+                    "cubestore-test-{}-{}-{}.csv",
+                    std::process::id(),
+                    cs_schema,
+                    table_name
+                ));
+                std::fs::write(&csv_path, csv)
+                    .unwrap_or_else(|e| panic!("Failed to write CSV {:?}: {}", csv_path, e));
+
                 let cols_sql = columns
                     .iter()
                     .map(|(n, t)| format!("\"{}\" {}", n, t))
@@ -856,8 +890,12 @@ impl TestContext {
                 let extra_sql =
                     self.cubestore_table_extras_sql(&table.cube_name, &name, pre_agg, &columns);
                 let create_sql = format!(
-                    "CREATE TABLE {}.\"{}\" ({}){}",
-                    cs_schema, table_name, cols_sql, extra_sql
+                    "CREATE TABLE {}.\"{}\" ({}){} LOCATION '{}'",
+                    cs_schema,
+                    table_name,
+                    cols_sql,
+                    extra_sql,
+                    csv_path.to_string_lossy()
                 );
                 conn.query_drop(&create_sql).await.unwrap_or_else(|e| {
                     panic!(
@@ -865,36 +903,9 @@ impl TestContext {
                         create_sql, e
                     )
                 });
-
-                let mut values: Vec<String> = Vec::new();
-                for msg in &messages {
-                    if let tokio_postgres::SimpleQueryMessage::Row(row) = msg {
-                        let row_values = (0..columns.len())
-                            .map(|i| {
-                                Self::cubestore_literal(
-                                    row.try_get(i).unwrap_or(None),
-                                    columns[i].1,
-                                )
-                            })
-                            .join(", ");
-                        values.push(format!("({})", row_values));
-                    }
-                }
-                if !values.is_empty() {
-                    let insert_sql = format!(
-                        "INSERT INTO {}.\"{}\" ({}) VALUES {}",
-                        cs_schema,
-                        table_name,
-                        columns.iter().map(|(n, _)| format!("\"{}\"", n)).join(", "),
-                        values.join(", ")
-                    );
-                    conn.query_drop(&insert_sql).await.unwrap_or_else(|e| {
-                        panic!(
-                            "Failed to insert into CubeStore table {}:\n{}\n\nError: {:?}",
-                            table_name, insert_sql, e
-                        )
-                    });
-                }
+                // CREATE TABLE ... LOCATION imports synchronously; the file is
+                // no longer needed once it returns.
+                let _ = std::fs::remove_file(&csv_path);
 
                 created.push(table_name);
             }
@@ -998,16 +1009,61 @@ impl TestContext {
         }
     }
 
+    /// Serializes a Postgres text value into the canonical form CubeStore's
+    /// CSV import expects, matching the JS postgres-driver type parsers:
+    /// timestamps become `YYYY-MM-DDTHH:mm:ss.SSS`, booleans `true`/`false`,
+    /// NULL an empty field; numerics pass through unchanged.
     #[cfg(feature = "integration-cubestore")]
-    fn cubestore_literal(value: Option<&str>, cubestore_type: &str) -> String {
+    fn cubestore_csv_value(value: Option<&str>, cubestore_type: &str) -> String {
         let Some(value) = value else {
-            return "NULL".to_string();
+            return String::new();
         };
         match cubestore_type {
-            "bigint" | "double" | "decimal" => value.to_string(),
             "boolean" => (if value == "t" { "true" } else { "false" }).to_string(),
-            "timestamp" => format!("'{}'", value.trim_end_matches("+00")),
-            _ => format!("'{}'", value.replace('\'', "''")),
+            "timestamp" => Self::normalize_pg_timestamp(value),
+            _ => value.to_string(),
+        }
+    }
+
+    /// `YYYY-MM-DD[ HH:MM:SS[.f...][+TZ]]` → `YYYY-MM-DDTHH:mm:ss.SSS` (UTC,
+    /// 3-digit millis), mirroring the JS postgres timestamp/date parsers.
+    #[cfg(feature = "integration-cubestore")]
+    fn normalize_pg_timestamp(value: &str) -> String {
+        let value = value.trim();
+        let (date, time) = match value.split_once(' ') {
+            Some((d, t)) => (d, t),
+            None => (value, "00:00:00"),
+        };
+        // Strip the timezone suffix (e.g. `+00`, `-05:30`): the offset sign
+        // sits after the HH:MM:SS portion.
+        let tz_pos = time
+            .char_indices()
+            .skip(8)
+            .find(|(_, c)| *c == '+' || *c == '-')
+            .map(|(i, _)| i);
+        let time = match tz_pos {
+            Some(i) => &time[..i],
+            None => time,
+        };
+        let (hms, frac) = match time.split_once('.') {
+            Some((h, f)) => (h, f),
+            None => (time, ""),
+        };
+        let mut ms = String::with_capacity(3);
+        ms.push_str(frac.get(..frac.len().min(3)).unwrap_or(""));
+        while ms.len() < 3 {
+            ms.push('0');
+        }
+        format!("{}T{}.{}", date, hms, ms)
+    }
+
+    /// RFC 4180 CSV field escaping.
+    #[cfg(feature = "integration-cubestore")]
+    fn csv_field(value: &str) -> String {
+        if value.contains([',', '"', '\n', '\r']) {
+            format!("\"{}\"", value.replace('"', "\"\""))
+        } else {
+            value.to_string()
         }
     }
 

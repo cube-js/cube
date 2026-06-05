@@ -12,15 +12,20 @@ struct CubeStoreInstance {
 }
 
 static CLEANUP_PID: OnceLock<u32> = OnceLock::new();
+static CLEANUP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 extern "C" fn cleanup_cubestored() {
     if let Some(pid) = CLEANUP_PID.get() {
         let _ = Command::new("kill").arg(pid.to_string()).output();
     }
+    if let Some(dir) = CLEANUP_DATA_DIR.get() {
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }
 
-fn register_atexit_cleanup(pid: u32) {
+fn register_atexit_cleanup(pid: u32, data_dir: PathBuf) {
     CLEANUP_PID.set(pid).ok();
+    CLEANUP_DATA_DIR.set(data_dir).ok();
     extern "C" {
         fn atexit(cb: extern "C" fn()) -> std::os::raw::c_int;
     }
@@ -99,7 +104,7 @@ async fn init_cubestore() -> CubeStoreInstance {
         .spawn()
         .unwrap_or_else(|e| panic!("Failed to spawn cubestored from {:?}: {}", bin, e));
 
-    register_atexit_cleanup(child.id());
+    register_atexit_cleanup(child.id(), data_dir.clone());
 
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
