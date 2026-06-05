@@ -1,0 +1,559 @@
+openapi: 3.1.0
+info:
+  title: Cube Cloud SCIM API
+  version: "1.0.0"
+  description: |
+    The SCIM 2.0 API lets identity providers (Okta, Azure AD/Entra ID, OneLogin,
+    and others) provision and de-provision users and groups in Cube Cloud
+    automatically. It implements the System for Cross-domain Identity Management
+    protocol as defined in [RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643)
+    and [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644).
+
+    ## Base URL
+
+    All SCIM endpoints live under the `/scim/v2` namespace on your Cube Cloud
+    tenant's API host:
+
+    ```text
+    https://<tenant>.cubecloud.dev/api/scim/v2
+    ```
+
+    Replace `<tenant>` with your Cube Cloud subdomain, or swap the whole host
+    if your account uses a custom domain.
+
+    ## Authentication
+
+    SCIM requests are authenticated with a bearer token issued from your Cube
+    Cloud account settings. Include it in the `Authorization` header:
+
+    ```text
+    Authorization: Bearer <YOUR_SCIM_TOKEN>
+    ```
+
+    ## Content type
+
+    Requests and responses use `application/json`. The SCIM media type
+    `application/scim+json` is also accepted.
+servers:
+  - url: https://{tenant}.cubecloud.dev/api
+    description: Cube Cloud API base URL. Replace the whole host if you use a custom domain.
+    variables:
+      tenant:
+        default: your-tenant
+        description: Your Cube Cloud tenant subdomain
+security:
+  - bearerAuth: []
+tags:
+  - name: Users
+    description: Provision, read, update, and de-provision users.
+  - name: Groups
+    description: Provision, read, update, and de-provision groups and their memberships.
+paths:
+  /scim/v2/Users:
+    get:
+      operationId: listUsers
+      summary: List users
+      description: |
+        Returns a paginated [ListResponse](https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2)
+        of users. Use the `filter` parameter to look a user up by `userName`,
+        for example `userName eq "jane@example.com"`.
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/StartIndex'
+        - $ref: '#/components/parameters/Count'
+      responses:
+        '200':
+          description: A list of users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+              example:
+                schemas:
+                  - urn:ietf:params:scim:api:messages:2.0:ListResponse
+                totalResults: 1
+                startIndex: 1
+                itemsPerPage: 20
+                Resources:
+                  - schemas:
+                      - urn:ietf:params:scim:schemas:core:2.0:User
+                    id: "2819c223-7f76-453a-919d-413861904646"
+                    userName: jane@example.com
+                    name:
+                      givenName: Jane
+                      familyName: Doe
+                    emails:
+                      - value: jane@example.com
+                        primary: true
+                    active: true
+    post:
+      operationId: createUser
+      summary: Create user
+      description: Provisions a new user.
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+            example:
+              schemas:
+                - urn:ietf:params:scim:schemas:core:2.0:User
+              userName: jane@example.com
+              name:
+                givenName: Jane
+                familyName: Doe
+              emails:
+                - value: jane@example.com
+                  primary: true
+              active: true
+      responses:
+        '201':
+          description: The created user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /scim/v2/Users/{id}:
+    get:
+      operationId: getUser
+      summary: Get user
+      description: Returns a single user by their SCIM `id`.
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: The requested user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: replaceUser
+      summary: Replace user
+      description: Replaces all attributes of an existing user with the supplied representation.
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: The updated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: patchUser
+      summary: Patch user
+      description: |
+        Applies a partial update to a user using a SCIM
+        [PatchOp](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2).
+        Commonly used to deactivate a user by setting `active` to `false`.
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchOp'
+            example:
+              schemas:
+                - urn:ietf:params:scim:api:messages:2.0:PatchOp
+              Operations:
+                - op: replace
+                  path: active
+                  value: false
+      responses:
+        '200':
+          description: The updated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteUser
+      summary: Delete user
+      description: De-provisions (deletes) a user by their SCIM `id`.
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: The user was deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /scim/v2/Groups:
+    get:
+      operationId: listGroups
+      summary: List groups
+      description: Returns a paginated ListResponse of groups.
+      tags:
+        - Groups
+      parameters:
+        - $ref: '#/components/parameters/Filter'
+        - $ref: '#/components/parameters/StartIndex'
+        - $ref: '#/components/parameters/Count'
+        - $ref: '#/components/parameters/ExcludedAttributes'
+      responses:
+        '200':
+          description: A list of groups.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+    post:
+      operationId: createGroup
+      summary: Create group
+      description: Provisions a new group.
+      tags:
+        - Groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Group'
+            example:
+              schemas:
+                - urn:ietf:params:scim:schemas:core:2.0:Group
+              displayName: Analysts
+      responses:
+        '201':
+          description: The created group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+  /scim/v2/Groups/{id}:
+    get:
+      operationId: getGroup
+      summary: Get group
+      description: Returns a single group by its SCIM `id`.
+      tags:
+        - Groups
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - $ref: '#/components/parameters/ExcludedAttributes'
+      responses:
+        '200':
+          description: The requested group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: replaceGroup
+      summary: Replace group
+      description: Replaces all attributes of an existing group, including its full membership list.
+      tags:
+        - Groups
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Group'
+      responses:
+        '200':
+          description: The updated group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: patchGroup
+      summary: Patch group
+      description: |
+        Applies a partial update to a group using a SCIM PatchOp. Commonly used
+        to add or remove members without resending the entire membership list.
+      tags:
+        - Groups
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchOp'
+            example:
+              schemas:
+                - urn:ietf:params:scim:api:messages:2.0:PatchOp
+              Operations:
+                - op: add
+                  path: members
+                  value:
+                    - value: "2819c223-7f76-453a-919d-413861904646"
+      responses:
+        '200':
+          description: The updated group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteGroup
+      summary: Delete group
+      description: Deletes a group by its SCIM `id`. Member users are not deleted.
+      tags:
+        - Groups
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: The group was deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: SCIM bearer token issued from your Cube Cloud account settings.
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: The unique SCIM identifier of the resource.
+      schema:
+        type: string
+    Filter:
+      name: filter
+      in: query
+      required: false
+      description: |
+        SCIM filter expression used to narrow results, for example
+        `userName eq "jane@example.com"`.
+      schema:
+        type: string
+    StartIndex:
+      name: startIndex
+      in: query
+      required: false
+      description: 1-based index of the first result to return. Defaults to `1`.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Count:
+      name: count
+      in: query
+      required: false
+      description: Maximum number of results to return per page.
+      schema:
+        type: integer
+        minimum: 0
+    ExcludedAttributes:
+      name: excludedAttributes
+      in: query
+      required: false
+      description: Comma-separated list of attributes to omit from the response.
+      schema:
+        type: string
+  responses:
+    NotFound:
+      description: The requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            schemas:
+              - urn:ietf:params:scim:api:messages:2.0:Error
+            status: "404"
+            detail: Resource not found.
+  schemas:
+    User:
+      type: object
+      description: A SCIM 2.0 core User resource.
+      required:
+        - userName
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+          example:
+            - urn:ietf:params:scim:schemas:core:2.0:User
+        id:
+          type: string
+          description: Unique identifier assigned by Cube Cloud. Read-only.
+          readOnly: true
+        userName:
+          type: string
+          description: Unique identifier for the user, typically their email address.
+        name:
+          type: object
+          properties:
+            givenName:
+              type: string
+            familyName:
+              type: string
+        emails:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+              primary:
+                type: boolean
+        active:
+          type: boolean
+          description: Whether the user is active. Set to `false` to deactivate.
+        externalId:
+          type: string
+          description: Identifier of the user as defined by the provisioning client.
+        meta:
+          $ref: '#/components/schemas/Meta'
+    Group:
+      type: object
+      description: A SCIM 2.0 core Group resource.
+      required:
+        - displayName
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+          example:
+            - urn:ietf:params:scim:schemas:core:2.0:Group
+        id:
+          type: string
+          readOnly: true
+        displayName:
+          type: string
+          description: Human-readable name of the group.
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+                description: The `id` of a member user.
+              display:
+                type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+    PatchOp:
+      type: object
+      description: A SCIM 2.0 PatchOp request.
+      required:
+        - schemas
+        - Operations
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+          example:
+            - urn:ietf:params:scim:api:messages:2.0:PatchOp
+        Operations:
+          type: array
+          items:
+            type: object
+            required:
+              - op
+            properties:
+              op:
+                type: string
+                enum:
+                  - add
+                  - remove
+                  - replace
+              path:
+                type: string
+              value: {}
+    UserListResponse:
+      allOf:
+        - $ref: '#/components/schemas/ListResponse'
+        - type: object
+          properties:
+            Resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+    GroupListResponse:
+      allOf:
+        - $ref: '#/components/schemas/ListResponse'
+        - type: object
+          properties:
+            Resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/Group'
+    ListResponse:
+      type: object
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+          example:
+            - urn:ietf:params:scim:api:messages:2.0:ListResponse
+        totalResults:
+          type: integer
+        startIndex:
+          type: integer
+        itemsPerPage:
+          type: integer
+    Meta:
+      type: object
+      readOnly: true
+      properties:
+        resourceType:
+          type: string
+        created:
+          type: string
+          format: date-time
+        lastModified:
+          type: string
+          format: date-time
+        location:
+          type: string
+    Error:
+      type: object
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+          example:
+            - urn:ietf:params:scim:api:messages:2.0:Error
+        status:
+          type: string
+        detail:
+          type: string

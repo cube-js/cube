@@ -667,6 +667,100 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "API",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              {
+                "group": "Users",
+                "openapi": "/api-reference/scim.yaml",
+                "pages": [
+                  "GET /scim/v2/Users",
+                  "POST /scim/v2/Users",
+                  "GET /scim/v2/Users/{id}",
+                  "PUT /scim/v2/Users/{id}",
+                  "PATCH /scim/v2/Users/{id}",
+                  "DELETE /scim/v2/Users/{id}"
+                ]
+              },
+              {
+                "group": "Groups",
+                "openapi": "/api-reference/scim.yaml",
+                "pages": [
+                  "GET /scim/v2/Groups",
+                  "POST /scim/v2/Groups",
+                  "GET /scim/v2/Groups/{id}",
+                  "PUT /scim/v2/Groups/{id}",
+                  "PATCH /scim/v2/Groups/{id}",
+                  "DELETE /scim/v2/Groups/{id}"
+                ]
+              },
+              {
+                "group": "Deployments",
+                "openapi": "/api-reference/deployments.yaml",
+                "pages": [
+                  "GET /v1/deployments/",
+                  "GET /v1/deployments/{deploymentId}",
+                  "POST /v1/deployments/{deploymentId}/token"
+                ]
+              },
+              {
+                "group": "Environments",
+                "openapi": "/api-reference/deployments.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/environments",
+                  "GET /v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
+                  "POST /v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
+                  "POST /v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync"
+                ]
+              },
+              {
+                "group": "Folders",
+                "openapi": "/api-reference/deployments.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/folders",
+                  "GET /v1/deployments/{deploymentId}/folders/{folderId}/ancestors"
+                ]
+              },
+              {
+                "group": "Reports",
+                "openapi": "/api-reference/deployments.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/report-folders",
+                  "GET /v1/deployments/{deploymentId}/reports",
+                  "POST /v1/deployments/{deploymentId}/reports",
+                  "GET /v1/deployments/{deploymentId}/reports/{reportId}",
+                  "PUT /v1/deployments/{deploymentId}/reports/{reportId}",
+                  "DELETE /v1/deployments/{deploymentId}/reports/{reportId}",
+                  "PUT /v1/deployments/{deploymentId}/reports/{reportId}/refresh"
+                ]
+              },
+              {
+                "group": "Workbooks",
+                "openapi": "/api-reference/deployments.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/workbooks",
+                  "POST /v1/deployments/{deploymentId}/workbooks",
+                  "GET /v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "DELETE /v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
+                  "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },

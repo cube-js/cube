@@ -1,0 +1,36 @@
+---
+title: Authentication
+description: Authenticate SCIM API requests with a bearer token.
+---
+
+The SCIM API authenticates requests with a bearer token issued from your Cube
+Cloud account. Include it in the `Authorization` header on every request:
+
+```text
+Authorization: Bearer <YOUR_SCIM_TOKEN>
+```
+
+## Get a token
+
+Generate a SCIM token in your Cube Cloud account settings, then configure it in
+your identity provider's SCIM integration alongside the
+[base URL](/api-reference/introduction#base-url).
+
+<Warning>
+
+Treat the SCIM token like a password. It grants full access to provision and
+de-provision users and groups. Store it securely and rotate it if it is
+exposed.
+
+</Warning>
+
+## Example request
+
+```bash
+curl --request GET \
+  --url 'https://<tenant>.cubecloud.dev/api/scim/v2/Users?count=100&startIndex=1' \
+  --header 'Authorization: Bearer <YOUR_SCIM_TOKEN>'
+```
+
+A `401 Unauthorized` response means the token is missing, malformed, or
+expired.
