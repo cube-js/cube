@@ -385,7 +385,10 @@ impl WorkerProcessing for WorkerProcessor {
                         },
                     )?;
                     let res = {
-                        let _g = crate::trace::OpGuard::start(OpKind::Other, "subprocess.execute");
+                        let _g = crate::trace::OpGuard::start_wrapper(
+                            OpKind::Other,
+                            "subprocess.execute",
+                        );
                         services
                             .query_executor
                             .clone()
@@ -1500,7 +1503,8 @@ impl ClusterImpl {
                     },
                 )?;
                 let pool_result = {
-                    let _ipc_guard = crate::trace::OpGuard::start(OpKind::Transport, "ipc.select");
+                    let _ipc_guard =
+                        crate::trace::OpGuard::start_wrapper(OpKind::Transport, "ipc.select");
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
                         worker_planning_params,

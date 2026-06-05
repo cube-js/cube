@@ -36,6 +36,10 @@ pub struct OpSample {
     pub bytes: Option<u64>,
     pub rows: Option<u64>,
     pub count: u32,
+    /// True for spans that contain other measured ops (round-trips, the execute
+    /// span around node metrics, choose_index around metastore calls). Shown in the
+    /// tree but excluded from the category summary so categories don't double-count.
+    pub is_wrapper: bool,
 }
 
 /// Trace assembled inside the select subprocess and shipped back over IPC.
@@ -194,6 +198,7 @@ pub fn record_op(
             bytes,
             rows,
             count,
+            is_wrapper: false,
         });
     }
 }
@@ -224,10 +229,22 @@ pub struct OpGuard {
     // just discards the sample instead of keeping it alive.
     ctx: Weak<TraceCtx>,
     bytes: Option<u64>,
+    is_wrapper: bool,
 }
 
 impl OpGuard {
     pub fn start(kind: OpKind, label: &'static str) -> Self {
+        Self::start_inner(kind, label, false)
+    }
+
+    /// Start a guard for a span that contains other measured ops (round-trip,
+    /// execute-around-node-metrics, choose_index-around-metastore). Marked so the
+    /// category summary skips it and does not double-count its contents.
+    pub fn start_wrapper(kind: OpKind, label: &'static str) -> Self {
+        Self::start_inner(kind, label, true)
+    }
+
+    fn start_inner(kind: OpKind, label: &'static str, is_wrapper: bool) -> Self {
         let ctx = current_trace();
         let began = ctx.is_some().then(Instant::now);
         Self {
@@ -236,6 +253,7 @@ impl OpGuard {
             began,
             ctx: ctx.as_ref().map(Arc::downgrade).unwrap_or_default(),
             bytes: None,
+            is_wrapper,
         }
     }
 
@@ -259,6 +277,7 @@ impl Drop for OpGuard {
                 bytes: self.bytes,
                 rows: None,
                 count: 1,
+                is_wrapper: self.is_wrapper,
             });
         }
     }

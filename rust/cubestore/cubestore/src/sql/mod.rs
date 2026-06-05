@@ -693,7 +693,8 @@ impl SqlServiceImpl {
             } else {
                 workers[thread_rng().sample(Uniform::new(0, workers.len()))].clone()
             };
-            let _g = crate::trace::OpGuard::start(OpKind::Transport, "route_select_detailed");
+            let _g =
+                crate::trace::OpGuard::start_wrapper(OpKind::Transport, "route_select_detailed");
             let main_trace = self
                 .cluster
                 .run_router_select_detailed(&main_node, serialized_plan)
@@ -743,17 +744,12 @@ impl SqlServiceImpl {
             }
         }
 
-        // Round-trip / execution wrappers contain other measured ops, so they are
-        // excluded from the category summary to avoid double counting.
+        // Wrapper spans contain other measured ops (round-trips, the execute span
+        // around node metrics, choose_index around metastore), so they are excluded
+        // from the category summary to keep categories a non-overlapping partition.
         fn add_ops(totals: &mut Vec<(String, u64)>, ops: &[OpSample]) {
-            const WRAPPERS: [&str; 4] = [
-                "route_select_detailed",
-                "ipc.select",
-                "main.execute",
-                "subprocess.execute",
-            ];
             for op in ops {
-                if !WRAPPERS.contains(&op.label.as_str()) {
+                if !op.is_wrapper {
                     bump(totals, &format!("{:?}", op.kind), op.elapsed_us);
                 }
             }
@@ -911,9 +907,7 @@ impl SqlServiceImpl {
 
         // ---- summary by category (overall + per node) ----
         out.push_str("\n────────────────────────────\n");
-        out.push_str(
-            "summary by category  (metastore within planning; transport = wire+queue)\n\n",
-        );
+        out.push_str("summary by category  (transport = wire+queue; wrapper spans excluded)\n\n");
         if let Some(main) = &trace.main {
             let et = find_elapsed(&trace.router.ops, "route_select_detailed")
                 .map(|rt| rt.saturating_sub(main.total_us))

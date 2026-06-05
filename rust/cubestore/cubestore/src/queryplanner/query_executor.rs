@@ -273,7 +273,10 @@ impl QueryExecutor for QueryExecutorImpl {
             runtime_env,
         ));
         {
-            let _g = crate::trace::OpGuard::start(crate::trace::OpKind::Execution, "main.execute");
+            let _g = crate::trace::OpGuard::start_wrapper(
+                crate::trace::OpKind::Execution,
+                "main.execute",
+            );
             let _results = collect(physical_plan.clone(), session_context.task_ctx()).await?;
         }
         // Harvest per-node DataFusion metrics of the final stages (router-level nodes

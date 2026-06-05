@@ -226,7 +226,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             let choose_index_ext_start = SystemTime::now();
             post_is_data_select_query_time = choose_index_ext_start;
-            let choose_guard = OpGuard::start(OpKind::Planning, "plan.choose_index");
+            let choose_guard = OpGuard::start_wrapper(OpKind::Planning, "plan.choose_index");
             let (logical_plan, meta) = choose_index_ext(
                 logical_plan,
                 &self.meta_store.as_ref(),
