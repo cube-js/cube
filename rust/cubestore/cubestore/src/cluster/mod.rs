@@ -107,13 +107,12 @@ pub trait Cluster: DIService + Send + Sync {
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     /// Runs explain analyze on a single worker node to get pretty printed physical plan
-    /// from that worker. `execute` runs the plan to report runtime metrics.
+    /// from that worker.
     async fn run_explain_analyze(
         &self,
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-        execute: bool,
     ) -> Result<String, CubeError>;
 
     /// Detailed-trace path: ask a main worker to run the full router plan for real
@@ -593,12 +592,11 @@ impl Cluster for ClusterImpl {
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-        execute: bool,
     ) -> Result<String, CubeError> {
         let response = self
             .send_or_process_locally(
                 node_name,
-                NetworkMessage::ExplainAnalyze(plan, worker_planning_params, execute),
+                NetworkMessage::ExplainAnalyze(plan, worker_planning_params),
             )
             .await?;
         match response {
@@ -837,9 +835,9 @@ impl Cluster for ClusterImpl {
                 let res = self.run_local_select_worker(plan, planning_params).await;
                 NetworkMessage::SelectResult(res)
             }
-            NetworkMessage::ExplainAnalyze(plan, planning_params, execute) => {
+            NetworkMessage::ExplainAnalyze(plan, planning_params) => {
                 let res = self
-                    .run_local_explain_analyze_worker(plan, planning_params, execute)
+                    .run_local_explain_analyze_worker(plan, planning_params)
                     .await;
                 NetworkMessage::ExplainAnalyzeResult(res)
             }
@@ -1596,31 +1594,22 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-        execute: bool,
     ) -> Result<String, CubeError> {
         let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
-        let chunk_id_to_record_batches = if execute {
-            self.load_in_memory_chunks(&plan_node).await?
-        } else {
-            plan_node
-                .in_memory_chunks_to_load()
-                .into_iter()
-                .map(|(c, _, _)| (c.get_id(), Vec::new()))
-                .collect()
-        };
+        let chunk_id_to_record_batches = plan_node
+            .in_memory_chunks_to_load()
+            .into_iter()
+            .map(|(c, _, _)| (c.get_id(), Vec::new()))
+            .collect();
 
-        let res = self
-            .query_executor
+        self.query_executor
             .pp_worker_plan(
                 plan_node,
                 worker_planning_params,
                 remote_to_local_names,
                 chunk_id_to_record_batches,
-                execute,
             )
-            .await;
-
-        res
+            .await
     }
 
     async fn load_in_memory_chunks(

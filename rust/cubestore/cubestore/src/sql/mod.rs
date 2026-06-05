@@ -546,12 +546,10 @@ impl SqlServiceImpl {
     }
 
     /// `analyze` builds and shows the physical plans on the router and the workers.
-    /// `execute` additionally runs the worker plans to report runtime metrics.
     async fn explain(
         &self,
         statement: Statement,
         analyze: bool,
-        execute: bool,
     ) -> Result<Arc<DataFrame>, CubeError> {
         fn extract_worker_plans(
             p: &Arc<dyn ExecutionPlan>,
@@ -616,7 +614,6 @@ impl SqlServiceImpl {
                                         &name,
                                         plan.to_serialized_plan()?,
                                         worker_planning_params,
-                                        execute,
                                     )
                                     .await
                                     .map(|p| (name, p))
@@ -1697,7 +1694,7 @@ impl SqlService for SqlServiceImpl {
                 ..
             }) => match *statement {
                 Statement::Query(q) => Ok(self
-                    .explain(Statement::Query(q.clone()), analyze, false)
+                    .explain(Statement::Query(q.clone()), analyze)
                     .await?
                     .into()),
                 _ => Err(CubeError::user(format!(
@@ -1705,9 +1702,6 @@ impl SqlService for SqlServiceImpl {
                     query
                 ))),
             },
-            CubeStoreStatement::ExplainAnalyzeExtended(q) => {
-                Ok(self.explain(Statement::Query(q), true, true).await?.into())
-            }
 
             CubeStoreStatement::Dump(q) => Ok(self.dump_select_inputs(query, q).await?.into()),
 
@@ -5490,35 +5484,6 @@ mod tests {
                             assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
                             // EXPLAIN ANALYZE only shows the plan, it doesn't execute it.
                             assert!(!pp_plan.contains("metrics:"), "pp_plan = {}", pp_plan);
-                        },
-                        _ => {assert!(false);}
-                    };
-
-                let result = service.exec_query(
-                    "EXPLAIN ANALYZE EXTENDED SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
-                    ).await?.collect().await?;
-
-                assert_eq!(result.len(), 2);
-                let worker_row = &result.get_rows()[1];
-                match &worker_row
-                    .values()[2] {
-                        TableValue::String(pp_plan) => {
-                            let regex = Regex::new(
-                                r"LinearPartialAggregate[^\n]*\s+Filter[^\n]*\s+Scan, index: default:1:\[1\], fields: \[platform, age, amount\][^\n]*\s+ParquetScan, files: \S*\.chunk\.parquet"
-                            ).unwrap();
-                            let matches = regex.captures_iter(&pp_plan).count();
-                            assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
-                            // The plan is executed, so the nodes carry runtime metrics.
-                            assert!(
-                                pp_plan.contains("metrics:") && pp_plan.contains("output_rows="),
-                                "pp_plan = {}",
-                                pp_plan
-                            );
-                            assert!(
-                                pp_plan.contains("row_groups_pruned_statistics="),
-                                "parquet scans must report pruning metrics, pp_plan = {}",
-                                pp_plan
-                            );
                         },
                         _ => {assert!(false);}
                     };

@@ -21,8 +21,7 @@ pub enum NetworkMessage {
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
     //Perform explain analyze of worker query part and return it pretty printed physical plan
-    /// The boolean flag is whether to execute the plan to collect runtime metrics.
-    ExplainAnalyze(SerializedPlan, WorkerPlanningParams, bool),
+    ExplainAnalyze(SerializedPlan, WorkerPlanningParams),
     ExplainAnalyzeResult(Result<String, CubeError>),
 
     /// Detailed-trace mirror of [RouterSelect]: the entry node asks a main worker to

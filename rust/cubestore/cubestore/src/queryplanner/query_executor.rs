@@ -76,8 +76,8 @@ use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, execute_stream, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning,
-    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
+    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
+    PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemorySourceConfig;
@@ -215,7 +215,6 @@ pub trait QueryExecutor: DIService + Send + Sync {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-        execute: bool,
     ) -> Result<String, CubeError>;
 }
 
@@ -516,7 +515,6 @@ impl QueryExecutor for QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-        execute: bool,
     ) -> Result<String, CubeError> {
         let (physical_plan, _) = self
             .worker_plan(
@@ -538,33 +536,7 @@ impl QueryExecutor for QueryExecutorImpl {
             ));
         }
 
-        if !execute {
-            return Ok(pp_phys_plan(worker_plan.as_ref()));
-        }
-
-        // Execute the plan to populate the metrics. The results are discarded batch by
-        // batch to avoid holding the full result set in memory.
-        let session_context = self.execution_context()?;
-        let mut stream = execute_stream(worker_plan.clone(), session_context.task_ctx())?;
-        async {
-            while let Some(batch) = stream.next().await {
-                batch?;
-            }
-            Ok::<_, DataFusionError>(())
-        }
-        .instrument(tracing::span!(
-            tracing::Level::TRACE,
-            "execute_physical_plan_for_explain_analyze"
-        ))
-        .await?;
-
-        Ok(pp_phys_plan_ext(
-            worker_plan.as_ref(),
-            &PPOptions {
-                show_metrics: true,
-                ..PPOptions::default()
-            },
-        ))
+        Ok(pp_phys_plan(worker_plan.as_ref()))
     }
 }
 
