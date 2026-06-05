@@ -712,131 +712,118 @@ impl SqlServiceImpl {
     }
 
     fn render_query_trace(trace: &QueryTrace) -> DataFrame {
-        fn opt_int(v: Option<u64>) -> TableValue {
-            v.map(|n| TableValue::Int(n as i64))
-                .unwrap_or(TableValue::Null)
-        }
-
-        fn push_ops(level: &str, node: &str, ops: &[OpSample], rows: &mut Vec<Row>) {
-            for op in ops {
-                rows.push(Row::new(vec![
-                    TableValue::String(level.to_string()),
-                    TableValue::String(node.to_string()),
-                    TableValue::String(format!("{:?}", op.kind)),
-                    TableValue::String(op.label.clone()),
-                    TableValue::Int(op.elapsed_us as i64),
-                    opt_int(op.bytes),
-                    opt_int(op.rows),
-                    TableValue::Int(op.count as i64),
-                ]));
+        fn fmt_bytes(b: u64) -> String {
+            if b >= 1 << 20 {
+                format!("{:.1}MB", b as f64 / (1u64 << 20) as f64)
+            } else if b >= 1 << 10 {
+                format!("{:.1}KB", b as f64 / (1u64 << 10) as f64)
+            } else {
+                format!("{}B", b)
             }
-        }
-
-        let headers = vec![
-            Column::new("level".to_string(), ColumnType::String, 0),
-            Column::new("node".to_string(), ColumnType::String, 1),
-            Column::new("kind".to_string(), ColumnType::String, 2),
-            Column::new("label".to_string(), ColumnType::String, 3),
-            Column::new("elapsed_us".to_string(), ColumnType::Int, 4),
-            Column::new("bytes".to_string(), ColumnType::Int, 5),
-            Column::new("rows".to_string(), ColumnType::Int, 6),
-            Column::new("count".to_string(), ColumnType::Int, 7),
-        ];
-        fn push_memory(level: &str, node: &str, bytes: u64, rows: &mut Vec<Row>) {
-            rows.push(Row::new(vec![
-                TableValue::String(level.to_string()),
-                TableValue::String(node.to_string()),
-                TableValue::String("Memory".to_string()),
-                TableValue::String("exec_peak".to_string()),
-                TableValue::Null,
-                TableValue::Int(bytes as i64),
-                TableValue::Null,
-                TableValue::Int(1),
-            ]));
-        }
-
-        fn push_plan(level: &str, node: &str, plan: &str, rows: &mut Vec<Row>) {
-            rows.push(Row::new(vec![
-                TableValue::String(level.to_string()),
-                TableValue::String(node.to_string()),
-                TableValue::String("Plan".to_string()),
-                TableValue::String(plan.to_string()),
-                TableValue::Null,
-                TableValue::Null,
-                TableValue::Null,
-                TableValue::Null,
-            ]));
-        }
-
-        // Transport (wire + queue) at a boundary = parent's round-trip − child's wall.
-        fn push_transport(level: &str, node: &str, label: &str, us: u64, rows: &mut Vec<Row>) {
-            rows.push(Row::new(vec![
-                TableValue::String(level.to_string()),
-                TableValue::String(node.to_string()),
-                TableValue::String("Transport".to_string()),
-                TableValue::String(label.to_string()),
-                TableValue::Int(us as i64),
-                TableValue::Null,
-                TableValue::Null,
-                TableValue::Int(1),
-            ]));
         }
 
         fn find_elapsed(ops: &[OpSample], label: &str) -> Option<u64> {
             ops.iter().find(|o| o.label == label).map(|o| o.elapsed_us)
         }
 
-        let mut rows = Vec::new();
-        push_ops("router", "", &trace.router.ops, &mut rows);
-        if let Some(main) = &trace.main {
-            push_ops("main", &main.node_name, &main.ops, &mut rows);
-            if let Some(rt) = find_elapsed(&trace.router.ops, "route_select_detailed") {
-                push_transport(
-                    "main",
-                    &main.node_name,
-                    "transport.entry_to_main",
-                    rt.saturating_sub(main.total_us),
-                    &mut rows,
-                );
-            }
-            if let Some(mem) = main.exec_memory_peak_bytes {
-                push_memory("main", &main.node_name, mem, &mut rows);
-            }
-            if let Some(plan) = &main.physical_plan {
-                push_plan("main", &main.node_name, plan, &mut rows);
-            }
-            for w in &main.workers {
-                push_ops("worker", &w.node_name, &w.ops, &mut rows);
-                if let Some(rt) = w.net_roundtrip_us {
-                    push_transport(
-                        "worker",
-                        &w.node_name,
-                        "transport.main_to_worker",
-                        rt.saturating_sub(w.total_us),
-                        &mut rows,
-                    );
+        // Renders one region (a node in the topology) and its measurements as an
+        // indented block: a header line, then `label   value` lines aligned within
+        // the region, then the physical plan as a nested block.
+        fn region(
+            out: &mut String,
+            depth: usize,
+            header: &str,
+            ops: &[OpSample],
+            transports: &[(&str, u64)],
+            memory: Option<u64>,
+            plan: Option<&str>,
+        ) {
+            let pad = "  ".repeat(depth);
+            out.push_str(&format!("{}{}\n", pad, header));
+            let ipad = format!("{}  ", pad);
+
+            let mut entries: Vec<(String, String)> = Vec::new();
+            for op in ops {
+                let mut v = format!("{:>8}us", op.elapsed_us);
+                if let Some(b) = op.bytes {
+                    v.push_str(&format!("  {:>8}", fmt_bytes(b)));
                 }
-                if let Some(sub) = &w.subprocess {
-                    push_ops("subprocess", &w.node_name, &sub.ops, &mut rows);
-                    if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
-                        push_transport(
-                            "subprocess",
-                            &w.node_name,
-                            "transport.ipc",
-                            rt.saturating_sub(sub.total_us),
-                            &mut rows,
-                        );
-                    }
-                    if let Some(mem) = sub.exec_memory_peak_bytes {
-                        push_memory("subprocess", &w.node_name, mem, &mut rows);
-                    }
-                    if let Some(plan) = &sub.physical_plan {
-                        push_plan("subprocess", &w.node_name, plan, &mut rows);
-                    }
+                if let Some(r) = op.rows {
+                    v.push_str(&format!("  {:>9} rows", r));
+                }
+                entries.push((op.label.clone(), v));
+            }
+            for (label, us) in transports {
+                entries.push((label.to_string(), format!("{:>8}us", us)));
+            }
+            if let Some(m) = memory {
+                entries.push(("mem.peak".to_string(), format!("{:>10}", fmt_bytes(m))));
+            }
+
+            let w = entries.iter().map(|(l, _)| l.len()).max().unwrap_or(0);
+            for (label, value) in &entries {
+                out.push_str(&format!("{}{:<w$}  {}\n", ipad, label, value, w = w));
+            }
+            if let Some(p) = plan {
+                out.push_str(&format!("{}plan:\n", ipad));
+                for line in p.lines() {
+                    out.push_str(&format!("{}    {}\n", ipad, line));
                 }
             }
         }
-        DataFrame::new(headers, rows)
+
+        let mut out = String::new();
+        region(&mut out, 0, "router", &trace.router.ops, &[], None, None);
+        if let Some(main) = &trace.main {
+            let mut t = Vec::new();
+            if let Some(rt) = find_elapsed(&trace.router.ops, "route_select_detailed") {
+                t.push(("transport.entry_to_main", rt.saturating_sub(main.total_us)));
+            }
+            region(
+                &mut out,
+                1,
+                &format!("main · {}", main.node_name),
+                &main.ops,
+                &t,
+                main.exec_memory_peak_bytes,
+                main.physical_plan.as_deref(),
+            );
+            for w in &main.workers {
+                let mut wt = Vec::new();
+                if let Some(rt) = w.net_roundtrip_us {
+                    wt.push(("transport.main_to_worker", rt.saturating_sub(w.total_us)));
+                }
+                region(
+                    &mut out,
+                    2,
+                    &format!("worker · {}", w.node_name),
+                    &w.ops,
+                    &wt,
+                    None,
+                    None,
+                );
+                if let Some(sub) = &w.subprocess {
+                    let mut st = Vec::new();
+                    if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
+                        st.push(("transport.ipc", rt.saturating_sub(sub.total_us)));
+                    }
+                    region(
+                        &mut out,
+                        3,
+                        &format!("subprocess · {}", w.node_name),
+                        &sub.ops,
+                        &st,
+                        sub.exec_memory_peak_bytes,
+                        sub.physical_plan.as_deref(),
+                    );
+                }
+            }
+        }
+
+        DataFrame::new(
+            vec![Column::new("trace".to_string(), ColumnType::String, 0)],
+            vec![Row::new(vec![TableValue::String(out)])],
+        )
     }
 }
 
