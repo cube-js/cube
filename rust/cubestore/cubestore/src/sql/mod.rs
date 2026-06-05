@@ -759,19 +759,44 @@ impl SqlServiceImpl {
             }
         }
 
+        // Sum elapsed by category over the given op slices, plus derived transport.
+        fn cat_totals(op_slices: &[&[OpSample]], transport_us: u64) -> Vec<(String, u64)> {
+            let mut t = Vec::new();
+            for ops in op_slices {
+                add_ops(&mut t, ops);
+            }
+            if transport_us > 0 {
+                bump(&mut t, "Transport", transport_us);
+            }
+            t.sort_by(|a, b| b.1.cmp(&a.1));
+            t
+        }
+
+        fn emit_cats(out: &mut String, title: &str, cats: &[(String, u64)]) {
+            out.push_str(&format!("{}\n", title));
+            let w = cats.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+            for (k, v) in cats {
+                out.push_str(&format!("  {:<w$}  {:>9}\n", k, fmt_dur(*v), w = w));
+            }
+        }
+
         // Renders one region (a node in the topology) as an indented block: header,
         // then `kind  label  value` lines aligned within the region, then the plan.
         fn region(
             out: &mut String,
             depth: usize,
             header: &str,
+            total: Option<u64>,
             ops: &[OpSample],
             transports: &[(&str, u64)],
             memory: Option<u64>,
             plan: Option<&str>,
         ) {
             let pad = "  ".repeat(depth);
-            out.push_str(&format!("{}{}\n", pad, header));
+            match total {
+                Some(t) => out.push_str(&format!("{}{}  ·  total {}\n", pad, header, fmt_dur(t))),
+                None => out.push_str(&format!("{}{}\n", pad, header)),
+            }
             let ipad = format!("{}  ", pad);
 
             let mut entries: Vec<(String, String, String)> = Vec::new();
@@ -821,59 +846,37 @@ impl SqlServiceImpl {
             }
         }
 
-        // ---- category summary (sum of elapsed by kind, wrappers excluded) ----
-        let mut totals: Vec<(String, u64)> = Vec::new();
-        let mut transport_total = 0u64;
-        add_ops(&mut totals, &trace.router.ops);
-        if let Some(main) = &trace.main {
-            add_ops(&mut totals, &main.ops);
-            if let Some(rt) = find_elapsed(&trace.router.ops, "route_select_detailed") {
-                transport_total += rt.saturating_sub(main.total_us);
-            }
-            for w in &main.workers {
-                add_ops(&mut totals, &w.ops);
-                if let Some(rt) = w.net_roundtrip_us {
-                    transport_total += rt.saturating_sub(w.total_us);
-                }
-                if let Some(sub) = &w.subprocess {
-                    add_ops(&mut totals, &sub.ops);
-                    if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
-                        transport_total += rt.saturating_sub(sub.total_us);
-                    }
-                }
-            }
-        }
-        if transport_total > 0 {
-            bump(&mut totals, "Transport", transport_total);
-        }
-        totals.sort_by(|a, b| b.1.cmp(&a.1));
-
         let mut out = String::new();
-        out.push_str("summary by category:\n");
-        let sw = totals.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
-        for (k, v) in &totals {
-            out.push_str(&format!("  {:<sw$}  {:>9}\n", k, fmt_dur(*v), sw = sw));
-        }
-        out.push_str("  (metastore is within planning; transport = wire + queue)\n\n");
 
-        // ---- tree ----
-        region(&mut out, 0, "router", &trace.router.ops, &[], None, None);
+        // ---- tree (per-node total in each header) ----
+        region(
+            &mut out,
+            0,
+            "router",
+            None,
+            &trace.router.ops,
+            &[],
+            None,
+            None,
+        );
         if let Some(main) = &trace.main {
-            let mut t = Vec::new();
-            if let Some(rt) = find_elapsed(&trace.router.ops, "route_select_detailed") {
-                t.push(("transport.entry_to_main", rt.saturating_sub(main.total_us)));
-            }
+            let et = find_elapsed(&trace.router.ops, "route_select_detailed")
+                .map(|rt| rt.saturating_sub(main.total_us));
+            let t: Vec<(&str, u64)> = et
+                .map(|v| vec![("transport.entry_to_main", v)])
+                .unwrap_or_default();
             region(
                 &mut out,
                 1,
                 &format!("main · {}", main.node_name),
+                Some(main.total_us),
                 &main.ops,
                 &t,
                 main.exec_memory_peak_bytes,
                 main.physical_plan.as_deref(),
             );
             for w in &main.workers {
-                let mut wt = Vec::new();
+                let mut wt: Vec<(&str, u64)> = Vec::new();
                 if let Some(rt) = w.net_roundtrip_us {
                     wt.push(("transport.main_to_worker", rt.saturating_sub(w.total_us)));
                 }
@@ -881,13 +884,14 @@ impl SqlServiceImpl {
                     &mut out,
                     2,
                     &format!("worker · {}", w.node_name),
+                    Some(w.total_us),
                     &w.ops,
                     &wt,
                     None,
                     None,
                 );
                 if let Some(sub) = &w.subprocess {
-                    let mut st = Vec::new();
+                    let mut st: Vec<(&str, u64)> = Vec::new();
                     if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
                         st.push(("transport.ipc", rt.saturating_sub(sub.total_us)));
                     }
@@ -895,6 +899,7 @@ impl SqlServiceImpl {
                         &mut out,
                         3,
                         &format!("subprocess · {}", w.node_name),
+                        Some(sub.total_us),
                         &sub.ops,
                         &st,
                         sub.exec_memory_peak_bytes,
@@ -902,6 +907,74 @@ impl SqlServiceImpl {
                     );
                 }
             }
+        }
+
+        // ---- summary by category (overall + per node) ----
+        out.push_str("\n────────────────────────────\n");
+        out.push_str(
+            "summary by category  (metastore within planning; transport = wire+queue)\n\n",
+        );
+        if let Some(main) = &trace.main {
+            let et = find_elapsed(&trace.router.ops, "route_select_detailed")
+                .map(|rt| rt.saturating_sub(main.total_us))
+                .unwrap_or(0);
+            let mut overall_slices: Vec<&[OpSample]> =
+                vec![trace.router.ops.as_slice(), main.ops.as_slice()];
+            let mut overall_transport = et;
+            for w in &main.workers {
+                overall_slices.push(w.ops.as_slice());
+                if let Some(rt) = w.net_roundtrip_us {
+                    overall_transport += rt.saturating_sub(w.total_us);
+                }
+                if let Some(sub) = &w.subprocess {
+                    overall_slices.push(sub.ops.as_slice());
+                    if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
+                        overall_transport += rt.saturating_sub(sub.total_us);
+                    }
+                }
+            }
+            emit_cats(
+                &mut out,
+                "overall",
+                &cat_totals(&overall_slices, overall_transport),
+            );
+            out.push('\n');
+            emit_cats(
+                &mut out,
+                "router",
+                &cat_totals(&[trace.router.ops.as_slice()], 0),
+            );
+            out.push('\n');
+            emit_cats(
+                &mut out,
+                &format!("main · {}", main.node_name),
+                &cat_totals(&[main.ops.as_slice()], et),
+            );
+            for w in &main.workers {
+                out.push('\n');
+                let mut slices: Vec<&[OpSample]> = vec![w.ops.as_slice()];
+                let mut wtrans = w
+                    .net_roundtrip_us
+                    .map(|rt| rt.saturating_sub(w.total_us))
+                    .unwrap_or(0);
+                if let Some(sub) = &w.subprocess {
+                    slices.push(sub.ops.as_slice());
+                    if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
+                        wtrans += rt.saturating_sub(sub.total_us);
+                    }
+                }
+                emit_cats(
+                    &mut out,
+                    &format!("worker · {}", w.node_name),
+                    &cat_totals(&slices, wtrans),
+                );
+            }
+        } else {
+            emit_cats(
+                &mut out,
+                "overall",
+                &cat_totals(&[trace.router.ops.as_slice()], 0),
+            );
         }
 
         DataFrame::new(
