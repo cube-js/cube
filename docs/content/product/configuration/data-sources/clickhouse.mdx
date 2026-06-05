@@ -35,6 +35,7 @@ CUBEJS_DB_PASS=**********
 | <EnvVar>CUBEJS_DB_PASS</EnvVar>                   | The password used to connect to the database                                        | A valid database password |    ✅    |
 | <EnvVar>CUBEJS_DB_CLICKHOUSE_READONLY</EnvVar>    | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |
 | <EnvVar>CUBEJS_DB_CLICKHOUSE_COMPRESSION</EnvVar> | Whether the ClickHouse client has compression enabled or not                        | `true`, `false`           |    ❌    |
+| <EnvVar>CUBEJS_DB_CLICKHOUSE_APPLICATION</EnvVar> | The application name reported to ClickHouse in the HTTP `User-Agent` header and visible in `system.query_log.http_user_agent` | A valid string            |    ❌    |
 | <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar>               | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |
 | <EnvVar>CUBEJS_CONCURRENCY</EnvVar>               | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
 

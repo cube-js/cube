@@ -986,6 +986,23 @@ describe('Single datasources', () => {
     expect(getEnv('clickhouseCompression', { dataSource: 'wrong' })).toEqual(false);
   });
 
+  test('getEnv("clickhouseApplication")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_APPLICATION = 'default1';
+    expect(getEnv('clickhouseApplication', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('clickhouseApplication', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('clickhouseApplication', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_CLICKHOUSE_APPLICATION = 'default2';
+    expect(getEnv('clickhouseApplication', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('clickhouseApplication', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('clickhouseApplication', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_APPLICATION;
+    expect(getEnv('clickhouseApplication', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('clickhouseApplication', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('clickhouseApplication', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("elasticApiId")', () => {
     process.env.CUBEJS_DB_ELASTIC_APIKEY_ID = 'default1';
     expect(getEnv('elasticApiId', { dataSource: 'default' })).toEqual('default1');

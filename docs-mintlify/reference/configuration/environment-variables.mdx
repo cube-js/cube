@@ -234,6 +234,16 @@ Whether the ClickHouse client has compression enabled or not.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBEJS_DB_CLICKHOUSE_APPLICATION`
+
+The application name reported to ClickHouse in the HTTP `User-Agent` header
+and visible in `system.query_log.http_user_agent`. Useful to attribute queries
+to a specific Cube deployment when several share the same ClickHouse user.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid string  | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY`
 
 To accept the license terms for the Databricks JDBC driver, this must be set to

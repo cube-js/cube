@@ -1566,6 +1566,35 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("clickhouseApplication")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_APPLICATION = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_APPLICATION = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_APPLICATION = 'wrong1';
+    expect(getEnv('clickhouseApplication', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('clickhouseApplication', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('clickhouseApplication', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_APPLICATION = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_APPLICATION = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_APPLICATION = 'wrong2';
+    expect(getEnv('clickhouseApplication', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('clickhouseApplication', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('clickhouseApplication', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_APPLICATION;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_APPLICATION;
+    delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_APPLICATION;
+    expect(getEnv('clickhouseApplication', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('clickhouseApplication', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('clickhouseApplication', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("elasticApiId")', () => {
     process.env.CUBEJS_DB_ELASTIC_APIKEY_ID = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_ELASTIC_APIKEY_ID = 'postgres1';

@@ -71,6 +71,11 @@ export interface ClickHouseDriverOptions {
   database?: string,
   readOnly?: boolean,
   /**
+   * The name of the application using the ClickHouse client. It is prepended
+   * to the HTTP User-Agent and is visible in system.query_log.http_user_agent.
+   */
+  application?: string,
+  /**
    * Timeout in milliseconds for requests to ClickHouse.
    * Default is 10 minutes
    */
@@ -118,6 +123,7 @@ type ClickHouseDriverConfig = {
   password: string,
   readOnly: boolean,
   database: string,
+  application?: string,
   requestTimeout: number,
   exportBucket: ClickhouseDriverExportAWS | null,
   compression: { response?: boolean; request?: boolean },
@@ -159,6 +165,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const username = config.username ?? getEnv('dbUser', { dataSource, preAggregations });
     const password = config.password ?? getEnv('dbPass', { dataSource, preAggregations });
     const database = config.database ?? (getEnv('dbName', { dataSource, preAggregations }) as string) ?? 'default';
+    const application = config.application ?? getEnv('clickhouseApplication', { dataSource, preAggregations });
 
     // TODO this is a bit inconsistent with readOnly
     this.readOnlyMode = getEnv('clickhouseReadOnly', { dataSource, preAggregations });
@@ -172,6 +179,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       username,
       password,
       database,
+      application,
       exportBucket: this.getExportBucket(dataSource, preAggregations),
       readOnly: !!config.readOnly,
       requestTimeout,
@@ -242,6 +250,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       username: this.config.username,
       password: this.config.password,
       database: this.config.database,
+      application: this.config.application,
       compression: this.config.compression,
       clickhouse_settings: this.config.clickhouseSettings,
       request_timeout: this.config.requestTimeout,

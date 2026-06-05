@@ -1258,6 +1258,18 @@ const variables: Record<string, (...args: any) => any> = {
       .asBool()
   ),
 
+  /**
+   * ClickHouse application name. It is prepended to the HTTP User-Agent
+   * and is visible in system.query_log.http_user_agent.
+   */
+  clickhouseApplication: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => (
+    get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_APPLICATION', dataSource, preAggregations))
+      .asString()
+  ),
+
   /** ****************************************************************
    * ElasticSearch Driver                                            *
    ***************************************************************** */
