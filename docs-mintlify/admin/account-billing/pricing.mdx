@@ -94,7 +94,6 @@ of deployments within a Cube Cloud account. The consumption is measured in 5-min
 | [Shared deployment][ref-development-instance] | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
 | Cube API Instance | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
 | Cube Store Worker | <nobr>1..2</nobr> | Depends on a [chosen tier](#cube-store-worker-tiers) |
-| [Semantic Catalog][ref-semantic-catalog] | <nobr>2..4</nobr> | Depends on a [chosen tier](#semantic-catalog-tiers) |
 | [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
 | [Monitoring Integrations][ref-monitoring-integrations] | — | Available as an [add-on](#monitoring-integrations) on the Enterprise plan |
 
@@ -136,19 +135,6 @@ pre-aggregations and executing queries against them under the following tiers:
 | ---- | :-----------: | ---------- | ------------------ |
 | S    | 1             | 100%       | —                  |
 | M    | 2             | 200%       | [Data-at-rest encryption][ref-data-at-rest-encryption] with [customer-managed keys][ref-customer-managed-keys] in Cube Store |
-
-You can upgrade to a chosen tier in the
-**Settings** of your deployment.
-
-### Semantic Catalog tiers
-
-[Semantic Catalog][ref-semantic-catalog] provides observability into other data
-tools interoperating with your data model under the following tiers:
-
-| Tier | <nobr>CCUs per hour</nobr> | Data assets |
-| ---- | :-----------: | ---------- |
-| S    | 2             | Up to 30,000 |
-| M    | 4             | Up to 100,000 |
 
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
@@ -346,5 +332,4 @@ for the AI token consumption at the **Billing** page of their Cube Cloud account
 [ref-cube-store-architecture]: /docs/pre-aggregations/running-in-production#architecture
 [ref-data-at-rest-encryption]: /docs/pre-aggregations/running-in-production#data-at-rest-encryption
 [ref-customer-managed-keys]: /admin/deployment/encryption-keys
-[ref-semantic-catalog]: /docs/workspace/semantic-catalog
 [ref-query-history-export]: /admin/deployment/monitoring-integrations#query-history-export
