@@ -147,6 +147,7 @@ pub struct QueryExecutorImpl {
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     memory_handler: Arc<dyn MemoryHandler>,
+    config: Arc<dyn ConfigObj>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
@@ -430,11 +431,13 @@ impl QueryExecutorImpl {
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
         parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
         memory_handler: Arc<dyn MemoryHandler>,
+        config: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(QueryExecutorImpl {
             metadata_cache_factory,
             parquet_metadata_cache,
             memory_handler,
+            config,
         })
     }
 
@@ -483,7 +486,9 @@ impl QueryExecutorImpl {
     fn physical_optimizer_rules(&self) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
         vec![
             // Cube rules
-            Arc::new(PreOptimizeRule::new()),
+            Arc::new(PreOptimizeRule::new(
+                self.config.partial_hash_aggregate_topk_factor(),
+            )),
             // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.
             Arc::new(OutputRequirements::new_add_mode()),
             Arc::new(AggregateStatistics::new()),
