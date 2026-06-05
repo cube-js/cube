@@ -4,37 +4,32 @@
 // deployments.yaml for the Mintlify API docs.
 //
 // The source spec lives in the (private) cubejs-enterprise repo and is NOT in
-// this repo. To regenerate:
+// this repo, so there is no hardcoded path — point the script at the spec via
+// the SRC_SPEC env var (a CLI path arg is also accepted):
 //
-//   1. Clone cubejs-enterprise as a sibling of this repo (default assumption:
-//      ../../../cubejs-enterprise relative to this script), or generate the
-//      spec there with `yarn generate:open-api:spec-public` in
-//      packages/console-server.
-//   2. Run, pointing at the spec:
-//        node scripts/extract-deployments.js [path/to/open-api-spec-public-v3.1.yaml]
-//      or:
-//        SRC_SPEC=path/to/spec.yaml node scripts/extract-deployments.js
+//   SRC_SPEC=/path/to/open-api-spec-public-v3.1.yaml node scripts/extract-deployments.js
+//   node scripts/extract-deployments.js /path/to/open-api-spec-public-v3.1.yaml
 //
-// Resolution order for the source path: CLI arg > SRC_SPEC env > sibling repo
-// default. The script errors out with this guidance if the file is missing.
+// The spec is generated in cubejs-enterprise/packages/console-server via
+// `yarn generate:open-api:spec-public`.
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 
-const DEFAULT_SRC = path.resolve(
-  __dirname,
-  '../../../cubejs-enterprise/packages/console-server/open-api-spec-public-v3.1.yaml'
-);
-const SRC = path.resolve(process.argv[2] || process.env.SRC_SPEC || DEFAULT_SRC);
-if (!fs.existsSync(SRC)) {
+const srcArg = process.argv[2] || process.env.SRC_SPEC;
+if (!srcArg) {
   console.error(
-    `Source spec not found: ${SRC}\n\n` +
-      'Pass the path to the Console Server public OpenAPI spec, e.g.:\n' +
-      '  node scripts/extract-deployments.js /path/to/open-api-spec-public-v3.1.yaml\n' +
-      '  SRC_SPEC=/path/to/spec.yaml node scripts/extract-deployments.js\n\n' +
+    'No source spec provided. Set the SRC_SPEC env var (or pass a path arg):\n' +
+      '  SRC_SPEC=/path/to/open-api-spec-public-v3.1.yaml node scripts/extract-deployments.js\n' +
+      '  node scripts/extract-deployments.js /path/to/open-api-spec-public-v3.1.yaml\n\n' +
       'The spec is generated in cubejs-enterprise/packages/console-server via\n' +
       '`yarn generate:open-api:spec-public` and is not committed to this repo.'
   );
+  process.exit(1);
+}
+const SRC = path.resolve(srcArg);
+if (!fs.existsSync(SRC)) {
+  console.error(`Source spec not found: ${SRC}`);
   process.exit(1);
 }
 const OUT = path.join(__dirname, '..', 'api-reference', 'deployments.yaml');
