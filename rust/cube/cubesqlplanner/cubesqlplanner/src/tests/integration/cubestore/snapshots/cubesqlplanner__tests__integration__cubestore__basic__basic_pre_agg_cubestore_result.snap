@@ -4,7 +4,7 @@ expression: result
 ---
 visitors__source | visitors__count
 -----------------+----------------
-NULL             | 1              
 google           | 5              
 organic          | 2              
-twitter          | 2
+twitter          | 2              
+NULL             | 1

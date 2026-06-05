@@ -4,6 +4,6 @@ expression: result
 ---
 orders__status | customers__count | customers__total_lifetime_value
 ---------------+------------------+--------------------------------
-NULL           | 1                | 500                            
 completed      | 3                | 4500                           
-pending        | 2                | 3000
+pending        | 2                | 3000                           
+NULL           | 1                | 500

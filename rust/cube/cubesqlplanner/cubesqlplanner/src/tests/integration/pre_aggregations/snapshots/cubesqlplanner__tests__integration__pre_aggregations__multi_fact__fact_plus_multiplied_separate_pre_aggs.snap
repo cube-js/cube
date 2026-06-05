@@ -4,6 +4,6 @@ expression: result
 ---
 orders__status | orders__count | customers__count
 ---------------+---------------+-----------------
-NULL           | NULL          | NULL            
 completed      | 5             | 3               
-pending        | 3             | 2
+pending        | 3             | 2               
+NULL           | NULL          | NULL

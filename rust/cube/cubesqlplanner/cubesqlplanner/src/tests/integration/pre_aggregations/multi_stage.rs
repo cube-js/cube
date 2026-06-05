@@ -26,6 +26,8 @@ async fn test_multi_stage_time_shift_pre_agg_with_leaf_measure() {
             dateRange:
               - "2024-01-01"
               - "2024-03-31"
+        order:
+          - id: returns.created_at
     "#};
 
     let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
@@ -86,6 +88,8 @@ async fn test_multi_stage_time_shift_pre_agg_with_multi_stage_measure() {
             dateRange:
               - "2024-01-01"
               - "2024-03-31"
+        order:
+          - id: returns.created_at
     "#};
 
     let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();

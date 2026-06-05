@@ -824,7 +824,7 @@ impl TestContext {
                     .collect()
             })
             .unwrap_or_default();
-        let mut formatted_rows: Vec<Vec<String>> = rows
+        let formatted_rows: Vec<Vec<String>> = rows
             .iter()
             .map(|r| {
                 (0..r.columns_ref().len())
@@ -833,11 +833,10 @@ impl TestContext {
             })
             .collect();
 
-        // CubeStore parallel aggregation yields rows in nondeterministic
-        // order; sort for stable snapshots without requiring ORDER BY in
-        // every query.
-        formatted_rows.sort();
-
+        // Rows are NOT re-sorted here: every test must carry a total `order:`
+        // so the query itself pins row order (CubeStore aggregates in parallel
+        // and returns rows unordered otherwise). This keeps ORDER BY rendering
+        // under test instead of masking it.
         Some(super::integration_context::format_rows_table(
             columns,
             formatted_rows,
@@ -1010,16 +1009,26 @@ impl TestContext {
             let aggregations: Vec<String> = pre_agg
                 .measures()
                 .iter()
-                .filter_map(|m| {
-                    let func = match m.as_measure().ok()?.measure_type() {
+                .map(|m| {
+                    let measure = m.as_measure().expect("aggregate-index measure");
+                    let func = match measure.measure_type() {
                         "count" | "sum" => "sum",
                         "min" => "min",
                         "max" => "max",
-                        _ => return None,
+                        // HLL (countDistinctApprox) needs a `merge(...)` aggregation
+                        // and an HLL-encoded upload, neither of which is wired yet.
+                        other => unimplemented!(
+                            "AGGREGATIONS for measure type '{}' (e.g. countDistinctApprox) \
+                             is not supported by the CubeStore test harness yet",
+                            other
+                        ),
                     };
                     let alias = m.alias();
-                    let column = columns.iter().find(|(n, _)| *n == alias)?;
-                    Some(format!("{}(\"{}\")", func, column.0))
+                    let column = columns
+                        .iter()
+                        .find(|(n, _)| *n == alias)
+                        .unwrap_or_else(|| panic!("aggregation column {} not found", alias));
+                    format!("{}(\"{}\")", func, column.0)
                 })
                 .collect();
             if !aggregations.is_empty() {

@@ -17,6 +17,8 @@ async fn test_basic_pre_agg_sql() {
           - visitors.count
         dimensions:
           - visitors.source
+        order:
+          - id: visitors.source
     "};
 
     let (_sql, pre_aggrs) = test_context
@@ -47,6 +49,9 @@ async fn test_full_match_main_rollup() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -75,6 +80,8 @@ async fn test_partial_match_main_rollup() {
           - orders.count
         dimensions:
           - orders.status
+        order:
+          - id: orders.status
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -104,6 +111,9 @@ async fn test_full_match_non_additive_measure() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -153,6 +163,9 @@ async fn test_daily_rollup_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.country
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -184,6 +197,9 @@ async fn test_daily_rollup_coarser_granularity() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: month
+        order:
+          - id: orders.country
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -236,6 +252,9 @@ async fn test_daily_rollup_non_additive_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.country
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -291,6 +310,9 @@ async fn test_multi_level_all_base_measures_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -322,6 +344,8 @@ async fn test_multi_level_all_base_measures_partial_match() {
           - orders.multi_level_measure
         dimensions:
           - orders.status
+        order:
+          - id: orders.status
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -372,6 +396,9 @@ async fn test_multi_level_calculated_measure_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -404,6 +431,9 @@ async fn test_multi_level_mixed_measure_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -454,6 +484,9 @@ async fn test_base_and_calculated_measure_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -485,6 +518,8 @@ async fn test_base_and_calculated_measure_parital_match() {
           - orders.amount_per_count
         dimensions:
           - orders.status
+        order:
+          - id: orders.status
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -523,6 +558,9 @@ async fn test_segment_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -554,6 +592,9 @@ async fn test_segment_partial_match_unused_segment() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -611,6 +652,9 @@ async fn test_custom_granularity_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -642,6 +686,9 @@ async fn test_standard_pre_agg_coarser_custom_query() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -718,6 +765,9 @@ async fn test_custom_granularity_non_additive_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -771,6 +821,8 @@ async fn test_custom_granularity_non_strict_self_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -807,6 +859,9 @@ async fn test_segment_with_coarser_granularity() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: month
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
@@ -916,6 +971,8 @@ async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
               - \"2025-01-01\"
               - \"2025-03-31\"
         cubestoreSupportMultistage: true
+        order:
+          - id: orders.created_at
     "};
 
     let (_sql, pre_aggrs) = ctx
