@@ -1,0 +1,37 @@
+---
+title: Introduction
+description: Programmatically manage Cube Cloud — deployments, reports, and workbooks over REST, plus user and group provisioning via SCIM 2.0.
+---
+
+Programmatically manage your Cube Cloud account: work with deployments and the
+resources scoped to them (environments, folders, reports, and workbooks) over a
+REST API, and provision users and groups from your identity provider via SCIM
+2.0.
+
+## Base URL
+
+Both APIs are served from your Cube Cloud tenant host under `/api`:
+
+```text
+https://<tenant>.cubecloud.dev/api
+```
+
+Endpoints live under two namespaces:
+
+- `/api/v1/…` — the REST management API (deployments and nested resources)
+- `/api/scim/v2/…` — the SCIM 2.0 user and group provisioning API
+
+Only HTTPS calls are accepted. Authenticate every request — see
+[Authentication](/api-reference/authentication).
+
+## Available endpoints
+
+| Entity | Resource | Version |
+| --- | --- | --- |
+| [Deployments](/api-reference/deployments/get-deployments) | `/v1/deployments` | v1 |
+| [Environments](/api-reference/environments/get-deployment-environments) | `/v1/deployments/{deploymentId}/environments` | v1 |
+| [Folders](/api-reference/folders/get-folders) | `/v1/deployments/{deploymentId}/folders` | v1 |
+| [Reports](/api-reference/reports/get-reports) | `/v1/deployments/{deploymentId}/reports` | v1 |
+| [Workbooks](/api-reference/workbooks/get-workbooks) | `/v1/deployments/{deploymentId}/workbooks` | v1 |
+| [Users](/api-reference/users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
+| [Groups](/api-reference/groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |
