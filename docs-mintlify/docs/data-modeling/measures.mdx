@@ -559,6 +559,11 @@ inverse of `exclude` — to forward only filters on a chosen set of members. The
 same `filter` parameter is available on
 [multi-stage dimensions][ref-dim-filter].
 
+For end-to-end patterns — always-on baselines, replacing a filter, pinning a
+baseline through chained calculations, segment-aware aggregates, and compound
+boolean filters — see the
+[Filtering multi-stage measures recipe][ref-filter-recipe].
+
 ### Conditional measures
 
 Conditional measures depend on the value of a dimension, using the
@@ -619,6 +624,7 @@ measures:
 [ref-add-group-by]: /reference/data-modeling/measures#add_group_by
 [ref-filter-directives]: /reference/data-modeling/measures#filter
 [ref-dim-filter]: /reference/data-modeling/dimensions#filter
+[ref-filter-recipe]: /recipes/data-modeling/filtering-multi-stage-measures
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type
 [ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner

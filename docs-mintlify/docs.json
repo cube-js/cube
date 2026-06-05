@@ -608,6 +608,7 @@
                   "recipes/data-modeling/filtered-aggregates",
                   "recipes/data-modeling/share-of-total",
                   "recipes/data-modeling/period-over-period",
+                  "recipes/data-modeling/filtering-multi-stage-measures",
                   "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
                   "recipes/data-modeling/using-dynamic-measures",
                   "recipes/data-modeling/dynamic-union-tables",

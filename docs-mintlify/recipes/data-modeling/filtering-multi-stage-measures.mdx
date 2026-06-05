@@ -1,0 +1,526 @@
+---
+title: Filtering multi-stage measures
+description: Use filter directives to drop, replace, or pin filters on multi-stage measures and dimensions — for always-on baselines, fixed cohorts, segment-aware aggregates, and chained calculations.
+---
+
+## Use case
+
+By default, a multi-stage measure inherits all query-time filters into its
+inner aggregation stage. The [`filter`][ref-filter-directives] parameter
+overrides that behavior — you can drop specific filters, replace them, or pin
+the measure to a fixed slice regardless of what the surrounding query asks
+for.
+
+This is the right tool when:
+
+- A baseline measure should ignore a filter the query applies (e.g.,
+  always-completed revenue, even when the query filters by `status`).
+- A comparison measure should be computed against a different cohort than
+  the query (actual vs. last-year, region X vs. region Y).
+- A measure must remain pinned to a fixed slice even when it is referenced
+  from another multi-stage measure higher in the chain.
+- You want segment-aware aggregates that respect or ignore segment filters
+  selectively.
+
+<Warning>
+
+The `filter` parameter on multi-stage measures and dimensions is powered by
+Tesseract, the [next-generation data modeling engine][link-tesseract].
+Tesseract is currently in preview. Use the
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
+enable it.
+
+</Warning>
+
+## Data model
+
+The examples below extend a simple `orders` cube with a `total_amount`
+measure, a `completed_orders` segment, and a few dimensions:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: ECOMMERCE.ORDERS
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: "{CUBE}.status"
+        type: string
+
+      - name: category
+        sql: "{CUBE}.category"
+        type: string
+
+      - name: city
+        sql: "{CUBE}.city"
+        type: string
+
+      - name: created_at
+        sql: "{CUBE}.created_at"
+        type: time
+
+    segments:
+      - name: completed_orders
+        sql: "{CUBE}.status = 'completed'"
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+        format: currency
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `ECOMMERCE.ORDERS`,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    status: {
+      sql: `${CUBE}.status`,
+      type: `string`
+    },
+
+    category: {
+      sql: `${CUBE}.category`,
+      type: `string`
+    },
+
+    city: {
+      sql: `${CUBE}.city`,
+      type: `string`
+    },
+
+    created_at: {
+      sql: `${CUBE}.created_at`,
+      type: `time`
+    }
+  },
+
+  segments: {
+    completed_orders: {
+      sql: `${CUBE}.status = 'completed'`
+    }
+  },
+
+  measures: {
+    total_amount: {
+      sql: `amount`,
+      type: `sum`,
+      format: `currency`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Each section below adds one or more multi-stage measures on top of this base
+model.
+
+## Always-on baseline (drop a query filter)
+
+Goal: a baseline `total_amount_all_statuses` that always reflects revenue
+across every status, even when the query is filtered to a single status. Use
+`exclude` to drop the inherited filter:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: total_amount_all_statuses
+    multi_stage: true
+    sql: "{total_amount}"
+    type: number
+    filter:
+      exclude:
+        - status
+```
+
+```javascript title="JavaScript"
+measures: {
+  total_amount_all_statuses: {
+    multi_stage: true,
+    sql: `${total_amount}`,
+    type: `number`,
+    filter: {
+      exclude: () => [status]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+A query that groups by `status` and filters to `status = 'pending'` will see
+`total_amount` constrained to pending orders, but `total_amount_all_statuses`
+will compute against every order — useful as a denominator for share-of-status
+calculations.
+
+## Replace a filter (actual vs. fixed cohort)
+
+Goal: alongside the query's filtered `total_amount`, show
+`total_amount_cancelled` — the cancelled-orders total — regardless of which
+`status` the query filters by. Combine `exclude` (to drop the query's
+`status` filter) with `include` (to apply your own):
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: total_amount_cancelled
+    multi_stage: true
+    sql: "{total_amount}"
+    type: sum
+    filter:
+      exclude:
+        - status
+      include:
+        - member: status
+          operator: equals
+          values:
+            - cancelled
+```
+
+```javascript title="JavaScript"
+measures: {
+  total_amount_cancelled: {
+    multi_stage: true,
+    sql: `${total_amount}`,
+    type: `sum`,
+    filter: {
+      exclude: () => [status],
+      include: [
+        {
+          member: `status`,
+          operator: `equals`,
+          values: [`cancelled`]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+Without `exclude`, the query's `status = 'completed'` filter would be ANDed
+with `status = 'cancelled'`, producing an empty set. `exclude` strips the
+inherited filter first; `include` then adds the desired one.
+
+## Pin a baseline through a chained calculation
+
+`mode: relative` (the default) means that when a multi-stage measure is
+wrapped by another multi-stage measure, the inner one inherits the outer's
+filter state. `mode: fixed` opts out: the inner measure always starts from
+an empty filter set, applying only what's in its own `include`.
+
+This matters for chained calculations. In the model below, `t_completed_share`
+divides revenue for `category = 'books'` by total revenue for
+`category = 'books'`. The numerator wraps a `fixed` measure so its denominator
+stays pinned to books regardless of the surrounding query:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: books_revenue_fixed
+    multi_stage: true
+    sql: "{total_amount}"
+    type: sum
+    filter:
+      mode: fixed
+      include:
+        - member: category
+          operator: equals
+          values:
+            - books
+
+  - name: books_completed_revenue
+    multi_stage: true
+    sql: "{books_revenue_fixed}"
+    type: number
+    filter:
+      include:
+        - member: status
+          operator: equals
+          values:
+            - completed
+
+  - name: books_completed_share
+    multi_stage: true
+    sql: "1.0 * {books_completed_revenue} / NULLIF({books_revenue_fixed}, 0)"
+    type: number
+    format: percent
+```
+
+```javascript title="JavaScript"
+measures: {
+  books_revenue_fixed: {
+    multi_stage: true,
+    sql: `${total_amount}`,
+    type: `sum`,
+    filter: {
+      mode: `fixed`,
+      include: [
+        {
+          member: `category`,
+          operator: `equals`,
+          values: [`books`]
+        }
+      ]
+    }
+  },
+
+  books_completed_revenue: {
+    multi_stage: true,
+    sql: `${books_revenue_fixed}`,
+    type: `number`,
+    filter: {
+      include: [
+        {
+          member: `status`,
+          operator: `equals`,
+          values: [`completed`]
+        }
+      ]
+    }
+  },
+
+  books_completed_share: {
+    multi_stage: true,
+    sql: `1.0 * ${books_completed_revenue} / NULLIF(${books_revenue_fixed}, 0)`,
+    type: `number`,
+    format: `percent`
+  }
+}
+```
+
+</CodeGroup>
+
+Because `books_revenue_fixed` uses `mode: fixed`, its inner stage ignores
+both the query's filters and the outer `status = 'completed'` filter applied
+by `books_completed_revenue`. If you switched it to `mode: relative`, the
+denominator would inherit `status = 'completed'` from the outer wrapper and
+the ratio would always be 1.
+
+## Filter on segments
+
+`exclude` and `keep_only` accept segment names too. Use this when a multi-stage
+measure should react to (or ignore) specific segment filters independently of
+the query's segment selection.
+
+Two complementary patterns:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  # Ignore any `completed_orders` segment the query applies.
+  - name: total_amount_ignoring_completion
+    multi_stage: true
+    sql: "{total_amount}"
+    type: number
+    filter:
+      exclude:
+        - completed_orders
+
+  # Only honor the `completed_orders` segment; drop everything else.
+  - name: total_amount_completed_only_segment
+    multi_stage: true
+    sql: "{total_amount}"
+    type: number
+    filter:
+      keep_only:
+        - completed_orders
+```
+
+```javascript title="JavaScript"
+measures: {
+  total_amount_ignoring_completion: {
+    multi_stage: true,
+    sql: `${total_amount}`,
+    type: `number`,
+    filter: {
+      exclude: () => [completed_orders]
+    }
+  },
+
+  total_amount_completed_only_segment: {
+    multi_stage: true,
+    sql: `${total_amount}`,
+    type: `number`,
+    filter: {
+      keep_only: () => [completed_orders]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+## Compound filters with boolean groups
+
+`include` entries can be combined with `or` / `and` groups for compound
+conditions. The example below counts revenue from large orders in the two
+top-tier cities — independent of the query's own filters:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: top_city_large_orders_revenue
+    multi_stage: true
+    sql: "{total_amount}"
+    type: sum
+    filter:
+      mode: fixed
+      include:
+        - and:
+            - member: total_amount
+              operator: gt
+              values:
+                - "100"
+            - or:
+                - member: city
+                  operator: equals
+                  values:
+                    - NYC
+                - member: city
+                  operator: equals
+                  values:
+                    - SF
+```
+
+```javascript title="JavaScript"
+measures: {
+  top_city_large_orders_revenue: {
+    multi_stage: true,
+    sql: `${total_amount}`,
+    type: `sum`,
+    filter: {
+      mode: `fixed`,
+      include: [
+        {
+          and: [
+            {
+              member: `total_amount`,
+              operator: `gt`,
+              values: [`100`]
+            },
+            {
+              or: [
+                {
+                  member: `city`,
+                  operator: `equals`,
+                  values: [`NYC`]
+                },
+                {
+                  member: `city`,
+                  operator: `equals`,
+                  values: [`SF`]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+Boolean groups nest to any depth. Each leaf is a `{ member, operator, values }`
+clause and uses the same operators as the
+[REST API query format][ref-rest-query-ops].
+
+## Filter directives on multi-stage dimensions
+
+The `filter` parameter is also available on
+[multi-stage dimensions][ref-dim-filter]. The directive works the same way —
+it controls which filters reach the dimension's inner aggregation stage. A
+common pattern is normalizing a dimension across a fixed cohort:
+
+<CodeGroup>
+
+```yaml title="YAML"
+dimensions:
+  - name: status_excluding_archived
+    sql: "{CUBE.status}"
+    type: string
+    multi_stage: true
+    add_group_by:
+      - status
+    filter:
+      mode: relative
+      include:
+        - member: status
+          operator: notEquals
+          values:
+            - archived
+```
+
+```javascript title="JavaScript"
+dimensions: {
+  status_excluding_archived: {
+    sql: `${CUBE.status}`,
+    type: `string`,
+    multi_stage: true,
+    add_group_by: [status],
+    filter: {
+      mode: `relative`,
+      include: [
+        {
+          member: `status`,
+          operator: `notEquals`,
+          values: [`archived`]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+## Choosing between `mode: relative` and `mode: fixed`
+
+| Mode | Inherits query filters? | Inherits outer multi-stage filters? | Use when |
+|---|---|---|---|
+| `relative` (default) | Yes (minus `exclude` / `keep_only`) | Yes | The measure should react to the surrounding query; you only need to tweak a few filters. |
+| `fixed` | No | No | The measure must always represent the same slice — baselines, denominators in chained ratios, fixed cohorts. |
+
+`relative` mode pairs naturally with `exclude` / `keep_only` / `include`
+overrides. `fixed` mode typically uses only `include`, because there's no
+inherited state to remove.
+
+## See also
+
+- [`filter` parameter on measures][ref-filter-directives]
+- [`filter` parameter on dimensions][ref-dim-filter]
+- [Multi-stage measures][ref-multi-stage]
+- [Calculating share of total][ref-share-of-total]
+- [Calculating period-over-period changes][ref-period-over-period]
+
+[ref-filter-directives]: /reference/data-modeling/measures#filter
+[ref-dim-filter]: /reference/data-modeling/dimensions#filter
+[ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
+[ref-share-of-total]: /recipes/data-modeling/share-of-total
+[ref-period-over-period]: /recipes/data-modeling/period-over-period
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
