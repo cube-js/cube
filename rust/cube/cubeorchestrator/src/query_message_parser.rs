@@ -459,11 +459,18 @@ fn append_arrow_array(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arrow::array::BinaryArray;
+    use arrow::datatypes::{Field, Schema};
+    use arrow::ipc::writer::StreamWriter;
+    use arrow::record_batch::RecordBatch;
     use cubeshared::codegen::{
-        root_as_http_message_unchecked, HttpColumnValue, HttpColumnValueArgs, HttpCommand,
-        HttpMessage, HttpMessageArgs, HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs,
+        root_as_http_message_unchecked, HttpColumnValue, HttpColumnValueArgs, HttpMessage,
+        HttpMessageArgs, HttpQueryResult, HttpQueryResultArgs, HttpQueryResultArrow,
+        HttpQueryResultArrowArgs, HttpQueryResultCompleted, HttpQueryResultCompletedArgs,
+        HttpResultSetArgs, HttpRow, HttpRowArgs,
     };
     use cubeshared::flatbuffers::FlatBufferBuilder;
+    use std::sync::Arc;
 
     /// Helper function to create a test HttpMessage with a given number of rows and columns
     fn create_test_message(num_rows: usize, num_columns: usize) -> Vec<u8> {
@@ -527,82 +534,82 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_small_result_set() {
+    fn test_parse_small_result_set() -> Result<(), ParseError> {
         let msg_data = create_test_message(10, 5);
-        let result = QueryResult::from_cubestore_fb(&msg_data);
-        assert!(result.is_ok());
+        let query_result = QueryResult::from_cubestore_fb(&msg_data)?;
 
-        let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 5);
         assert_eq!(query_result.row_count, 10);
         assert_eq!(query_result.data.len(), 5);
         assert!(query_result.data.iter().all(|c| c.len() == 10));
+
+        Ok(())
     }
 
     #[test]
-    fn test_parse_medium_result_set() {
+    fn test_parse_medium_result_set() -> Result<(), ParseError> {
         // Medium result set: 1000 rows, 20 columns
         let msg_data = create_test_message(1000, 20);
-        let result = QueryResult::from_cubestore_fb(&msg_data);
-        assert!(result.is_ok());
+        let query_result = QueryResult::from_cubestore_fb(&msg_data)?;
 
-        let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 20);
         assert_eq!(query_result.row_count, 1000);
         assert_eq!(query_result.data.len(), 20);
         assert!(query_result.data.iter().all(|c| c.len() == 1000));
+
+        Ok(())
     }
 
     #[test]
-    fn test_parse_large_result_set() {
+    fn test_parse_large_result_set() -> Result<(), ParseError> {
         // Large result set: 10,000 rows, 30 columns
         // This should start showing verification issues
         let msg_data = create_test_message(10_000, 30);
-        let result = QueryResult::from_cubestore_fb(&msg_data);
-        assert!(result.is_ok());
+        let query_result = QueryResult::from_cubestore_fb(&msg_data)?;
 
-        let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 30);
         assert_eq!(query_result.row_count, 10_000);
         assert_eq!(query_result.data.len(), 30);
         assert!(query_result.data.iter().all(|c| c.len() == 10_000));
+
+        Ok(())
     }
 
     #[test]
-    fn test_parse_very_large_result_set() {
+    fn test_parse_very_large_result_set() -> Result<(), ParseError> {
         // Very large result set: 33,000 rows, 40 columns
         let msg_data = create_test_message(33_000, 40);
-        let result = QueryResult::from_cubestore_fb(&msg_data);
-        assert!(result.is_ok());
+        let query_result = QueryResult::from_cubestore_fb(&msg_data)?;
 
-        let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 40);
         assert_eq!(query_result.row_count, 33_000);
         assert_eq!(query_result.data.len(), 40);
         assert!(query_result.data.iter().all(|c| c.len() == 33_000));
+
+        Ok(())
     }
 
     #[test]
-    fn test_parse_huge_result_set() {
+    fn test_parse_huge_result_set() -> Result<(), ParseError> {
         // Huge result set: 50,000 rows, 100 columns
         let msg_data = create_test_message(50_000, 100);
-        let result = QueryResult::from_cubestore_fb(&msg_data);
-        assert!(result.is_ok());
+        let query_result = QueryResult::from_cubestore_fb(&msg_data)?;
 
-        let query_result = result.unwrap();
         assert_eq!(query_result.members.len(), 100);
         assert_eq!(query_result.row_count, 50_000);
         assert_eq!(query_result.data.len(), 100);
         assert!(query_result.data.iter().all(|c| c.len() == 50_000));
+
+        Ok(())
     }
 
     #[test]
-    fn test_compare_with_unchecked_parse() {
+    fn test_compare_with_unchecked_parse() -> Result<(), ParseError> {
         // Test to demonstrate that unchecked parsing would work
         let msg_data = create_test_message(33_000, 40);
 
         // Checked version (current implementation)
-        let checked_result = QueryResult::from_cubestore_fb(&msg_data);
+        let checked_result = QueryResult::from_cubestore_fb(&msg_data)?;
 
         // Try unchecked version to verify the data itself is valid
         let unchecked_result = unsafe {
@@ -625,12 +632,13 @@ mod tests {
             }
         };
 
-        assert!(checked_result.is_ok());
+        assert_eq!(checked_result.row_count, 33_000);
         assert!(unchecked_result.is_ok());
+
+        Ok(())
     }
 
-    fn arrow_ipc_bytes(batch: &arrow::record_batch::RecordBatch) -> Vec<u8> {
-        use arrow::ipc::writer::StreamWriter;
+    fn arrow_ipc_bytes(batch: &RecordBatch) -> Vec<u8> {
         let mut buf = Vec::new();
         {
             let schema = batch.schema();
@@ -642,12 +650,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_arrow_basic_types() {
-        use arrow::array::{Float64Array, StringArray, TimestampMillisecondArray};
-        use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
-        use arrow::record_batch::RecordBatch;
-        use std::sync::Arc;
-
+    fn test_from_arrow_basic_types() -> Result<(), ParseError> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("city", DataType::Utf8, true),
             Field::new("amount", DataType::Float64, true),
@@ -670,7 +673,7 @@ mod tests {
         .unwrap();
 
         let bytes = arrow_ipc_bytes(&batch);
-        let result = QueryResult::from_arrow(&bytes).expect("from_arrow");
+        let result = QueryResult::from_arrow(&bytes)?;
 
         assert_eq!(result.members, vec!["city", "amount", "created_at"]);
         assert_eq!(result.row_count, 3);
@@ -703,15 +706,12 @@ mod tests {
         assert_eq!(json[0], "1970-01-01T00:00:00.000");
         assert_eq!(json[1], serde_json::Value::Null);
         assert_eq!(json[2], "1970-01-01T00:00:01.000");
+
+        Ok(())
     }
 
     #[test]
-    fn test_from_arrow_unsupported_type() {
-        use arrow::array::BinaryArray;
-        use arrow::datatypes::{DataType, Field, Schema};
-        use arrow::record_batch::RecordBatch;
-        use std::sync::Arc;
-
+    fn test_from_arrow_unsupported_type() -> Result<(), ParseError> {
         let schema = Arc::new(Schema::new(vec![Field::new(
             "blob",
             DataType::Binary,
@@ -723,20 +723,12 @@ mod tests {
         let bytes = arrow_ipc_bytes(&batch);
         let err = QueryResult::from_arrow(&bytes).expect_err("should reject Binary");
         assert!(matches!(err, ParseError::UnsupportedArrowType(_)));
+
+        Ok(())
     }
 
     #[test]
-    fn test_from_cubestore_fb_arrow_query_result() {
-        use arrow::array::{Float64Array, StringArray};
-        use arrow::datatypes::{DataType, Field, Schema};
-        use arrow::record_batch::RecordBatch;
-        use cubeshared::codegen::{
-            HttpMessage, HttpMessageArgs, HttpQueryResult, HttpQueryResultArgs,
-            HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultData,
-        };
-        use cubeshared::flatbuffers::FlatBufferBuilder;
-        use std::sync::Arc;
-
+    fn test_from_cubestore_fb_arrow_query_result() -> Result<(), ParseError> {
         // Arrow IPC stream payload, as CubeStore would emit it.
         let schema = Arc::new(Schema::new(vec![
             Field::new("city", DataType::Utf8, false),
@@ -782,7 +774,7 @@ mod tests {
         builder.finish(message, None);
         let msg_data = builder.finished_data().to_vec();
 
-        let result = QueryResult::from_cubestore_fb(&msg_data).expect("from_cubestore_fb arrow");
+        let result = QueryResult::from_cubestore_fb(&msg_data)?;
         assert_eq!(result.members, vec!["city", "amount"]);
         assert_eq!(result.row_count, 2);
         assert_eq!(
@@ -799,18 +791,12 @@ mod tests {
                 DBResponsePrimitive::Float64(2.0),
             ]
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_from_cubestore_fb_completed_query_result() {
-        use cubeshared::codegen::{
-            HttpMessage, HttpMessageArgs, HttpQueryResult, HttpQueryResultArgs,
-            HttpQueryResultCompleted, HttpQueryResultCompletedArgs, HttpQueryResultData,
-        };
-        use cubeshared::flatbuffers::FlatBufferBuilder;
-
-        // A statement that completes without a result set (e.g. CREATE TABLE/INSERT)
-        // is reported as an empty HttpQueryResultCompleted marker.
+    fn test_from_cubestore_fb_completed_query_result() -> Result<(), ParseError> {
         let mut builder = FlatBufferBuilder::new();
         let completed =
             HttpQueryResultCompleted::create(&mut builder, &HttpQueryResultCompletedArgs {});
@@ -834,18 +820,16 @@ mod tests {
         builder.finish(message, None);
         let msg_data = builder.finished_data().to_vec();
 
-        let result =
-            QueryResult::from_cubestore_fb(&msg_data).expect("from_cubestore_fb completed");
+        let result = QueryResult::from_cubestore_fb(&msg_data)?;
         assert!(result.members.is_empty());
         assert_eq!(result.row_count, 0);
         assert!(result.data.is_empty());
+
+        Ok(())
     }
 
     #[test]
-    fn test_parse_with_custom_verifier_options() {
-        use cubeshared::codegen::root_as_http_message_with_opts;
-        use cubeshared::flatbuffers::VerifierOptions;
-
+    fn test_parse_with_custom_verifier_options() -> Result<(), ParseError> {
         // Test that custom verifier options can handle large datasets
         let msg_data = create_test_message(33_000, 40);
 
@@ -857,23 +841,21 @@ mod tests {
         };
 
         // This should succeed with custom options
-        let result = root_as_http_message_with_opts(&opts, &msg_data);
+        let http_message = root_as_http_message_with_opts(&opts, &msg_data)
+            .map_err(|err| ParseError::FlatBufferError(err.to_string()))?;
 
-        match result {
-            Ok(http_message) => match http_message.command_type() {
-                HttpCommand::HttpResultSet => {
-                    let result_set = http_message.command_as_http_result_set();
-                    if let Some(rs) = result_set {
-                        if let Some(rows) = rs.rows() {
-                            assert_eq!(rows.len(), 33_000);
-                        }
+        match http_message.command_type() {
+            HttpCommand::HttpResultSet => {
+                let result_set = http_message.command_as_http_result_set();
+                if let Some(rs) = result_set {
+                    if let Some(rows) = rs.rows() {
+                        assert_eq!(rows.len(), 33_000);
                     }
                 }
-                _ => panic!("Wrong command type"),
-            },
-            Err(e) => {
-                panic!("Failed to parse with custom verifier options: {:?}", e);
             }
+            _ => panic!("Wrong command type"),
         }
+
+        Ok(())
     }
 }
