@@ -37,11 +37,9 @@ const OUT = path.join(__dirname, '..', 'api-reference', 'deployments.yaml');
 const TAG_MAP = {
   'Deployments Public': 'Deployments',
   'Deployment Environment Public': 'Environments',
-  'Agents Public': 'Agents',
   'Folders Public': 'Folders',
   'Reports Public': 'Reports',
   'Workbooks Public': 'Workbooks',
-  'Workspace Public': 'Workspace',
 };
 // Allowlist of areas to include (also controls tag + nav order).
 const TAG_ORDER = ['Deployments', 'Environments', 'Folders', 'Reports', 'Workbooks'];
