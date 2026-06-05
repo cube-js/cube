@@ -11,7 +11,9 @@ use arrow::array::{
 };
 use arrow::datatypes::{DataType, TimeUnit};
 use arrow::ipc::reader::StreamReader;
-use cubeshared::codegen::{root_as_http_message_with_opts, HttpCommand, HttpResultSet};
+use cubeshared::codegen::{
+    root_as_http_message_with_opts, HttpCommand, HttpQueryResultData, HttpResultSet,
+};
 use cubeshared::flatbuffers::VerifierOptions;
 use indexmap::IndexMap;
 use neon::prelude::Finalize;
@@ -200,15 +202,30 @@ impl QueryResult {
                 let query_result = http_message
                     .command_as_http_query_result()
                     .ok_or(ParseError::EmptyResultSet)?;
-                let arrow = query_result
-                    .data_as_http_query_result_arrow()
-                    .ok_or_else(|| {
-                        ParseError::FlatBufferError(
-                            "HttpQueryResult.data is not HttpQueryResultArrow".to_string(),
-                        )
-                    })?;
 
-                Self::from_arrow(arrow.data().bytes())
+                match query_result.data_type() {
+                    HttpQueryResultData::HttpQueryResultArrow => {
+                        let arrow =
+                            query_result
+                                .data_as_http_query_result_arrow()
+                                .ok_or_else(|| {
+                                    ParseError::FlatBufferError(
+                                        "HttpQueryResult.data is not HttpQueryResultArrow"
+                                            .to_string(),
+                                    )
+                                })?;
+
+                        Self::from_arrow(arrow.data().bytes())
+                    }
+                    // Marker for statements that complete without a result set
+                    // (CREATE TABLE/INSERT, queue/cache writes). Carries no payload,
+                    // so it maps to an empty result, like a zero-column legacy result set.
+                    HttpQueryResultData::HttpQueryResultCompleted => Ok(QueryResult::empty()),
+                    other => Err(ParseError::FlatBufferError(format!(
+                        "Unsupported HttpQueryResult.data type: {:?}",
+                        other
+                    ))),
+                }
             }
             _ => Err(ParseError::UnsupportedCommand),
         }
@@ -782,6 +799,46 @@ mod tests {
                 DBResponsePrimitive::Float64(2.0),
             ]
         );
+    }
+
+    #[test]
+    fn test_from_cubestore_fb_completed_query_result() {
+        use cubeshared::codegen::{
+            HttpMessage, HttpMessageArgs, HttpQueryResult, HttpQueryResultArgs,
+            HttpQueryResultCompleted, HttpQueryResultCompletedArgs, HttpQueryResultData,
+        };
+        use cubeshared::flatbuffers::FlatBufferBuilder;
+
+        // A statement that completes without a result set (e.g. CREATE TABLE/INSERT)
+        // is reported as an empty HttpQueryResultCompleted marker.
+        let mut builder = FlatBufferBuilder::new();
+        let completed =
+            HttpQueryResultCompleted::create(&mut builder, &HttpQueryResultCompletedArgs {});
+        let query_result = HttpQueryResult::create(
+            &mut builder,
+            &HttpQueryResultArgs {
+                data_type: HttpQueryResultData::HttpQueryResultCompleted,
+                data: Some(completed.as_union_value()),
+            },
+        );
+        let connection_id = builder.create_string("test_connection");
+        let message = HttpMessage::create(
+            &mut builder,
+            &HttpMessageArgs {
+                message_id: 1,
+                command_type: HttpCommand::HttpQueryResult,
+                command: Some(query_result.as_union_value()),
+                connection_id: Some(connection_id),
+            },
+        );
+        builder.finish(message, None);
+        let msg_data = builder.finished_data().to_vec();
+
+        let result =
+            QueryResult::from_cubestore_fb(&msg_data).expect("from_cubestore_fb completed");
+        assert!(result.members.is_empty());
+        assert_eq!(result.row_count, 0);
+        assert!(result.data.is_empty());
     }
 
     #[test]
