@@ -766,6 +766,217 @@ dimensions will be included in the inner stage's `GROUP BY` but will *not* appea
 in the outer aggregation — they are used only to define the granularity at which
 the base measure is computed before the outer aggregation is applied.
 
+### `filter`
+
+The `filter` parameter is used with [multi-stage measures][ref-multi-stage] to
+control which query-time filters reach the inner aggregation stage. It allows
+you to drop, replace, or augment filters that would otherwise be inherited from
+the query.
+
+This is commonly used when a multi-stage calculation needs to ignore filters on
+specific dimensions (for example, computing a "share of total" against an
+unfiltered base) or apply its own additional filters on top of the query's
+filters.
+
+<Warning>
+
+The `filter` parameter on multi-stage measures and dimensions is powered by
+Tesseract, the [next-generation data modeling engine][link-tesseract]. Tesseract
+is currently in preview. Use the
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
+enable it.
+
+</Warning>
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue
+    sql: amount
+    type: sum
+
+  - name: revenue_completed_only
+    multi_stage: true
+    sql: "{revenue}"
+    type: number
+    filter:
+      mode: relative
+      exclude:
+        - status
+      include:
+        - member: status
+          operator: equals
+          values:
+            - completed
+        - or:
+            - member: city
+              operator: equals
+              values:
+                - NYC
+            - member: city
+              operator: equals
+              values:
+                - SF
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue: {
+    sql: `amount`,
+    type: `sum`
+  },
+
+  revenue_completed_only: {
+    multi_stage: true,
+    sql: `${revenue}`,
+    type: `number`,
+    filter: {
+      mode: `relative`,
+      exclude: () => [status],
+      include: [
+        {
+          member: `status`,
+          operator: `equals`,
+          values: [`completed`]
+        },
+        {
+          or: [
+            {
+              member: `city`,
+              operator: `equals`,
+              values: [`NYC`]
+            },
+            {
+              member: `city`,
+              operator: `equals`,
+              values: [`SF`]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+The `filter` parameter accepts an object with the following keys, all of which
+are optional. At least one of `exclude`, `keep_only`, or `include` must be
+provided.
+
+#### `mode`
+
+Controls how the inner stage's filter set is composed. Can be either of:
+
+| Mode | Description |
+|---|---|
+| `relative` (default) | Start from the filters that would otherwise apply to the inner stage (the query's filters minus anything that was already consumed by an outer multi-stage wrapper), then apply `exclude` / `keep_only` / `include` on top. |
+| `fixed` | Ignore the inherited filter state entirely. The inner stage starts from an empty set of filters and only the entries listed in `include` are applied. |
+
+Use `fixed` when a multi-stage measure must always be computed against the same
+slice of data regardless of which other multi-stage measures wrap it. Use
+`relative` (the default) when the calculation should still react to the
+surrounding query.
+
+#### `exclude`
+
+A list of dimension or segment names. Any query-time filter on a listed member
+is dropped before the inner stage runs. This is useful when a calculation must
+be insensitive to a specific dimension's filter (e.g., a denominator that
+should not be filtered by `status` even when the query filters by it).
+
+In JavaScript, `exclude` is written as a function returning an array of
+dimension references — the same pattern as
+[`group_by`](#group_by) and [`reduce_by`](#reduce_by):
+
+<CodeGroup>
+
+```yaml title="YAML"
+filter:
+  exclude:
+    - status
+    - completed_orders  # may also reference a segment
+```
+
+```javascript title="JavaScript"
+filter: {
+  exclude: () => [status, completed_orders]
+}
+```
+
+</CodeGroup>
+
+#### `keep_only`
+
+The inverse of `exclude`. A list of dimension or segment names — only filters
+on the listed members are forwarded to the inner stage; everything else is
+dropped.
+
+<CodeGroup>
+
+```yaml title="YAML"
+filter:
+  keep_only:
+    - city
+```
+
+```javascript title="JavaScript"
+filter: {
+  keep_only: () => [city]
+}
+```
+
+</CodeGroup>
+
+#### `include`
+
+A list of filter clauses that are added on top of the resulting filter set.
+Each clause is either a single-member filter or a boolean group:
+
+- A **member filter** has the shape `{ member, operator, values }`, where
+  `operator` matches the operators available in the
+  [REST API query format][ref-rest-query-ops] (`equals`, `notEquals`,
+  `contains`, `notContains`, `startsWith`, `notStartsWith`, `endsWith`,
+  `notEndsWith`, `in`, `notIn`, `gt`, `gte`, `lt`, `lte`, `set`, `notSet`,
+  `inDateRange`, `notInDateRange`, `onTheDate`, `beforeDate`, `beforeOrOnDate`,
+  `afterDate`, `afterOrOnDate`, `measureFilter`). `values` is required for all
+  operators except `set` and `notSet`.
+- A **boolean group** has the shape `{ or: [ ... ] }` or `{ and: [ ... ] }`,
+  containing nested member filters or further boolean groups.
+
+`exclude` and `include` can be combined to *replace* a filter — `exclude` first
+strips the inherited filter on a member, then `include` adds the desired one.
+
+<CodeGroup>
+
+```yaml title="YAML"
+filter:
+  exclude:
+    - status
+  include:
+    - member: status
+      operator: equals
+      values:
+        - cancelled
+```
+
+```javascript title="JavaScript"
+filter: {
+  exclude: () => [status],
+  include: [
+    {
+      member: `status`,
+      operator: `equals`,
+      values: [`cancelled`]
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
 ### `time_shift`
 
 The `time_shift` parameter is used to configure a [time shift][ref-time-shift] for a
@@ -1431,6 +1642,8 @@ cube(`orders`, {
 [ref-apis]: /reference
 [ref-rolling-window]: /docs/data-modeling/measures#rolling-windows
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
 [ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
 [ref-time-shift]: /docs/data-modeling/measures#time-shift
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates

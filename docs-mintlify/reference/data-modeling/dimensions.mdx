@@ -1302,6 +1302,71 @@ cube(`fiscal_calendar`, {
 </CodeGroup>
 
 
+### `filter`
+
+The `filter` parameter is used with [multi-stage dimensions][ref-multi-stage] to
+control which query-time filters reach the inner aggregation stage. It accepts
+the same shape as the [`filter` parameter on measures][ref-measure-filter] —
+`mode` (`relative` or `fixed`), `exclude`, `keep_only`, and `include`.
+
+<Warning>
+
+The `filter` parameter on multi-stage measures and dimensions is powered by
+Tesseract, the [next-generation data modeling engine][link-tesseract]. Tesseract
+is currently in preview. Use the
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
+enable it.
+
+</Warning>
+
+<CodeGroup>
+
+```yaml title="YAML"
+dimensions:
+  - name: status_normalized
+    type: string
+    sql: "{CUBE.status}"
+    multi_stage: true
+    add_group_by:
+      - status
+    filter:
+      mode: relative
+      keep_only:
+        - city
+      include:
+        - member: status
+          operator: notEquals
+          values:
+            - archived
+```
+
+```javascript title="JavaScript"
+dimensions: {
+  status_normalized: {
+    type: `string`,
+    sql: `${CUBE.status}`,
+    multi_stage: true,
+    add_group_by: [status],
+    filter: {
+      mode: `relative`,
+      keep_only: () => [city],
+      include: [
+        {
+          member: `status`,
+          operator: `notEquals`,
+          values: [`archived`]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+See the [measures reference][ref-measure-filter] for the full description of
+each sub-parameter.
+
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-schema-ref-joins]: /reference/data-modeling/joins
@@ -1335,3 +1400,6 @@ cube(`fiscal_calendar`, {
 [ref-filter-params]: /reference/data-modeling/context-variables#filter_params
 [link-encode-uri-component]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
 [ref-rest-filters]: /reference/rest-api/query-format#query-properties
+[ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
+[ref-measure-filter]: /reference/data-modeling/measures#filter
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
