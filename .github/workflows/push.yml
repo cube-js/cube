@@ -208,7 +208,7 @@ jobs:
   unit-core:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    needs: latest-tag-sha
+    needs: [latest-tag-sha, build-cubestore]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     steps:
@@ -219,8 +219,17 @@ jobs:
         with:
           toolchain: 1.90.0
           components: rustfmt
+      # cubesqlplanner pre-aggregation tests run against this binary; the
+      # resolver picks up target/release first (see cubestore_service.rs).
+      - name: Download cubestored artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: ./rust/cubestore/target/release/
+          name: cubestored-x86_64-unknown-linux-gnu-release
+      - name: Chmod +x for cubestored
+        run: chmod +x ./rust/cubestore/target/release/cubestored
       - name: Cargo test cube workspace
-        run: cargo test --manifest-path rust/cube/Cargo.toml --workspace --features cubesqlplanner/integration-postgres -j 4
+        run: cargo test --manifest-path rust/cube/Cargo.toml --workspace --features cubesqlplanner/integration-cubestore -j 4
 
   build-cubestore:
     needs: [latest-tag-sha]
