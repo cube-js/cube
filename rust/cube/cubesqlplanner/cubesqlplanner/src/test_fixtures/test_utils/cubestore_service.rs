@@ -37,12 +37,14 @@ fn register_atexit_cleanup(pid: u32, data_dir: PathBuf) {
 static CS_INSTANCE: OnceCell<CubeStoreInstance> = OnceCell::const_new();
 static SCHEMA_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// Resolves the cubestored binary. Default is the downloaded release binary
-/// (`@cubejs-backend/cubestore` postinstall), which suits Tesseract
-/// development. Set `CUBESTORED_LOCAL_BUILD=1` to use a locally built binary
-/// from `rust/cubestore/target` (for CubeStore development); the release
-/// profile is preferred since a debug build stack-overflows on deep
-/// multi-stage plans. `CUBESTORED_BIN_PATH` overrides everything.
+/// Resolves the cubestored binary. Prefers a local release build
+/// (`rust/cubestore/target/release`, which is where CI drops the
+/// `build-cubestore` artifact), falling back to the downloaded
+/// `@cubejs-backend/cubestore` release binary. A debug build is ignored by
+/// default — it stack-overflows on deep multi-stage plans — but if one is
+/// present and unused we warn, and `CUBESTORED_ALLOW_DEBUG=1` opts into it
+/// for fast local iteration on features that don't hit the overflow.
+/// `CUBESTORED_BIN_PATH` overrides everything.
 fn cubestored_bin() -> PathBuf {
     if let Ok(path) = std::env::var("CUBESTORED_BIN_PATH") {
         let path = PathBuf::from(path);
@@ -53,32 +55,49 @@ fn cubestored_bin() -> PathBuf {
     }
 
     let cubestore_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cubestore");
+    let release = cubestore_root.join("target/release/cubestored");
+    let debug = cubestore_root.join("target/debug/cubestored");
+    let downloaded = cubestore_root.join("downloaded/latest/bin/cubestored");
+    let allow_debug = std::env::var("CUBESTORED_ALLOW_DEBUG").is_ok_and(|v| !v.is_empty());
 
-    if std::env::var("CUBESTORED_LOCAL_BUILD").is_ok_and(|v| !v.is_empty()) {
-        for candidate in [
-            cubestore_root.join("target/release/cubestored"),
-            cubestore_root.join("target/debug/cubestored"),
-        ] {
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-        panic!(
-            "CUBESTORED_LOCAL_BUILD is set but no local binary found. Build it with \
-             `cargo build --release -p cubestore --bin cubestored` in rust/cubestore"
+    // Explicit opt-in: run against the local debug build (fast iteration).
+    if allow_debug && debug.exists() {
+        return debug;
+    }
+
+    let chosen = if release.exists() {
+        Some(release.clone())
+    } else if downloaded.exists() {
+        Some(downloaded.clone())
+    } else {
+        None
+    };
+
+    if debug.exists() {
+        eprintln!(
+            "warning: a debug cubestored build exists at {:?} but is not used — \
+             a release build is required (debug stack-overflows on deep multi-stage \
+             plans). Set CUBESTORED_ALLOW_DEBUG=1 to run against it anyway.",
+            debug
         );
     }
 
-    let downloaded = cubestore_root.join("downloaded/latest/bin/cubestored");
-    if downloaded.exists() {
-        return downloaded;
+    if let Some(path) = chosen {
+        return path;
     }
 
+    let debug_hint = if debug.exists() {
+        " A debug build exists; set CUBESTORED_ALLOW_DEBUG=1 to use it despite the \
+          multi-stage stack overflow."
+    } else {
+        ""
+    };
     panic!(
-        "cubestored binary not found at {:?}. Install it via the \
-         @cubejs-backend/cubestore package, or set CUBESTORED_LOCAL_BUILD=1 \
-         to use a local `cargo build` from rust/cubestore, or CUBESTORED_BIN_PATH",
-        downloaded
+        "cubestored binary not found. Build it with \
+         `cargo build --release -p cubestore --bin cubestored` in rust/cubestore, \
+         install it via the @cubejs-backend/cubestore package, or set \
+         CUBESTORED_BIN_PATH.{}",
+        debug_hint
     );
 }
 
