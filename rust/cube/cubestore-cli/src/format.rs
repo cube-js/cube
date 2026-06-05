@@ -17,6 +17,8 @@ pub fn render_table(result: &QueryResult) -> Result<Option<String>, CliError> {
     let table = match &result.data {
         ResultData::Legacy { rows, .. } => render_legacy_rows(&columns, rows),
         ResultData::Arrow { batches, .. } => render_arrow_batches(&columns, batches)?,
+        // Completed carries no columns, so the guard above already returned.
+        ResultData::Completed => return Ok(None),
     };
     Ok(Some(table))
 }

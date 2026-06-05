@@ -17,8 +17,9 @@ use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
     HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpQueryResult,
-    HttpQueryResultArgs, HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultData,
-    HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs, QueryResultFormat,
+    HttpQueryResultArgs, HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultCompleted,
+    HttpQueryResultCompletedArgs, HttpQueryResultData, HttpResultSet, HttpResultSetArgs, HttpRow,
+    HttpRowArgs, QueryResultFormat,
 };
 use cubeshared::flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use datafusion::cube_ext;
@@ -328,6 +329,7 @@ impl HttpServer {
                                     HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                                     HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
                                     HttpCommand::QueryResultArrow { .. } => format!("HttpCommand::QueryResultArrow {{}}"),
+                                    HttpCommand::QueryResultCompleted => format!("HttpCommand::QueryResultCompleted"),
                                 };
                                 log::error!(
                                     "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
@@ -409,6 +411,7 @@ impl HttpServer {
                             HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                             HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
                             HttpCommand::QueryResultArrow { .. } => format!("HttpCommand::QueryResultArrow {{}}"),
+                            HttpCommand::QueryResultCompleted => format!("HttpCommand::QueryResultCompleted"),
                         };
                         let res = HttpServer::process_command(
                             sql_service.clone(),
@@ -599,8 +602,16 @@ impl HttpServer {
                         data_frame: query_result.collect().await?,
                     }),
                     QueryResultFormat::Arrow => {
-                        let data = query_result.to_arrow_ipc_stream().await?;
-                        Ok(HttpCommand::QueryResultArrow { data })
+                        // Commands that complete without a result set (CREATE
+                        // TABLE/INSERT, queue/cache writes) carry zero columns.
+                        // There's no Arrow stream to build for them, so signal
+                        // completion with a dedicated result instead.
+                        if query_result.schema().fields().is_empty() {
+                            Ok(HttpCommand::QueryResultCompleted)
+                        } else {
+                            let data = query_result.to_arrow_ipc_stream().await?;
+                            Ok(HttpCommand::QueryResultArrow { data })
+                        }
                     }
                     other => Err(CubeError::user(format!(
                         "Unsupported response_format: {:?}",
@@ -668,6 +679,10 @@ pub enum HttpCommand {
         /// decode it with a streaming IPC reader.
         data: Vec<u8>,
     },
+    /// Command completed without a result set (zero columns) — e.g. CREATE
+    /// TABLE/INSERT or queue/cache writes. Only produced for Arrow-format
+    /// requests; the legacy path returns an empty `ResultSet` instead.
+    QueryResultCompleted,
     CloseConnection {
         error: String,
     },
@@ -685,7 +700,7 @@ impl HttpMessage {
             command_type: match self.command {
                 HttpCommand::Query { .. } => cubeshared::codegen::HttpCommand::HttpQuery,
                 HttpCommand::ResultSet { .. } => cubeshared::codegen::HttpCommand::HttpResultSet,
-                HttpCommand::QueryResultArrow { .. } => {
+                HttpCommand::QueryResultArrow { .. } | HttpCommand::QueryResultCompleted => {
                     cubeshared::codegen::HttpCommand::HttpQueryResult
                 }
                 HttpCommand::CloseConnection { .. } | HttpCommand::Error { .. } => {
@@ -742,6 +757,22 @@ impl HttpMessage {
                             &HttpQueryResultArgs {
                                 data_type: HttpQueryResultData::HttpQueryResultArrow,
                                 data: Some(arrow_table.as_union_value()),
+                            },
+                        )
+                        .as_union_value(),
+                    )
+                }
+                HttpCommand::QueryResultCompleted => {
+                    let completed_table = HttpQueryResultCompleted::create(
+                        &mut builder,
+                        &HttpQueryResultCompletedArgs {},
+                    );
+                    Some(
+                        HttpQueryResult::create(
+                            &mut builder,
+                            &HttpQueryResultArgs {
+                                data_type: HttpQueryResultData::HttpQueryResultCompleted,
+                                data: Some(completed_table.as_union_value()),
                             },
                         )
                         .as_union_value(),
@@ -1059,6 +1090,45 @@ mod tests {
     use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
     use url::Url;
 
+    /// Minimal SqlService that always replies with a fixed DataFrame, used to
+    /// drive process_command in unit tests.
+    struct StubService(Arc<DataFrame>);
+    crate::di_service!(StubService, [SqlService]);
+    #[async_trait]
+    impl SqlService for StubService {
+        async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn exec_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryResult, CubeError> {
+            Ok(QueryResult::Frame(self.0.clone()))
+        }
+        async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn upload_temp_file(
+            &self,
+            _ctx: SqlQueryContext,
+            _name: String,
+            _path: &Path,
+        ) -> Result<(), CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+            unimplemented!("Mock")
+        }
+    }
+
     fn build_types<'a: 'ma, 'ma>(
         builder: &'ma mut FlatBufferBuilder<'a>,
         columns: &Vec<Column>,
@@ -1188,7 +1258,7 @@ mod tests {
     #[tokio::test]
     async fn arrow_response_format_round_trip() -> Result<(), CubeError> {
         use crate::queryplanner::query_executor::batches_to_dataframe;
-        use crate::sql::{timestamp_from_string, QueryResult};
+        use crate::sql::timestamp_from_string;
         use crate::util::decimal::{Decimal, Decimal96};
         use crate::util::int96::Int96;
         use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
@@ -1248,43 +1318,6 @@ mod tests {
         let original_df = Arc::new(DataFrame::new(columns.clone(), rows));
 
         // 2. Drive process_command with response_format = Arrow.
-        struct StubService(Arc<DataFrame>);
-        crate::di_service!(StubService, [SqlService]);
-        #[async_trait]
-        impl SqlService for StubService {
-            async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn exec_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryResult, CubeError> {
-                Ok(QueryResult::Frame(self.0.clone()))
-            }
-            async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn plan_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn upload_temp_file(
-                &self,
-                _ctx: SqlQueryContext,
-                _name: String,
-                _path: &Path,
-            ) -> Result<(), CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
-                unimplemented!("Mock")
-            }
-        }
-
         let svc = Arc::new(StubService(original_df.clone()));
         let resp = HttpServer::process_command(
             svc,
@@ -1336,6 +1369,56 @@ mod tests {
         assert_eq!(decoded.get_rows().len(), original_df.get_rows().len());
 
         insta::assert_snapshot!("arrow_response_format_round_trip", decoded.print());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn arrow_response_format_zero_columns_completed() -> Result<(), CubeError> {
+        use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
+
+        // Write commands (CREATE TABLE/INSERT, queue/cache writes) produce a
+        // result with zero columns. For Arrow-format requests there's no Arrow
+        // stream to build, so the server answers with QueryResultCompleted.
+        let empty_df = Arc::new(DataFrame::new(vec![], vec![]));
+
+        let svc = Arc::new(StubService(empty_df));
+        let resp = HttpServer::process_command(
+            svc,
+            SqlQueryContext::default(),
+            HttpCommand::Query {
+                query: "CREATE TABLE s.t (id int)".to_string(),
+                inline_tables: vec![],
+                trace_obj: None,
+                parameters: None,
+                response_format: QueryResultFormat::Arrow,
+            },
+        )
+        .await?;
+        assert!(
+            matches!(resp, HttpCommand::QueryResultCompleted),
+            "expected QueryResultCompleted, got: {:?}",
+            resp
+        );
+
+        // Round-trip through HttpMessage::bytes() and verify the wire shape.
+        let wire = HttpMessage {
+            message_id: 7,
+            command: HttpCommand::QueryResultCompleted,
+            connection_id: None,
+        }
+        .bytes();
+        let parsed = root_as_http_message(&wire)?;
+        assert_eq!(
+            parsed.command_type(),
+            cubeshared::codegen::HttpCommand::HttpQueryResult
+        );
+        let result = parsed.command_as_http_query_result().unwrap();
+        assert_eq!(
+            result.data_type(),
+            HttpQueryResultData::HttpQueryResultCompleted
+        );
+        assert!(result.data_as_http_query_result_completed().is_some());
 
         Ok(())
     }

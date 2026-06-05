@@ -324,15 +324,16 @@ pub const ENUM_MIN_HTTP_QUERY_RESULT_DATA: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_HTTP_QUERY_RESULT_DATA: u8 = 1;
+pub const ENUM_MAX_HTTP_QUERY_RESULT_DATA: u8 = 2;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_HTTP_QUERY_RESULT_DATA: [HttpQueryResultData; 2] = [
+pub const ENUM_VALUES_HTTP_QUERY_RESULT_DATA: [HttpQueryResultData; 3] = [
     HttpQueryResultData::NONE,
     HttpQueryResultData::HttpQueryResultArrow,
+    HttpQueryResultData::HttpQueryResultCompleted,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -342,15 +343,21 @@ pub struct HttpQueryResultData(pub u8);
 impl HttpQueryResultData {
     pub const NONE: Self = Self(0);
     pub const HttpQueryResultArrow: Self = Self(1);
+    pub const HttpQueryResultCompleted: Self = Self(2);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 1;
-    pub const ENUM_VALUES: &'static [Self] = &[Self::NONE, Self::HttpQueryResultArrow];
+    pub const ENUM_MAX: u8 = 2;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::HttpQueryResultArrow,
+        Self::HttpQueryResultCompleted,
+    ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
         match self {
             Self::NONE => Some("NONE"),
             Self::HttpQueryResultArrow => Some("HttpQueryResultArrow"),
+            Self::HttpQueryResultCompleted => Some("HttpQueryResultCompleted"),
             _ => None,
         }
     }
@@ -2792,6 +2799,89 @@ impl ::core::fmt::Debug for HttpQueryResultArrow<'_> {
         ds.finish()
     }
 }
+pub enum HttpQueryResultCompletedOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct HttpQueryResultCompleted<'a> {
+    pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for HttpQueryResultCompleted<'a> {
+    type Inner = HttpQueryResultCompleted<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { ::flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> HttpQueryResultCompleted<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+        HttpQueryResultCompleted { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<
+        'bldr: 'args,
+        'args: 'mut_bldr,
+        'mut_bldr,
+        A: ::flatbuffers::Allocator + 'bldr,
+    >(
+        _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+        _args: &'args HttpQueryResultCompletedArgs,
+    ) -> ::flatbuffers::WIPOffset<HttpQueryResultCompleted<'bldr>> {
+        let mut builder = HttpQueryResultCompletedBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl ::flatbuffers::Verifiable for HttpQueryResultCompleted<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut ::flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct HttpQueryResultCompletedArgs {}
+impl<'a> Default for HttpQueryResultCompletedArgs {
+    #[inline]
+    fn default() -> Self {
+        HttpQueryResultCompletedArgs {}
+    }
+}
+
+pub struct HttpQueryResultCompletedBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> HttpQueryResultCompletedBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> HttpQueryResultCompletedBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        HttpQueryResultCompletedBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> ::flatbuffers::WIPOffset<HttpQueryResultCompleted<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        ::flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl ::core::fmt::Debug for HttpQueryResultCompleted<'_> {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        let mut ds = f.debug_struct("HttpQueryResultCompleted");
+        ds.finish()
+    }
+}
 pub enum HttpQueryResultOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -2876,6 +2966,20 @@ impl<'a> HttpQueryResult<'a> {
             None
         }
     }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn data_as_http_query_result_completed(&self) -> Option<HttpQueryResultCompleted<'a>> {
+        if self.data_type() == HttpQueryResultData::HttpQueryResultCompleted {
+            let u = self.data();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { HttpQueryResultCompleted::init_from_table(u) })
+        } else {
+            None
+        }
+    }
 }
 
 impl ::flatbuffers::Verifiable for HttpQueryResult<'_> {
@@ -2885,26 +2989,14 @@ impl ::flatbuffers::Verifiable for HttpQueryResult<'_> {
         pos: usize,
     ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
         v.visit_table(pos)?
-            .visit_union::<HttpQueryResultData, _>(
-                "data_type",
-                Self::VT_DATA_TYPE,
-                "data",
-                Self::VT_DATA,
-                true,
-                |key, v, pos| {
-                    match key {
-                        HttpQueryResultData::HttpQueryResultArrow => v
-                            .verify_union_variant::<::flatbuffers::ForwardsUOffset<
-                            HttpQueryResultArrow,
-                        >>(
-                            "HttpQueryResultData::HttpQueryResultArrow",
-                            pos,
-                        ),
-                        _ => Ok(()),
-                    }
-                },
-            )?
-            .finish();
+     .visit_union::<HttpQueryResultData, _>("data_type", Self::VT_DATA_TYPE, "data", Self::VT_DATA, true, |key, v, pos| {
+        match key {
+          HttpQueryResultData::HttpQueryResultArrow => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<HttpQueryResultArrow>>("HttpQueryResultData::HttpQueryResultArrow", pos),
+          HttpQueryResultData::HttpQueryResultCompleted => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<HttpQueryResultCompleted>>("HttpQueryResultData::HttpQueryResultCompleted", pos),
+          _ => Ok(()),
+        }
+     })?
+     .finish();
         Ok(())
     }
 }
@@ -2965,6 +3057,16 @@ impl ::core::fmt::Debug for HttpQueryResult<'_> {
         match self.data_type() {
             HttpQueryResultData::HttpQueryResultArrow => {
                 if let Some(x) = self.data_as_http_query_result_arrow() {
+                    ds.field("data", &x)
+                } else {
+                    ds.field(
+                        "data",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            HttpQueryResultData::HttpQueryResultCompleted => {
+                if let Some(x) = self.data_as_http_query_result_completed() {
                     ds.field("data", &x)
                 } else {
                     ds.field(

@@ -71,8 +71,13 @@ table HttpQueryResultArrow {
     is_last: bool;
 }
 
+// Returned for commands that complete without a result set (zero columns):
+// CREATE TABLE/INSERT, queue/cache writes. A marker — carries no payload.
+table HttpQueryResultCompleted {}
+
 union HttpQueryResultData {
     HttpQueryResultArrow,
+    HttpQueryResultCompleted,
 }
 
 table HttpQueryResult {
