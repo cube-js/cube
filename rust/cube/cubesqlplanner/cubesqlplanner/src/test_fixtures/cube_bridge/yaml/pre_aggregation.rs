@@ -134,13 +134,19 @@ impl YamlPreAggregationDefinition {
             })
             .collect::<Vec<_>>();
 
+        // Mirror the JS default (CUBEJS_EXTERNAL_DEFAULT=true): rollup and
+        // rollupJoin are external unless explicitly set otherwise.
+        let external = self.external.or_else(|| {
+            matches!(self.pre_aggregation_type.as_str(), "rollup" | "rollupJoin").then_some(true)
+        });
+
         Rc::new(
             MockPreAggregationDescription::builder()
                 .name(name)
                 .pre_aggregation_type(self.pre_aggregation_type)
                 .granularity(self.granularity)
                 .sql_alias(self.sql_alias)
-                .external(self.external)
+                .external(external)
                 .allow_non_strict_date_range_match(self.allow_non_strict_date_range_match)
                 .measure_references_opt(measure_references)
                 .dimension_references_opt(dimension_references)

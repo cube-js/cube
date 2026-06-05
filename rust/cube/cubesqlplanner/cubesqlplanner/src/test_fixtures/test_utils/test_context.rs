@@ -193,7 +193,8 @@ impl TestContext {
             let driver_tools = MockDriverTools::with_sql_templates_and_timezone(
                 MockSqlTemplatesRender::cubestore_templates(),
                 timezone.to_string(),
-            );
+            )
+            .with_cubestore_dialect();
             base_tools.set_external_driver_tools(Rc::new(driver_tools));
         }
         let join_graph = Rc::new(schema.create_join_graph()?);
@@ -476,6 +477,44 @@ impl TestContext {
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
         planner.plan()
+    }
+
+    /// Executes the query the way production would route it: when the query
+    /// is covered by external pre-aggregations it runs on CubeStore (skipped,
+    /// returning `None`, unless built with `integration-cubestore`); otherwise
+    /// it runs against the source Postgres. Matches the JS default where
+    /// rollups are external (CUBEJS_EXTERNAL_DEFAULT=true) and thus served by
+    /// CubeStore, while `external: false` pre-aggs stay in the source DB.
+    #[cfg(feature = "integration-postgres")]
+    pub async fn try_execute(&self, query_yaml: &str, seed_file: &str) -> Option<String> {
+        let (_, usages) = self
+            .build_sql_with_used_pre_aggregations(query_yaml)
+            .expect("Failed to plan query");
+        let external = !usages.is_empty() && usages.iter().all(|u| u.pre_aggregation.external());
+
+        if external {
+            // Ensure the CubeStore dialect regardless of how this context was
+            // built, so callers need not pick the constructor.
+            let cs_ctx = if self.external_cubestore {
+                None
+            } else {
+                Some(
+                    Self::new_with_external_cubestore(self.schema.clone())
+                        .expect("Failed to create external CubeStore context"),
+                )
+            };
+            match &cs_ctx {
+                Some(ctx) => ctx.try_execute_cubestore(query_yaml, seed_file).await,
+                None => self.try_execute_cubestore(query_yaml, seed_file).await,
+            }
+        } else {
+            self.try_execute_pg(query_yaml, seed_file).await
+        }
+    }
+
+    #[cfg(not(feature = "integration-postgres"))]
+    pub async fn try_execute(&self, _query_yaml: &str, _seed_file: &str) -> Option<String> {
+        None
     }
 
     #[cfg(feature = "integration-postgres")]
@@ -785,7 +824,7 @@ impl TestContext {
                     .collect()
             })
             .unwrap_or_default();
-        let formatted_rows: Vec<Vec<String>> = rows
+        let mut formatted_rows: Vec<Vec<String>> = rows
             .iter()
             .map(|r| {
                 (0..r.columns_ref().len())
@@ -793,6 +832,11 @@ impl TestContext {
                     .collect()
             })
             .collect();
+
+        // CubeStore parallel aggregation yields rows in nondeterministic
+        // order; sort for stable snapshots without requiring ORDER BY in
+        // every query.
+        formatted_rows.sort();
 
         Some(super::integration_context::format_rows_table(
             columns,

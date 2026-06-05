@@ -27,10 +27,10 @@ async fn test_basic_pre_agg_sql() {
     assert_eq!(pre_aggrs[0].name(), "daily_rollup");
 
     if let Some(result) = test_context
-        .try_execute_pg(query_yaml, "pre_aggregation_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_tables.sql")
         .await
     {
-        insta::assert_snapshot!("basic_pre_agg_sql_pg_result", result);
+        insta::assert_snapshot!("basic_pre_agg_sql_cubestore_result", result);
     }
 }
 
@@ -57,10 +57,10 @@ async fn test_full_match_main_rollup() {
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("full_match_main_rollup_pg_result", result);
+        insta::assert_snapshot!("full_match_main_rollup_cubestore_result", result);
     }
 }
 
@@ -85,10 +85,10 @@ async fn test_partial_match_main_rollup() {
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("partial_match_main_rollup_pg_result", result);
+        insta::assert_snapshot!("partial_match_main_rollup_cubestore_result", result);
     }
 }
 
@@ -114,10 +114,10 @@ async fn test_full_match_non_additive_measure() {
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("full_match_non_additive_measure_pg_result", result);
+        insta::assert_snapshot!("full_match_non_additive_measure_cubestore_result", result);
     }
 }
 
@@ -163,10 +163,10 @@ async fn test_daily_rollup_full_match() {
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("daily_rollup_full_match_pg_result", result);
+        insta::assert_snapshot!("daily_rollup_full_match_cubestore_result", result);
     }
 }
 
@@ -194,10 +194,10 @@ async fn test_daily_rollup_coarser_granularity() {
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("daily_rollup_coarser_granularity_pg_result", result);
+        insta::assert_snapshot!("daily_rollup_coarser_granularity_cubestore_result", result);
     }
 }
 
@@ -246,10 +246,13 @@ async fn test_daily_rollup_non_additive_full_match() {
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("daily_rollup_non_additive_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "daily_rollup_non_additive_full_match_cubestore_result",
+            result
+        );
     }
 }
 
@@ -298,10 +301,13 @@ async fn test_multi_level_all_base_measures_full_match() {
     assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_level_all_base_measures_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_level_all_base_measures_full_match_cubestore_result",
+            result
+        );
     }
 }
 
@@ -326,11 +332,11 @@ async fn test_multi_level_all_base_measures_partial_match() {
     assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "multi_level_all_base_measures_partial_match_pg_result",
+            "multi_level_all_base_measures_partial_match_cubestore_result",
             result
         );
     }
@@ -376,11 +382,11 @@ async fn test_multi_level_calculated_measure_full_match() {
     assert_eq!(pre_aggrs[0].name(), "calculated_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "multi_level_calculated_measure_full_match_pg_result",
+            "multi_level_calculated_measure_full_match_cubestore_result",
             result
         );
     }
@@ -408,10 +414,13 @@ async fn test_multi_level_mixed_measure_full_match() {
     assert_eq!(pre_aggrs[0].name(), "mixed_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_level_mixed_measure_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_level_mixed_measure_full_match_cubestore_result",
+            result
+        );
     }
 }
 
@@ -455,10 +464,13 @@ async fn test_base_and_calculated_measure_full_match() {
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("base_and_calculated_measure_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "base_and_calculated_measure_full_match_cubestore_result",
+            result
+        );
     }
 }
 
@@ -483,11 +495,11 @@ async fn test_base_and_calculated_measure_parital_match() {
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "base_and_calculated_measure_parital_match_pg_result",
+            "base_and_calculated_measure_parital_match_cubestore_result",
             result
         );
     }
@@ -521,10 +533,10 @@ async fn test_segment_full_match() {
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("segment_full_match_pg_result", result);
+        insta::assert_snapshot!("segment_full_match_cubestore_result", result);
     }
 }
 
@@ -552,10 +564,13 @@ async fn test_segment_partial_match_unused_segment() {
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("segment_partial_match_unused_segment_pg_result", result);
+        insta::assert_snapshot!(
+            "segment_partial_match_unused_segment_cubestore_result",
+            result
+        );
     }
 }
 
@@ -606,10 +621,10 @@ async fn test_custom_granularity_full_match() {
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("custom_granularity_full_match_pg_result", result);
+        insta::assert_snapshot!("custom_granularity_full_match_cubestore_result", result);
     }
 }
 
@@ -637,10 +652,13 @@ async fn test_standard_pre_agg_coarser_custom_query() {
     assert_eq!(pre_aggrs[0].name(), "daily_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("standard_pre_agg_coarser_custom_query_pg_result", result);
+        insta::assert_snapshot!(
+            "standard_pre_agg_coarser_custom_query_cubestore_result",
+            result
+        );
     }
 }
 
@@ -710,11 +728,11 @@ async fn test_custom_granularity_non_additive_full_match() {
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "custom_granularity_non_additive_full_match_pg_result",
+            "custom_granularity_non_additive_full_match_cubestore_result",
             result
         );
     }
@@ -763,10 +781,13 @@ async fn test_custom_granularity_non_strict_self_match() {
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_non_strict");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("custom_granularity_non_strict_self_match_pg_result", result);
+        insta::assert_snapshot!(
+            "custom_granularity_non_strict_self_match_cubestore_result",
+            result
+        );
     }
 }
 
@@ -796,10 +817,10 @@ async fn test_segment_with_coarser_granularity() {
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("segment_with_coarser_granularity_pg_result", result);
+        insta::assert_snapshot!("segment_with_coarser_granularity_cubestore_result", result);
     }
 }
 
@@ -824,11 +845,11 @@ async fn test_multi_stage_count_distinct_sum_by_quarter_with_pre_aggregation() {
     assert_eq!(pre_aggrs[0].name(), "main");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "multi_stage_sum_by_quarter_tables.sql")
+        .try_execute(query_yaml, "multi_stage_sum_by_quarter_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "multi_stage_count_distinct_sum_by_quarter_with_pre_agg_pg_result",
+            "multi_stage_count_distinct_sum_by_quarter_with_pre_agg_cubestore_result",
             result
         );
     }
@@ -870,10 +891,10 @@ async fn test_multi_stage_separate_pre_aggregations() {
     );
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "multi_stage_separate_pre_aggs_tables.sql")
+        .try_execute(query_yaml, "multi_stage_separate_pre_aggs_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_stage_separate_pre_aggs_pg_result", result);
+        insta::assert_snapshot!("multi_stage_separate_pre_aggs_cubestore_result", result);
     }
 }
 
@@ -934,10 +955,13 @@ async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
     );
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "multi_stage_pre_agg_time_shift_tables.sql")
+        .try_execute(query_yaml, "multi_stage_pre_agg_time_shift_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_stage_separate_pre_aggs_time_shift_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_stage_separate_pre_aggs_time_shift_cubestore_result",
+            result
+        );
     }
 }
 

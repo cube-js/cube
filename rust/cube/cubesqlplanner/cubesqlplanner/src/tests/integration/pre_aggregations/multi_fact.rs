@@ -36,7 +36,7 @@ async fn test_multi_fact_separate_pre_aggs_totals() {
         names
     );
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -72,7 +72,7 @@ async fn test_multi_fact_separate_pre_aggs_by_shared_dim() {
         names
     );
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -111,7 +111,7 @@ async fn test_multi_fact_whole_query_single_rollup_match() {
     );
     assert_eq!(pre_aggrs[0].name(), "multi_fact_combined");
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -158,7 +158,7 @@ async fn test_fact_plus_multiplied_separate_pre_aggs() {
         names
     );
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -195,7 +195,7 @@ async fn test_multiplied_whole_query_single_rollup_match() {
     );
     assert_eq!(pre_aggrs[0].name(), "customers_by_order_status");
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -242,7 +242,7 @@ async fn test_multi_fact_plus_multiplied_shared_pre_agg() {
         names
     );
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -299,7 +299,7 @@ async fn test_regular_plus_two_multiplied_separate_pre_aggs() {
         names
     );
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -343,7 +343,7 @@ async fn test_multi_fact_separate_pre_aggs_by_shared_dim_filtered() {
     assert!(names.contains(&"orders_by_customer_city_with_name"));
     assert!(names.contains(&"returns_by_customer_city_with_name"));
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -375,7 +375,7 @@ async fn test_multi_fact_whole_query_single_rollup_match_filtered() {
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "multi_fact_combined_with_name");
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -415,7 +415,7 @@ async fn test_multi_fact_plus_multiplied_shared_pre_agg_filtered() {
     assert_eq!(combo_count, 2);
     assert!(names.contains(&"returns_by_customer_city_with_name"));
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -445,7 +445,7 @@ async fn test_multiplied_whole_query_single_rollup_match_filtered() {
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "customers_by_order_status_with_name");
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -480,7 +480,7 @@ async fn test_multi_fact_partial_match_rolls_back() {
             .collect::<Vec<_>>()
     );
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
