@@ -5529,6 +5529,71 @@ mod tests {
         }).await;
         Ok(())
     }
+
+    #[tokio::test]
+    async fn explain_analyze_detailed() -> Result<(), CubeError> {
+        Config::test("explain_detailed_router").update_config(|mut config| {
+            config.select_workers = vec!["127.0.0.1:14016".to_string()];
+            config.metastore_bind_address = Some("127.0.0.1:15016".to_string());
+            config.compaction_chunks_count_threshold = 0;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            Config::test("explain_detailed_worker_1").update_config(|mut config| {
+                config.worker_bind_address = Some("127.0.0.1:14016".to_string());
+                config.server_name = "127.0.0.1:14016".to_string();
+                config.metastore_remote_address = Some("127.0.0.1:15016".to_string());
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: Some(env::current_dir()
+                        .unwrap()
+                        .join("explain_detailed_router-upstream".to_string())),
+                };
+                config.compaction_chunks_count_threshold = 0;
+                config
+            }).start_test_worker(async move |_| {
+                service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await?.collect().await?;
+                service.exec_query(
+                    "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'ios', 17, 4), (3, 'ios', 20, 5)"
+                ).await?.collect().await?;
+
+                let result = service.exec_query(
+                    "EXPLAIN ANALYZE DETAILED SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
+                ).await?.collect().await?;
+
+                // Single "trace" cell holding the whole report.
+                assert_eq!(result.get_columns().len(), 1);
+                assert_eq!(result.get_rows().len(), 1);
+                let trace = match &result.get_rows()[0].values()[0] {
+                    TableValue::String(s) => s.clone(),
+                    v => panic!("expected string trace, got {:?}", v),
+                };
+
+                // Smoke check: the whole path produced the levels + the summary.
+                // (The test harness runs the worker in-process, without the select
+                // subprocess pool, so no `subprocess ·` section here.)
+                for marker in [
+                    "summary by category",
+                    "router",
+                    "Metastore",
+                    "main \u{b7}",
+                    "worker \u{b7}",
+                    "Planning",
+                    "Execution",
+                    "transport.",
+                    "plan:",
+                ] {
+                    assert!(trace.contains(marker), "trace missing '{}':\n{}", marker, trace);
+                }
+
+                Ok::<(), CubeError>(())
+            }).await;
+            Ok::<(), CubeError>(())
+        }).await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn create_aggr_index() -> Result<(), CubeError> {
         assert!(true);
