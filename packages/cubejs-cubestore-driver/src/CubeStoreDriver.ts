@@ -31,6 +31,8 @@ const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
   queueExternalId: '1.6.26',
   sendableParameters: '1.6.38',
+  // Arrow format + Completed response type
+  arrowFormat: '1.6.55',
 } satisfies Record<string, string>;
 type CubeStoreCapability = keyof typeof CubeStoreCapabilityMinVersion;
 
@@ -116,9 +118,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return this.connection.query(query, sendParameters ? values : [], {
       inlineTables: inlineTables ?? [],
       queryTracingObj: tracingObj,
-      // Arrow is a default format for Cube Store, but
-      // an old Cube Store will ignore this option and will continue to serve results in Legacy format
-      responseFormat: responseFormat ?? QueryResultFormat.Arrow,
+      responseFormat: responseFormat ?? (
+        await this.hasCapability('arrowFormat') ? QueryResultFormat.Arrow : QueryResultFormat.Legacy
+      ),
     });
   }
 
