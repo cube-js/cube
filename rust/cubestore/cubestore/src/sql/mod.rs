@@ -712,6 +712,16 @@ impl SqlServiceImpl {
     }
 
     fn render_query_trace(trace: &QueryTrace) -> DataFrame {
+        fn fmt_dur(us: u64) -> String {
+            if us >= 1_000_000 {
+                format!("{:.2}s", us as f64 / 1_000_000.0)
+            } else if us >= 1_000 {
+                format!("{:.2}ms", us as f64 / 1_000.0)
+            } else {
+                format!("{}us", us)
+            }
+        }
+
         fn fmt_bytes(b: u64) -> String {
             if b >= 1 << 20 {
                 format!("{:.1}MB", b as f64 / (1u64 << 20) as f64)
@@ -726,9 +736,31 @@ impl SqlServiceImpl {
             ops.iter().find(|o| o.label == label).map(|o| o.elapsed_us)
         }
 
-        // Renders one region (a node in the topology) and its measurements as an
-        // indented block: a header line, then `label   value` lines aligned within
-        // the region, then the physical plan as a nested block.
+        fn bump(totals: &mut Vec<(String, u64)>, key: &str, v: u64) {
+            match totals.iter_mut().find(|(k, _)| k == key) {
+                Some(e) => e.1 += v,
+                None => totals.push((key.to_string(), v)),
+            }
+        }
+
+        // Round-trip / execution wrappers contain other measured ops, so they are
+        // excluded from the category summary to avoid double counting.
+        fn add_ops(totals: &mut Vec<(String, u64)>, ops: &[OpSample]) {
+            const WRAPPERS: [&str; 4] = [
+                "route_select_detailed",
+                "ipc.select",
+                "main.execute",
+                "subprocess.execute",
+            ];
+            for op in ops {
+                if !WRAPPERS.contains(&op.label.as_str()) {
+                    bump(totals, &format!("{:?}", op.kind), op.elapsed_us);
+                }
+            }
+        }
+
+        // Renders one region (a node in the topology) as an indented block: header,
+        // then `kind  label  value` lines aligned within the region, then the plan.
         fn region(
             out: &mut String,
             depth: usize,
@@ -742,27 +774,44 @@ impl SqlServiceImpl {
             out.push_str(&format!("{}{}\n", pad, header));
             let ipad = format!("{}  ", pad);
 
-            let mut entries: Vec<(String, String)> = Vec::new();
+            let mut entries: Vec<(String, String, String)> = Vec::new();
             for op in ops {
-                let mut v = format!("{:>8}us", op.elapsed_us);
+                let mut v = format!("{:>9}", fmt_dur(op.elapsed_us));
                 if let Some(b) = op.bytes {
                     v.push_str(&format!("  {:>8}", fmt_bytes(b)));
                 }
                 if let Some(r) = op.rows {
                     v.push_str(&format!("  {:>9} rows", r));
                 }
-                entries.push((op.label.clone(), v));
+                entries.push((format!("{:?}", op.kind), op.label.clone(), v));
             }
             for (label, us) in transports {
-                entries.push((label.to_string(), format!("{:>8}us", us)));
+                entries.push((
+                    "Transport".to_string(),
+                    label.to_string(),
+                    format!("{:>9}", fmt_dur(*us)),
+                ));
             }
             if let Some(m) = memory {
-                entries.push(("mem.peak".to_string(), format!("{:>10}", fmt_bytes(m))));
+                entries.push((
+                    "Memory".to_string(),
+                    "exec.peak".to_string(),
+                    format!("{:>9}", fmt_bytes(m)),
+                ));
             }
 
-            let w = entries.iter().map(|(l, _)| l.len()).max().unwrap_or(0);
-            for (label, value) in &entries {
-                out.push_str(&format!("{}{:<w$}  {}\n", ipad, label, value, w = w));
+            let kw = entries.iter().map(|(k, _, _)| k.len()).max().unwrap_or(0);
+            let lw = entries.iter().map(|(_, l, _)| l.len()).max().unwrap_or(0);
+            for (kind, label, value) in &entries {
+                out.push_str(&format!(
+                    "{}{:<kw$}  {:<lw$}  {}\n",
+                    ipad,
+                    kind,
+                    label,
+                    value,
+                    kw = kw,
+                    lw = lw
+                ));
             }
             if let Some(p) = plan {
                 out.push_str(&format!("{}plan:\n", ipad));
@@ -772,7 +821,42 @@ impl SqlServiceImpl {
             }
         }
 
+        // ---- category summary (sum of elapsed by kind, wrappers excluded) ----
+        let mut totals: Vec<(String, u64)> = Vec::new();
+        let mut transport_total = 0u64;
+        add_ops(&mut totals, &trace.router.ops);
+        if let Some(main) = &trace.main {
+            add_ops(&mut totals, &main.ops);
+            if let Some(rt) = find_elapsed(&trace.router.ops, "route_select_detailed") {
+                transport_total += rt.saturating_sub(main.total_us);
+            }
+            for w in &main.workers {
+                add_ops(&mut totals, &w.ops);
+                if let Some(rt) = w.net_roundtrip_us {
+                    transport_total += rt.saturating_sub(w.total_us);
+                }
+                if let Some(sub) = &w.subprocess {
+                    add_ops(&mut totals, &sub.ops);
+                    if let Some(rt) = find_elapsed(&w.ops, "ipc.select") {
+                        transport_total += rt.saturating_sub(sub.total_us);
+                    }
+                }
+            }
+        }
+        if transport_total > 0 {
+            bump(&mut totals, "Transport", transport_total);
+        }
+        totals.sort_by(|a, b| b.1.cmp(&a.1));
+
         let mut out = String::new();
+        out.push_str("summary by category:\n");
+        let sw = totals.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+        for (k, v) in &totals {
+            out.push_str(&format!("  {:<sw$}  {:>9}\n", k, fmt_dur(*v), sw = sw));
+        }
+        out.push_str("  (metastore is within planning; transport = wire + queue)\n\n");
+
+        // ---- tree ----
         region(&mut out, 0, "router", &trace.router.ops, &[], None, None);
         if let Some(main) = &trace.main {
             let mut t = Vec::new();
