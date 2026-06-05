@@ -37,6 +37,12 @@ fn register_atexit_cleanup(pid: u32, data_dir: PathBuf) {
 static CS_INSTANCE: OnceCell<CubeStoreInstance> = OnceCell::const_new();
 static SCHEMA_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+/// Resolves the cubestored binary. Default is the downloaded release binary
+/// (`@cubejs-backend/cubestore` postinstall), which suits Tesseract
+/// development. Set `CUBESTORED_LOCAL_BUILD=1` to use a locally built binary
+/// from `rust/cubestore/target` (for CubeStore development); the release
+/// profile is preferred since a debug build stack-overflows on deep
+/// multi-stage plans. `CUBESTORED_BIN_PATH` overrides everything.
 fn cubestored_bin() -> PathBuf {
     if let Ok(path) = std::env::var("CUBESTORED_BIN_PATH") {
         let path = PathBuf::from(path);
@@ -47,20 +53,32 @@ fn cubestored_bin() -> PathBuf {
     }
 
     let cubestore_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../cubestore");
-    for candidate in [
-        cubestore_root.join("target/release/cubestored"),
-        cubestore_root.join("target/debug/cubestored"),
-        cubestore_root.join("downloaded/latest/bin/cubestored"),
-    ] {
-        if candidate.exists() {
-            return candidate;
+
+    if std::env::var("CUBESTORED_LOCAL_BUILD").is_ok_and(|v| !v.is_empty()) {
+        for candidate in [
+            cubestore_root.join("target/release/cubestored"),
+            cubestore_root.join("target/debug/cubestored"),
+        ] {
+            if candidate.exists() {
+                return candidate;
+            }
         }
+        panic!(
+            "CUBESTORED_LOCAL_BUILD is set but no local binary found. Build it with \
+             `cargo build --release -p cubestore --bin cubestored` in rust/cubestore"
+        );
+    }
+
+    let downloaded = cubestore_root.join("downloaded/latest/bin/cubestored");
+    if downloaded.exists() {
+        return downloaded;
     }
 
     panic!(
-        "cubestored binary not found. Build it with \
-         `cargo build -p cubestore --bin cubestored` in rust/cubestore \
-         or set CUBESTORED_BIN_PATH"
+        "cubestored binary not found at {:?}. Install it via the \
+         @cubejs-backend/cubestore package, or set CUBESTORED_LOCAL_BUILD=1 \
+         to use a local `cargo build` from rust/cubestore, or CUBESTORED_BIN_PATH",
+        downloaded
     );
 }
 
