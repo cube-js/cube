@@ -1090,6 +1090,45 @@ mod tests {
     use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
     use url::Url;
 
+    /// Minimal SqlService that always replies with a fixed DataFrame, used to
+    /// drive process_command in unit tests.
+    struct StubService(Arc<DataFrame>);
+    crate::di_service!(StubService, [SqlService]);
+    #[async_trait]
+    impl SqlService for StubService {
+        async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn exec_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryResult, CubeError> {
+            Ok(QueryResult::Frame(self.0.clone()))
+        }
+        async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn upload_temp_file(
+            &self,
+            _ctx: SqlQueryContext,
+            _name: String,
+            _path: &Path,
+        ) -> Result<(), CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+            unimplemented!("Mock")
+        }
+    }
+
     fn build_types<'a: 'ma, 'ma>(
         builder: &'ma mut FlatBufferBuilder<'a>,
         columns: &Vec<Column>,
@@ -1219,7 +1258,7 @@ mod tests {
     #[tokio::test]
     async fn arrow_response_format_round_trip() -> Result<(), CubeError> {
         use crate::queryplanner::query_executor::batches_to_dataframe;
-        use crate::sql::{timestamp_from_string, QueryResult};
+        use crate::sql::timestamp_from_string;
         use crate::util::decimal::{Decimal, Decimal96};
         use crate::util::int96::Int96;
         use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
@@ -1279,43 +1318,6 @@ mod tests {
         let original_df = Arc::new(DataFrame::new(columns.clone(), rows));
 
         // 2. Drive process_command with response_format = Arrow.
-        struct StubService(Arc<DataFrame>);
-        crate::di_service!(StubService, [SqlService]);
-        #[async_trait]
-        impl SqlService for StubService {
-            async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn exec_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryResult, CubeError> {
-                Ok(QueryResult::Frame(self.0.clone()))
-            }
-            async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn plan_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn upload_temp_file(
-                &self,
-                _ctx: SqlQueryContext,
-                _name: String,
-                _path: &Path,
-            ) -> Result<(), CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
-                unimplemented!("Mock")
-            }
-        }
-
         let svc = Arc::new(StubService(original_df.clone()));
         let resp = HttpServer::process_command(
             svc,
@@ -1373,50 +1375,12 @@ mod tests {
 
     #[tokio::test]
     async fn arrow_response_format_zero_columns_completed() -> Result<(), CubeError> {
-        use crate::sql::QueryResult;
         use cubeshared::codegen::{root_as_http_message, HttpQueryResultData};
 
         // Write commands (CREATE TABLE/INSERT, queue/cache writes) produce a
         // result with zero columns. For Arrow-format requests there's no Arrow
         // stream to build, so the server answers with QueryResultCompleted.
         let empty_df = Arc::new(DataFrame::new(vec![], vec![]));
-
-        struct StubService(Arc<DataFrame>);
-        crate::di_service!(StubService, [SqlService]);
-        #[async_trait]
-        impl SqlService for StubService {
-            async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn exec_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryResult, CubeError> {
-                Ok(QueryResult::Frame(self.0.clone()))
-            }
-            async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn plan_query_with_context(
-                &self,
-                _ctx: SqlQueryContext,
-                _q: &str,
-            ) -> Result<QueryPlans, CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn upload_temp_file(
-                &self,
-                _ctx: SqlQueryContext,
-                _name: String,
-                _path: &Path,
-            ) -> Result<(), CubeError> {
-                unimplemented!("Mock")
-            }
-            async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
-                unimplemented!("Mock")
-            }
-        }
 
         let svc = Arc::new(StubService(empty_df));
         let resp = HttpServer::process_command(
