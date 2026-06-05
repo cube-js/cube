@@ -12,6 +12,8 @@ use typed_builder::TypedBuilder;
 
 /// Mirrors the JS pre-aggregation description's `createTableIndexes` entries:
 /// member references resolved to columns at table creation time.
+// Only read by the CubeStore table builder, which is integration-cubestore-gated.
+#[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
 #[derive(Debug, Clone)]
 pub struct MockPreAggregationIndex {
     pub name: String,
@@ -46,10 +48,12 @@ pub struct MockPreAggregationDescription {
     #[builder(default)]
     time_dimension_references: Option<Vec<Rc<MockPreAggregationTimeDimension>>>,
     #[builder(default)]
+    #[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
     indexes: Vec<MockPreAggregationIndex>,
 }
 
 impl MockPreAggregationDescription {
+    #[cfg_attr(not(feature = "integration-cubestore"), allow(dead_code))]
     pub fn indexes(&self) -> &[MockPreAggregationIndex] {
         &self.indexes
     }
