@@ -17,6 +17,25 @@ The AI agent interprets your questions, generates queries against your semantic 
 - **Queued messages** – Send follow-up messages while the agent is still processing
 - **Save to Workbook** – Export insights to [Workbooks](/docs/explore-analyze/workbooks) for further analysis
 
+## Discover available fields
+
+You can ask the AI agent what's available in your semantic model before
+diving into analysis. This is useful when you're new to a deployment or
+exploring an unfamiliar view.
+
+Try prompts like:
+
+- "What fields are available?"
+- "What measures and dimensions can I query in the Orders view?"
+- "Describe the fields in the Customers view and what each one means."
+- "What does the `lifetime_value` measure represent?"
+
+The agent uses the descriptions and [AI context](/docs/data-modeling/ai-context)
+defined on your views, measures, and dimensions to answer. Well-documented
+semantic models produce better answers — see
+[AI context best practices](/docs/data-modeling/ai-context#best-practices)
+for guidance on writing descriptions the agent can use.
+
 ## Queued messages
 
 You can send follow-up messages while the AI agent is still processing a
