@@ -21,7 +21,7 @@ tags:
   - name: Reports
   - name: Workbooks
 paths:
-  /v1/deployments/:
+  /v1/deployments:
     get:
       operationId: getDeployments
       parameters:

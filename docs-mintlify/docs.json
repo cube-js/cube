@@ -718,7 +718,7 @@
                 "group": "Deployments",
                 "openapi": "/api-reference/deployments.yaml",
                 "pages": [
-                  "GET /v1/deployments/",
+                  "GET /v1/deployments",
                   "GET /v1/deployments/{deploymentId}",
                   "POST /v1/deployments/{deploymentId}/token"
                 ]
