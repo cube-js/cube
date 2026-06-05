@@ -1,30 +1,41 @@
 ---
 title: Authentication
-description: Authenticate SCIM API requests with a bearer token.
+description: Authenticate REST requests with an API key and SCIM requests with a bearer token.
 ---
 
-The SCIM API authenticates requests with a bearer token issued from your Cube
-Cloud account. Include it in the `Authorization` header on every request:
+How you authenticate depends on which API you call. The REST management API
+(`/api/v1/…`) uses an API key; the SCIM API (`/api/scim/v2/…`) uses a bearer
+token. Both are sent in the `Authorization` header, and only HTTPS is accepted.
+
+## REST API (`/api/v1`)
+
+Authenticate deployment, report, and workbook requests with an API key from your
+Cube Cloud account, sent with the `Api-Key` prefix:
+
+```text
+Authorization: Api-Key <YOUR_API_KEY>
+```
+
+Generate an API key (access token) in your Cube Cloud account settings.
+
+```bash
+curl --request GET \
+  --url 'https://<tenant>.cubecloud.dev/api/v1/deployments' \
+  --header 'Authorization: Api-Key <YOUR_API_KEY>'
+```
+
+## SCIM API (`/api/scim/v2`)
+
+Authenticate user and group provisioning requests with a SCIM bearer token,
+configured in your identity provider's SCIM integration:
 
 ```text
 Authorization: Bearer <YOUR_SCIM_TOKEN>
 ```
 
-## Get a token
-
 Generate a SCIM token in your Cube Cloud account settings, then configure it in
-your identity provider's SCIM integration alongside the
+your identity provider alongside the
 [base URL](/api-reference/introduction#base-url).
-
-<Warning>
-
-Treat the SCIM token like a password. It grants full access to provision and
-de-provision users and groups. Store it securely and rotate it if it is
-exposed.
-
-</Warning>
-
-## Example request
 
 ```bash
 curl --request GET \
@@ -32,5 +43,12 @@ curl --request GET \
   --header 'Authorization: Bearer <YOUR_SCIM_TOKEN>'
 ```
 
-A `401 Unauthorized` response means the token is missing, malformed, or
+<Warning>
+
+Treat API keys and SCIM tokens like passwords — they grant full access to your
+account's resources. Store them securely and rotate them if they are exposed.
+
+</Warning>
+
+A `401 Unauthorized` response means the credential is missing, malformed, or
 expired.

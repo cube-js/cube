@@ -92,16 +92,27 @@ function collectRefs(node, acc) {
 const wanted = new Set();
 collectRefs(paths, wanted);
 const schemas = {};
+const missing = [];
 const queue = [...wanted];
 while (queue.length) {
   const name = queue.shift();
   if (schemas[name]) continue;
   const def = src.components.schemas[name];
-  if (!def) { console.warn('MISSING schema:', name); continue; }
+  if (!def) { missing.push(name); continue; }
   schemas[name] = def;
   const sub = new Set();
   collectRefs(def, sub);
   for (const s of sub) if (!schemas[s]) queue.push(s);
+}
+// Hard-fail rather than shipping deployments.yaml with dangling $refs (broken
+// docs). A missing schema usually means an upstream rename/removal to handle.
+if (missing.length) {
+  console.error(
+    'Aborting: referenced schemas not found in the source spec (broken $refs):\n  ' +
+      missing.sort().join('\n  ') +
+      '\nThe upstream spec likely renamed or removed these. Fix the mapping and re-run.'
+  );
+  process.exit(1);
 }
 
 // 3. Assemble output doc (sorted schemas for stable diff).
@@ -124,11 +135,21 @@ const out = {
       variables: { tenant: { default: 'your-tenant', description: 'Your Cube Cloud tenant subdomain' } },
     },
   ],
-  security: [{ jwtAuth: [] }],
+  security: [{ apiKey: [] }],
   tags: TAG_ORDER.map((t) => ({ name: t })),
   paths,
   components: {
-    securitySchemes: { jwtAuth: src.components.securitySchemes.jwtAuth },
+    // The public API authenticates REST clients with an API key sent as
+    // `Authorization: Api-Key <token>`. The source spec hardcodes a bearer/JWT
+    // scheme that does not reflect the primary runtime auth, so we override it.
+    securitySchemes: {
+      apiKey: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'Authorization',
+        description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.',
+      },
+    },
     schemas: sortedSchemas,
   },
 };

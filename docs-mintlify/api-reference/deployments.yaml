@@ -13,7 +13,7 @@ servers:
         default: your-tenant
         description: Your Cube Cloud tenant subdomain
 security:
-  - jwtAuth: []
+  - apiKey: []
 tags:
   - name: Deployments
   - name: Environments
@@ -733,10 +733,11 @@ paths:
         - Workbooks
 components:
   securitySchemes:
-    jwtAuth:
-      bearerFormat: JWT
-      scheme: bearer
-      type: http
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.'
   schemas:
     ColumnFormatOverrideDto:
       properties:
