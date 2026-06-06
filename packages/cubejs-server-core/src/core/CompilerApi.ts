@@ -647,38 +647,73 @@ export class CompilerApi {
         //
         //         No policy covers {a,b,c} → Access denied, empty result
         //
-        const policiesWithMemberAccess = userPolicies.filter((policy: any) => {
-          // If there's no memberLevel and no memberMasking policy, all members are accessible
+        const cubeMembersInQueryForAccess = Array.from(queryMemberNames).filter(
+          memberName => memberName.startsWith(`${cubeName}.`)
+        );
+
+        // A policy "grants" a member if it exposes it through memberLevel (full
+        // access) or memberMasking (masked access). Policies without memberLevel
+        // and memberMasking expose everything, as do cubes reached through a view.
+        const policyGrantsMember = (policy: any, memberName: string): boolean => {
           if (!policy.memberLevel && !policy.memberMasking) {
             return true;
           }
-
-          // PostgreSQL-style view behavior: if this cube is accessed through a view,
-          // the view grants access to all members it exposes.
-          // We only apply row-level filters from the cube, not member-level restrictions.
           if (cubesAccessedViaView.has(cubeName)) {
             return true;
           }
+          const hasFullAccess = !policy.memberLevel ||
+            (policy.memberLevel.includesMembers.includes(memberName) &&
+             !policy.memberLevel.excludesMembers.includes(memberName));
+          if (hasFullAccess) return true;
 
-          const cubeMembersInQuery = Array.from(queryMemberNames).filter(
-            memberName => memberName.startsWith(`${cubeName}.`)
+          if (policy.memberMasking) {
+            return policy.memberMasking.includesMembers.includes(memberName) &&
+                   !policy.memberMasking.excludesMembers.includes(memberName);
+          }
+          return false;
+        };
+
+        const policyHasRowFilter = (policy: any): boolean => !!(
+          policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0
+        );
+
+        // Policies that on their own cover ALL queried members. These drive the
+        // row-level union semantics (see the diagram above): when policies carry
+        // different row filters, access requires a single policy to cover every
+        // queried member so that we don't union member access across disjoint row
+        // ranges.
+        let policiesWithMemberAccess = userPolicies.filter(
+          (policy: any) => cubeMembersInQueryForAccess.every(
+            (memberName: string) => policyGrantsMember(policy, memberName)
+          )
+        );
+
+        // Multi-group member-level union (CUB-2758): when no single policy covers
+        // all queried members, member access should be the UNION across the
+        // matching policies — as long as the policies that provide that access do
+        // not impose row-level filters (an undefined row_level defaults to
+        // allow-all). This is safe because there are no row ranges to reconcile:
+        // every row is visible for each policy. Policies with row filters are
+        // intentionally excluded here so that the disjoint row-range behavior
+        // (querying members spanning differently-filtered policies) keeps denying
+        // access rather than silently widening the visible rows.
+        if (policiesWithMemberAccess.length === 0) {
+          const unrestrictedPolicies = userPolicies.filter(
+            (policy: any) => !policyHasRowFilter(policy)
           );
-
-          // A policy covers a member if it's in memberLevel includes (full access)
-          // or in memberMasking includes (masked access)
-          return [...cubeMembersInQuery].every(memberName => {
-            const hasFullAccess = !policy.memberLevel ||
-              (policy.memberLevel.includesMembers.includes(memberName) &&
-               !policy.memberLevel.excludesMembers.includes(memberName));
-            if (hasFullAccess) return true;
-
-            if (policy.memberMasking) {
-              return policy.memberMasking.includesMembers.includes(memberName) &&
-                     !policy.memberMasking.excludesMembers.includes(memberName);
-            }
-            return false;
-          });
-        });
+          const everyMemberCovered = cubeMembersInQueryForAccess.every(
+            (memberName: string) => unrestrictedPolicies.some(
+              (policy: any) => policyGrantsMember(policy, memberName)
+            )
+          );
+          if (everyMemberCovered) {
+            policiesWithMemberAccess = unrestrictedPolicies.filter(
+              (policy: any) => cubeMembersInQueryForAccess.some(
+                (memberName: string) => policyGrantsMember(policy, memberName)
+              )
+            );
+          }
+        }
 
         // Determine which members need masking: a member is masked if no covering
         // policy grants it unconditional full access via memberLevel AND at least

@@ -379,6 +379,54 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
+   * Multi-group member-level access union (CUB-2758).
+   *
+   * multi_group_test view has two access policies, each matched by a different
+   * group, granting DIFFERENT members and WITHOUT any row_level filter (so row
+   * access defaults to allow-all):
+   *   - group mg_group_a → member_a
+   *   - group mg_group_c → member_c
+   *
+   * multi_group_user belongs to BOTH groups. Because neither policy has a
+   * row-level filter, member-level access must be the UNION across the matching
+   * policies: querying member_a together with member_c must return data.
+   */
+  describe('RBAC multi-group member-level access union (no row filters)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('multi_group_user', 'multi_group_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('single-policy member is accessible (member_a)', async () => {
+      const res = await connection.query(
+        'SELECT member_a FROM multi_group_test LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('single-policy member is accessible (member_c)', async () => {
+      const res = await connection.query(
+        'SELECT member_c FROM multi_group_test LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('union of member access across groups returns data (member_a + member_c)', async () => {
+      const res = await connection.query(
+        'SELECT member_a, member_c FROM multi_group_test LIMIT 10'
+      );
+      // Both policies are allow-all (no row_level filter), so the member-level
+      // access is the union: the cross-group query must return rows.
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
    * Data masking tests via member_masking access policies.
    *
    * masking_test cube has dimensions and measures with mask definitions:
