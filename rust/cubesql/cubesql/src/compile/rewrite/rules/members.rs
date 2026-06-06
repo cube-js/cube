@@ -3050,8 +3050,23 @@ impl MemberRules {
                             all_match = false;
                             break;
                         }
-                        left_cube_name = left_name.split('.').next().map(|s| s.to_string());
-                        right_cube_name = right_name.split('.').next().map(|s| s.to_string());
+                        // A CubeScan can expose members from multiple cubes/views,
+                        // so every join-key column on a given side must resolve to
+                        // the same cube/view. Otherwise the merged join hint would
+                        // be ambiguous and the merge is not a single shared-member
+                        // join we can represent.
+                        let this_left_cube = left_name.split('.').next().map(|s| s.to_string());
+                        let this_right_cube = right_name.split('.').next().map(|s| s.to_string());
+                        if left_cube_name.is_some() && left_cube_name != this_left_cube {
+                            all_match = false;
+                            break;
+                        }
+                        if right_cube_name.is_some() && right_cube_name != this_right_cube {
+                            all_match = false;
+                            break;
+                        }
+                        left_cube_name = this_left_cube;
+                        right_cube_name = this_right_cube;
                         left_keys.push(left_name);
                         right_keys.push(right_name);
                     }
