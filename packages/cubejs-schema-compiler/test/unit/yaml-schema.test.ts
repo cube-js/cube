@@ -2139,6 +2139,104 @@ cubes:
       expect(sql).toMatch(/owner_id/);
     });
 
+    // Smoke test: a single matching access policy grants masked access while its
+    // row-level filter is already enforced in the query WHERE clause. The policy
+    // layer produces a masked member WITHOUT a conditional filter, so masking must
+    // render plainly (no CASE WHEN) and stay valid SQL for an aggregate measure.
+    it('single policy match: masked aggregate measure renders mask without CASE WHEN', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id'],
+        // Single policy match => no conditional filter attached.
+        maskedMembers: [{ member: 'transactions.total_cost' }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).not.toMatch(/owner_id/);
+      expect(sql).toMatch(/NULL\s+"transactions__total_cost"/);
+    });
+
+    // Smoke test: two matching access policies (one conditional full-access policy
+    // contributing a multi-member row filter, plus a masking policy) cause the
+    // policy layer to attach a conditional filter, so a CASE WHEN would normally be
+    // triggered. But when not all of the row filter's dimensions are part of the
+    // GROUP BY, the aggregate measure must render the mask instead of the measure.
+    it('two policy match: aggregate measure renders mask when not all row filter dimensions are in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id'],
+        // Composite row filter from the conditional full-access policy: org_id IS
+        // grouped, owner_id is NOT => not all filter members are in the GROUP BY.
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            and: [
+              {
+                member: 'transactions.org_id',
+                operator: 'equals',
+                values: ['acme'],
+              },
+              {
+                member: 'transactions.owner_id',
+                operator: 'equals',
+                values: ['42'],
+              },
+            ],
+          },
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).not.toMatch(/owner_id\s*=/);
+      expect(sql).toMatch(/NULL\s+"transactions__total_cost"/);
+    });
+
     it('does not recurse when filter member is also masked', async () => {
       const compilers = prepareYamlCompiler(`
 cubes:
