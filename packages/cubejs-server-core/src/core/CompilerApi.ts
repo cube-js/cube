@@ -542,20 +542,16 @@ export class CompilerApi {
       }
     }
 
-    // We collect Cube and View filters separately because they have to be
-    // applied in "two layers": first Cube filters, then View filters on top
-    const cubeFiltersPerCubePerRole: Record<string, Record<string, any[]>> = {};
-    const viewFiltersPerCubePerRole: Record<string, Record<string, any[]>> = {};
-    const hasAllowAllForCube: Record<string, boolean> = {};
+    // Per-cube row-level constraints, AND-ed together to form the final RLS
+    // filter. Each cube/view contributes a single expression (see below).
+    const rlsConstraints: any[] = [];
     const maskedMembersSet = new Set<string>();
     const memberMaskFiltersMap: Record<string, any> = {};
 
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
-      const filtersMap = cube.isView ? viewFiltersPerCubePerRole : cubeFiltersPerCubePerRole;
 
       if (cubeEvaluator.isRbacEnabledForCube(cube)) {
-        let hasAccessPermission = false;
         const userPolicies = await this.getApplicablePolicies(cube, context, compilers);
 
         // Filter out policies that don't grant member-level access to query members
@@ -579,9 +575,14 @@ export class CompilerApi {
         //     └──────────────────────────────────────────> Rows
         //              R1 rows        R2 rows
         //
+        // Access is resolved PER MEMBER: a member is accessible if any policy
+        // grants it (union), and visible rows are the intersection over queried
+        // members of the union of each member's granting-policy row filters. An
+        // allow-all (filter-less) policy imposes no row restriction.
+        //
         // ═══════════════════════════════════════════════════════════════════
         // Case 1: Query members (a, b)
-        //         Only Policy 1 covers ALL queried members → R1 rows visible
+        //         a → R1, b → R1∪R2  ⇒  R1 ∩ (R1∪R2) = R1 rows visible
         //
         //   Members
         //     ^
@@ -598,7 +599,7 @@ export class CompilerApi {
         //
         // ═══════════════════════════════════════════════════════════════════
         // Case 2: Query members (b, c)
-        //         Only Policy 2 covers ALL queried members → R2 rows visible
+        //         b → R1∪R2, c → R2  ⇒  (R1∪R2) ∩ R2 = R2 rows visible
         //
         //   Members
         //     ^
@@ -615,7 +616,7 @@ export class CompilerApi {
         //
         // ═══════════════════════════════════════════════════════════════════
         // Case 3: Query member (b) only
-        //         Both policies cover member b → Union of R1 ∪ R2 rows visible
+        //         b → R1∪R2  ⇒  R1 ∪ R2 rows visible (union)
         //
         //   Members
         //     ^
@@ -632,7 +633,7 @@ export class CompilerApi {
         //
         // ═══════════════════════════════════════════════════════════════════
         // Case 4: Query members (a, b, c)
-        //         Neither policy covers ALL three → NO rows visible (denied)
+        //         a → R1, b → R1∪R2, c → R2  ⇒  R1 ∩ R2 = ∅ → no rows visible
         //
         //   Members
         //     ^
@@ -645,9 +646,9 @@ export class CompilerApi {
         //     |   └─────────────────┘
         //     └──────────────────────────────────────────> Rows
         //
-        //         No policy covers {a,b,c} → Access denied, empty result
+        //         Disjoint row ranges (R1 ∩ R2 = ∅) → empty result
         //
-        const cubeMembersInQueryForAccess = Array.from(queryMemberNames).filter(
+        const cubeMembersInQuery = Array.from(queryMemberNames).filter(
           memberName => memberName.startsWith(`${cubeName}.`)
         );
 
@@ -673,126 +674,103 @@ export class CompilerApi {
           return false;
         };
 
+        const policyRowFilter = (policy: any) => {
+          const filters = (policy.rowLevel?.filters || []).map(
+            (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
+          );
+          return filters.length === 1 ? filters[0] : { and: filters };
+        };
+
         const policyHasRowFilter = (policy: any): boolean => !!(
           policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0
         );
 
-        // Policies that on their own cover ALL queried members. These drive the
-        // row-level union semantics (see the diagram above): when policies carry
-        // different row filters, access requires a single policy to cover every
-        // queried member so that we don't union member access across disjoint row
-        // ranges.
-        let policiesWithMemberAccess = userPolicies.filter(
-          (policy: any) => cubeMembersInQueryForAccess.every(
-            (memberName: string) => policyGrantsMember(policy, memberName)
-          )
-        );
-
-        // Multi-group member-level union (CUB-2758): when no single policy covers
-        // all queried members, member access should be the UNION across the
-        // matching policies — as long as the policies that provide that access do
-        // not impose row-level filters (an undefined row_level defaults to
-        // allow-all). This is safe because there are no row ranges to reconcile:
-        // every row is visible for each policy. Policies with row filters are
-        // intentionally excluded here so that the disjoint row-range behavior
-        // (querying members spanning differently-filtered policies) keeps denying
-        // access rather than silently widening the visible rows.
-        if (policiesWithMemberAccess.length === 0) {
-          const unrestrictedPolicies = userPolicies.filter(
-            (policy: any) => !policyHasRowFilter(policy)
-          );
-          const everyMemberCovered = cubeMembersInQueryForAccess.every(
-            (memberName: string) => unrestrictedPolicies.some(
-              (policy: any) => policyGrantsMember(policy, memberName)
-            )
-          );
-          if (everyMemberCovered) {
-            policiesWithMemberAccess = unrestrictedPolicies.filter(
-              (policy: any) => cubeMembersInQueryForAccess.some(
-                (memberName: string) => policyGrantsMember(policy, memberName)
-              )
-            );
-          }
-        }
-
-        // Determine which members need masking: a member is masked if no covering
-        // policy grants it unconditional full access via memberLevel AND at least
-        // one covering policy defines memberMasking that includes the member.
+        // Access is resolved per member as the UNION across all matching policies:
+        // a member is accessible if ANY applicable policy grants it (full or
+        // masked). This is what makes multi-group access work — a user matching
+        // several policies (e.g. via multiple groups) sees every member any of
+        // those policies grants, even when no single policy covers all of them.
         //
-        // When a policy grants full memberLevel access but also has row_level filters,
-        // the full access is conditional on the row filter. In that case, we track
-        // the row filters so that the generated SQL uses:
-        //   CASE WHEN {rowFilter} THEN {originalValue} ELSE {maskedValue} END
-        // This ensures that rows outside the filter range see masked values.
-        const cubeMembersInQuery = Array.from(queryMemberNames).filter(
-          memberName => memberName.startsWith(`${cubeName}.`)
-        );
+        // Row-level access is resolved per member and then intersected: for each
+        // queried member we take the OR of the row filters of the policies that
+        // grant it (a policy without a row filter — allow-all — imposes no
+        // restriction), and the cube's row constraint is the AND of those
+        // per-member expressions. This keeps differently-filtered policies safe:
+        //   - members covered by an allow-all policy impose no restriction;
+        //   - querying members that live in disjoint row ranges intersects to no
+        //     rows instead of leaking (the two-dimensional overlap case).
+        //
+        // Masking: a member is masked unless some granting policy provides
+        // unconditional full access (memberLevel + allow-all). When the full
+        // access is conditional on a row filter, that filter is recorded so the
+        // SQL renders CASE WHEN {rowFilter} THEN {value} ELSE {mask} END.
+        const memberRowConstraints: any[] = [];
+        const seenRowConstraints = new Set<string>();
+        let cubeAccessDenied = false;
+
         for (const memberName of cubeMembersInQuery) {
-          const hasUnconditionalFullAccess = policiesWithMemberAccess.some(policy => {
-            if (!policy.memberLevel) {
-              return !policy.rowLevel || policy.rowLevel.allowAll;
-            }
-            const inIncludes = policy.memberLevel.includesMembers.includes(memberName) &&
-                   !policy.memberLevel.excludesMembers.includes(memberName);
-            return inIncludes && (!policy.rowLevel || policy.rowLevel.allowAll);
+          const grantingPolicies = userPolicies.filter(
+            (policy: any) => policyGrantsMember(policy, memberName)
+          );
+
+          if (grantingPolicies.length === 0) {
+            cubeAccessDenied = true;
+            break;
+          }
+
+          const hasUnconditionalFullAccess = grantingPolicies.some((policy: any) => {
+            const inFullAccess = !policy.memberLevel ||
+              (policy.memberLevel.includesMembers.includes(memberName) &&
+               !policy.memberLevel.excludesMembers.includes(memberName));
+            return inFullAccess && (!policy.rowLevel || policy.rowLevel.allowAll);
           });
 
           if (!hasUnconditionalFullAccess) {
-            const hasMaskingPolicy = policiesWithMemberAccess.some(
-              (policy) => policy.memberMasking &&
+            const hasMaskingPolicy = grantingPolicies.some(
+              (policy: any) => policy.memberMasking &&
                 policy.memberMasking.includesMembers.includes(memberName) &&
                 !policy.memberMasking.excludesMembers.includes(memberName)
             );
 
             if (hasMaskingPolicy) {
-              const conditionalFullAccessPolicies = policiesWithMemberAccess.filter(policy => {
+              maskedMembersSet.add(memberName);
+
+              const conditionalFullAccessPolicies = grantingPolicies.filter((policy: any) => {
                 const hasFullMemberAccess = !policy.memberLevel ||
                   (policy.memberLevel.includesMembers.includes(memberName) &&
                    !policy.memberLevel.excludesMembers.includes(memberName));
-                return hasFullMemberAccess &&
-                  policy.rowLevel && !policy.rowLevel.allowAll &&
-                  policy.rowLevel.filters?.length > 0;
+                return hasFullMemberAccess && policyHasRowFilter(policy);
               });
 
-              maskedMembersSet.add(memberName);
               if (conditionalFullAccessPolicies.length > 0) {
-                const policyFilters = conditionalFullAccessPolicies.map(policy => {
-                  const filters = (policy.rowLevel.filters || []).map(
-                    (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
-                  );
-                  return filters.length === 1 ? filters[0] : { and: filters };
-                });
-                if (policyFilters.length > 0) {
-                  memberMaskFiltersMap[memberName] = policyFilters.length === 1
-                    ? policyFilters[0]
-                    : { or: policyFilters };
-                }
+                const policyFilters = conditionalFullAccessPolicies.map(policyRowFilter);
+                memberMaskFiltersMap[memberName] = policyFilters.length === 1
+                  ? policyFilters[0]
+                  : { or: policyFilters };
               }
+            }
+          }
+
+          // Row-level constraint for this member: OR of the row filters of every
+          // granting policy. If any granting policy is allow-all the member is
+          // visible on all rows, so it adds no restriction to the intersection.
+          const memberHasUnrestrictedRow = grantingPolicies.some(
+            (policy: any) => !policyHasRowFilter(policy)
+          );
+          if (!memberHasUnrestrictedRow) {
+            const orClauses = grantingPolicies.map(policyRowFilter);
+            const constraint = orClauses.length === 1 ? orClauses[0] : { or: orClauses };
+            // Members granted by the same set of policies produce identical row
+            // constraints; dedupe so the WHERE clause isn't repeated per member.
+            const constraintKey = JSON.stringify(constraint);
+            if (!seenRowConstraints.has(constraintKey)) {
+              seenRowConstraints.add(constraintKey);
+              memberRowConstraints.push(constraint);
             }
           }
         }
 
-        for (const policy of policiesWithMemberAccess) {
-          hasAccessPermission = true;
-          (policy?.rowLevel?.filters || []).forEach((filter: any) => {
-            filtersMap[cubeName] = filtersMap[cubeName] || {};
-            // Create a unique key for the policy (either role, group, or groups)
-            const groupValue = policy.group || policy.groups;
-            const policyKey = policy.role ||
-              (Array.isArray(groupValue) ? groupValue.join(',') : groupValue) ||
-              'default';
-            filtersMap[cubeName][policyKey] = filtersMap[cubeName][policyKey] || [];
-            filtersMap[cubeName][policyKey].push(
-              this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
-            );
-          });
-          if (!policy?.rowLevel || policy?.rowLevel?.allowAll) {
-            hasAllowAllForCube[cubeName] = true;
-            break;
-          }
-        }
-
-        if (!hasAccessPermission) {
+        if (cubeAccessDenied) {
           query.segments = query.segments || [];
           query.segments.push({
             expression: () => '1 = 0',
@@ -801,14 +779,20 @@ export class CompilerApi {
           } as unknown as MemberExpression);
           return { query, denied: true };
         }
+
+        if (memberRowConstraints.length > 0) {
+          rlsConstraints.push(
+            memberRowConstraints.length === 1
+              ? memberRowConstraints[0]
+              : { and: memberRowConstraints }
+          );
+        }
       }
     }
 
-    const rlsFilter = this.buildFinalRlsFilter(
-      cubeFiltersPerCubePerRole,
-      viewFiltersPerCubePerRole,
-      hasAllowAllForCube
-    );
+    const rlsFilter = rlsConstraints.length > 0
+      ? this.removeEmptyFilters({ and: rlsConstraints })
+      : null;
     if (rlsFilter) {
       query.filters = query.filters || [];
       query.filters.push(rlsFilter);
@@ -832,48 +816,6 @@ export class CompilerApi {
       return or.length > 1 ? { or } : or.at(0) || null;
     }
     return filter;
-  }
-
-  protected buildFinalRlsFilter(
-    cubeFiltersPerCubePerRole: Record<string, Record<string, any[]>>,
-    viewFiltersPerCubePerRole: Record<string, Record<string, any[]>>,
-    hasAllowAllForCube: Record<string, boolean>
-  ): any {
-    // - delete all filters for cubes where the user has allowAll
-    // - combine the rest into per policy maps (policies can be role-based or group-based)
-    // - join all filters for the same policy with AND
-    // - join all filters for different policies with OR
-    // - join cube and view filters with AND
-
-    const policyReducer = (filtersMap: Record<string, Record<string, any[]>>) => (acc: Record<string, any[]>, cubeName: string) => {
-      if (!hasAllowAllForCube[cubeName]) {
-        Object.keys(filtersMap[cubeName]).forEach(policyKey => {
-          acc[policyKey] = (acc[policyKey] || []).concat(filtersMap[cubeName][policyKey]);
-        });
-      }
-      return acc;
-    };
-
-    const cubeFiltersPerPolicy = Object.keys(cubeFiltersPerCubePerRole).reduce(
-      policyReducer(cubeFiltersPerCubePerRole),
-      {}
-    );
-    const viewFiltersPerPolicy = Object.keys(viewFiltersPerCubePerRole).reduce(
-      policyReducer(viewFiltersPerCubePerRole),
-      {}
-    );
-
-    return this.removeEmptyFilters({
-      and: [{
-        or: Object.keys(cubeFiltersPerPolicy).map(policyKey => ({
-          and: cubeFiltersPerPolicy[policyKey]
-        }))
-      }, {
-        or: Object.keys(viewFiltersPerPolicy).map(policyKey => ({
-          and: viewFiltersPerPolicy[policyKey]
-        }))
-      }]
-    });
   }
 
   public async compilerCacheFn(
