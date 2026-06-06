@@ -147,6 +147,16 @@ describe('Cube RBAC Engine', () => {
       expect(res.rows).toMatchSnapshot('orders_view');
     });
 
+    test('row-level filters from cube AND view layers are both applied', async () => {
+      // The underlying `orders` cube policy restricts rows to id IN {1, 10, 11}
+      // (role "*" → id = 1, role admin → id = 10 OR id = 11). The view adds its
+      // own row filter id < 11. Both layers must apply (AND), so the visible ids
+      // are the intersection: {1, 10}.
+      const res = await connection.query('SELECT id FROM orders_two_layer_test ORDER BY id');
+      const ids = res.rows.map(row => Number(row.id)).sort((a, b) => a - b);
+      expect(ids).toEqual([1, 10]);
+    });
+
     test('SELECT * from users', async () => {
       const res = await connection.query('SELECT * FROM users limit 10');
       // Querying a cube with nested filters and mixed values should not cause any issues
