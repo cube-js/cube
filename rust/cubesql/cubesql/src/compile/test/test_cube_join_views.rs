@@ -44,10 +44,12 @@ fn views_meta() -> Vec<CubeMeta> {
             description: None,
             title: None,
             r#type: V1CubeMetaType::View,
-            dimensions: vec![dimension(
-                "customers_view.customer_city",
-                "customers.customer_city",
-            )],
+            dimensions: vec![
+                dimension("customers_view.customer_city", "customers.customer_city"),
+                // A second dimension that is NOT a join key, used to test that a
+                // query grouping by it (instead of the join key) is not merged.
+                dimension("customers_view.status", "customers.status"),
+            ],
             measures: vec![measure(
                 "customers_view.avg_age",
                 "customers.avg_age",
@@ -90,61 +92,11 @@ fn set_filter(member: &str) -> V1LoadRequestQueryFilterItem {
     }
 }
 
-/// A join between two views on a dimension that resolves to the same
-/// underlying cube member (`customers.customer_city`) should be merged into a
-/// single CubeScan over the combined members, exactly like a regular
-/// cube-to-cube join. As a `LEFT JOIN`, the left ("must be present") side is
-/// guarded with a `set` filter on its join key so the downstream FULL OUTER
-/// multi-fact stitch keeps left-join semantics.
-#[tokio::test]
-async fn test_join_two_views_on_shared_member() {
-    if !Rewriter::sql_push_down_enabled() {
-        return;
-    }
-    init_testing_logger();
-
-    let logical_plan = convert_select_to_query_plan_with_meta(
-        r#"
-            SELECT *
-            FROM customers_view
-            LEFT JOIN orders_view
-                ON (orders_view.customer_city = customers_view.customer_city)
-            "#
-        .to_string(),
-        views_meta(),
-    )
-    .await
-    .as_logical_plan();
-
-    assert_eq!(
-        logical_plan.find_cube_scan().request,
-        V1LoadRequestQuery {
-            measures: Some(vec![
-                "customers_view.avg_age".to_string(),
-                "orders_view.revenue".to_string(),
-            ]),
-            dimensions: Some(vec![
-                "customers_view.customer_city".to_string(),
-                "orders_view.customer_city".to_string(),
-            ]),
-            segments: Some(vec![]),
-            order: Some(vec![]),
-            filters: Some(vec![set_filter("customers_view.customer_city")]),
-            ungrouped: Some(true),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
-            ..Default::default()
-        }
-    )
-}
-
 /// The motivating query: a grouped (multi-fact) `LEFT JOIN` selecting a
-/// dimension and measures from each view, joined on the shared `customer_city`.
-/// The two view scans are merged into a single grouped CubeScan, and the left
-/// join key gets a `set` filter to recover LEFT-join semantics on top of the
-/// FULL OUTER multi-fact stitch.
+/// dimension and measures from each view, joined on the shared `customer_city`
+/// which is also the GROUP BY key. The two view scans are merged into a single
+/// grouped CubeScan, and the left join key gets a `set` filter to recover
+/// LEFT-join semantics on top of the FULL OUTER multi-fact stitch.
 #[tokio::test]
 async fn test_group_by_left_join_two_views_on_shared_member() {
     if !Rewriter::sql_push_down_enabled() {
@@ -230,10 +182,65 @@ async fn test_group_by_inner_join_two_views_on_shared_member() {
     )
 }
 
+/// Ungrouped query (`SELECT *`): the shared-member merge only applies to
+/// grouped queries, so an ungrouped join is not merged and is rejected the
+/// same way any other unsupported cube join is.
+#[tokio::test]
+async fn test_ungrouped_join_two_views_on_shared_member_is_not_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_meta(views_meta());
+    let query = convert_sql_to_cube_query(
+        &r#"
+            SELECT *
+            FROM customers_view
+            LEFT JOIN orders_view
+                ON (orders_view.customer_city = customers_view.customer_city)
+            "#
+        .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await;
+
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
+}
+
+/// The join is over a dimension (`customer_city`) that is not in the GROUP BY
+/// (the query groups by `status` instead). The merge requires the join key to
+/// be the group-by key, so this is not merged and is rejected.
+#[tokio::test]
+async fn test_group_by_join_dimension_not_in_group_by_is_not_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_meta(views_meta());
+    let query = convert_sql_to_cube_query(
+        &r#"
+            SELECT c.status, measure(o.revenue), measure(c.avg_age)
+            FROM customers_view c
+            LEFT JOIN orders_view o ON o.customer_city = c.customer_city
+            GROUP BY 1
+            "#
+        .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await;
+
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
+}
+
 /// The merge only fires when the join key is fully within dimensions. Joining
 /// the two views on a measure (`o.revenue = c.avg_age`) is not a shared-member
-/// dimension join, so the scans are not merged and the query is rejected the
-/// same way any other unsupported cube join is.
+/// dimension join, so the scans are not merged and the query is rejected.
 #[tokio::test]
 async fn test_join_two_views_on_measure_is_not_merged() {
     if !Rewriter::sql_push_down_enabled() {
@@ -244,9 +251,10 @@ async fn test_join_two_views_on_measure_is_not_merged() {
     let meta = get_test_tenant_ctx_with_meta(views_meta());
     let query = convert_sql_to_cube_query(
         &r#"
-            SELECT *
+            SELECT c.customer_city, measure(o.revenue)
             FROM customers_view c
             LEFT JOIN orders_view o ON (o.revenue = c.avg_age)
+            GROUP BY 1
             "#
         .to_string(),
         meta.clone(),

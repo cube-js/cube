@@ -432,8 +432,87 @@ impl RewriteRules for MemberRules {
                     "?left_join_hints",
                     "?right_join_hints",
                     "?out_join_hints",
+                ),
+            ),
+            // Merge a join between two (view) CubeScans on a dimension that
+            // resolves to the same underlying cube member into a single
+            // CubeScan, but ONLY under an aggregate whose GROUP BY is exactly
+            // that shared join key. The merged scan becomes a multi-fact query
+            // (FULL OUTER stitched over the group-by key by the planner).
+            // Gating on the aggregate means ungrouped queries (e.g. SELECT *)
+            // and queries grouping by a non-join-key dimension are not merged.
+            transforming_rewrite(
+                "push-down-aggregate-shared-member-join",
+                aggregate(
+                    join(
+                        cube_scan(
+                            "?left_alias_to_cube",
+                            "?left_members",
+                            "?left_filters",
+                            "?left_orders",
+                            "CubeScanLimit:None",
+                            "CubeScanOffset:None",
+                            "?left_split",
+                            "CubeScanCanPushdownJoin:true",
+                            "CubeScanWrapped:false",
+                            "CubeScanUngrouped:true",
+                            "?left_join_hints",
+                        ),
+                        cube_scan(
+                            "?right_alias_to_cube",
+                            "?right_members",
+                            "?right_filters",
+                            "?right_orders",
+                            "CubeScanLimit:None",
+                            "CubeScanOffset:None",
+                            "?right_split",
+                            "CubeScanCanPushdownJoin:true",
+                            "CubeScanWrapped:false",
+                            "CubeScanUngrouped:true",
+                            "?right_join_hints",
+                        ),
+                        "?left_on",
+                        "?right_on",
+                        "?join_type",
+                        "?join_constraint",
+                        "?null_equals_null",
+                    ),
+                    "?group_expr",
+                    "?aggr_expr",
+                    "?agg_split",
+                ),
+                aggregate(
+                    cube_scan(
+                        "?out_alias_to_cube",
+                        cube_scan_members("?left_members", "?right_members"),
+                        cube_scan_filters("?left_filters", "?right_filters"),
+                        cube_scan_order_empty_tail(),
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
+                        "CubeScanSplit:false",
+                        "CubeScanCanPushdownJoin:true",
+                        "CubeScanWrapped:false",
+                        "CubeScanUngrouped:true",
+                        "?out_join_hints",
+                    ),
+                    "?group_expr",
+                    "?aggr_expr",
+                    "?agg_split",
+                ),
+                self.push_down_aggregate_shared_member_join(
+                    "?left_alias_to_cube",
+                    "?right_alias_to_cube",
+                    "?out_alias_to_cube",
+                    "?left_members",
+                    "?right_members",
+                    "?left_on",
+                    "?right_on",
                     "?join_type",
+                    "?left_join_hints",
+                    "?right_join_hints",
+                    "?out_join_hints",
                     "?left_filters",
+                    "?group_expr",
                 ),
             ),
         ];
@@ -2794,8 +2873,6 @@ impl MemberRules {
         left_join_hints_var: &'static str,
         right_join_hints_var: &'static str,
         out_join_hints_var: &'static str,
-        join_type_var: &'static str,
-        left_filters_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
@@ -2807,184 +2884,17 @@ impl MemberRules {
         let left_join_hints_var = var!(left_join_hints_var);
         let right_join_hints_var = var!(right_join_hints_var);
         let out_join_hints_var = var!(out_join_hints_var);
-        let join_type_var = var!(join_type_var);
-        let left_filters_var = var!(left_filters_var);
-        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            // Resolves a join column to the name of the dimension member it
-            // references, but only for plain or time dimensions (measures,
-            // segments, etc. are not valid shared join keys).
-            fn dimension_member_name(
-                egraph: &mut CubeEGraph,
-                members_id: Id,
-                column: &Column,
-            ) -> Option<String> {
-                match egraph[members_id].data.find_member_by_column(column) {
-                    Some(((_, Member::Dimension { name, .. }, _), _))
-                    | Some(((_, Member::TimeDimension { name, .. }, _), _)) => Some(name.clone()),
-                    _ => None,
-                }
-            }
-
-            // Two ways to recognize a joinable pair of CubeScans:
-            //  1. The classic `left.__cubeJoinField = right.__cubeJoinField`
-            //     condition that comes from the data model join graph.
-            //  2. A join between two CubeScans (typically views) on a
-            //     dimension that resolves to the *same underlying cube member*
-            //     — e.g. `orders_view.city = customers_view.city` where both
-            //     `city` dimensions are aliases of the same `cube.dimension`.
-            //     Such a join is on the same shared key, so the two scans can
-            //     be merged into a single CubeScan exactly like any other
-            //     cube-to-cube join, letting the query planner treat the result
-            //     as a (multi-fact) query over the combined members.
-            let cubes = is_proper_cube_join_condition(
+            let Some((left_cube, right_cube)) = is_proper_cube_join_condition(
                 egraph,
                 subst,
                 left_members_var,
                 left_on_var,
                 right_members_var,
                 right_on_var,
-            );
-            let mut shared_left_keys: Vec<String> = vec![];
-            let mut shared_right_keys: Vec<String> = vec![];
-            let (cubes, shared_member_join) = match cubes {
-                Some(cubes) => (Some(cubes), false),
-                None => {
-                    // A view dimension keeps the original `cube.dimension` path
-                    // in `alias_member`; for non-view members we fall back to
-                    // the member name itself.
-                    let resolve_underlying = |member_name: &str| -> String {
-                        meta_context
-                            .find_dimension_with_name(member_name)
-                            .and_then(|dim| dim.alias_member.clone())
-                            .unwrap_or_else(|| member_name.to_string())
-                    };
-
-                    let left_join_ons = var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    let right_join_ons = var_iter!(egraph[subst[right_on_var]], JoinRightOn)
-                        .cloned()
-                        .collect::<Vec<_>>();
-
-                    let mut found = None;
-                    'pairs: for left_on in left_join_ons.iter() {
-                        for right_on in right_join_ons.iter() {
-                            // We can only merge when the *whole* join key is
-                            // fully within dimensions: every column pair must
-                            // resolve to a dimension (or time dimension) on both
-                            // sides and to the same underlying cube member. A
-                            // join key that touches a measure/segment/etc. (or
-                            // mixes underlying members) is rejected, leaving the
-                            // join to the normal (non-merged) handling.
-                            if left_on.is_empty() || left_on.len() != right_on.len() {
-                                continue;
-                            }
-                            let mut left_cube_name: Option<String> = None;
-                            let mut right_cube_name: Option<String> = None;
-                            let mut left_keys: Vec<String> = vec![];
-                            let mut right_keys: Vec<String> = vec![];
-                            let mut all_match = true;
-                            for (left_column, right_column) in left_on.iter().zip(right_on.iter()) {
-                                let Some(left_name) = dimension_member_name(
-                                    egraph,
-                                    subst[left_members_var],
-                                    left_column,
-                                ) else {
-                                    all_match = false;
-                                    break;
-                                };
-                                let Some(right_name) = dimension_member_name(
-                                    egraph,
-                                    subst[right_members_var],
-                                    right_column,
-                                ) else {
-                                    all_match = false;
-                                    break;
-                                };
-                                if resolve_underlying(&left_name) != resolve_underlying(&right_name)
-                                {
-                                    all_match = false;
-                                    break;
-                                }
-                                left_cube_name = left_name.split('.').next().map(|s| s.to_string());
-                                right_cube_name =
-                                    right_name.split('.').next().map(|s| s.to_string());
-                                left_keys.push(left_name);
-                                right_keys.push(right_name);
-                            }
-                            if all_match {
-                                if let (Some(left_cube_name), Some(right_cube_name)) =
-                                    (left_cube_name, right_cube_name)
-                                {
-                                    found = Some((left_cube_name, right_cube_name));
-                                    shared_left_keys = left_keys;
-                                    shared_right_keys = right_keys;
-                                    break 'pairs;
-                                }
-                            }
-                        }
-                    }
-                    (found, true)
-                }
-            };
-            let Some((left_cube, right_cube)) = cubes else {
+            ) else {
                 return false;
             };
-
-            // For a join between two views on a shared cube member, Tesseract
-            // renders the merged multi-fact scan as a FULL OUTER JOIN over the
-            // shared key. Re-introduce the requested INNER/LEFT/RIGHT semantics
-            // by requiring the join key of each "must be present" side to be
-            // set (FULL adds nothing).
-            if shared_member_join {
-                let mut require_left = false;
-                let mut require_right = false;
-                if let Some(join_type) = var_list_iter!(egraph[subst[join_type_var]], JoinJoinType)
-                    .cloned()
-                    .next()
-                {
-                    match join_type.0 {
-                        datafusion::prelude::JoinType::Inner => {
-                            require_left = true;
-                            require_right = true;
-                        }
-                        datafusion::prelude::JoinType::Left => require_left = true,
-                        datafusion::prelude::JoinType::Right => require_right = true,
-                        _ => {}
-                    }
-                }
-
-                let mut presence_members: Vec<String> = vec![];
-                if require_left {
-                    presence_members.extend(shared_left_keys.iter().cloned());
-                }
-                if require_right {
-                    presence_members.extend(shared_right_keys.iter().cloned());
-                }
-
-                if !presence_members.is_empty() {
-                    let mut acc = subst[left_filters_var];
-                    for name in presence_members {
-                        let member = egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                            crate::compile::rewrite::FilterMemberMember(name),
-                        ));
-                        let op = egraph.add(LogicalPlanLanguage::FilterMemberOp(
-                            crate::compile::rewrite::FilterMemberOp("set".to_string()),
-                        ));
-                        let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                            crate::compile::rewrite::FilterMemberValues(vec![]),
-                        ));
-                        let filter_member =
-                            egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
-                        acc = egraph.add(LogicalPlanLanguage::CubeScanFilters(vec![
-                            filter_member,
-                            acc,
-                        ]));
-                    }
-                    subst.insert(left_filters_var, acc);
-                }
-            }
 
             for left_alias_to_cube in
                 var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube)
@@ -3012,6 +2922,267 @@ impl MemberRules {
                                     .chain(right_join_hints.iter())
                                     .cloned()
                                     .chain(iter::once(vec![left_cube, right_cube]))
+                                    .collect(),
+                            );
+
+                            subst.insert(
+                                out_alias_to_cube_var,
+                                egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
+                                    out_alias_to_cube,
+                                )),
+                            );
+
+                            subst.insert(
+                                out_join_hints_var,
+                                egraph.add(LogicalPlanLanguage::CubeScanJoinHints(out_join_hints)),
+                            );
+
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn push_down_aggregate_shared_member_join(
+        &self,
+        left_alias_to_cube_var: &'static str,
+        right_alias_to_cube_var: &'static str,
+        out_alias_to_cube_var: &'static str,
+        left_members_var: &'static str,
+        right_members_var: &'static str,
+        left_on_var: &'static str,
+        right_on_var: &'static str,
+        join_type_var: &'static str,
+        left_join_hints_var: &'static str,
+        right_join_hints_var: &'static str,
+        out_join_hints_var: &'static str,
+        left_filters_var: &'static str,
+        group_expr_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let left_alias_to_cube_var = var!(left_alias_to_cube_var);
+        let right_alias_to_cube_var = var!(right_alias_to_cube_var);
+        let out_alias_to_cube_var = var!(out_alias_to_cube_var);
+        let left_members_var = var!(left_members_var);
+        let right_members_var = var!(right_members_var);
+        let left_on_var = var!(left_on_var);
+        let right_on_var = var!(right_on_var);
+        let join_type_var = var!(join_type_var);
+        let left_join_hints_var = var!(left_join_hints_var);
+        let right_join_hints_var = var!(right_join_hints_var);
+        let out_join_hints_var = var!(out_join_hints_var);
+        let left_filters_var = var!(left_filters_var);
+        let group_expr_var = var!(group_expr_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            fn dimension_member_name(
+                egraph: &mut CubeEGraph,
+                members_id: Id,
+                column: &Column,
+            ) -> Option<String> {
+                match egraph[members_id].data.find_member_by_column(column) {
+                    Some(((_, Member::Dimension { name, .. }, _), _))
+                    | Some(((_, Member::TimeDimension { name, .. }, _), _)) => Some(name.clone()),
+                    _ => None,
+                }
+            }
+
+            let resolve_underlying = |member_name: &str| -> String {
+                meta_context
+                    .find_dimension_with_name(member_name)
+                    .and_then(|dim| dim.alias_member.clone())
+                    .unwrap_or_else(|| member_name.to_string())
+            };
+
+            // The join must be on dimensions that resolve to the same
+            // underlying cube member on both sides (a shared key).
+            let left_join_ons = var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
+                .cloned()
+                .collect::<Vec<_>>();
+            let right_join_ons = var_iter!(egraph[subst[right_on_var]], JoinRightOn)
+                .cloned()
+                .collect::<Vec<_>>();
+
+            let mut matched: Option<(
+                String,
+                String,
+                Vec<String>,
+                Vec<String>,
+                Vec<Column>,
+                Vec<Column>,
+            )> = None;
+            'pairs: for left_on in left_join_ons.iter() {
+                for right_on in right_join_ons.iter() {
+                    if left_on.is_empty() || left_on.len() != right_on.len() {
+                        continue;
+                    }
+                    let mut left_cube_name: Option<String> = None;
+                    let mut right_cube_name: Option<String> = None;
+                    let mut left_keys: Vec<String> = vec![];
+                    let mut right_keys: Vec<String> = vec![];
+                    let mut all_match = true;
+                    for (left_column, right_column) in left_on.iter().zip(right_on.iter()) {
+                        let Some(left_name) =
+                            dimension_member_name(egraph, subst[left_members_var], left_column)
+                        else {
+                            all_match = false;
+                            break;
+                        };
+                        let Some(right_name) =
+                            dimension_member_name(egraph, subst[right_members_var], right_column)
+                        else {
+                            all_match = false;
+                            break;
+                        };
+                        if resolve_underlying(&left_name) != resolve_underlying(&right_name) {
+                            all_match = false;
+                            break;
+                        }
+                        left_cube_name = left_name.split('.').next().map(|s| s.to_string());
+                        right_cube_name = right_name.split('.').next().map(|s| s.to_string());
+                        left_keys.push(left_name);
+                        right_keys.push(right_name);
+                    }
+                    if all_match {
+                        if let (Some(left_cube_name), Some(right_cube_name)) =
+                            (left_cube_name, right_cube_name)
+                        {
+                            matched = Some((
+                                left_cube_name,
+                                right_cube_name,
+                                left_keys,
+                                right_keys,
+                                left_on.clone(),
+                                right_on.clone(),
+                            ));
+                            break 'pairs;
+                        }
+                    }
+                }
+            }
+
+            let Some((
+                left_cube,
+                right_cube,
+                shared_left_keys,
+                shared_right_keys,
+                matched_left_cols,
+                matched_right_cols,
+            )) = matched
+            else {
+                return false;
+            };
+
+            // The join key must be fully within the GROUP BY dimensions: every
+            // group-by column must be one of the join-key columns, and every
+            // join-key pair must be grouped. This is what makes the multi-fact
+            // stitch over the group-by key match the requested join.
+            let Some(group_referenced_expr) =
+                &egraph.index(subst[group_expr_var]).data.referenced_expr
+            else {
+                return false;
+            };
+            let group_cols = referenced_columns(group_referenced_expr);
+            if group_cols.is_empty() {
+                return false;
+            }
+            let join_key_cols: HashSet<String> = matched_left_cols
+                .iter()
+                .chain(matched_right_cols.iter())
+                .map(|c| c.flat_name())
+                .collect();
+            if !group_cols.iter().all(|c| join_key_cols.contains(c)) {
+                return false;
+            }
+            let group_set: HashSet<&String> = group_cols.iter().collect();
+            for (left_col, right_col) in matched_left_cols.iter().zip(matched_right_cols.iter()) {
+                if !group_set.contains(&left_col.flat_name())
+                    && !group_set.contains(&right_col.flat_name())
+                {
+                    return false;
+                }
+            }
+
+            // Re-introduce INNER/LEFT/RIGHT semantics on top of the FULL OUTER
+            // multi-fact stitch by requiring the join key of each "must be
+            // present" side to be set (FULL adds nothing).
+            let mut require_left = false;
+            let mut require_right = false;
+            if let Some(join_type) = var_list_iter!(egraph[subst[join_type_var]], JoinJoinType)
+                .cloned()
+                .next()
+            {
+                match join_type.0 {
+                    datafusion::prelude::JoinType::Inner => {
+                        require_left = true;
+                        require_right = true;
+                    }
+                    datafusion::prelude::JoinType::Left => require_left = true,
+                    datafusion::prelude::JoinType::Right => require_right = true,
+                    _ => {}
+                }
+            }
+
+            let mut presence_members: Vec<String> = vec![];
+            if require_left {
+                presence_members.extend(shared_left_keys.iter().cloned());
+            }
+            if require_right {
+                presence_members.extend(shared_right_keys.iter().cloned());
+            }
+
+            if !presence_members.is_empty() {
+                let mut acc = subst[left_filters_var];
+                for name in presence_members {
+                    let member = egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                        crate::compile::rewrite::FilterMemberMember(name),
+                    ));
+                    let op = egraph.add(LogicalPlanLanguage::FilterMemberOp(
+                        crate::compile::rewrite::FilterMemberOp("set".to_string()),
+                    ));
+                    let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                        crate::compile::rewrite::FilterMemberValues(vec![]),
+                    ));
+                    let filter_member =
+                        egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
+                    acc = egraph.add(LogicalPlanLanguage::CubeScanFilters(vec![
+                        filter_member,
+                        acc,
+                    ]));
+                }
+                subst.insert(left_filters_var, acc);
+            }
+
+            for left_alias_to_cube in
+                var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube)
+            {
+                for right_alias_to_cube in
+                    var_iter!(egraph[subst[right_alias_to_cube_var]], CubeScanAliasToCube)
+                {
+                    for left_join_hints in
+                        var_iter!(egraph[subst[left_join_hints_var]], CubeScanJoinHints)
+                    {
+                        for right_join_hints in
+                            var_iter!(egraph[subst[right_join_hints_var]], CubeScanJoinHints)
+                        {
+                            let out_alias_to_cube = CubeScanAliasToCube(
+                                left_alias_to_cube
+                                    .iter()
+                                    .chain(right_alias_to_cube.iter())
+                                    .cloned()
+                                    .collect(),
+                            );
+
+                            let out_join_hints = CubeScanJoinHints(
+                                left_join_hints
+                                    .iter()
+                                    .chain(right_join_hints.iter())
+                                    .cloned()
+                                    .chain(iter::once(vec![left_cube.clone(), right_cube.clone()]))
                                     .collect(),
                             );
 
