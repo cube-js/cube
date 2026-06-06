@@ -1296,6 +1296,8 @@ pub struct ClusterSendExec {
     pub limit_and_reverse: Option<(usize, bool)>,
     // Used to prevent SortExec on workers (e.g. with ClusterAggregateTopK) from being optimized away.
     pub required_input_ordering: Option<LexRequirement>,
+    /// Sort + limit for worker-side bounded sort when ORDER BY is on GROUP BY columns.
+    pub worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
 }
 
 pub type PartitionWithFilters = (u64, RowRange);
@@ -1319,6 +1321,7 @@ impl ClusterSendExec {
         use_streaming: bool,
         limit_and_reverse: Option<(usize, bool)>,
         required_input_ordering: Option<LexRequirement>,
+        worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
     ) -> Result<Self, CubeError> {
         let partitions = Self::distribute_to_workers(
             cluster.config().as_ref(),
@@ -1337,6 +1340,7 @@ impl ClusterSendExec {
             use_streaming,
             limit_and_reverse,
             required_input_ordering,
+            worker_sort_and_limit,
         })
     }
 
@@ -1658,6 +1662,7 @@ impl ClusterSendExec {
             // the bug.
             limit_and_reverse: self.limit_and_reverse,
             required_input_ordering: new_required_input_ordering,
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
         }
     }
 
@@ -1725,6 +1730,7 @@ impl ExecutionPlan for ClusterSendExec {
             use_streaming: self.use_streaming,
             limit_and_reverse: self.limit_and_reverse,
             required_input_ordering: self.required_input_ordering.clone(),
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
         }))
     }
 

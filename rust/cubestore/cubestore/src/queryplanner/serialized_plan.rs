@@ -637,6 +637,7 @@ impl PreSerializedPlan {
                         input,
                         snapshots,
                         limit_and_reverse,
+                        worker_sort_and_limit,
                     } = cluster_send;
                     let input = PreSerializedPlan::remove_unused_tables(
                         &input,
@@ -649,6 +650,7 @@ impl PreSerializedPlan {
                             input: Arc::new(input),
                             snapshots: snapshots.clone(),
                             limit_and_reverse: *limit_and_reverse,
+                            worker_sort_and_limit: worker_sort_and_limit.clone(),
                         }),
                     })
                 } else if let Some(panic_worker) = node.as_any().downcast_ref::<PanicWorkerNode>() {

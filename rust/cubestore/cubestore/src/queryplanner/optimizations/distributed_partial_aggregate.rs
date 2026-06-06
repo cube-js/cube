@@ -84,7 +84,7 @@ pub fn push_aggregate_to_workers(
             let worker_input = p_partial.clone().with_new_children(vec![w.input.clone()])?;
 
             // Worker plan, execute partial aggregate inside the worker.
-            Arc::new(WorkerExec::new(
+            let new_worker = WorkerExec::new(
                 worker_input,
                 w.max_batch_rows,
                 // TODO upgrade DF: WorkerExec limit_and_reverse must be wrong here.  Should be
@@ -98,7 +98,9 @@ pub fn push_aggregate_to_workers(
                 WorkerPlanningParams {
                     worker_partition_count: w.properties().output_partitioning().partition_count(),
                 },
-            ))
+                w.worker_sort_and_limit.clone(),
+            );
+            Arc::new(new_worker)
         } else {
             return Ok(p_final);
         };

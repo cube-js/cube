@@ -29,6 +29,7 @@ use std::sync::Arc;
 pub enum InlineAggregateMode {
     Partial,
     Final,
+    Single,
 }
 
 #[derive(Debug, Clone)]
@@ -66,10 +67,11 @@ impl InlineAggregateExec {
             return None;
         }
 
-        // Only support Partial and Final modes
+        // Only support Partial, Final, and Single modes
         let mode = match aggregate.mode() {
             AggregateMode::Partial => InlineAggregateMode::Partial,
             AggregateMode::Final => InlineAggregateMode::Final,
+            AggregateMode::Single => InlineAggregateMode::Single,
             _ => return None,
         };
 
@@ -109,6 +111,11 @@ impl InlineAggregateExec {
 
     pub fn limit(&self) -> Option<usize> {
         self.limit
+    }
+
+    pub fn with_limit(mut self, limit: Option<usize>) -> Self {
+        self.limit = limit;
+        self
     }
 
     pub fn aggr_expr(&self) -> &[Arc<AggregateFunctionExpr>] {
@@ -151,7 +158,7 @@ impl ExecutionPlan for InlineAggregateExec {
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
         match &self.mode {
-            InlineAggregateMode::Partial => {
+            InlineAggregateMode::Partial | InlineAggregateMode::Single => {
                 vec![Distribution::UnspecifiedDistribution]
             }
             InlineAggregateMode::Final => {
@@ -181,7 +188,7 @@ impl ExecutionPlan for InlineAggregateExec {
             group_by: self.group_by.clone(),
             aggr_expr: self.aggr_expr.clone(),
             filter_expr: self.filter_expr.clone(),
-            limit: self.limit.clone(),
+            limit: self.limit,
             input: children[0].clone(),
             schema: self.schema.clone(),
             input_schema: self.input_schema.clone(),
