@@ -44,9 +44,9 @@ servers:
 security:
   - bearerAuth: []
 tags:
-  - name: Users
+  - name: SCIM Users
     description: Provision, read, update, and de-provision users.
-  - name: Groups
+  - name: SCIM Groups
     description: Provision, read, update, and de-provision groups and their memberships.
 paths:
   /scim/v2/Users:
@@ -58,7 +58,7 @@ paths:
         of users. Use the `filter` parameter to look a user up by `userName`,
         for example `userName eq "jane@example.com"`.
       tags:
-        - Users
+        - SCIM Users
       parameters:
         - $ref: '#/components/parameters/Filter'
         - $ref: '#/components/parameters/StartIndex'
@@ -93,7 +93,7 @@ paths:
       summary: Create user
       description: Provisions a new user.
       tags:
-        - Users
+        - SCIM Users
       requestBody:
         required: true
         content:
@@ -124,7 +124,7 @@ paths:
       summary: Get user
       description: Returns a single user by their SCIM `id`.
       tags:
-        - Users
+        - SCIM Users
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -141,7 +141,7 @@ paths:
       summary: Replace user
       description: Replaces all attributes of an existing user with the supplied representation.
       tags:
-        - Users
+        - SCIM Users
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       requestBody:
@@ -167,7 +167,7 @@ paths:
         [PatchOp](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2).
         Commonly used to deactivate a user by setting `active` to `false`.
       tags:
-        - Users
+        - SCIM Users
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       requestBody:
@@ -197,7 +197,7 @@ paths:
       summary: Delete user
       description: De-provisions (deletes) a user by their SCIM `id`.
       tags:
-        - Users
+        - SCIM Users
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:
@@ -211,7 +211,7 @@ paths:
       summary: List groups
       description: Returns a paginated ListResponse of groups.
       tags:
-        - Groups
+        - SCIM Groups
       parameters:
         - $ref: '#/components/parameters/Filter'
         - $ref: '#/components/parameters/StartIndex'
@@ -229,7 +229,7 @@ paths:
       summary: Create group
       description: Provisions a new group.
       tags:
-        - Groups
+        - SCIM Groups
       requestBody:
         required: true
         content:
@@ -253,7 +253,7 @@ paths:
       summary: Get group
       description: Returns a single group by its SCIM `id`.
       tags:
-        - Groups
+        - SCIM Groups
       parameters:
         - $ref: '#/components/parameters/ResourceId'
         - $ref: '#/components/parameters/ExcludedAttributes'
@@ -271,7 +271,7 @@ paths:
       summary: Replace group
       description: Replaces all attributes of an existing group, including its full membership list.
       tags:
-        - Groups
+        - SCIM Groups
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       requestBody:
@@ -296,7 +296,7 @@ paths:
         Applies a partial update to a group using a SCIM PatchOp. Commonly used
         to add or remove members without resending the entire membership list.
       tags:
-        - Groups
+        - SCIM Groups
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       requestBody:
@@ -327,7 +327,7 @@ paths:
       summary: Delete group
       description: Deletes a group by its SCIM `id`. Member users are not deleted.
       tags:
-        - Groups
+        - SCIM Groups
       parameters:
         - $ref: '#/components/parameters/ResourceId'
       responses:

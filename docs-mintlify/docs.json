@@ -691,32 +691,8 @@
             "group": "Endpoints",
             "pages": [
               {
-                "group": "Users",
-                "openapi": "/api-reference/scim.yaml",
-                "pages": [
-                  "GET /scim/v2/Users",
-                  "POST /scim/v2/Users",
-                  "GET /scim/v2/Users/{id}",
-                  "PUT /scim/v2/Users/{id}",
-                  "PATCH /scim/v2/Users/{id}",
-                  "DELETE /scim/v2/Users/{id}"
-                ]
-              },
-              {
-                "group": "Groups",
-                "openapi": "/api-reference/scim.yaml",
-                "pages": [
-                  "GET /scim/v2/Groups",
-                  "POST /scim/v2/Groups",
-                  "GET /scim/v2/Groups/{id}",
-                  "PUT /scim/v2/Groups/{id}",
-                  "PATCH /scim/v2/Groups/{id}",
-                  "DELETE /scim/v2/Groups/{id}"
-                ]
-              },
-              {
                 "group": "Deployments",
-                "openapi": "/api-reference/deployments.yaml",
+                "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /v1/deployments",
                   "GET /v1/deployments/{deploymentId}",
@@ -725,7 +701,7 @@
               },
               {
                 "group": "Environments",
-                "openapi": "/api-reference/deployments.yaml",
+                "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /v1/deployments/{deploymentId}/environments",
                   "GET /v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
@@ -735,15 +711,18 @@
               },
               {
                 "group": "Folders",
-                "openapi": "/api-reference/deployments.yaml",
+                "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /v1/deployments/{deploymentId}/folders",
+                  "POST /v1/deployments/{deploymentId}/folders",
+                  "PUT /v1/deployments/{deploymentId}/folders/{folderId}",
+                  "DELETE /v1/deployments/{deploymentId}/folders/{folderId}",
                   "GET /v1/deployments/{deploymentId}/folders/{folderId}/ancestors"
                 ]
               },
               {
                 "group": "Reports",
-                "openapi": "/api-reference/deployments.yaml",
+                "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /v1/deployments/{deploymentId}/report-folders",
                   "GET /v1/deployments/{deploymentId}/reports",
@@ -756,7 +735,7 @@
               },
               {
                 "group": "Workbooks",
-                "openapi": "/api-reference/deployments.yaml",
+                "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /v1/deployments/{deploymentId}/workbooks",
                   "POST /v1/deployments/{deploymentId}/workbooks",
@@ -764,9 +743,151 @@
                   "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "DELETE /v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
+                  "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
                   "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
                 ]
+              },
+              {
+                "group": "Notifications",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/notifications",
+                  "POST /v1/deployments/{deploymentId}/notifications",
+                  "GET /v1/deployments/{deploymentId}/notifications/{id}",
+                  "PUT /v1/deployments/{deploymentId}/notifications/{id}",
+                  "DELETE /v1/deployments/{deploymentId}/notifications/{id}",
+                  "GET /v1/deployments/{deploymentId}/notifications/{id}/recipients",
+                  "POST /v1/deployments/{deploymentId}/notifications/{id}/recipients",
+                  "DELETE /v1/deployments/{deploymentId}/notifications/{id}/recipients"
+                ]
+              },
+              {
+                "group": "Workspace",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/shared-workspace",
+                  "GET /v1/deployments/{deploymentId}/workspace",
+                  "POST /v1/deployments/{deploymentId}/workspace/move"
+                ]
+              },
+              {
+                "group": "Agents",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/agent-skills",
+                  "GET /v1/deployments/{deploymentId}/agents"
+                ]
+              },
+              {
+                "group": "Metadata",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /v1/meta"
+                ]
+              },
+              {
+                "group": "Users",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/users",
+                  "GET /v1/users/embed-theme",
+                  "GET /v1/users/me"
+                ]
+              },
+              {
+                "group": "Groups",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "DELETE /v1/groups/{id}"
+                ]
+              },
+              {
+                "group": "User Groups",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/user-groups"
+                ]
+              },
+              {
+                "group": "User Attributes",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "DELETE /v1/user-attributes/{id}"
+                ]
+              },
+              {
+                "group": "Resource Policies",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/resource-policies",
+                  "PUT /v1/resource-policies/group",
+                  "PUT /v1/resource-policies/user"
+                ]
+              },
+              {
+                "group": "App Theme",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/app-theme"
+                ]
+              },
+              {
+                "group": "AI Engineer",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/ai-engineer/active-region",
+                  "GET /v1/ai-engineer/settings"
+                ]
+              },
+              {
+                "group": "Embed",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/embed/dashboard/{publicId}",
+                  "POST /v1/embed/generate-session",
+                  "POST /v1/embed/session/token"
+                ]
+              },
+              {
+                "group": "Embed Tenants",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/embed-tenants/{embedTenantName}/groups",
+                  "DELETE /v1/embed-tenants/{embedTenantName}/groups/{id}",
+                  "GET /v1/embed-tenants/{embedTenantName}/user-attributes",
+                  "DELETE /v1/embed-tenants/{embedTenantName}/user-attributes/{id}"
+                ]
+              },
+              {
+                "group": "SCIM Users",
+                "openapi": "/api-reference/scim.yaml",
+                "pages": [
+                  "GET /scim/v2/Users",
+                  "POST /scim/v2/Users",
+                  "GET /scim/v2/Users/{id}",
+                  "PUT /scim/v2/Users/{id}",
+                  "PATCH /scim/v2/Users/{id}",
+                  "DELETE /scim/v2/Users/{id}"
+                ]
+              },
+              {
+                "group": "SCIM Groups",
+                "openapi": "/api-reference/scim.yaml",
+                "pages": [
+                  "GET /scim/v2/Groups",
+                  "POST /scim/v2/Groups",
+                  "GET /scim/v2/Groups/{id}",
+                  "PUT /scim/v2/Groups/{id}",
+                  "PATCH /scim/v2/Groups/{id}",
+                  "DELETE /scim/v2/Groups/{id}"
+                ]
               }
+            ]
+          },
+          {
+            "group": "Changelog",
+            "pages": [
+              "api-reference/changelog"
             ]
           }
         ]
