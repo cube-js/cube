@@ -130,6 +130,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut select_builder = SelectBuilder::new(from);
         context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
 
+        if !logical_plan.modifers().ungrouped {
+            context_factory.set_group_by_members(
+                logical_plan
+                    .schema()
+                    .all_dimensions()
+                    .map(|symbol| symbol.full_name())
+                    .collect(),
+            );
+        }
+
         for dimension in logical_plan.schema().all_dimensions() {
             self.builder.process_query_dimension(
                 dimension,

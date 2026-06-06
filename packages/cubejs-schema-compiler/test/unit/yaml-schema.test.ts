@@ -2011,6 +2011,134 @@ cubes:
       expect(sql).toContain('NULL');
     });
 
+    it('renders the mask value (no CASE WHEN) for aggregate measures when the filter member is not in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      // The aggregate measure must not be wrapped in a row-grain CASE WHEN that
+      // references the (ungrouped) filter column. It should fall back to the mask.
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).not.toMatch(/owner_id\s*=/);
+      expect(sql).toContain('NULL');
+    });
+
+    it('uses the static mask value for aggregate measures when the filter member is not in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+        mask: -1
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).not.toMatch(/owner_id\s*=/);
+      expect(sql).toMatch(/-1\s+"transactions__total_cost"/);
+    });
+
+    it('still applies conditional CASE WHEN masking for aggregate measures when the filter member is in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id', 'transactions.owner_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/owner_id/);
+    });
+
     it('does not recurse when filter member is also masked', async () => {
       const compilers = prepareYamlCompiler(`
 cubes:
