@@ -110,8 +110,49 @@ Currently, advanced semantic queries can be placed on dashboards, but dashboard 
 
 </Info>
 
+## Applying a security context
+
+When you run a query in a workbook—or open a dashboard—Cube generates a token to
+execute it against the semantic layer. If you have developer access, you can
+attach a [security context][ref-security-context] to that token directly from
+the workbook or dashboard page. The values you provide are used when the token
+is generated, overriding the claims that would otherwise come from your session.
+
+<Note>
+
+The security context control is only visible to developers. Other users always
+query with the security context derived from their own session.
+
+</Note>
+
+This is primarily a testing tool. It lets developers reproduce what a specific
+end user would see and verify [access control][ref-access-control] and
+multitenancy behavior without leaving Cube Cloud. It's especially useful when a
+query fails or returns no data because the data model expects security context
+values that aren't present in your session—you can supply them here and confirm
+the model behaves as intended.
+
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="w-full h-auto rounded-xl block dark:hidden"
+  src="https://lgo0ecceic.ucarecd.net/add0e872-e951-4d13-850b-991bf0e34c41/"
+></video>
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="w-full h-auto rounded-xl hidden dark:block"
+  src="https://lgo0ecceic.ucarecd.net/d61efb90-809c-4247-aa00-efe3d0af2f6f/"
+></video>
+
 [ref-core-data-apis]: /reference/core-data-apis
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
 [ref-configuration]: /docs/data-modeling/configuration
+[ref-security-context]: /docs/data-modeling/access-control/context
+[ref-access-control]: /docs/data-modeling/access-control
 
