@@ -537,12 +537,13 @@ describe('Cube RBAC Engine', () => {
     // the measure renders the mask value (NULL) and the query compiles successfully.
     test('aggregate measure: single filter policy does not trigger CASE when filter member is not in the group by', async () => {
       const res = await connection.query(
-        'SELECT id, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+        'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
-        // total_price is masked (NULL) rather than rendered as an invalid
-        // CASE WHEN over the aggregate.
+        // product_id (the row filter member) is not in the GROUP BY, so total_price
+        // is masked (NULL) rather than rendered as an invalid CASE WHEN over the
+        // aggregate.
         expect(row.total_price).toBeNull();
       }
     });
@@ -592,7 +593,7 @@ describe('Cube RBAC Engine', () => {
     // must compile successfully.
     test('aggregate measure: multiple policies render mask instead of measure when row filter members are not in the group by', async () => {
       const res = await connection.query(
-        'SELECT id, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+        'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
       );
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
