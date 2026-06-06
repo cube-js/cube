@@ -2978,7 +2978,15 @@ impl MemberRules {
         let left_filters_var = var!(left_filters_var);
         let group_expr_var = var!(group_expr_var);
         let meta_context = self.meta_context.clone();
+        // Merging a view join into a single multi-fact CubeScan relies on the
+        // Tesseract SQL planner (it stitches the fact groups with a FULL OUTER
+        // JOIN over the shared key). Only enable this rewrite when Tesseract is
+        // enabled; the legacy planner would mis-handle the resulting query.
+        let enable_tesseract_sql_planner = self.config_obj.enable_tesseract_sql_planner();
         move |egraph, subst| {
+            if !enable_tesseract_sql_planner {
+                return false;
+            }
             fn dimension_member_name(
                 egraph: &mut CubeEGraph,
                 members_id: Id,

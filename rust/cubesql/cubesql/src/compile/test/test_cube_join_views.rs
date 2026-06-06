@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use cubeclient::models::{V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
 use pretty_assertions::assert_eq;
 
@@ -5,11 +7,12 @@ use crate::{
     compile::{
         rewrite::rewriter::Rewriter,
         test::{
-            convert_select_to_query_plan_with_meta, convert_sql_to_cube_query, get_test_session,
-            get_test_tenant_ctx_with_meta, init_testing_logger, utils::LogicalPlanTestUtils,
+            convert_sql_to_cube_query, get_test_session_with_config, get_test_tenant_ctx_with_meta,
+            init_testing_logger, utils::LogicalPlanTestUtils,
         },
-        CompilationError, DatabaseProtocol,
+        CompilationError, DatabaseProtocol, QueryPlan,
     },
+    config::{ConfigObj, ConfigObjImpl},
     transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure},
 };
 
@@ -92,6 +95,26 @@ fn set_filter(member: &str) -> V1LoadRequestQueryFilterItem {
     }
 }
 
+/// Plans `sql` against the two views, with the Tesseract SQL planner enabled or
+/// disabled. The shared-member view-join merge only fires when Tesseract is
+/// enabled.
+async fn plan_view_join(sql: &str, tesseract: bool) -> Result<QueryPlan, CompilationError> {
+    let meta = get_test_tenant_ctx_with_meta(views_meta());
+    let mut config = ConfigObjImpl::default();
+    config.tesseract_sql_planner = tesseract;
+    let config: Arc<dyn ConfigObj> = Arc::new(config);
+    let session =
+        get_test_session_with_config(DatabaseProtocol::PostgreSQL, config, meta.clone()).await;
+    convert_sql_to_cube_query(&sql.to_string(), meta, session).await
+}
+
+const GROUPED_LEFT_JOIN: &str = r#"
+    SELECT c.customer_city, measure(o.revenue), measure(c.avg_age)
+    FROM customers_view c
+    LEFT JOIN orders_view o ON o.customer_city = c.customer_city
+    GROUP BY 1
+"#;
+
 /// The motivating query: a grouped (multi-fact) `LEFT JOIN` selecting a
 /// dimension and measures from each view, joined on the shared `customer_city`
 /// which is also the GROUP BY key. The two view scans are merged into a single
@@ -104,18 +127,10 @@ async fn test_group_by_left_join_two_views_on_shared_member() {
     }
     init_testing_logger();
 
-    let logical_plan = convert_select_to_query_plan_with_meta(
-        r#"
-            SELECT c.customer_city, measure(o.revenue), measure(c.avg_age)
-            FROM customers_view c
-            LEFT JOIN orders_view o ON o.customer_city = c.customer_city
-            GROUP BY 1
-            "#
-        .to_string(),
-        views_meta(),
-    )
-    .await
-    .as_logical_plan();
+    let logical_plan = plan_view_join(GROUPED_LEFT_JOIN, true)
+        .await
+        .unwrap()
+        .as_logical_plan();
 
     assert_eq!(
         logical_plan.find_cube_scan().request,
@@ -146,17 +161,17 @@ async fn test_group_by_inner_join_two_views_on_shared_member() {
     }
     init_testing_logger();
 
-    let logical_plan = convert_select_to_query_plan_with_meta(
+    let logical_plan = plan_view_join(
         r#"
             SELECT c.customer_city, measure(o.revenue), measure(c.avg_age)
             FROM customers_view c
             INNER JOIN orders_view o ON o.customer_city = c.customer_city
             GROUP BY 1
-            "#
-        .to_string(),
-        views_meta(),
+            "#,
+        true,
     )
     .await
+    .unwrap()
     .as_logical_plan();
 
     assert_eq!(
@@ -182,9 +197,22 @@ async fn test_group_by_inner_join_two_views_on_shared_member() {
     )
 }
 
+/// The merge relies on the Tesseract SQL planner; with it disabled the join is
+/// not merged and the query is rejected like any other unsupported cube join.
+#[tokio::test]
+async fn test_grouped_view_join_not_merged_without_tesseract() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let error = plan_view_join(GROUPED_LEFT_JOIN, false).await.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
+}
+
 /// Ungrouped query (`SELECT *`): the shared-member merge only applies to
-/// grouped queries, so an ungrouped join is not merged and is rejected the
-/// same way any other unsupported cube join is.
+/// grouped queries, so an ungrouped join is not merged and is rejected even
+/// when Tesseract is enabled.
 #[tokio::test]
 async fn test_ungrouped_join_two_views_on_shared_member_is_not_merged() {
     if !Rewriter::sql_push_down_enabled() {
@@ -192,21 +220,17 @@ async fn test_ungrouped_join_two_views_on_shared_member_is_not_merged() {
     }
     init_testing_logger();
 
-    let meta = get_test_tenant_ctx_with_meta(views_meta());
-    let query = convert_sql_to_cube_query(
-        &r#"
+    let error = plan_view_join(
+        r#"
             SELECT *
             FROM customers_view
             LEFT JOIN orders_view
                 ON (orders_view.customer_city = customers_view.customer_city)
-            "#
-        .to_string(),
-        meta.clone(),
-        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+            "#,
+        true,
     )
-    .await;
-
-    let error = query.unwrap_err();
+    .await
+    .unwrap_err();
     assert!(matches!(error, CompilationError::Rewrite(..)));
 }
 
@@ -220,21 +244,17 @@ async fn test_group_by_join_dimension_not_in_group_by_is_not_merged() {
     }
     init_testing_logger();
 
-    let meta = get_test_tenant_ctx_with_meta(views_meta());
-    let query = convert_sql_to_cube_query(
-        &r#"
+    let error = plan_view_join(
+        r#"
             SELECT c.status, measure(o.revenue), measure(c.avg_age)
             FROM customers_view c
             LEFT JOIN orders_view o ON o.customer_city = c.customer_city
             GROUP BY 1
-            "#
-        .to_string(),
-        meta.clone(),
-        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+            "#,
+        true,
     )
-    .await;
-
-    let error = query.unwrap_err();
+    .await
+    .unwrap_err();
     assert!(matches!(error, CompilationError::Rewrite(..)));
 }
 
@@ -248,20 +268,16 @@ async fn test_join_two_views_on_measure_is_not_merged() {
     }
     init_testing_logger();
 
-    let meta = get_test_tenant_ctx_with_meta(views_meta());
-    let query = convert_sql_to_cube_query(
-        &r#"
+    let error = plan_view_join(
+        r#"
             SELECT c.customer_city, measure(o.revenue)
             FROM customers_view c
             LEFT JOIN orders_view o ON (o.revenue = c.avg_age)
             GROUP BY 1
-            "#
-        .to_string(),
-        meta.clone(),
-        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+            "#,
+        true,
     )
-    .await;
-
-    let error = query.unwrap_err();
+    .await
+    .unwrap_err();
     assert!(matches!(error, CompilationError::Rewrite(..)));
 }
