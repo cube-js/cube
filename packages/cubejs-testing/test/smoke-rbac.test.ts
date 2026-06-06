@@ -529,6 +529,23 @@ describe('Cube RBAC Engine', () => {
         }
       }
     });
+
+    // Smoke test: only one filter policy matches (conditional_mask_role). For an
+    // aggregate measure (total_price), a per-row CASE WHEN over the row filter would
+    // reference product_id at row grain while the measure is aggregated. Since
+    // product_id is not in the GROUP BY, the conditional CASE must NOT be triggered —
+    // the measure renders the mask value (NULL) and the query compiles successfully.
+    test('aggregate measure: single filter policy does not trigger CASE when filter member is not in the group by', async () => {
+      const res = await connection.query(
+        'SELECT id, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // total_price is masked (NULL) rather than rendered as an invalid
+        // CASE WHEN over the aggregate.
+        expect(row.total_price).toBeNull();
+      }
+    });
   });
 
   /**
@@ -564,6 +581,22 @@ describe('Cube RBAC Engine', () => {
           // Matches neither policy filter → masked
           expect(Number(row.price)).toBe(-1);
         }
+      }
+    });
+
+    // Smoke test: two filter policies match, so conditional masking is engaged and a
+    // CASE WHEN would normally be triggered (the OR of both row filters). But for an
+    // aggregate measure (total_price), the row filter members (product_id) are not in
+    // the GROUP BY, so a per-row CASE WHEN over the aggregate would be invalid SQL.
+    // The measure must render the mask (NULL) instead of the measure, and the query
+    // must compile successfully.
+    test('aggregate measure: multiple policies render mask instead of measure when row filter members are not in the group by', async () => {
+      const res = await connection.query(
+        'SELECT id, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.total_price).toBeNull();
       }
     });
   });
