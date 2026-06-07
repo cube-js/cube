@@ -335,6 +335,61 @@ dimension in your query.
 
 </Warning>
 
+#### Masking across multiple policies
+
+Because member access is [unioned](#the-permission-space), **full access wins
+over masking**. If any matching policy grants a member unconditional full access
+through `member_level` (with no `row_level` filter), the user sees the **real**
+value — even if another matching policy lists that member under `member_masking`.
+
+Masking only takes effect when **no** matching policy grants unconditional full
+access. There are two sub-cases:
+
+- **Masked only.** The member is exposed solely through `member_masking` (or any
+  full-access policy is itself row-restricted). The member is masked for **all**
+  rows.
+- **Conditionally unmasked.** Another policy grants full access _and_ defines a
+  `row_level` filter — full access is conditional on that filter. Masking then
+  becomes **conditional on the row filter**: rows matching the filter show the
+  real value, while the rest show the masked value. The generated SQL is roughly
+  `CASE WHEN {rowFilter} THEN {value} ELSE {mask} END`.
+
+<Info>
+
+This lets you combine a broad masking policy (e.g. the `*` group sees masked
+values) with a narrower policy that reveals real values only for the rows a
+group is entitled to (its `row_level` range).
+
+</Info>
+
+#### Conditional masking on measures
+
+Conditional masking is evaluated **per row**, which works naturally for
+dimensions (the `CASE WHEN` expression is part of the `GROUP BY`). For an
+**aggregate measure** (e.g. `sum`, `count`), that per-row expression can only be
+applied when the members referenced by the row filter are part of the query's
+`GROUP BY`.
+
+When a query selects a conditionally-masked measure but **does not group by the
+members referenced in the row filter**, Cube cannot decide the condition per
+aggregated group. Rather than emit invalid SQL (where the filter column is
+neither grouped nor aggregated — which fails on strict engines like BigQuery),
+it renders the **mask value for the entire measure** (`NULL` by default) instead
+of the conditional expression.
+
+| Query groups by the row filter's members? | Result for the measure |
+| --- | --- |
+| Yes | Conditional: real value for matching rows, masked otherwise |
+| No | Fully masked (the mask value, e.g. `NULL`) |
+
+<Tip>
+
+If you need a row-aware value for a measure regardless of grouping, add the row
+filter's member (the dimension it filters on) to your query's dimensions so it
+becomes part of the `GROUP BY`.
+
+</Tip>
+
 _When querying a view,_ data masking follows the same pattern as row-level
 security: masking rules from both the view and relevant cubes are applied.
 
