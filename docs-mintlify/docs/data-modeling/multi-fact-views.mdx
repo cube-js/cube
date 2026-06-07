@@ -395,6 +395,18 @@ planner expresses it as a filtered cross join), so both sides must share a key;
 both truncated columns must resolve to the same underlying time member at the
 same granularity.
 
+You can also combine a `DATE_TRUNC` equality with a plain dimension equality in
+the same join (a composite key), and group by both:
+
+```sql
+SELECT DATE_TRUNC('day', o.created_at), o.name, MEASURE(o.total_amount), MEASURE(r.total_refund)
+FROM orders_view o
+JOIN returns_view r
+  ON DATE_TRUNC('day', r.created_at) = DATE_TRUNC('day', o.created_at)
+ AND r.name = o.name
+GROUP BY 1, 2
+```
+
 ### Filtering the join
 
 Filters on top of the join are supported and are applied to the merged query:

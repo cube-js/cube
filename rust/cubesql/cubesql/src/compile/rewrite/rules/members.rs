@@ -679,6 +679,79 @@ impl RewriteRules for MemberRules {
                     "?join_members",
                 ),
             ),
+            // Absorb a date-truncated equality filter sitting on top of a
+            // MultiFactJoinWrapper as an additional (time) join key. This covers
+            // joins on a mix of a plain dimension and a DATE_TRUNC: the planner
+            // turns `ON a.dim = b.dim AND DATE_TRUNC(g, a.ts) = DATE_TRUNC(g, b.ts)`
+            // into Filter(<trunc eq>, Join(a.dim = b.dim, ...)). The column join
+            // becomes the wrapper; this rule folds the truncated time member into
+            // the recorded join key (and marks both time columns present, since a
+            // post-join equality is effectively INNER on that key).
+            transforming_rewrite(
+                "multi-fact-join-wrapper-absorb-time-key",
+                filter(
+                    binary_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec![
+                                literal_expr("?abs_left_granularity"),
+                                column_expr("?abs_left_column"),
+                            ],
+                        ),
+                        "=",
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec![
+                                literal_expr("?abs_right_granularity"),
+                                column_expr("?abs_right_column"),
+                            ],
+                        ),
+                    ),
+                    multi_fact_join_wrapper(
+                        cube_scan(
+                            "?abs_alias_to_cube",
+                            "?abs_members",
+                            "?abs_filters",
+                            "?abs_orders",
+                            "?abs_limit",
+                            "?abs_offset",
+                            "?abs_split",
+                            "?abs_can_pushdown_join",
+                            "?abs_wrapped",
+                            "?abs_ungrouped",
+                            "?abs_join_hints",
+                        ),
+                        "?abs_prev_join_members",
+                    ),
+                ),
+                multi_fact_join_wrapper(
+                    cube_scan(
+                        "?abs_alias_to_cube",
+                        "?abs_members",
+                        "?abs_out_filters",
+                        "?abs_orders",
+                        "?abs_limit",
+                        "?abs_offset",
+                        "?abs_split",
+                        "?abs_can_pushdown_join",
+                        "?abs_wrapped",
+                        "?abs_ungrouped",
+                        "?abs_join_hints",
+                    ),
+                    "?abs_join_members",
+                ),
+                self.absorb_time_key_into_wrapper(
+                    "?abs_members",
+                    "?abs_left_column",
+                    "?abs_left_granularity",
+                    "?abs_right_column",
+                    "?abs_right_granularity",
+                    "?abs_filters",
+                    "?abs_out_filters",
+                    "?abs_prev_join_members",
+                    "?abs_join_members",
+                ),
+            ),
             // Push a Filter (e.g. a WHERE on top of the join) down through the
             // wrapper into the merged CubeScan, where the standard filter
             // push-down rules turn it into a Cube query filter.
@@ -3606,6 +3679,144 @@ impl MemberRules {
             }
 
             false
+        }
+    }
+
+    // Fold a date-truncated equality (DATE_TRUNC(g, a.ts) = DATE_TRUNC(g, b.ts))
+    // that sits on top of a MultiFactJoinWrapper into the wrapper's recorded join
+    // key. Both truncated columns must resolve to the same underlying time member
+    // (at the same granularity) on the merged scan; both are marked present.
+    #[allow(clippy::too_many_arguments)]
+    fn absorb_time_key_into_wrapper(
+        &self,
+        members_var: &'static str,
+        left_column_var: &'static str,
+        left_granularity_var: &'static str,
+        right_column_var: &'static str,
+        right_granularity_var: &'static str,
+        filters_var: &'static str,
+        out_filters_var: &'static str,
+        prev_join_members_var: &'static str,
+        join_members_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let members_var = var!(members_var);
+        let left_column_var = var!(left_column_var);
+        let left_granularity_var = var!(left_granularity_var);
+        let right_column_var = var!(right_column_var);
+        let right_granularity_var = var!(right_granularity_var);
+        let filters_var = var!(filters_var);
+        let out_filters_var = var!(out_filters_var);
+        let prev_join_members_var = var!(prev_join_members_var);
+        let join_members_var = var!(join_members_var);
+        let meta_context = self.meta_context.clone();
+        let enable_tesseract_sql_planner = self.config_obj.enable_tesseract_sql_planner();
+        move |egraph, subst| {
+            if !enable_tesseract_sql_planner {
+                return false;
+            }
+            fn dimension_member_name(
+                egraph: &mut CubeEGraph,
+                members_id: Id,
+                column: &Column,
+            ) -> Option<String> {
+                match egraph[members_id].data.find_member_by_column(column) {
+                    Some(((_, Member::Dimension { name, .. }, _), _))
+                    | Some(((_, Member::TimeDimension { name, .. }, _), _)) => Some(name.clone()),
+                    _ => None,
+                }
+            }
+
+            let resolve_underlying = |member_name: &str| -> String {
+                meta_context
+                    .find_dimension_with_name(member_name)
+                    .and_then(|dim| dim.alias_member.clone())
+                    .unwrap_or_else(|| member_name.to_string())
+            };
+
+            let Some(left_granularity) =
+                var_iter!(egraph[subst[left_granularity_var]], LiteralExprValue)
+                    .find_map(|v| utils::parse_granularity(v, false))
+            else {
+                return false;
+            };
+            let Some(right_granularity) =
+                var_iter!(egraph[subst[right_granularity_var]], LiteralExprValue)
+                    .find_map(|v| utils::parse_granularity(v, false))
+            else {
+                return false;
+            };
+            if left_granularity != right_granularity {
+                return false;
+            }
+
+            let Some(left_col) = var_iter!(egraph[subst[left_column_var]], ColumnExprColumn)
+                .next()
+                .cloned()
+            else {
+                return false;
+            };
+            let Some(right_col) = var_iter!(egraph[subst[right_column_var]], ColumnExprColumn)
+                .next()
+                .cloned()
+            else {
+                return false;
+            };
+
+            // Both columns live on the merged scan; resolve them to time members.
+            let Some(left_key) = dimension_member_name(egraph, subst[members_var], &left_col)
+            else {
+                return false;
+            };
+            let Some(right_key) = dimension_member_name(egraph, subst[members_var], &right_col)
+            else {
+                return false;
+            };
+            if resolve_underlying(&left_key) != resolve_underlying(&right_key) {
+                return false;
+            }
+
+            // Time key recorded for the GROUP BY check at finalize, unioned with
+            // the keys already on the wrapper.
+            let mut join_member_names: Vec<String> = vec![resolve_underlying(&left_key)];
+            if let Some(prev) = var_iter!(
+                egraph[subst[prev_join_members_var]],
+                MultiFactJoinWrapperJoinMembers
+            )
+            .next()
+            {
+                join_member_names.extend(prev.iter().cloned());
+            }
+            join_member_names.sort();
+            join_member_names.dedup();
+
+            let join_members_id = egraph.add(LogicalPlanLanguage::MultiFactJoinWrapperJoinMembers(
+                MultiFactJoinWrapperJoinMembers(join_member_names),
+            ));
+            subst.insert(join_members_var, join_members_id);
+
+            // INNER on the time key: both columns must be present.
+            let presence_members = [left_key, right_key];
+            let mut acc = subst[filters_var];
+            for name in &presence_members {
+                let member = egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                    crate::compile::rewrite::FilterMemberMember(name.clone()),
+                ));
+                let op = egraph.add(LogicalPlanLanguage::FilterMemberOp(
+                    crate::compile::rewrite::FilterMemberOp("set".to_string()),
+                ));
+                let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                    crate::compile::rewrite::FilterMemberValues(vec![]),
+                ));
+                let filter_member =
+                    egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
+                acc = egraph.add(LogicalPlanLanguage::CubeScanFilters(vec![
+                    filter_member,
+                    acc,
+                ]));
+            }
+            subst.insert(out_filters_var, acc);
+
+            true
         }
     }
 

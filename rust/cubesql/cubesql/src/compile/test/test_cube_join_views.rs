@@ -817,3 +817,58 @@ async fn test_join_on_multiple_dimensions_partial_group_by_is_not_merged() {
         result.map(|p| p.as_logical_plan().find_cube_scan().request)
     );
 }
+
+/// Joining on a mix of a `DATE_TRUNC` equality and a plain dimension equality.
+/// The SQL planner makes the column equality the join key and keeps the
+/// truncated-time equality as a filter on top; the rewrite folds the time
+/// member into the join key so the whole thing merges into one multi-fact scan
+/// grouped by the time dimension and the dimension. Both join (INNER) keys and
+/// the absorbed time key are marked present.
+#[tokio::test]
+async fn test_inner_join_on_date_trunc_and_dimension() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT DATE_TRUNC('day', c.created_at), c.customer_city, measure(o.revenue)
+            FROM customers_view c
+            JOIN orders_view o
+                ON DATE_TRUNC('day', o.created_at) = DATE_TRUNC('day', c.created_at)
+               AND o.customer_city = c.customer_city
+            GROUP BY 1, 2
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["orders_view.revenue".to_string()]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "customers_view.created_at".to_string(),
+                granularity: Some("day".to_string()),
+                date_range: None,
+            }]),
+            order: Some(vec![]),
+            filters: Some(vec![
+                set_filter("customers_view.created_at"),
+                set_filter("orders_view.created_at"),
+                set_filter("orders_view.customer_city"),
+                set_filter("customers_view.customer_city"),
+            ]),
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
