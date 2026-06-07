@@ -541,6 +541,16 @@ crate::plan_to_language! {
             left_input: Arc<LogicalPlan>,
             right_input: Arc<LogicalPlan>,
         },
+        // Intermediate node produced while merging a join of two (view)
+        // CubeScans on a shared cube member into a single multi-fact CubeScan.
+        // `input` is the merged CubeScan; `join_members` holds the underlying
+        // cube members the scans were joined on, so the aggregate finalize rule
+        // can verify the GROUP BY matches the join key. Rewrite-only: it must be
+        // eliminated (unwrapped at the aggregate) before extraction.
+        MultiFactJoinWrapper {
+            input: Arc<LogicalPlan>,
+            join_members: Vec<String>,
+        },
     }
 }
 
@@ -2264,6 +2274,10 @@ fn cube_scan(
 
 fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
     format!("(CubeScanWrapper {} {})", input, finalized)
+}
+
+fn multi_fact_join_wrapper(input: impl Display, join_members: impl Display) -> String {
+    format!("(MultiFactJoinWrapper {} {})", input, join_members)
 }
 
 fn distinct(input: impl Display) -> String {

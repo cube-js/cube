@@ -70,11 +70,45 @@ fn views_meta() -> Vec<CubeMeta> {
             description: None,
             title: None,
             r#type: V1CubeMetaType::View,
+            dimensions: vec![
+                dimension("orders_view.customer_city", "customers.customer_city"),
+                dimension("orders_view.status", "orders.status"),
+            ],
+            measures: vec![measure("orders_view.revenue", "orders.revenue", "sum")],
+            segments: vec![],
+            joins: None,
+            folders: None,
+            nested_folders: None,
+            hierarchies: None,
+            meta: None,
+        },
+        CubeMeta {
+            name: "returns_view".to_string(),
+            description: None,
+            title: None,
+            r#type: V1CubeMetaType::View,
             dimensions: vec![dimension(
-                "orders_view.customer_city",
+                "returns_view.customer_city",
                 "customers.customer_city",
             )],
-            measures: vec![measure("orders_view.revenue", "orders.revenue", "sum")],
+            measures: vec![measure("returns_view.refunds", "returns.refunds", "sum")],
+            segments: vec![],
+            joins: None,
+            folders: None,
+            nested_folders: None,
+            hierarchies: None,
+            meta: None,
+        },
+        CubeMeta {
+            name: "payments_view".to_string(),
+            description: None,
+            title: None,
+            r#type: V1CubeMetaType::View,
+            dimensions: vec![dimension(
+                "payments_view.customer_city",
+                "customers.customer_city",
+            )],
+            measures: vec![measure("payments_view.paid", "payments.paid", "sum")],
             segments: vec![],
             joins: None,
             folders: None,
@@ -358,6 +392,191 @@ async fn test_group_by_full_join_two_views_on_shared_member() {
             order: Some(vec![]),
             // FULL JOIN adds no presence filter.
             filters: None,
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
+
+/// Joining three views on the shared key (FULL JOIN, so no presence filters)
+/// merges into a single multi-fact CubeScan with all three measures.
+#[tokio::test]
+async fn test_group_by_full_join_three_views_on_shared_member() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue), measure(r.refunds)
+            FROM customers_view c
+            FULL JOIN orders_view o ON o.customer_city = c.customer_city
+            FULL JOIN returns_view r ON r.customer_city = c.customer_city
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![
+                "orders_view.revenue".to_string(),
+                "returns_view.refunds".to_string(),
+            ]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            join_hints: Some(vec![
+                vec!["customers_view".to_string(), "orders_view".to_string()],
+                vec!["customers_view".to_string(), "returns_view".to_string()],
+            ]),
+            ..Default::default()
+        }
+    )
+}
+
+/// Joining four views on the shared key (FULL JOIN) merges into a single
+/// multi-fact CubeScan with all four measures.
+#[tokio::test]
+async fn test_group_by_full_join_four_views_on_shared_member() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue), measure(r.refunds), measure(p.paid)
+            FROM customers_view c
+            FULL JOIN orders_view o ON o.customer_city = c.customer_city
+            FULL JOIN returns_view r ON r.customer_city = c.customer_city
+            FULL JOIN payments_view p ON p.customer_city = c.customer_city
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![
+                "orders_view.revenue".to_string(),
+                "returns_view.refunds".to_string(),
+                "payments_view.paid".to_string(),
+            ]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            join_hints: Some(vec![
+                vec!["customers_view".to_string(), "orders_view".to_string()],
+                vec!["customers_view".to_string(), "returns_view".to_string()],
+                vec!["customers_view".to_string(), "payments_view".to_string()],
+            ]),
+            ..Default::default()
+        }
+    )
+}
+
+/// A WHERE filter on top of the join is pushed through the wrapper into the
+/// merged scan and shows up as a Cube query filter alongside the join-semantics
+/// `set` filter.
+#[tokio::test]
+async fn test_group_by_left_join_with_where_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue)
+            FROM customers_view c
+            LEFT JOIN orders_view o ON o.customer_city = c.customer_city
+            WHERE c.status = 'active'
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["orders_view.revenue".to_string()]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            filters: Some(vec![
+                set_filter("customers_view.customer_city"),
+                V1LoadRequestQueryFilterItem {
+                    member: Some("customers_view.status".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["active".to_string()]),
+                    or: None,
+                    and: None,
+                },
+            ]),
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
+
+/// A filter placed in the ON clause (in addition to the shared-key equality).
+#[tokio::test]
+async fn test_group_by_left_join_with_on_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue)
+            FROM customers_view c
+            LEFT JOIN orders_view o
+                ON o.customer_city = c.customer_city AND o.status = 'completed'
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["orders_view.revenue".to_string()]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            filters: Some(vec![
+                set_filter("customers_view.customer_city"),
+                V1LoadRequestQueryFilterItem {
+                    member: Some("orders_view.status".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["completed".to_string()]),
+                    or: None,
+                    and: None,
+                },
+            ]),
             join_hints: Some(vec![vec![
                 "customers_view".to_string(),
                 "orders_view".to_string(),

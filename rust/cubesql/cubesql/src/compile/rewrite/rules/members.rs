@@ -7,10 +7,10 @@ use crate::{
             binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
             cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr, distinct,
-            expr_column_name, fun_expr, join, like_expr, limit, list_concat_pushdown_replacer,
-            list_concat_pushup_replacer, literal_expr, literal_member, measure_expr,
-            member_pushdown_replacer, member_replacer, original_expr_name, projection,
-            referenced_columns, rewrite,
+            expr_column_name, filter, fun_expr, join, like_expr, limit,
+            list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
+            literal_member, measure_expr, member_pushdown_replacer, member_replacer,
+            multi_fact_join_wrapper, original_expr_name, projection, referenced_columns, rewrite,
             rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
             rules::{
                 replacer_flat_push_down_node_substitute_rules, replacer_push_down_node,
@@ -26,9 +26,10 @@ use crate::{
             LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, ListType,
             LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
             MeasureName, MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
-            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
-            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
+            MultiFactJoinWrapperJoinMembers, ProjectionAlias, TableScanFetch, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName,
         },
     },
     config::ConfigObj,
@@ -434,54 +435,48 @@ impl RewriteRules for MemberRules {
                     "?out_join_hints",
                 ),
             ),
-            // Merge a join between two (view) CubeScans on a dimension that
-            // resolves to the same underlying cube member into a single
-            // CubeScan, but ONLY under an aggregate whose GROUP BY is exactly
-            // that shared join key. The merged scan becomes a multi-fact query
-            // (FULL OUTER stitched over the group-by key by the planner).
-            // Gating on the aggregate means ungrouped queries (e.g. SELECT *)
-            // and queries grouping by a non-join-key dimension are not merged.
+            // Merge a join of two (view) CubeScans on a dimension that resolves
+            // to the same underlying cube member into a single CubeScan wrapped
+            // in a MultiFactJoinWrapper. The wrapper records the join key (as
+            // underlying cube members) so the aggregate finalize rule can later
+            // require the GROUP BY to match it, and so additional joins (3+
+            // views) and WHERE filters can compose before finalization.
             transforming_rewrite(
-                "push-down-aggregate-shared-member-join",
-                aggregate(
-                    join(
-                        cube_scan(
-                            "?left_alias_to_cube",
-                            "?left_members",
-                            "?left_filters",
-                            "?left_orders",
-                            "CubeScanLimit:None",
-                            "CubeScanOffset:None",
-                            "?left_split",
-                            "CubeScanCanPushdownJoin:true",
-                            "CubeScanWrapped:false",
-                            "CubeScanUngrouped:true",
-                            "?left_join_hints",
-                        ),
-                        cube_scan(
-                            "?right_alias_to_cube",
-                            "?right_members",
-                            "?right_filters",
-                            "?right_orders",
-                            "CubeScanLimit:None",
-                            "CubeScanOffset:None",
-                            "?right_split",
-                            "CubeScanCanPushdownJoin:true",
-                            "CubeScanWrapped:false",
-                            "CubeScanUngrouped:true",
-                            "?right_join_hints",
-                        ),
-                        "?left_on",
-                        "?right_on",
-                        "?join_type",
-                        "?join_constraint",
-                        "?null_equals_null",
+                "shared-member-join-to-wrapper",
+                join(
+                    cube_scan(
+                        "?left_alias_to_cube",
+                        "?left_members",
+                        "?left_filters",
+                        "?left_orders",
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
+                        "?left_split",
+                        "CubeScanCanPushdownJoin:true",
+                        "CubeScanWrapped:false",
+                        "CubeScanUngrouped:true",
+                        "?left_join_hints",
                     ),
-                    "?group_expr",
-                    "?aggr_expr",
-                    "?agg_split",
+                    cube_scan(
+                        "?right_alias_to_cube",
+                        "?right_members",
+                        "?right_filters",
+                        "?right_orders",
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
+                        "?right_split",
+                        "CubeScanCanPushdownJoin:true",
+                        "CubeScanWrapped:false",
+                        "CubeScanUngrouped:true",
+                        "?right_join_hints",
+                    ),
+                    "?left_on",
+                    "?right_on",
+                    "?join_type",
+                    "?join_constraint",
+                    "?null_equals_null",
                 ),
-                aggregate(
+                multi_fact_join_wrapper(
                     cube_scan(
                         "?out_alias_to_cube",
                         cube_scan_members("?left_members", "?right_members"),
@@ -495,11 +490,9 @@ impl RewriteRules for MemberRules {
                         "CubeScanUngrouped:true",
                         "?out_join_hints",
                     ),
-                    "?group_expr",
-                    "?aggr_expr",
-                    "?agg_split",
+                    "?join_members",
                 ),
-                self.push_down_aggregate_shared_member_join(
+                self.merge_shared_member_join(
                     "?left_alias_to_cube",
                     "?right_alias_to_cube",
                     "?out_alias_to_cube",
@@ -512,8 +505,109 @@ impl RewriteRules for MemberRules {
                     "?right_join_hints",
                     "?out_join_hints",
                     "?left_filters",
-                    "?group_expr",
+                    "?join_members",
+                    None,
                 ),
+            ),
+            // Extend a MultiFactJoinWrapper with another joined (view) CubeScan,
+            // supporting joins of 3+ views. The new join must again be on a
+            // dimension resolving to the same underlying member; its key is
+            // unioned into the wrapper's recorded join members.
+            transforming_rewrite(
+                "shared-member-join-extend-wrapper",
+                join(
+                    multi_fact_join_wrapper(
+                        cube_scan(
+                            "?left_alias_to_cube",
+                            "?left_members",
+                            "?left_filters",
+                            "?left_orders",
+                            "CubeScanLimit:None",
+                            "CubeScanOffset:None",
+                            "?left_split",
+                            "CubeScanCanPushdownJoin:true",
+                            "CubeScanWrapped:false",
+                            "CubeScanUngrouped:true",
+                            "?left_join_hints",
+                        ),
+                        "?prev_join_members",
+                    ),
+                    cube_scan(
+                        "?right_alias_to_cube",
+                        "?right_members",
+                        "?right_filters",
+                        "?right_orders",
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
+                        "?right_split",
+                        "CubeScanCanPushdownJoin:true",
+                        "CubeScanWrapped:false",
+                        "CubeScanUngrouped:true",
+                        "?right_join_hints",
+                    ),
+                    "?left_on",
+                    "?right_on",
+                    "?join_type",
+                    "?join_constraint",
+                    "?null_equals_null",
+                ),
+                multi_fact_join_wrapper(
+                    cube_scan(
+                        "?out_alias_to_cube",
+                        cube_scan_members("?left_members", "?right_members"),
+                        cube_scan_filters("?left_filters", "?right_filters"),
+                        cube_scan_order_empty_tail(),
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
+                        "CubeScanSplit:false",
+                        "CubeScanCanPushdownJoin:true",
+                        "CubeScanWrapped:false",
+                        "CubeScanUngrouped:true",
+                        "?out_join_hints",
+                    ),
+                    "?join_members",
+                ),
+                self.merge_shared_member_join(
+                    "?left_alias_to_cube",
+                    "?right_alias_to_cube",
+                    "?out_alias_to_cube",
+                    "?left_members",
+                    "?right_members",
+                    "?left_on",
+                    "?right_on",
+                    "?join_type",
+                    "?left_join_hints",
+                    "?right_join_hints",
+                    "?out_join_hints",
+                    "?left_filters",
+                    "?join_members",
+                    Some("?prev_join_members"),
+                ),
+            ),
+            // Push a Filter (e.g. a WHERE on top of the join) down through the
+            // wrapper into the merged CubeScan, where the standard filter
+            // push-down rules turn it into a Cube query filter.
+            rewrite(
+                "multi-fact-join-wrapper-filter-push-down",
+                filter(
+                    "?filter_expr",
+                    multi_fact_join_wrapper("?wrapped_input", "?join_members"),
+                ),
+                multi_fact_join_wrapper(filter("?filter_expr", "?wrapped_input"), "?join_members"),
+            ),
+            // Finalize: once the query is grouped and the GROUP BY matches the
+            // recorded join key, drop the wrapper so the standard aggregate
+            // push-down turns the merged scan into a (multi-fact) CubeScan.
+            transforming_rewrite(
+                "aggregate-multi-fact-join-wrapper",
+                aggregate(
+                    multi_fact_join_wrapper("?scan", "?join_members"),
+                    "?group_expr",
+                    "?aggr_expr",
+                    "?agg_split",
+                ),
+                aggregate("?scan", "?group_expr", "?aggr_expr", "?agg_split"),
+                self.finalize_shared_member_join("?scan", "?join_members", "?group_expr"),
             ),
         ];
 
@@ -2948,7 +3042,8 @@ impl MemberRules {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn push_down_aggregate_shared_member_join(
+    #[allow(clippy::too_many_arguments)]
+    fn merge_shared_member_join(
         &self,
         left_alias_to_cube_var: &'static str,
         right_alias_to_cube_var: &'static str,
@@ -2962,7 +3057,8 @@ impl MemberRules {
         right_join_hints_var: &'static str,
         out_join_hints_var: &'static str,
         left_filters_var: &'static str,
-        group_expr_var: &'static str,
+        join_members_var: &'static str,
+        prev_join_members_var: Option<&'static str>,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
@@ -2976,7 +3072,8 @@ impl MemberRules {
         let right_join_hints_var = var!(right_join_hints_var);
         let out_join_hints_var = var!(out_join_hints_var);
         let left_filters_var = var!(left_filters_var);
-        let group_expr_var = var!(group_expr_var);
+        let join_members_var = var!(join_members_var);
+        let prev_join_members_var = prev_join_members_var.map(|v| var!(v));
         let meta_context = self.meta_context.clone();
         // Merging a view join into a single multi-fact CubeScan relies on the
         // Tesseract SQL planner (it stitches the fact groups with a FULL OUTER
@@ -3015,14 +3112,7 @@ impl MemberRules {
                 .cloned()
                 .collect::<Vec<_>>();
 
-            let mut matched: Option<(
-                String,
-                String,
-                Vec<String>,
-                Vec<String>,
-                Vec<Column>,
-                Vec<Column>,
-            )> = None;
+            let mut matched: Option<(String, String, Vec<String>, Vec<String>)> = None;
             'pairs: for left_on in left_join_ons.iter() {
                 for right_on in right_join_ons.iter() {
                     if left_on.is_empty() || left_on.len() != right_on.len() {
@@ -3074,61 +3164,17 @@ impl MemberRules {
                         if let (Some(left_cube_name), Some(right_cube_name)) =
                             (left_cube_name, right_cube_name)
                         {
-                            matched = Some((
-                                left_cube_name,
-                                right_cube_name,
-                                left_keys,
-                                right_keys,
-                                left_on.clone(),
-                                right_on.clone(),
-                            ));
+                            matched =
+                                Some((left_cube_name, right_cube_name, left_keys, right_keys));
                             break 'pairs;
                         }
                     }
                 }
             }
 
-            let Some((
-                left_cube,
-                right_cube,
-                shared_left_keys,
-                shared_right_keys,
-                matched_left_cols,
-                matched_right_cols,
-            )) = matched
-            else {
+            let Some((left_cube, right_cube, shared_left_keys, shared_right_keys)) = matched else {
                 return false;
             };
-
-            // The join key must be fully within the GROUP BY dimensions: every
-            // group-by column must be one of the join-key columns, and every
-            // join-key pair must be grouped. This is what makes the multi-fact
-            // stitch over the group-by key match the requested join.
-            let Some(group_referenced_expr) =
-                &egraph.index(subst[group_expr_var]).data.referenced_expr
-            else {
-                return false;
-            };
-            let group_cols = referenced_columns(group_referenced_expr);
-            if group_cols.is_empty() {
-                return false;
-            }
-            let join_key_cols: HashSet<String> = matched_left_cols
-                .iter()
-                .chain(matched_right_cols.iter())
-                .map(|c| c.flat_name())
-                .collect();
-            if !group_cols.iter().all(|c| join_key_cols.contains(c)) {
-                return false;
-            }
-            let group_set: HashSet<&String> = group_cols.iter().collect();
-            for (left_col, right_col) in matched_left_cols.iter().zip(matched_right_cols.iter()) {
-                if !group_set.contains(&left_col.flat_name())
-                    && !group_set.contains(&right_col.flat_name())
-                {
-                    return false;
-                }
-            }
 
             // Re-introduce INNER/LEFT/RIGHT semantics on top of the FULL OUTER
             // multi-fact stitch by requiring the join key of each "must be
@@ -3157,6 +3203,22 @@ impl MemberRules {
             if require_right {
                 presence_members.extend(shared_right_keys.iter().cloned());
             }
+
+            // The join key as underlying cube members, unioned with any keys
+            // already recorded on the left wrapper (for chained 3+ view joins).
+            let mut join_member_names: Vec<String> = shared_left_keys
+                .iter()
+                .map(|k| resolve_underlying(k))
+                .collect();
+            if let Some(prev_var) = prev_join_members_var {
+                if let Some(prev) =
+                    var_iter!(egraph[subst[prev_var]], MultiFactJoinWrapperJoinMembers).next()
+                {
+                    join_member_names.extend(prev.iter().cloned());
+                }
+            }
+            join_member_names.sort();
+            join_member_names.dedup();
 
             for left_alias_to_cube in
                 var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube)
@@ -3199,6 +3261,12 @@ impl MemberRules {
                                 egraph.add(LogicalPlanLanguage::CubeScanJoinHints(out_join_hints)),
                             );
 
+                            let join_members_id =
+                                egraph.add(LogicalPlanLanguage::MultiFactJoinWrapperJoinMembers(
+                                    MultiFactJoinWrapperJoinMembers(join_member_names.clone()),
+                                ));
+                            subst.insert(join_members_var, join_members_id);
+
                             // Add the join-semantics presence filters only once a
                             // concrete merge is being produced, so a `false` return
                             // never leaves a stale `subst` entry behind.
@@ -3237,6 +3305,82 @@ impl MemberRules {
             }
 
             false
+        }
+    }
+
+    // Finalize a MultiFactJoinWrapper: only unwrap it (letting the standard
+    // aggregate push-down produce the merged multi-fact CubeScan) when the
+    // query's GROUP BY is exactly the recorded shared join key. This rejects
+    // ungrouped queries (no aggregate matches) and queries grouping by a
+    // non-join-key dimension.
+    fn finalize_shared_member_join(
+        &self,
+        scan_var: &'static str,
+        join_members_var: &'static str,
+        group_expr_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let scan_var = var!(scan_var);
+        let join_members_var = var!(join_members_var);
+        let group_expr_var = var!(group_expr_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            fn dimension_member_name(
+                egraph: &mut CubeEGraph,
+                scan_id: Id,
+                column: &Column,
+            ) -> Option<String> {
+                match egraph[scan_id].data.find_member_by_column(column) {
+                    Some(((_, Member::Dimension { name, .. }, _), _))
+                    | Some(((_, Member::TimeDimension { name, .. }, _), _)) => Some(name.clone()),
+                    _ => None,
+                }
+            }
+
+            let resolve_underlying = |member_name: &str| -> String {
+                meta_context
+                    .find_dimension_with_name(member_name)
+                    .and_then(|dim| dim.alias_member.clone())
+                    .unwrap_or_else(|| member_name.to_string())
+            };
+
+            let join_members: Vec<String> = match var_iter!(
+                egraph[subst[join_members_var]],
+                MultiFactJoinWrapperJoinMembers
+            )
+            .next()
+            {
+                Some(jm) => jm.clone(),
+                None => return false,
+            };
+            if join_members.is_empty() {
+                return false;
+            }
+            let join_set: HashSet<String> = join_members.into_iter().collect();
+
+            let group_exprs = match &egraph.index(subst[group_expr_var]).data.referenced_expr {
+                Some(exprs) => exprs.clone(),
+                None => return false,
+            };
+            if group_exprs.is_empty() {
+                return false;
+            }
+
+            // Every GROUP BY expression must be a dimension column of the merged
+            // scan whose underlying cube member is part of the recorded join key.
+            let mut group_underlying: HashSet<String> = HashSet::new();
+            for expr in &group_exprs {
+                let Expr::Column(column) = expr else {
+                    return false;
+                };
+                let Some(member_name) = dimension_member_name(egraph, subst[scan_var], column)
+                else {
+                    return false;
+                };
+                group_underlying.insert(resolve_underlying(&member_name));
+            }
+
+            // GROUP BY must match the join key exactly.
+            group_underlying == join_set
         }
     }
 
