@@ -513,6 +513,12 @@ impl RewriteRules for MemberRules {
             // supporting joins of 3+ views. The new join must again be on a
             // dimension resolving to the same underlying member; its key is
             // unioned into the wrapper's recorded join members.
+            //
+            // Only the wrapper-on-the-left shape is matched, which is the
+            // left-deep tree SQL parsers produce for `a JOIN b JOIN c`. A
+            // right-associative `a JOIN (b JOIN c)` (explicit parentheses) keeps
+            // the wrapper on the right and is not chained; it falls back to
+            // standard join handling.
             transforming_rewrite(
                 "shared-member-join-extend-wrapper",
                 join(
@@ -3042,7 +3048,6 @@ impl MemberRules {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::too_many_arguments)]
     fn merge_shared_member_join(
         &self,
         left_alias_to_cube_var: &'static str,
@@ -3367,6 +3372,10 @@ impl MemberRules {
 
             // Every GROUP BY expression must be a dimension column of the merged
             // scan whose underlying cube member is part of the recorded join key.
+            // Only plain column references are accepted: a wrapped expression
+            // (e.g. `GROUP BY DATE_TRUNC('day', c.day)`) can't be matched against
+            // the recorded join key, so the wrapper is left in place and the
+            // query falls back to standard join handling.
             let mut group_underlying: HashSet<String> = HashSet::new();
             for expr in &group_exprs {
                 let Expr::Column(column) = expr else {

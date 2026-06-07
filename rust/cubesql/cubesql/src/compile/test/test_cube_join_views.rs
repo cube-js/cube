@@ -585,3 +585,50 @@ async fn test_group_by_left_join_with_on_filter() {
         }
     )
 }
+
+/// A 3-way LEFT join pins the per-pass presence-filter accumulation through
+/// `shared-member-join-extend-wrapper`: each LEFT join contributes a `set`
+/// filter on its own left-side join key.
+#[tokio::test]
+async fn test_group_by_left_join_three_views_presence_filters() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue), measure(r.refunds)
+            FROM customers_view c
+            LEFT JOIN orders_view o ON o.customer_city = c.customer_city
+            LEFT JOIN returns_view r ON r.customer_city = o.customer_city
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![
+                "orders_view.revenue".to_string(),
+                "returns_view.refunds".to_string(),
+            ]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            filters: Some(vec![
+                set_filter("orders_view.customer_city"),
+                set_filter("customers_view.customer_city"),
+            ]),
+            join_hints: Some(vec![
+                vec!["customers_view".to_string(), "orders_view".to_string()],
+                vec!["orders_view".to_string(), "returns_view".to_string()],
+            ]),
+            ..Default::default()
+        }
+    )
+}
