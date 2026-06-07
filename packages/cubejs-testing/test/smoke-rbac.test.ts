@@ -147,6 +147,16 @@ describe('Cube RBAC Engine', () => {
       expect(res.rows).toMatchSnapshot('orders_view');
     });
 
+    test('row-level filters from cube AND view layers are both applied', async () => {
+      // The underlying `orders` cube policy restricts rows to id IN {1, 10, 11}
+      // (role "*" → id = 1, role admin → id = 10 OR id = 11). The view adds its
+      // own row filter id < 11. Both layers must apply (AND), so the visible ids
+      // are the intersection: {1, 10}.
+      const res = await connection.query('SELECT id FROM orders_two_layer_test ORDER BY id');
+      const ids = res.rows.map(row => Number(row.id)).sort((a, b) => a - b);
+      expect(ids).toEqual([1, 10]);
+    });
+
     test('SELECT * from users', async () => {
       const res = await connection.query('SELECT * FROM users limit 10');
       // Querying a cube with nested filters and mixed values should not cause any issues
@@ -379,6 +389,54 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
+   * Multi-group member-level access union (CUB-2758).
+   *
+   * multi_group_test view has two access policies, each matched by a different
+   * group, granting DIFFERENT members and WITHOUT any row_level filter (so row
+   * access defaults to allow-all):
+   *   - group mg_group_a → member_a
+   *   - group mg_group_c → member_c
+   *
+   * multi_group_user belongs to BOTH groups. Because neither policy has a
+   * row-level filter, member-level access must be the UNION across the matching
+   * policies: querying member_a together with member_c must return data.
+   */
+  describe('RBAC multi-group member-level access union (no row filters)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('multi_group_user', 'multi_group_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('single-policy member is accessible (member_a)', async () => {
+      const res = await connection.query(
+        'SELECT member_a FROM multi_group_test LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('single-policy member is accessible (member_c)', async () => {
+      const res = await connection.query(
+        'SELECT member_c FROM multi_group_test LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('union of member access across groups returns data (member_a + member_c)', async () => {
+      const res = await connection.query(
+        'SELECT member_a, member_c FROM multi_group_test LIMIT 10'
+      );
+      // Both policies are allow-all (no row_level filter), so the member-level
+      // access is the union: the cross-group query must return rows.
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
    * Data masking tests via member_masking access policies.
    *
    * masking_test cube has dimensions and measures with mask definitions:
@@ -529,6 +587,70 @@ describe('Cube RBAC Engine', () => {
         }
       }
     });
+
+    // Smoke test: only one filter policy matches (conditional_mask_role). For an
+    // aggregate measure (total_price), a per-row CASE WHEN over the row filter would
+    // reference product_id at row grain while the measure is aggregated. Since
+    // product_id is not in the GROUP BY, the conditional CASE must NOT be triggered —
+    // the measure renders the mask value (NULL) and the query compiles successfully.
+    test('aggregate measure: single filter policy does not trigger CASE when filter member is not in the group by', async () => {
+      const res = await connection.query(
+        'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // product_id (the row filter member) is not in the GROUP BY, so total_price
+        // is masked (NULL) rather than rendered as an invalid CASE WHEN over the
+        // aggregate.
+        expect(row.total_price).toBeNull();
+      }
+    });
+
+    // Smoke test: when the query itself is already at least as restrictive as the
+    // conditional mask's row filter (here `product_id <= 3`, identical to the
+    // policy filter), every returned row satisfies the filter, so the conditional
+    // mask is unnecessary. The member is unmasked — and the aggregate measure
+    // renders its real value instead of being masked to NULL.
+    test('query filter equal to the row-security filter unmasks the aggregate measure', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test WHERE product_id <= 3'
+      );
+      expect(res.rows.length).toBe(1);
+      // Unmasked: the query is already scoped to the mask filter's rows.
+      expect(res.rows[0].total_price).not.toBeNull();
+      expect(Number(res.rows[0].total_price)).toBeGreaterThan(0);
+    });
+
+    // Conversely, a more restrictive query filter (a subset of the mask filter's
+    // rows) also unmasks the dimension — no CASE WHEN, just real values.
+    test('query filter more restrictive than the row-security filter unmasks the dimension', async () => {
+      const res = await connection.query(
+        'SELECT product_id, price FROM conditional_masking_test WHERE product_id <= 2 ORDER BY product_id LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // All rows are within product_id <= 2 ⊆ product_id <= 3, so price is real.
+        expect(Number(row.price)).not.toBe(-1);
+      }
+    });
+
+    // Negative case (soundness): a query filter that is NOT at least as
+    // restrictive as the mask filter (product_id <= 10 is broader than the
+    // mask's product_id <= 3) must NOT unmask. The conditionally-masked
+    // aggregate measure stays masked (NULL) because product_id is not in the
+    // GROUP BY — the optimization only applies when the query is provably at
+    // least as restrictive as the row-security filter.
+    test('query filter less restrictive than the row-security filter does not unmask the measure', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test WHERE product_id <= 10'
+      );
+      // Not unmasked: product_id <= 10 is broader than the mask filter
+      // product_id <= 3, so the measure stays masked (NULL) for every row.
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.total_price).toBeNull();
+      }
+    });
   });
 
   /**
@@ -565,6 +687,65 @@ describe('Cube RBAC Engine', () => {
           expect(Number(row.price)).toBe(-1);
         }
       }
+    });
+
+    // Smoke test: two filter policies match, so conditional masking is engaged and a
+    // CASE WHEN would normally be triggered (the OR of both row filters). But for an
+    // aggregate measure (total_price), the row filter members (product_id) are not in
+    // the GROUP BY, so a per-row CASE WHEN over the aggregate would be invalid SQL.
+    // The measure must render the mask (NULL) instead of the measure, and the query
+    // must compile successfully.
+    test('aggregate measure: multiple policies render mask instead of measure when row filter members are not in the group by', async () => {
+      const res = await connection.query(
+        'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.total_price).toBeNull();
+      }
+    });
+  });
+
+  /**
+   * Single matching policy granting full (unmasked) access to a measure.
+   *
+   * single_policy_measure_test cube has two policies:
+   *   - spm_mask_group  → masks all members (member_masking)
+   *   - spm_full_group  → full member access + row filter product_id <= 3
+   *
+   * single_policy_measure_user belongs ONLY to spm_full_group, so only the
+   * full-access policy matches. Because no matching policy masks the measure,
+   * the masked measure must render its REAL aggregated value (not the mask),
+   * and the row-level filter must still be applied — even for a measure-only
+   * query with NO GROUP BY.
+   */
+  describe('RBAC single matching policy: unmasked measure with row filter (no group by)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('single_policy_measure_user', 'single_policy_measure_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('measure renders unmasked and row filter is applied with no group by', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("single_policy_measure_test"."total_quantity") AS total_quantity, ' +
+        'MEASURE("single_policy_measure_test"."max_product_id") AS max_product_id ' +
+        'FROM single_policy_measure_test'
+      );
+      // Measure-only query with no GROUP BY returns a single aggregated row.
+      expect(res.rows.length).toBe(1);
+      const row = res.rows[0];
+      // Only the full-access policy matches (the masking policy targets a group
+      // the user is not in), so the measure renders its real aggregated value,
+      // not the mask (-1).
+      expect(Number(row.total_quantity)).toBeGreaterThan(0);
+      expect(Number(row.total_quantity)).not.toBe(-1);
+      // The full-access policy's row-level filter (product_id <= 3) is applied.
+      expect(Number(row.max_product_id)).toBeLessThanOrEqual(3);
     });
   });
 

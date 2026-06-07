@@ -80,9 +80,101 @@ When processing a request, Cube will evaluate the access policies and combine th
 with relevant custom security rules, e.g., [`public` parameters][ref-mls-public] for member-level security
 and `query_rewrite` filters for row-level security.
 
-If multiple access policies apply to a request, they are _combined together_
-using the _OR_ semantics. For example, if a user has two groups with different
-policies, the user will get the union of the permissions in these policies.
+### The permission space
+
+It helps to think of access control as a **two-dimensional permission space** —
+a grid of **members** (the columns a user may query: dimensions and measures)
+and **rows** (the records a user may see):
+
+- one axis is **members** — _what_ a user can look at;
+- the other axis is **rows** — _which_ records they can look at.
+
+Each access policy grants visibility over a rectangular region of this space:
+its `member_level` chooses the members (the horizontal extent) and its
+`row_level` chooses the rows (the vertical extent). Defaults _widen_ the region —
+a policy with no `row_level` (or with `row_level: { allow_all: true }`) spans
+**every row**, and a policy with no `member_level` spans **every member**.
+`member_masking` marks part of a region as **visible but masked** rather than
+fully readable.
+
+A user usually matches more than one policy (for example, through multiple
+[groups](#custom-mapping)), so their effective access is the combination of
+every region granted by every matching policy:
+
+- **Members are unioned.** A member is accessible if **any** matching policy
+  grants it. A user who matches several policies sees every member those
+  policies expose, even when no single policy exposes all of them.
+- **Rows are intersected across the queried members.** For each queried member,
+  the visible rows are the **union** of the row filters of the policies that
+  grant that member (a policy with no row filter adds no restriction). A row is
+  returned only when it is visible for **every** queried member.
+- **A member is masked** when no granting policy gives it unconditional full
+  access through `member_level`, but some matching policy lists it under
+  `member_masking`.
+- **Access is denied** (an empty result) only when a queried member is granted
+  by **no** matching policy at all.
+
+#### Diagram and behavior
+
+Consider an `orders_view` matched by two of a user's groups:
+
+- the `support` group — `member_level: [status, count]`, `row_level` restricted
+  to `region = 'US'`;
+- the `finance` group — `member_level: [count, revenue]`, `row_level` restricted
+  to `region = 'EU'`.
+
+The two policies cover overlapping regions of the permission space. `count` sits
+in the overlap (both policies grant it); `status` and `revenue` are each granted
+by only one policy:
+
+```text
+  members
+     ▲
+     │        ┌──────────────────────────────────┐
+ revenue      │           finance policy          │
+     │   ┌────┼──────────────┐                    │
+   count │    │   overlap     │                    │
+     │   │    └──────────────┼────────────────────┘
+  status │     support policy │
+     │   └────────────────────┘
+     └────────────────────────────────────────────▶ rows
+              US region            EU region
+```
+
+For a user in **both** groups, the readable cells (✓) of the permission space are:
+
+| | `US` rows | `EU` rows |
+| --- | :---: | :---: |
+| `status` | ✓ (support) | — |
+| `count` | ✓ (support) | ✓ (finance) |
+| `revenue` | — | ✓ (finance) |
+
+Because rows are intersected across the queried members, the visible rows depend
+on _which_ members the query selects:
+
+| Queried members | How rows resolve | Visible rows |
+| --- | --- | --- |
+| `status`, `count` | `US` ∩ (`US` ∪ `EU`) | `US` rows |
+| `count`, `revenue` | (`US` ∪ `EU`) ∩ `EU` | `EU` rows |
+| `count` | `US` ∪ `EU` | all rows |
+| `status`, `count`, `revenue` | `US` ∩ `EU` | none (empty result) |
+
+- Querying `status` and `count` returns only `US` rows: `status` is granted only
+  by the `support` policy, so records outside the US can never satisfy the query.
+- Querying `count` alone returns all rows: both policies grant `count`, so its
+  visible rows are the union of the two regions.
+- Querying `status`, `count`, and `revenue` returns nothing: `status` is visible
+  only on `US` rows and `revenue` only on `EU` rows, and no record is in both.
+  The result is empty rather than leaking US-only members onto EU rows.
+
+<Info>
+
+A policy without a `row_level` filter defaults to **all rows** (allow-all). So
+when every policy that grants the queried members is filter-less, there is no
+row restriction at all — the members are simply unioned and all rows are
+returned. Row filters only narrow the result when a granting policy defines them.
+
+</Info>
 
 ### Member-level access
 
@@ -242,6 +334,69 @@ define it as a dimension with an SQL mask instead, and reference that masked
 dimension in your query.
 
 </Warning>
+
+#### Masking across multiple policies
+
+Because member access is [unioned](#the-permission-space), **full access wins
+over masking**. If any matching policy grants a member unconditional full access
+through `member_level` (with no `row_level` filter), the user sees the **real**
+value — even if another matching policy lists that member under `member_masking`.
+
+Masking only takes effect when **no** matching policy grants unconditional full
+access. There are two sub-cases:
+
+- **Masked only.** The member is exposed solely through `member_masking` (or any
+  full-access policy is itself row-restricted). The member is masked for **all**
+  rows.
+- **Conditionally unmasked.** Another policy grants full access _and_ defines a
+  `row_level` filter — full access is conditional on that filter. Masking then
+  becomes **conditional on the row filter**: rows matching the filter show the
+  real value, while the rest show the masked value. The generated SQL is roughly
+  `CASE WHEN {rowFilter} THEN {value} ELSE {mask} END`.
+
+<Info>
+
+This lets you combine a broad masking policy (e.g. the `*` group sees masked
+values) with a narrower policy that reveals real values only for the rows a
+group is entitled to (its `row_level` range).
+
+</Info>
+
+If the query itself already constrains rows to a subset of the conditional
+mask's row filter — an equally or more restrictive filter on the same member
+(for example, the query filters `country = 'US'` and the mask filter is
+`country = 'US'`) — then every returned row would show the real value anyway.
+In that case the `CASE WHEN` is unnecessary and the member is **unmasked**. This
+also lets a conditionally-masked _aggregate measure_ render its real value
+instead of being masked, even without grouping by the filter's member.
+
+#### Conditional masking on measures
+
+Conditional masking is evaluated **per row**, which works naturally for
+dimensions (the `CASE WHEN` expression is part of the `GROUP BY`). For an
+**aggregate measure** (e.g. `sum`, `count`), that per-row expression can only be
+applied when the members referenced by the row filter are part of the query's
+`GROUP BY`.
+
+When a query selects a conditionally-masked measure but **does not group by the
+members referenced in the row filter**, Cube cannot decide the condition per
+aggregated group. Rather than emit invalid SQL (where the filter column is
+neither grouped nor aggregated — which fails on strict engines like BigQuery),
+it renders the **mask value for the entire measure** (`NULL` by default) instead
+of the conditional expression.
+
+| Query groups by the row filter's members? | Result for the measure |
+| --- | --- |
+| Yes | Conditional: real value for matching rows, masked otherwise |
+| No | Fully masked (the mask value, e.g. `NULL`) |
+
+<Tip>
+
+If you need a row-aware value for a measure regardless of grouping, add the row
+filter's member (the dimension it filters on) to your query's dimensions so it
+becomes part of the `GROUP BY`.
+
+</Tip>
 
 _When querying a view,_ data masking follows the same pattern as row-level
 security: masking rules from both the view and relevant cubes are applied.
