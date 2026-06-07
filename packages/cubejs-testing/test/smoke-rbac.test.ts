@@ -661,6 +661,49 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
+   * Single matching policy granting full (unmasked) access to a measure.
+   *
+   * single_policy_measure_test cube has two policies:
+   *   - spm_mask_group  → masks all members (member_masking)
+   *   - spm_full_group  → full member access + row filter product_id <= 3
+   *
+   * single_policy_measure_user belongs ONLY to spm_full_group, so only the
+   * full-access policy matches. Because no matching policy masks the measure,
+   * the masked measure must render its REAL aggregated value (not the mask),
+   * and the row-level filter must still be applied — even for a measure-only
+   * query with NO GROUP BY.
+   */
+  describe('RBAC single matching policy: unmasked measure with row filter (no group by)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('single_policy_measure_user', 'single_policy_measure_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('measure renders unmasked and row filter is applied with no group by', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("single_policy_measure_test"."total_quantity") AS total_quantity, ' +
+        'MEASURE("single_policy_measure_test"."max_product_id") AS max_product_id ' +
+        'FROM single_policy_measure_test'
+      );
+      // Measure-only query with no GROUP BY returns a single aggregated row.
+      expect(res.rows.length).toBe(1);
+      const row = res.rows[0];
+      // Only the full-access policy matches (the masking policy targets a group
+      // the user is not in), so the measure renders its real aggregated value,
+      // not the mask (-1).
+      expect(Number(row.total_quantity)).toBeGreaterThan(0);
+      expect(Number(row.total_quantity)).not.toBe(-1);
+      // The full-access policy's row-level filter (product_id <= 3) is applied.
+      expect(Number(row.max_product_id)).toBeLessThanOrEqual(3);
+    });
+  });
+
+  /**
    * View masking tests — masking follows the RLS pattern and is applied at
    * both cube and view levels. If a cube masks a member, it stays masked
    * even when accessed through a view that grants full access.

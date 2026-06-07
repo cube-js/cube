@@ -279,6 +279,25 @@ module.exports = {
         },
       };
     }
+    // User matching only the full-access policy (with a row filter) on a cube
+    // that also has a separate, group-scoped masking policy the user is NOT in.
+    if (user === 'single_policy_measure_user') {
+      if (password && password !== 'single_policy_measure_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'single_policy_measure_user',
+            userAttributes: {},
+            roles: [],
+            groups: ['spm_full_group'],
+          },
+        },
+      };
+    }
     // User belonging to two groups whose access policies grant different
     // members (member-level union across groups, no row_level filters).
     if (user === 'multi_group_user') {
