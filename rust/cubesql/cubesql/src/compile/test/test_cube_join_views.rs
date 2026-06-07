@@ -281,3 +281,88 @@ async fn test_join_two_views_on_measure_is_not_merged() {
     .unwrap_err();
     assert!(matches!(error, CompilationError::Rewrite(..)));
 }
+
+/// `RIGHT JOIN`: the right side must be present, so the merged scan carries a
+/// `set` filter on the right join key.
+#[tokio::test]
+async fn test_group_by_right_join_two_views_on_shared_member() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue), measure(c.avg_age)
+            FROM customers_view c
+            RIGHT JOIN orders_view o ON o.customer_city = c.customer_city
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![
+                "orders_view.revenue".to_string(),
+                "customers_view.avg_age".to_string(),
+            ]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            filters: Some(vec![set_filter("orders_view.customer_city")]),
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
+
+/// `FULL JOIN`: every key from either side is kept (default multi-fact
+/// behavior), so no presence `set` filter is added.
+#[tokio::test]
+async fn test_group_by_full_join_two_views_on_shared_member() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue), measure(c.avg_age)
+            FROM customers_view c
+            FULL JOIN orders_view o ON o.customer_city = c.customer_city
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![
+                "orders_view.revenue".to_string(),
+                "customers_view.avg_age".to_string(),
+            ]),
+            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            // FULL JOIN adds no presence filter.
+            filters: None,
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}

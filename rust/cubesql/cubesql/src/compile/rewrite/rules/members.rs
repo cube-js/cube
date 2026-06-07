@@ -3158,28 +3158,6 @@ impl MemberRules {
                 presence_members.extend(shared_right_keys.iter().cloned());
             }
 
-            if !presence_members.is_empty() {
-                let mut acc = subst[left_filters_var];
-                for name in presence_members {
-                    let member = egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                        crate::compile::rewrite::FilterMemberMember(name),
-                    ));
-                    let op = egraph.add(LogicalPlanLanguage::FilterMemberOp(
-                        crate::compile::rewrite::FilterMemberOp("set".to_string()),
-                    ));
-                    let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                        crate::compile::rewrite::FilterMemberValues(vec![]),
-                    ));
-                    let filter_member =
-                        egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
-                    acc = egraph.add(LogicalPlanLanguage::CubeScanFilters(vec![
-                        filter_member,
-                        acc,
-                    ]));
-                }
-                subst.insert(left_filters_var, acc);
-            }
-
             for left_alias_to_cube in
                 var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube)
             {
@@ -3220,6 +3198,37 @@ impl MemberRules {
                                 out_join_hints_var,
                                 egraph.add(LogicalPlanLanguage::CubeScanJoinHints(out_join_hints)),
                             );
+
+                            // Add the join-semantics presence filters only once a
+                            // concrete merge is being produced, so a `false` return
+                            // never leaves a stale `subst` entry behind.
+                            if !presence_members.is_empty() {
+                                let mut acc = subst[left_filters_var];
+                                for name in &presence_members {
+                                    let member =
+                                        egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                            crate::compile::rewrite::FilterMemberMember(
+                                                name.clone(),
+                                            ),
+                                        ));
+                                    let op = egraph.add(LogicalPlanLanguage::FilterMemberOp(
+                                        crate::compile::rewrite::FilterMemberOp("set".to_string()),
+                                    ));
+                                    let values =
+                                        egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                            crate::compile::rewrite::FilterMemberValues(vec![]),
+                                        ));
+                                    let filter_member =
+                                        egraph.add(LogicalPlanLanguage::FilterMember([
+                                            member, op, values,
+                                        ]));
+                                    acc = egraph.add(LogicalPlanLanguage::CubeScanFilters(vec![
+                                        filter_member,
+                                        acc,
+                                    ]));
+                                }
+                                subst.insert(left_filters_var, acc);
+                            }
 
                             return true;
                         }
