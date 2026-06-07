@@ -129,16 +129,16 @@ by only one policy:
 
 ```text
   members
-     ▲
-     │        ┌──────────────────────────────────┐
- revenue      │           finance policy          │
-     │   ┌────┼──────────────┐                    │
-   count │    │   overlap     │                    │
-     │   │    └──────────────┼────────────────────┘
-  status │     support policy │
-     │   └────────────────────┘
-     └────────────────────────────────────────────▶ rows
-              US region            EU region
+         ▲
+         │          ┌───────────────────────────────────────┐
+ revenue │          │            finance policy             │
+         │ ┌────────┼──────────────┐                        │
+   count │ │        │   overlap    │                        │
+         │ │        └──────────────┼────────────────────────┘
+  status │ │    support policy     │
+         │ └───────────────────────┘
+         └───────────────────────────────────────────────────▶ rows
+                   US region                EU region
 ```
 
 For a user in **both** groups, the readable cells (✓) of the permission space are:
