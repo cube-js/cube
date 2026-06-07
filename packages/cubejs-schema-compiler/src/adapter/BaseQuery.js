@@ -3557,7 +3557,7 @@ export class BaseQuery {
   // when the filter predicate is evaluated against grouped columns; otherwise the
   // generated SQL references ungrouped columns and fails on strict GROUP BY engines.
   maskFilterReferencesOnlyGroupByMembers(maskFilter) {
-    const filterMembers = this.collectFilterMemberPaths(maskFilter);
+    const filterMembers = [...new Set(this.collectFilterMemberPaths(maskFilter))];
     if (!filterMembers.length) {
       return false;
     }
