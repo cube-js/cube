@@ -633,6 +633,24 @@ describe('Cube RBAC Engine', () => {
         expect(Number(row.price)).not.toBe(-1);
       }
     });
+
+    // Negative case (soundness): a query filter that is NOT at least as
+    // restrictive as the mask filter (product_id <= 10 is broader than the
+    // mask's product_id <= 3) must NOT unmask. The conditionally-masked
+    // aggregate measure stays masked (NULL) because product_id is not in the
+    // GROUP BY — the optimization only applies when the query is provably at
+    // least as restrictive as the row-security filter.
+    test('query filter less restrictive than the row-security filter does not unmask the measure', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test WHERE product_id <= 10'
+      );
+      // Not unmasked: product_id <= 10 is broader than the mask filter
+      // product_id <= 3, so the measure stays masked (NULL) for every row.
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.total_price).toBeNull();
+      }
+    });
   });
 
   /**
