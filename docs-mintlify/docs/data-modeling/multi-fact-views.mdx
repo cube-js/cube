@@ -314,7 +314,7 @@ with `NULL` values for the missing fact table.
 
 You don't have to define a dedicated multi-fact view to get multi-fact
 behavior. The [SQL API][ref-sql-api] produces the same query when you **join
-two views on a dimension they share** and group by that dimension.
+two or more views on a dimension they share** and group by that dimension.
 
 Suppose `orders_view` and `returns_view` are two separate views that each
 expose the customer's `name` (both backed by the same underlying
@@ -347,6 +347,37 @@ This rewrite applies only when:
   shared join key. Ungrouped joins (such as `SELECT *`) and queries that group
   by a different dimension are not merged and fall back to standard join
   handling.
+
+### Joining three or more views
+
+The rewrite is not limited to two views. Chained joins on the same shared key
+are merged into a single multi-fact query, with each view contributing its own
+aggregating subquery:
+
+```sql
+SELECT
+  o.name,
+  MEASURE(o.total_amount),
+  MEASURE(r.total_refund),
+  MEASURE(p.total_paid)
+FROM orders_view o
+FULL JOIN returns_view r ON r.name = o.name
+FULL JOIN payments_view p ON p.name = o.name
+GROUP BY 1
+```
+
+### Filtering the join
+
+Filters on top of the join are supported and are applied to the merged query:
+
+- A `WHERE` clause is pushed into the merged scan. A predicate on a dimension
+  shared by all facts filters the whole result; a predicate on a fact-specific
+  dimension filters only that fact's subquery.
+- A predicate in the `ON` clause that the planner can attach to a single side
+  (for example, a condition on the optional side of a `LEFT JOIN`) becomes a
+  filter on that fact. Predicates that the SQL planner can't push to one side
+  of an outer join (such as a left-table condition in a `LEFT JOIN ON`) aren't
+  supported by the planner and will raise an error.
 
 ### Join type
 
