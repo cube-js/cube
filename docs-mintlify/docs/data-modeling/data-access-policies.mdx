@@ -362,6 +362,14 @@ group is entitled to (its `row_level` range).
 
 </Info>
 
+If the query itself already constrains rows to a subset of the conditional
+mask's row filter — an equally or more restrictive filter on the same member
+(for example, the query filters `country = 'US'` and the mask filter is
+`country = 'US'`) — then every returned row would show the real value anyway.
+In that case the `CASE WHEN` is unnecessary and the member is **unmasked**. This
+also lets a conditionally-masked _aggregate measure_ render its real value
+instead of being masked, even without grouping by the filter's member.
+
 #### Conditional masking on measures
 
 Conditional masking is evaluated **per row**, which works naturally for

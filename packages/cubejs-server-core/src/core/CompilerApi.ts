@@ -790,6 +790,22 @@ export class CompilerApi {
       }
     }
 
+    // If the query already constrains rows to a subset of a conditionally-masked
+    // member's row filter, every returned row would satisfy that filter anyway —
+    // so the conditional `CASE WHEN {rowFilter} THEN value ELSE mask END` is
+    // redundant and the member can be unmasked. This is evaluated against the
+    // user-supplied query filters (before the RLS filter is appended below). It
+    // also lets a conditionally-masked aggregate measure render its real value
+    // (instead of being fully masked) when the query is already scoped to the
+    // filter's rows.
+    for (const member of Array.from(maskedMembersSet)) {
+      const maskFilter = memberMaskFiltersMap[member];
+      if (maskFilter && this.queryFiltersImplyFilter(query.filters || [], maskFilter)) {
+        maskedMembersSet.delete(member);
+        delete memberMaskFiltersMap[member];
+      }
+    }
+
     const rlsFilter = rlsConstraints.length > 0
       ? this.removeEmptyFilters({ and: rlsConstraints })
       : null;
@@ -804,6 +820,115 @@ export class CompilerApi {
       }));
     }
     return { query, denied: false };
+  }
+
+  protected filterMemberName(filter: any): string | undefined {
+    return filter?.member || filter?.dimension;
+  }
+
+  /**
+   * Collects the leaf conditions that are guaranteed to hold for every row a
+   * query returns — i.e. conditions that are AND-ed together at the top level.
+   * OR groups weaken the guarantee, so their members are not collected.
+   */
+  protected collectGuaranteedFilterLeaves(filters: any[], acc: any[] = []): any[] {
+    for (const filter of filters || []) {
+      if (filter?.and) {
+        this.collectGuaranteedFilterLeaves(filter.and, acc);
+      } else if (filter && !filter.or && this.filterMemberName(filter) && filter.operator) {
+        // OR groups (and falsy entries) don't guarantee a single branch, so skip them.
+        acc.push(filter);
+      }
+    }
+    return acc;
+  }
+
+  /**
+   * Returns true when a query leaf condition is at least as restrictive as a
+   * target leaf condition on the same member (i.e. the rows allowed by the query
+   * condition are guaranteed to be a subset of the rows allowed by the target).
+   * Intentionally conservative: when implication can't be proven soundly, returns
+   * false so masking is preserved.
+   */
+  protected leafFilterImplies(queryLeaf: any, targetLeaf: any): boolean {
+    if (this.filterMemberName(queryLeaf) !== this.filterMemberName(targetLeaf)) {
+      return false;
+    }
+    const qOp = queryLeaf.operator;
+    const tOp = targetLeaf.operator;
+    const qVals = (queryLeaf.values || []).map((v: any) => String(v));
+    const tVals = (targetLeaf.values || []).map((v: any) => String(v));
+
+    // Identical condition.
+    if (
+      qOp === tOp &&
+      qVals.length === tVals.length &&
+      qVals.every((v: string) => tVals.includes(v)) &&
+      tVals.every((v: string) => qVals.includes(v))
+    ) {
+      return true;
+    }
+
+    // equals/in: the query value set must be a subset of the target value set
+    // (querying fewer values is more restrictive).
+    if (qOp === 'equals' && tOp === 'equals') {
+      return qVals.length > 0 && qVals.every((v: string) => tVals.includes(v));
+    }
+
+    // Numeric range bounds in the same direction.
+    if (qVals.length === 1 && tVals.length === 1) {
+      const q = Number(qVals[0]);
+      const t = Number(tVals[0]);
+      if (!Number.isNaN(q) && !Number.isNaN(t)) {
+        // Lower bounds: x > / >= value.
+        if ((qOp === 'gt' || qOp === 'gte') && (tOp === 'gt' || tOp === 'gte')) {
+          // target `x > t`: a `gt q` query needs q >= t, a `gte q` query needs q > t.
+          // target `x >= t`: q >= t for both query operators.
+          if (tOp === 'gt') {
+            return qOp === 'gt' ? q >= t : q > t;
+          }
+          return q >= t;
+        }
+        // Upper bounds: x < / <= value.
+        if ((qOp === 'lt' || qOp === 'lte') && (tOp === 'lt' || tOp === 'lte')) {
+          if (tOp === 'lt') {
+            return qOp === 'lt' ? q <= t : q < t;
+          }
+          return q <= t;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  protected filterConditionImplied(guaranteedLeaves: any[], condition: any): boolean {
+    if (!condition) {
+      return false;
+    }
+    if (condition.and) {
+      return condition.and.every((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
+    }
+    if (condition.or) {
+      return condition.or.some((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
+    }
+    if (this.filterMemberName(condition) && condition.operator) {
+      return guaranteedLeaves.some(leaf => this.leafFilterImplies(leaf, condition));
+    }
+    return false;
+  }
+
+  /**
+   * Returns true when the rows allowed by `queryFilters` are guaranteed to be a
+   * subset of the rows allowed by `maskFilter` — i.e. the query is already at
+   * least as restrictive as the (row-security) mask filter.
+   */
+  protected queryFiltersImplyFilter(queryFilters: any[], maskFilter: any): boolean {
+    const guaranteedLeaves = this.collectGuaranteedFilterLeaves(queryFilters);
+    if (guaranteedLeaves.length === 0) {
+      return false;
+    }
+    return this.filterConditionImplied(guaranteedLeaves, maskFilter);
   }
 
   protected removeEmptyFilters(filter: any): any {

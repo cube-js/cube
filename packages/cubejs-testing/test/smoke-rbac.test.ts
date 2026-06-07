@@ -605,6 +605,34 @@ describe('Cube RBAC Engine', () => {
         expect(row.total_price).toBeNull();
       }
     });
+
+    // Smoke test: when the query itself is already at least as restrictive as the
+    // conditional mask's row filter (here `product_id <= 3`, identical to the
+    // policy filter), every returned row satisfies the filter, so the conditional
+    // mask is unnecessary. The member is unmasked — and the aggregate measure
+    // renders its real value instead of being masked to NULL.
+    test('query filter equal to the row-security filter unmasks the aggregate measure', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test WHERE product_id <= 3'
+      );
+      expect(res.rows.length).toBe(1);
+      // Unmasked: the query is already scoped to the mask filter's rows.
+      expect(res.rows[0].total_price).not.toBeNull();
+      expect(Number(res.rows[0].total_price)).toBeGreaterThan(0);
+    });
+
+    // Conversely, a more restrictive query filter (a subset of the mask filter's
+    // rows) also unmasks the dimension — no CASE WHEN, just real values.
+    test('query filter more restrictive than the row-security filter unmasks the dimension', async () => {
+      const res = await connection.query(
+        'SELECT product_id, price FROM conditional_masking_test WHERE product_id <= 2 ORDER BY product_id LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // All rows are within product_id <= 2 ⊆ product_id <= 3, so price is real.
+        expect(Number(row.price)).not.toBe(-1);
+      }
+    });
   });
 
   /**
