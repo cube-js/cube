@@ -4,9 +4,90 @@ description: Programmatically manage Cube Cloud — deployments, reports, and wo
 ---
 
 Programmatically manage your Cube Cloud account: work with deployments and the
-resources scoped to them (environments, folders, reports, and workbooks) over a
-REST API, and provision users and groups from your identity provider via SCIM
-2.0.
+resources scoped to them (environments, folders, reports, workbooks,
+notifications, workspace items, and agents), manage account-level users, groups,
+policies, embedding, and AI settings over a REST API, and provision users and
+groups from your identity provider via SCIM 2.0.
+
+## Official client library
+
+The recommended way to call the Platform API from JavaScript or TypeScript is the
+official client, [`@cube-dev/platform-client`](https://www.npmjs.com/package/@cube-dev/platform-client).
+It wraps the OpenAPI spec on this site with end-to-end types for every endpoint,
+request, and response, plus optional [React Query](https://tanstack.com/query)
+bindings.
+
+<CodeGroup>
+
+```bash npm
+npm install @cube-dev/platform-client
+```
+
+```bash yarn
+yarn add @cube-dev/platform-client
+```
+
+```bash pnpm
+pnpm add @cube-dev/platform-client
+```
+
+</CodeGroup>
+
+Create a client with your tenant's base URL and an auth header (see
+[Authentication](/api-reference/authentication)), then call any endpoint through
+the fully-typed `fetchClient`:
+
+```ts
+import { createCubePlatformClient } from '@cube-dev/platform-client';
+
+const client = createCubePlatformClient({
+  baseUrl: 'https://<tenant>.cubecloud.dev',
+  // Returned on every request — provide the Platform API auth header.
+  getHeaders: () => ({ Authorization: `Api-Key ${process.env.CUBE_API_KEY}` }),
+});
+
+const { data, error } = await client.fetchClient.GET('/api/v1/deployments/', {
+  params: { query: { first: 50 } },
+});
+
+for (const deployment of data?.items ?? []) {
+  console.log(deployment.id, deployment.name);
+}
+```
+
+### React Query bindings
+
+The `@cube-dev/platform-client/react-query` entry point adds a provider and typed
+hooks built on `@tanstack/react-query` (a peer dependency alongside `react`):
+
+```tsx
+import { createCubePlatformClient } from '@cube-dev/platform-client';
+import {
+  CubePlatformApiProvider,
+  useCubePlatformApiQuery,
+} from '@cube-dev/platform-client/react-query';
+
+const client = createCubePlatformClient({ baseUrl, getHeaders });
+
+function App() {
+  return (
+    <CubePlatformApiProvider client={client}>
+      <Deployments />
+    </CubePlatformApiProvider>
+  );
+}
+
+function Deployments() {
+  const { data } = useCubePlatformApiQuery('get', '/api/v1/deployments/');
+  return <ul>{data?.items.map((d) => <li key={d.id}>{d.name}</li>)}</ul>;
+}
+```
+
+<Info>
+  Schema types are exported as `PlatformApiSchemas` (e.g.
+  `PlatformApiSchemas['Deployment']`). See the package
+  [`CHANGELOG`](/api-reference/changelog) for release notes and breaking changes.
+</Info>
 
 ## Base URL
 
@@ -31,7 +112,20 @@ Only HTTPS calls are accepted. Authenticate every request — see
 | [Deployments](/api-reference/deployments/get-deployments) | `/v1/deployments` | v1 |
 | [Environments](/api-reference/environments/get-deployment-environments) | `/v1/deployments/{deploymentId}/environments` | v1 |
 | [Folders](/api-reference/folders/get-folders) | `/v1/deployments/{deploymentId}/folders` | v1 |
-| [Reports](/api-reference/reports/get-reports) | `/v1/deployments/{deploymentId}/reports` | v1 |
+| [Reports](/api-reference/reports/get-report-folders) | `/v1/deployments/{deploymentId}/reports` | v1 |
 | [Workbooks](/api-reference/workbooks/get-workbooks) | `/v1/deployments/{deploymentId}/workbooks` | v1 |
-| [Users](/api-reference/users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
-| [Groups](/api-reference/groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |
+| [Notifications](/api-reference/notifications/get-notifications) | `/v1/deployments/{deploymentId}/notifications` | v1 |
+| [Workspace](/api-reference/workspace/shared-workspace-objects) | `/v1/deployments/{deploymentId}/workspace` | v1 |
+| [Agents](/api-reference/agents/get-agents) | `/v1/deployments/{deploymentId}/agents` | v1 |
+| [Metadata](/api-reference/metadata/get-metadata) | `/v1/meta` | v1 |
+| [Users](/api-reference/users/get-users) | `/v1/users` | v1 |
+| [Groups](/api-reference/groups/delete-group) | `/v1/groups` | v1 |
+| [User Groups](/api-reference/user-groups/list-groups) | `/v1/user-groups` | v1 |
+| [User Attributes](/api-reference/user-attributes/delete-user-attribute) | `/v1/user-attributes` | v1 |
+| [Resource Policies](/api-reference/resource-policies/get-policies) | `/v1/resource-policies` | v1 |
+| [App Theme](/api-reference/app-theme/get-app-theme) | `/v1/app-theme` | v1 |
+| [AI Engineer](/api-reference/ai-engineer/get-my-active-agent-region) | `/v1/ai-engineer` | v1 |
+| [Embed](/api-reference/embed/get-dashboard) | `/v1/embed` | v1 |
+| [Embed Tenants](/api-reference/embed-tenants/get-groups) | `/v1/embed-tenants` | v1 |
+| [SCIM Users](/api-reference/scim-users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
+| [SCIM Groups](/api-reference/scim-groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |

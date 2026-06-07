@@ -1,0 +1,5465 @@
+openapi: 3.1.0
+info:
+  title: Cube Cloud REST API
+  version: 1.0.0
+  description: |-
+    Programmatically manage Cube Cloud: deployments and everything scoped to them
+    (environments, folders, reports, workbooks, notifications, workspace, and agents),
+    plus account-level users, groups, policies, embedding, and AI settings.
+servers:
+  - url: https://{tenant}.cubecloud.dev/api
+    description: Cube Cloud API base URL. Replace the whole host if you use a custom domain.
+    variables:
+      tenant:
+        default: your-tenant
+        description: Your Cube Cloud tenant subdomain
+security:
+  - apiKey: []
+tags:
+  - name: Deployments
+  - name: Environments
+  - name: Folders
+  - name: Reports
+  - name: Workbooks
+  - name: Notifications
+  - name: Workspace
+  - name: Agents
+  - name: Metadata
+  - name: Users
+  - name: Groups
+  - name: User Groups
+  - name: User Attributes
+  - name: Resource Policies
+  - name: App Theme
+  - name: AI Engineer
+  - name: Embed
+  - name: Embed Tenants
+paths:
+  /v1/ai-engineer/active-region:
+    get:
+      operationId: getMyActiveAgentRegion
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveAgentRegion'
+          description: ''
+      summary: Get my active agent region
+      tags:
+        - AI Engineer
+  /v1/ai-engineer/settings:
+    get:
+      operationId: getAIEngineerSettings
+      parameters:
+        - in: query
+          name: deploymentId
+          required: false
+          schema:
+            type: number
+        - in: query
+          name: agentId
+          required: false
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIEngineerSettings'
+          description: ''
+      summary: Get ai engineer settings
+      tags:
+        - AI Engineer
+  /v1/app-theme:
+    get:
+      operationId: getAppTheme
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppThemeResponse'
+          description: ''
+      summary: Get app theme
+      tags:
+        - App Theme
+  /v1/deployments:
+    get:
+      operationId: getDeployments
+      parameters:
+        - in: query
+          name: creationStep
+          required: false
+          schema:
+            oneOf:
+              - items:
+                  enum:
+                    - project
+                    - upload
+                    - schema
+                    - github
+                    - ssh
+                    - databases
+                    - ready
+                    - demo
+                  type: string
+                type: array
+                $ref: '#/components/schemas/CreationStep'
+              - type: array
+                items:
+                  $ref: '#/components/schemas/CreationStep'
+        - in: query
+          name: offset
+          required: false
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          required: false
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            type: integer
+            minimum: 0
+        - in: query
+          name: first
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Page size for cursor-based pagination
+        - in: query
+          name: after
+          required: false
+          schema:
+            minimum: 1
+            type: string
+          description: Cursor for fetching the next page
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentsListResponse'
+          description: ''
+      summary: Get deployments
+      tags:
+        - Deployments
+  /v1/deployments/{deploymentId}:
+    get:
+      operationId: getDeployment
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+          description: ''
+      summary: Get deployment
+      tags:
+        - Deployments
+  /v1/deployments/{deploymentId}/agent-skills:
+    get:
+      operationId: getAgentSkills
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: space
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: branchName
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSkillsResponse'
+          description: ''
+      summary: Get agent skills
+      tags:
+        - Agents
+  /v1/deployments/{deploymentId}/agents:
+    get:
+      operationId: getAgents
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: allowEmbedding
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Agent'
+                type: array
+          description: ''
+      summary: Get agents
+      tags:
+        - Agents
+  /v1/deployments/{deploymentId}/environments:
+    get:
+      operationId: getDeploymentEnvironments
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: type
+          required: false
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetDeploymentEnvironmentsQueryType'
+              - type: 'null'
+            type: string
+            enum:
+              - production
+              - staging
+              - development
+        - in: query
+          name: offset
+          required: false
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          required: false
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentEnvironmentsListResponse'
+          description: ''
+      summary: Get deployment environments
+      tags:
+        - Environments
+  /v1/deployments/{deploymentId}/environments/{environmentId}/tokens:
+    get:
+      operationId: getDeploymentEnvironmentTokens
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: environmentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          required: false
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          required: false
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentEnvironmentTokensListResponse'
+          description: ''
+      summary: Get deployment environment tokens
+      tags:
+        - Environments
+    post:
+      operationId: createDeploymentEnvironmentToken
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: environmentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentEnvironmentTokenInput'
+        description: CreateDeploymentEnvironmentTokenInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentEnvironmentTokenResponse'
+          description: ''
+      summary: Create deployment environment token
+      tags:
+        - Environments
+  /v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync:
+    post:
+      operationId: createDeploymentEnvironmentTokenForMetaSync
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: environmentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentEnvironmentTokenInput'
+        description: CreateDeploymentEnvironmentTokenInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentEnvironmentTokenResponse'
+          description: ''
+      summary: Create deployment environment token for meta sync
+      tags:
+        - Environments
+  /v1/deployments/{deploymentId}/folders:
+    get:
+      description: >-
+        List the folders in a deployment's workspace.
+
+
+        By default this returns the folders at the workspace root. Pass the `parentId` query
+        parameter to list the direct children of a specific folder instead.
+
+
+        Results are scoped to the calling user: only folders the user can see are returned. A folder
+        is visible when the user owns it, has been granted access to it directly, or has access to
+        something inside it (a sub-folder, workbook, or dashboard), in which case the ancestor
+        folders are surfaced as navigation.
+
+
+        This endpoint is not recursive — it returns a single level of the folder tree per call. Use
+        `parentId` to walk deeper, or `GET /folders/{folderId}/ancestors` to resolve a breadcrumb
+        path.
+
+
+        Results are returned in pages using cursor-based pagination: pass `first` to set the page
+        size and `after` (the previous response's `pageInfo.endCursor`) to fetch the next page. The
+        legacy `data` and `count` fields are still populated for backwards compatibility but are
+        deprecated in favour of `items` and `pageInfo`.
+      operationId: getFolders
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: parentId
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoldersListResponse'
+          description: ''
+      summary: List folders
+      tags:
+        - Folders
+    post:
+      description: >-
+        Create a new folder in a deployment's workspace.
+
+
+        Provide a `name`, and optionally a `parentId` to nest the folder inside an existing one
+        (omit it to create the folder at the workspace root). An optional `position` controls the
+        folder's ordering among its siblings.
+
+
+        Requires the **AI BI User** role (or higher). When `parentId` is set, the caller must
+        additionally have **edit** or **manage** access to that parent folder.
+
+
+        Folders can be nested up to a fixed maximum depth; exceeding it returns `400`.
+      operationId: createFolder
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFolderInput'
+        description: CreateFolderInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Folder'
+          description: ''
+      summary: Create a folder
+      tags:
+        - Folders
+  /v1/deployments/{deploymentId}/folders/{folderId}:
+    delete:
+      description: >-
+        Delete a folder from a deployment's workspace. Responds with `204 No Content` on success.
+
+
+        The folder must be empty of sub-folders: if it still has child folders, the request is
+        rejected with `400` — delete or move the sub-folders first.
+
+
+        Content directly inside the folder (workbooks, dashboards, reports) is **not** deleted. It
+        is detached and returned to the workspace root.
+
+
+        Requires **manage** access to the folder. Returns `404` if the folder does not exist or
+        belongs to a different deployment.
+      operationId: deleteFolder
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: folderId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete a folder
+      tags:
+        - Folders
+    put:
+      description: >-
+        Update a folder's metadata — its `name` and/or its `position` among its siblings. Both
+        fields are optional; only the fields you send are changed.
+
+
+        This endpoint does **not** move a folder to a different parent. To re-parent a folder, use
+        `POST /workspace/move` with `type: FOLDER`.
+
+
+        Requires **edit** access to the folder. Returns `404` if the folder does not exist or
+        belongs to a different deployment.
+      operationId: updateFolder
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: folderId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFolderInput'
+        description: UpdateFolderInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Folder'
+          description: ''
+      summary: Update a folder
+      tags:
+        - Folders
+  /v1/deployments/{deploymentId}/folders/{folderId}/ancestors:
+    get:
+      description: >-
+        Return the ancestor chain of a folder, ordered from the workspace root down to (and
+        including) the folder itself.
+
+
+        Use this to render a breadcrumb path for a nested folder. For example, for `Root / Sales /
+        Q1` requested on the `Q1` folder, the response is `[Root, Sales, Q1]`.
+
+
+        Requires visibility access to the target folder. Returns `404` if the folder does not exist
+        or belongs to a different deployment.
+      operationId: getFolderAncestors
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: folderId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Folder'
+                type: array
+          description: ''
+      summary: List folder ancestors
+      tags:
+        - Folders
+  /v1/deployments/{deploymentId}/notifications:
+    get:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Returns the deployment’s scheduled notifications (recurring dashboard runs), ordered by
+        creation time (newest first) and cursor-paginated. Optionally filter to a single dashboard
+        with `dashboardId`. Each item describes the schedule only; recipients are managed through
+        the `/recipients` sub-resource.
+      operationId: getNotifications
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+        - in: query
+          name: dashboardId
+          required: false
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+            type: integer
+            minimum: 1
+          description: 'Optional filter: only return notifications for this dashboard id.'
+        - in: query
+          name: first
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+          description: Page size for cursor pagination (default 100, max 200).
+        - in: query
+          name: after
+          required: false
+          schema:
+            minimum: 1
+            type: string
+          description: Opaque cursor for the next page; pass the previous response's `pageInfo.endCursor`.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationsListResponse'
+          description: ''
+      summary: List scheduled notifications
+      tags:
+        - Notifications
+    post:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Creates a scheduled notification — a recurring run of a dashboard whose rendered result is
+        delivered to its recipients. The cadence is set by `scheduleType` plus the relevant time
+        fields (`minute`, `hour`, `dayOfWeek`, `dayOfMonth`) or a raw `customCron` expression when
+        `scheduleType` is `CUSTOM`; `timezone` defaults to UTC. The target `dashboardId` must belong
+        to this deployment, otherwise `404` is returned. The created notification has no recipients
+        — add them via `POST /notifications/{id}/recipients`.
+      operationId: createNotification
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNotificationInput'
+        description: CreateNotificationInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDto'
+          description: ''
+      summary: Create a scheduled notification
+      tags:
+        - Notifications
+  /v1/deployments/{deploymentId}/notifications/{id}:
+    delete:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Permanently deletes a scheduled notification and all of its recipients (main, embed, and
+        Slack) in a single cascade. Returns `204 No Content` on success, or `404` if the
+        notification does not belong to this deployment.
+      operationId: deleteNotification
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the notification (scheduled run).
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Notification deleted.
+      summary: Delete a scheduled notification
+      tags:
+        - Notifications
+    get:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Returns a single scheduled notification by id, including its cron expression, timezone,
+        enabled state, notification format, and a human-readable schedule summary. Returns `404` if
+        the notification does not exist or does not belong to this deployment.
+      operationId: getNotification
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the notification (scheduled run).
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDto'
+          description: ''
+      summary: Get a scheduled notification
+      tags:
+        - Notifications
+    put:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Updates a notification’s schedule definition. Any subset of the schedule fields may be
+        supplied (`scheduleType` + time fields or `customCron`, `timezone`), along with `isEnabled`,
+        `notificationEnabled`, and `notificationFormat`. Omitted fields are left unchanged. This
+        endpoint never modifies recipients — manage those through the `/recipients` sub-resource.
+        Returns `404` if the notification is not part of this deployment.
+      operationId: updateNotification
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the notification (scheduled run).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNotificationInput'
+        description: UpdateNotificationInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDto'
+          description: ''
+      summary: Update a scheduled notification
+      tags:
+        - Notifications
+  /v1/deployments/{deploymentId}/notifications/{id}/recipients:
+    delete:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Unsubscribes one or more recipients (1–1000 per request) from a notification. Each entry is
+        identified by `type` plus the `id` returned by the API — `userId` for `USER`, `embedUserId`
+        for `EMBED_USER`, or `channelId` for `SLACK`. `EMBED_USER` entries must also include
+        `embedTenantName`, which locates the recipient’s storage partition. Removals are idempotent
+        (deleting a recipient that isn’t subscribed is a no-op). Returns `204 No Content`, or `404`
+        if the notification is not part of this deployment.
+      operationId: removeRecipients
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the notification (scheduled run).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoveNotificationRecipientsInput'
+        description: RemoveNotificationRecipientsInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Recipients removed.
+      summary: Remove notification recipients
+      tags:
+        - Notifications
+    get:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Returns the recipients subscribed to a notification, cursor-paginated and ordered by
+        creation time (newest first). Recipients span three kinds, distinguished by `type`: `USER`
+        (a main console user, with `userId` + `email`), `EMBED_USER` (an embed user, with
+        `embedUserId`, `embedTenantName`, `externalId`, and `email`), and `SLACK` (a channel, with
+        `channelId` + `channelName`). Returns `404` if the notification is not part of this
+        deployment.
+      operationId: getRecipients
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the notification (scheduled run).
+        - in: query
+          name: first
+          required: false
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+            type: integer
+            minimum: 1
+            maximum: 200
+          description: Page size for cursor pagination (default 100, max 200).
+        - in: query
+          name: after
+          required: false
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+            type: string
+          description: Opaque cursor for the next page; pass the previous response's `pageInfo.endCursor`.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationRecipientsListResponse'
+          description: ''
+      summary: List notification recipients
+      tags:
+        - Notifications
+    post:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Subscribes one or more recipients (1–1000 per request) to a notification. Each recipient is
+        one of: a main console `USER` (identified by `userId` or `email`); an `EMBED_USER`
+        (identified by `embedTenantName` + `externalId`, auto-provisioned if it does not yet exist,
+        and optionally given `securityContext`, `userAttributes`, and `groups` that drive
+        per-recipient rendering); or `SLACK` — **not yet supported**, a request containing a Slack
+        recipient is rejected with `400`. Every recipient must resolve to a valid email (an embed
+        user’s `email`, or an email-shaped `externalId`); otherwise the whole request fails with
+        `400` before anything is written. The operation is idempotent: the response buckets each
+        recipient into `createdRecipients`, `updatedRecipients` (an existing recipient whose embed
+        properties changed), or `unchangedRecipients`.
+      operationId: addRecipients
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the deployment that owns the notification.
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the notification (scheduled run).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddNotificationRecipientsInput'
+        description: AddNotificationRecipientsInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationRecipientsMutationResponse'
+          description: ''
+      summary: Add notification recipients
+      tags:
+        - Notifications
+  /v1/deployments/{deploymentId}/report-folders:
+    get:
+      operationId: getReportFolders
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportFoldersFindAllResult'
+          description: ''
+      summary: Get report folders
+      tags:
+        - Reports
+  /v1/deployments/{deploymentId}/reports:
+    get:
+      operationId: getReports
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: workbookId
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: limit
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: page
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: sortBy
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetReportsQuerySortBy'
+              - type: 'null'
+        - in: query
+          name: sortDirection
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetReportsQuerySortDirection'
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportsFindAllResult'
+          description: ''
+      summary: Get reports
+      tags:
+        - Reports
+    post:
+      operationId: createReport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportInput'
+        description: CreateReportInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Create report
+      tags:
+        - Reports
+  /v1/deployments/{deploymentId}/reports/{reportId}:
+    delete:
+      operationId: deleteReport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete report
+      tags:
+        - Reports
+    get:
+      operationId: getReport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Get report
+      tags:
+        - Reports
+    put:
+      operationId: updateReport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportInput'
+        description: UpdateReportInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Update report
+      tags:
+        - Reports
+  /v1/deployments/{deploymentId}/reports/{reportId}/refresh:
+    put:
+      operationId: refreshReport
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Refresh report
+      tags:
+        - Reports
+  /v1/deployments/{deploymentId}/shared-workspace:
+    get:
+      description: >-
+        List the workspace items (folders, workbooks, reports) that have been shared with embed
+        users via the built-in `all_embed_users` group.
+
+
+        Unlike `GET /workspace`, this feed is not per-user: every valid embed caller for the
+        deployment sees the same set, scoped to what the built-in group has been granted. Owner
+        identities are blanked out so they are not exposed to embed users.
+
+
+        Accepts the same `folderId`, `types`, `search`, sorting, and cursor-pagination parameters as
+        `GET /workspace`. Folders reachable only because a nested item inside them was shared are
+        surfaced as navigation, but their unshared siblings stay hidden.
+      operationId: sharedWorkspaceObjects
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: folderId
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: types
+          schema:
+            oneOf:
+              - items:
+                  enum:
+                    - FOLDER
+                    - WORKBOOK
+                    - REPORT
+                  type: string
+                type: array
+              - type: 'null'
+        - in: query
+          name: orderByField
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetWorkspaceObjectsQueryOrderByField'
+              - type: 'null'
+        - in: query
+          name: orderByDirection
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetWorkspaceObjectsQueryOrderByDirection'
+              - type: 'null'
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceConnectionResponse'
+          description: ''
+      summary: List shared workspace items
+      tags:
+        - Workspace
+  /v1/deployments/{deploymentId}/token:
+    post:
+      operationId: deploymentToken
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentTokenResponse'
+          description: ''
+      summary: Deployment token
+      tags:
+        - Deployments
+  /v1/deployments/{deploymentId}/workbooks:
+    get:
+      operationId: getWorkbooks
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: folderId
+          schema:
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbooksListResponse'
+          description: ''
+      summary: Get workbooks
+      tags:
+        - Workbooks
+    post:
+      operationId: createWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkbookInput'
+        description: CreateWorkbookInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Create workbook
+      tags:
+        - Workbooks
+  /v1/deployments/{deploymentId}/workbooks/{workbookId}:
+    delete:
+      operationId: deleteWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete workbook
+      tags:
+        - Workbooks
+    get:
+      operationId: getWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Get workbook
+      tags:
+        - Workbooks
+    put:
+      description: >-
+        Update a workbook's properties. All fields are optional; only the fields you send are
+        changed.
+
+
+        - `name` — rename the workbook.
+
+        - `meta` — replace the workbook's metadata object.
+
+        - `folderId` — move the workbook between folders. Set it to a folder id to move the workbook
+        into that folder, or to `null` to move it back to the workspace root.
+
+
+        Access depends on what you change. Renaming or editing metadata requires **edit** access to
+        the workbook. Moving the workbook (any request that includes `folderId`) requires **manage**
+        access to the workbook, plus **edit** access to the destination folder when moving into one.
+
+
+        To move a workbook you can use either this endpoint or the unified `POST /workspace/move`.
+        Returns `404` if the workbook does not exist or belongs to a different deployment.
+      operationId: updateWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkbookInput'
+        description: UpdateWorkbookInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Update a workbook
+      tags:
+        - Workbooks
+  /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard:
+    put:
+      operationId: updateWorkbookDashboard
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkbookDashboardInput'
+        description: WorkbookDashboardInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkbookDashboard'
+          description: ''
+      summary: Update workbook dashboard
+      tags:
+        - Workbooks
+  /v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
+    post:
+      description: >-
+        Create a full copy of a workbook, including its reports and its published dashboard, and
+        return the new workbook.
+
+
+        The clone is created in the same folder as the source and named "Copy of {original name}".
+        All report references inside the dashboard (and the dashboard draft) are re-pointed at the
+        copied reports, so the duplicate is fully self-contained and independent of the original.
+        Per-user view history (last-viewed timestamps) is **not** carried over.
+
+
+        Requires **read** access to the source workbook and the **AI BI User** role (or higher). The
+        new workbook is owned by the calling user.
+
+
+        If the deployment's plan enforces a workbook limit and it has been reached, the request is
+        rejected with `400`. Returns `404` if the workbook does not exist or belongs to a different
+        deployment.
+      operationId: duplicateWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Clone a workbook
+      tags:
+        - Workbooks
+  /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish:
+    post:
+      operationId: publishDashboard
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishDashboardInput'
+        description: PublishDashboardInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: ''
+      summary: Publish dashboard
+      tags:
+        - Workbooks
+  /v1/deployments/{deploymentId}/workspace:
+    get:
+      description: >-
+        List the items in a deployment's workspace — folders, workbooks, and reports — in a single
+        unified, paginated feed.
+
+
+        By default this returns the items at the workspace root. Pass `folderId` to list the
+        contents of a specific folder instead. Folders are always returned ahead of other item types
+        so they render at the top of a listing.
+
+
+        Supported query parameters:
+
+        - `folderId` — list the contents of this folder (omit for the root).
+
+        - `types` — restrict the results to one or more item types (`FOLDER`, `WORKBOOK`, `REPORT`).
+        Repeat the parameter to pass several.
+
+        - `search` — case-insensitive substring match on item names; searches across all folders,
+        not just the current level.
+
+        - `orderByField` / `orderByDirection` — sort the non-folder items (e.g. by `name`,
+        `updated_at`, `created_at`, or `viewer_last_viewed_at`).
+
+        - `first` / `after` — cursor-based pagination.
+
+
+        Results are scoped to the calling user: only items the user can access are returned.
+      operationId: workspaceObjects
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: folderId
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: types
+          schema:
+            oneOf:
+              - items:
+                  enum:
+                    - FOLDER
+                    - WORKBOOK
+                    - REPORT
+                  type: string
+                type: array
+              - type: 'null'
+        - in: query
+          name: orderByField
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetWorkspaceObjectsQueryOrderByField'
+              - type: 'null'
+        - in: query
+          name: orderByDirection
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetWorkspaceObjectsQueryOrderByDirection'
+              - type: 'null'
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceConnectionResponse'
+          description: ''
+      summary: List workspace items
+      tags:
+        - Workspace
+  /v1/deployments/{deploymentId}/workspace/move:
+    post:
+      description: >-
+        Move any workspace item — a workbook, report, or folder — into a folder, in one unified
+        endpoint. Returns the moved item.
+
+
+        Request body:
+
+        - `type` — the item type: `WORKBOOK`, `REPORT`, or `FOLDER`.
+
+        - `id` — the id of the item to move.
+
+        - `folderId` — the destination folder id, or `null` to move the item to the workspace root.
+        For a folder, this becomes its new parent.
+
+
+        Access requirements depend on the item type and mirror the per-type rules:
+
+        - **Workbook** — manage access to the workbook, plus edit access to the destination folder
+        when moving into one.
+
+        - **Report** — edit access to the report (with the report-manage permission).
+
+        - **Folder** — manage access to the folder being moved, plus manage or edit access to the
+        destination parent folder.
+
+
+        Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
+        rejected with `400`. Returns `404` if the item does not exist or belongs to a different
+        deployment.
+      operationId: moveWorkspaceObject
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveWorkspaceObjectInput'
+        description: MoveWorkspaceObjectInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Move a workspace item
+      tags:
+        - Workspace
+  /v1/embed-tenants/{embedTenantName}/groups:
+    get:
+      operationId: getGroups
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupsConnectionResponse'
+          description: ''
+      summary: Get groups
+      tags:
+        - Embed Tenants
+  /v1/embed-tenants/{embedTenantName}/groups/{id}:
+    delete:
+      operationId: deleteGroup
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete group
+      tags:
+        - Embed Tenants
+  /v1/embed-tenants/{embedTenantName}/user-attributes:
+    get:
+      operationId: getUserAttributes
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAttributesConnectionResponse'
+          description: ''
+      summary: Get user attributes
+      tags:
+        - Embed Tenants
+  /v1/embed-tenants/{embedTenantName}/user-attributes/{id}:
+    delete:
+      operationId: deleteUserAttribute
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete user attribute
+      tags:
+        - Embed Tenants
+  /v1/embed/dashboard/{publicId}:
+    get:
+      description: >-
+        Returns the dashboard identified by its `publicId` — including its reports/widgets —
+        resolved within the caller's embed session scope, for rendering inside an embedded view.
+
+
+        Access is authorized against the embed user: the dashboard is returned when the user owns
+        its workbook, has been granted workbook access (folder-based or direct), holds
+        `EmbedDashboardRead` on the dashboard, or when it has been shared with all embed users
+        (creator-mode flow). Returns `404` if the dashboard does not exist or is not visible to the
+        caller.
+
+
+        Signed embedding additionally requires the dashboard to have "Allow signed embedding"
+        enabled; the trusted screenshoter and creator-mode session flows are exempt. Returns `403`
+        when embedding is not permitted for the dashboard.
+      operationId: getDashboard
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: ''
+      summary: Get an embeddable dashboard
+      tags:
+        - Embed
+  /v1/embed/generate-session:
+    post:
+      description: >-
+        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+        Creates a one-time embed session for a deployment and returns its `sessionId`.
+
+
+        The session captures the embed context that will be baked into the embed token once redeemed
+        — the target `deploymentId`, the end user's identity (`externalId` / `email` /
+        `userProfile`), their `groups` and `userAttributes`, and an optional `securityContext`.
+        Exchange the returned `sessionId` for a signed embed JWT via `POST
+        /api/v1/embed/session/token` (single use).
+
+
+        `deploymentId` is required and the caller must have read access to it. Embedding must be
+        enabled for the tenant, otherwise `403` is returned.
+      operationId: generateSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateSession'
+        description: GenerateSessionDTO
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateSessionResponse'
+          description: ''
+      summary: Generate an embed session
+      tags:
+        - Embed
+  /v1/embed/session/token:
+    post:
+      description: >-
+        Exchanges a one-time embed session id (created via `POST /api/v1/embed/generate-session`)
+        for a signed, short-lived embed JWT used to authenticate the embedded analytics in the
+        browser.
+
+
+        The session is **single-use**: it is consumed (deleted) on the first successful exchange, so
+        a given `sessionId` can be redeemed only once. The returned token is signed with the
+        tenant's embed secret, issued by `cubecloud`, and expires after 24 hours.
+
+
+        This endpoint is unauthenticated — it is called from the embedding client and the session id
+        itself is the credential. Returns `401` if the session id is unknown or has already been
+        redeemed.
+      operationId: postTokenBySessionId
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostTokenBySessionIdInput'
+        description: PostTokenBySessionIdInputDTO
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateEmbedTokenResponse'
+          description: ''
+      summary: Exchange a session for an embed token
+      tags:
+        - Embed
+  /v1/groups/{id}:
+    delete:
+      operationId: deleteGroup
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete group
+      tags:
+        - Groups
+  /v1/meta:
+    post:
+      operationId: getMetadata
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataRequest'
+        description: MetadataRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Get metadata
+      tags:
+        - Metadata
+  /v1/resource-policies:
+    get:
+      operationId: getPolicies
+      parameters:
+        - in: query
+          name: resourceType
+          required: true
+          schema:
+            $ref: '#/components/schemas/GetResourcePoliciesQueryResourceType'
+        - in: query
+          name: resourceId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePoliciesResponse'
+          description: ''
+      summary: Get policies
+      tags:
+        - Resource Policies
+  /v1/resource-policies/group:
+    put:
+      operationId: updateGroupPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResourceGroupPolicyBody'
+        description: UpdateResourceGroupPolicyBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Update group policy
+      tags:
+        - Resource Policies
+  /v1/resource-policies/user:
+    put:
+      operationId: updateUserPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResourceUserPolicyBody'
+        description: UpdateResourceUserPolicyBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Update user policy
+      tags:
+        - Resource Policies
+  /v1/user-attributes/{id}:
+    delete:
+      operationId: deleteUserAttribute
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete user attribute
+      tags:
+        - User Attributes
+  /v1/user-groups:
+    get:
+      operationId: listGroups
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupsConnectionResponse'
+          description: ''
+      summary: List groups
+      tags:
+        - User Groups
+  /v1/users:
+    get:
+      operationId: getUsers
+      parameters:
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersConnection'
+          description: ''
+      summary: Get users
+      tags:
+        - Users
+  /v1/users/embed-theme:
+    get:
+      operationId: getEmbedTheme
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedTheme'
+          description: ''
+      summary: Get embed theme
+      tags:
+        - Users
+  /v1/users/me:
+    get:
+      operationId: getMe
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+      summary: Get me
+      tags:
+        - Users
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.'
+  schemas:
+    AIEngineerCubeCredentialsDTO:
+      properties:
+        apiToken:
+          type: string
+        apiUrl:
+          type: string
+        internalIngressHost:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - apiToken
+        - apiUrl
+      type: object
+    AIEngineerSettings:
+      properties:
+        cubeCredentials:
+          oneOf:
+            - $ref: '#/components/schemas/AIEngineerCubeCredentialsDTO'
+            - type: 'null'
+        graphqlToken:
+          oneOf:
+            - type: string
+            - type: 'null'
+        hasAgentAccess:
+          oneOf:
+            - {}
+            - type: 'null'
+        mcpToken:
+          oneOf:
+            - type: string
+            - type: 'null'
+        token:
+          type: string
+        url:
+          type: string
+      required:
+        - token
+        - url
+      type: object
+    ActiveAgentRegion:
+      properties:
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        regionName:
+          type: string
+        updatedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        userId:
+          type: number
+      required:
+        - userId
+        - regionName
+      type: object
+    AddNotificationRecipientsInput:
+      properties:
+        recipients:
+          description: Recipients to subscribe (1–1000 per request)
+          items:
+            $ref: '#/components/schemas/NotificationRecipientInput'
+          maxItems: 1000
+          minItems: 1
+          type: array
+      required:
+        - recipients
+      type: object
+    Agent:
+      properties:
+        accessibleViews:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        agentConfigName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        agentLlm:
+          oneOf:
+            - $ref: '#/components/schemas/AgentLlm'
+            - type: 'null'
+        agentLlmId:
+          oneOf:
+            - type: number
+            - type: 'null'
+        agentSpace:
+          oneOf:
+            - $ref: '#/components/schemas/AgentSpace'
+            - type: 'null'
+        agentSpaceId:
+          oneOf:
+            - type: number
+            - type: 'null'
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dedicatedAiEngineerRegion:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deploymentId:
+          oneOf:
+            - type: number
+            - type: 'null'
+        embeddingLlm:
+          oneOf:
+            - $ref: '#/components/schemas/AgentLlm'
+            - type: 'null'
+        embeddingUrl:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: number
+        integrations:
+          oneOf:
+            - $ref: '#/components/schemas/AgentIntegrationsDto'
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        userId:
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - id
+        - createdAt
+        - updatedAt
+      type: object
+    AgentIntegrationsDto:
+      properties:
+        jira:
+          oneOf:
+            - $ref: '#/components/schemas/AgentIntegrationsJiraDto'
+            - type: 'null'
+      type: object
+    AgentIntegrationsJiraDto:
+      properties:
+        connected:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        jiraIssueType:
+          oneOf:
+            - $ref: '#/components/schemas/JiraIssueType'
+            - type: 'null'
+        jiraProject:
+          oneOf:
+            - $ref: '#/components/schemas/JiraProject'
+            - type: 'null'
+      type: object
+    AgentLlm:
+      properties:
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        id:
+          type: number
+        llmProvider:
+          oneOf:
+            - type: string
+            - type: 'null'
+        llmType:
+          oneOf:
+            - type: string
+            - type: 'null'
+        localEncryptedSecrets:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/LocalEncryptedSecret'
+                type: object
+              type: array
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        secrets:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - id
+      type: object
+    AgentSkillDto:
+      properties:
+        description:
+          type: string
+        input:
+          oneOf:
+            - type: string
+            - type: 'null'
+        name:
+          type: string
+        title:
+          type: string
+      required:
+        - name
+        - title
+        - description
+      type: object
+    AgentSkillsResponse:
+      properties:
+        skills:
+          items:
+            $ref: '#/components/schemas/AgentSkillDto'
+          type: array
+      required:
+        - skills
+      type: object
+    AgentSpace:
+      properties:
+        config:
+          oneOf:
+            - $ref: '#/components/schemas/AgentSpaceConfigDto'
+              type: object
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        id:
+          type: number
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        spaceConfigName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - id
+      type: object
+    AgentSpaceConfigDto:
+      properties:
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        spaceConfigName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    AppThemeFontRef:
+      properties:
+        fontRef:
+          type: string
+        fontWeight:
+          type: number
+      required:
+        - fontRef
+        - fontWeight
+      type: object
+    AppThemeResponse:
+      properties:
+        applyThemeGlobally:
+          type: boolean
+        dark:
+          $ref: '#/components/schemas/AppThemeScheme'
+        light:
+          $ref: '#/components/schemas/AppThemeScheme'
+        typography:
+          $ref: '#/components/schemas/AppThemeTypography'
+      required:
+        - applyThemeGlobally
+        - light
+        - dark
+      type: object
+    AppThemeScheme:
+      properties:
+        accentColor:
+          type: string
+        backgroundColor:
+          type: string
+        contrast:
+          type: number
+        foregroundColor:
+          type: string
+        logoUrl:
+          type: string
+      required:
+        - accentColor
+        - backgroundColor
+        - foregroundColor
+        - contrast
+        - logoUrl
+      type: object
+    AppThemeTypography:
+      properties:
+        body:
+          $ref: '#/components/schemas/AppThemeFontRef'
+        fonts:
+          items:
+            $ref: '#/components/schemas/ThemeFont'
+          type: array
+        heading:
+          $ref: '#/components/schemas/AppThemeFontRef'
+      required:
+        - fonts
+        - body
+        - heading
+      type: object
+    ColumnFormatOverride:
+      properties:
+        decimalPlaces:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/ColumnFormatOverrideDtoType'
+      required:
+        - type
+      type: object
+    ColumnFormatOverrideDtoType:
+      enum:
+        - currency
+        - percent
+        - number
+      type: string
+    ControlThemeBorderSectionInput:
+      properties:
+        color:
+          oneOf:
+            - type: string
+            - type: 'null'
+        radius:
+          oneOf:
+            - type: string
+            - type: 'null'
+        style:
+          oneOf:
+            - type: string
+            - type: 'null'
+        width:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    ControlThemeSectionInput:
+      properties:
+        backgroundColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        border:
+          oneOf:
+            - $ref: '#/components/schemas/ControlThemeBorderSectionInput'
+            - type: 'null'
+        padding:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - $ref: '#/components/schemas/ControlThemeTitleSectionInput'
+            - type: 'null'
+      type: object
+    ControlThemeTitleSectionInput:
+      properties:
+        color:
+          oneOf:
+            - type: string
+            - type: 'null'
+        fontFamily:
+          oneOf:
+            - type: string
+            - type: 'null'
+        fontSize:
+          oneOf:
+            - type: string
+            - type: 'null'
+        fontWeight:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    CreateDeploymentEnvironmentTokenInput:
+      properties:
+        expires_in:
+          oneOf:
+            - maximum: 3600
+              type: integer
+              minimum: 1
+            - type: 'null'
+        scopes:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        security_context:
+          additionalProperties: true
+          not:
+            type: 'null'
+          type: object
+      required:
+        - security_context
+      type: object
+    CreateFolderInput:
+      properties:
+        name:
+          maxLength: 255
+          type: string
+        parentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        position:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - name
+      type: object
+    CreateNotificationInput:
+      properties:
+        customCron:
+          oneOf:
+            - type: string
+              description: Custom cron expression (required if scheduleType is CUSTOM)
+            - type: 'null'
+        dashboardId:
+          description: Dashboard to run on the schedule
+          type: integer
+        dayOfMonth:
+          oneOf:
+            - type: integer
+              description: Day of month (1-31)
+            - type: 'null'
+        dayOfWeek:
+          oneOf:
+            - type: integer
+              description: Day of week (0-6, Sunday=0)
+            - type: 'null'
+        hour:
+          oneOf:
+            - type: integer
+              description: Hour of the day (0-23)
+            - type: 'null'
+        minute:
+          oneOf:
+            - type: integer
+              description: Minute of the hour (0-59)
+            - type: 'null'
+        notificationEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        notificationFormat:
+          oneOf:
+            - $ref: '#/components/schemas/CreateNotificationInputNotificationFormat'
+            - type: 'null'
+        scheduleType:
+          $ref: '#/components/schemas/CreateNotificationInputScheduleType'
+        timezone:
+          oneOf:
+            - type: string
+              description: Timezone for the schedule (e.g. "America/New_York")
+            - type: 'null'
+      required:
+        - dashboardId
+        - scheduleType
+      type: object
+    CreateNotificationInputNotificationFormat:
+      enum:
+        - png
+        - pdf
+      type: string
+    CreateNotificationInputScheduleType:
+      enum:
+        - HOURLY
+        - DAILY
+        - WEEKLY
+        - MONTHLY
+        - CUSTOM
+      type: string
+    CreateReportInput:
+      properties:
+        endResultCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        folderId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        jsonQuery:
+          oneOf:
+            - type: string
+            - type: 'null'
+        meta:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        pivotItems:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItemsInput'
+            - type: 'null'
+        publicId:
+          oneOf:
+            - pattern: ^[0-9A-Za-z]+$
+              type: string
+              minLength: 12
+              maxLength: 12
+            - type: 'null'
+        resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        source:
+          oneOf:
+            - $ref: '#/components/schemas/CreateReportInputSource'
+            - type: 'null'
+        sqlQuery:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        workbookId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      type: object
+    CreateReportInputSource:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+        - PLAYGROUND
+        - D3
+      type: string
+    CreateWorkbookInput:
+      properties:
+        folderId:
+          oneOf:
+            - type: number
+            - type: 'null'
+        meta:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    CreationStep:
+      enum:
+        - project
+        - upload
+        - schema
+        - github
+        - ssh
+        - databases
+        - ready
+        - demo
+      type: string
+    Dashboard:
+      properties:
+        allowEmbed:
+          type: boolean
+        config:
+          $ref: '#/components/schemas/DashboardConfig'
+        createdBy:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        deploymentId:
+          type: integer
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        publicId:
+          type: string
+        reportSnapshots:
+          items:
+            $ref: '#/components/schemas/ReportSnapshot'
+          type: array
+        status:
+          $ref: '#/components/schemas/DashboardDtoStatus'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        versionId:
+          type: integer
+        versionNumber:
+          type: integer
+        workbookId:
+          type: integer
+      required:
+        - id
+        - publicId
+        - deploymentId
+        - workbookId
+        - status
+        - allowEmbed
+        - config
+        - versionNumber
+        - versionId
+        - reportSnapshots
+      type: object
+    DashboardBreakpointCols:
+      properties:
+        lg:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        md:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        sm:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xxs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      title: DashboardBreakpointColsDto
+      type: object
+    DashboardBreakpointColsInput:
+      properties:
+        lg:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        md:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        sm:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xxs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      title: DashboardBreakpointColsInput
+      type: object
+    DashboardBreakpoints:
+      properties:
+        lg:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        md:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        sm:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xxs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      title: DashboardBreakpointsDto
+      type: object
+    DashboardBreakpointsInput:
+      properties:
+        lg:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        md:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        sm:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        xxs:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      title: DashboardBreakpointsInput
+      type: object
+    DashboardConfig:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        layout:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardLayout'
+            - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        theme:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        widgets:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardWidget'
+              type: array
+            - type: 'null'
+      type: object
+    DashboardConfigInput:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        layout:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardLayoutInput'
+            - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        theme:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardThemeInput'
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        widgets:
+          items:
+            $ref: '#/components/schemas/DashboardWidgetInput'
+          type: array
+      required:
+        - widgets
+      type: object
+    DashboardDtoStatus:
+      enum:
+        - draft
+        - published
+        - archived
+      type: string
+    DashboardLayout:
+      properties:
+        breakpoints:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardBreakpoints'
+            - type: 'null'
+        cols:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardBreakpointCols'
+            - type: 'null'
+        containerPadding:
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        margin:
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        rowHeight:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      type: object
+    DashboardLayoutInput:
+      properties:
+        breakpoints:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardBreakpointsInput'
+            - type: 'null'
+        cols:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardBreakpointColsInput'
+            - type: 'null'
+        containerPadding:
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        margin:
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        rowHeight:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      type: object
+    DashboardResponsiveLayouts:
+      properties:
+        lg:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPosition'
+            - type: 'null'
+        md:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPosition'
+            - type: 'null'
+        sm:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPosition'
+            - type: 'null'
+        xs:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPosition'
+            - type: 'null'
+        xxs:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPosition'
+            - type: 'null'
+      type: object
+    DashboardResponsiveLayoutsInput:
+      properties:
+        lg:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPositionInput'
+            - type: 'null'
+        md:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPositionInput'
+            - type: 'null'
+        sm:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPositionInput'
+            - type: 'null'
+        xs:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPositionInput'
+            - type: 'null'
+        xxs:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardWidgetPositionInput'
+            - type: 'null'
+      type: object
+    DashboardThemeInput:
+      properties:
+        backgroundColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        controls:
+          oneOf:
+            - $ref: '#/components/schemas/ControlThemeSectionInput'
+            - type: 'null'
+        dashboard:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardThemeSectionInput'
+            - type: 'null'
+        fontFamily:
+          oneOf:
+            - type: string
+            - type: 'null'
+        primaryColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        themeId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        widgets:
+          oneOf:
+            - $ref: '#/components/schemas/WidgetThemeSectionInput'
+            - type: 'null'
+      type: object
+    DashboardThemeSectionInput:
+      properties:
+        backgroundColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        padding:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    DashboardWidget:
+      properties:
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        id:
+          type: string
+        position:
+          $ref: '#/components/schemas/DashboardWidgetPosition'
+        responsiveLayouts:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardResponsiveLayouts'
+            - type: 'null'
+        style:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DashboardWidgetDtoType'
+      required:
+        - id
+        - type
+        - position
+      type: object
+    DashboardWidgetDtoType:
+      enum:
+        - CHART
+        - TEXT
+        - FILTER
+        - AI
+        - TABS_CONTAINER
+        - TIME_GRAIN
+      type: string
+    DashboardWidgetInput:
+      properties:
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        id:
+          type: string
+        position:
+          $ref: '#/components/schemas/DashboardWidgetPositionInput'
+        responsiveLayouts:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardResponsiveLayoutsInput'
+            - type: 'null'
+        style:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DashboardWidgetInputType'
+      required:
+        - id
+        - type
+        - position
+      type: object
+    DashboardWidgetInputType:
+      enum:
+        - CHART
+        - TEXT
+        - FILTER
+        - AI
+        - TABS_CONTAINER
+        - TIME_GRAIN
+      type: string
+    DashboardWidgetPosition:
+      properties:
+        h:
+          type: integer
+        w:
+          type: integer
+        x:
+          type: integer
+        'y':
+          type: integer
+      required:
+        - x
+        - 'y'
+        - w
+        - h
+      type: object
+    DashboardWidgetPositionInput:
+      properties:
+        h:
+          type: integer
+        w:
+          type: integer
+        x:
+          type: integer
+        'y':
+          type: integer
+      required:
+        - x
+        - 'y'
+        - w
+        - h
+      type: object
+    Deployment:
+      properties:
+        creationStep:
+          $ref: '#/components/schemas/CreationStep'
+        deploymentUrl:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - deploymentUrl
+        - creationStep
+      type: object
+    DeploymentEnvironment:
+      properties:
+        api_credentials:
+          items:
+            $ref: '#/components/schemas/DeploymentEnvironmentApiCredential'
+          type: array
+        branch:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/DeploymentEnvironmentType'
+        user:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - id
+        - type
+        - api_credentials
+      type: object
+    DeploymentEnvironmentApiCredential:
+      properties:
+        database:
+          oneOf:
+            - type: string
+            - type: 'null'
+        host:
+          oneOf:
+            - type: string
+            - type: 'null'
+        port:
+          oneOf:
+            - minimum: 1
+              type: integer
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DeploymentEnvironmentApiCredentialType'
+        url:
+          oneOf:
+            - type: string
+            - type: 'null'
+        version:
+          minimum: 1
+          type: integer
+      required:
+        - type
+        - version
+      type: object
+    DeploymentEnvironmentApiCredentialType:
+      enum:
+        - rest
+        - sql
+      type: string
+    DeploymentEnvironmentToken:
+      properties:
+        created_at:
+          type: string
+        expires_at:
+          type: string
+        security_context:
+          additionalProperties: true
+          type: object
+        token:
+          type: string
+      required:
+        - token
+        - security_context
+        - created_at
+        - expires_at
+      type: object
+    DeploymentEnvironmentTokenResponse:
+      properties:
+        data:
+          $ref: '#/components/schemas/DeploymentEnvironmentToken'
+      required:
+        - data
+      type: object
+    DeploymentEnvironmentTokensListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/DeploymentEnvironmentToken'
+          type: array
+        pagination:
+          $ref: '#/components/schemas/DeploymentsPagination'
+      required:
+        - data
+        - pagination
+      type: object
+    DeploymentEnvironmentType:
+      enum:
+        - production
+        - staging
+        - development
+      type: string
+    DeploymentEnvironmentsListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/DeploymentEnvironment'
+          type: array
+        pagination:
+          $ref: '#/components/schemas/DeploymentsPagination'
+      required:
+        - data
+        - pagination
+      type: object
+    DeploymentTokenResponse:
+      properties:
+        cubeApiToken:
+          type: string
+      required:
+        - cubeApiToken
+      type: object
+    DeploymentsListResponse:
+      properties:
+        count:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+        data:
+          items:
+            $ref: '#/components/schemas/Deployment'
+          type: array
+        items:
+          items:
+            $ref: '#/components/schemas/Deployment'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+        pagination:
+          $ref: '#/components/schemas/DeploymentsPagination'
+        totalCount:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+      required:
+        - data
+        - items
+        - pagination
+      type: object
+    DeploymentsPagination:
+      properties:
+        limit:
+          minimum: 0
+          type: integer
+        offset:
+          minimum: 0
+          type: integer
+        total:
+          minimum: 0
+          type: integer
+      required:
+        - total
+        - offset
+        - limit
+      type: object
+    EmbedTheme:
+      properties:
+        analyticsChat:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedThemeAnalyticsChat'
+              type: object
+            - type: 'null'
+        chat:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedThemeChat'
+              type: object
+            - type: 'null'
+        font:
+          oneOf:
+            - type: string
+            - type: 'null'
+        primaryColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    EmbedThemeAnalyticsChat:
+      properties:
+        backgroundColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        chatInput:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedThemeAnalyticsChatInput'
+              type: object
+            - type: 'null'
+      type: object
+    EmbedThemeAnalyticsChatInput:
+      properties:
+        backgroundColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        borderColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    EmbedThemeChat:
+      properties:
+        inputColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    EmbedUserProfile:
+      properties:
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        picture:
+          oneOf:
+            - format: url
+              type: string
+            - type: 'null'
+      type: object
+    Folder:
+      properties:
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        createdBy:
+          type: integer
+        deploymentId:
+          type: integer
+        id:
+          type: integer
+        name:
+          type: string
+        parentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        position:
+          type: integer
+        type:
+          $ref: '#/components/schemas/FolderDtoType'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        updatedBy:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - name
+        - position
+        - id
+        - deploymentId
+        - createdAt
+        - updatedAt
+        - type
+      type: object
+    FolderDtoType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
+    FoldersListResponse:
+      properties:
+        count:
+          oneOf:
+            - minimum: 0
+              type: integer
+              deprecated: true
+              description: >-
+                Deprecated: total number of accessible folders, ignoring pagination. Kept for
+                backward compatibility.
+            - type: 'null'
+        data:
+          deprecated: true
+          description: 'Deprecated: use `items` instead. Kept for backward compatibility.'
+          items:
+            $ref: '#/components/schemas/Folder'
+          type: array
+        items:
+          items:
+            $ref: '#/components/schemas/Folder'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+        - data
+      type: object
+    GenerateEmbedTokenResponse:
+      properties:
+        token:
+          type: string
+      required:
+        - token
+      type: object
+    GenerateSession:
+      properties:
+        creatorMode:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        deploymentId:
+          type: number
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+        embedTenantName:
+          oneOf:
+            - pattern: ^[a-z][a-z0-9-]{3,34}[a-z0-9]$
+              type: string
+            - type: 'null'
+        embedTheme:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedTheme'
+              type: object
+            - type: 'null'
+        ephemeralTtlSeconds:
+          oneOf:
+            - type: number
+            - type: 'null'
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        groupDefinitions:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/GroupDefinition'
+              type: array
+            - type: 'null'
+        groups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        internalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        isEphemeral:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        publicDashboardId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        roles:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        securityContext:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        userAttributeDefinitions:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAttributeDefinition'
+              type: array
+            - type: 'null'
+        userAttributes:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAttributeInput'
+              type: array
+            - type: 'null'
+        userProfile:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedUserProfile'
+              type: object
+            - type: 'null'
+      required:
+        - deploymentId
+      type: object
+    GenerateSessionResponse:
+      properties:
+        sessionId:
+          type: string
+      required:
+        - sessionId
+      type: object
+    GetDeploymentEnvironmentsQueryType:
+      enum:
+        - production
+        - staging
+        - development
+      type: string
+    GetReportsQuerySortBy:
+      enum:
+        - createdAt
+        - updatedAt
+        - lastViewedAt
+      type: string
+    GetReportsQuerySortDirection:
+      enum:
+        - ASC
+        - DESC
+      type: string
+    GetResourcePoliciesQueryResourceType:
+      enum:
+        - Global
+        - Deployment
+        - Report
+        - ReportFolder
+        - Agent
+        - AgentSpace
+        - Workbook
+        - Dashboard
+        - Folder
+        - ChatThread
+      type: string
+    GetWorkspaceObjectsQueryOrderByDirection:
+      enum:
+        - ASC
+        - DESC
+      type: string
+    GetWorkspaceObjectsQueryOrderByField:
+      enum:
+        - updated_at
+        - created_at
+        - name
+        - viewer_last_viewed_at
+      type: string
+    GroupDefinition:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        name:
+          type: string
+      required:
+        - name
+      type: object
+    InheritedGroupPolicyDto:
+      properties:
+        action:
+          $ref: '#/components/schemas/InheritedGroupPolicyDtoAction'
+        groupId:
+          type: integer
+        sourceFolder:
+          oneOf:
+            - $ref: '#/components/schemas/Folder'
+            - type: 'null'
+      required:
+        - groupId
+        - action
+      type: object
+    InheritedGroupPolicyDtoAction:
+      enum:
+        - All
+        - DeploymentsManage
+        - DeploymentCreate
+        - DeploymentRead
+        - DeploymentUpdate
+        - DeploymentDelete
+        - PlaygroundRead
+        - SchemaRead
+        - SchemaUpdate
+        - SchemaUpdateDevBranches
+        - APMRead
+        - PreAggregationBuild
+        - AlertsCreate
+        - AlertsRead
+        - AlertsUpdate
+        - AlertsDelete
+        - AuditLogManage
+        - BillingRead
+        - SqlRunnerRead
+        - DataAssetsRead
+        - DataAssetsManage
+        - CubeNetworkConnect
+        - ReportRead
+        - ReportEdit
+        - ReportManage
+        - WorkbookManage
+        - WorkbookRead
+        - WorkbookEdit
+        - ChatThreadRead
+        - AgentManage
+        - AgentRead
+        - AgentSpaceManage
+        - AgentAdmin
+        - DeploymentAgentRead
+        - OAuthIntegrationsManage
+        - OAuthIntegrationsIssueTokens
+        - AIBIDevelop
+        - AIBIExplore
+        - AIBIView
+        - ChartPalettesManage
+        - DashboardThemesManage
+        - AIBIDeveloper
+        - AIBIUser
+        - AIBIViewer
+        - EmbedDeploymentRead
+        - EmbedDashboardRead
+        - FolderRead
+        - FolderEdit
+        - FolderManage
+      type: string
+    InheritedUserPolicyDto:
+      properties:
+        action:
+          $ref: '#/components/schemas/InheritedUserPolicyDtoAction'
+        sourceFolder:
+          oneOf:
+            - $ref: '#/components/schemas/Folder'
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - action
+      type: object
+    InheritedUserPolicyDtoAction:
+      enum:
+        - All
+        - DeploymentsManage
+        - DeploymentCreate
+        - DeploymentRead
+        - DeploymentUpdate
+        - DeploymentDelete
+        - PlaygroundRead
+        - SchemaRead
+        - SchemaUpdate
+        - SchemaUpdateDevBranches
+        - APMRead
+        - PreAggregationBuild
+        - AlertsCreate
+        - AlertsRead
+        - AlertsUpdate
+        - AlertsDelete
+        - AuditLogManage
+        - BillingRead
+        - SqlRunnerRead
+        - DataAssetsRead
+        - DataAssetsManage
+        - CubeNetworkConnect
+        - ReportRead
+        - ReportEdit
+        - ReportManage
+        - WorkbookManage
+        - WorkbookRead
+        - WorkbookEdit
+        - ChatThreadRead
+        - AgentManage
+        - AgentRead
+        - AgentSpaceManage
+        - AgentAdmin
+        - DeploymentAgentRead
+        - OAuthIntegrationsManage
+        - OAuthIntegrationsIssueTokens
+        - AIBIDevelop
+        - AIBIExplore
+        - AIBIView
+        - ChartPalettesManage
+        - DashboardThemesManage
+        - AIBIDeveloper
+        - AIBIUser
+        - AIBIViewer
+        - EmbedDeploymentRead
+        - EmbedDashboardRead
+        - FolderRead
+        - FolderEdit
+        - FolderManage
+      type: string
+    JiraIssueType:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        iconUrl:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+      type: object
+    JiraProject:
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        site:
+          $ref: '#/components/schemas/JiraSite'
+          type: object
+      required:
+        - site
+        - id
+        - key
+        - name
+      type: object
+    JiraSite:
+      properties:
+        host:
+          type: string
+        id:
+          type: string
+      required:
+        - id
+        - host
+      type: object
+    LocalEncryptedSecret:
+      properties:
+        authTagBase64:
+          type: string
+        ciphertext:
+          type: string
+        id:
+          type: integer
+        ivBase64:
+          type: string
+      required:
+        - id
+        - ciphertext
+        - ivBase64
+        - authTagBase64
+      type: object
+    MetadataRequest:
+      properties:
+        selectors:
+          not:
+            type: 'null'
+      required:
+        - selectors
+      type: object
+    MoveWorkspaceObjectInput:
+      properties:
+        folderId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        id:
+          type: integer
+        type:
+          $ref: '#/components/schemas/MoveWorkspaceObjectInputType'
+      required:
+        - type
+        - id
+      type: object
+    MoveWorkspaceObjectInputType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
+    NotificationDto:
+      properties:
+        cronExpression:
+          type: string
+        dashboardId:
+          type: integer
+        deploymentId:
+          type: integer
+        humanReadableSchedule:
+          description: Human-readable description of the cron schedule
+          type: string
+        id:
+          type: integer
+        isEnabled:
+          type: boolean
+        notificationEnabled:
+          type: boolean
+        notificationFormat:
+          type: string
+        timezone:
+          type: string
+      required:
+        - id
+        - dashboardId
+        - deploymentId
+        - cronExpression
+        - timezone
+        - isEnabled
+        - humanReadableSchedule
+        - notificationEnabled
+        - notificationFormat
+      type: object
+    NotificationRecipient:
+      properties:
+        channelId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        channelName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+        embedTenantName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        embedUserId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/NotificationRecipientType'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - type
+      type: object
+    NotificationRecipientInput:
+      properties:
+        channelId:
+          oneOf:
+            - type: string
+              description: Slack channel id (for type=SLACK)
+            - type: 'null'
+        channelName:
+          oneOf:
+            - type: string
+              description: Slack channel display name (optional, for type=SLACK)
+            - type: 'null'
+        email:
+          oneOf:
+            - type: string
+              description: Main user email (for type=USER; provide this OR userId)
+            - type: 'null'
+        embedTenantName:
+          oneOf:
+            - type: string
+              description: Embed tenant name (for type=EMBED_USER)
+            - type: 'null'
+        externalId:
+          oneOf:
+            - type: string
+              description: Embed user external id (for type=EMBED_USER)
+            - type: 'null'
+        groups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+              description: >-
+                Embed user groups (type=EMBED_USER). Must reference groups that already exist;
+                drives per-recipient access when the report is rendered.
+            - type: 'null'
+        securityContext:
+          oneOf:
+            - type: object
+              additionalProperties: true
+              description: >-
+                Embed user security context (type=EMBED_USER). Applied for per-recipient row-level
+                security when the report is rendered.
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/NotificationRecipientInputType'
+        userAttributes:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAttributeInput'
+              type: array
+              description: >-
+                Embed user attribute values (type=EMBED_USER). Names must reference attribute
+                definitions that already exist.
+            - type: 'null'
+        userId:
+          oneOf:
+            - type: integer
+              description: Main user id (for type=USER; provide this OR email)
+            - type: 'null'
+      required:
+        - type
+      type: object
+    NotificationRecipientInputType:
+      enum:
+        - USER
+        - EMBED_USER
+        - SLACK
+      type: string
+    NotificationRecipientType:
+      enum:
+        - USER
+        - EMBED_USER
+        - SLACK
+      type: string
+    NotificationRecipientsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/NotificationRecipient'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+      type: object
+    NotificationRecipientsMutationResponse:
+      properties:
+        createdRecipients:
+          description: Recipients newly subscribed by this request
+          items:
+            $ref: '#/components/schemas/NotificationRecipient'
+          type: array
+        unchangedRecipients:
+          description: Recipients that already existed and were left unchanged
+          items:
+            $ref: '#/components/schemas/NotificationRecipient'
+          type: array
+        updatedRecipients:
+          description: >-
+            Existing recipients whose properties (e.g. embed security context / attributes / groups,
+            or Slack channel name) were updated
+          items:
+            $ref: '#/components/schemas/NotificationRecipient'
+          type: array
+      required:
+        - createdRecipients
+        - updatedRecipients
+        - unchangedRecipients
+      type: object
+    NotificationsListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/NotificationDto'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+      type: object
+    PageInfo:
+      properties:
+        endCursor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+        startCursor:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - hasNextPage
+        - hasPreviousPage
+      type: object
+    PivotItems:
+      properties:
+        columns:
+          items:
+            type: string
+          type: array
+        filters:
+          items:
+            type: string
+          type: array
+        measures:
+          items:
+            type: string
+          type: array
+        rows:
+          items:
+            type: string
+          type: array
+      required:
+        - columns
+        - measures
+        - rows
+        - filters
+      type: object
+    PivotItemsInput:
+      properties:
+        columns:
+          items:
+            type: string
+          type: array
+        filters:
+          items:
+            type: string
+          type: array
+        measures:
+          items:
+            type: string
+          type: array
+        rows:
+          items:
+            type: string
+          type: array
+      required:
+        - columns
+        - measures
+        - rows
+        - filters
+      type: object
+    PostTokenBySessionIdInput:
+      properties:
+        sessionId:
+          type: string
+      required:
+        - sessionId
+      type: object
+    PublishDashboardInput:
+      properties:
+        config:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfigInput'
+            - type: 'null'
+        dashboardId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        workbookId:
+          type: integer
+      required:
+        - workbookId
+      type: object
+    RemoveNotificationRecipientInput:
+      properties:
+        embedTenantName:
+          oneOf:
+            - type: string
+              description: Embed tenant name (required for type=EMBED_USER; resolves the storage partition)
+            - type: 'null'
+        id:
+          description: >-
+            Recipient id: userId (type=USER), embedUserId (type=EMBED_USER), or channelId
+            (type=SLACK)
+          not:
+            type: 'null'
+          oneOf:
+            - type: integer
+            - type: string
+        type:
+          $ref: '#/components/schemas/RemoveNotificationRecipientInputType'
+      required:
+        - type
+        - id
+      type: object
+    RemoveNotificationRecipientInputType:
+      enum:
+        - USER
+        - EMBED_USER
+        - SLACK
+      type: string
+    RemoveNotificationRecipientsInput:
+      properties:
+        recipients:
+          description: Recipients to unsubscribe (1–1000 per request)
+          items:
+            $ref: '#/components/schemas/RemoveNotificationRecipientInput'
+          maxItems: 1000
+          minItems: 1
+          type: array
+      required:
+        - recipients
+      type: object
+    Report:
+      properties:
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        createdBy:
+          type: integer
+        deploymentId:
+          type: integer
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        endResultCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        folderId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        id:
+          type: integer
+        jsonQuery:
+          oneOf:
+            - type: string
+            - type: 'null'
+        meta:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        name:
+          type: string
+        pivotItems:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItems'
+            - type: 'null'
+        publicId:
+          maxLength: 12
+          minLength: 12
+          pattern: ^[0-9A-Za-z]+$
+          type: string
+        refreshedBy:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        refreshedByUser:
+          $ref: '#/components/schemas/ResourceOwner'
+        resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        rolesWithAccess:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/RoleWithAccess'
+              type: array
+            - type: 'null'
+        source:
+          oneOf:
+            - $ref: '#/components/schemas/ReportDtoSource'
+            - type: 'null'
+        sqlQuery:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/ReportDtoType'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        user:
+          $ref: '#/components/schemas/ResourceOwner'
+        userId:
+          type: integer
+        version:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        workbookId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - publicId
+        - userId
+        - user
+        - name
+        - refreshedByUser
+        - id
+        - deploymentId
+        - createdAt
+        - updatedAt
+        - type
+      type: object
+    ReportDtoSource:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+        - PLAYGROUND
+        - D3
+      type: string
+    ReportDtoType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
+    ReportFolder:
+      properties:
+        createdBy:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        id:
+          type: integer
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        reportsCount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - id
+      type: object
+    ReportFoldersFindAllResult:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/ReportFolder'
+          type: array
+      required:
+        - data
+      type: object
+    ReportSnapshot:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        kind:
+          oneOf:
+            - $ref: '#/components/schemas/ReportSnapshotDtoKind'
+            - type: 'null'
+        meta:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        preferences:
+          oneOf:
+            - $ref: '#/components/schemas/ReportSnapshotPreferences'
+            - type: 'null'
+        reportId:
+          type: integer
+        spec:
+          oneOf:
+            - oneOf:
+                - type: string
+                - type: object
+            - type: 'null'
+        sqlQuery:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        versionNumber:
+          type: integer
+      required:
+        - id
+        - reportId
+        - versionNumber
+      type: object
+    ReportSnapshotDtoKind:
+      enum:
+        - vega
+        - table
+        - kpi
+        - html
+        - map
+      type: string
+    ReportSnapshotPreferences:
+      properties:
+        columnFormats:
+          oneOf:
+            - type: object
+              additionalProperties:
+                $ref: '#/components/schemas/ColumnFormatOverride'
+            - type: 'null'
+      type: object
+    ReportsFindAllResult:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/Report'
+          type: array
+      required:
+        - data
+      type: object
+    ResourceGroupPolicyDto:
+      properties:
+        action:
+          $ref: '#/components/schemas/ResourceGroupPolicyDtoAction'
+        groupId:
+          type: integer
+      required:
+        - groupId
+        - action
+      type: object
+    ResourceGroupPolicyDtoAction:
+      enum:
+        - All
+        - DeploymentsManage
+        - DeploymentCreate
+        - DeploymentRead
+        - DeploymentUpdate
+        - DeploymentDelete
+        - PlaygroundRead
+        - SchemaRead
+        - SchemaUpdate
+        - SchemaUpdateDevBranches
+        - APMRead
+        - PreAggregationBuild
+        - AlertsCreate
+        - AlertsRead
+        - AlertsUpdate
+        - AlertsDelete
+        - AuditLogManage
+        - BillingRead
+        - SqlRunnerRead
+        - DataAssetsRead
+        - DataAssetsManage
+        - CubeNetworkConnect
+        - ReportRead
+        - ReportEdit
+        - ReportManage
+        - WorkbookManage
+        - WorkbookRead
+        - WorkbookEdit
+        - ChatThreadRead
+        - AgentManage
+        - AgentRead
+        - AgentSpaceManage
+        - AgentAdmin
+        - DeploymentAgentRead
+        - OAuthIntegrationsManage
+        - OAuthIntegrationsIssueTokens
+        - AIBIDevelop
+        - AIBIExplore
+        - AIBIView
+        - ChartPalettesManage
+        - DashboardThemesManage
+        - AIBIDeveloper
+        - AIBIUser
+        - AIBIViewer
+        - EmbedDeploymentRead
+        - EmbedDashboardRead
+        - FolderRead
+        - FolderEdit
+        - FolderManage
+      type: string
+    ResourceOwner:
+      properties:
+        email:
+          type: string
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        picture:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - id
+        - email
+      type: object
+    ResourcePoliciesResponse:
+      properties:
+        groupPolicies:
+          items:
+            $ref: '#/components/schemas/ResourceGroupPolicyDto'
+          type: array
+        inheritedGroupPolicies:
+          items:
+            $ref: '#/components/schemas/InheritedGroupPolicyDto'
+          type: array
+        inheritedUserPolicies:
+          items:
+            $ref: '#/components/schemas/InheritedUserPolicyDto'
+          type: array
+        userPolicies:
+          items:
+            $ref: '#/components/schemas/ResourceUserPolicyDto'
+          type: array
+      required:
+        - userPolicies
+        - groupPolicies
+        - inheritedUserPolicies
+        - inheritedGroupPolicies
+      type: object
+    ResourceUserPolicyDto:
+      properties:
+        action:
+          $ref: '#/components/schemas/ResourceUserPolicyDtoAction'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - action
+      type: object
+    ResourceUserPolicyDtoAction:
+      enum:
+        - All
+        - DeploymentsManage
+        - DeploymentCreate
+        - DeploymentRead
+        - DeploymentUpdate
+        - DeploymentDelete
+        - PlaygroundRead
+        - SchemaRead
+        - SchemaUpdate
+        - SchemaUpdateDevBranches
+        - APMRead
+        - PreAggregationBuild
+        - AlertsCreate
+        - AlertsRead
+        - AlertsUpdate
+        - AlertsDelete
+        - AuditLogManage
+        - BillingRead
+        - SqlRunnerRead
+        - DataAssetsRead
+        - DataAssetsManage
+        - CubeNetworkConnect
+        - ReportRead
+        - ReportEdit
+        - ReportManage
+        - WorkbookManage
+        - WorkbookRead
+        - WorkbookEdit
+        - ChatThreadRead
+        - AgentManage
+        - AgentRead
+        - AgentSpaceManage
+        - AgentAdmin
+        - DeploymentAgentRead
+        - OAuthIntegrationsManage
+        - OAuthIntegrationsIssueTokens
+        - AIBIDevelop
+        - AIBIExplore
+        - AIBIView
+        - ChartPalettesManage
+        - DashboardThemesManage
+        - AIBIDeveloper
+        - AIBIUser
+        - AIBIViewer
+        - EmbedDeploymentRead
+        - EmbedDashboardRead
+        - FolderRead
+        - FolderEdit
+        - FolderManage
+      type: string
+    RoleWithAccess:
+      properties:
+        actions:
+          items:
+            enum:
+              - All
+              - DeploymentsManage
+              - DeploymentCreate
+              - DeploymentRead
+              - DeploymentUpdate
+              - DeploymentDelete
+              - PlaygroundRead
+              - SchemaRead
+              - SchemaUpdate
+              - SchemaUpdateDevBranches
+              - APMRead
+              - PreAggregationBuild
+              - AlertsCreate
+              - AlertsRead
+              - AlertsUpdate
+              - AlertsDelete
+              - AuditLogManage
+              - BillingRead
+              - SqlRunnerRead
+              - DataAssetsRead
+              - DataAssetsManage
+              - CubeNetworkConnect
+              - ReportRead
+              - ReportEdit
+              - ReportManage
+              - WorkbookManage
+              - WorkbookRead
+              - WorkbookEdit
+              - ChatThreadRead
+              - AgentManage
+              - AgentRead
+              - AgentSpaceManage
+              - AgentAdmin
+              - DeploymentAgentRead
+              - OAuthIntegrationsManage
+              - OAuthIntegrationsIssueTokens
+              - AIBIDevelop
+              - AIBIExplore
+              - AIBIView
+              - ChartPalettesManage
+              - DashboardThemesManage
+              - AIBIDeveloper
+              - AIBIUser
+              - AIBIViewer
+              - EmbedDeploymentRead
+              - EmbedDashboardRead
+              - FolderRead
+              - FolderEdit
+              - FolderManage
+            type: string
+          type: array
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - actions
+      type: object
+    ThemeFont:
+      properties:
+        family:
+          oneOf:
+            - type: string
+            - type: 'null'
+        format:
+          type: string
+        id:
+          type: string
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        url:
+          type: string
+      required:
+        - id
+        - url
+        - format
+      type: object
+    UpdateFolderInput:
+      properties:
+        name:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        position:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      type: object
+    UpdateNotificationInput:
+      properties:
+        customCron:
+          oneOf:
+            - type: string
+            - type: 'null'
+        dayOfMonth:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        dayOfWeek:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        hour:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        isEnabled:
+          oneOf:
+            - type: boolean
+              description: Enable or disable the schedule
+            - type: 'null'
+        minute:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        notificationEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        notificationFormat:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateNotificationInputNotificationFormat'
+            - type: 'null'
+        scheduleType:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateNotificationInputScheduleType'
+            - type: 'null'
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    UpdateNotificationInputNotificationFormat:
+      enum:
+        - png
+        - pdf
+      type: string
+    UpdateNotificationInputScheduleType:
+      enum:
+        - HOURLY
+        - DAILY
+        - WEEKLY
+        - MONTHLY
+        - CUSTOM
+      type: string
+    UpdateReportInput:
+      properties:
+        endResultCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        folderId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        jsonQuery:
+          oneOf:
+            - type: string
+            - type: 'null'
+        meta:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        pivotItems:
+          oneOf:
+            - $ref: '#/components/schemas/PivotItems'
+            - type: 'null'
+        resultLocation:
+          oneOf:
+            - type: string
+            - type: 'null'
+        sqlQuery:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        workbookId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      type: object
+    UpdateResourceGroupPolicyBody:
+      properties:
+        action:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateResourceGroupPolicyBodyAction'
+            - type: 'null'
+        groupId:
+          type: integer
+        resourceId:
+          type: integer
+        resourceType:
+          $ref: '#/components/schemas/UpdateResourceGroupPolicyBodyResourceType'
+      required:
+        - resourceType
+        - resourceId
+        - groupId
+      type: object
+    UpdateResourceGroupPolicyBodyAction:
+      enum:
+        - All
+        - DeploymentsManage
+        - DeploymentCreate
+        - DeploymentRead
+        - DeploymentUpdate
+        - DeploymentDelete
+        - PlaygroundRead
+        - SchemaRead
+        - SchemaUpdate
+        - SchemaUpdateDevBranches
+        - APMRead
+        - PreAggregationBuild
+        - AlertsCreate
+        - AlertsRead
+        - AlertsUpdate
+        - AlertsDelete
+        - AuditLogManage
+        - BillingRead
+        - SqlRunnerRead
+        - DataAssetsRead
+        - DataAssetsManage
+        - CubeNetworkConnect
+        - ReportRead
+        - ReportEdit
+        - ReportManage
+        - WorkbookManage
+        - WorkbookRead
+        - WorkbookEdit
+        - ChatThreadRead
+        - AgentManage
+        - AgentRead
+        - AgentSpaceManage
+        - AgentAdmin
+        - DeploymentAgentRead
+        - OAuthIntegrationsManage
+        - OAuthIntegrationsIssueTokens
+        - AIBIDevelop
+        - AIBIExplore
+        - AIBIView
+        - ChartPalettesManage
+        - DashboardThemesManage
+        - AIBIDeveloper
+        - AIBIUser
+        - AIBIViewer
+        - EmbedDeploymentRead
+        - EmbedDashboardRead
+        - FolderRead
+        - FolderEdit
+        - FolderManage
+      type: string
+    UpdateResourceGroupPolicyBodyResourceType:
+      enum:
+        - Global
+        - Deployment
+        - Report
+        - ReportFolder
+        - Agent
+        - AgentSpace
+        - Workbook
+        - Dashboard
+        - Folder
+        - ChatThread
+      type: string
+    UpdateResourceUserPolicyBody:
+      properties:
+        action:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateResourceUserPolicyBodyAction'
+            - type: 'null'
+        resourceId:
+          type: integer
+        resourceType:
+          $ref: '#/components/schemas/UpdateResourceUserPolicyBodyResourceType'
+        userId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - resourceType
+        - resourceId
+      type: object
+    UpdateResourceUserPolicyBodyAction:
+      enum:
+        - All
+        - DeploymentsManage
+        - DeploymentCreate
+        - DeploymentRead
+        - DeploymentUpdate
+        - DeploymentDelete
+        - PlaygroundRead
+        - SchemaRead
+        - SchemaUpdate
+        - SchemaUpdateDevBranches
+        - APMRead
+        - PreAggregationBuild
+        - AlertsCreate
+        - AlertsRead
+        - AlertsUpdate
+        - AlertsDelete
+        - AuditLogManage
+        - BillingRead
+        - SqlRunnerRead
+        - DataAssetsRead
+        - DataAssetsManage
+        - CubeNetworkConnect
+        - ReportRead
+        - ReportEdit
+        - ReportManage
+        - WorkbookManage
+        - WorkbookRead
+        - WorkbookEdit
+        - ChatThreadRead
+        - AgentManage
+        - AgentRead
+        - AgentSpaceManage
+        - AgentAdmin
+        - DeploymentAgentRead
+        - OAuthIntegrationsManage
+        - OAuthIntegrationsIssueTokens
+        - AIBIDevelop
+        - AIBIExplore
+        - AIBIView
+        - ChartPalettesManage
+        - DashboardThemesManage
+        - AIBIDeveloper
+        - AIBIUser
+        - AIBIViewer
+        - EmbedDeploymentRead
+        - EmbedDashboardRead
+        - FolderRead
+        - FolderEdit
+        - FolderManage
+      type: string
+    UpdateResourceUserPolicyBodyResourceType:
+      enum:
+        - Global
+        - Deployment
+        - Report
+        - ReportFolder
+        - Agent
+        - AgentSpace
+        - Workbook
+        - Dashboard
+        - Folder
+        - ChatThread
+      type: string
+    UpdateWorkbookInput:
+      properties:
+        folderId:
+          oneOf:
+            - type: number
+            - type: 'null'
+        meta:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    User:
+      properties:
+        activeRoleId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        aliases:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAlias'
+              type: array
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        defaultRoles:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        email:
+          type: string
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gitUser:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        impersonation:
+          oneOf:
+            - $ref: '#/components/schemas/UserImpersonationDTO'
+            - type: 'null'
+        isAdmin:
+          type: boolean
+        isDeactivated:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        lastLogin:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        notifications:
+          additionalProperties: true
+          type: object
+        picture:
+          oneOf:
+            - type: string
+            - type: 'null'
+        samlId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        settings:
+          oneOf:
+            - $ref: '#/components/schemas/UserSettingsInput'
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        tosAccepted:
+          oneOf:
+            - type: object
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        username:
+          type: string
+      required:
+        - id
+        - email
+        - username
+        - isAdmin
+        - notifications
+      type: object
+    UserAlias:
+      properties:
+        createdAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        id:
+          type: integer
+        source:
+          $ref: '#/components/schemas/UserAliasDTOSource'
+        updatedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        userId:
+          type: integer
+        username:
+          type: string
+      required:
+        - id
+        - userId
+        - username
+        - source
+        - createdAt
+        - updatedAt
+      type: object
+    UserAliasDTOSource:
+      enum:
+        - ldap
+        - saml
+        - scim
+        - manual
+      type: string
+    UserAttribute:
+      properties:
+        defaultValue:
+          oneOf:
+            - type: string
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/UserAttributeDTOType'
+      required:
+        - id
+        - name
+        - type
+      type: object
+    UserAttributeDTOType:
+      enum:
+        - string
+        - number
+        - string_array
+        - number_array
+      type: string
+    UserAttributeDefinition:
+      properties:
+        defaultValue:
+          oneOf:
+            - type: string
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/UserAttributeDefinitionDTOType'
+      required:
+        - name
+        - type
+      type: object
+    UserAttributeDefinitionDTOType:
+      enum:
+        - string
+        - number
+        - string_array
+        - number_array
+      type: string
+    UserAttributeInput:
+      properties:
+        name:
+          type: string
+        value:
+          oneOf:
+            - oneOf:
+                - type: string
+                - type: number
+                - type: array
+                  items:
+                    type: string
+                - type: array
+                  items:
+                    type: number
+            - type: 'null'
+      required:
+        - name
+      type: object
+    UserAttributesConnectionResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/UserAttribute'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    UserGroupDTO:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        name:
+          type: string
+        userCount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - id
+        - name
+      type: object
+    UserGroupsConnectionResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/UserGroupDTO'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    UserImpersonationDTO:
+      properties:
+        expiresAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        impersonatedUser:
+          oneOf:
+            - $ref: '#/components/schemas/User'
+            - type: 'null'
+        startedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+      type: object
+    UserSettingsInput:
+      properties:
+        alternatingRowColors:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        lastSeenChangelogId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        locale:
+          oneOf:
+            - type: string
+            - type: 'null'
+        theme:
+          oneOf:
+            - type: string
+            - type: 'null'
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    UsersConnection:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ResourceOwner'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    WidgetThemeBorderSectionInput:
+      properties:
+        color:
+          oneOf:
+            - type: string
+            - type: 'null'
+        radius:
+          oneOf:
+            - type: string
+            - type: 'null'
+        style:
+          oneOf:
+            - type: string
+            - type: 'null'
+        width:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    WidgetThemeSectionInput:
+      properties:
+        backgroundColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+        border:
+          oneOf:
+            - $ref: '#/components/schemas/WidgetThemeBorderSectionInput'
+            - type: 'null'
+        margin:
+          oneOf:
+            - type: string
+            - type: 'null'
+        padding:
+          oneOf:
+            - type: string
+            - type: 'null'
+        text:
+          oneOf:
+            - $ref: '#/components/schemas/WidgetThemeTextSectionInput'
+            - type: 'null'
+        title:
+          oneOf:
+            - $ref: '#/components/schemas/WidgetThemeTitleSectionInput'
+            - type: 'null'
+      type: object
+    WidgetThemeTextSectionInput:
+      properties:
+        codeFontFamily:
+          oneOf:
+            - type: string
+            - type: 'null'
+        color:
+          oneOf:
+            - type: string
+            - type: 'null'
+        fontFamily:
+          oneOf:
+            - type: string
+            - type: 'null'
+        secondaryColor:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    WidgetThemeTitleSectionInput:
+      properties:
+        color:
+          oneOf:
+            - type: string
+            - type: 'null'
+        fontFamily:
+          oneOf:
+            - type: string
+            - type: 'null'
+        fontSize:
+          oneOf:
+            - type: string
+            - type: 'null'
+        fontWeight:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    Workbook:
+      properties:
+        calculatedFields:
+          type: object
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        createdBy:
+          type: integer
+        dashboardDraft:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfig'
+            - type: 'null'
+        dashboardPublished:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfig'
+            - type: 'null'
+        deploymentId:
+          type: integer
+        folderId:
+          oneOf:
+            - type: number
+            - type: 'null'
+        id:
+          type: integer
+        isFavorite:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        meta:
+          additionalProperties: true
+          type: object
+        name:
+          type: string
+        publishedDashboard:
+          oneOf:
+            - $ref: '#/components/schemas/Dashboard'
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/WorkbookDtoType'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        userId:
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - name
+        - meta
+        - calculatedFields
+        - id
+        - deploymentId
+        - createdAt
+        - updatedAt
+        - type
+      type: object
+    WorkbookDashboard:
+      properties:
+        dashboardDraft:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfig'
+            - type: 'null'
+        dashboardPublished:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfig'
+            - type: 'null'
+      type: object
+    WorkbookDashboardInput:
+      properties:
+        dashboardDraft:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfigInput'
+            - type: 'null'
+      type: object
+    WorkbookDtoType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
+    WorkbooksListResponse:
+      properties:
+        count:
+          oneOf:
+            - minimum: 0
+              type: integer
+            - type: 'null'
+        data:
+          items:
+            $ref: '#/components/schemas/Workbook'
+          type: array
+        items:
+          items:
+            $ref: '#/components/schemas/Workbook'
+          type: array
+        pageInfo:
+          oneOf:
+            - $ref: '#/components/schemas/PageInfo'
+            - type: 'null'
+      required:
+        - items
+        - data
+      type: object
+    WorkspaceConnectionResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Workbook'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
