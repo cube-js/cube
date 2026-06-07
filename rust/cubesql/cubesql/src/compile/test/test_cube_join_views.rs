@@ -58,6 +58,7 @@ fn views_meta() -> Vec<CubeMeta> {
             r#type: V1CubeMetaType::View,
             dimensions: vec![
                 dimension("customers_view.customer_city", "customers.customer_city"),
+                dimension("customers_view.customer_state", "customers.customer_state"),
                 // A second dimension that is NOT a join key, used to test that a
                 // query grouping by it (instead of the join key) is not merged.
                 dimension("customers_view.status", "customers.status"),
@@ -82,6 +83,7 @@ fn views_meta() -> Vec<CubeMeta> {
             r#type: V1CubeMetaType::View,
             dimensions: vec![
                 dimension("orders_view.customer_city", "customers.customer_city"),
+                dimension("orders_view.customer_state", "customers.customer_state"),
                 dimension("orders_view.status", "orders.status"),
                 time_dimension("orders_view.created_at", "customers.created_at"),
             ],
@@ -736,4 +738,82 @@ async fn test_inner_join_on_date_trunc_group_by_date_trunc() {
             ..Default::default()
         }
     )
+}
+
+/// Joining two views on a composite key (two shared dimensions) and grouping by
+/// both merges into a single multi-fact CubeScan. The GROUP BY must cover the
+/// full join key, and each LEFT-join key column is marked present.
+#[tokio::test]
+async fn test_left_join_on_multiple_dimensions_group_by_both() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, c.customer_state, measure(o.revenue)
+            FROM customers_view c
+            LEFT JOIN orders_view o
+                ON o.customer_city = c.customer_city
+               AND o.customer_state = c.customer_state
+            GROUP BY 1, 2
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["orders_view.revenue".to_string()]),
+            dimensions: Some(vec![
+                "customers_view.customer_city".to_string(),
+                "customers_view.customer_state".to_string(),
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            filters: Some(vec![
+                set_filter("customers_view.customer_state"),
+                set_filter("customers_view.customer_city"),
+            ]),
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
+
+/// Grouping by only part of a composite join key must not merge: the GROUP BY
+/// must cover the full join key, so this falls back to standard join handling
+/// (which errors for ungrouped-style cube joins).
+#[tokio::test]
+async fn test_join_on_multiple_dimensions_partial_group_by_is_not_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let result = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue)
+            FROM customers_view c
+            LEFT JOIN orders_view o
+                ON o.customer_city = c.customer_city
+               AND o.customer_state = c.customer_state
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "expected partial-group-by composite join not to merge, got: {:?}",
+        result.map(|p| p.as_logical_plan().find_cube_scan().request)
+    );
 }
