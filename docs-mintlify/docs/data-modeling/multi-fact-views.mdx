@@ -366,6 +366,35 @@ FULL JOIN payments_view p ON p.name = o.name
 GROUP BY 1
 ```
 
+### Joining on a time dimension
+
+A common multi-fact pattern joins facts on a shared time dimension and groups by
+a truncated grain. Both shapes are supported:
+
+- **Join on the raw time column, group by `DATE_TRUNC`:**
+
+```sql
+SELECT DATE_TRUNC('day', o.created_at), MEASURE(o.total_amount), MEASURE(r.total_refund)
+FROM orders_view o
+LEFT JOIN returns_view r ON r.created_at = o.created_at
+GROUP BY 1
+```
+
+- **Join directly on `DATE_TRUNC`:**
+
+```sql
+SELECT DATE_TRUNC('day', o.created_at), MEASURE(o.total_amount), MEASURE(r.total_refund)
+FROM orders_view o
+JOIN returns_view r ON DATE_TRUNC('day', r.created_at) = DATE_TRUNC('day', o.created_at)
+GROUP BY 1
+```
+
+In both cases the grouped column is emitted as a time dimension with its
+granularity. A join written directly on `DATE_TRUNC` is an `INNER` join (the SQL
+planner expresses it as a filtered cross join), so both sides must share a key;
+both truncated columns must resolve to the same underlying time member at the
+same granularity.
+
 ### Filtering the join
 
 Filters on top of the join are supported and are applied to the merged query:

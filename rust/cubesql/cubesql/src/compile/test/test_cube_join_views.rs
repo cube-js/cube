@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use cubeclient::models::{V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
+use cubeclient::models::{
+    V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryFilterItem,
+    V1LoadRequestQueryTimeDimension,
+};
 use pretty_assertions::assert_eq;
 
 use crate::{
@@ -24,6 +27,12 @@ fn views_meta() -> Vec<CubeMeta> {
     let dimension = |name: &str, alias: &str| CubeMetaDimension {
         name: name.to_string(),
         r#type: "string".to_string(),
+        alias_member: Some(alias.to_string()),
+        ..CubeMetaDimension::default()
+    };
+    let time_dimension = |name: &str, alias: &str| CubeMetaDimension {
+        name: name.to_string(),
+        r#type: "time".to_string(),
         alias_member: Some(alias.to_string()),
         ..CubeMetaDimension::default()
     };
@@ -52,6 +61,7 @@ fn views_meta() -> Vec<CubeMeta> {
                 // A second dimension that is NOT a join key, used to test that a
                 // query grouping by it (instead of the join key) is not merged.
                 dimension("customers_view.status", "customers.status"),
+                time_dimension("customers_view.created_at", "customers.created_at"),
             ],
             measures: vec![measure(
                 "customers_view.avg_age",
@@ -73,6 +83,7 @@ fn views_meta() -> Vec<CubeMeta> {
             dimensions: vec![
                 dimension("orders_view.customer_city", "customers.customer_city"),
                 dimension("orders_view.status", "orders.status"),
+                time_dimension("orders_view.created_at", "customers.created_at"),
             ],
             measures: vec![measure("orders_view.revenue", "orders.revenue", "sum")],
             segments: vec![],
@@ -628,6 +639,100 @@ async fn test_group_by_left_join_three_views_presence_filters() {
                 vec!["customers_view".to_string(), "orders_view".to_string()],
                 vec!["orders_view".to_string(), "returns_view".to_string()],
             ]),
+            ..Default::default()
+        }
+    )
+}
+
+/// Joining two views on a raw shared time column and grouping by
+/// `DATE_TRUNC('day', ...)` merges into a single multi-fact CubeScan with the
+/// grouped column emitted as a `timeDimensions` entry (granularity `day`).
+#[tokio::test]
+async fn test_left_join_raw_time_group_by_date_trunc() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT DATE_TRUNC('day', c.created_at), measure(o.revenue)
+            FROM customers_view c
+            LEFT JOIN orders_view o ON o.created_at = c.created_at
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["orders_view.revenue".to_string()]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "customers_view.created_at".to_string(),
+                granularity: Some("day".to_string()),
+                date_range: None,
+            }]),
+            order: Some(vec![]),
+            filters: Some(vec![set_filter("customers_view.created_at")]),
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
+
+/// Joining two views directly on `DATE_TRUNC('day', ...)` (which the SQL planner
+/// lowers to `Filter(<eq>, CrossJoin(...))`, i.e. an INNER join) merges into a
+/// single multi-fact CubeScan. Both truncated keys are marked present (INNER).
+#[tokio::test]
+async fn test_inner_join_on_date_trunc_group_by_date_trunc() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT DATE_TRUNC('day', c.created_at), measure(o.revenue)
+            FROM customers_view c
+            LEFT JOIN orders_view o
+                ON DATE_TRUNC('day', o.created_at) = DATE_TRUNC('day', c.created_at)
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["orders_view.revenue".to_string()]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "customers_view.created_at".to_string(),
+                granularity: Some("day".to_string()),
+                date_range: None,
+            }]),
+            order: Some(vec![]),
+            filters: Some(vec![
+                set_filter("orders_view.created_at"),
+                set_filter("customers_view.created_at"),
+            ]),
+            join_hints: Some(vec![vec![
+                "customers_view".to_string(),
+                "orders_view".to_string(),
+            ]]),
             ..Default::default()
         }
     )
