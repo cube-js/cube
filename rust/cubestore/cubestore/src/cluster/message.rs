@@ -1,6 +1,7 @@
 use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::trace::{MainTrace, WorkerTrace};
 use crate::CubeError;
 use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
@@ -20,9 +21,20 @@ pub enum NetworkMessage {
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
     //Perform explain analyze of worker query part and return it pretty printed physical plan
-    /// The boolean flag is whether to execute the plan to collect runtime metrics.
-    ExplainAnalyze(SerializedPlan, WorkerPlanningParams, bool),
+    ExplainAnalyze(SerializedPlan, WorkerPlanningParams),
     ExplainAnalyzeResult(Result<String, CubeError>),
+
+    /// Detailed-trace mirror of [RouterSelect]: the entry node asks a main worker to
+    /// run the full router plan for real and return the assembled `MainTrace`.
+    RouterSelectDetailed(SerializedPlan),
+    RouterSelectDetailedResult(Result<MainTrace, CubeError>),
+
+    /// Detailed-trace mirror of [Select]: a worker runs its part for real and returns
+    /// both the result rows (for the main to merge) and its `WorkerTrace`.
+    SelectDetailed(SerializedPlan, WorkerPlanningParams),
+    SelectDetailedResult(
+        Result<(SchemaRef, Vec<SerializedRecordBatchStream>, WorkerTrace), CubeError>,
+    ),
 
     /// Select that sends results in batches. The immediate response is [SelectResultSchema],
     /// followed by a stream of [SelectResultBatch].

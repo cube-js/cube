@@ -46,6 +46,8 @@ use datafusion::datasource::physical_plan::{
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
+use datafusion::execution::memory_pool::{MemoryPool, MemoryReservation};
+use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
@@ -74,8 +76,8 @@ use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, execute_stream, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning,
-    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
+    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
+    PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemorySourceConfig;
@@ -91,12 +93,78 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
 use std::mem::take;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
 use super::serialized_plan::PreSerializedPlan;
 use super::{try_make_memory_data_source, QueryPlannerImpl};
+
+/// Unbounded `MemoryPool` that records the peak of all operator reservations for a
+/// single query execution. The pool lives in that query's `RuntimeEnv`, so the peak
+/// is per-query and isolated from concurrent queries sharing the process. Covers only
+/// memory that operators voluntarily reserve (sort/aggregate/join buffers), not every
+/// allocation — by design.
+#[derive(Debug, Default)]
+pub struct TrackingMemoryPool {
+    used: AtomicUsize,
+    peak: AtomicUsize,
+}
+
+impl TrackingMemoryPool {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn peak(&self) -> usize {
+        self.peak.load(Ordering::Relaxed)
+    }
+}
+
+impl MemoryPool for TrackingMemoryPool {
+    fn grow(&self, _reservation: &MemoryReservation, additional: usize) {
+        let used = self.used.fetch_add(additional, Ordering::Relaxed) + additional;
+        self.peak.fetch_max(used, Ordering::Relaxed);
+    }
+
+    fn shrink(&self, _reservation: &MemoryReservation, shrink: usize) {
+        self.used.fetch_sub(shrink, Ordering::Relaxed);
+    }
+
+    fn try_grow(&self, reservation: &MemoryReservation, additional: usize) -> DFResult<()> {
+        // Unbounded: always succeeds; we only measure, never reject.
+        self.grow(reservation, additional);
+        Ok(())
+    }
+
+    fn reserved(&self) -> usize {
+        self.used.load(Ordering::Relaxed)
+    }
+}
+
+/// Walk an executed physical plan and record each node's `elapsed_compute` and
+/// `output_rows` into the active trace as `OpKind::Execution` samples keyed by node
+/// type. Same-typed nodes aggregate (summed time/rows, node count).
+fn record_plan_node_metrics(plan: &Arc<dyn ExecutionPlan>) {
+    if let Some(metrics) = plan.metrics() {
+        let elapsed_us = metrics.elapsed_compute().map(|ns| (ns / 1000) as u64);
+        let rows = metrics.output_rows().map(|r| r as u64);
+        if elapsed_us.is_some() || rows.is_some() {
+            crate::trace::record_op(
+                crate::trace::OpKind::Execution,
+                plan.name(),
+                elapsed_us.unwrap_or(0),
+                None,
+                rows,
+                1,
+            );
+        }
+    }
+    for child in plan.children() {
+        record_plan_node_metrics(child);
+    }
+}
 
 #[automock]
 #[async_trait]
@@ -107,12 +175,23 @@ pub trait QueryExecutor: DIService + Send + Sync {
         cluster: Arc<dyn Cluster>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
+    /// Like [execute_router_plan], but runs under detailed tracing: the worker-trace
+    /// collector rides in the session config so ClusterSendExec records per-worker
+    /// traces. Result rows are discarded; returns the execution memory peak if known.
+    async fn execute_router_plan_detailed(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+        worker_traces: Arc<crate::trace::WorkerTraceCollector>,
+    ) -> Result<Option<u64>, CubeError>;
+
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        memory_pool: Option<Arc<TrackingMemoryPool>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError>;
 
     async fn router_plan(
@@ -136,7 +215,6 @@ pub trait QueryExecutor: DIService + Send + Sync {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-        execute: bool,
     ) -> Result<String, CubeError>;
 }
 
@@ -162,6 +240,51 @@ impl QueryExecutorImpl {
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
+    async fn execute_router_plan_detailed(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+        worker_traces: Arc<crate::trace::WorkerTraceCollector>,
+    ) -> Result<Option<u64>, CubeError> {
+        let (physical_plan, _logical_plan) = {
+            let _g = crate::trace::OpGuard::start(
+                crate::trace::OpKind::Planning,
+                "main.router_physical_plan",
+            );
+            self.router_plan(plan, cluster).await?
+        };
+        // The collector rides in the session config so ClusterSendExec can record
+        // per-worker traces through DataFusion's own task context propagation.
+        let config = self
+            .metadata_cache_factory
+            .make_session_config()
+            .with_extension(worker_traces);
+        // Per-query tracking pool in this execution's own RuntimeEnv: the peak is
+        // isolated from concurrent queries sharing the process.
+        let memory_pool = TrackingMemoryPool::new();
+        let runtime_env = Arc::new(
+            RuntimeEnvBuilder::new()
+                .with_memory_pool(memory_pool.clone())
+                .build()?,
+        );
+        let session_context = Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
+            config,
+            runtime_env,
+        ));
+        {
+            let _g = crate::trace::OpGuard::start_wrapper(
+                crate::trace::OpKind::Execution,
+                "main.execute",
+            );
+            let _results = collect(physical_plan.clone(), session_context.task_ctx()).await?;
+        }
+        // Harvest per-node DataFusion metrics of the final stages (router-level nodes
+        // above ClusterSend), aggregated by node type into the active trace.
+        record_plan_node_metrics(&physical_plan);
+        crate::trace::set_plan_text(pp_phys_plan(physical_plan.as_ref()));
+        Ok(Some(memory_pool.peak() as u64))
+    }
+
     #[instrument(level = "trace", skip(self, plan, cluster))]
     async fn execute_router_plan(
         &self,
@@ -237,6 +360,7 @@ impl QueryExecutor for QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        memory_pool: Option<Arc<TrackingMemoryPool>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError> {
         let data_loaded_size = DataLoadedSize::new();
         let create_worker_physical_plan_time = SystemTime::now();
@@ -270,7 +394,20 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
-        let session_context = self.execution_context()?;
+        let session_context = match &memory_pool {
+            Some(pool) => {
+                let runtime = Arc::new(
+                    RuntimeEnvBuilder::new()
+                        .with_memory_pool(pool.clone())
+                        .build()?,
+                );
+                Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
+                    self.metadata_cache_factory.make_session_config(),
+                    runtime,
+                ))
+            }
+            None => self.execution_context()?,
+        };
         let results = collect(worker_plan.clone(), session_context.task_ctx())
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
@@ -313,6 +450,11 @@ impl QueryExecutor for QueryExecutorImpl {
         }
         // TODO: stream results as they become available.
         let results = regroup_batches(results?, max_batch_rows)?;
+        // Detailed trace: record per-node metrics + the worker subplan text.
+        if memory_pool.is_some() {
+            record_plan_node_metrics(&worker_plan);
+            crate::trace::set_plan_text(pp_phys_plan(worker_plan.as_ref()));
+        }
         Ok((worker_plan.schema(), results, data_loaded_size.get()))
     }
 
@@ -373,7 +515,6 @@ impl QueryExecutor for QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-        execute: bool,
     ) -> Result<String, CubeError> {
         let (physical_plan, _) = self
             .worker_plan(
@@ -395,33 +536,7 @@ impl QueryExecutor for QueryExecutorImpl {
             ));
         }
 
-        if !execute {
-            return Ok(pp_phys_plan(worker_plan.as_ref()));
-        }
-
-        // Execute the plan to populate the metrics. The results are discarded batch by
-        // batch to avoid holding the full result set in memory.
-        let session_context = self.execution_context()?;
-        let mut stream = execute_stream(worker_plan.clone(), session_context.task_ctx())?;
-        async {
-            while let Some(batch) = stream.next().await {
-                batch?;
-            }
-            Ok::<_, DataFusionError>(())
-        }
-        .instrument(tracing::span!(
-            tracing::Level::TRACE,
-            "execute_physical_plan_for_explain_analyze"
-        ))
-        .await?;
-
-        Ok(pp_phys_plan_ext(
-            worker_plan.as_ref(),
-            &PPOptions {
-                show_metrics: true,
-                ..PPOptions::default()
-            },
-        ))
+        Ok(pp_phys_plan(worker_plan.as_ref()))
     }
 }
 
@@ -1808,6 +1923,40 @@ impl ExecutionPlan for ClusterSendExec {
         let schema = self.properties.eq_properties.schema().clone();
         let node_name = node_name.to_string();
         let worker_planning_params = self.worker_planning_params();
+
+        // Detailed-trace path: when a worker-trace collector rides in the task context,
+        // pull rows + the worker's trace and record the trace. Rows still flow into the
+        // merge so the final stages execute (and can be measured) for real.
+        //
+        // FIDELITY CAVEAT: this path always materializes (non-streaming), even where prod
+        // would stream this ClusterSend. So main-side wall-time and RSS reflect the
+        // non-streaming variant; the per-query MemoryPool peak (operator reservations) is
+        // less affected, but a streaming prod path will diverge here. Streaming + trace
+        // return is a deferred follow-up.
+        if let Some(collector) = context
+            .session_config()
+            .get_extension::<crate::trace::WorkerTraceCollector>()
+        {
+            let record_batches = async move {
+                let started = std::time::Instant::now();
+                let (rows, mut trace) = cluster
+                    .run_select_detailed(
+                        &node_name,
+                        plan.to_serialized_plan()?,
+                        worker_planning_params,
+                    )
+                    .await?;
+                trace.net_roundtrip_us = Some(started.elapsed().as_micros() as u64);
+                collector.push(trace);
+                Ok::<_, CubeError>(rows)
+            };
+            let stream = futures::stream::once(record_batches).flat_map(|r| match r {
+                Ok(vec) => stream::iter(vec.into_iter().map(|b| Ok(b)).collect::<Vec<_>>()),
+                Err(e) => stream::iter(vec![Err(DataFusionError::Execution(e.to_string()))]),
+            });
+            return Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)));
+        }
+
         if self.use_streaming {
             // A future that yields a stream
             let fut = async move {
@@ -2168,6 +2317,10 @@ pub struct SerializedRecordBatchStream {
 }
 
 impl SerializedRecordBatchStream {
+    pub fn byte_size(&self) -> usize {
+        self.record_batch_file.len()
+    }
+
     pub fn write(
         schema: &Schema,
         record_batches: Vec<RecordBatch>,

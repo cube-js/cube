@@ -42,6 +42,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
 use crate::telemetry::tracing::{TraceIdAndSpanId, TracingHelper};
+use crate::trace::{MainTrace, OpKind, SubprocessTrace, WorkerTrace};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -106,14 +107,30 @@ pub trait Cluster: DIService + Send + Sync {
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     /// Runs explain analyze on a single worker node to get pretty printed physical plan
-    /// from that worker. `execute` runs the plan to report runtime metrics.
+    /// from that worker.
     async fn run_explain_analyze(
         &self,
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-        execute: bool,
     ) -> Result<String, CubeError>;
+
+    /// Detailed-trace path: ask a main worker to run the full router plan for real
+    /// and return the assembled `MainTrace` (its ops + collected per-worker traces).
+    async fn run_router_select_detailed(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<MainTrace, CubeError>;
+
+    /// Detailed-trace mirror of [run_select]: runs the worker part for real and
+    /// returns both the result rows (for the main to merge) and the worker's trace.
+    async fn run_select_detailed(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
+    ) -> Result<(Vec<RecordBatch>, WorkerTrace), CubeError>;
 
     /// Like [run_select], but streams results as they are requested.
     /// This allows to send only a limited number of results, if the caller does not need all.
@@ -244,6 +261,8 @@ pub enum WorkerMessage {
         HashMap<String, String>,
         HashMap<u64, Vec<SerializedRecordBatchStream>>,
         Option<TraceIdAndSpanId>,
+        /// When true the subprocess collects a `SubprocessTrace` for the run.
+        bool,
     ),
 }
 
@@ -295,7 +314,12 @@ pub struct WorkerProcessor;
 #[async_trait]
 impl WorkerProcessing for WorkerProcessor {
     type Request = WorkerMessage;
-    type Response = (SchemaRef, Vec<SerializedRecordBatchStream>, usize);
+    type Response = (
+        SchemaRef,
+        Vec<SerializedRecordBatchStream>,
+        usize,
+        Option<SubprocessTrace>,
+    );
     type Config = Config;
 
     fn spawn_background_processes(config: Self::Config) -> Result<(), CubeError> {
@@ -313,7 +337,15 @@ impl WorkerProcessing for WorkerProcessor {
     async fn process(
         config: &Self::Config,
         args: WorkerMessage,
-    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, usize), CubeError> {
+    ) -> Result<
+        (
+            SchemaRef,
+            Vec<SerializedRecordBatchStream>,
+            usize,
+            Option<SubprocessTrace>,
+        ),
+        CubeError,
+    > {
         let services = config.worker_services().await;
         match args {
             WorkerMessage::Select(
@@ -322,13 +354,21 @@ impl WorkerProcessing for WorkerProcessor {
                 remote_to_local_names,
                 chunk_id_to_record_batches,
                 trace_id_and_span_id,
+                detailed,
             ) => {
+                let memory_pool =
+                    detailed.then(crate::queryplanner::query_executor::TrackingMemoryPool::new);
+                let memory_pool_for_exec = memory_pool.clone();
                 let future = async move {
                     let time = SystemTime::now();
                     debug!("Running select in worker started");
                     let plan_node_to_send = plan_node.clone();
                     let result = tracing::trace_span!("Deserialize in_memory chunks").in_scope(
                         move || {
+                            let _g = crate::trace::OpGuard::start(
+                                OpKind::Deserialize,
+                                "chunks.deserialize",
+                            );
                             chunk_id_to_record_batches
                                 .into_iter()
                                 .map(|(id, batches)| -> Result<_, CubeError> {
@@ -343,23 +383,36 @@ impl WorkerProcessing for WorkerProcessor {
                                 .collect::<Result<HashMap<_, _>, _>>()
                         },
                     )?;
-                    let res = services
-                        .query_executor
-                        .clone()
-                        .execute_worker_plan(
-                            plan_node_to_send,
-                            worker_planning_params,
-                            remote_to_local_names,
-                            result,
-                        )
-                        .await;
+                    let res = {
+                        let _g = crate::trace::OpGuard::start_wrapper(
+                            OpKind::Other,
+                            "subprocess.execute",
+                        );
+                        services
+                            .query_executor
+                            .clone()
+                            .execute_worker_plan(
+                                plan_node_to_send,
+                                worker_planning_params,
+                                remote_to_local_names,
+                                result,
+                                memory_pool_for_exec,
+                            )
+                            .await
+                    };
                     debug!(
                         "Running select in worker completed ({:?})",
                         time.elapsed().unwrap()
                     );
                     let (schema, records, data_loaded_size) = res?;
-                    let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
-                    Ok((schema, records, data_loaded_size))
+                    let records = {
+                        let mut g =
+                            crate::trace::OpGuard::start(OpKind::Serialize, "result.serialize");
+                        let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
+                        g.set_bytes(records.iter().map(|r| r.byte_size() as u64).sum());
+                        records
+                    };
+                    Ok::<_, CubeError>((schema, records, data_loaded_size))
                 };
 
                 let span = trace_id_and_span_id.map(|(t, s)| {
@@ -380,11 +433,26 @@ impl WorkerProcessing for WorkerProcessor {
                     span
                 });
 
-                if let Some(span) = span {
-                    future.instrument(span).await
-                } else {
-                    future.await
-                }
+                let run = async move {
+                    if let Some(span) = span {
+                        future.instrument(span).await
+                    } else {
+                        future.await
+                    }
+                };
+
+                let ctx = detailed.then(crate::trace::TraceCtx::new);
+                let started = std::time::Instant::now();
+                let (schema, records, data_loaded_size) =
+                    crate::trace::scoped(ctx.clone(), run).await?;
+                let total_us = started.elapsed().as_micros() as u64;
+                let subtrace = ctx.map(|c| SubprocessTrace {
+                    total_us,
+                    physical_plan: c.take_plan_text(),
+                    ops: c.take_ops(),
+                    exec_memory_peak_bytes: memory_pool.as_ref().map(|p| p.peak() as u64),
+                });
+                Ok((schema, records, data_loaded_size, subtrace))
             }
         }
     }
@@ -524,17 +592,59 @@ impl Cluster for ClusterImpl {
         node_name: &str,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-        execute: bool,
     ) -> Result<String, CubeError> {
         let response = self
             .send_or_process_locally(
                 node_name,
-                NetworkMessage::ExplainAnalyze(plan, worker_planning_params, execute),
+                NetworkMessage::ExplainAnalyze(plan, worker_planning_params),
             )
             .await?;
         match response {
             NetworkMessage::ExplainAnalyzeResult(r) => r,
             _ => panic!("unexpected result for explain analize"),
+        }
+    }
+
+    async fn run_router_select_detailed(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+    ) -> Result<MainTrace, CubeError> {
+        let response = self
+            .send_or_process_locally(node_name, NetworkMessage::RouterSelectDetailed(plan))
+            .await?;
+        match response {
+            NetworkMessage::RouterSelectDetailedResult(r) => r,
+            _ => panic!("unexpected result for router select detailed"),
+        }
+    }
+
+    async fn run_select_detailed(
+        &self,
+        node_name: &str,
+        plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
+    ) -> Result<(Vec<RecordBatch>, WorkerTrace), CubeError> {
+        let response = self
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::SelectDetailed(plan, worker_planning_params),
+            )
+            .await?;
+        match response {
+            NetworkMessage::SelectDetailedResult(r) => r.and_then(|(_, batches, trace)| {
+                // NOTE: this main-side deserialization is not traced. It runs inside
+                // ClusterSendExec on a DataFusion-spawned task where the task-local trace
+                // ctx is not visible (the worker trace itself rides the collector in the
+                // task context for that reason). Measuring it needs an explicit channel,
+                // not an OpGuard — deferred.
+                let records = batches
+                    .into_iter()
+                    .map(|b| b.read())
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok((records, trace))
+            }),
+            _ => panic!("unexpected result for select detailed"),
         }
     }
 
@@ -725,11 +835,21 @@ impl Cluster for ClusterImpl {
                 let res = self.run_local_select_worker(plan, planning_params).await;
                 NetworkMessage::SelectResult(res)
             }
-            NetworkMessage::ExplainAnalyze(plan, planning_params, execute) => {
+            NetworkMessage::ExplainAnalyze(plan, planning_params) => {
                 let res = self
-                    .run_local_explain_analyze_worker(plan, planning_params, execute)
+                    .run_local_explain_analyze_worker(plan, planning_params)
                     .await;
                 NetworkMessage::ExplainAnalyzeResult(res)
+            }
+            NetworkMessage::RouterSelectDetailed(plan) => {
+                let res = self.run_local_router_select_detailed_main(plan).await;
+                NetworkMessage::RouterSelectDetailedResult(res)
+            }
+            NetworkMessage::SelectDetailed(plan, planning_params) => {
+                let res = self
+                    .run_local_select_detailed_worker(plan, planning_params)
+                    .await;
+                NetworkMessage::SelectDetailedResult(res)
             }
             NetworkMessage::WarmupDownload(remote_path, expected_file_size) => {
                 let res = self
@@ -740,7 +860,9 @@ impl Cluster for ClusterImpl {
             }
             NetworkMessage::SelectResult(_)
             | NetworkMessage::WarmupDownloadResult(_)
-            | NetworkMessage::ExplainAnalyzeResult(_) => {
+            | NetworkMessage::ExplainAnalyzeResult(_)
+            | NetworkMessage::RouterSelectDetailedResult(_)
+            | NetworkMessage::SelectDetailedResult(_) => {
                 panic!("result sent to worker");
             }
             NetworkMessage::AddMemoryChunk { chunk_name, data } => {
@@ -1278,10 +1400,10 @@ impl ClusterImpl {
             trace_obj: plan_node.trace_obj(),
         };
         let res = self
-            .run_local_select_worker_impl(plan_node, worker_planning_params)
+            .run_local_select_worker_impl(plan_node, worker_planning_params, false)
             .await;
         match res {
-            Ok((schema, records, data_loaded_size)) => {
+            Ok((schema, records, data_loaded_size, _)) => {
                 self.process_rate_limiter
                     .commit_task_usage(
                         TaskType::Select,
@@ -1305,16 +1427,29 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, usize), CubeError> {
+        detailed: bool,
+    ) -> Result<
+        (
+            SchemaRef,
+            Vec<SerializedRecordBatchStream>,
+            usize,
+            Option<SubprocessTrace>,
+        ),
+        CubeError,
+    > {
         let start = SystemTime::now();
         debug!("Running select");
+        let warmup_guard = crate::trace::OpGuard::start(OpKind::WarmupIo, "worker.warmup");
         let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
+        drop(warmup_guard);
         let warmup = start.elapsed()?;
         if warmup.as_millis() > 200 {
             warn!("Warmup download for select ({:?})", warmup);
         }
 
+        let chunk_load_guard = crate::trace::OpGuard::start(OpKind::ChunkLoad, "chunks.load");
         let chunk_id_to_record_batches = self.load_in_memory_chunks(&plan_node).await?;
+        drop(chunk_load_guard);
 
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
@@ -1333,36 +1468,56 @@ impl ClusterImpl {
                     tracing::Level::TRACE,
                     "Serialize chunks into SerializedRecordBatchStream"
                 );
-                let chunk_id_to_record_batches = span.in_scope(|| {
-                    chunk_id_to_record_batches
-                    .iter()
-                    .map(
-                        |(id, b)| -> Result<(u64, Vec<SerializedRecordBatchStream>), CubeError> {
-                            Ok((
-                                *id,
-                                SerializedRecordBatchStream::write(
-                                    &b.iter().next().unwrap().schema(),
-                                    b.to_vec(),
-                                )?,
-                            ))
-                        },
-                    )
-                    .collect::<Result<HashMap<_, _>, _>>()
-                })?;
-                res = Some(
+                let chunk_id_to_record_batches = span.in_scope(
+                    || -> Result<HashMap<u64, Vec<SerializedRecordBatchStream>>, CubeError> {
+                        let mut g =
+                            crate::trace::OpGuard::start(OpKind::Serialize, "chunks.serialize");
+                        let result =
+                            chunk_id_to_record_batches
+                                .iter()
+                                .map(
+                                    |(id, b)| -> Result<
+                                        (u64, Vec<SerializedRecordBatchStream>),
+                                        CubeError,
+                                    > {
+                                        Ok((
+                                            *id,
+                                            SerializedRecordBatchStream::write(
+                                                &b.iter().next().unwrap().schema(),
+                                                b.to_vec(),
+                                            )?,
+                                        ))
+                                    },
+                                )
+                                .collect::<Result<HashMap<_, _>, _>>()?;
+                        g.set_bytes(
+                            result
+                                .values()
+                                .flatten()
+                                .map(|r| r.byte_size() as u64)
+                                .sum(),
+                        );
+                        Ok(result)
+                    },
+                )?;
+                let pool_result = {
+                    let _ipc_guard =
+                        crate::trace::OpGuard::start_wrapper(OpKind::Transport, "ipc.select");
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
                         worker_planning_params,
                         remote_to_local_names.clone(),
                         chunk_id_to_record_batches,
                         self.tracing_helper.trace_and_span_id(),
+                        detailed,
                     ))
                     .instrument(tracing::span!(
                         tracing::Level::TRACE,
                         "execute_worker_plan_on_pool"
                     ))
-                    .await,
-                )
+                    .await
+                };
+                res = Some(pool_result)
             }
         }
 
@@ -1375,45 +1530,86 @@ impl ClusterImpl {
                     worker_planning_params,
                     remote_to_local_names,
                     chunk_id_to_record_batches,
+                    None,
                 )
                 .await?;
             let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
-            res = Some(Ok((schema, records?, data_loaded_size)))
+            res = Some(Ok((schema, records?, data_loaded_size, None)))
         }
 
         info!("Running select completed ({:?})", start.elapsed()?);
         res.unwrap()
     }
 
+    async fn run_local_select_detailed_worker(
+        &self,
+        plan_node: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, WorkerTrace), CubeError> {
+        let ctx = crate::trace::TraceCtx::new();
+        let node_name = self.server_name.clone();
+        let started = std::time::Instant::now();
+        let (schema, records, subprocess) = crate::trace::scoped(Some(ctx.clone()), async {
+            self.run_local_select_worker_impl(plan_node, worker_planning_params, true)
+                .await
+                .map(|(schema, records, _size, subtrace)| (schema, records, subtrace))
+        })
+        .await?;
+        let worker_trace = WorkerTrace {
+            node_name,
+            total_us: started.elapsed().as_micros() as u64,
+            net_roundtrip_us: None,
+            ops: ctx.take_ops(),
+            subprocess,
+        };
+        Ok((schema, records, worker_trace))
+    }
+
+    async fn run_local_router_select_detailed_main(
+        &self,
+        plan_node: SerializedPlan,
+    ) -> Result<MainTrace, CubeError> {
+        let ctx = crate::trace::TraceCtx::new();
+        let collector = crate::trace::WorkerTraceCollector::new();
+        let node_name = self.server_name.clone();
+        let cluster = self.this.upgrade().unwrap();
+        let started = std::time::Instant::now();
+        let memory_peak = crate::trace::scoped(Some(ctx.clone()), async {
+            self.query_executor
+                .execute_router_plan_detailed(plan_node, cluster, collector.clone())
+                .await
+        })
+        .await?;
+        Ok(MainTrace {
+            node_name,
+            total_us: started.elapsed().as_micros() as u64,
+            physical_plan: ctx.take_plan_text(),
+            ops: ctx.take_ops(),
+            exec_memory_peak_bytes: memory_peak,
+            workers: collector.take(),
+        })
+    }
+
     async fn run_local_explain_analyze_worker(
         &self,
         plan_node: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
-        execute: bool,
     ) -> Result<String, CubeError> {
         let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
-        let chunk_id_to_record_batches = if execute {
-            self.load_in_memory_chunks(&plan_node).await?
-        } else {
-            plan_node
-                .in_memory_chunks_to_load()
-                .into_iter()
-                .map(|(c, _, _)| (c.get_id(), Vec::new()))
-                .collect()
-        };
+        let chunk_id_to_record_batches = plan_node
+            .in_memory_chunks_to_load()
+            .into_iter()
+            .map(|(c, _, _)| (c.get_id(), Vec::new()))
+            .collect();
 
-        let res = self
-            .query_executor
+        self.query_executor
             .pp_worker_plan(
                 plan_node,
                 worker_planning_params,
                 remote_to_local_names,
                 chunk_id_to_record_batches,
-                execute,
             )
-            .await;
-
-        res
+            .await
     }
 
     async fn load_in_memory_chunks(

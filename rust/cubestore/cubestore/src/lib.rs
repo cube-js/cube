@@ -47,6 +47,7 @@ pub mod streaming;
 pub mod sys;
 pub mod table;
 pub mod telemetry;
+pub mod trace;
 pub mod util;
 
 pub use datafusion::cube_ext::spawn;

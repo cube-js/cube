@@ -803,7 +803,7 @@ pub struct PartitionData {
     pub chunks: Vec<IdRow<Chunk>>,
 }
 
-#[cuberpc::service]
+#[cuberpc::service(trace_guard = crate::trace::metastore_trace_guard)]
 pub trait MetaStore: DIService + Send + Sync {
     async fn wait_for_current_seq_to_sync(&self) -> Result<(), CubeError>;
     fn schemas_table(&self) -> SchemaMetaStoreTable;
@@ -1192,6 +1192,7 @@ pub trait MetaStore: DIService + Send + Sync {
 
 crate::di_service!(RocksMetaStore, [MetaStore]);
 crate::di_service!(MetaStoreRpcClient, [MetaStore]);
+crate::di_service!(TracedMetaStore, [MetaStore]);
 
 #[derive(Clone, Debug)]
 pub enum MetaStoreEvent {

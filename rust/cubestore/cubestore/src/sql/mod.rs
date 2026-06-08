@@ -78,6 +78,7 @@ use deepsize::DeepSizeOf;
 
 pub mod cache;
 pub mod cachestore;
+mod explain_detailed;
 pub mod parser;
 mod table_creator;
 
@@ -545,12 +546,10 @@ impl SqlServiceImpl {
     }
 
     /// `analyze` builds and shows the physical plans on the router and the workers.
-    /// `execute` additionally runs the worker plans to report runtime metrics.
     async fn explain(
         &self,
         statement: Statement,
         analyze: bool,
-        execute: bool,
     ) -> Result<Arc<DataFrame>, CubeError> {
         fn extract_worker_plans(
             p: &Arc<dyn ExecutionPlan>,
@@ -615,7 +614,6 @@ impl SqlServiceImpl {
                                         &name,
                                         plan.to_serialized_plan()?,
                                         worker_planning_params,
-                                        execute,
                                     )
                                     .await
                                     .map(|p| (name, p))
@@ -1380,7 +1378,7 @@ impl SqlService for SqlServiceImpl {
                 ..
             }) => match *statement {
                 Statement::Query(q) => Ok(self
-                    .explain(Statement::Query(q.clone()), analyze, false)
+                    .explain(Statement::Query(q.clone()), analyze)
                     .await?
                     .into()),
                 _ => Err(CubeError::user(format!(
@@ -1388,11 +1386,12 @@ impl SqlService for SqlServiceImpl {
                     query
                 ))),
             },
-            CubeStoreStatement::ExplainAnalyzeExtended(q) => {
-                Ok(self.explain(Statement::Query(q), true, true).await?.into())
-            }
 
             CubeStoreStatement::Dump(q) => Ok(self.dump_select_inputs(query, q).await?.into()),
+
+            CubeStoreStatement::ExplainAnalyzeDetailed(q) => {
+                Ok(self.explain_detailed(Statement::Query(q)).await?.into())
+            }
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
@@ -5173,34 +5172,69 @@ mod tests {
                         _ => {assert!(false);}
                     };
 
-                let result = service.exec_query(
-                    "EXPLAIN ANALYZE EXTENDED SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
-                    ).await?.collect().await?;
+                Ok::<(), CubeError>(())
+            }).await;
+            Ok::<(), CubeError>(())
+        }).await;
+        Ok(())
+    }
 
-                assert_eq!(result.len(), 2);
-                let worker_row = &result.get_rows()[1];
-                match &worker_row
-                    .values()[2] {
-                        TableValue::String(pp_plan) => {
-                            let regex = Regex::new(
-                                r"LinearPartialAggregate[^\n]*\s+Filter[^\n]*\s+Scan, index: default:1:\[1\], fields: \[platform, age, amount\][^\n]*\s+ParquetScan, files: \S*\.chunk\.parquet"
-                            ).unwrap();
-                            let matches = regex.captures_iter(&pp_plan).count();
-                            assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
-                            // The plan is executed, so the nodes carry runtime metrics.
-                            assert!(
-                                pp_plan.contains("metrics:") && pp_plan.contains("output_rows="),
-                                "pp_plan = {}",
-                                pp_plan
-                            );
-                            assert!(
-                                pp_plan.contains("row_groups_pruned_statistics="),
-                                "parquet scans must report pruning metrics, pp_plan = {}",
-                                pp_plan
-                            );
-                        },
-                        _ => {assert!(false);}
-                    };
+    #[tokio::test]
+    async fn explain_analyze_detailed() -> Result<(), CubeError> {
+        Config::test("explain_detailed_router").update_config(|mut config| {
+            config.select_workers = vec!["127.0.0.1:14016".to_string()];
+            config.metastore_bind_address = Some("127.0.0.1:15016".to_string());
+            config.compaction_chunks_count_threshold = 0;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            Config::test("explain_detailed_worker_1").update_config(|mut config| {
+                config.worker_bind_address = Some("127.0.0.1:14016".to_string());
+                config.server_name = "127.0.0.1:14016".to_string();
+                config.metastore_remote_address = Some("127.0.0.1:15016".to_string());
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: Some(env::current_dir()
+                        .unwrap()
+                        .join("explain_detailed_router-upstream".to_string())),
+                };
+                config.compaction_chunks_count_threshold = 0;
+                config
+            }).start_test_worker(async move |_| {
+                service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await?.collect().await?;
+                service.exec_query(
+                    "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'ios', 17, 4), (3, 'ios', 20, 5)"
+                ).await?.collect().await?;
+
+                let result = service.exec_query(
+                    "EXPLAIN ANALYZE DETAILED SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
+                ).await?.collect().await?;
+
+                // Single "trace" cell holding the whole report.
+                assert_eq!(result.get_columns().len(), 1);
+                assert_eq!(result.get_rows().len(), 1);
+                let trace = match &result.get_rows()[0].values()[0] {
+                    TableValue::String(s) => s.clone(),
+                    v => panic!("expected string trace, got {:?}", v),
+                };
+
+                // Smoke check: the whole path produced the levels + the summary.
+                // (The test harness runs the worker in-process, without the select
+                // subprocess pool, so no `subprocess ·` section here.)
+                for marker in [
+                    "summary by category",
+                    "router",
+                    "Metastore",
+                    "main \u{b7}",
+                    "worker \u{b7}",
+                    "Planning",
+                    "Execution",
+                    "transport.",
+                    "plan:",
+                ] {
+                    assert!(trace.contains(marker), "trace missing '{}':\n{}", marker, trace);
+                }
 
                 Ok::<(), CubeError>(())
             }).await;
@@ -5208,6 +5242,7 @@ mod tests {
         }).await;
         Ok(())
     }
+
     #[tokio::test]
     async fn create_aggr_index() -> Result<(), CubeError> {
         assert!(true);

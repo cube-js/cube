@@ -7,15 +7,47 @@ use syn::spanned::Spanned;
 use syn::{parse_macro_input, FnArg, Item, Pat, ReturnType, TraitItem};
 
 #[proc_macro_attribute]
-pub fn service(_attr: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
-    let svc = parse_macro_input!(input as RpcService);
+pub fn service(attr: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
+    let args = parse_macro_input!(attr as ServiceArgs);
+    let mut svc = parse_macro_input!(input as RpcService);
+    svc.trace_guard = args.trace_guard;
 
     proc_macro::TokenStream::from(svc.into_token_stream())
+}
+
+/// Optional arguments to `#[cuberpc::service]`.
+/// `trace_guard = <path>`: generate a `Traced<Service>` decorator that wraps an
+/// `Arc<dyn Service>` and, for every async method, holds the guard returned by
+/// `<path>(method_name)` across the call. Keeps cuberpc decoupled from the host
+/// crate's tracing module.
+struct ServiceArgs {
+    trace_guard: Option<syn::Path>,
+}
+
+impl Parse for ServiceArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut trace_guard = None;
+        if !input.is_empty() {
+            let key: Ident = input.parse()?;
+            input.parse::<syn::Token![=]>()?;
+            let path: syn::Path = input.parse()?;
+            if key == "trace_guard" {
+                trace_guard = Some(path);
+            } else {
+                return Err(syn::Error::new(
+                    key.span(),
+                    "unknown cuberpc::service argument",
+                ));
+            }
+        }
+        Ok(ServiceArgs { trace_guard })
+    }
 }
 
 struct RpcService {
     ident: Ident,
     methods: Vec<RpcMethod>,
+    trace_guard: Option<syn::Path>,
 }
 
 struct RpcMethod {
@@ -46,6 +78,7 @@ impl Parse for RpcService {
                 RpcService {
                     ident: trait_item.ident.clone(),
                     methods,
+                    trace_guard: None,
                 }
             }
             x => {
@@ -102,6 +135,62 @@ impl RpcService {
             #[derive(serde::Serialize, serde::Deserialize, Debug)]
             pub enum #method_call {
                 #( #methods ),*
+            }
+        }
+    }
+
+    fn method_call_variant_name_impl(&self) -> proc_macro2::TokenStream {
+        let method_call = self.method_call_ident();
+        let arms = self
+            .methods
+            .iter()
+            .map(|m| {
+                let variant = m.variant_ident();
+                let has_args = m.args.iter().any(|a| matches!(a, FnArg::Typed(_)));
+                if has_args {
+                    quote! { #method_call::#variant(..) => stringify!(#variant) }
+                } else {
+                    quote! { #method_call::#variant => stringify!(#variant) }
+                }
+            })
+            .collect::<Vec<_>>();
+        quote! {
+            impl #method_call {
+                /// The trait method name behind this call, for tracing/metrics labels.
+                pub fn variant_name(&self) -> &'static str {
+                    match self {
+                        #( #arms ),*
+                    }
+                }
+            }
+        }
+    }
+
+    fn traced_decorator(&self) -> proc_macro2::TokenStream {
+        let Some(guard_path) = self.trace_guard.as_ref() else {
+            return quote! {};
+        };
+        let service = &self.ident;
+        let traced = format_ident!("Traced{}", self.ident);
+        let methods = self
+            .methods
+            .iter()
+            .map(|m| m.traced_method(guard_path))
+            .collect::<Vec<_>>();
+        quote! {
+            pub struct #traced {
+                inner: std::sync::Arc<dyn #service>,
+            }
+
+            impl #traced {
+                pub fn new(inner: std::sync::Arc<dyn #service>) -> std::sync::Arc<Self> {
+                    std::sync::Arc::new(Self { inner })
+                }
+            }
+
+            #[async_trait]
+            impl #service for #traced {
+                #( #methods )*
             }
         }
     }
@@ -350,6 +439,40 @@ impl RpcMethod {
     fn variant_ident(&self) -> Ident {
         format_ident!("{}", self.ident.to_string().to_camel_case())
     }
+
+    fn traced_method(&self, guard_path: &syn::Path) -> proc_macro2::TokenStream {
+        let &Self {
+            ident,
+            asyncness,
+            args,
+            output,
+        } = &self;
+        let arg_names = args
+            .iter()
+            .filter_map(|a| match a {
+                FnArg::Typed(ty) => match ty.pat.as_ref() {
+                    Pat::Ident(id) => Some(id.ident.clone()),
+                    x => panic!("Unexpected pattern: {:?}", x),
+                },
+                FnArg::Receiver(_) => None,
+            })
+            .collect::<Vec<_>>();
+        let variant = self.variant_ident();
+        if *asyncness {
+            quote! {
+                async fn #ident(#( #args ),*) #output {
+                    let _g = #guard_path(stringify!(#variant));
+                    self.inner.#ident(#( #arg_names ),*).await
+                }
+            }
+        } else {
+            quote! {
+                fn #ident(#( #args ),*) #output {
+                    self.inner.#ident(#( #arg_names ),*)
+                }
+            }
+        }
+    }
 }
 
 impl ToTokens for RpcService {
@@ -357,10 +480,12 @@ impl ToTokens for RpcService {
         tokens.extend(vec![
             self.original_trait(),
             self.method_call_enum(),
+            self.method_call_variant_name_impl(),
             self.method_result_enum(),
             self.client_transport_trait(),
             self.client_impl(),
             self.server_impl(),
+            self.traced_decorator(),
         ]);
     }
 }
