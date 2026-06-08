@@ -416,6 +416,8 @@ lazy_static::lazy_static! {
         "planning_aggregate_below_merge_with_limit",
         "global_aggregate_no_chunk_merge",
         "global_aggregate_unique_key_keeps_merge",
+        "limit_pushdown_group_having",
+        "limit_pushdown_group_nonprefix_order",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
