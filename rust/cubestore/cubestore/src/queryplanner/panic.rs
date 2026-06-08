@@ -186,5 +186,6 @@ pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         WorkerPlanningParams {
             worker_partition_count: 1,
         },
+        /* worker_sort_and_limit */ None,
     )))
 }

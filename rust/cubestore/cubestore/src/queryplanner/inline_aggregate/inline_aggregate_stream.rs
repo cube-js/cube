@@ -73,7 +73,7 @@ impl InlineAggregateStream {
             aggregate_expressions(&agg.aggr_expr, &agg.mode, agg_group_by.num_group_exprs())?;
 
         let filter_expressions = match agg.mode {
-            InlineAggregateMode::Partial => agg_filter_expr,
+            InlineAggregateMode::Partial | InlineAggregateMode::Single => agg_filter_expr,
             InlineAggregateMode::Final => {
                 vec![None; agg.aggr_expr.len()]
             }
@@ -113,7 +113,7 @@ fn aggregate_expressions(
     col_idx_base: usize,
 ) -> DFResult<Vec<Vec<Arc<dyn PhysicalExpr>>>> {
     match mode {
-        InlineAggregateMode::Partial => Ok(aggr_expr
+        InlineAggregateMode::Partial | InlineAggregateMode::Single => Ok(aggr_expr
             .iter()
             .map(|agg| {
                 let mut result = agg.expressions();
@@ -225,7 +225,6 @@ impl Stream for InlineAggregateStream {
                 ExecutionState::ProducingOutput(batch) => {
                     let batch = batch.clone();
 
-                    // Determine next state
                     self.exec_state = if self.input_done {
                         ExecutionState::Done
                     } else {
@@ -267,7 +266,7 @@ impl InlineAggregateStream {
                     let state = acc.state(emit_to)?;
                     aggr_arrays.extend(state);
                 }
-                InlineAggregateMode::Final => {
+                InlineAggregateMode::Final | InlineAggregateMode::Single => {
                     // Emit final aggregated values
                     aggr_arrays.push(acc.evaluate(emit_to)?);
                 }
@@ -333,7 +332,7 @@ impl InlineAggregateStream {
             // Call the appropriate method on each aggregator with
             // the entire input row and the relevant group indexes
             match self.mode {
-                InlineAggregateMode::Partial => {
+                InlineAggregateMode::Partial | InlineAggregateMode::Single => {
                     acc.update_batch(values, group_indices, opt_filter, total_num_groups)?;
                 }
                 _ => {

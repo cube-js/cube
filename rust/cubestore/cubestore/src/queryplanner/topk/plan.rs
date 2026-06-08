@@ -645,6 +645,7 @@ pub fn plan_topk(
         None,
         None,
         Some(sort_requirement.clone()),
+        None,
     )?;
 
     let having = if let Some(predicate) = &upper_node.having_expr {

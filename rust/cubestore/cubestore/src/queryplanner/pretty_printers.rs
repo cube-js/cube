@@ -609,6 +609,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             let mode = match agg.mode() {
                 InlineAggregateMode::Partial => "Partial",
                 InlineAggregateMode::Final => "Final",
+                InlineAggregateMode::Single => "Single",
             };
             *out += &format!("Inline{}Aggregate", mode);
             if o.show_aggregations {
