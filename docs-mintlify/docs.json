@@ -885,6 +885,18 @@
             ]
           },
           {
+            "group": "AI Endpoints",
+            "pages": [
+              {
+                "group": "Chat",
+                "openapi": "/api-reference/chat.yaml",
+                "pages": [
+                  "POST /chat/stream-chat-state"
+                ]
+              }
+            ]
+          },
+          {
             "group": "Changelog",
             "pages": [
               "api-reference/changelog"
