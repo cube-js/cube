@@ -275,8 +275,11 @@ impl SchemaModelBuilder {
             .rolling_type
             .as_deref()
             .map(|t| match t {
-                "time" => Ok(RollingWindowKind::Time),
-                "row" => Ok(RollingWindowKind::Row),
+                "fixed" => Ok(RollingWindowKind::Fixed),
+                "to_date" => Ok(RollingWindowKind::ToDate),
+                "year_to_date" => Ok(RollingWindowKind::YearToDate),
+                "quarter_to_date" => Ok(RollingWindowKind::QuarterToDate),
+                "month_to_date" => Ok(RollingWindowKind::MonthToDate),
                 other => Err(CubeError::user(format!(
                     "Unknown rolling window kind: {other}"
                 ))),

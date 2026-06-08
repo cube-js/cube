@@ -111,8 +111,11 @@ pub struct RollingWindowSpec {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RollingWindowKind {
-    Time,
-    Row,
+    Fixed,
+    ToDate,
+    YearToDate,
+    QuarterToDate,
+    MonthToDate,
 }
 
 #[derive(Clone, Debug)]
