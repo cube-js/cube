@@ -1,6 +1,8 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
 
+import { getEnv } from '@cubejs-backend/shared';
+import { prepareModel as nativePrepareModel, TesseractModel } from '@cubejs-backend/native';
 import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
@@ -16,8 +18,6 @@ import {
   ViewDefaultValueFilter,
   ViewIncludedMember
 } from './CubeSymbols';
-import { getEnv } from '@cubejs-backend/shared';
-import { prepareModel as nativePrepareModel, TesseractModel } from '@cubejs-backend/native';
 import { UserError } from './UserError';
 import { SchemaSource } from './SchemaSource';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
@@ -877,7 +877,7 @@ export class CubeEvaluator extends CubeSymbols {
           } else if (typeof memberMask === 'boolean') {
             maskLiteral = memberMask ? '(TRUE)' : '(FALSE)';
           } else {
-            maskLiteral = `'${String(memberMask).replace(/'/g, "''")}'`;
+            maskLiteral = `'${String(memberMask).replace(/'/g, '\'\'')}'`;
           }
           // eslint-disable-next-line no-new-func
           const maskFn = new Function(`return \`${maskLiteral}\`;`);
