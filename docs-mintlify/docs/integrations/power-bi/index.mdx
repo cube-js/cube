@@ -43,20 +43,17 @@ Cube Cloud supports the following authentication methods for Power BI:
 
 ### Connection methods
 
-Power BI provides [three methods][link-powerbi-connection] to connect to data
-sources: _live connection_, _DirectQuery_, and _import mode_.
+Cube uses Power BI's [_live connection_][link-powerbi-live] mode. You compose
+queries using the Power BI UI, and they run against your Cube semantic model in
+real time, so you always work with up-to-date data and an up-to-date model.
 
-| | Live connection | DirectQuery | <nobr>Import mode</nobr> |
-| --- | --- | --- | --- |
-| Data location | 🟢 Data source | 🟢 Data source | 🟡 Power BI |
-| Data freshness | 🟢 Real-time data | 🟢 Real-time data | 🟡 Stale copy |
-| Semantic model | <nobr>🟢 Up-to-date model</nobr> | 🟡 Stale copy | 🟡 Stale copy |
-| Queries | <nobr>🟢 Composed in UI</nobr><br/><nobr>🔴 No custom queries</nobr> | <nobr>🟢 Composed in UI</nobr><br/><nobr>🟢 Custom queries</nobr> | <nobr>🟢 Composed in UI</nobr><br/><nobr>🟢 Custom queries</nobr> |
+<Warning>
 
-__It's recommended to use a _live connection_ whenever possible.__ Use _DirectQuery_
-if you need to write your own DAX queries, but be aware that you must manually
-synchronize semantic models as they evolve. _Import mode_ is not recommended, as
-it removes the benefits of using a semantic layer.
+Power BI's other connection methods, [_DirectQuery_][link-powerbi-directquery]
+and _import mode_, are not supported. Because writing your own DAX queries
+requires _DirectQuery_, custom DAX queries are not supported either.
+
+</Warning>
 
 ## Connect to the SQL API
 
@@ -75,5 +72,6 @@ than the DAX API. However, this is the only option when using Cube Core.
 [ref-kerberos]: /docs/integrations/power-bi/kerberos
 [ref-ntlm]: /docs/integrations/power-bi/ntlm
 [ref-ntlm-desktop]: /docs/integrations/power-bi/ntlm#power-bi-desktop
-[link-powerbi-connection]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-live-connect-dq-datasets
+[link-powerbi-live]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-directquery-about#live-connections
+[link-powerbi-directquery]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-directquery-about
 [ref-opdg]: /docs/integrations/power-bi/ntlm#configuration
