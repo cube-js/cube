@@ -1,4 +1,4 @@
-import { PrestoDriver } from '../src/PrestoDriver';
+import { PrestoDriver } from '../../src/PrestoDriver';
 
 const path = require('path');
 const { DockerComposeEnvironment, Wait } = require('testcontainers');
@@ -37,7 +37,7 @@ describe('PrestoHouseDriver', () => {
     }
 
     const dc = new DockerComposeEnvironment(
-      path.resolve(path.dirname(__filename), '../../'),
+      path.resolve(path.dirname(__filename), '../../../'),
       'docker-compose.yml'
     );
 

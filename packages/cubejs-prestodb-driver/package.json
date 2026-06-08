@@ -21,15 +21,16 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "jest dist/test",
-    "integration:presto": "jest dist/test",
+    "unit": "jest dist/test/unit",
+    "integration": "jest dist/test/integration",
+    "integration:presto": "jest dist/test/integration",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.6.55",
     "@cubejs-backend/shared": "1.6.55",
-    "presto-client": "^1.2.0",
+    "presto-client": "1.2.0",
     "ramda": "^0.27.0",
     "sqlstring": "^2.3.1"
   },
