@@ -409,6 +409,10 @@ pub trait ConfigObj: DIService {
 
     fn query_timeout(&self) -> u64;
 
+    /// Maximum number of rows a single query plan node may materialize in memory. Zero means no
+    /// limit.
+    fn materialized_rows_limit(&self) -> usize;
+
     fn not_used_timeout(&self) -> u64;
 
     fn in_memory_not_used_timeout(&self) -> u64;
@@ -595,6 +599,7 @@ pub struct ConfigObjImpl {
     pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
     pub query_timeout: u64,
+    pub materialized_rows_limit: usize,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
     pub in_memory_not_used_timeout: u64,
@@ -770,6 +775,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn query_timeout(&self) -> u64 {
         self.query_timeout
+    }
+
+    fn materialized_rows_limit(&self) -> usize {
+        self.materialized_rows_limit
     }
 
     fn not_used_timeout(&self) -> u64 {
@@ -1240,6 +1249,8 @@ impl Config {
 
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
+        let partition_split_threshold =
+            env_parse("CUBESTORE_PARTITION_SPLIT_THRESHOLD", 1048576 * 2);
         let query_cache_stale_while_revalidate_secs: u64 =
             env_parse("CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE", 0);
         let query_cache_time_to_idle_secs = env_parse(
@@ -1289,10 +1300,7 @@ impl Config {
                 dump_dir: env::var("CUBESTORE_DUMP_DIR")
                     .ok()
                     .map(|v| PathBuf::from(v)),
-                partition_split_threshold: env_parse(
-                    "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
-                    1048576 * 2,
-                ),
+                partition_split_threshold,
                 partition_size_split_threshold_bytes: env_parse_size(
                     "CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD",
                     100 * 1024 * 1024,
@@ -1392,6 +1400,12 @@ impl Config {
                     format!("0.0.0.0:{}", env_parse("CUBESTORE_HTTP_PORT", 3030)),
                 )),
                 query_timeout,
+                // A single plan node should not materialize more than one partition's worth of
+                // rows.
+                materialized_rows_limit: env_parse(
+                    "CUBESTORE_MATERIALIZED_ROWS_LIMIT",
+                    partition_split_threshold as usize,
+                ),
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
@@ -1709,6 +1723,7 @@ impl Config {
                 status_bind_address: None,
                 http_bind_address: None,
                 query_timeout,
+                materialized_rows_limit: 500_000,
                 not_used_timeout: 2 * query_timeout,
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
@@ -2444,6 +2459,7 @@ impl Config {
                         .await
                         .cache_factory()
                         .clone(),
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                 )

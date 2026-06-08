@@ -225,6 +225,7 @@ pub struct QueryExecutorImpl {
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     memory_handler: Arc<dyn MemoryHandler>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
@@ -545,11 +546,13 @@ impl QueryExecutorImpl {
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
         parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
         memory_handler: Arc<dyn MemoryHandler>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(QueryExecutorImpl {
             metadata_cache_factory,
             parquet_metadata_cache,
             memory_handler,
+            config_obj,
         })
     }
 
@@ -563,6 +566,7 @@ impl QueryExecutorImpl {
             cluster,
             serialized_plan,
             self.memory_handler.clone(),
+            self.config_obj.materialized_rows_limit(),
         ))
     }
 
@@ -578,6 +582,7 @@ impl QueryExecutorImpl {
             worker_planning_params,
             self.memory_handler.clone(),
             data_loaded_size.clone(),
+            self.config_obj.materialized_rows_limit(),
         ))
     }
 

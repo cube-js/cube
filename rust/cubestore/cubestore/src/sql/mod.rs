@@ -2751,6 +2751,106 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn materialized_rows_limit() -> Result<(), CubeError> {
+        Config::test("materialized_rows_limit")
+            .update_config(|mut c| {
+                c.materialized_rows_limit = 4;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+                let _ = service
+                    .exec_query("CREATE TABLE foo.values (id int)")
+                    .await?
+                    .collect()
+                    .await?;
+                let _ = service
+                    .exec_query("INSERT INTO foo.values (id) VALUES (1), (2), (3), (4), (5), (6)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let result = service
+                    .exec_query("SELECT id FROM foo.values WHERE id <= 3")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(result.get_rows().len(), 3);
+
+                let expect_limit_error = async |query: &str, stage: &str| {
+                    let res = async { service.exec_query(query).await?.collect().await }.await;
+                    let err = res.expect_err("query must exceed the materialized rows limit");
+                    let message = err.to_string();
+                    assert!(message.contains(&format!("'{}'", stage)), "{}", message);
+                    assert!(message.contains("limit of 4 rows"), "{}", message);
+                    assert!(message.contains("pre-aggregation"), "{}", message);
+                };
+
+                expect_limit_error("SELECT id FROM foo.values", "worker result").await;
+                expect_limit_error(
+                    "SELECT id % 100, count(*) FROM foo.values GROUP BY 1",
+                    "aggregation groups",
+                )
+                .await;
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn materialized_rows_limit_plan() -> Result<(), CubeError> {
+        Config::test("materialized_rows_limit_plan")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+                let _ = service
+                    .exec_query("CREATE TABLE foo.values (id int)")
+                    .await?
+                    .collect()
+                    .await?;
+                let _ = service
+                    .exec_query("INSERT INTO foo.values (id) VALUES (1), (2), (3)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let mut opts = PPOptions::default();
+                opts.show_materialized_rows_limit_nodes = true;
+
+                let plans = service
+                    .plan_query("SELECT id % 100, count(*) FROM foo.values GROUP BY 1")
+                    .await?;
+                let worker = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
+                assert!(worker.contains("stage: aggregation groups"), "{}", worker);
+                assert!(worker.contains("stage: worker result"), "{}", worker);
+
+                let plans = service
+                    .plan_query("SELECT id FROM foo.values ORDER BY id % 100")
+                    .await?;
+                let router = pp_phys_plan_ext(plans.router.as_ref(), &opts);
+                assert!(router.contains("stage: sort input"), "{}", router);
+                assert!(router.contains("stage: query result"), "{}", router);
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn int96_read() -> Result<(), CubeError> {
         // Copy pre-DF store.
         let fixtures_path = env::current_dir()

@@ -2,12 +2,14 @@ mod check_memory;
 mod distributed_partial_aggregate;
 mod inline_aggregate_rewriter;
 pub mod is_not_distinct_from_join_keys;
+mod materialized_rows_limit;
 pub mod rewrite_plan;
 pub mod rolling_optimizer;
 mod trace_data_loaded;
 
 use super::serialized_plan::PreSerializedPlan;
 use crate::cluster::{Cluster, WorkerPlanningParams};
+use crate::queryplanner::materialized_rows_limit::MaterializedRowsLimitExec;
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
     replace_suboptimal_merge_sorts,
@@ -29,6 +31,7 @@ use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_planner::{DefaultPhysicalPlanner, PhysicalPlanner};
 use distributed_partial_aggregate::ensure_partition_merge_with_acceptable_parent;
+use materialized_rows_limit::add_materialized_rows_limit_exec;
 use rewrite_plan::rewrite_physical_plan;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -42,6 +45,8 @@ pub struct CubeQueryPlanner {
     serialized_plan: Arc<PreSerializedPlan>,
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
+    /// Zero means no limit.
+    materialized_rows_limit: usize,
 }
 
 impl CubeQueryPlanner {
@@ -49,6 +54,7 @@ impl CubeQueryPlanner {
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<PreSerializedPlan>,
         memory_handler: Arc<dyn MemoryHandler>,
+        materialized_rows_limit: usize,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             cluster: Some(cluster),
@@ -56,6 +62,7 @@ impl CubeQueryPlanner {
             serialized_plan,
             memory_handler,
             data_loaded_size: None,
+            materialized_rows_limit,
         }
     }
 
@@ -64,6 +71,7 @@ impl CubeQueryPlanner {
         worker_planning_params: WorkerPlanningParams,
         memory_handler: Arc<dyn MemoryHandler>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
+        materialized_rows_limit: usize,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             serialized_plan,
@@ -71,6 +79,7 @@ impl CubeQueryPlanner {
             worker_partition_count: Some(worker_planning_params),
             memory_handler,
             data_loaded_size,
+            materialized_rows_limit,
         }
     }
 }
@@ -103,6 +112,8 @@ impl QueryPlanner for CubeQueryPlanner {
             self.memory_handler.clone(),
             self.data_loaded_size.clone(),
             ctx_state.config().options(),
+            self.materialized_rows_limit,
+            self.cluster.is_some(),
         );
         result
     }
@@ -157,6 +168,8 @@ fn finalize_physical_plan(
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
     config: &ConfigOptions,
+    materialized_rows_limit: usize,
+    is_router: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| add_check_memory_exec(p, memory_handler.clone()))?;
     log::trace!(
@@ -182,5 +195,23 @@ fn finalize_physical_plan(
         "Rewrote physical plan by replace_suboptimal_merge_sorts:\n{}",
         pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
     );
+    let p = if materialized_rows_limit > 0 {
+        let p = rewrite_physical_plan(p, &mut |p| {
+            add_materialized_rows_limit_exec(p, materialized_rows_limit)
+        })?;
+        // The router collects the final query result in memory.
+        let p = if is_router && !p.as_any().is::<MaterializedRowsLimitExec>() {
+            materialized_rows_limit::wrap(p, materialized_rows_limit, "query result")
+        } else {
+            p
+        };
+        log::trace!(
+            "Rewrote physical plan by add_materialized_rows_limit_exec:\n{}",
+            pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
+        );
+        p
+    } else {
+        p
+    };
     Ok(p)
 }
