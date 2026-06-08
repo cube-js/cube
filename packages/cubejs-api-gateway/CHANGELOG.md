@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.3](https://github.com/cube-js/cube/compare/v1.4.2...v1.4.3) (2026-06-08)
+
+### Bug Fixes
+
+- **api-gateway:** Accept `cache` parameter in WebSocket requests, fix [#10451](https://github.com/cube-js/cube/issues/10451) ([#10453](https://github.com/cube-js/cube/issues/10453)) ([f1c9b7c](https://github.com/cube-js/cube/commit/f1c9b7cfe3065c175fc1dbd5eaf2e4c58bfc4529))
+- Improve subscription ID handling and connection management, thanks @H31nz3l ([#10485](https://github.com/cube-js/cube/issues/10485)) ([6d7bbe5](https://github.com/cube-js/cube/commit/6d7bbe59b3a8d9f7732234b5369325284d2e285a))
+
 ## [1.4.2](https://github.com/cube-js/cube/compare/v1.4.1...v1.4.2) (2025-12-16)
 
 ### Bug Fixes

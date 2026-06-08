@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.3](https://github.com/cube-js/cube/compare/v1.4.2...v1.4.3) (2026-06-08)
+
+### Bug Fixes
+
+- **native:** Don't fail deserializing JS numbers above u64/i64 range ([#11033](https://github.com/cube-js/cube/issues/11033)) ([efcfe89](https://github.com/cube-js/cube/commit/efcfe8989e47f5bb1dc408d643e2e6b91409042e))
+
 ## [1.4.2](https://github.com/cube-js/cube/compare/v1.4.1...v1.4.2) (2025-12-16)
 
 **Note:** Version bump only for package @cubejs-backend/native
