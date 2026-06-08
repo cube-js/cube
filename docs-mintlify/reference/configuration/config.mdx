@@ -360,6 +360,47 @@ module.exports = {
 
 </CodeGroup>
 
+### `context_to_cube_store_router_id`
+
+`context_to_cube_store_router_id` is a function used to determine which Cube Store
+router a request is routed to. It returns a string id that is used as a routing
+key: requests that resolve to the same id share the same Cube Store router, while
+distinct ids are routed to separate routers.
+
+This is only relevant for deployments running multiple Cube Store routers (for
+example, when [tenants][ref-multitenancy] are partitioned across routers to
+isolate their pre-aggregation storage and query load). By default this function
+is not set, and all requests use the same Cube Store router.
+
+<Warning>
+
+`context_to_cube_store_router_id` requires
+[`context_to_orchestrator_id`][self-orchestrator-id] to also be defined.
+
+</Warning>
+
+Called on each request.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('context_to_cube_store_router_id')
+def context_to_cube_store_router_id(ctx: dict) -> str:
+  return f"CUBE_ROUTER_{ctx['securityContext']['tenant_id']}"
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  contextToCubeStoreRouterId: ({ securityContext }) => {
+    return `CUBE_ROUTER_${securityContext.tenant_id}`
+  }
+}
+```
+
+</CodeGroup>
+
 ### `driver_factory`
 
 A function to provide a custom configuration for the data source driver.
