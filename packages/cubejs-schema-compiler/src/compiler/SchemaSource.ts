@@ -38,12 +38,7 @@ export class SchemaSource {
       return dim;
     }
     const wrapped = Object.create(dim);
-    wrapped.granularities = Object.entries(dim.granularities).map(([name, gran]: [string, any]) => {
-      if (gran.name === undefined) {
-        gran.name = name;
-      }
-      return gran;
-    });
+    wrapped.granularities = Object.entries(dim.granularities).map(([name, gran]: [string, any]) => ({ name, ...gran }));
     return wrapped;
   }
 
@@ -52,12 +47,7 @@ export class SchemaSource {
       return preAgg;
     }
     const wrapped = Object.create(preAgg);
-    wrapped.indexes = Object.entries(preAgg.indexes).map(([name, idx]: [string, any]) => {
-      if (idx.name === undefined) {
-        idx.name = name;
-      }
-      return idx;
-    });
+    wrapped.indexes = Object.entries(preAgg.indexes).map(([name, idx]: [string, any]) => ({ name, ...idx }));
     return wrapped;
   }
 }

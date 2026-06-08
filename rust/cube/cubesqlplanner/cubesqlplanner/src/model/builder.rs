@@ -346,11 +346,11 @@ impl SchemaModelBuilder {
                     .map(|item| -> Result<CaseWhen, CubeError> {
                         Ok(CaseWhen {
                             sql: Expression::new(item.sql()?),
-                            label: Self::build_case_label(item.label()?),
+                            label: Self::build_case_label(item.label()?)?,
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                let else_label = Some(Self::build_case_label(def.else_label()?.label()?));
+                let else_label = Some(Self::build_case_label(def.else_label()?.label()?)?);
                 Ok(ModelCaseVariant::Predicate(Case { when, else_label }))
             }
             BridgeCaseVariant::CaseSwitch(def) => {
@@ -375,18 +375,13 @@ impl SchemaModelBuilder {
         }
     }
 
-    fn build_case_label(label: StringOrSql) -> CaseLabel {
+    fn build_case_label(label: StringOrSql) -> Result<CaseLabel, CubeError> {
         match label {
-            StringOrSql::String(s) => CaseLabel::String(s),
+            StringOrSql::String(s) => Ok(CaseLabel::String(s)),
             StringOrSql::MemberSql(member) => {
                 // StructWithSqlMember holds a `sql` callable behind another
-                // trait — surface it as Expression. This swallows the
-                // `sql()` Result; we'd rather fail at build time, but the
-                // bridge surface returns it eagerly.
-                match member.sql() {
-                    Ok(sql) => CaseLabel::Sql(Expression::new(sql)),
-                    Err(_) => CaseLabel::String(String::new()),
-                }
+                // trait — surface it as Expression.
+                Ok(CaseLabel::Sql(Expression::new(member.sql()?)))
             }
         }
     }
