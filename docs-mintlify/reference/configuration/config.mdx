@@ -372,6 +372,13 @@ example, when [tenants][ref-multitenancy] are partitioned across routers to
 isolate their pre-aggregation storage and query load). By default this function
 is not set, and all requests use the same Cube Store router.
 
+<Warning>
+
+`context_to_cube_store_router_id` requires
+[`context_to_orchestrator_id`][self-orchestrator-id] to also be defined.
+
+</Warning>
+
 Called on each request.
 
 <CodeGroup>
