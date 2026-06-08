@@ -144,11 +144,32 @@ impl TypedFilterBuilder {
         self
     }
 
+    fn measure_filter_param_type(measure_type: &str) -> &str {
+        match measure_type {
+            "count"
+            | "sum"
+            | "avg"
+            | "min"
+            | "max"
+            | "countDistinct"
+            | "countDistinctApprox"
+            | "count_distinct"
+            | "count_distinct_approx"
+            | "numberAgg"
+            | "number_agg"
+            | "runningTotal"
+            | "running_total" => "number",
+            _ => measure_type,
+        }
+    }
+
     fn resolve_member_type(member_evaluator: &Rc<MemberSymbol>) -> Option<String> {
         let symbol = resolve_base_symbol(member_evaluator);
         match symbol.as_ref() {
             MemberSymbol::Dimension(d) => Some(d.dimension_type().to_string()),
-            MemberSymbol::Measure(m) => Some(m.measure_type().to_string()),
+            MemberSymbol::Measure(m) => {
+                Some(Self::measure_filter_param_type(m.measure_type()).to_string())
+            }
             _ => None,
         }
     }

@@ -325,6 +325,34 @@ fn test_lte_string_no_cast() {
 }
 
 #[test]
+fn test_sum_measure_filter_casts_numeric() {
+    let result = build(indoc! {"
+        filters:
+          - member: visitors.total_revenue
+            operator: lt
+            values:
+              - \"100\"
+    "});
+    assert_filter(
+        &result,
+        r#"(sum("visitors".revenue) < $_0_$::numeric)"#,
+        &["100"],
+    );
+}
+
+#[test]
+fn test_count_measure_filter_casts_numeric() {
+    let result = build(indoc! {"
+        filters:
+          - member: visitors.count
+            operator: equals
+            values:
+              - \"4\"
+    "});
+    assert_filter(&result, r#"(count(COUNT(*)) = $_0_$::numeric)"#, &["4"]);
+}
+
+#[test]
 fn test_contains_filter() {
     let result = build(indoc! {"
         filters:
