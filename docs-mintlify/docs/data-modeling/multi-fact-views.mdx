@@ -395,6 +395,12 @@ planner expresses it as a filtered cross join), so both sides must share a key;
 both truncated columns must resolve to the same underlying time member at the
 same granularity.
 
+The join-key granularity must match the `GROUP BY` granularity, because the
+facts are stitched together at the grain you group by. Joining on
+`DATE_TRUNC('month', …)` while grouping by `DATE_TRUNC('day', …)` is not merged
+(it would silently stitch at day grain, diverging from the month-grain join) and
+falls back to standard handling.
+
 You can also combine a `DATE_TRUNC` equality with a plain dimension equality in
 the same join (a composite key), and group by both:
 

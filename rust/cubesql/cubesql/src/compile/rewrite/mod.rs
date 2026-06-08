@@ -544,12 +544,14 @@ crate::plan_to_language! {
         // Intermediate node produced while merging a join of two (view)
         // CubeScans on a shared cube member into a single multi-fact CubeScan.
         // `input` is the merged CubeScan; `join_members` holds the underlying
-        // cube members the scans were joined on, so the aggregate finalize rule
-        // can verify the GROUP BY matches the join key. Rewrite-only: it must be
+        // cube members the scans were joined on, each paired with the join-key
+        // granularity (`Some` for a `DATE_TRUNC` time key, `None` for a plain
+        // dimension), so the aggregate finalize rule can verify the GROUP BY
+        // matches the join key at the same grain. Rewrite-only: it must be
         // eliminated (unwrapped at the aggregate) before extraction.
         MultiFactJoinWrapper {
             input: Arc<LogicalPlan>,
-            join_members: Vec<String>,
+            join_members: Vec<(String, Option<String>)>,
         },
     }
 }

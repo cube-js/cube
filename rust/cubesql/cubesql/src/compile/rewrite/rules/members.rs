@@ -42,7 +42,7 @@ use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
     arrow::datatypes::DataType,
     logical_plan::{Column, DFSchema, Expr, Operator},
-    physical_plan::aggregates::AggregateFunction,
+    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
 };
 use egg::{Id, Subst, Var};
@@ -3373,9 +3373,9 @@ impl MemberRules {
 
             // The join key as underlying cube members, unioned with any keys
             // already recorded on the left wrapper (for chained 3+ view joins).
-            let mut join_member_names: Vec<String> = shared_left_keys
+            let mut join_member_names: Vec<(String, Option<String>)> = shared_left_keys
                 .iter()
-                .map(|k| resolve_underlying(k))
+                .map(|k| (resolve_underlying(k), None))
                 .collect();
             if let Some(prev_var) = prev_join_members_var {
                 if let Some(prev) =
@@ -3601,7 +3601,10 @@ impl MemberRules {
 
             // A filtered cross join is an INNER join: require both keys present.
             let presence_members: Vec<String> = vec![left_key.clone(), right_key.clone()];
-            let mut join_member_names: Vec<String> = vec![resolve_underlying(&left_key)];
+            let mut join_member_names: Vec<(String, Option<String>)> = vec![(
+                resolve_underlying(&left_key),
+                Some(left_granularity.clone()),
+            )];
             join_member_names.sort();
             join_member_names.dedup();
 
@@ -3777,7 +3780,10 @@ impl MemberRules {
 
             // Time key recorded for the GROUP BY check at finalize, unioned with
             // the keys already on the wrapper.
-            let mut join_member_names: Vec<String> = vec![resolve_underlying(&left_key)];
+            let mut join_member_names: Vec<(String, Option<String>)> = vec![(
+                resolve_underlying(&left_key),
+                Some(left_granularity.clone()),
+            )];
             if let Some(prev) = var_iter!(
                 egraph[subst[prev_join_members_var]],
                 MultiFactJoinWrapperJoinMembers
@@ -3855,7 +3861,7 @@ impl MemberRules {
                     .unwrap_or_else(|| member_name.to_string())
             };
 
-            let join_members: Vec<String> = match var_iter!(
+            let join_members: Vec<(String, Option<String>)> = match var_iter!(
                 egraph[subst[join_members_var]],
                 MultiFactJoinWrapperJoinMembers
             )
@@ -3867,39 +3873,62 @@ impl MemberRules {
             if join_members.is_empty() {
                 return false;
             }
-            let join_set: HashSet<String> = join_members.into_iter().collect();
+            let join_set: HashSet<(String, Option<String>)> = join_members.into_iter().collect();
 
-            let group_exprs = match &egraph.index(subst[group_expr_var]).data.referenced_expr {
-                Some(exprs) => exprs.clone(),
-                None => return false,
-            };
-            if group_exprs.is_empty() {
+            // The actual GROUP BY expressions (with their full structure, so a
+            // `DATE_TRUNC(g, col)` keeps its granularity). `referenced_expr`
+            // can't be used here because it collapses a wrapped expression to
+            // its inner column and would drop the grain.
+            let group_child_ids: Vec<Id> =
+                match var_list_iter!(egraph[subst[group_expr_var]], AggregateGroupExpr).next() {
+                    Some(ids) => ids.clone(),
+                    None => return false,
+                };
+            if group_child_ids.is_empty() {
                 return false;
             }
 
-            // Every GROUP BY expression must reference a dimension of the merged
-            // scan whose underlying cube member is part of the recorded join key.
-            // `group_exprs` comes from `referenced_expr`, which collapses a
-            // wrapped expression to the column(s) it references, so a time-grain
-            // group-by such as `DATE_TRUNC('day', c.created_at)` is matched via
-            // its inner `created_at` column. An expression that references no
-            // column (or more/other columns than the join key) won't match, so
-            // the wrapper is left in place and the query falls back to standard
-            // join handling.
-            let mut group_underlying: HashSet<String> = HashSet::new();
-            for expr in &group_exprs {
-                let Expr::Column(column) = expr else {
-                    return false;
-                };
-                let Some(member_name) = dimension_member_name(egraph, subst[scan_var], column)
+            // Every GROUP BY expression must be either a plain dimension column
+            // (no granularity) or a `DATE_TRUNC(g, col)` over one, and the
+            // resulting (underlying member, granularity) pair must be part of
+            // the recorded join key. A join on `DATE_TRUNC('month', ...)` paired
+            // with `GROUP BY DATE_TRUNC('day', ...)` therefore won't merge: the
+            // multi-fact stitch happens at the GROUP BY grain, which must match
+            // the grain the user joined on.
+            let mut group_set: HashSet<(String, Option<String>)> = HashSet::new();
+            for child_id in &group_child_ids {
+                let Some(OriginalExpr::Expr(expr)) = egraph[*child_id].data.original_expr.clone()
                 else {
                     return false;
                 };
-                group_underlying.insert(resolve_underlying(&member_name));
+                let (column, granularity) = match &expr {
+                    Expr::Column(col) => (col.clone(), None),
+                    Expr::ScalarFunction {
+                        fun: BuiltinScalarFunction::DateTrunc,
+                        args,
+                    } if args.len() == 2 => {
+                        let Expr::Literal(scalar) = &args[0] else {
+                            return false;
+                        };
+                        let Some(granularity) = utils::parse_granularity(scalar, false) else {
+                            return false;
+                        };
+                        let Expr::Column(col) = &args[1] else {
+                            return false;
+                        };
+                        (col.clone(), Some(granularity))
+                    }
+                    _ => return false,
+                };
+                let Some(member_name) = dimension_member_name(egraph, subst[scan_var], &column)
+                else {
+                    return false;
+                };
+                group_set.insert((resolve_underlying(&member_name), granularity));
             }
 
-            // GROUP BY must match the join key exactly.
-            group_underlying == join_set
+            // GROUP BY must match the join key exactly, member and grain.
+            group_set == join_set
         }
     }
 

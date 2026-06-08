@@ -646,49 +646,43 @@ async fn test_group_by_left_join_three_views_presence_filters() {
     )
 }
 
-/// Joining two views on a raw shared time column and grouping by
-/// `DATE_TRUNC('day', ...)` merges into a single multi-fact CubeScan with the
-/// grouped column emitted as a `timeDimensions` entry (granularity `day`).
+/// The join-key granularity must match the GROUP BY granularity: the multi-fact
+/// stitch happens at the GROUP BY grain, so joining on `DATE_TRUNC('month', ...)`
+/// while grouping by `DATE_TRUNC('day', ...)` must not merge (it would silently
+/// stitch at day grain, diverging from the month-grain join).
 #[tokio::test]
-async fn test_left_join_raw_time_group_by_date_trunc() {
+async fn test_join_date_trunc_granularity_mismatch_is_not_merged() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
     init_testing_logger();
 
-    let logical_plan = plan_view_join(
+    let request = plan_view_join(
         r#"
             SELECT DATE_TRUNC('day', c.created_at), measure(o.revenue)
             FROM customers_view c
-            LEFT JOIN orders_view o ON o.created_at = c.created_at
+            JOIN orders_view o
+                ON DATE_TRUNC('month', o.created_at) = DATE_TRUNC('month', c.created_at)
             GROUP BY 1
             "#,
         true,
     )
     .await
     .unwrap()
-    .as_logical_plan();
+    .as_logical_plan()
+    .find_cube_scan()
+    .request;
 
+    // The merge did not happen: rather than a single grouped multi-fact scan,
+    // the query falls back to the raw ungrouped cross-join scan (pushed to the
+    // cube as SQL), so the measure is not pushed and the scan stays ungrouped.
     assert_eq!(
-        logical_plan.find_cube_scan().request,
-        V1LoadRequestQuery {
-            measures: Some(vec!["orders_view.revenue".to_string()]),
-            dimensions: Some(vec![]),
-            segments: Some(vec![]),
-            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                dimension: "customers_view.created_at".to_string(),
-                granularity: Some("day".to_string()),
-                date_range: None,
-            }]),
-            order: Some(vec![]),
-            filters: Some(vec![set_filter("customers_view.created_at")]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
-            ..Default::default()
-        }
-    )
+        request.ungrouped,
+        Some(true),
+        "expected month-grain join with day-grain GROUP BY not to merge, got: {:?}",
+        request
+    );
+    assert_eq!(request.measures, Some(vec![]), "got: {:?}", request);
 }
 
 /// Joining two views directly on `DATE_TRUNC('day', ...)` (which the SQL planner
