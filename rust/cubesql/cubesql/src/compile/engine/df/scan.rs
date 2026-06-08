@@ -305,7 +305,9 @@ pub enum FieldValue<'a> {
     // because V8 uses UTF-16 It allocates/converts a new strings while doing JsString.value()
     // @see v8 WriteUtf8 for more details. Cow::Owned is used for this variant
     String(Cow<'a, str>),
-    Number(f64),
+    Int64(i64),
+    UInt64(u64),
+    Float64(f64),
     Bool(bool),
     Null,
 }
@@ -345,9 +347,28 @@ impl JsonValueObject {
 fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_>, CubeError> {
     Ok(match value {
         Value::String(s) => FieldValue::String(Cow::Borrowed(s)),
-        Value::Number(n) => FieldValue::Number(n.as_f64().ok_or_else(|| {
-            DataFusionError::Execution(format!("Can't convert {:?} to float", n))
-        })?),
+        Value::Number(n) => {
+            if n.is_f64() {
+                return n
+                    .as_f64()
+                    .map(|v| FieldValue::Float64(v))
+                    .ok_or(CubeError::user(format!(
+                        "Can't convert number {:?} to FieldValue::Float64",
+                        n
+                    )));
+            };
+
+            if let Some(i) = n.as_i64() {
+                FieldValue::Int64(i)
+            } else if let Some(u) = n.as_u64() {
+                FieldValue::UInt64(u)
+            } else {
+                return Err(CubeError::user(format!(
+                    "Can't convert number: {:?} to FieldValue",
+                    n
+                )));
+            }
+        }
         Value::Bool(b) => FieldValue::Bool(*b),
         Value::Null => FieldValue::Null,
         x => {
@@ -918,7 +939,9 @@ macro_rules! transform_response_body {
                         {
                             (FieldValue::String(v), builder) => builder.append_value(v)?,
                             (FieldValue::Bool(v), builder) => builder.append_value(if v { "true" } else { "false" })?,
-                            (FieldValue::Number(v), builder) => builder.append_value(v.to_string())?,
+                            (FieldValue::Int64(v), builder) => builder.append_value(v.to_string())?,
+                            (FieldValue::UInt64(v), builder) => builder.append_value(v.to_string())?,
+                            (FieldValue::Float64(v), builder) => builder.append_value(v.to_string())?,
                         },
                         {
                             (ScalarValue::Utf8(v), builder) => builder.append_option(v.as_ref())?,
@@ -933,7 +956,9 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
+                            (FieldValue::Int64(number), builder) => builder.append_value(number as i16)?,
+                            (FieldValue::UInt64(number), builder) => builder.append_value(number as i16)?,
+                            (FieldValue::Float64(number), builder) => builder.append_value(number.round() as i16)?,
                             (FieldValue::String(s), builder) => match s.parse::<i16>() {
                                 Ok(v) => builder.append_value(v)?,
                                 Err(error) => {
@@ -959,7 +984,9 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32)?,
+                            (FieldValue::Int64(number), builder) => builder.append_value(number as i32)?,
+                            (FieldValue::UInt64(number), builder) => builder.append_value(number as i32)?,
+                            (FieldValue::Float64(number), builder) => builder.append_value(number.round() as i32)?,
                             (FieldValue::String(s), builder) => match s.parse::<i32>() {
                                 Ok(v) => builder.append_value(v)?,
                                 Err(error) => {
@@ -985,7 +1012,9 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64)?,
+                            (FieldValue::Int64(number), builder) => builder.append_value(number)?,
+                            (FieldValue::UInt64(number), builder) => builder.append_value(number as i64)?,
+                            (FieldValue::Float64(number), builder) => builder.append_value(number.round() as i64)?,
                             (FieldValue::String(s), builder)  => match s.parse::<i64>() {
                                 Ok(v) => builder.append_value(v)?,
                                 Err(error) => {
@@ -1011,7 +1040,9 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
+                            (FieldValue::Int64(number), builder) => builder.append_value(number as f32)?,
+                            (FieldValue::UInt64(number), builder) => builder.append_value(number as f32)?,
+                            (FieldValue::Float64(number), builder) => builder.append_value(number as f32)?,
                             (FieldValue::String(s), builder) => match s.parse::<f32>() {
                                 Ok(v) => builder.append_value(v)?,
                                 Err(error) => {
@@ -1037,7 +1068,9 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number)?,
+                            (FieldValue::Int64(number), builder) => builder.append_value(number as f64)?,
+                            (FieldValue::UInt64(number), builder) => builder.append_value(number as f64)?,
+                            (FieldValue::Float64(number), builder) => builder.append_value(number)?,
                             (FieldValue::String(s), builder) => match s.parse::<f64>() {
                                 Ok(v) => builder.append_value(v)?,
                                 Err(error) => {

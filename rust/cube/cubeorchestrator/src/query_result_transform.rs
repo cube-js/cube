@@ -1152,14 +1152,38 @@ pub struct RequestResultArray {
     pub results: Vec<RequestResultData>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DBResponsePrimitive {
     Null,
     Boolean(bool),
-    Number(f64),
+    Int64(i64),
+    UInt64(u64),
+    Float64(f64),
+    /// 128-bit integers that don't fit into `i64`/`u64`. Kept as their decimal
+    /// string form to avoid precision loss and to stay safe for JSON/JS consumers
+    /// (which can't represent integers beyond 2^53). Serialized as a JSON string.
+    Int128(String),
+    UInt128(String),
     String(String),
     Uncommon(Value),
+}
+
+// Hand-written `Serialize`. Numeric variants (`Int64`/`UInt64`/`Float64`) are
+// rendered as JSON strings, not numbers.
+impl Serialize for DBResponsePrimitive {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            DBResponsePrimitive::Null => serializer.serialize_none(),
+            DBResponsePrimitive::Boolean(b) => serializer.serialize_bool(*b),
+            DBResponsePrimitive::Int64(n) => serializer.collect_str(n),
+            DBResponsePrimitive::UInt64(n) => serializer.collect_str(n),
+            DBResponsePrimitive::Float64(n) => serializer.collect_str(n),
+            DBResponsePrimitive::Int128(s) => serializer.serialize_str(s),
+            DBResponsePrimitive::UInt128(s) => serializer.serialize_str(s),
+            DBResponsePrimitive::String(s) => serializer.serialize_str(s),
+            DBResponsePrimitive::Uncommon(v) => v.serialize(serializer),
+        }
+    }
 }
 
 // Hand-written `Deserialize` that avoids serde's untagged-enum buffering.
@@ -1182,23 +1206,23 @@ impl<'de> Deserialize<'de> for DBResponsePrimitive {
             }
 
             fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::Int64(v))
             }
 
             fn visit_i128<E: de::Error>(self, v: i128) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::Int128(v.to_string()))
             }
 
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::UInt64(v))
             }
 
             fn visit_u128<E: de::Error>(self, v: u128) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v as f64))
+                Ok(DBResponsePrimitive::UInt128(v.to_string()))
             }
 
             fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
-                Ok(DBResponsePrimitive::Number(v))
+                Ok(DBResponsePrimitive::Float64(v))
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
@@ -1254,7 +1278,11 @@ impl Display for DBResponsePrimitive {
         let str = match self {
             DBResponsePrimitive::Null => "null".to_string(),
             DBResponsePrimitive::Boolean(b) => b.to_string(),
-            DBResponsePrimitive::Number(n) => n.to_string(),
+            DBResponsePrimitive::Int64(n) => n.to_string(),
+            DBResponsePrimitive::UInt64(n) => n.to_string(),
+            DBResponsePrimitive::Float64(n) => n.to_string(),
+            DBResponsePrimitive::Int128(s) => s.clone(),
+            DBResponsePrimitive::UInt128(s) => s.clone(),
             DBResponsePrimitive::String(s) => s.clone(),
             DBResponsePrimitive::Uncommon(v) => {
                 serde_json::to_string(&v).unwrap_or_else(|_| v.to_string())
@@ -1323,6 +1351,116 @@ mod tests {
     use std::{fmt, sync::LazyLock};
 
     type TestSuiteData = HashMap<String, TestData>;
+
+    /// Guards the in-memory size of the per-cell primitive. It is materialized
+    /// once per cell across every parse/transform path, so an accidental growth
+    /// (e.g. a fat new variant) would regress memory and throughput for large
+    /// result sets. Bump this deliberately if the layout must change.
+    #[test]
+    fn test_db_response_primitive_size() {
+        assert_eq!(std::mem::size_of::<DBResponsePrimitive>(), 32);
+    }
+
+    #[test]
+    fn test_numeric_primitives_serialize_as_json_strings() {
+        use serde_json::{json, to_value, Value as JsonValue};
+
+        assert_eq!(to_value(DBResponsePrimitive::Int64(5)).unwrap(), json!("5"));
+        assert_eq!(
+            to_value(DBResponsePrimitive::UInt64(42)).unwrap(),
+            json!("42")
+        );
+        assert_eq!(
+            to_value(DBResponsePrimitive::Float64(2.0)).unwrap(),
+            json!("2")
+        );
+        assert_eq!(
+            to_value(DBResponsePrimitive::Float64(0.6666666666666666)).unwrap(),
+            json!("0.6666666666666666")
+        );
+        assert_eq!(
+            to_value(DBResponsePrimitive::Int128(
+                "170141183460469231731687303715884105727".to_string()
+            ))
+            .unwrap(),
+            json!("170141183460469231731687303715884105727")
+        );
+
+        assert_eq!(
+            to_value(DBResponsePrimitive::Boolean(true)).unwrap(),
+            json!(true)
+        );
+        assert_eq!(
+            to_value(DBResponsePrimitive::Null).unwrap(),
+            JsonValue::Null
+        );
+        assert_eq!(
+            to_value(DBResponsePrimitive::String("x".to_string())).unwrap(),
+            json!("x")
+        );
+    }
+
+    #[test]
+    fn test_from_js_raw_data_parses_numeric_variants() -> Result<()> {
+        use serde_json::{from_value, json};
+
+        let raw: JsRawColumnarData = from_value(json!({
+            "members": ["nonneg", "neg", "float", "mixed"],
+            "columns": [
+                [0, 1, u64::MAX],
+                [-1, -42, i64::MIN],
+                [1.5, 2.0, 0.6666666666666666],
+                ["text", true, null],
+            ],
+        }))?;
+
+        let result = QueryResult::from_js_raw_data(raw)?;
+
+        assert_eq!(result.row_count(), 3);
+        assert_eq!(
+            result.members().to_vec(),
+            vec!["nonneg", "neg", "float", "mixed"]
+        );
+
+        // Non-negative integers -> UInt64, including u64::MAX.
+        assert_eq!(
+            result.column(0)?.as_slice(),
+            &[
+                DBResponsePrimitive::UInt64(0),
+                DBResponsePrimitive::UInt64(1),
+                DBResponsePrimitive::UInt64(u64::MAX),
+            ]
+        );
+        // Negative integers -> Int64, including i64::MIN.
+        assert_eq!(
+            result.column(1)?.as_slice(),
+            &[
+                DBResponsePrimitive::Int64(-1),
+                DBResponsePrimitive::Int64(-42),
+                DBResponsePrimitive::Int64(i64::MIN),
+            ]
+        );
+        // Fractional values -> Float64 (`2.0` keeps its float token).
+        assert_eq!(
+            result.column(2)?.as_slice(),
+            &[
+                DBResponsePrimitive::Float64(1.5),
+                DBResponsePrimitive::Float64(2.0),
+                DBResponsePrimitive::Float64(0.6666666666666666),
+            ]
+        );
+        // Non-numeric cells pass through.
+        assert_eq!(
+            result.column(3)?.as_slice(),
+            &[
+                DBResponsePrimitive::String("text".to_string()),
+                DBResponsePrimitive::Boolean(true),
+                DBResponsePrimitive::Null,
+            ]
+        );
+
+        Ok(())
+    }
 
     #[derive(Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]

@@ -280,7 +280,7 @@ impl ValueObject for JsValueObject<'_> {
         if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
             Ok(FieldValue::String(Cow::Owned(s.value(&mut self.cx))))
         } else if let Ok(n) = value.downcast::<JsNumber, _>(&mut self.cx) {
-            Ok(FieldValue::Number(n.value(&mut self.cx)))
+            Ok(FieldValue::Float64(n.value(&mut self.cx)))
         } else if let Ok(b) = value.downcast::<JsBoolean, _>(&mut self.cx) {
             Ok(FieldValue::Bool(b.value(&mut self.cx)))
         } else if value.downcast::<JsUndefined, _>(&mut self.cx).is_ok()
