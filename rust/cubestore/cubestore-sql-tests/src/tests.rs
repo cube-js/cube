@@ -319,6 +319,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             queue_result_ack_multiple_with_external_id,
         ),
         t("limit_pushdown_group", limit_pushdown_group),
+        t("limit_pushdown_group_having", limit_pushdown_group_having),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
             "limit_pushdown_group_where_order",
@@ -7651,6 +7652,11 @@ async fn group_by_prefix_limit_high_cardinality(
     // No limit: all the groups
     let r = service.exec_query(&format!("{} ORDER BY 1", query)).await?;
     assert_eq!(to_rows(&r), expected(0..7500));
+
+    // No ORDER BY: the limit still descends (the group key is the index sort prefix), so groups
+    // come out in key order and the first 10 are returned.
+    let r = service.exec_query(&format!("{} LIMIT 10", query)).await?;
+    assert_eq!(to_rows(&r), expected(0..10));
     Ok(())
 }
 
@@ -8892,6 +8898,8 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         )
         .await?;
 
+    // GROUP BY + LIMIT without ORDER BY: the group-by key is a prefix of the index sort key, so
+    // the limit descends to the workers' sorted partial aggregate and groups come out key-ordered.
     let res = assert_limit_pushdown(
         &service,
         "SELECT id, SUM(n) FROM (
@@ -8900,22 +8908,57 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) -> Result<(), CubeErr
                 SELECT * FROM foo.pushdown2
                 ) as `tb` GROUP BY 1 LIMIT 3",
         None,
+        true,
+        false,
+    )
+    .await?;
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
+            Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
+        ]
+    );
+    Ok(())
+}
+
+// A HAVING (a filter above the aggregate) must block the group-by limit pushdown: the worker
+// would truncate to its first `limit` groups before HAVING runs on the router, dropping qualifying
+// groups that sort past the truncation point and undercounting the result.
+async fn limit_pushdown_group_having(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.having (id int, n int)")
+        .await?;
+    // Odd ids sum to 100 (pass HAVING), even ids to 1 (filtered out). The first 3 ids (1, 2, 3)
+    // contain only two passing groups, so a per-worker limit-before-HAVING would return 2 rows.
+    let values = (1..=10).map(|id| format!("({}, {})", id, if id % 2 == 1 { 100 } else { 1 }));
+    service
+        .exec_query(&format!(
+            "INSERT INTO foo.having (id, n) VALUES {}",
+            values.collect::<Vec<_>>().join(", ")
+        ))
+        .await?;
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT id, SUM(n) FROM foo.having GROUP BY 1 HAVING SUM(n) > 50 LIMIT 3",
+        None,
         false,
         false,
     )
     .await?;
 
-    // TODO upgrade DF limit isn't expected and order can't be validated.
-    // TODO But should we keep existing behavior of always sorted output?
-    assert_eq!(res.len(), 3);
-    // assert_eq!(
-    //     res,
-    //     vec![
-    //         Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
-    //         Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
-    //         Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
-    //     ]
-    // );
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(1), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(3), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(5), TableValue::Int(100)]),
+        ]
+    );
     Ok(())
 }
 
