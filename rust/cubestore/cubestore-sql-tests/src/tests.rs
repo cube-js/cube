@@ -258,6 +258,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "global_aggregate_unique_key_keeps_merge",
             global_aggregate_unique_key_keeps_merge,
         ),
+        t("prefilter_chunks_shared_scan", prefilter_chunks_shared_scan),
         t("divide_by_zero", divide_by_zero),
         t(
             "filter_multiple_in_for_decimal",
@@ -7831,7 +7832,6 @@ async fn global_aggregate_unique_key_keeps_merge(
     service
         .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
         .await?;
-
     service
         .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2)")
         .await?;
@@ -7852,6 +7852,37 @@ async fn global_aggregate_unique_key_keeps_merge(
         "the deduplicating merge must stay in place:\n{}",
         worker_plan
     );
+    Ok(())
+}
+
+async fn prefilter_chunks_shared_scan(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
+        .await?;
+
+    service
+        .exec_query(
+            "INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2), (3, 3, 5, 3)",
+        )
+        .await?;
+    // Newer versions of (1, 1) and (3, 3) in another in-memory chunk.
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 30, 4), (3, 3, 50, 5)")
+        .await?;
+
+    // Two scans of the same index over the same in-memory chunks: one carries a dedup-safe
+    // key filter (a = 1), the other none. The worker must not trim the shared chunks by the
+    // first scan's predicate, or the unfiltered branch loses rows. Filtered branch dedups to
+    // (1,1)->30 = 30; unfiltered branch dedups to 30+20+50 = 100; total = 130.
+    let query = "SELECT sum(val) FROM (\
+        SELECT val FROM s.Versions WHERE a = 1 \
+        UNION ALL \
+        SELECT val FROM s.Versions\
+    ) t";
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(130)]));
+
     Ok(())
 }
 

@@ -1085,6 +1085,59 @@ impl SerializedPlan {
         })
     }
 
+    /// In-memory chunks of executable partitions grouped by the proto-encoded pushable
+    /// predicate of their index (from `PlanningMeta::pushable_chunk_filters`). Empty when
+    /// no index carries a pre-filter. The worker uses this to trim chunks before IPC.
+    pub fn in_memory_chunk_filter_groups(&self) -> Vec<(Vec<u8>, Vec<u64>)> {
+        let pushable = &self.planning_meta().pushable_chunk_filters;
+        if pushable.iter().all(|p| p.is_none()) {
+            return Vec::new();
+        }
+
+        let executable = |partition: &PartitionSnapshot| {
+            self.partition_ids_to_execute
+                .binary_search_by_key(&partition.partition.get_id(), |(id, _)| *id)
+                .is_ok()
+        };
+
+        // The subprocess shares in-memory batches by chunk id across scans (a self-join or
+        // self-union of one index yields one snapshot per scan, all pointing at the same
+        // chunks). Trimming a shared chunk in place would corrupt the rows seen by a scan
+        // that re-applies a different predicate, or none at all. So count references across
+        // ALL snapshots (predicate-bearing or not) and only pre-filter chunks referenced by
+        // exactly one scan.
+        let mut chunk_counts: HashMap<u64, usize> = HashMap::new();
+        for index in self.index_snapshots().iter() {
+            for partition in index.partitions().iter().filter(|p| executable(p)) {
+                for chunk in partition.chunks() {
+                    if chunk.get_row().in_memory() {
+                        *chunk_counts.entry(chunk.get_id()).or_default() += 1;
+                    }
+                }
+            }
+        }
+
+        let mut groups = Vec::new();
+        for (idx, index) in self.index_snapshots().iter().enumerate() {
+            let Some(bytes) = pushable.get(idx).and_then(|p| p.as_ref()) else {
+                continue;
+            };
+            let mut chunk_ids = Vec::new();
+            for partition in index.partitions().iter().filter(|p| executable(p)) {
+                for chunk in partition.chunks() {
+                    if chunk.get_row().in_memory() && chunk_counts.get(&chunk.get_id()) == Some(&1)
+                    {
+                        chunk_ids.push(chunk.get_id());
+                    }
+                }
+            }
+            if !chunk_ids.is_empty() {
+                groups.push((bytes.clone(), chunk_ids));
+            }
+        }
+        groups
+    }
+
     pub fn in_memory_chunks_to_load(&self) -> Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)> {
         self.list_in_memory_chunks_to_load(|id| {
             self.partition_ids_to_execute
