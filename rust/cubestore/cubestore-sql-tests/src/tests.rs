@@ -320,6 +320,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         ),
         t("limit_pushdown_group", limit_pushdown_group),
         t("limit_pushdown_group_having", limit_pushdown_group_having),
+        t(
+            "limit_pushdown_group_nonprefix_order",
+            limit_pushdown_group_nonprefix_order,
+        ),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
             "limit_pushdown_group_where_order",
@@ -8957,6 +8961,55 @@ async fn limit_pushdown_group_having(service: Box<dyn SqlClient>) -> Result<(), 
             Row::new(vec![TableValue::Int(1), TableValue::Int(100)]),
             Row::new(vec![TableValue::Int(3), TableValue::Int(100)]),
             Row::new(vec![TableValue::Int(5), TableValue::Int(100)]),
+        ]
+    );
+    Ok(())
+}
+
+// ORDER BY a group column that is not an index-sort prefix, with the same group spread across
+// chunks: the limit can't ride the index, so the per-worker bounded sort kicks in. The sort key is
+// the full group key, so every chunk keeps the global top groups' partial states and the sums stay
+// correct (sorting by the ORDER BY column alone would drop partial states of groups split across
+// chunks and undercount).
+async fn limit_pushdown_group_nonprefix_order(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.ovl (a int, b int, val int) INDEX bidx (a, b)")
+        .await?;
+    // Three chunks; every b in {1, 2, 3} appears in each chunk under a different `a`, so each b
+    // group spans all three chunks.
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (1, 1, 10), (1, 2, 20), (1, 3, 30)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (2, 1, 100), (2, 2, 200), (2, 3, 300)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (3, 1, 1000), (3, 2, 2000), (3, 3, 3000)")
+        .await?;
+
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.ovl GROUP BY b ORDER BY b LIMIT 2")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(1), TableValue::Int(1110)],
+            vec![TableValue::Int(2), TableValue::Int(2220)],
+        ]
+    );
+
+    // DESC keeps the largest keys.
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.ovl GROUP BY b ORDER BY b DESC LIMIT 2")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(3), TableValue::Int(3330)],
+            vec![TableValue::Int(2), TableValue::Int(2220)],
         ]
     );
     Ok(())

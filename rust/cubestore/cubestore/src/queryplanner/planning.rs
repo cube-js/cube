@@ -1029,13 +1029,22 @@ impl ChooseIndex<'_> {
                             (limit, has_order_by && !ctx.sort_is_asc)
                         });
 
-                        return Ok(ClusterSendNode::new(
+                        // When the limit can't ride the index (ORDER BY on group columns that
+                        // isn't a sort-key prefix), fall back to a per-worker bounded sort.
+                        let worker_sort_and_limit = if limit_and_reverse.is_none() {
+                            self.compute_worker_sort_and_limit(ctx)
+                        } else {
+                            None
+                        };
+
+                        let mut node = ClusterSendNode::new(
                             self.get_cluster_send_next_id(),
                             Arc::new(p),
                             vec![vec![Snapshot::Index(snapshot)]],
                             limit_and_reverse,
-                        )
-                        .into_plan());
+                        );
+                        node.worker_sort_and_limit = worker_sort_and_limit;
+                        return Ok(node.into_plan());
                     } else if let Some(table) = table_provider
                         .as_any()
                         .downcast_ref::<InlineTableProvider>()
@@ -1081,6 +1090,40 @@ impl ChooseIndex<'_> {
         let id = self.cluster_send_next_id;
         self.cluster_send_next_id += 1;
         id
+    }
+
+    /// Builds the worker bounded-sort descriptor for `ORDER BY <group cols> LIMIT n` that can't ride
+    /// the index. Returns the full group key reordered with the ORDER BY columns first (so the
+    /// per-partition top-n on the workers is sound), or `None` when it doesn't apply.
+    fn compute_worker_sort_and_limit(
+        &self,
+        ctx: &ChooseIndexContext,
+    ) -> Option<WorkerSortAndLimit> {
+        if !self.can_pushdown_limit || ctx.unusable_sort || ctx.group_by_has_having {
+            return None;
+        }
+        let limit = ctx.limit?;
+        let sort = ctx.sort.as_ref().filter(|s| !s.is_empty())?;
+        let group_by = ctx.group_by.as_ref().filter(|g| !g.is_empty())?;
+
+        // Every ORDER BY column must be a group-by column; map it to its group-key position.
+        let mut cols: Vec<(usize, bool, bool)> = Vec::with_capacity(group_by.len());
+        let mut used = vec![false; group_by.len()];
+        for name in sort {
+            let idx = group_by.iter().position(|g| g == name)?;
+            if used[idx] {
+                continue;
+            }
+            used[idx] = true;
+            cols.push((idx, ctx.sort_is_asc, !ctx.sort_is_asc));
+        }
+        // Extend with the remaining group keys to make it a total order on the full group key.
+        for (idx, is_used) in used.iter().enumerate() {
+            if !is_used {
+                cols.push((idx, true, false));
+            }
+        }
+        Some((cols, limit))
     }
 
     fn get_limit_for_pushdown(
@@ -1551,12 +1594,18 @@ pub enum ExtensionNodeSerialized {
     ClusterAggregateTopKLower(ClusterAggregateTopKLowerSerialized),
 }
 
+/// Per-worker bounded sort for `ORDER BY <group cols> LIMIT n` when the order isn't an index
+/// prefix: the full group key reordered with the ORDER BY columns first, plus the limit. Stored as
+/// `(group_column_index, ascending, nulls_first)` over the aggregate's group columns.
+pub type WorkerSortAndLimit = (Vec<(usize, bool, bool)>, usize);
+
 #[derive(Debug, Clone)]
 pub struct ClusterSendNode {
     pub id: usize,
     pub input: Arc<LogicalPlan>,
     pub snapshots: Vec<Snapshots>,
     pub limit_and_reverse: Option<(usize, bool)>,
+    pub worker_sort_and_limit: Option<WorkerSortAndLimit>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -1564,6 +1613,8 @@ pub struct ClusterSendSerialized {
     pub id: usize,
     pub snapshots: Vec<Snapshots>,
     pub limit_and_reverse: Option<(usize, bool)>,
+    #[serde(default)]
+    pub worker_sort_and_limit: Option<WorkerSortAndLimit>,
 }
 
 impl ClusterSendNode {
@@ -1578,6 +1629,7 @@ impl ClusterSendNode {
             input,
             snapshots,
             limit_and_reverse,
+            worker_sort_and_limit: None,
         }
     }
 
@@ -1593,6 +1645,7 @@ impl ClusterSendNode {
             input: Arc::new(inputs[0].clone()),
             snapshots: serialized.snapshots,
             limit_and_reverse: serialized.limit_and_reverse,
+            worker_sort_and_limit: serialized.worker_sort_and_limit,
         }
     }
 
@@ -1601,6 +1654,7 @@ impl ClusterSendNode {
             id: self.id,
             snapshots: self.snapshots.clone(),
             limit_and_reverse: self.limit_and_reverse.clone(),
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
         }
     }
 }
@@ -1651,6 +1705,7 @@ impl UserDefinedLogicalNode for ClusterSendNode {
             input: Arc::new(inputs[0].clone()),
             snapshots: self.snapshots.clone(),
             limit_and_reverse: self.limit_and_reverse.clone(),
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
         }))
     }
 
@@ -1722,9 +1777,14 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             let id = send.id;
             snapshots = send.snapshots.clone();
             let limit = send.limit_and_reverse.clone();
+            // These nodes sit below the aggregate and don't change the group columns, so the
+            // worker bounded-sort descriptor (indexed by group column) stays valid.
+            let worker_sort_and_limit = send.worker_sort_and_limit.clone();
 
             *input = send.input.clone();
-            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
+            let mut new_send = ClusterSendNode::new(id, Arc::new(p), snapshots, limit);
+            new_send.worker_sort_and_limit = worker_sort_and_limit;
+            return Ok(new_send.into_plan());
         }
         LogicalPlan::Union(Union { inputs, .. }) => {
             // Handle UNION over constants, e.g. inline data series.
@@ -1870,6 +1930,7 @@ impl ExtensionPlanner for CubeExtensionPlanner {
                 false,
                 usize::MAX,
                 cs.limit_and_reverse.clone(),
+                cs.worker_sort_and_limit.clone(),
                 Some(find_cluster_send_cut_point.result.ok_or_else(|| {
                     CubeError::internal("ClusterSend cut point not found".to_string())
                 })?),
@@ -1929,6 +1990,7 @@ impl CubeExtensionPlanner {
         use_streaming: bool,
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
+        worker_sort_and_limit: Option<WorkerSortAndLimit>,
         logical_plan_to_send: Option<&LogicalPlan>,
         required_input_ordering: Option<LexRequirement>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
@@ -1951,6 +2013,7 @@ impl CubeExtensionPlanner {
                 input,
                 use_streaming,
                 limit_and_reverse,
+                worker_sort_and_limit,
                 required_input_ordering,
             )?))
         } else {
@@ -1960,6 +2023,7 @@ impl CubeExtensionPlanner {
                 max_batch_rows,
                 limit_and_reverse,
                 required_input_ordering,
+                worker_sort_and_limit,
                 worker_planning_params,
             )))
         }
@@ -1974,6 +2038,7 @@ pub struct WorkerExec {
     pub max_batch_rows: usize,
     pub limit_and_reverse: Option<(usize, bool)>,
     pub required_input_ordering: Option<LexRequirement>,
+    pub worker_sort_and_limit: Option<WorkerSortAndLimit>,
     properties: PlanProperties,
 }
 
@@ -1983,6 +2048,7 @@ impl WorkerExec {
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
         required_input_ordering: Option<LexRequirement>,
+        worker_sort_and_limit: Option<WorkerSortAndLimit>,
         worker_planning_params: WorkerPlanningParams,
     ) -> WorkerExec {
         // This, importantly, gives us the same PlanProperties as ClusterSendExec.
@@ -1995,6 +2061,7 @@ impl WorkerExec {
             max_batch_rows,
             limit_and_reverse,
             required_input_ordering,
+            worker_sort_and_limit,
             properties,
         }
     }
@@ -2031,6 +2098,7 @@ impl ExecutionPlan for WorkerExec {
             max_batch_rows: self.max_batch_rows,
             limit_and_reverse: self.limit_and_reverse.clone(),
             required_input_ordering: self.required_input_ordering.clone(),
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             properties,
         }))
     }

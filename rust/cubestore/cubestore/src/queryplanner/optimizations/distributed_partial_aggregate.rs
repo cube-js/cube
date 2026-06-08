@@ -1,18 +1,23 @@
 use crate::cluster::WorkerPlanningParams;
+use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::AggregateTopKExec;
+use datafusion::arrow::compute::SortOptions;
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::common::{internal_datafusion_err, HashMap};
 use datafusion::config::ConfigOptions;
 use datafusion::error::DataFusionError;
-use datafusion::physical_expr::{LexOrdering, LexRequirement, PhysicalSortRequirement};
+use datafusion::physical_expr::{
+    LexOrdering, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
+};
 use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
 use datafusion::physical_optimizer::PhysicalOptimizerRule as _;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
+use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::projection::ProjectionExec;
@@ -99,6 +104,7 @@ pub fn push_aggregate_to_workers(
                     .into_iter()
                     .next()
                     .unwrap(),
+                w.worker_sort_and_limit.clone(),
                 WorkerPlanningParams {
                     worker_partition_count: w.properties().output_partitioning().partition_count(),
                 },
@@ -253,6 +259,231 @@ pub fn push_sorted_partial_aggregate_below_merge(
         ordering,
         Arc::new(new_agg),
     )))
+}
+
+/// Bounds worker memory for `GROUP BY ... ORDER BY <group cols> LIMIT n` when the ORDER BY is a
+/// subset of the group keys but not a prefix of the index sort key (so the cheaper
+/// `add_limit_to_workers` early-termination doesn't apply and the worker would otherwise emit every
+/// group). Driven by the `worker_sort_and_limit` descriptor computed in `ChooseIndex` and carried
+/// through `ClusterSendNode` serialization, since the worker's plan has no ORDER BY of its own.
+///
+/// On the worker (a `WorkerExec` carrying the descriptor), the worker subtree
+///     SortPreservingMerge(index) <- PartialAggregate
+/// becomes
+///     SortPreservingMerge(worker_order) <- Sort(worker_order, fetch=n, per partition) <- PartialAggregate
+///
+/// On the router (a final aggregate over a `ClusterSend` carrying the descriptor), the final
+/// aggregate is rebuilt over a `SortPreservingMerge(worker_order)`: the bounded worker streams are
+/// merged in `worker_order`, so equal group keys are adjacent and the (sorted) final aggregate
+/// combines them. Its output is `worker_order`-sorted, whose prefix is the query's ORDER BY, so the
+/// limit above it stays correct.
+///
+/// `worker_order` is the full group key reordered with the ORDER BY columns as its prefix. The
+/// per-partition `fetch=n` is sound only because the key is the full group key: a group in the
+/// global first `n` has fewer than `n` smaller-keyed groups, hence stays within every partition's
+/// first `n`, so all of its partial states survive the fetch and the final aggregate sums it
+/// correctly -- even when the same group spans partitions. Sorting by `order_by` alone (a partial
+/// key) would drop partial states of tied groups.
+pub fn push_worker_sort_and_limit(
+    p: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    // Worker side: wrap the partial aggregate with a per-partition bounded sort.
+    if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
+        let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
+            return Ok(p);
+        };
+        let Some(new_input) = resort_worker_subtree(&w.input, &cols, fetch) else {
+            return Ok(p);
+        };
+        return Ok(Arc::new(WorkerExec::new(
+            new_input,
+            w.max_batch_rows,
+            w.limit_and_reverse.clone(),
+            w.required_input_ordering.clone(),
+            w.worker_sort_and_limit.clone(),
+            WorkerPlanningParams {
+                worker_partition_count: w.properties().output_partitioning().partition_count(),
+            },
+        )));
+    }
+
+    // Router side: rebuild the final aggregate over a sort-preserving merge in `worker_order`, and
+    // reorder the (optimization-only) worker subtree to match. Same keys are adjacent in
+    // `worker_order`, so the sorted final combines them; its output is `worker_order`-sorted (whose
+    // prefix is the query's ORDER BY), so the limit above stays correct.
+    let Some(final_agg) = FinalAggregateInfo::extract(&p) else {
+        return Ok(p);
+    };
+    let Some(cs_plan) = find_cluster_send(&final_agg.input) else {
+        return Ok(p);
+    };
+    let cs = cs_plan
+        .as_any()
+        .downcast_ref::<ClusterSendExec>()
+        .expect("find_cluster_send returns a ClusterSendExec");
+    let Some((cols, fetch)) = cs.worker_sort_and_limit.clone() else {
+        return Ok(p);
+    };
+    let Some(new_worker_subtree) = resort_worker_subtree(&cs.input_for_optimizations, &cols, fetch)
+    else {
+        return Ok(p);
+    };
+    let new_cs: Arc<dyn ExecutionPlan> =
+        Arc::new(cs.with_changed_schema(new_worker_subtree, cs.required_input_ordering.clone()));
+    let worker_order = worker_ordering(&final_agg.group_expr, &cols)?;
+    let merged: Arc<dyn ExecutionPlan> =
+        Arc::new(SortPreservingMergeExec::new(worker_order, new_cs));
+    Ok(Arc::new(AggregateExec::try_new(
+        AggregateMode::Final,
+        final_agg.group_expr,
+        final_agg.aggr_expr,
+        final_agg.filter_expr,
+        merged,
+        final_agg.input_schema,
+    )?))
+}
+
+/// Builds the `worker_order` LexOrdering over an aggregate's group columns from the descriptor.
+fn worker_ordering(
+    group_expr: &datafusion::physical_plan::aggregates::PhysicalGroupBy,
+    cols: &[(usize, bool, bool)],
+) -> Result<LexOrdering, DataFusionError> {
+    let names = group_expr.expr();
+    let mut exprs = Vec::with_capacity(cols.len());
+    for (idx, asc, nulls_first) in cols {
+        let (_, name) = names.get(*idx).ok_or_else(|| {
+            DataFusionError::Internal("worker_sort_and_limit column out of range".to_string())
+        })?;
+        exprs.push(PhysicalSortExpr {
+            expr: Arc::new(Column::new(name, *idx)),
+            options: SortOptions {
+                descending: !asc,
+                nulls_first: *nulls_first,
+            },
+        });
+    }
+    Ok(LexOrdering::new(exprs))
+}
+
+/// Rebuilds a worker subtree as `SortPreservingMerge(worker_order) <- Sort(worker_order, fetch, per
+/// partition) <- partial`. Returns `None` for an unrecognized or already-rewritten subtree, which
+/// keeps [push_worker_sort_and_limit] idempotent.
+///
+/// The per-partition `Sort` does the bounding (a bounded heap, O(fetch) memory); the merge above it
+/// carries no fetch. Because this pass runs last, `replace_suboptimal_merge_sorts` has already run
+/// and won't push the query's row limit into the merge -- which would cut the merged stream of
+/// (still uncombined) partial rows by rows and undercount groups split across partitions.
+fn resort_worker_subtree(
+    worker_subtree: &Arc<dyn ExecutionPlan>,
+    cols: &[(usize, bool, bool)],
+    fetch: usize,
+) -> Option<Arc<dyn ExecutionPlan>> {
+    let partial = locate_partial_aggregate(worker_subtree)?;
+    let schema = partial.schema();
+    let mut exprs = Vec::with_capacity(cols.len());
+    for (idx, asc, nulls_first) in cols {
+        let field = schema.fields().get(*idx)?;
+        exprs.push(PhysicalSortExpr {
+            expr: Arc::new(Column::new(field.name(), *idx)),
+            options: SortOptions {
+                descending: !asc,
+                nulls_first: *nulls_first,
+            },
+        });
+    }
+    let worker_order = LexOrdering::new(exprs);
+    let per_partition_sort: Arc<dyn ExecutionPlan> = Arc::new(
+        SortExec::new(worker_order.clone(), partial)
+            .with_fetch(Some(fetch))
+            .with_preserve_partitioning(true),
+    );
+    Some(Arc::new(SortPreservingMergeExec::new(
+        worker_order,
+        per_partition_sort,
+    )))
+}
+
+/// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in
+/// Final mode.
+struct FinalAggregateInfo {
+    group_expr: datafusion::physical_plan::aggregates::PhysicalGroupBy,
+    aggr_expr: Vec<Arc<datafusion::physical_expr::aggregate::AggregateFunctionExpr>>,
+    filter_expr: Vec<Option<Arc<dyn PhysicalExpr>>>,
+    input_schema: datafusion::arrow::datatypes::SchemaRef,
+    input: Arc<dyn ExecutionPlan>,
+}
+
+impl FinalAggregateInfo {
+    fn extract(p: &Arc<dyn ExecutionPlan>) -> Option<Self> {
+        if let Some(a) = p.as_any().downcast_ref::<InlineAggregateExec>() {
+            if *a.mode() != InlineAggregateMode::Final {
+                return None;
+            }
+            Some(Self {
+                group_expr: a.group_expr().clone(),
+                aggr_expr: a.aggr_expr().to_vec(),
+                filter_expr: a.filter_expr().to_vec(),
+                input_schema: a.input_schema.clone(),
+                input: a.input().clone(),
+            })
+        } else if let Some(a) = p.as_any().downcast_ref::<AggregateExec>() {
+            if !matches!(
+                a.mode(),
+                AggregateMode::Final | AggregateMode::FinalPartitioned
+            ) {
+                return None;
+            }
+            Some(Self {
+                group_expr: a.group_expr().clone(),
+                aggr_expr: a.aggr_expr().to_vec(),
+                filter_expr: a.filter_expr().to_vec(),
+                input_schema: a.input_schema().clone(),
+                input: a.input().clone(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// Descends through merge/coalesce/check-memory wrappers to the ClusterSend feeding a final
+/// aggregate.
+fn find_cluster_send(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+    let any = p.as_any();
+    if any.is::<ClusterSendExec>() {
+        return Some(p.clone());
+    }
+    if any.is::<SortPreservingMergeExec>()
+        || any.is::<CoalescePartitionsExec>()
+        || any.is::<CheckMemoryExec>()
+    {
+        return find_cluster_send(p.children().into_iter().next()?);
+    }
+    None
+}
+
+/// The partial aggregate inside a worker subtree, reached through merge/coalesce wrappers. Returns
+/// `None` for any other shape (including an already-rewritten subtree, whose partial now sits under
+/// a `SortExec` -- not a wrapper we descend -- keeping the pass idempotent).
+fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+    let mut candidate = p.clone();
+    loop {
+        let any = candidate.as_any();
+        if let Some(a) = any.downcast_ref::<InlineAggregateExec>() {
+            return (*a.mode() == InlineAggregateMode::Partial).then_some(candidate.clone());
+        }
+        if let Some(a) = any.downcast_ref::<AggregateExec>() {
+            return (*a.mode() == AggregateMode::Partial).then_some(candidate.clone());
+        }
+        if any.is::<SortPreservingMergeExec>()
+            || any.is::<CoalescePartitionsExec>()
+            || any.is::<CheckMemoryExec>()
+        {
+            candidate = candidate.children().into_iter().next()?.clone();
+            continue;
+        }
+        return None;
+    }
 }
 
 pub fn ensure_partition_merge_helper(
@@ -903,6 +1134,7 @@ mod tests {
             input,
             4096,
             limit_and_reverse,
+            None,
             None,
             WorkerPlanningParams {
                 worker_partition_count: 1,

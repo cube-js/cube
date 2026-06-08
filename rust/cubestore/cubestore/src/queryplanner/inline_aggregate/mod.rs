@@ -127,6 +127,10 @@ impl InlineAggregateExec {
         &self.aggr_expr
     }
 
+    pub fn filter_expr(&self) -> &[Option<Arc<dyn PhysicalExpr>>] {
+        &self.filter_expr
+    }
+
     pub fn input(&self) -> &Arc<dyn ExecutionPlan> {
         &self.input
     }
