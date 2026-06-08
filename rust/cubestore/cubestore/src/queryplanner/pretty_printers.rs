@@ -43,6 +43,7 @@ use crate::queryplanner::topk::SortColumn;
 use crate::queryplanner::topk::{
     AggregateTopKExec, ClusterAggregateTopKLower, ClusterAggregateTopKUpper,
 };
+use crate::queryplanner::topk_aggregate::TopKHashAggregateExec;
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider, QueryPlan};
 //use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -616,6 +617,16 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
             if let Some(limit) = agg.limit() {
                 *out += &format!(", limit: {}", limit)
+            }
+        } else if let Some(agg) = a.downcast_ref::<TopKHashAggregateExec>() {
+            *out += &format!(
+                "TopKHashAggregate, k: {}, factor: {}, order: {:?}",
+                agg.k(),
+                agg.factor(),
+                agg.order()
+            );
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
         } else if let Some(l) = a.downcast_ref::<LocalLimitExec>() {
             *out += &format!("LocalLimit, n: {}", l.fetch());

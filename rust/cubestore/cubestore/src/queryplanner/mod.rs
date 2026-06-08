@@ -17,6 +17,7 @@ pub mod query_executor;
 pub mod serialized_plan;
 mod tail_limit;
 mod topk;
+mod topk_aggregate;
 pub mod trace_data_loaded;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;

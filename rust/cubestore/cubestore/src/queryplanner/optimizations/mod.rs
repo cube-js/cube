@@ -4,6 +4,7 @@ mod inline_aggregate_rewriter;
 pub mod is_not_distinct_from_join_keys;
 pub mod rewrite_plan;
 pub mod rolling_optimizer;
+mod topk_aggregate_rewriter;
 mod trace_data_loaded;
 
 use super::serialized_plan::PreSerializedPlan;
@@ -13,6 +14,7 @@ use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     replace_suboptimal_merge_sorts,
 };
 use crate::queryplanner::optimizations::inline_aggregate_rewriter::replace_with_inline_aggregate;
+use crate::queryplanner::optimizations::topk_aggregate_rewriter::replace_with_topk_aggregate;
 use crate::queryplanner::planning::CubeExtensionPlanner;
 use crate::queryplanner::pretty_printers::{pp_phys_plan_ext, PPOptions};
 use crate::queryplanner::rolling::RollingWindowPlanner;
@@ -109,11 +111,15 @@ impl QueryPlanner for CubeQueryPlanner {
 }
 
 #[derive(Debug)]
-pub struct PreOptimizeRule {}
+pub struct PreOptimizeRule {
+    partial_hash_aggregate_topk_factor: usize,
+}
 
 impl PreOptimizeRule {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(partial_hash_aggregate_topk_factor: usize) -> Self {
+        Self {
+            partial_hash_aggregate_topk_factor,
+        }
     }
 }
 
@@ -123,7 +129,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
-        pre_optimize_physical_plan(plan)
+        pre_optimize_physical_plan(plan, self.partial_hash_aggregate_topk_factor)
     }
 
     fn name(&self) -> &str {
@@ -137,6 +143,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
 
 fn pre_optimize_physical_plan(
     p: Arc<dyn ExecutionPlan>,
+    partial_hash_aggregate_topk_factor: usize,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))?;
 
@@ -147,6 +154,11 @@ fn pre_optimize_physical_plan(
 
     // Replace sorted AggregateExec with InlineAggregateExec for better performance
     let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;
+
+    // Trim the worker-side partial hash aggregate to the top-k groups when the query orders by a
+    // subset of group-by columns and has a limit. Runs after inline-aggregate replacement so it
+    // only sees the remaining (hash) partial aggregates.
+    let p = replace_with_topk_aggregate(p, partial_hash_aggregate_topk_factor)?;
 
     Ok(p)
 }

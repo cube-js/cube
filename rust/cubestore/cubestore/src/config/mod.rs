@@ -497,6 +497,11 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
+    /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
+    /// `k = limit + offset`. `0` disables the optimization.
+    fn partial_hash_aggregate_topk_factor(&self) -> usize;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -639,6 +644,7 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub partial_hash_aggregate_topk_factor: usize,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -935,6 +941,10 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+
+    fn partial_hash_aggregate_topk_factor(&self) -> usize {
+        self.partial_hash_aggregate_topk_factor
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1515,6 +1525,10 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                partial_hash_aggregate_topk_factor: env_parse(
+                    "CUBESTORE_PARTIAL_HASH_AGGREGATE_TOPK_FACTOR",
+                    2,
+                ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -1749,6 +1763,7 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                partial_hash_aggregate_topk_factor: 2,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2446,6 +2461,7 @@ impl Config {
                         .clone(),
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed::<dyn ConfigObj>().await,
                 )
             })
             .await;
