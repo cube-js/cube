@@ -368,6 +368,202 @@ measures:
     type: rank
 ```
 
+### Filter directives
+
+By default, a multi-stage measure inherits the query's filters into its inner
+aggregation stage. The [`filter`][ref-filter-directives] parameter lets you
+override this — dropping, replacing, or augmenting filters before the inner
+stage runs.
+
+This is the building block for "share of total" against an unfiltered base,
+measures that ignore certain filters (e.g., always-completed revenue), and
+measures that pin themselves to a fixed slice regardless of the surrounding
+query.
+
+The `filter` parameter accepts four sub-parameters: `mode` (`relative` —
+the default — or `fixed`), `exclude`, `keep_only`, and `include`.
+
+**Drop a specific query filter.** The measure ignores any filter the query
+places on `status`, but still respects every other filter:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue_ignoring_status
+    multi_stage: true
+    sql: "{revenue}"
+    type: number
+    filter:
+      exclude:
+        - status
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue_ignoring_status: {
+    multi_stage: true,
+    sql: `${revenue}`,
+    type: `number`,
+    filter: {
+      exclude: () => [status]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+**Replace a query filter.** Strip the inherited filter on `status` and force
+the inner stage to filter on `status = 'cancelled'` instead:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue_cancelled
+    multi_stage: true
+    sql: "{revenue}"
+    type: sum
+    filter:
+      exclude:
+        - status
+      include:
+        - member: status
+          operator: equals
+          values:
+            - cancelled
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue_cancelled: {
+    multi_stage: true,
+    sql: `${revenue}`,
+    type: `sum`,
+    filter: {
+      exclude: () => [status],
+      include: [
+        {
+          member: `status`,
+          operator: `equals`,
+          values: [`cancelled`]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+**Always compute against a fixed slice.** With `mode: fixed`, all inherited
+filters are discarded and only the entries in `include` apply, even when the
+measure is referenced from another multi-stage measure:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue_completed_fixed
+    multi_stage: true
+    sql: "{revenue}"
+    type: sum
+    filter:
+      mode: fixed
+      include:
+        - member: status
+          operator: equals
+          values:
+            - completed
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue_completed_fixed: {
+    multi_stage: true,
+    sql: `${revenue}`,
+    type: `sum`,
+    filter: {
+      mode: `fixed`,
+      include: [
+        {
+          member: `status`,
+          operator: `equals`,
+          values: [`completed`]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+**Boolean groups.** `include` clauses can be combined with `or` / `and`
+groups to express compound filters:
+
+<CodeGroup>
+
+```yaml title="YAML"
+measures:
+  - name: revenue_top_cities
+    multi_stage: true
+    sql: "{revenue}"
+    type: sum
+    filter:
+      include:
+        - or:
+            - member: city
+              operator: equals
+              values:
+                - NYC
+            - member: city
+              operator: equals
+              values:
+                - SF
+```
+
+```javascript title="JavaScript"
+measures: {
+  revenue_top_cities: {
+    multi_stage: true,
+    sql: `${revenue}`,
+    type: `sum`,
+    filter: {
+      include: [
+        {
+          or: [
+            {
+              member: `city`,
+              operator: `equals`,
+              values: [`NYC`]
+            },
+            {
+              member: `city`,
+              operator: `equals`,
+              values: [`SF`]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+`filter` can also be combined with [`keep_only`][ref-filter-directives] — the
+inverse of `exclude` — to forward only filters on a chosen set of members. The
+same `filter` parameter is available on
+[multi-stage dimensions][ref-dim-filter].
+
+For end-to-end patterns — always-on baselines, replacing a filter, pinning a
+baseline through chained calculations, segment-aware aggregates, and compound
+boolean filters — see the
+[Filtering multi-stage measures recipe][ref-filter-recipe].
+
 ### Conditional measures
 
 Conditional measures depend on the value of a dimension, using the
@@ -426,6 +622,9 @@ measures:
 [ref-group-by]: /reference/data-modeling/measures#group_by
 [ref-reduce-by]: /reference/data-modeling/measures#reduce_by
 [ref-add-group-by]: /reference/data-modeling/measures#add_group_by
+[ref-filter-directives]: /reference/data-modeling/measures#filter
+[ref-dim-filter]: /reference/data-modeling/dimensions#filter
+[ref-filter-recipe]: /recipes/data-modeling/filtering-multi-stage-measures
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type
 [ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
