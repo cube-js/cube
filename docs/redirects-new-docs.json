@@ -1235,11 +1235,6 @@
     "permanent": true
   },
   {
-    "source": "/config/databases/elasticsearch",
-    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/elasticsearch",
-    "permanent": true
-  },
-  {
     "source": "/config/databases/druid",
     "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/druid",
     "permanent": true
@@ -3067,11 +3062,6 @@
   {
     "source": "/product/configuration/data-sources/duckdb",
     "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/duckdb",
-    "permanent": true
-  },
-  {
-    "source": "/product/configuration/data-sources/elasticsearch",
-    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/elasticsearch",
     "permanent": true
   },
   {

@@ -19,8 +19,6 @@ const DriverDependencies: Record<DatabaseType, string> = {
   trino: '@cubejs-backend/trino-driver',
   oracle: '@cubejs-backend/oracle-driver',
   sqlite: '@cubejs-backend/sqlite-driver',
-  awselasticsearch: '@cubejs-backend/elasticsearch-driver',
-  elasticsearch: '@cubejs-backend/elasticsearch-driver',
   dremio: '@cubejs-backend/dremio-driver',
   druid: '@cubejs-backend/druid-driver',
   duckdb: '@cubejs-backend/duckdb-driver',

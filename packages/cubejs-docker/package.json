@@ -18,7 +18,6 @@
     "@cubejs-backend/dremio-driver": "1.6.57",
     "@cubejs-backend/druid-driver": "1.6.57",
     "@cubejs-backend/duckdb-driver": "1.6.57",
-    "@cubejs-backend/elasticsearch-driver": "1.6.57",
     "@cubejs-backend/firebolt-driver": "1.6.57",
     "@cubejs-backend/hive-driver": "1.6.57",
     "@cubejs-backend/ksql-driver": "1.6.57",

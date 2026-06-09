@@ -44,10 +44,6 @@ driver:duckdb:
 - changed-files:
   - any-glob-to-any-file: packages/cubejs-duckdb-driver/**/*
 
-driver:elasticsearch:
-- changed-files:
-  - any-glob-to-any-file: packages/cubejs-elasticsearch-driver/**/*
-
 driver:firebolt:
 - changed-files:
   - any-glob-to-any-file: packages/cubejs-firebolt-driver/**/*

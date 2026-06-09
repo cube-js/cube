@@ -400,7 +400,7 @@ jobs:
         # @see https://github.com/vertica/vertica-containers/issues/64
         db: [
             'athena', 'bigquery', 'snowflake', 'trino',
-            'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
+            'clickhouse', 'druid', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt',
 #            'dremio' # Commented out because of flaky integration tests
 #            'vertica'

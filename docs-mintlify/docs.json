@@ -243,7 +243,6 @@
                   "admin/connect-to-data/data-sources/databricks-jdbc",
                   "admin/connect-to-data/data-sources/druid",
                   "admin/connect-to-data/data-sources/duckdb",
-                  "admin/connect-to-data/data-sources/elasticsearch",
                   "admin/connect-to-data/data-sources/firebolt",
                   "admin/connect-to-data/data-sources/google-bigquery",
                   "admin/connect-to-data/data-sources/hive",

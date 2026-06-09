@@ -1259,50 +1259,6 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /** ****************************************************************
-   * ElasticSearch Driver                                            *
-   ***************************************************************** */
-
-  /**
-   * ElasticSearch API Id.
-   */
-  elasticApiId: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_APIKEY_ID', dataSource, preAggregations)).asString()
-  ),
-
-  /**
-   * ElasticSearch API Key.
-   */
-  elasticApiKey: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_APIKEY_KEY', dataSource, preAggregations)).asString()
-  ),
-
-  /**
-   * ElasticSearch OpenDistro flag.
-   */
-  elasticOpenDistro: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_OPENDISTRO', dataSource, preAggregations)).asString()
-  ),
-
-  /**
-   * ElasticSearch query format.
-   */
-  elasticQueryFormat: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_QUERY_FORMAT', dataSource, preAggregations)).asString()
-  ),
-
-  /** ****************************************************************
    * Firebolt Driver                                                 *
    ***************************************************************** */
 
