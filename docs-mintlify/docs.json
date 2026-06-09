@@ -678,7 +678,7 @@
         ]
       },
       {
-        "tab": "Platform API",
+        "tab": "API",
         "groups": [
           {
             "group": "Getting Started",
@@ -688,7 +688,23 @@
             ]
           },
           {
-            "group": "Endpoints",
+            "group": "Core Data Endpoints",
+            "openapi": "/api-reference/core-data.yaml",
+            "pages": [
+              "POST /v1/load",
+              "POST /v1/cubesql",
+              "GET /v1/meta"
+            ]
+          },
+          {
+            "group": "AI Endpoints",
+            "openapi": "/api-reference/chat.yaml",
+            "pages": [
+              "POST /chat/stream-chat-state"
+            ]
+          },
+          {
+            "group": "Platform Endpoints",
             "pages": [
               {
                 "group": "Deployments",
@@ -771,75 +787,6 @@
                 ]
               },
               {
-                "group": "Agents",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "GET /v1/deployments/{deploymentId}/agent-skills",
-                  "GET /v1/deployments/{deploymentId}/agents"
-                ]
-              },
-              {
-                "group": "Metadata",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "POST /v1/meta"
-                ]
-              },
-              {
-                "group": "Users",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "GET /v1/users",
-                  "GET /v1/users/embed-theme",
-                  "GET /v1/users/me"
-                ]
-              },
-              {
-                "group": "Groups",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "DELETE /v1/groups/{id}"
-                ]
-              },
-              {
-                "group": "User Groups",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "GET /v1/user-groups"
-                ]
-              },
-              {
-                "group": "User Attributes",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "DELETE /v1/user-attributes/{id}"
-                ]
-              },
-              {
-                "group": "Resource Policies",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "GET /v1/resource-policies",
-                  "PUT /v1/resource-policies/group",
-                  "PUT /v1/resource-policies/user"
-                ]
-              },
-              {
-                "group": "App Theme",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "GET /v1/app-theme"
-                ]
-              },
-              {
-                "group": "AI Engineer",
-                "openapi": "/api-reference/api.yaml",
-                "pages": [
-                  "GET /v1/ai-engineer/active-region",
-                  "GET /v1/ai-engineer/settings"
-                ]
-              },
-              {
                 "group": "Embed",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
@@ -859,7 +806,7 @@
                 ]
               },
               {
-                "group": "SCIM Users",
+                "group": "Users",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
                   "GET /scim/v2/Users",
@@ -871,7 +818,7 @@
                 ]
               },
               {
-                "group": "SCIM Groups",
+                "group": "Groups",
                 "openapi": "/api-reference/scim.yaml",
                 "pages": [
                   "GET /scim/v2/Groups",
@@ -882,12 +829,6 @@
                   "DELETE /scim/v2/Groups/{id}"
                 ]
               }
-            ]
-          },
-          {
-            "group": "Changelog",
-            "pages": [
-              "api-reference/changelog"
             ]
           }
         ]

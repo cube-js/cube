@@ -1,0 +1,412 @@
+openapi: 3.1.0
+info:
+  title: Cube Cloud Chat API
+  version: 1.0.0
+  description: |-
+    Real-time streaming conversations with Cube Cloud AI agents for analytics and
+    data exploration. Copy the exact Chat API URL from your agent settings
+    (Admin → Agents → Chat API URL).
+servers:
+  - url: https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}
+    description: >-
+      Chat API base URL. Copy the exact URL from your agent settings (Admin → Agents → Chat API
+      URL).
+    variables:
+      cloudRegion:
+        default: gcp-us-central1
+        description: Cloud region identifier
+      accountName:
+        default: your-account
+        description: Your Cube Cloud account/tenant name
+      agentId:
+        default: '1'
+        description: AI agent identifier (Admin → Agents)
+security:
+  - apiKey: []
+tags:
+  - name: Chat
+paths:
+  /chat/stream-chat-state:
+    post:
+      description: >-
+        Real-time streaming conversation with Cube's AI agents for analytics and data exploration.
+
+
+        The response is streamed as newline-delimited JSON (each line is a standalone JSON object
+
+        terminated by `\n`) and served with `Content-Type: application/json`. Each line represents a
+
+        chat message, a state update, or an error object. Assistant content arrives incrementally —
+
+        updates to a previously emitted message carry the same `id` with `isDelta: true`.
+
+
+        Provide `input` to send a new message. Omit `input` (with a `chatId`) to retrieve the
+        current
+
+        thread state. If `chatId` is omitted a new thread is created and its id is returned on the
+
+        `__cutoff__` message.
+
+
+        Special sentinel messages:
+
+        - `__cutoff__` — initial marker emitted before new content; also carries the thread `chatId`
+        and `isStreaming` under `state`.
+
+        - `__state__` — final thread snapshot emitted at the end, carrying the full `{ messages:
+        [...] }` state.
+
+
+        Errors mid-stream are emitted as a standalone line `{ "error": "<message>" }` rather than a
+        non-200 status.
+
+
+        Finding the final answer: filter assistant messages where `graphPath[0] === "final"` and
+
+        `graphPath.length <= 2`; the last such message is the final answer.
+
+
+        Idempotency: provide a client-generated `messageId` in the format `<timestamp>-message` (a
+        13+ digit
+
+        Unix-millisecond timestamp). If a request with the same `messageId` arrives while a stream
+        for that
+
+        message is still active on the thread, the API resubscribes the new request to the existing
+        stream
+
+        instead of starting a new one.
+      operationId: streamChatState
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+        description: >-
+          Chat request. Provide `input` to send a new message, or omit it together with a `chatId`
+          to retrieve the current thread state.
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                assistantDelta:
+                  summary: Assistant response start (delta)
+                  value:
+                    content: ''
+                    graphPath:
+                      - cube_data_analyst_agent
+                    id: cdfe1a84-08d7-40b9-8b1c-e7e3a698647e
+                    isDelta: true
+                    isInProcess: true
+                    role: assistant
+                    sort: 2
+                error:
+                  summary: Error line
+                  value:
+                    error: 'BadRequestError: Bad branch'
+                finalState:
+                  summary: Final state (__state__)
+                  value:
+                    id: __state__
+                    isDelta: false
+                    role: assistant
+                    state:
+                      messages: []
+                initialState:
+                  summary: Initial state (__cutoff__)
+                  value:
+                    id: __cutoff__
+                    role: assistant
+                    sort: 0
+                    state:
+                      chatId: a1b2c3d4-08d7-40b9-8b1c-e7e3a698647e
+                      isStreaming: false
+                toolCall:
+                  summary: Tool call (cubeMeta)
+                  value:
+                    graphPath:
+                      - cube_data_analyst_agent
+                      - tools
+                    id: 4849adb2-b55d-4afe-946b-fc117bcadaf5
+                    isInProcess: true
+                    role: assistant
+                    toolCall:
+                      input: '{"searchQuery":"revenue trends"}'
+                      name: cubeMeta
+                userEcho:
+                  summary: User message echo
+                  value:
+                    content: Show me revenue trends for the last 6 months
+                    id: 1732512345678-message
+                    isDelta: false
+                    role: user
+                    sort: 1
+              schema:
+                properties:
+                  content:
+                    description: >-
+                      Message content. Streamed incrementally for assistant messages when `isDelta`
+                      is true.
+                    type: string
+                  error:
+                    description: >-
+                      Present only on error lines (`{ "error": "<message>" }`). When set, the line
+                      carries no message fields.
+                    type: string
+                  graphPath:
+                    description: Agent graph node path, e.g. `["cube_data_analyst_agent"]` or `["final"]`.
+                    items:
+                      type: string
+                    type: array
+                  id:
+                    description: >-
+                      Unique message identifier. Sentinel values: `__cutoff__` (initial marker,
+                      carries the chatId under `state`) and `__state__` (final thread state
+                      snapshot). Absent on error lines.
+                    type: string
+                  isDelta:
+                    description: >-
+                      Whether this is an incremental update to a previously sent message with the
+                      same id.
+                    type: boolean
+                  isInProcess:
+                    description: Whether the message is still being generated.
+                    type: boolean
+                  role:
+                    enum:
+                      - user
+                      - assistant
+                    type: string
+                  sort:
+                    description: Message ordering sequence.
+                    type: number
+                  state:
+                    description: >-
+                      Streaming state. Carries `{ isStreaming, chatId }` on the `__cutoff__` message
+                      and `{ messages: [...] }` on the `__state__` message.
+                    type: object
+                  thinking:
+                    description: Agent's internal reasoning. Only present in development mode.
+                    type: string
+                  toolCall:
+                    description: Present when the message represents a tool invocation or its result.
+                    properties:
+                      input:
+                        description: JSON-encoded tool input.
+                        type: string
+                      name:
+                        description: Tool name, e.g. `cubeMeta` or `cubeSqlApi`.
+                        type: string
+                      result:
+                        description: >-
+                          JSON-encoded tool result. Absent until the tool finishes; on failure
+                          contains a JSON object with an `error` field.
+                        type: string
+                    type: object
+                type: object
+            text/html; charset=utf-8: {}
+          description: >-
+            Newline-delimited stream of chat message / state / error objects (served as
+            `Content-Type: application/json`). Each line is a JSON object of the schema below.
+      security:
+        - apiKey: []
+      summary: Stream chat state
+      tags:
+        - Chat
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.'
+  schemas:
+    ChatRequest:
+      properties:
+        activeBranchName:
+          description: Development branch name to run queries against. Uses the main branch if omitted.
+          type: string
+        agentId:
+          nullable: true
+          type: number
+        chatId:
+          description: >-
+            Chat thread ID. If omitted, a new thread is created automatically. Should match the
+            previously returned `chatId` carried on the `__cutoff__` message.
+          type: string
+        context:
+          enum:
+            - chat
+            - workbook
+            - model
+            - dashboard
+            - external
+            - mcp
+            - ai-widget
+            - onboarding
+            - explore
+            - connection_setup
+            - slack_dm
+            - published-dashboard
+          type: string
+        cubeCredentials: {}
+        dashboardContext:
+          $ref: '#/components/schemas/DashboardContextDto'
+        images:
+          items:
+            $ref: '#/components/schemas/ImageAttachmentDto'
+          type: array
+        input:
+          description: >-
+            User's message/question. If omitted, returns the current thread state for the provided
+            `chatId`.
+          type: string
+        isDefaultBranch:
+          description: Whether `activeBranchName` is the default branch. Defaults to `true` when not set.
+          type: boolean
+        isDevMode:
+          type: boolean
+        messageId:
+          description: >-
+            Client-provided identifier in the format `<timestamp>-message` (13+ digit Unix
+            milliseconds). Makes requests idempotent.
+          pattern: ^\d{13,}-message$
+          type: string
+        sessionSettings:
+          $ref: '#/components/schemas/SessionSettingsDto'
+        workbookContext:
+          $ref: '#/components/schemas/WorkbookContextDto'
+        workbookId:
+          type: number
+      type: object
+    DashboardContextDto:
+      properties:
+        publicId:
+          type: string
+        snapshots:
+          items:
+            $ref: '#/components/schemas/DashboardContextSnapshotDto'
+          type: array
+        title:
+          type: string
+        viewerState:
+          $ref: '#/components/schemas/DashboardViewerStateDto'
+        widgets:
+          items: {}
+          type: array
+      required:
+        - publicId
+      type: object
+    DashboardContextSnapshotDto:
+      properties:
+        data:
+          items: {}
+          type: array
+        spec:
+          type: object
+        sqlQuery:
+          type: string
+        widgetId:
+          type: string
+      required:
+        - widgetId
+      type: object
+    DashboardViewerStateDto:
+      properties:
+        filterState:
+          type: object
+        timeGrainState:
+          type: object
+      type: object
+    ImageAttachmentDto:
+      properties:
+        data:
+          type: string
+        mimeType:
+          type: string
+        name:
+          type: string
+      required:
+        - mimeType
+        - data
+      type: object
+    SessionSettingsDto:
+      properties:
+        email:
+          description: User's email address.
+          type: string
+        externalId:
+          description: >-
+            Unique identifier for an external user. Must be lowercase and trimmed (no
+            leading/trailing whitespace). Either `externalId` or `internalId` is required.
+          type: string
+        groups:
+          description: Array of group names the user belongs to. Not allowed together with `internalId`.
+          items:
+            type: string
+          type: array
+        internalId:
+          description: >-
+            Username of an internal Cube Cloud user, matched lowercased and trimmed; the user must
+            already exist and must not be external. An email is a common username form but is not
+            required. Either `externalId` or `internalId` is required.
+          type: string
+        publicDashboardId:
+          type: string
+        roles:
+          items:
+            type: string
+          type: array
+        securityContext:
+          description: Custom security context object for Cube queries. Not allowed together with `internalId`.
+          type: object
+        userAttributes:
+          description: >-
+            Array of `{ name, value }` pairs for row-level security. Not allowed together with
+            `internalId`.
+          items: {}
+          type: array
+      type: object
+    WorkbookContextChartDto:
+      properties:
+        baseSql:
+          type: string
+        logicalFilters: {}
+        reportId:
+          type: number
+        sql:
+          type: string
+        title:
+          type: string
+        widgetId:
+          type: string
+      required:
+        - widgetId
+        - sql
+      type: object
+    WorkbookContextDto:
+      properties:
+        charts:
+          items:
+            $ref: '#/components/schemas/WorkbookContextChartDto'
+          type: array
+        filters:
+          items:
+            $ref: '#/components/schemas/WorkbookContextFilterDto'
+          type: array
+      type: object
+    WorkbookContextFilterDto:
+      properties:
+        filter:
+          type: object
+        semanticView:
+          type: string
+        widgetId:
+          type: string
+      required:
+        - widgetId
+        - semanticView
+      type: object
