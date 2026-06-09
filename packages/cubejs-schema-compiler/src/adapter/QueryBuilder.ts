@@ -12,8 +12,6 @@ import { CrateQuery } from './CrateQuery';
 import { HiveQuery } from './HiveQuery';
 import { OracleQuery } from './OracleQuery';
 import { SqliteQuery } from './SqliteQuery';
-import { AWSElasticSearchQuery } from './AWSElasticSearchQuery';
-import { ElasticSearchQuery } from './ElasticSearchQuery';
 import { CubeStoreQuery } from './CubeStoreQuery';
 import { AthenaQuery } from './AthenaQuery';
 import { TrinoQuery } from './TrinoQuery';
@@ -37,8 +35,6 @@ const ADAPTERS = {
   hive: HiveQuery,
   oracle: OracleQuery,
   sqlite: SqliteQuery,
-  awselasticsearch: AWSElasticSearchQuery,
-  elasticsearch: ElasticSearchQuery,
   materialize: PostgresQuery,
   cubestore: CubeStoreQuery,
 };
