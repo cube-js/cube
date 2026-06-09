@@ -54,11 +54,6 @@ export class OptsHandler {
   }
 
   /**
-   * Decorated dbType flag.
-   */
-  private decoratedType = false;
-
-  /**
    * Decorated driverFactory flag.
    */
   private decoratedFactory = false;
@@ -84,35 +79,25 @@ export class OptsHandler {
    * Assert create options.
    */
   private assertOptions(opts: CreateOptions) {
+    if ((opts as any).dbType) {
+      throw new Error(
+        'CreateOptions.dbType has been deprecated and removed. ' +
+        'Use driverFactory instead (return a DriverConfig `{ type, ... }`), ' +
+        'or set the CUBEJS_DB_TYPE environment variable.'
+      );
+    }
+
     optionsValidate(opts);
 
     if (
       !this.isDevMode() &&
       !process.env.CUBEJS_DB_TYPE &&
-      !opts.dbType &&
       !opts.driverFactory
     ) {
       throw new Error(
-        'Either CUBEJS_DB_TYPE, CreateOptions.dbType or CreateOptions.driverFactory ' +
-        'must be specified'
+        'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
       );
     }
-
-    // TODO (buntarb): this assertion should be restored after documentation
-    // will be added.
-    //
-    // if (opts.dbType) {
-    //   this.core.logger(
-    //     'Cube.js `CreateOptions.dbType` Property Deprecation',
-    //     {
-    //       warning: (
-    //         // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#dbType
-    //         // link once it will be created.
-    //         'CreateOptions.dbType property is now deprecated, please migrate.'
-    //       ),
-    //     },
-    //   );
-    // }
   }
 
   /**
@@ -122,25 +107,6 @@ export class OptsHandler {
     val: DriverConfig | BaseDriver,
   ) {
     if (isDriver(val)) {
-      // TODO (buntarb): these assertions should be restored after dbType
-      // deprecation period will be passed.
-      //
-      // if (this.decoratedType) {
-      //   throw new Error(
-      //     'CreateOptions.dbType is required if CreateOptions.driverFactory ' +
-      //     'returns driver instance'
-      //   );
-      // }
-      // this.core.logger(
-      //   'Cube.js CreateOptions.driverFactory Property Deprecation',
-      //   {
-      //     warning: (
-      //       // TODO (buntarb): add https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#driverFactory
-      //       // link once it will be created.
-      //       'CreateOptions.driverFactory should return DriverConfig object instead of driver instance, please migrate.'
-      //     ),
-      //   },
-      // );
       if (!this.driverFactoryType) {
         this.driverFactoryType = 'BaseDriver';
       } else if (this.driverFactoryType !== 'BaseDriver') {
@@ -175,20 +141,6 @@ export class OptsHandler {
   }
 
   /**
-   * Assert value returned from the dbType function.
-   */
-  private assertDbTypeResult(val: DatabaseType) {
-    if (typeof val !== 'string') {
-      throw new Error(`Unexpected CreateOptions.dbType result type: <${
-        typeof val
-      }>${
-        JSON.stringify(val, undefined, 2)
-      }`);
-    }
-    return val;
-  }
-
-  /**
    * Assert orchestration options.
    */
   private asserOrchestratorOptions(opts: OrchestratorOptions) {
@@ -219,8 +171,7 @@ export class OptsHandler {
    * Async driver factory getter.
    */
   private getDriverFactory(opts: CreateOptions): DriverFactoryInternalFn {
-    const { dbType, driverFactory } = opts;
-    this.decoratedType = !dbType;
+    const { driverFactory } = opts;
     this.decoratedFactory = !driverFactory;
     return async (ctx: DriverContext) => {
       if (!driverFactory) {
@@ -251,28 +202,22 @@ export class OptsHandler {
       driverFactory: DriverFactoryInternalFn,
     },
   ): DbTypeInternalFn {
-    const { dbType, driverFactory } = opts;
+    const { driverFactory } = opts;
     return async (ctx: DriverContext) => {
-      if (!dbType) {
-        let val: undefined | BaseDriver | DriverConfig;
-        let type: DatabaseType;
-        if (!this.driverFactoryType) {
-          val = await driverFactory(ctx);
-        }
-        if (
-          this.driverFactoryType === 'BaseDriver' &&
-          process.env.CUBEJS_DB_TYPE
-        ) {
-          type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
-        } else if (this.driverFactoryType === 'DriverConfig') {
-          type = (<DriverConfig>(val || await driverFactory(ctx))).type;
-        }
-        return type;
-      } else if (typeof dbType === 'function') {
-        return this.assertDbTypeResult(await dbType(ctx));
-      } else {
-        return dbType;
+      let val: undefined | BaseDriver | DriverConfig;
+      let type: DatabaseType;
+      if (!this.driverFactoryType) {
+        val = await driverFactory(ctx);
       }
+      if (
+        this.driverFactoryType === 'BaseDriver' &&
+        process.env.CUBEJS_DB_TYPE
+      ) {
+        type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
+      } else if (this.driverFactoryType === 'DriverConfig') {
+        type = (<DriverConfig>(val || await driverFactory(ctx))).type;
+      }
+      return type;
     };
   }
 

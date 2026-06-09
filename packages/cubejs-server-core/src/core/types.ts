@@ -161,6 +161,10 @@ export type DriverConfig = {
   type: DatabaseType,
 } & DriverOptions;
 
+/**
+ * @deprecated CreateOptions.dbType has been removed. Use driverFactory
+ * returning a DriverConfig, or the CUBEJS_DB_TYPE environment variable.
+ */
 export type DbTypeFn = (context: DriverContext) =>
   DatabaseType | Promise<DatabaseType>;
 export type DriverFactoryFn = (context: DriverContext) =>
@@ -189,7 +193,6 @@ export type BiToolSyncConfig = {
 };
 
 export interface CreateOptions {
-  dbType?: DatabaseType | DbTypeFn;
   externalDbType?: DatabaseType | ExternalDbTypeFn;
   schemaPath?: string;
   basePath?: string;

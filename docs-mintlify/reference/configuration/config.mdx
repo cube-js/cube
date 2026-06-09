@@ -1485,36 +1485,6 @@ module.exports = {
 
 </CodeGroup>
 
-## Deprecated
-
-### `dbType`
-
-<Warning>
-
-`dbType` is deprecated and will be removed in a future release.
-Use [`driverFactory`][self-driver-factory] instead.
-
-</Warning>
-
-Data source type. Called only once per [`appId`][self-opts-ctx-to-appid].
-
-```javascript
-module.exports = {
-  // string
-  dbType: 'snowflake',
-
-  // function
-  dbType: ({ securityContext }) => 'databricks'
-}
-```
-
-Either `string` or `function` could be passed. Providing a `Function` allows
-to dynamically select a database type depending on the security context.
-Usually used for [multitenancy][ref-multitenancy].
-
-If not defined, Cube will lookup for environment variable
-[`CUBEJS_DB_TYPE`](/reference/configuration/environment-variables#cubejs_db_type) to resolve the data source type.
-
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
 [link-express-cors-opts]:
@@ -1534,7 +1504,6 @@ If not defined, Cube will lookup for environment variable
 [ref-sec-ctx]: /docs/data-modeling/access-control/context
 [self-pre-aggregations-schema]: #pre_aggregations_schema
 [self-opts-ctx-to-appid]: #context_to_app_id
-[self-driver-factory]: #driver_factory
 [ref-schema-ref-datasource]: /reference/data-modeling/cube#data_source
 [self-repofactory]: #repository_factory
 [ref-exec-environment-globals]: /docs/data-modeling/dynamic/schema-execution-environment#nodejs-globals-processenv-consolelog-and-others
