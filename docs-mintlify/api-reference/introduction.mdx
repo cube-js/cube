@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Programmatically manage Cube Cloud — deployments, reports, and workbooks over REST, plus user and group provisioning via SCIM 2.0.
+description: Cube's HTTP APIs — query your data with the Core Data API, stream agent conversations with the AI API, and manage Cube Cloud with the Platform API.
 ---
 
 Cube exposes three HTTP API families, each for a different job and with slightly
@@ -71,7 +71,9 @@ https://{tenant}.cubecloud.dev/api
 | [Users (SCIM)](/api-reference/scim-users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
 | [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |
 
-## Core Data API client library
+## Client libraries
+
+### Core Data API
 
 Query the Core Data API from JavaScript or TypeScript with Cube's JS client,
 [`@cubejs-client/core`](https://www.npmjs.com/package/@cubejs-client/core), which
@@ -83,7 +85,7 @@ for full usage.
 npm install @cubejs-client/core
 ```
 
-## Platform API client library
+### Platform API
 
 The recommended way to call the Platform API from JavaScript or TypeScript is the
 official client, [`@cube-dev/platform-client`](https://www.npmjs.com/package/@cube-dev/platform-client).
@@ -129,7 +131,7 @@ for (const deployment of data?.items ?? []) {
 }
 ```
 
-### React Query bindings
+#### React Query bindings
 
 The `@cube-dev/platform-client/react-query` entry point adds a provider and typed
 hooks built on `@tanstack/react-query` (a peer dependency alongside `react`):
