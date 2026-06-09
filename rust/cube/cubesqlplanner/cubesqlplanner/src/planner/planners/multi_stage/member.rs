@@ -85,7 +85,6 @@ impl RollingWindowDescription {
             rolling_window: RollingWindowType::ToDate(ToDateRollingWindow { granularity }),
         }
     }
-
 }
 
 /// Semantic shape of a non-leaf multi-stage CTE: a rank window,
