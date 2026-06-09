@@ -9,8 +9,9 @@ mod trace_data_loaded;
 use super::serialized_plan::PreSerializedPlan;
 use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
-    add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
-    replace_suboptimal_merge_sorts,
+    add_limit_to_workers, drop_sort_merge_under_global_aggregate, ensure_partition_merge,
+    push_aggregate_to_workers, push_sorted_partial_aggregate_below_merge,
+    push_worker_sort_and_limit, replace_suboptimal_merge_sorts,
 };
 use crate::queryplanner::optimizations::inline_aggregate_rewriter::replace_with_inline_aggregate;
 use crate::queryplanner::planning::CubeExtensionPlanner;
@@ -145,6 +146,12 @@ fn pre_optimize_physical_plan(
     // Handles the root node case
     let p = ensure_partition_merge(p)?;
 
+    // Make the merge carry partial aggregate states instead of all raw rows
+    let p = rewrite_physical_plan(p, &mut |p| push_sorted_partial_aggregate_below_merge(p))?;
+
+    // Global (no GROUP BY) aggregates don't need their input merged in the sort order
+    let p = rewrite_physical_plan(p, &mut |p| drop_sort_merge_under_global_aggregate(p))?;
+
     // Replace sorted AggregateExec with InlineAggregateExec for better performance
     let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;
 
@@ -180,6 +187,14 @@ fn finalize_physical_plan(
     let p = rewrite_physical_plan(p, &mut |p| replace_suboptimal_merge_sorts(p))?;
     log::trace!(
         "Rewrote physical plan by replace_suboptimal_merge_sorts:\n{}",
+        pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
+    );
+    // Last: bound worker memory for ORDER BY <group cols> LIMIT that isn't an index prefix. Runs
+    // after replace_suboptimal_merge_sorts so it doesn't push the query's row limit into the
+    // worker merge we add (which would cut uncombined partial rows and undercount).
+    let p = rewrite_physical_plan(p, &mut |p| push_worker_sort_and_limit(p))?;
+    log::trace!(
+        "Rewrote physical plan by push_worker_sort_and_limit:\n{}",
         pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
     );
     Ok(p)

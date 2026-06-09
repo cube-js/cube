@@ -730,6 +730,19 @@ fn sort_to_column_names(sort_exprs: &Vec<SortExpr>, input: &LogicalPlan) -> (Vec
     }
 }
 
+/// Column names of the group-by keys, or `None` if any key is not a plain column (then we can't
+/// relate the grouping to the index sort key).
+fn group_expr_to_column_names(group_expr: &Vec<Expr>, input: &LogicalPlan) -> Option<Vec<String>> {
+    let mut names = Vec::with_capacity(group_expr.len());
+    for expr in group_expr {
+        match expr {
+            Expr::Column(c) => names.push(get_original_name(&c.name, input)),
+            _ => return None,
+        }
+    }
+    Some(names)
+}
+
 fn single_value_filter_columns<'a>(expr: &'a Expr, columns: &mut Vec<&'a common::Column>) -> bool {
     match expr {
         Expr::Column(c) => {
@@ -782,37 +795,69 @@ struct ChooseIndex<'a> {
     cluster_send_next_id: usize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Option<Vec<String>>,
     sort_is_asc: bool,
     single_value_filtered_cols: HashSet<String>,
+    /// Group-by key column names of the nearest aggregate above the scan, when all of them are
+    /// plain columns. Lets a `GROUP BY ... LIMIT` without `ORDER BY` push the limit to workers.
+    group_by: Option<Vec<String>>,
+    /// An `ORDER BY` we couldn't reduce to a column prefix (mixed asc/desc, or a non-column expr).
+    /// It still constrains the output order, so a group-by limit pushdown must not bypass it.
+    unusable_sort: bool,
+    /// A `HAVING` (a filter above the group-by aggregate) drops groups on the router after the
+    /// workers already truncated to their first `limit` groups, so a group-by limit pushdown would
+    /// undercount. Set when [group_by] is captured if a filter was seen above the aggregate.
+    group_by_has_having: bool,
+    /// A filter has been seen on the way down since the last aggregate (or the root) -- folded
+    /// into [group_by_has_having] at the next aggregate. A `WHERE` below the aggregate is fine, so
+    /// this is reset when entering an aggregate.
+    filter_above: bool,
 }
 
 impl ChooseIndexContext {
     fn update_limit(&self, limit: Option<usize>) -> Self {
         Self {
             limit,
-            sort: self.sort.clone(),
-            single_value_filtered_cols: self.single_value_filtered_cols.clone(),
-            sort_is_asc: self.sort_is_asc.clone(),
+            ..self.clone()
         }
     }
     fn update_sort(&self, names: Vec<String>, sort_is_asc: bool) -> Self {
         Self {
-            limit: self.limit.clone(),
             sort: Some(names),
-            single_value_filtered_cols: self.single_value_filtered_cols.clone(),
             sort_is_asc,
+            ..self.clone()
         }
     }
     fn update_single_value_filtered_cols(&self, cols: HashSet<String>) -> Self {
         Self {
-            limit: self.limit.clone(),
-            sort: self.sort.clone(),
             single_value_filtered_cols: cols,
-            sort_is_asc: self.sort_is_asc.clone(),
+            ..self.clone()
+        }
+    }
+    /// Enter an aggregate: record its group-by keys, fold any filter seen above it into
+    /// [group_by_has_having], and reset [filter_above] so a `WHERE` below counts only towards a
+    /// deeper aggregate.
+    fn enter_aggregate(&self, names: Vec<String>) -> Self {
+        Self {
+            group_by: Some(names),
+            group_by_has_having: self.filter_above,
+            filter_above: false,
+            ..self.clone()
+        }
+    }
+    fn mark_filter_above(&self) -> Self {
+        Self {
+            filter_above: true,
+            ..self.clone()
+        }
+    }
+    fn mark_unusable_sort(&self) -> Self {
+        Self {
+            unusable_sort: true,
+            ..self.clone()
         }
     }
 }
@@ -876,34 +921,36 @@ impl PlanRewriter for ChooseIndex<'_> {
             },
             LogicalPlan::Filter(Filter { predicate, .. }) => {
                 let mut single_filtered = Vec::new();
-                if single_value_filter_columns(predicate, &mut single_filtered) {
-                    Some(
-                        context.update_single_value_filtered_cols(
-                            single_filtered
-                                .into_iter()
-                                .map(|c| c.name.to_string())
-                                .collect(),
-                        ),
+                let base = if single_value_filter_columns(predicate, &mut single_filtered) {
+                    context.update_single_value_filtered_cols(
+                        single_filtered
+                            .into_iter()
+                            .map(|c| c.name.to_string())
+                            .collect(),
                     )
                 } else {
-                    None
-                }
+                    context.clone()
+                };
+                // A filter above the group-by aggregate is a HAVING; record it so the group-by
+                // limit pushdown (which truncates per worker before this filter) stays disabled.
+                Some(base.mark_filter_above())
             }
             LogicalPlan::Sort(Sort {
                 expr, input, fetch, ..
             }) => {
-                let mut new_context = fetch.as_ref().map(|f| context.update_limit(Some(*f)));
+                let base = fetch.as_ref().map(|f| context.update_limit(Some(*f)));
                 let (names, sort_is_asc) = sort_to_column_names(expr, input);
-                if !names.is_empty() {
-                    new_context = Some(
-                        new_context
-                            .as_ref()
-                            .unwrap_or(context)
-                            .update_sort(names, sort_is_asc),
-                    );
-                }
-                new_context
+                let base = base.as_ref().unwrap_or(context);
+                Some(if !names.is_empty() {
+                    base.update_sort(names, sort_is_asc)
+                } else {
+                    base.mark_unusable_sort()
+                })
             }
+            LogicalPlan::Aggregate(Aggregate {
+                group_expr, input, ..
+            }) => group_expr_to_column_names(group_expr, input)
+                .map(|names| context.enter_aggregate(names)),
             _ => None,
         }
     }
@@ -975,19 +1022,29 @@ impl ChooseIndex<'_> {
                         let index_schema = source.schema();
                         assert_eq!(table_schema, index_schema);
                         let limit = self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
-                        let limit_and_reverse = if let Some(limit) = limit {
-                            Some((limit, !ctx.sort_is_asc))
+                        let limit_and_reverse = limit.map(|limit| {
+                            // `reverse` reads the index backwards for a descending ORDER BY. A
+                            // group-by-only pushdown (no ORDER BY) reads it forward.
+                            let has_order_by = ctx.sort.as_ref().map_or(false, |s| !s.is_empty());
+                            (limit, has_order_by && !ctx.sort_is_asc)
+                        });
+
+                        // When the limit can't ride the index (ORDER BY on group columns that
+                        // isn't a sort-key prefix), fall back to a per-worker bounded sort.
+                        let worker_sort_and_limit = if limit_and_reverse.is_none() {
+                            self.compute_worker_sort_and_limit(ctx)
                         } else {
                             None
                         };
 
-                        return Ok(ClusterSendNode::new(
+                        let mut node = ClusterSendNode::new(
                             self.get_cluster_send_next_id(),
                             Arc::new(p),
                             vec![vec![Snapshot::Index(snapshot)]],
                             limit_and_reverse,
-                        )
-                        .into_plan());
+                        );
+                        node.worker_sort_and_limit = worker_sort_and_limit;
+                        return Ok(node.into_plan());
                     } else if let Some(table) = table_provider
                         .as_any()
                         .downcast_ref::<InlineTableProvider>()
@@ -1035,6 +1092,40 @@ impl ChooseIndex<'_> {
         id
     }
 
+    /// Builds the worker bounded-sort descriptor for `ORDER BY <group cols> LIMIT n` that can't ride
+    /// the index. Returns the full group key reordered with the ORDER BY columns first (so the
+    /// per-partition top-n on the workers is sound), or `None` when it doesn't apply.
+    fn compute_worker_sort_and_limit(
+        &self,
+        ctx: &ChooseIndexContext,
+    ) -> Option<WorkerSortAndLimit> {
+        if !self.can_pushdown_limit || ctx.unusable_sort || ctx.group_by_has_having {
+            return None;
+        }
+        let limit = ctx.limit?;
+        let sort = ctx.sort.as_ref().filter(|s| !s.is_empty())?;
+        let group_by = ctx.group_by.as_ref().filter(|g| !g.is_empty())?;
+
+        // Every ORDER BY column must be a group-by column; map it to its group-key position.
+        let mut cols: Vec<(usize, bool, bool)> = Vec::with_capacity(group_by.len());
+        let mut used = vec![false; group_by.len()];
+        for name in sort {
+            let idx = group_by.iter().position(|g| g == name)?;
+            if used[idx] {
+                continue;
+            }
+            used[idx] = true;
+            cols.push((idx, ctx.sort_is_asc, !ctx.sort_is_asc));
+        }
+        // Extend with the remaining group keys to make it a total order on the full group key.
+        for (idx, is_used) in used.iter().enumerate() {
+            if !is_used {
+                cols.push((idx, true, false));
+            }
+        }
+        Some((cols, limit))
+    }
+
     fn get_limit_for_pushdown(
         &self,
         index_sort_on: Option<&Vec<String>>,
@@ -1044,34 +1135,51 @@ impl ChooseIndex<'_> {
             || !self.can_pushdown_limit
             || index_sort_on.is_none()
             || index_sort_on.unwrap().is_empty()
-            || ctx.sort.is_none()
-            || ctx.sort.as_ref().unwrap().is_empty()
         {
             return None;
         }
 
         let limit = ctx.limit.unwrap();
-        let sort_columns = ctx.sort.as_ref().unwrap();
         let index_sort_on = index_sort_on.unwrap();
 
-        //We exclude from order by and index sort_on strictly restricted columns (aka `a = 10`)
-        let works_ind_sort_cols = index_sort_on
-            .iter()
-            .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
-        let works_sort_cols = sort_columns
-            .iter()
-            .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
+        let can_pushdown = match ctx.sort.as_ref().filter(|s| !s.is_empty()) {
+            //We can push down limit only if resulting order by is the prefix of index sort on
+            Some(sort_columns) => {
+                //We exclude from order by and index sort_on strictly restricted columns (aka `a = 10`)
+                let works_ind_sort_cols = index_sort_on
+                    .iter()
+                    .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
+                let works_sort_cols = sort_columns
+                    .iter()
+                    .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
 
-        //We can push down limit only if resulting order by is the prefix of index sort on
-        let can_pushdown = works_sort_cols
-            .zip_longest(works_ind_sort_cols)
-            .all(|item| {
-                match item {
-                    EitherOrBoth::Both(sort, index) => sort == index,
-                    EitherOrBoth::Left(_) => false, //order by has more columns then index sort on
-                    EitherOrBoth::Right(_) => true,
+                works_sort_cols
+                    .zip_longest(works_ind_sort_cols)
+                    .all(|item| {
+                        match item {
+                            EitherOrBoth::Both(sort, index) => sort == index,
+                            EitherOrBoth::Left(_) => false, //order by has more columns then index sort on
+                            EitherOrBoth::Right(_) => true,
+                        }
+                    })
+            }
+            // No ORDER BY: a grouped aggregate whose group-by keys are a prefix of the index sort
+            // key emits complete groups in sort order, so the per-partition limit may descend to
+            // the workers' sorted partial aggregate (see add_limit_to_workers). Skipped when an
+            // ORDER BY is present but unusable (it still constrains the output order), or when a
+            // HAVING above the aggregate would drop groups after the workers already truncated.
+            None if !ctx.unusable_sort && !ctx.group_by_has_having => {
+                match ctx.group_by.as_ref().filter(|g| !g.is_empty()) {
+                    Some(group_by) => group_by_is_index_sort_prefix(
+                        group_by,
+                        index_sort_on,
+                        &ctx.single_value_filtered_cols,
+                    ),
+                    None => false,
                 }
-            });
+            }
+            None => false,
+        };
 
         if can_pushdown {
             Some(limit)
@@ -1079,6 +1187,30 @@ impl ChooseIndex<'_> {
             None
         }
     }
+}
+
+/// True if the group-by key set equals a prefix of the index sort key (ignoring single-valued
+/// filtered columns). Then the rows of each group are contiguous in the index scan, the partial
+/// aggregate is sorted, and groups are emitted in index sort order -- the order the router's limit
+/// cuts on, so a per-partition group limit is safe to push down.
+fn group_by_is_index_sort_prefix(
+    group_by: &[String],
+    index_sort_on: &[String],
+    single_value_filtered_cols: &HashSet<String>,
+) -> bool {
+    let group_set: HashSet<&String> = group_by
+        .iter()
+        .filter(|c| !single_value_filtered_cols.contains(*c))
+        .collect();
+    if group_set.is_empty() {
+        return false;
+    }
+    let prefix: Vec<&String> = index_sort_on
+        .iter()
+        .filter(|c| !single_value_filtered_cols.contains(*c))
+        .take(group_set.len())
+        .collect();
+    prefix.len() == group_set.len() && prefix.iter().all(|c| group_set.contains(*c))
 }
 
 struct IndexCandidate {
@@ -1462,12 +1594,18 @@ pub enum ExtensionNodeSerialized {
     ClusterAggregateTopKLower(ClusterAggregateTopKLowerSerialized),
 }
 
+/// Per-worker bounded sort for `ORDER BY <group cols> LIMIT n` when the order isn't an index
+/// prefix: the full group key reordered with the ORDER BY columns first, plus the limit. Stored as
+/// `(group_column_index, ascending, nulls_first)` over the aggregate's group columns.
+pub type WorkerSortAndLimit = (Vec<(usize, bool, bool)>, usize);
+
 #[derive(Debug, Clone)]
 pub struct ClusterSendNode {
     pub id: usize,
     pub input: Arc<LogicalPlan>,
     pub snapshots: Vec<Snapshots>,
     pub limit_and_reverse: Option<(usize, bool)>,
+    pub worker_sort_and_limit: Option<WorkerSortAndLimit>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -1475,6 +1613,8 @@ pub struct ClusterSendSerialized {
     pub id: usize,
     pub snapshots: Vec<Snapshots>,
     pub limit_and_reverse: Option<(usize, bool)>,
+    #[serde(default)]
+    pub worker_sort_and_limit: Option<WorkerSortAndLimit>,
 }
 
 impl ClusterSendNode {
@@ -1489,6 +1629,7 @@ impl ClusterSendNode {
             input,
             snapshots,
             limit_and_reverse,
+            worker_sort_and_limit: None,
         }
     }
 
@@ -1504,6 +1645,7 @@ impl ClusterSendNode {
             input: Arc::new(inputs[0].clone()),
             snapshots: serialized.snapshots,
             limit_and_reverse: serialized.limit_and_reverse,
+            worker_sort_and_limit: serialized.worker_sort_and_limit,
         }
     }
 
@@ -1512,6 +1654,7 @@ impl ClusterSendNode {
             id: self.id,
             snapshots: self.snapshots.clone(),
             limit_and_reverse: self.limit_and_reverse.clone(),
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
         }
     }
 }
@@ -1562,6 +1705,7 @@ impl UserDefinedLogicalNode for ClusterSendNode {
             input: Arc::new(inputs[0].clone()),
             snapshots: self.snapshots.clone(),
             limit_and_reverse: self.limit_and_reverse.clone(),
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
         }))
     }
 
@@ -1633,9 +1777,14 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             let id = send.id;
             snapshots = send.snapshots.clone();
             let limit = send.limit_and_reverse.clone();
+            // These nodes sit below the aggregate and don't change the group columns, so the
+            // worker bounded-sort descriptor (indexed by group column) stays valid.
+            let worker_sort_and_limit = send.worker_sort_and_limit.clone();
 
             *input = send.input.clone();
-            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
+            let mut new_send = ClusterSendNode::new(id, Arc::new(p), snapshots, limit);
+            new_send.worker_sort_and_limit = worker_sort_and_limit;
+            return Ok(new_send.into_plan());
         }
         LogicalPlan::Union(Union { inputs, .. }) => {
             // Handle UNION over constants, e.g. inline data series.
@@ -1781,6 +1930,7 @@ impl ExtensionPlanner for CubeExtensionPlanner {
                 false,
                 usize::MAX,
                 cs.limit_and_reverse.clone(),
+                cs.worker_sort_and_limit.clone(),
                 Some(find_cluster_send_cut_point.result.ok_or_else(|| {
                     CubeError::internal("ClusterSend cut point not found".to_string())
                 })?),
@@ -1840,6 +1990,7 @@ impl CubeExtensionPlanner {
         use_streaming: bool,
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
+        worker_sort_and_limit: Option<WorkerSortAndLimit>,
         logical_plan_to_send: Option<&LogicalPlan>,
         required_input_ordering: Option<LexRequirement>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
@@ -1862,6 +2013,7 @@ impl CubeExtensionPlanner {
                 input,
                 use_streaming,
                 limit_and_reverse,
+                worker_sort_and_limit,
                 required_input_ordering,
             )?))
         } else {
@@ -1871,6 +2023,7 @@ impl CubeExtensionPlanner {
                 max_batch_rows,
                 limit_and_reverse,
                 required_input_ordering,
+                worker_sort_and_limit,
                 worker_planning_params,
             )))
         }
@@ -1885,6 +2038,7 @@ pub struct WorkerExec {
     pub max_batch_rows: usize,
     pub limit_and_reverse: Option<(usize, bool)>,
     pub required_input_ordering: Option<LexRequirement>,
+    pub worker_sort_and_limit: Option<WorkerSortAndLimit>,
     properties: PlanProperties,
 }
 
@@ -1894,6 +2048,7 @@ impl WorkerExec {
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
         required_input_ordering: Option<LexRequirement>,
+        worker_sort_and_limit: Option<WorkerSortAndLimit>,
         worker_planning_params: WorkerPlanningParams,
     ) -> WorkerExec {
         // This, importantly, gives us the same PlanProperties as ClusterSendExec.
@@ -1906,6 +2061,7 @@ impl WorkerExec {
             max_batch_rows,
             limit_and_reverse,
             required_input_ordering,
+            worker_sort_and_limit,
             properties,
         }
     }
@@ -1942,6 +2098,7 @@ impl ExecutionPlan for WorkerExec {
             max_batch_rows: self.max_batch_rows,
             limit_and_reverse: self.limit_and_reverse.clone(),
             required_input_ordering: self.required_input_ordering.clone(),
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             properties,
         }))
     }

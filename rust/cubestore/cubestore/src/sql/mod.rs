@@ -3625,14 +3625,13 @@ mod tests {
                 \n      CoalescePartitions\
                 \n        LinearPartialAggregate\
                 \n          Filter\
-                \n            MergeSort\
-                \n              Scan, index: default:1:[1]:sort_on[num], fields: *\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan";
+                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan";
                 let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
                 let p = plan_regexp.replace_all(&plan, "ParquetScan");
                 println!("pp {}", p);
@@ -5957,6 +5956,213 @@ mod tests {
                     })
                     .await;
             });
+    }
+
+    #[tokio::test]
+    async fn worker_sort_and_limit_cluster() -> Result<(), CubeError> {
+        Config::test("worker_sort_limit_router")
+            .update_config(|mut config| {
+                config.select_workers = vec![
+                    "127.0.0.1:24106".to_string(),
+                    "127.0.0.1:24107".to_string(),
+                ];
+                config.metastore_bind_address = Some("127.0.0.1:25106".to_string());
+                config.compaction_chunks_count_threshold = 0;
+                config
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                Config::test("worker_sort_limit_worker_1")
+                    .update_config(|mut config| {
+                        config.worker_bind_address = Some("127.0.0.1:24106".to_string());
+                        config.server_name = "127.0.0.1:24106".to_string();
+                        config.metastore_remote_address =
+                            Some("127.0.0.1:25106".to_string());
+                        config.store_provider = FileStoreProvider::Filesystem {
+                            remote_dir: Some(
+                                env::current_dir()
+                                    .unwrap()
+                                    .join("worker_sort_limit_router-upstream".to_string()),
+                            ),
+                        };
+                        config.compaction_chunks_count_threshold = 0;
+                        config
+                    })
+                    .start_test_worker(async move |_| {
+                        Config::test("worker_sort_limit_worker_2")
+                            .update_config(|mut config| {
+                                config.worker_bind_address =
+                                    Some("127.0.0.1:24107".to_string());
+                                config.server_name = "127.0.0.1:24107".to_string();
+                                config.metastore_remote_address =
+                                    Some("127.0.0.1:25106".to_string());
+                                config.store_provider = FileStoreProvider::Filesystem {
+                                    remote_dir: Some(
+                                        env::current_dir().unwrap().join(
+                                            "worker_sort_limit_router-upstream".to_string(),
+                                        ),
+                                    ),
+                                };
+                                config.compaction_chunks_count_threshold = 0;
+                                config
+                            })
+                            .start_test_worker(async move |_| {
+                                service
+                                    .exec_query("CREATE SCHEMA foo")
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                service
+                                    .exec_query(
+                                        "CREATE TABLE foo.data (category text, region text, amount int) \
+                                         INDEX idx1 (category, region)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                service
+                                    .exec_query(
+                                        "INSERT INTO foo.data (category, region, amount) VALUES \
+                                         ('A', 'East', 10), ('A', 'West', 20), ('B', 'East', 30), ('B', 'West', 40), \
+                                         ('C', 'East', 50), ('C', 'West', 60), ('D', 'East', 70), ('D', 'West', 80), \
+                                         ('A', 'North', 15), ('B', 'North', 25), ('C', 'North', 35), ('D', 'North', 45), \
+                                         ('A', 'South', 55), ('B', 'South', 65), ('C', 'South', 75), ('D', 'South', 85)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                // Test 1: ORDER BY group-by column (matches index prefix) with LIMIT
+                                // Should use limit_and_reverse on the worker
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT category, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        !worker_plan.contains("Sort"),
+                                        "When ORDER BY matches index prefix, worker should use \
+                                         limit scan instead of Sort. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 2: ORDER BY non-prefix group-by column with LIMIT
+                                // Should push Sort(fetch=N) to the worker
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT category, region, sum(amount) \
+                                             FROM foo.data GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        worker_plan.contains("Sort, fetch: 3"),
+                                        "Worker should have Sort with fetch=3. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 3: Verify correctness of ORDER BY 2 LIMIT 3
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "SELECT category, region, sum(amount) \
+                                             FROM foo.data GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    assert_eq!(result.len(), 3);
+                                    // ORDER BY region ASC: East comes first
+                                    for row in result.get_rows() {
+                                        match &row.values()[1] {
+                                            TableValue::String(region) => {
+                                                assert_eq!(region, "East");
+                                            }
+                                            _ => panic!("expected string"),
+                                        }
+                                    }
+                                }
+
+                                // Test 4: ORDER BY 1 DESC with LIMIT on non-prefix column
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT region, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 DESC LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        worker_plan.contains("Sort, fetch: 2"),
+                                        "Worker should have Sort with fetch=2 for DESC. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 5: Verify correctness of ORDER BY 1 DESC LIMIT 2
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "SELECT region, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 DESC LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    assert_eq!(result.len(), 2);
+                                    let regions: Vec<&str> = result
+                                        .get_rows()
+                                        .iter()
+                                        .map(|r| match &r.values()[0] {
+                                            TableValue::String(s) => s.as_str(),
+                                            _ => panic!("expected string"),
+                                        })
+                                        .collect();
+                                    assert_eq!(regions, vec!["West", "South"]);
+                                }
+
+                                Ok::<(), CubeError>(())
+                            })
+                            .await;
+                        Ok::<(), CubeError>(())
+                    })
+                    .await;
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
     }
 }
 

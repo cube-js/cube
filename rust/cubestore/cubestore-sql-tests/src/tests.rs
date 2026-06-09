@@ -234,6 +234,26 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             unique_key_and_multi_partitions_hash_aggregate,
         ),
         t("filter_pushdown_unique_key", filter_pushdown_unique_key),
+        t(
+            "group_by_prefix_sorted_aggregate_multi_partition",
+            group_by_prefix_sorted_aggregate_multi_partition,
+        ),
+        t(
+            "group_by_prefix_limit_high_cardinality",
+            group_by_prefix_limit_high_cardinality,
+        ),
+        t(
+            "planning_aggregate_below_merge_with_limit",
+            planning_aggregate_below_merge_with_limit,
+        ),
+        t(
+            "global_aggregate_no_chunk_merge",
+            global_aggregate_no_chunk_merge,
+        ),
+        t(
+            "global_aggregate_unique_key_keeps_merge",
+            global_aggregate_unique_key_keeps_merge,
+        ),
         t("divide_by_zero", divide_by_zero),
         t(
             "filter_multiple_in_for_decimal",
@@ -299,6 +319,11 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             queue_result_ack_multiple_with_external_id,
         ),
         t("limit_pushdown_group", limit_pushdown_group),
+        t("limit_pushdown_group_having", limit_pushdown_group_having),
+        t(
+            "limit_pushdown_group_nonprefix_order",
+            limit_pushdown_group_nonprefix_order,
+        ),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
             "limit_pushdown_group_where_order",
@@ -386,6 +411,13 @@ lazy_static::lazy_static! {
         "create_table_with_csv_no_header_and_delimiter",
         "create_table_with_csv_no_header_and_quotes",
         "filter_pushdown_unique_key",
+        "group_by_prefix_sorted_aggregate_multi_partition",
+        "group_by_prefix_limit_high_cardinality",
+        "planning_aggregate_below_merge_with_limit",
+        "global_aggregate_no_chunk_merge",
+        "global_aggregate_unique_key_keeps_merge",
+        "limit_pushdown_group_having",
+        "limit_pushdown_group_nonprefix_order",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -3630,8 +3662,8 @@ async fn planning_simple(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         pp_phys_plan(p.worker.as_ref()),
         "InlineFinalAggregate\
         \n  Worker\
-        \n    InlinePartialAggregate\
-        \n      MergeSort\
+        \n    MergeSort\
+        \n      InlinePartialAggregate\
         \n        Union\
         \n          Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
         \n            Sort\
@@ -7240,9 +7272,9 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) -> Result<
             \n  InlineFinalAggregate, partitions: 1\
             \n    MergeSort, partitions: 1\
             \n      Worker, partitions: 2\
-            \n        GlobalLimit, n: 100, partitions: 1\
-            \n          InlinePartialAggregate, partitions: 1\
-            \n            MergeSort, partitions: 1\
+            \n        MergeSort, partitions: 1\
+            \n          LocalLimit, n: 100, partitions: 2\
+            \n            InlinePartialAggregate, limit: 100, partitions: 2\
             \n              Union, partitions: 2\
             \n                Projection, [a, b], partitions: 1\
             \n                  LastRowByUniqueKey, partitions: 1\
@@ -7436,6 +7468,387 @@ async fn filter_pushdown_unique_key(service: Box<dyn SqlClient>) -> Result<(), C
             })
             .count()
     }
+}
+
+/// Correctness of the sorted partial aggregate executed per partition below the merge: group
+/// keys present in several partitions must combine to the same totals as without the
+/// optimization, with and without LIMIT.
+async fn group_by_prefix_sorted_aggregate_multi_partition(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data1 (a int, b int, val int, fval double)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.Data2 (a int, b int, val int, fval double)")
+        .await?;
+
+    // Group keys with `a` in 4..8 get rows from both tables, i.e. from both partitions of the
+    // union.
+    let mut raw_rows = Vec::new();
+    let mut values1 = Vec::new();
+    for a in 0i64..8 {
+        for b in 0i64..3 {
+            for r in 0i64..2 {
+                let val = a * 31 + b * 17 + r;
+                values1.push(format!("({}, {}, {}, {}.5)", a, b, val, val));
+                raw_rows.push((a, b, val));
+            }
+        }
+    }
+    let mut values2 = Vec::new();
+    for a in 4i64..12 {
+        for b in 0i64..3 {
+            for r in 0i64..2 {
+                let val = a * 13 + b * 7 + r;
+                values2.push(format!("({}, {}, {}, {}.5)", a, b, val, val));
+                raw_rows.push((a, b, val));
+            }
+        }
+    }
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.Data1 (a, b, val, fval) VALUES {}",
+            values1.join(", ")
+        ))
+        .await?;
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.Data2 (a, b, val, fval) VALUES {}",
+            values2.join(", ")
+        ))
+        .await?;
+
+    // Expected aggregates per group; fval = val + 0.5 keeps float sums exactly representable,
+    // so the assertions stay byte-exact regardless of the summation order.
+    let mut groups = std::collections::BTreeMap::<(i64, i64), (i64, i64, i64, i64)>::new();
+    for (a, b, val) in raw_rows {
+        let group = groups.entry((a, b)).or_insert((0, i64::MAX, i64::MIN, 0));
+        group.0 += val;
+        group.1 = group.1.min(val);
+        group.2 = group.2.max(val);
+        group.3 += 1;
+    }
+    let group_row = |((a, b), (sum, min, max, count)): (&(i64, i64), &(i64, i64, i64, i64))| {
+        vec![
+            TableValue::Int(*a),
+            TableValue::Int(*b),
+            TableValue::Int(*sum),
+            TableValue::Int(*min),
+            TableValue::Int(*max),
+            TableValue::Float((*sum as f64 + 0.5 * *count as f64).into()),
+        ]
+    };
+    let expected: Vec<Vec<TableValue>> = groups.iter().map(group_row).collect();
+
+    let query = "SELECT a, b, sum(val), min(val), max(val), sum(fval) FROM (\
+                     SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2\
+                 ) `t` GROUP BY 1, 2";
+
+    let full = service
+        .exec_query(&format!("{} ORDER BY 1, 2", query))
+        .await?;
+    assert_eq!(to_rows(&full), expected);
+
+    // LIMIT must return the same prefix of the full result
+    let limited = service
+        .exec_query(&format!("{} ORDER BY 1, 2 LIMIT 5", query))
+        .await?;
+    assert_eq!(to_rows(&limited), expected[..5]);
+
+    // DESC ordering takes the tail groups
+    let tail = service
+        .exec_query(&format!("{} ORDER BY 1 DESC, 2 DESC LIMIT 5", query))
+        .await?;
+    let expected_tail: Vec<_> = expected.iter().rev().take(5).cloned().collect();
+    assert_eq!(to_rows(&tail), expected_tail);
+
+    // ORDER BY an aggregate must not use the group-order shortcut
+    let by_sum = service
+        .exec_query(&format!("{} ORDER BY 3, 1, 2 LIMIT 4", query))
+        .await?;
+    let mut by_sum_keys: Vec<(i64, i64, i64)> = groups
+        .iter()
+        .map(|((a, b), (sum, ..))| (*sum, *a, *b))
+        .collect();
+    by_sum_keys.sort();
+    let expected_by_sum: Vec<Vec<TableValue>> = by_sum_keys
+        .iter()
+        .take(4)
+        .map(|(_, a, b)| group_row(((&(*a, *b)), &groups[&(*a, *b)])))
+        .collect();
+    assert_eq!(to_rows(&by_sum), expected_by_sum);
+    Ok(())
+}
+
+/// LIMIT short-circuit correctness on group counts below and above the execution batch size
+/// (4096), with duplicate group keys across partitions.
+async fn group_by_prefix_limit_high_cardinality(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data1 (a int, val int)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.Data2 (a int, val int)")
+        .await?;
+
+    // 7500 groups in total, above the 4096 execution batch size; keys 2500..5000 are present
+    // in both tables.
+    for chunk in (0i64..5000).collect::<Vec<_>>().chunks(1000) {
+        let values = chunk
+            .iter()
+            .map(|a| format!("({}, {})", a, a * 3 + 1))
+            .join(", ");
+        service
+            .exec_query(&format!("INSERT INTO s.Data1 (a, val) VALUES {}", values))
+            .await?;
+    }
+    for chunk in (2500i64..7500).collect::<Vec<_>>().chunks(1000) {
+        let values = chunk
+            .iter()
+            .map(|a| format!("({}, {})", a, a * 5 + 2))
+            .join(", ");
+        service
+            .exec_query(&format!("INSERT INTO s.Data2 (a, val) VALUES {}", values))
+            .await?;
+    }
+
+    let expected = |range: std::ops::Range<i64>| -> Vec<Vec<TableValue>> {
+        range
+            .map(|a| {
+                let mut sum = 0;
+                if a < 5000 {
+                    sum += a * 3 + 1;
+                }
+                if a >= 2500 {
+                    sum += a * 5 + 2;
+                }
+                vec![TableValue::Int(a), TableValue::Int(sum)]
+            })
+            .collect()
+    };
+
+    let query = "SELECT a, sum(val) FROM (\
+                     SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2\
+                 ) `t` GROUP BY 1";
+
+    // LIMIT far below the batch size
+    let r = service
+        .exec_query(&format!("{} ORDER BY 1 LIMIT 10", query))
+        .await?;
+    assert_eq!(to_rows(&r), expected(0..10));
+
+    // LIMIT above the batch size
+    let r = service
+        .exec_query(&format!("{} ORDER BY 1 LIMIT 5000", query))
+        .await?;
+    assert_eq!(to_rows(&r), expected(0..5000));
+
+    // DESC takes the last groups (per-partition tail path)
+    let r = service
+        .exec_query(&format!("{} ORDER BY 1 DESC LIMIT 10", query))
+        .await?;
+    let mut expected_tail = expected(7490..7500);
+    expected_tail.reverse();
+    assert_eq!(to_rows(&r), expected_tail);
+
+    // No limit: all the groups
+    let r = service.exec_query(&format!("{} ORDER BY 1", query)).await?;
+    assert_eq!(to_rows(&r), expected(0..7500));
+
+    // No ORDER BY: the limit still descends (the group key is the index sort prefix), so groups
+    // come out in key order and the first 10 are returned.
+    let r = service.exec_query(&format!("{} LIMIT 10", query)).await?;
+    assert_eq!(to_rows(&r), expected(0..10));
+    Ok(())
+}
+
+/// The sorted partial aggregate runs per partition below the merge; the worker limit becomes a
+/// group limit on the aggregate plus a widened row budget on the merge (duplicate group keys
+/// from different partitions make a plain row limit incorrect).
+async fn planning_aggregate_below_merge_with_limit(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, amount int)")
+        .await?;
+
+    let p = service
+        .plan_query(
+            "SELECT a, b, SUM(amount) FROM (\
+                 SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders\
+             ) `t` GROUP BY 1, 2",
+        )
+        .await?;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "InlineFinalAggregate\
+        \n  Worker\
+        \n    MergeSort\
+        \n      InlinePartialAggregate\
+        \n        Union\
+        \n          Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n            Sort\
+        \n              Empty\
+        \n          Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n            Sort\
+        \n              Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT a, b, SUM(amount) FROM (\
+                 SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders\
+             ) `t` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 5",
+        )
+        .await?;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Sort, fetch: 5\
+        \n  InlineFinalAggregate\
+        \n    Worker\
+        \n      MergeSort\
+        \n        LocalLimit, n: 5\
+        \n          InlinePartialAggregate, limit: 5\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty"
+    );
+
+    // Reverse limit: a per-partition tail below the merge instead of a group limit (the last
+    // groups are unknown until the input ends, so the aggregate can't stop early)
+    let p = service
+        .plan_query(
+            "SELECT a, b, SUM(amount) FROM (\
+                 SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders\
+             ) `t` GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 5",
+        )
+        .await?;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Sort, fetch: 5\
+        \n  InlineFinalAggregate\
+        \n    Worker\
+        \n      MergeSort\
+        \n        TailLimit, n: 5\
+        \n          InlinePartialAggregate\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:1:[1]:sort_on[a, b], fields: *\
+        \n                Sort\
+        \n                  Empty"
+    );
+    Ok(())
+}
+
+/// A no-GROUP BY (hash) aggregate over a multi-chunk scan: the chunks must be coalesced, not
+/// merge-sorted -- the aggregate doesn't use the order, and the equality filters on the sort key
+/// prefix make every merge comparison a full-length tie.
+async fn global_aggregate_no_chunk_merge(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Batch (tenant_id int, deployment_id int, ts timestamp, hits int, hits_failed int)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Stream (tenant_id int, deployment_id int, ts timestamp, hits int, hits_failed int)",
+        )
+        .await?;
+
+    // Several inserts = several chunks, like a streaming table
+    for i in 0..3 {
+        let values = (0..50)
+            .map(|j| {
+                format!(
+                    "(25358, 5, '2026-06-03T0{}:00:{:02}.000', {}, {})",
+                    i,
+                    j,
+                    j,
+                    j % 3
+                )
+            })
+            .join(", ");
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.Stream (tenant_id, deployment_id, ts, hits, hits_failed) VALUES {}",
+                values
+            ))
+            .await?;
+    }
+
+    let query = "SELECT sum(hits) hits, sum(hits_failed) hits_failed FROM (\
+                     SELECT * FROM s.Batch WHERE 1 = 0 \
+                     UNION ALL \
+                     SELECT * FROM s.Stream\
+                 ) `t` WHERE tenant_id = 25358 AND deployment_id = 5 \
+                   AND ts >= to_timestamp('2026-06-03T00:00:00.000') \
+                   AND ts <= to_timestamp('2026-06-03T23:59:59.999') \
+                 LIMIT 10000";
+
+    let r = service.exec_query(query).await?;
+    assert_eq!(to_rows(&r), rows(&[(3675, 147)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        !worker_plan.contains("MergeSort"),
+        "hash aggregate must not merge-sort the chunks:\n{}",
+        worker_plan
+    );
+    let coalesce_pos = worker_plan.find("CoalescePartitions");
+    let aggregate_pos = worker_plan.find("LinearPartialAggregate");
+    assert!(
+        coalesce_pos.is_some() && aggregate_pos.is_some() && coalesce_pos < aggregate_pos,
+        "the per-partition aggregation must be coalesced above:\n{}",
+        worker_plan
+    );
+    Ok(())
+}
+
+/// A unique key table deduplicates row versions via LastRowByUniqueKey, which needs its input
+/// merge-sorted to keep the versions of a key adjacent. That merge must survive the
+/// no-ordering-needed rewrite under a global aggregate.
+async fn global_aggregate_unique_key_keeps_merge(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Versions (a int, b int, val int) unique key (a, b)")
+        .await?;
+
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 10, 1), (2, 2, 20, 2)")
+        .await?;
+    // A newer version of (1, 1) in another chunk
+    service
+        .exec_query("INSERT INTO s.Versions (a, b, val, __seq) VALUES (1, 1, 30, 3)")
+        .await?;
+
+    let query = "SELECT sum(val) FROM s.Versions";
+    let r = service.exec_query(query).await?;
+    // Only the last version of each key counts: 30 + 20, not 10 + 30 + 20
+    assert_eq!(to_rows(&r), rows(&[(50)]));
+
+    let p = service.plan_query(query).await?;
+    let worker_plan = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        worker_plan.contains("LastRowByUniqueKey") && worker_plan.contains("MergeSort"),
+        "the deduplicating merge must stay in place:\n{}",
+        worker_plan
+    );
+    Ok(())
 }
 
 async fn divide_by_zero(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
@@ -8177,12 +8590,12 @@ async fn build_range_end(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     Ok(())
 }
 
-async fn assert_limit_pushdown_using_search_string(
+async fn assert_limit_pushdown_using_search_strings(
     service: &Box<dyn SqlClient>,
     query: &str,
     expected_index: Option<&str>,
     is_limit_expected: bool,
-    search_string: &str,
+    search_strings: &[&str],
 ) -> Result<Vec<Row>, CubeError> {
     let res = service
         .exec_query(&format!("EXPLAIN ANALYZE {}", query))
@@ -8197,18 +8610,17 @@ async fn assert_limit_pushdown_using_search_string(
                     )));
                 }
             }
-            let expected_limit = search_string;
             if is_limit_expected {
-                if !s.contains(expected_limit) {
+                if !search_strings.iter().any(|expected| s.contains(expected)) {
                     return Err(CubeError::internal(format!(
                         "{} expected but not found",
-                        expected_limit
+                        search_strings.join(" or ")
                     )));
                 }
-            } else if s.contains(expected_limit) {
+            } else if let Some(found) = search_strings.iter().find(|e| s.contains(*e)) {
                 return Err(CubeError::internal(format!(
                     "{} unexpected but found",
-                    expected_limit
+                    found
                 )));
             }
         }
@@ -8219,6 +8631,23 @@ async fn assert_limit_pushdown_using_search_string(
     Ok(res.get_rows().clone())
 }
 
+async fn assert_limit_pushdown_using_search_string(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected_index: Option<&str>,
+    is_limit_expected: bool,
+    search_string: &str,
+) -> Result<Vec<Row>, CubeError> {
+    assert_limit_pushdown_using_search_strings(
+        service,
+        query,
+        expected_index,
+        is_limit_expected,
+        &[search_string],
+    )
+    .await
+}
+
 async fn assert_limit_pushdown(
     service: &Box<dyn SqlClient>,
     query: &str,
@@ -8226,15 +8655,17 @@ async fn assert_limit_pushdown(
     is_limit_expected: bool,
     is_tail_limit: bool,
 ) -> Result<Vec<Row>, CubeError> {
-    assert_limit_pushdown_using_search_string(
+    assert_limit_pushdown_using_search_strings(
         service,
         query,
         expected_index,
         is_limit_expected,
         if is_tail_limit {
-            "TailLimit"
+            &["TailLimit"]
         } else {
-            "GlobalLimit"
+            // The worker limit is either a plain row limit or, for a partial aggregate running
+            // per partition below the merge, a group limit on the aggregate.
+            &["GlobalLimit", "InlinePartialAggregate, limit:"]
         },
     )
     .await
@@ -8473,6 +8904,8 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         )
         .await?;
 
+    // GROUP BY + LIMIT without ORDER BY: the group-by key is a prefix of the index sort key, so
+    // the limit descends to the workers' sorted partial aggregate and groups come out key-ordered.
     let res = assert_limit_pushdown(
         &service,
         "SELECT id, SUM(n) FROM (
@@ -8481,22 +8914,106 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) -> Result<(), CubeErr
                 SELECT * FROM foo.pushdown2
                 ) as `tb` GROUP BY 1 LIMIT 3",
         None,
+        true,
+        false,
+    )
+    .await?;
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
+            Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
+        ]
+    );
+    Ok(())
+}
+
+// A HAVING (a filter above the aggregate) must block the group-by limit pushdown: the worker
+// would truncate to its first `limit` groups before HAVING runs on the router, dropping qualifying
+// groups that sort past the truncation point and undercounting the result.
+async fn limit_pushdown_group_having(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.having (id int, n int)")
+        .await?;
+    // Odd ids sum to 100 (pass HAVING), even ids to 1 (filtered out). The first 3 ids (1, 2, 3)
+    // contain only two passing groups, so a per-worker limit-before-HAVING would return 2 rows.
+    let values = (1..=10).map(|id| format!("({}, {})", id, if id % 2 == 1 { 100 } else { 1 }));
+    service
+        .exec_query(&format!(
+            "INSERT INTO foo.having (id, n) VALUES {}",
+            values.collect::<Vec<_>>().join(", ")
+        ))
+        .await?;
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT id, SUM(n) FROM foo.having GROUP BY 1 HAVING SUM(n) > 50 LIMIT 3",
+        None,
         false,
         false,
     )
     .await?;
 
-    // TODO upgrade DF limit isn't expected and order can't be validated.
-    // TODO But should we keep existing behavior of always sorted output?
-    assert_eq!(res.len(), 3);
-    // assert_eq!(
-    //     res,
-    //     vec![
-    //         Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
-    //         Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
-    //         Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
-    //     ]
-    // );
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(1), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(3), TableValue::Int(100)]),
+            Row::new(vec![TableValue::Int(5), TableValue::Int(100)]),
+        ]
+    );
+    Ok(())
+}
+
+// ORDER BY a group column that is not an index-sort prefix, with the same group spread across
+// chunks: the limit can't ride the index, so the per-worker bounded sort kicks in. The sort key is
+// the full group key, so every chunk keeps the global top groups' partial states and the sums stay
+// correct (sorting by the ORDER BY column alone would drop partial states of groups split across
+// chunks and undercount).
+async fn limit_pushdown_group_nonprefix_order(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.ovl (a int, b int, val int) INDEX bidx (a, b)")
+        .await?;
+    // Three chunks; every b in {1, 2, 3} appears in each chunk under a different `a`, so each b
+    // group spans all three chunks.
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (1, 1, 10), (1, 2, 20), (1, 3, 30)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (2, 1, 100), (2, 2, 200), (2, 3, 300)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.ovl (a, b, val) VALUES (3, 1, 1000), (3, 2, 2000), (3, 3, 3000)")
+        .await?;
+
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.ovl GROUP BY b ORDER BY b LIMIT 2")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(1), TableValue::Int(1110)],
+            vec![TableValue::Int(2), TableValue::Int(2220)],
+        ]
+    );
+
+    // DESC keeps the largest keys.
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.ovl GROUP BY b ORDER BY b DESC LIMIT 2")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            vec![TableValue::Int(3), TableValue::Int(3330)],
+            vec![TableValue::Int(2), TableValue::Int(2220)],
+        ]
+    );
     Ok(())
 }
 
