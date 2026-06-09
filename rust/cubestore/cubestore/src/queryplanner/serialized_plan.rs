@@ -1085,9 +1085,10 @@ impl SerializedPlan {
         })
     }
 
-    /// In-memory chunks of executable partitions grouped by the proto-encoded pushable
-    /// predicate of their index (from `PlanningMeta::pushable_chunk_filters`). Empty when
-    /// no index carries a pre-filter. The worker uses this to trim chunks before IPC.
+    /// One entry per index snapshot that carries a pre-filter: its proto-encoded pushable
+    /// predicate (from `PlanningMeta::pushable_chunk_filters`) paired with the ids of its
+    /// in-memory chunks in executable partitions. Empty when no index carries a pre-filter.
+    /// The worker uses this to trim chunks before IPC.
     pub fn in_memory_chunk_filter_groups(&self) -> Vec<(Vec<u8>, Vec<u64>)> {
         let pushable = &self.planning_meta().pushable_chunk_filters;
         if pushable.iter().all(|p| p.is_none()) {
