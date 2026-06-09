@@ -114,8 +114,6 @@ export type DatabaseType =
   | 'mssql'
   | 'mysql'
   | 'mysqlauroraserverless'
-  | 'elasticsearch'
-  | 'awselasticsearch'
   | 'oracle'
   | 'postgres'
   | 'prestodb'
