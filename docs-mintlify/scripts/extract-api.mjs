@@ -51,6 +51,32 @@ const OUT = path.join(import.meta.dirname, '..', 'api-reference', 'api.yaml');
 const INCLUDE_PREFIX = '/api/v1/';
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
+// Operations to hide from the public docs even though the source spec exposes
+// them — e.g. stray/internal admin routes that surface a single, incomplete
+// endpoint. Listed as "METHOD /path" using the normalized path (no /api prefix,
+// no trailing slash). Kept here so re-pulling an updated upstream spec does NOT
+// resurface them. If a path's only operations are excluded, the whole path (and
+// its now-empty nav group) is dropped automatically.
+const EXCLUDE_OPERATIONS = new Set([
+  // Stray/incomplete admin routes.
+  'DELETE /v1/groups/{id}',
+  'GET /v1/user-groups',
+  // Account-level / internal admin APIs kept out of the public docs.
+  'GET /v1/deployments/{deploymentId}/agent-skills',
+  'GET /v1/deployments/{deploymentId}/agents',
+  'POST /v1/meta',
+  'GET /v1/users',
+  'GET /v1/users/embed-theme',
+  'GET /v1/users/me',
+  'DELETE /v1/user-attributes/{id}',
+  'GET /v1/resource-policies',
+  'PUT /v1/resource-policies/group',
+  'PUT /v1/resource-policies/user',
+  'GET /v1/app-theme',
+  'GET /v1/ai-engineer/active-region',
+  'GET /v1/ai-engineer/settings',
+]);
+
 // Explicit display names for tags whose auto-cleaned form would be unclear or
 // collide. Everything else is cleaned by cleanTag() below.
 const TAG_MAP = {
@@ -85,12 +111,15 @@ for (const [key, val] of Object.entries(src.paths)) {
   if (!key.startsWith(INCLUDE_PREFIX)) continue;
   let newKey = key.replace(/^\/api/, '');
   if (newKey.length > 1) newKey = newKey.replace(/\/$/, ''); // drop trailing slash
-  if (paths[newKey]) {
-    console.error(`Aborting: path collision after normalization: ${newKey} (from ${key}).`);
-    process.exit(1);
-  }
+  let kept = 0;
   for (const m of METHODS) {
     if (!val[m]) continue;
+    // Drop explicitly hidden operations before they reach the spec or nav.
+    if (EXCLUDE_OPERATIONS.has(`${m.toUpperCase()} ${newKey}`)) {
+      delete val[m];
+      continue;
+    }
+    kept++;
     if (Array.isArray(val[m].tags)) {
       val[m].tags = val[m].tags.map(cleanTag);
     }
@@ -98,6 +127,11 @@ for (const [key, val] of Object.entries(src.paths)) {
     if (typeof val[m].operationId === 'string') {
       val[m].operationId = val[m].operationId.replace(/^[^.]*\./, '');
     }
+  }
+  if (!kept) continue; // every operation on this path was excluded
+  if (paths[newKey]) {
+    console.error(`Aborting: path collision after normalization: ${newKey} (from ${key}).`);
+    process.exit(1);
   }
   paths[newKey] = val;
 }

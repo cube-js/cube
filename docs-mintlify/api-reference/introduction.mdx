@@ -3,13 +3,87 @@ title: Introduction
 description: Programmatically manage Cube Cloud — deployments, reports, and workbooks over REST, plus user and group provisioning via SCIM 2.0.
 ---
 
-Programmatically manage your Cube Cloud account: work with deployments and the
-resources scoped to them (environments, folders, reports, workbooks,
-notifications, workspace items, and agents), manage account-level users, groups,
-policies, embedding, and AI settings over a REST API, and provision users and
-groups from your identity provider via SCIM 2.0.
+Cube exposes three HTTP API families, each for a different job and with slightly
+different authentication:
 
-## Official client library
+| API | What it's for | Authentication |
+| --- | --- | --- |
+| **Core Data API** | Query your data model over HTTP — run queries (`/v1/load`) and read metadata (`/v1/meta`) | Cube API token (a JWT) sent **directly** in the `Authorization` header — no prefix |
+| **AI API** | Stream conversations with Cube AI agents (`/chat/stream-chat-state`) | Cube Cloud API key with the **`Api-Key`** prefix |
+| **Platform API** | Manage Cube Cloud — deployments, reports, workbooks, users, policies, and more | **`Api-Key`** prefix for REST; **`Bearer`** for SCIM 2.0 |
+
+The exact header for each is shown above. The Platform and SCIM schemes are
+detailed on the [Authentication](/api-reference/authentication) page; the Core
+Data and AI headers are also documented on their own reference pages.
+
+## Available endpoints
+
+Each API family has its own base URL — copy the exact host from Cube Cloud where
+noted. Only HTTPS is accepted, and every request must be authenticated (see
+[Authentication](/api-reference/authentication)).
+
+### Core Data API
+
+Base URL — your deployment's data API host (the `/cubejs-api` base path is configurable):
+
+```text
+https://{deployment}.{region}.cubecloudapp.dev/cubejs-api
+```
+
+| Endpoint | Path |
+| --- | --- |
+| [JSON query](/api-reference/data/json-query) | `POST /v1/load` |
+| [SQL query](/api-reference/data/sql-query) | `POST /v1/cubesql` |
+| [Metadata](/api-reference/data/load-metadata) | `GET /v1/meta` |
+
+### AI API
+
+Base URL — your agent's Chat API URL (copy it from **Admin → Agents → Chat API URL**):
+
+```text
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}
+```
+
+| Endpoint | Path |
+| --- | --- |
+| [Stream chat state](/api-reference/chat/stream-chat-state) | `POST /chat/stream-chat-state` |
+
+### Platform API
+
+Base URL — your Cube Cloud tenant host under `/api` (endpoints live under
+`/api/v1/…` for REST management and `/api/scim/v2/…` for SCIM 2.0 provisioning):
+
+```text
+https://{tenant}.cubecloud.dev/api
+```
+
+| Entity | Resource | Version |
+| --- | --- | --- |
+| [Deployments](/api-reference/deployments/get-deployments) | `/v1/deployments` | v1 |
+| [Environments](/api-reference/environments/get-deployment-environments) | `/v1/deployments/{deploymentId}/environments` | v1 |
+| [Folders](/api-reference/folders/get-folders) | `/v1/deployments/{deploymentId}/folders` | v1 |
+| [Reports](/api-reference/reports/get-report-folders) | `/v1/deployments/{deploymentId}/reports` | v1 |
+| [Workbooks](/api-reference/workbooks/get-workbooks) | `/v1/deployments/{deploymentId}/workbooks` | v1 |
+| [Notifications](/api-reference/notifications/get-notifications) | `/v1/deployments/{deploymentId}/notifications` | v1 |
+| [Workspace](/api-reference/workspace/shared-workspace-objects) | `/v1/deployments/{deploymentId}/workspace` | v1 |
+| [Embed](/api-reference/embed/get-dashboard) | `/v1/embed` | v1 |
+| [Embed Tenants](/api-reference/embed-tenants/get-groups) | `/v1/embed-tenants` | v1 |
+| [Users (SCIM)](/api-reference/scim-users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
+| [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |
+
+## Core Data API client library
+
+Query the Core Data API from JavaScript or TypeScript with Cube's JS client,
+[`@cubejs-client/core`](https://www.npmjs.com/package/@cubejs-client/core), which
+also ships React, Vue, and Angular bindings and a WebSocket transport for
+real-time updates. See the [JavaScript SDK](/reference/javascript-sdk) reference
+for full usage.
+
+```bash
+npm install @cubejs-client/core
+```
+
+## Platform API client library
 
 The recommended way to call the Platform API from JavaScript or TypeScript is the
 official client, [`@cube-dev/platform-client`](https://www.npmjs.com/package/@cube-dev/platform-client).
@@ -89,43 +163,3 @@ function Deployments() {
   [`CHANGELOG`](/api-reference/changelog) for release notes and breaking changes.
 </Info>
 
-## Base URL
-
-Both APIs are served from your Cube Cloud tenant host under `/api`:
-
-```text
-https://<tenant>.cubecloud.dev/api
-```
-
-Endpoints live under two namespaces:
-
-- `/api/v1/…` — the REST management API (deployments and nested resources)
-- `/api/scim/v2/…` — the SCIM 2.0 user and group provisioning API
-
-Only HTTPS calls are accepted. Authenticate every request — see
-[Authentication](/api-reference/authentication).
-
-## Available endpoints
-
-| Entity | Resource | Version |
-| --- | --- | --- |
-| [Deployments](/api-reference/deployments/get-deployments) | `/v1/deployments` | v1 |
-| [Environments](/api-reference/environments/get-deployment-environments) | `/v1/deployments/{deploymentId}/environments` | v1 |
-| [Folders](/api-reference/folders/get-folders) | `/v1/deployments/{deploymentId}/folders` | v1 |
-| [Reports](/api-reference/reports/get-report-folders) | `/v1/deployments/{deploymentId}/reports` | v1 |
-| [Workbooks](/api-reference/workbooks/get-workbooks) | `/v1/deployments/{deploymentId}/workbooks` | v1 |
-| [Notifications](/api-reference/notifications/get-notifications) | `/v1/deployments/{deploymentId}/notifications` | v1 |
-| [Workspace](/api-reference/workspace/shared-workspace-objects) | `/v1/deployments/{deploymentId}/workspace` | v1 |
-| [Agents](/api-reference/agents/get-agents) | `/v1/deployments/{deploymentId}/agents` | v1 |
-| [Metadata](/api-reference/metadata/get-metadata) | `/v1/meta` | v1 |
-| [Users](/api-reference/users/get-users) | `/v1/users` | v1 |
-| [Groups](/api-reference/groups/delete-group) | `/v1/groups` | v1 |
-| [User Groups](/api-reference/user-groups/list-groups) | `/v1/user-groups` | v1 |
-| [User Attributes](/api-reference/user-attributes/delete-user-attribute) | `/v1/user-attributes` | v1 |
-| [Resource Policies](/api-reference/resource-policies/get-policies) | `/v1/resource-policies` | v1 |
-| [App Theme](/api-reference/app-theme/get-app-theme) | `/v1/app-theme` | v1 |
-| [AI Engineer](/api-reference/ai-engineer/get-my-active-agent-region) | `/v1/ai-engineer` | v1 |
-| [Embed](/api-reference/embed/get-dashboard) | `/v1/embed` | v1 |
-| [Embed Tenants](/api-reference/embed-tenants/get-groups) | `/v1/embed-tenants` | v1 |
-| [SCIM Users](/api-reference/scim-users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
-| [SCIM Groups](/api-reference/scim-groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |
