@@ -117,6 +117,8 @@ pub trait ConfigObj: DIService + Debug {
     fn max_sessions(&self) -> usize;
 
     fn no_implicit_order(&self) -> bool;
+
+    fn enable_tesseract_sql_planner(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -138,6 +140,7 @@ pub struct ConfigObjImpl {
     pub non_streaming_query_max_row_limit: i32,
     pub max_sessions: usize,
     pub no_implicit_order: bool,
+    pub tesseract_sql_planner: bool,
 }
 
 impl ConfigObjImpl {
@@ -181,6 +184,7 @@ impl ConfigObjImpl {
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
+            tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", false),
         }
     }
 }
@@ -251,6 +255,10 @@ impl ConfigObj for ConfigObjImpl {
     fn max_sessions(&self) -> usize {
         self.max_sessions
     }
+
+    fn enable_tesseract_sql_planner(&self) -> bool {
+        self.tesseract_sql_planner
+    }
 }
 
 impl Config {
@@ -284,6 +292,7 @@ impl Config {
                 non_streaming_query_max_row_limit: 50000,
                 max_sessions: 1024,
                 no_implicit_order: true,
+                tesseract_sql_planner: false,
             }),
         }
     }

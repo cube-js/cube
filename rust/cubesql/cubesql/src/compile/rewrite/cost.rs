@@ -127,6 +127,7 @@ impl BestCubePlan {
             LogicalPlanLanguage::JoinCheckStage(_) => 1,
             LogicalPlanLanguage::JoinCheckPushDown(_) => 1,
             LogicalPlanLanguage::JoinCheckPullUp(_) => 1,
+            LogicalPlanLanguage::MultiFactJoinWrapper(_) => 1,
             LogicalPlanLanguage::SortProjectionPushdownReplacer(_) => 1,
             LogicalPlanLanguage::SortProjectionPullupReplacer(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as

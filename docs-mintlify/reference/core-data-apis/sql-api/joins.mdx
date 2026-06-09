@@ -207,7 +207,33 @@ LIMIT 5;
 Please note that, even if `product_description` is in the inner selection, it isn't
 evaluated in the final query as it isn't used in any way.
 
+## Joining views on a shared dimension
+
+When you join two views on a dimension that resolves to the **same underlying
+cube member** and group by that dimension, Cube doesn't perform a row-level
+join. Instead it merges them into a single
+[multi-fact query][ref-multi-fact-views]: each view becomes its own
+aggregating subquery and the results are stitched together on the shared key,
+so measures from both views are combined without fan-out.
+
+```sql
+SELECT
+  o.name,
+  MEASURE(o.total_amount),
+  MEASURE(r.total_refund)
+FROM orders_view o
+LEFT JOIN returns_view r ON r.name = o.name
+GROUP BY 1
+```
+
+The `JOIN` type (`INNER`, `LEFT`, `RIGHT`, `FULL`) controls which keys are
+kept. This requires the [Tesseract SQL planner][ref-tesseract-env] and only
+applies to grouped queries whose `GROUP BY` is the join key. See
+[multi-fact views][ref-multi-fact-views] for the full explanation.
+
 
 [ref-views]: /docs/data-modeling/views
 [ref-join-paths]: /docs/data-modeling/joins#join-paths
 [ref-join-hints]: /docs/data-modeling/joins#join-hints
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
