@@ -866,3 +866,32 @@ async fn test_inner_join_on_date_trunc_and_dimension() {
         }
     )
 }
+
+/// A join on the raw time column (exact-timestamp equality, "no grain") does not
+/// match a truncated `DATE_TRUNC('day', ...)` GROUP BY, so it is not merged: the
+/// multi-fact stitch happens at the GROUP BY grain, which must be the grain the
+/// user joined on. Truncate the join key to the grain you group by instead.
+#[tokio::test]
+async fn test_raw_time_join_with_date_trunc_group_by_is_not_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let result = plan_view_join(
+        r#"
+            SELECT DATE_TRUNC('day', c.created_at), measure(o.revenue)
+            FROM customers_view c
+            LEFT JOIN orders_view o ON o.created_at = c.created_at
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "expected raw-time-column join with a DATE_TRUNC GROUP BY not to merge, got: {:?}",
+        result.map(|p| p.as_logical_plan().find_cube_scan().request)
+    );
+}
