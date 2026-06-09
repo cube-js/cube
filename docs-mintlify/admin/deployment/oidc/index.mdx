@@ -96,8 +96,8 @@ deployments in the tenant.
 
 | Field                     | What it controls                                                                                                       |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Audience type**         | One of `AWS`, `GCP`, `Azure`, or `Custom`. Well-known types pre-fill the audience value.                                |
-| **Audience**              | The JWT `aud` claim value. Pre-set for `AWS`, `GCP`, and `Azure`; user-supplied for `Custom`.                           |
+| **Audience type**         | One of `AWS`, `GCP`, `Azure`, or `Custom`. `AWS` and `Azure` pre-fill the audience value.                               |
+| **Audience**              | The JWT `aud` claim value. Pre-set for `AWS` (`sts.amazonaws.com`) and `Azure` (`api://AzureADTokenExchange`). For `GCP` you supply the **Workload Identity Federation provider resource path** (`//iam.googleapis.com/projects/.../providers/...`) — there is no global GCP audience. User-supplied for `Custom`. |
 | **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`).                     |
 | **Subject Claim Format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
 
@@ -204,11 +204,13 @@ config per integration target.
     </Frame>
   </Step>
   <Step title="Add token configs">
-    Click **Add Config** and pick the audience type. For `AWS`, `GCP`, and
-    `Azure`, the audience auto-fills with the standard value; for `Custom`,
-    enter the audience your target system expects in the **Custom Audience**
-    field. Optionally set the **Subject Claim Format** — see
-    [Token configs](#token-configs) for the available templates.
+    Click **Add Config** and pick the audience type. For `AWS` and `Azure`,
+    the audience auto-fills with the standard value. For `GCP`, enter the
+    **Workload Identity Federation provider resource path** (the same
+    `//iam.googleapis.com/projects/.../providers/...` value you use for
+    `GCP_POOL_AUDIENCE`) — GCP has no global audience. For `Custom`, enter the
+    audience your target system expects. Optionally set the **Subject Claim
+    Format** — see [Token configs](#token-configs) for the available templates.
   </Step>
   <Step title="Configure trust on the cloud side">
     Follow the cloud-specific guides below to register Cube as an OIDC
