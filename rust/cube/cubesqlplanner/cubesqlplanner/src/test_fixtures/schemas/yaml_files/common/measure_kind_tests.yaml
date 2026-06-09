@@ -33,9 +33,6 @@ cubes:
           - name: approx_count
             type: countDistinctApprox
             sql: user_id
-          - name: running
-            type: runningTotal
-            sql: amount
           - name: number_agg
             type: numberAgg
             sql: amount

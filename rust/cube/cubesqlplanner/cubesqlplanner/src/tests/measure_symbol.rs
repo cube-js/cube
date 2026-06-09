@@ -25,7 +25,6 @@ fn measure_count_properties() {
 
     assert!(matches!(measure.kind(), MeasureKind::Count(_)));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
     assert!(!measure.is_cumulative());
     assert!(measure.is_additive());
@@ -42,7 +41,6 @@ fn measure_sum_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_rolling_window());
     assert!(!measure.is_cumulative());
     assert!(measure.is_additive());
@@ -59,7 +57,6 @@ fn measure_avg_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Avg
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
     assert!(!measure.is_additive());
 }
@@ -75,7 +72,6 @@ fn measure_min_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Min
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
     assert!(measure.is_additive());
 }
@@ -91,7 +87,6 @@ fn measure_max_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Max
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
     assert!(measure.is_additive());
 }
@@ -107,7 +102,6 @@ fn measure_count_distinct_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
     assert!(!measure.is_additive());
 }
@@ -123,25 +117,7 @@ fn measure_count_distinct_approx_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinctApprox
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
-    assert!(measure.is_additive());
-}
-
-#[test]
-fn measure_running_total_properties() {
-    let ctx = ctx();
-    let m = ctx.create_measure("test_measures.running").unwrap();
-    let measure = m.as_measure().unwrap();
-
-    assert!(matches!(
-        measure.kind(),
-        MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::RunningTotal
-    ));
-    assert!(!measure.is_calculated());
-    assert!(measure.is_running_total());
-    assert!(!measure.is_rolling_window());
-    assert!(measure.is_cumulative());
     assert!(measure.is_additive());
 }
 
@@ -156,7 +132,6 @@ fn measure_number_agg_properties() {
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::NumberAgg
     ));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
     assert!(!measure.is_additive());
 }
@@ -172,7 +147,6 @@ fn measure_calculated_number_properties() {
         MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
     ));
     assert!(measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
     assert!(!measure.is_additive());
 }
@@ -185,7 +159,6 @@ fn measure_rank_properties() {
 
     assert!(matches!(measure.kind(), MeasureKind::Rank));
     assert!(!measure.is_calculated());
-    assert!(!measure.is_running_total());
     assert!(!measure.is_cumulative());
     assert!(!measure.is_additive());
 }
@@ -202,7 +175,6 @@ fn measure_rolling_window_properties() {
     ));
     assert!(measure.is_rolling_window());
     assert!(measure.is_cumulative());
-    assert!(!measure.is_running_total());
 }
 
 // ─── new_patched: valid type replacements ───────────────────────────────────
@@ -287,7 +259,7 @@ fn new_patched_sum_invalid_targets() {
     let m = ctx.create_measure("test_measures.total").unwrap();
     let measure = m.as_measure().unwrap();
 
-    for invalid in ["number", "count", "runningTotal", "rank", "numberAgg"] {
+    for invalid in ["number", "count", "rank", "numberAgg"] {
         assert!(
             measure
                 .new_patched(Some(invalid.to_string()), vec![])
@@ -317,7 +289,6 @@ fn new_patched_non_patchable_types() {
         "test_measures.cnt",
         "test_measures.calculated",
         "test_measures.rank_measure",
-        "test_measures.running",
     ];
     for path in non_patchable {
         let m = ctx.create_measure(path).unwrap();
@@ -417,7 +388,6 @@ fn new_patched_filters_rejected_for_non_aggregatable_types() {
 
     let reject_filters = [
         "test_measures.calculated",
-        "test_measures.running",
         "test_measures.rank_measure",
         "test_measures.number_agg",
     ];

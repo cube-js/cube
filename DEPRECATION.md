@@ -57,7 +57,7 @@ features:
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
 | Deprecated | [`SECURITY_CONTEXT`](#security_context)                                                                                           | v0.33.0    |           |
-| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
+| Removed    | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   | v1.7.0    |
 | Removed    | [Top-level `includes` parameter in views](#top-level-includes-parameter-in-views)                                                 | v0.34.34   | v1.3.0    |
 | Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
@@ -348,9 +348,11 @@ instead.
 
 **Deprecated in Release: v0.33.39**
 
-The `running_total` measure type is now deprecated, and we recommend using
+**Removed in Release: v1.7.0**
+
+The `running_total` measure type has been removed. Use a
 [`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
-to calculate running totals instead.
+with an `unbounded` trailing window to calculate running totals instead.
 
 ### Top-level `includes` parameter in views
 

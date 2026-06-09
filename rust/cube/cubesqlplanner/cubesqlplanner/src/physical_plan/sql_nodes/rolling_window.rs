@@ -65,7 +65,7 @@ impl SqlNode for RollingWindowNode {
                         AggregationType::CountDistinctApprox => {
                             templates.hll_cardinality_merge(render_input()?)?
                         }
-                        AggregationType::Sum | AggregationType::RunningTotal => {
+                        AggregationType::Sum => {
                             format!("sum({})", render_input()?)
                         }
                         AggregationType::Min | AggregationType::Max => {

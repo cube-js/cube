@@ -37,12 +37,11 @@ pub struct ToDateRollingWindow {
 }
 
 /// Flavour of rolling-window computation: regular trailing/leading
-/// window, to-date window, or a running-total accumulation.
+/// window or a to-date window.
 #[derive(Clone)]
 pub enum RollingWindowType {
     Regular(RegularRollingWindow),
     ToDate(ToDateRollingWindow),
-    RunningTotal,
 }
 
 /// Planner-side description of a rolling window: the time
@@ -87,16 +86,6 @@ impl RollingWindowDescription {
         }
     }
 
-    pub fn new_running_total(
-        time_dimension: Rc<MemberSymbol>,
-        base_time_dimension: Rc<MemberSymbol>,
-    ) -> Self {
-        Self {
-            time_dimension,
-            base_time_dimension,
-            rolling_window: RollingWindowType::RunningTotal,
-        }
-    }
 }
 
 /// Semantic shape of a non-leaf multi-stage CTE: a rank window,

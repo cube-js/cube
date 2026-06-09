@@ -28,8 +28,7 @@ pub enum AggregateWrap<'a> {
 /// - `Count` — `type: count`. Counts rows; falls back to the cube's
 ///   primary keys when no explicit `sql` is given.
 /// - `Aggregated` — built-in aggregation (`sum`, `avg`, `min`, `max`,
-///   `count_distinct`, `count_distinct_approx`, `number_agg`,
-///   `running_total`).
+///   `count_distinct`, `count_distinct_approx`, `number_agg`).
 /// - `Calculated` — `type: number / string / time / boolean`. A
 ///   plain expression with no aggregation wrapper.
 /// - `Rank` — `type: rank`. Window-function rank, no `sql`.
@@ -180,7 +179,7 @@ impl MeasureKind {
 
     /// True if extra `measure_filters` can be merged into the kind.
     /// Counts and the basic aggregations support it; `number_agg`,
-    /// `running_total`, calculated and rank measures do not.
+    /// calculated and rank measures do not.
     pub fn supports_additional_filters(&self) -> bool {
         match self {
             Self::Count(_) | Self::MultipliedCount(_) => true,
@@ -219,7 +218,6 @@ impl MeasureKind {
                 AggregationType::NumberAgg => AggregateWrap::PassThrough,
                 AggregationType::CountDistinctApprox => AggregateWrap::CountDistinctApprox,
                 AggregationType::CountDistinct => AggregateWrap::CountDistinct,
-                AggregationType::RunningTotal => AggregateWrap::Function("sum"),
                 _ => AggregateWrap::Function(a.agg_type().as_str()),
             },
             Self::Count(_) => AggregateWrap::Function("count"),

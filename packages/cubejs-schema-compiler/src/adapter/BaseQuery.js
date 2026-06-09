@@ -1112,16 +1112,6 @@ export class BaseQuery {
     });
   }
 
-  runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
-        ]
-      );
-  }
-
   rollingWindowToDateJoinCondition(granularity) {
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {
@@ -3869,8 +3859,6 @@ export class BaseQuery {
         this.countDistinctApprox(evaluateSql);
     } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
       return `count(distinct ${evaluateSql})`;
-    } else if (symbol.type === 'runningTotal') {
-      return `sum(${evaluateSql})`; // TODO
     }
     if (multiplied) {
       if (symbol.type === 'number' && evaluateSql === 'count(*)') {
