@@ -434,7 +434,7 @@ views:
           - full_name
           - email
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - full_name
@@ -485,7 +485,7 @@ views:
           - full_name
           - email
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - full_name
@@ -535,7 +535,7 @@ views:
       - join_path: users
         includes: "*"
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: "*"
 `;

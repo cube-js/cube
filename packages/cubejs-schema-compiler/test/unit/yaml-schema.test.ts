@@ -859,7 +859,7 @@ cubes:
             - name: count
               type: count
           accessPolicy:
-            - role: admin
+            - group: admin
               conditions:
                 - if: "{ security_context.isNotBlocked }"
               rowLevel:
@@ -888,7 +888,7 @@ cubes:
               memberLevel:
                 includes:
                   - status
-            - role: manager
+            - group: manager
               memberLevel:
                 excludes:
                   - status
@@ -1645,7 +1645,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -1695,7 +1695,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -1728,7 +1728,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:

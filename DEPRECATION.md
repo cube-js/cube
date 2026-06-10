@@ -441,5 +441,5 @@ The Elasticsearch driver has been removed.
 
 **Removed in Release: v1.7.0**
 
-The `context_to_roles` configuration option has been removed. Please use `context_to_groups`
-instead.
+The `context_to_roles` configuration option has been removed. Please use `context_to_groups` instead.
+

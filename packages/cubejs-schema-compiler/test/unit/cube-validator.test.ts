@@ -1719,7 +1719,7 @@ describe('Cube Validation', () => {
   describe('Access Policy group/groups support:', () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
 
-    it('should allow group instead of role', () => {
+    it('should allow group', () => {
       const cube = {
         name: 'TestCube',
         fileName: 'test.js',
@@ -1749,21 +1749,6 @@ describe('Cube Validation', () => {
       expect(result.error).toBeFalsy();
     });
 
-    it('should allow role as single string (existing behavior)', () => {
-      const cube = {
-        name: 'TestCube',
-        fileName: 'test.js',
-        sql: () => 'SELECT * FROM test',
-        accessPolicy: [{
-          role: 'admin',
-          rowLevel: { allowAll: true }
-        }]
-      };
-
-      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(result.error).toBeFalsy();
-    });
-
     it('should allow group: "*" syntax', () => {
       const cube = {
         name: 'TestCube',
@@ -1777,38 +1762,6 @@ describe('Cube Validation', () => {
 
       const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
       expect(result.error).toBeFalsy();
-    });
-
-    it('should reject role and group together', () => {
-      const cube = {
-        name: 'TestCube',
-        fileName: 'test.js',
-        sql: () => 'SELECT * FROM test',
-        accessPolicy: [{
-          role: 'admin',
-          group: 'admin',
-          rowLevel: { allowAll: true }
-        }]
-      };
-
-      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(result.error).toBeTruthy();
-    });
-
-    it('should reject role and groups together', () => {
-      const cube = {
-        name: 'TestCube',
-        fileName: 'test.js',
-        sql: () => 'SELECT * FROM test',
-        accessPolicy: [{
-          role: 'admin',
-          groups: ['user'],
-          rowLevel: { allowAll: true }
-        }]
-      };
-
-      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(result.error).toBeTruthy();
     });
 
     it('should reject group and groups together', () => {
@@ -1827,7 +1780,7 @@ describe('Cube Validation', () => {
       expect(result.error).toBeTruthy();
     });
 
-    it('should reject access policy without role/group/groups', () => {
+    it('should reject access policy without group/groups', () => {
       const cube = {
         name: 'TestCube',
         fileName: 'test.js',
