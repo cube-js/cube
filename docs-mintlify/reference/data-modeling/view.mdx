@@ -230,6 +230,89 @@ view(`active_users`, {
 
 </CodeGroup>
 
+#### `default_ui_filters`
+
+In Cube Cloud, you can use the `default_ui_filters` key in a view's `meta` to
+define default filters for [workbooks][ref-workbook-filtering]. When the view
+is selected in a new workbook report, these filters are pre-populated as
+regular, fully editable filters — data consumers can change their values,
+switch operators, or remove them entirely.
+
+Each entry has the same shape as a [`default_filters`](#default_filters) entry:
+a `member` (a dimension or measure exposed by the view), an `operator`, and a
+list of `values`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      default_ui_filters:
+        - member: status
+          operator: equals
+          values:
+            - completed
+        - member: created_at
+          operator: inDateRange
+          values:
+            - 2024-01-01
+            - 2024-12-31
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    default_ui_filters: [
+      {
+        member: `status`,
+        operator: `equals`,
+        values: [`completed`]
+      },
+      {
+        member: `created_at`,
+        operator: `inDateRange`,
+        values: [`2024-01-01`, `2024-12-31`]
+      }
+    ]
+  }
+});
+```
+
+</CodeGroup>
+
+Unlike [`default_filters`](#default_filters), which are enforced on every query
+against the view, `default_ui_filters` only provide a starting point for the
+workbook UI: they don't apply to queries made through APIs or other
+visualization tools, and workbook users can freely modify or remove them.
+
+The following operators are supported: `equals`, `notEquals`, `contains`,
+`notContains`, `startsWith`, `notStartsWith`, `endsWith`, `notEndsWith`, `gt`,
+`gte`, `lt`, `lte`, `set`, `notSet`, `beforeDate`, `beforeOrOnDate`,
+`afterDate`, `afterOrOnDate`, and `inDateRange`. `values` is required for all
+operators except `set` and `notSet`, and `inDateRange` expects exactly two
+values: the start and end dates.
+
+<Note>
+
+Entries that reference a member not exposed by the view or use an unsupported
+operator are skipped with a warning in the browser console, so a malformed
+entry never breaks view selection in the workbook.
+
+</Note>
+
 ### `cubes`
 
 Use `cubes` parameter in view to include exposed cubes in bulk. You can build
@@ -788,6 +871,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-apis-support]: /reference#data-modeling
 [ref-playground]: /docs/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
+[ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
 [ref-extension]: /docs/data-modeling/extending-cubes
 [ref-dim-name]: /reference/data-modeling/dimensions#name
 [ref-dim-title]: /reference/data-modeling/dimensions#title
