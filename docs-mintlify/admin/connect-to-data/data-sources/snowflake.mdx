@@ -72,9 +72,8 @@ Instead of a password or key pair, Cube Cloud deployments can authenticate
 to Snowflake with [OIDC workload identity][ref-oidc-snowflake]: a Snowflake
 External OAuth integration trusts Cube's OIDC issuer, and the driver
 presents a short-lived Cube-minted token — no long-lived secrets to
-provision or rotate. Set the `OAUTH` authenticator and point the driver at
-the token file Cube maintains, omitting `CUBEJS_DB_USER` /
-`CUBEJS_DB_PASS`:
+provision or rotate. Set the `OAUTH` authenticator and omit
+`CUBEJS_DB_USER` / `CUBEJS_DB_PASS`:
 
 ```dotenv
 CUBEJS_DB_TYPE=snowflake
@@ -83,8 +82,12 @@ CUBEJS_DB_SNOWFLAKE_WAREHOUSE=MY_SNOWFLAKE_WAREHOUSE
 CUBEJS_DB_NAME=my_snowflake_database
 CUBEJS_DB_SNOWFLAKE_ROLE=CUBE_ROLE
 CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR=OAUTH
-CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH=/var/cube/<tenant-id>/<deployment-id>/cube_cloud_token_snowflake
 ```
+
+Cube sets `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` automatically via the
+token config's **Target Env Var** — the token file lives at a different
+path in deployed pods, dev mode, and test connection, so it is never
+written by hand.
 
 See the [Snowflake OIDC guide][ref-oidc-snowflake] for the security
 integration, service user, and token config setup.

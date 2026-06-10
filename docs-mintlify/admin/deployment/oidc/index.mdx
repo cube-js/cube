@@ -101,6 +101,7 @@ deployments in the tenant.
 | **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`).                     |
 | **Subject Claim Format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
 | **Custom Claims**         | Optional extra JWT claims emitted verbatim in every minted token — see [Custom claims](#custom-claims) below.            |
+| **Target Env Var**        | Custom audience type only: env var Cube populates with the token file path in every execution context — see [Custom token configs](#custom-token-configs) below. |
 
 You can have one config per well-known audience type (AWS, GCP, Azure) plus
 any number of custom configs for tools like [Snowflake][ref-oidc-snowflake]
@@ -183,6 +184,21 @@ Custom claims are deliberately constrained:
 
 Like subject-format changes, custom-claim changes take up to one hour to
 fully propagate as cached tokens expire.
+
+### Custom token configs
+
+For `Custom` audiences, the driver or SDK on the other side reads the token
+from a file. Where that file lives depends on **where the deployment is
+running** — deployed pods, a dev-mode worker, and a test-connection probe
+each keep it in a different place — so the path must never be hard-coded.
+
+The **Target Env Var** field solves this: name the env var the consumer
+reads (e.g. `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` for the Snowflake
+driver), and Cube sets it to the correct token-file path in every context.
+Leave `CUBEJS_DB_USER` / `CUBEJS_DB_PASS` (or the equivalent secret) unset
+and don't write the path by hand. Well-known audiences (AWS/GCP/Azure)
+don't need this — their SDKs read fixed, standard env vars that Cube
+already populates.
 
 ## Trust mechanism
 
