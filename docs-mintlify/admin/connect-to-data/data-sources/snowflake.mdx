@@ -25,7 +25,7 @@ GRANT SELECT ON FUTURE TABLES IN DATABASE ABC TO ROLE XYZ;
 - [Account/Server URL][snowflake-docs-account-id] for Snowflake.
 - User name and password or an RSA private key for the Snowflake account.
   In Cube Cloud, you can authenticate with [OIDC workload
-  identity][ref-oidc-snowflake] instead — the same role grants apply to the
+  identity][ref-oidc-overview] instead — the same role grants apply to the
   mapped service user.
 - Optionally, the warehouse name, the user role, and the database name.
 
@@ -69,28 +69,132 @@ The following fields are required when creating a Snowflake connection:
 #### OIDC workload identity
 
 Instead of a password or key pair, Cube Cloud deployments can authenticate
-to Snowflake with [OIDC workload identity][ref-oidc-snowflake]: a Snowflake
+to Snowflake with [OIDC workload identity][ref-oidc-overview]: a Snowflake
 External OAuth integration trusts Cube's OIDC issuer, and the driver
-presents a short-lived Cube-minted token — no long-lived secrets to
-provision or rotate. Set the `OAUTH` authenticator and omit
-`CUBEJS_DB_USER` / `CUBEJS_DB_PASS`:
+presents a short-lived Cube-minted JWT — no long-lived secrets to
+provision or rotate. Snowflake validates each connection's token against
+your tenant's public JWKS, maps the token's `sub` claim to a Snowflake
+user, and authorizes the session role through the token's `scp` claim.
 
-```dotenv
-CUBEJS_DB_TYPE=snowflake
-CUBEJS_DB_SNOWFLAKE_ACCOUNT=acme-analytics
-CUBEJS_DB_SNOWFLAKE_WAREHOUSE=MY_SNOWFLAKE_WAREHOUSE
-CUBEJS_DB_NAME=my_snowflake_database
-CUBEJS_DB_SNOWFLAKE_ROLE=CUBE_ROLE
-CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR=OAUTH
+Start with the [OIDC overview][ref-oidc-overview] for the concepts (issuer,
+token configs, custom claims, target env var) and to enable OIDC for your
+tenant, then:
+
+<Steps>
+  <Step title="Create the token config">
+    In **Admin → OIDC**, click **Add Config** and create a config with:
+
+    | Field                    | Value                                                                                          |
+    | ------------------------ | ----------------------------------------------------------------------------------------------- |
+    | **Audience Type**        | `Custom`                                                                                         |
+    | **Name**                 | `snowflake`                                                                                      |
+    | **Custom Audience**      | `https://<account-identifier>.snowflakecomputing.com`                                            |
+    | **Subject Claim Format** | Keep the default, or pick a richer template — the rendered `sub` must match the Snowflake user's `LOGIN_NAME` below |
+    | **Custom Claims**        | Claim `scp` with value `session:role-any`                                                        |
+    | **Target Env Var**       | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`                                                           |
+
+    <Frame>
+      <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
+    </Frame>
+
+    The `scp` claim is the part that's easy to miss: Snowflake grants
+    session roles **exclusively** through it — a token without `scp`
+    authenticates but fails role authorization. `session:role-any` lets the
+    driver request any role granted to the mapped user; to pin the role
+    inside the token instead, use `session:role:<role-name>` and
+    `EXTERNAL_OAUTH_ANY_ROLE_MODE = 'DISABLE'` below. The **Target Env Var**
+    is how the driver finds the token: Cube sets that env var to the token
+    file path in every execution context (deployed pods, dev mode, and test
+    connection each keep the file in a different place), so the path is
+    never written by hand.
+  </Step>
+  <Step title="Create the External OAuth security integration">
+    In a Snowflake worksheet, as `ACCOUNTADMIN`:
+
+    ```sql
+    CREATE SECURITY INTEGRATION CUBE_CLOUD_EXTERNAL_OAUTH
+      TYPE = EXTERNAL_OAUTH
+      ENABLED = TRUE
+      EXTERNAL_OAUTH_TYPE = CUSTOM
+      EXTERNAL_OAUTH_ISSUER = 'https://<tenant-name>.cubecloud.dev'
+      EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://<tenant-name>.cubecloud.dev/.well-known/jwks.json'
+      EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<account-identifier>.snowflakecomputing.com')
+      EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
+      EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
+      EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE';
+    ```
+
+    The issuer and audience must match the token config exactly. Snowflake
+    fetches the JWKS from your tenant's public endpoint, so no key material
+    changes hands.
+  </Step>
+  <Step title="Create the service user and role">
+    The integration maps the token's `sub` claim to a Snowflake user via
+    `LOGIN_NAME`. With the default subject claim format the rendered `sub`
+    is `cube:deployment:<deployment-id>` — the deployment ID is the number
+    in your deployment's console URL. If you chose a different template,
+    use the token-config dialog's live preview to see the exact rendered
+    value.
+
+    ```sql
+    CREATE ROLE CUBE_ROLE;
+
+    CREATE USER CUBE_SVC
+      TYPE = SERVICE
+      LOGIN_NAME = 'cube:deployment:<deployment-id>'
+      DEFAULT_ROLE = CUBE_ROLE
+      DEFAULT_WAREHOUSE = <warehouse>;
+
+    GRANT ROLE CUBE_ROLE TO USER CUBE_SVC;
+    GRANT USAGE ON WAREHOUSE <warehouse> TO ROLE CUBE_ROLE;
+
+    -- Grant the role read access to the data Cube serves, e.g.:
+    GRANT USAGE ON DATABASE <database> TO ROLE CUBE_ROLE;
+    GRANT USAGE ON ALL SCHEMAS IN DATABASE <database> TO ROLE CUBE_ROLE;
+    GRANT SELECT ON ALL TABLES IN DATABASE <database> TO ROLE CUBE_ROLE;
+    ```
+
+    `TYPE = SERVICE` blocks password logins for this user entirely — it
+    can only authenticate through the federation.
+  </Step>
+  <Step title="Configure the deployment">
+    Set the `OAUTH` authenticator and omit `CUBEJS_DB_USER` /
+    `CUBEJS_DB_PASS`:
+
+    ```dotenv
+    CUBEJS_DB_TYPE=snowflake
+    CUBEJS_DB_SNOWFLAKE_ACCOUNT=<account-identifier>
+    CUBEJS_DB_SNOWFLAKE_WAREHOUSE=<warehouse>
+    CUBEJS_DB_NAME=<database>
+    CUBEJS_DB_SNOWFLAKE_ROLE=CUBE_ROLE
+    CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR=OAUTH
+    ```
+
+    `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` is **not** set here — Cube
+    populates it automatically thanks to the **Target Env Var** from the
+    token config. The driver re-reads the file on every new connection, so
+    the broker's automatic refresh is picked up without restarts.
+  </Step>
+</Steps>
+
+To verify, run any query against the Snowflake data source. On the
+Snowflake side, a successful federation shows up in the login history with
+`OAUTH_ACCESS_TOKEN` as the authentication factor:
+
+```sql
+SELECT event_timestamp, user_name, first_authentication_factor, is_success
+FROM TABLE(SNOWFLAKE.INFORMATION_SCHEMA.LOGIN_HISTORY_BY_USER(USER_NAME => 'CUBE_SVC'))
+ORDER BY event_timestamp DESC;
 ```
 
-Cube sets `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` automatically via the
-token config's **Target Env Var** — the token file lives at a different
-path in deployed pods, dev mode, and test connection, so it is never
-written by hand.
+Common failure modes:
 
-See the [Snowflake OIDC guide][ref-oidc-snowflake] for the security
-integration, service user, and token config setup.
+| Error                                                                  | Cause                                                                                                                |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Invalid OAuth access token`                                             | Issuer or audience mismatch between the token config and the security integration, or the JWKS URL is unreachable.     |
+| `The role … is not listed in the Access Token or was filtered`           | The `scp` custom claim is missing from the token config, or the role isn't granted to the mapped user.                 |
+| `User … not found` / mapping errors                                      | The rendered `sub` doesn't match the Snowflake user's `LOGIN_NAME` — compare against the dialog's live preview.        |
+| `File … provided by CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH does not exist` | The **Target Env Var** isn't set on the token config (or a stale hand-written path is configured), or the deployment is still starting up. |
 
 Cube Cloud also supports connecting to data sources within private VPCs
 if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
@@ -121,7 +225,7 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)                                 | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)                                 | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                                                  | A valid number                                                         |    ❌    |
 
-<sup>1</sup> Required when using password-based authentication. Not required with `SNOWFLAKE_JWT` (key pair) or with `OAUTH` — including [OIDC workload identity][ref-oidc-snowflake] in Cube Cloud, where the driver reads a Cube-minted token from [`CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`](/reference/configuration/environment-variables#cubejs_db_snowflake_oauth_token_path).
+<sup>1</sup> Required when using password-based authentication. Not required with `SNOWFLAKE_JWT` (key pair) or with `OAUTH` — including [OIDC workload identity](#oidc-workload-identity) in Cube Cloud, where the driver reads a Cube-minted token from [`CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`](/reference/configuration/environment-variables#cubejs_db_snowflake_oauth_token_path).
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
@@ -253,7 +357,7 @@ connections are made over HTTPS.
 [google-cloud-storage]: https://cloud.google.com/storage
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
-[ref-oidc-snowflake]: /admin/deployment/oidc/snowflake
+[ref-oidc-overview]: /admin/deployment/oidc
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-account-id]:
