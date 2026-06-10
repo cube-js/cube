@@ -13,6 +13,35 @@ On the left side, you can select a semantic view you would like to query. Inside
 
 Dimensions and measures can be added as filters to focus on specific rows of data.
 
+### Default filters
+
+A data model author can define default workbook filters on a semantic view with
+the [`meta.default_ui_filters`][ref-default-ui-filters] parameter:
+
+```yaml
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      default_ui_filters:
+        - member: status
+          operator: equals
+          values:
+            - completed
+```
+
+When you select such a view in a new tab, those filters are added to the query
+automatically. They behave exactly like filters you add yourself: you can
+change their values, switch operators, or remove them.
+
+Resetting the tab or going back to the view list clears default filters
+along with the rest of the query; they are seeded again the next time you
+select a view.
+
 ## Pivoting
 
 You can add dimensions to the pivot by right-clicking on the left pane or in the results header.
@@ -155,4 +184,5 @@ the model behaves as intended.
 [ref-configuration]: /docs/data-modeling/configuration
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
+[ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 
