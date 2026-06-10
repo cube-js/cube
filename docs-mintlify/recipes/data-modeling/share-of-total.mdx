@@ -338,12 +338,18 @@ to end users in Explore, workbooks, and the API.
 
 Query filters applied to the dimension used in share calculations (e.g.,
 filtering to a specific brand) will also filter the data used to compute
-the total, making that row's share appear as 100%. 
+the total, making that row's share appear as 100%. To keep the total
+unaffected by such filters, use the [`filter`][ref-filter] parameter to
+exclude them from the helper measure — see [share of total (filter
+override)][ref-share-filter].
+
 </Note>
 
 
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [link-ecommerce-demo]: https://github.com/cubedevinc/ecommerce_demo
 [ref-group-by]: /reference/data-modeling/measures#group_by
+[ref-filter]: /reference/data-modeling/measures#filter
+[ref-share-filter]: /docs/data-modeling/measures#share-of-total-filter-override
 [ref-dynamic-params]: /recipes/data-modeling/passing-dynamic-parameters-in-a-query
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields

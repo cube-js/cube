@@ -329,6 +329,46 @@ measures:
     type: number
 ```
 
+### Share of total (filter override)
+
+Use the [`filter`][ref-filter] parameter to override the filters that a
+multi-stage measure inherits from the query. This enables "share of total"
+calculations where the denominator must ignore a filter applied by the query.
+
+In the example below, `amount_all_statuses` uses `exclude` to drop the `status`
+filter, so it always aggregates across all statuses. When the query is filtered
+to a single status, `total_amount` reflects that status while
+`amount_all_statuses` stays the full per-category total, and
+`percent_of_total` is the share that the filtered status represents:
+
+```yaml
+measures:
+  - name: total_amount
+    sql: amount
+    type: sum
+
+  - name: amount_all_statuses
+    multi_stage: true
+    sql: "{total_amount}"
+    type: number
+    filter:
+      exclude:
+        - status
+
+  - name: percent_of_total
+    multi_stage: true
+    sql: "100.0 * {total_amount} / NULLIF({amount_all_statuses}, 0)"
+    type: number
+    format: percent
+```
+
+<Note>
+
+The `filter` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
+(`CUBEJS_TESSERACT_SQL_PLANNER=true`).
+
+</Note>
+
 ### Nested aggregates
 
 Use the [`add_group_by`][ref-add-group-by] parameter to compute an aggregate
@@ -426,6 +466,7 @@ measures:
 [ref-group-by]: /reference/data-modeling/measures#group_by
 [ref-reduce-by]: /reference/data-modeling/measures#reduce_by
 [ref-add-group-by]: /reference/data-modeling/measures#add_group_by
+[ref-filter]: /reference/data-modeling/measures#filter
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type
 [ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
