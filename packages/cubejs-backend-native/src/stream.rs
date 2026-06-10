@@ -320,12 +320,9 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         cx,
         handle: chunk_array,
     };
-    // Handle transform errors via `reject()` rather than `.unwrap()` — a
-    // panic here bubbles up as an unhandled rejection on Node's tick queue
-    // and crashes the process. We signal both ends of the FFI bridge: the
-    // Rust downstream via `reject()` (so the wire layer can emit a Postgres
-    // `ErrorResponse`) and the JS callback via the same async wrapper used
-    // on the success path (avoids mixing sync/async stream-callback timing).
+    // Don't unwrap: a panic across the FFI boundary crashes the process.
+    // Signal the error on both sides of the bridge — reject() for the Rust
+    // downstream, the chunk callback for JS.
     let value =
         match transform_response(&mut value_object, this.schema.clone(), &this.member_fields) {
             Ok(v) => v,
