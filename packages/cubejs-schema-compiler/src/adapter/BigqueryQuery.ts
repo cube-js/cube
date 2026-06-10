@@ -351,7 +351,8 @@ export class BigqueryQuery extends BaseQuery {
     delete templates.functions.PERCENTILECONT;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
-    templates.expressions.extract = 'EXTRACT({% if date_part|upper == \'DOW\' %}DAYOFWEEK{% elif date_part|upper == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
+    // Postgres DOW is 0-based (Sunday = 0), BigQuery DAYOFWEEK is 1-based
+    templates.expressions.extract = '{% if date_part|upper == \'DOW\' %}(EXTRACT(DAYOFWEEK FROM {{ expr }}) - 1){% elif date_part|upper == \'DOY\' %}EXTRACT(DAYOFYEAR FROM {{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';
     delete templates.expressions.ilike;
