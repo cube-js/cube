@@ -530,32 +530,95 @@ The data within `category_productname_zipcode_index` would look as follows:
 
 ### Aggregating indexes
 
-Aggregating indexes should be used when there is a wide rollup pre-aggregation, however, only a subset of its dimensions is queried. 
-For example, you have rollup pre-aggregation with 50 dimensions, but any query is just using only 5 of those dimensions.
-Such a use case would be a sweet spot for the aggregating index.
-Such indexes would persist **only** dimensions from the index definition and pre-aggregated measures from the pre-aggregation definition.
-Cube Store would aggregate over missing dimensions to calculate stored measure values when preparing the aggregating index.
-During querying time, Cube Store will save time on this aggregation over missing dimensions, as it was done during the preparation step.
+A regular index (the kind described above) is a _sorted copy_ of the full
+pre-aggregation: it contains the same rows at the same granularity, just ordered
+differently so that a particular query can be served with a fast merge scan. An
+**aggregating index** goes one step further. It stores **only** the dimensions
+listed in its definition, together with the pre-aggregated measures, and rolls the
+data up over every dimension that is _not_ in the index.
 
-Queries with the following characteristics can target aggregating indexes:
+**In other words, an aggregating index is a rollup of the data that already lives
+inside a rollup table.** Cube Store aggregates over the missing dimensions once,
+when the index is built. At query time that work is already done, so a query that
+matches the index reads far fewer rows and skips the aggregation step entirely.
 
-- They cannot make use of any `filters` other than for dimensions that are
-included in that index.
-- **All** dimensions used in the query must be defined in the aggregating
-index.
+Take the `main` pre-aggregation [from above](#example). A regular index keeps
+every `timestamp` / `product_name` / `product_category` / `zip_code` combination.
+An aggregating index on `zip_code` alone collapses all of that into one row per
+ZIP code:
 
-Queries that do not have the characteristics above can still make use of
-regular indexes so that their performance can still be optimized.
+| zip_code | order_total |
+| -------- | ----------- |
+| 88523    | 3800        |
+| 88524    | 5000        |
 
-**In other words, an aggregating index is a rollup of data in a rollup table.**
-Data needs to be downloaded from the upstream data source as many times as
-many pre-aggregations you have. Compared to having multiple pre-aggregations,
-having a single pre-aggregation with multiple aggregating indexes gives you
-pretty much the same performance from the Cube Store side but multiple times
-less cost from a data warehouse side.
+#### When to use an aggregating index
 
-Aggregating indexes are defined by using the [`type` option][ref-ref-index-type]
-in the index definition:
+Reach for an aggregating index when you have a **wide** pre-aggregation (many
+dimensions) that is frequently queried on a **small, fixed subset** of those
+dimensions. The classic example is a rollup with 50 dimensions where a recurring
+dashboard tile only ever groups by 5 of them. The aggregating index materializes
+exactly that narrow shape, so the tile reads a tiny pre-rolled table instead of
+scanning and re-aggregating the full pre-aggregation.
+
+The decision is usually between an aggregating index and a _second
+pre-aggregation_ for the same narrow shape. The economics favor the index:
+
+- Each pre-aggregation is built by querying your data source independently, so
+_N_ pre-aggregations means _N_ expensive warehouse reads.
+- A single pre-aggregation with _N_ aggregating indexes is built from **one**
+warehouse read — Cube Store derives every index locally during ingestion.
+
+You get roughly the same Cube Store query performance at a fraction of the
+warehouse cost. The cost is paid in pre-aggregation _build_ time, which grows with
+each index.
+
+The following table summarizes how the two index types differ:
+
+| | Regular index | Aggregating index |
+| --- | --- | --- |
+| `type` | `regular` (default; can be omitted) | `aggregate` |
+| What it stores | All pre-aggregation rows, re-sorted | Only the index dimensions + rolled-up measures |
+| Granularity | Same as the pre-aggregation | Rolled up to the index dimensions |
+| Size | Same row count as the pre-aggregation | Typically much smaller |
+| Supported measures | Any | [Additive][ref-additivity] only |
+| Query dimensions | Any (affects only sort efficiency) | **All** must be columns of the index |
+| Filters | Any dimension | Only on dimensions that are columns of the index |
+| Best for | Tuning sort order for known shapes; flexible and ad-hoc queries | A wide pre-aggregation queried on a narrow, fixed subset |
+
+#### How regular and aggregating indexes work together
+
+You don't have to choose one _or_ the other. You can define both kinds on the same
+pre-aggregation, and Cube Store selects the best index for each query
+automatically:
+
+- When a query **qualifies** for an aggregating index, Cube Store **prefers it**
+over regular indexes, because it is smaller and already rolled up. When several
+aggregating indexes qualify, the one with the smallest key wins.
+- Any query that does **not** qualify falls back to a regular index (or the
+default index), so those queries are still optimized.
+
+This is why the recommended pattern for a wide pre-aggregation is a couple of
+regular indexes covering your general and ad-hoc query shapes, _plus_ one
+aggregating index per hot narrow query shape.
+
+A query qualifies for an aggregating index only when **all** of the following
+hold:
+
+- Every measure used in the query is [additive][ref-additivity] — for example,
+measures built on `sum`, `count`, `min`, `max`, or `countDistinctApprox`.
+Non-additive measures (such as `avg` or exact `countDistinct`) can never use an
+aggregating index, because they cannot be re-derived from a partially rolled-up
+result.
+- **Every** dimension used in the query is one of the index's columns.
+- **Every** filter is on a dimension that is one of the index's columns. You
+cannot filter on a dimension that was rolled away when the index was built.
+
+#### Defining aggregating indexes
+
+Aggregating indexes are defined by adding the [`type` option][ref-ref-index-type]
+to an index definition. Define them alongside your regular indexes so that Cube
+Store can route each query to the most efficient one:
 
 <CodeGroup>
 
@@ -606,6 +669,123 @@ The data for `zip_code_index` would look as follows:
 | -------- | ----------- |
 | 88523    | 3800        |
 | 88524    | 5000        |
+
+#### Putting it together
+
+The two index types are most useful in combination. Building on the `main`
+pre-aggregation from above, define both the regular index that targets your
+filtered, multi-dimension query and the aggregating index that targets the narrow
+ZIP-code rollup:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - order_total
+        dimensions:
+          - product_name
+          - product_category
+          - zip_code
+        time_dimension: timestamp
+        granularity: hour
+        # ...
+
+        indexes:
+          # Regular index: full-grain, re-sorted for the filtered query
+          - name: category_productname_zipcode_index
+            columns:
+              - product_category
+              - zip_code
+              - product_name
+
+          # Aggregating index: pre-rolled to a single dimension
+          - name: zip_code_index
+            columns:
+              - zip_code
+            type: aggregate
+```
+
+```javascript title="JavaScript"
+cube("orders", {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      measures: [order_total],
+      dimensions: [product_name, product_category, zip_code],
+      time_dimension: timestamp,
+      granularity: `hour`,
+      // ...
+
+      indexes: {
+        // Regular index: full-grain, re-sorted for the filtered query
+        category_productname_zipcode_index: {
+          columns: [product_category, zip_code, product_name]
+        },
+
+        // Aggregating index: pre-rolled to a single dimension
+        zip_code_index: {
+          columns: [zip_code],
+          type: `aggregate`
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Now consider two queries against this pre-aggregation.
+
+**Query A — totals per ZIP code.** It groups by a single dimension that is a
+column of the aggregating index, uses only an additive measure, and applies no
+disqualifying filters:
+
+```json
+{
+  "measures": ["orders.order_total"],
+  "dimensions": ["orders.zip_code"]
+}
+```
+
+This query **qualifies for `zip_code_index`**, so Cube Store serves it from the
+two-row aggregating index rather than scanning the full pre-aggregation — even
+though the regular index also contains `zip_code`, the smaller aggregating index
+is preferred.
+
+**Query B — filtered breakdown by product.** It filters on `product_category` and
+groups by `product_name`:
+
+```json
+{
+  "measures": ["orders.order_total"],
+  "dimensions": ["orders.product_name"],
+  "filters": [
+    {
+      "member": "orders.product_category",
+      "operator": "equals",
+      "values": ["Electronics"]
+    }
+  ]
+}
+```
+
+This query **cannot** use `zip_code_index`: it groups by and filters on dimensions
+that were rolled away. Cube Store automatically **falls back to the regular
+`category_productname_zipcode_index`**, whose column order (`product_category`
+first for the single-value filter, then the rest) lets it serve the query with a
+fast merge scan.
+
+With both indexes defined, each query is routed to the most efficient one without
+any change to the query itself. Use [`EXPLAIN`](#explain-queries) to confirm which
+index a given query selects.
 
 ### Compaction
 

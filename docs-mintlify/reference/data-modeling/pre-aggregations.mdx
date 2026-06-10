@@ -1730,6 +1730,17 @@ This option is used to define [aggregating indexes][ref-aggregating-indexes]
 that contain **only** dimensions and pre-aggregated measures from the
 pre-aggregation definition.
 
+<Note>
+
+A query can only target an aggregating index when every measure it uses is
+[additive](/docs/pre-aggregations/getting-started-pre-aggregations#additivity)
+(e.g. built on `sum`, `count`, `min`, `max`, or `countDistinctApprox`), and every
+dimension and filter in the query is one of the index's `columns`. Non-additive
+measures, such as `avg` or exact `countDistinct`, cannot use an aggregating index.
+Queries that don't qualify automatically fall back to a regular index.
+
+</Note>
+
 Here's how you can define an aggregating index:
 
 <CodeGroup>
