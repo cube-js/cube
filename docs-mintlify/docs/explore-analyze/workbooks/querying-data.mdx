@@ -38,20 +38,9 @@ When you select such a view in a new tab, those filters are added to the query
 automatically. They behave exactly like filters you add yourself: you can
 change their values, switch operators, or remove them.
 
-Default filters only apply to new queries: defining or changing them in the
-data model does not add them to existing queries.
-
 Resetting the tab or going back to the view list clears default filters
 along with the rest of the query; they are seeded again the next time you
 select a view.
-
-<Note>
-
-Default filters are a starting point for the workbook only. To enforce a filter
-on every query against a view, regardless of the client, use the
-[`default_filters`][ref-default-filters] view parameter instead.
-
-</Note>
 
 ## Pivoting
 
@@ -196,5 +185,4 @@ the model behaves as intended.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
-[ref-default-filters]: /reference/data-modeling/view#default_filters
 
