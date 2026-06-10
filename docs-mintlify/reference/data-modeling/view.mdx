@@ -744,6 +744,15 @@ They can also be used to provide a sensible default that consumers can override
 by adding their own filter on the same member, by leveraging the [`unless`](#unless)
 parameter.
 
+<Note>
+
+`default_filters` are enforced on every query against the view, including
+queries with other filters. If you want UI-only default filters that data
+consumers can edit or remove in Cube Cloud workbooks, use
+[`meta.default_ui_filters`](#default_ui_filters) instead.
+
+</Note>
+
 <CodeGroup>
 
 ```yaml title="YAML"
