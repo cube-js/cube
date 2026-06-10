@@ -14,7 +14,7 @@ servers:
         default: your-tenant
         description: Your Cube Cloud tenant subdomain
 security:
-  - apiKey: []
+  - bearerAuth: []
 tags:
   - name: Deployments
   - name: Environments
@@ -276,8 +276,8 @@ paths:
         List the folders in a deployment's workspace.
 
 
-        By default this returns the folders at the workspace root. Pass the `parentId` query
-        parameter to list the direct children of a specific folder instead.
+        By default this returns the folders at the workspace root. Pass the parentId query parameter
+        to list the direct children of a specific folder instead.
 
 
         Results are scoped to the calling user: only folders the user can see are returned. A folder
@@ -287,14 +287,13 @@ paths:
 
 
         This endpoint is not recursive — it returns a single level of the folder tree per call. Use
-        `parentId` to walk deeper, or `GET /folders/{folderId}/ancestors` to resolve a breadcrumb
-        path.
+        parentId to walk deeper, or GET /folders/{folderId}/ancestors to resolve a breadcrumb path.
 
 
-        Results are returned in pages using cursor-based pagination: pass `first` to set the page
-        size and `after` (the previous response's `pageInfo.endCursor`) to fetch the next page. The
-        legacy `data` and `count` fields are still populated for backwards compatibility but are
-        deprecated in favour of `items` and `pageInfo`.
+        Results are returned in pages using cursor-based pagination: pass first to set the page size
+        and after (the previous response's pageInfo.endCursor) to fetch the next page. The legacy
+        data and count fields are still populated for backwards compatibility but are deprecated in
+        favour of items and pageInfo.
       operationId: getFolders
       parameters:
         - in: path
@@ -333,16 +332,16 @@ paths:
         Create a new folder in a deployment's workspace.
 
 
-        Provide a `name`, and optionally a `parentId` to nest the folder inside an existing one
-        (omit it to create the folder at the workspace root). An optional `position` controls the
-        folder's ordering among its siblings.
+        Provide a name, and optionally a parentId to nest the folder inside an existing one (omit it
+        to create the folder at the workspace root). An optional position controls the folder's
+        ordering among its siblings.
 
 
-        Requires the **AI BI User** role (or higher). When `parentId` is set, the caller must
-        additionally have **edit** or **manage** access to that parent folder.
+        Requires the AI BI User role (or higher). When parentId is set, the caller must additionally
+        have edit or manage access to that parent folder.
 
 
-        Folders can be nested up to a fixed maximum depth; exceeding it returns `400`.
+        Folders can be nested up to a fixed maximum depth; exceeding it returns 400.
       operationId: createFolder
       parameters:
         - in: path
@@ -370,19 +369,19 @@ paths:
   /v1/deployments/{deploymentId}/folders/{folderId}:
     delete:
       description: >-
-        Delete a folder from a deployment's workspace. Responds with `204 No Content` on success.
+        Delete a folder from a deployment's workspace. Responds with 204 No Content on success.
 
 
         The folder must be empty of sub-folders: if it still has child folders, the request is
-        rejected with `400` — delete or move the sub-folders first.
+        rejected with 400 — delete or move the sub-folders first.
 
 
-        Content directly inside the folder (workbooks, dashboards, reports) is **not** deleted. It
-        is detached and returned to the workspace root.
+        Content directly inside the folder (workbooks, dashboards, reports) is not deleted. It is
+        detached and returned to the workspace root.
 
 
-        Requires **manage** access to the folder. Returns `404` if the folder does not exist or
-        belongs to a different deployment.
+        Requires manage access to the folder. Returns 404 if the folder does not exist or belongs to
+        a different deployment.
       operationId: deleteFolder
       parameters:
         - in: path
@@ -405,16 +404,16 @@ paths:
         - Folders
     put:
       description: >-
-        Update a folder's metadata — its `name` and/or its `position` among its siblings. Both
-        fields are optional; only the fields you send are changed.
+        Update a folder's metadata — its name and/or its position among its siblings. Both fields
+        are optional; only the fields you send are changed.
 
 
-        This endpoint does **not** move a folder to a different parent. To re-parent a folder, use
-        `POST /workspace/move` with `type: FOLDER`.
+        This endpoint does not move a folder to a different parent. To re-parent a folder, use POST
+        /workspace/move with type: FOLDER.
 
 
-        Requires **edit** access to the folder. Returns `404` if the folder does not exist or
-        belongs to a different deployment.
+        Requires edit access to the folder. Returns 404 if the folder does not exist or belongs to a
+        different deployment.
       operationId: updateFolder
       parameters:
         - in: path
@@ -451,12 +450,12 @@ paths:
         including) the folder itself.
 
 
-        Use this to render a breadcrumb path for a nested folder. For example, for `Root / Sales /
-        Q1` requested on the `Q1` folder, the response is `[Root, Sales, Q1]`.
+        Use this to render a breadcrumb path for a nested folder. For example, for Root / Sales / Q1
+        requested on the Q1 folder, the response is [Root, Sales, Q1].
 
 
-        Requires visibility access to the target folder. Returns `404` if the folder does not exist
-        or belongs to a different deployment.
+        Requires visibility access to the target folder. Returns 404 if the folder does not exist or
+        belongs to a different deployment.
       operationId: getFolderAncestors
       parameters:
         - in: path
@@ -484,14 +483,14 @@ paths:
   /v1/deployments/{deploymentId}/notifications:
     get:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Returns the deployment’s scheduled notifications (recurring dashboard runs), ordered by
         creation time (newest first) and cursor-paginated. Optionally filter to a single dashboard
-        with `dashboardId`. Each item describes the schedule only; recipients are managed through
-        the `/recipients` sub-resource.
+        with dashboardId. Each item describes the schedule only; recipients are managed through the
+        /recipients sub-resource.
       operationId: getNotifications
       parameters:
         - in: path
@@ -538,16 +537,16 @@ paths:
         - Notifications
     post:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Creates a scheduled notification — a recurring run of a dashboard whose rendered result is
-        delivered to its recipients. The cadence is set by `scheduleType` plus the relevant time
-        fields (`minute`, `hour`, `dayOfWeek`, `dayOfMonth`) or a raw `customCron` expression when
-        `scheduleType` is `CUSTOM`; `timezone` defaults to UTC. The target `dashboardId` must belong
-        to this deployment, otherwise `404` is returned. The created notification has no recipients
-        — add them via `POST /notifications/{id}/recipients`.
+        delivered to its recipients. The cadence is set by scheduleType plus the relevant time
+        fields (minute, hour, dayOfWeek, dayOfMonth) or a raw customCron expression when
+        scheduleType is CUSTOM; timezone defaults to UTC. The target dashboardId must belong to this
+        deployment, otherwise 404 is returned. The created notification has no recipients — add them
+        via POST /notifications/{id}/recipients.
       operationId: createNotification
       parameters:
         - in: path
@@ -576,13 +575,13 @@ paths:
   /v1/deployments/{deploymentId}/notifications/{id}:
     delete:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Permanently deletes a scheduled notification and all of its recipients (main, embed, and
-        Slack) in a single cascade. Returns `204 No Content` on success, or `404` if the
-        notification does not belong to this deployment.
+        Slack) in a single cascade. Returns 204 No Content on success, or 404 if the notification
+        does not belong to this deployment.
       operationId: deleteNotification
       parameters:
         - in: path
@@ -609,12 +608,12 @@ paths:
         - Notifications
     get:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Returns a single scheduled notification by id, including its cron expression, timezone,
-        enabled state, notification format, and a human-readable schedule summary. Returns `404` if
+        enabled state, notification format, and a human-readable schedule summary. Returns 404 if
         the notification does not exist or does not belong to this deployment.
       operationId: getNotification
       parameters:
@@ -642,15 +641,15 @@ paths:
         - Notifications
     put:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Updates a notification’s schedule definition. Any subset of the schedule fields may be
-        supplied (`scheduleType` + time fields or `customCron`, `timezone`), along with `isEnabled`,
-        `notificationEnabled`, and `notificationFormat`. Omitted fields are left unchanged. This
-        endpoint never modifies recipients — manage those through the `/recipients` sub-resource.
-        Returns `404` if the notification is not part of this deployment.
+        supplied (scheduleType + time fields or customCron, timezone), along with isEnabled,
+        notificationEnabled, and notificationFormat. Omitted fields are left unchanged. This
+        endpoint never modifies recipients — manage those through the /recipients sub-resource.
+        Returns 404 if the notification is not part of this deployment.
       operationId: updateNotification
       parameters:
         - in: path
@@ -685,16 +684,16 @@ paths:
   /v1/deployments/{deploymentId}/notifications/{id}/recipients:
     delete:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Unsubscribes one or more recipients (1–1000 per request) from a notification. Each entry is
-        identified by `type` plus the `id` returned by the API — `userId` for `USER`, `embedUserId`
-        for `EMBED_USER`, or `channelId` for `SLACK`. `EMBED_USER` entries must also include
-        `embedTenantName`, which locates the recipient’s storage partition. Removals are idempotent
-        (deleting a recipient that isn’t subscribed is a no-op). Returns `204 No Content`, or `404`
-        if the notification is not part of this deployment.
+        identified by type plus the id returned by the API — userId for USER, embedUserId for
+        EMBED_USER, or channelId for SLACK. EMBED_USER entries must also include embedTenantName,
+        which locates the recipient’s storage partition. Removals are idempotent (deleting a
+        recipient that isn’t subscribed is a no-op). Returns 204 No Content, or 404 if the
+        notification is not part of this deployment.
       operationId: removeRecipients
       parameters:
         - in: path
@@ -728,16 +727,15 @@ paths:
         - Notifications
     get:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Returns the recipients subscribed to a notification, cursor-paginated and ordered by
-        creation time (newest first). Recipients span three kinds, distinguished by `type`: `USER`
-        (a main console user, with `userId` + `email`), `EMBED_USER` (an embed user, with
-        `embedUserId`, `embedTenantName`, `externalId`, and `email`), and `SLACK` (a channel, with
-        `channelId` + `channelName`). Returns `404` if the notification is not part of this
-        deployment.
+        creation time (newest first). Recipients span three kinds, distinguished by type: USER (a
+        main console user, with userId + email), EMBED_USER (an embed user, with embedUserId,
+        embedTenantName, externalId, and email), and SLACK (a channel, with channelId +
+        channelName). Returns 404 if the notification is not part of this deployment.
       operationId: getRecipients
       parameters:
         - in: path
@@ -785,20 +783,20 @@ paths:
         - Notifications
     post:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
         Subscribes one or more recipients (1–1000 per request) to a notification. Each recipient is
-        one of: a main console `USER` (identified by `userId` or `email`); an `EMBED_USER`
-        (identified by `embedTenantName` + `externalId`, auto-provisioned if it does not yet exist,
-        and optionally given `securityContext`, `userAttributes`, and `groups` that drive
-        per-recipient rendering); or `SLACK` — **not yet supported**, a request containing a Slack
-        recipient is rejected with `400`. Every recipient must resolve to a valid email (an embed
-        user’s `email`, or an email-shaped `externalId`); otherwise the whole request fails with
-        `400` before anything is written. The operation is idempotent: the response buckets each
-        recipient into `createdRecipients`, `updatedRecipients` (an existing recipient whose embed
-        properties changed), or `unchangedRecipients`.
+        one of: a main console USER (identified by userId or email); an EMBED_USER (identified by
+        embedTenantName + externalId, auto-provisioned if it does not yet exist, and optionally
+        given securityContext, userAttributes, and groups that drive per-recipient rendering); or
+        SLACK — not yet supported, a request containing a Slack recipient is rejected with 400.
+        Every recipient must resolve to a valid email (an embed user’s email, or an email-shaped
+        externalId); otherwise the whole request fails with 400 before anything is written. The
+        operation is idempotent: the response buckets each recipient into createdRecipients,
+        updatedRecipients (an existing recipient whose embed properties changed), or
+        unchangedRecipients.
       operationId: addRecipients
       parameters:
         - in: path
@@ -1026,17 +1024,17 @@ paths:
     get:
       description: >-
         List the workspace items (folders, workbooks, reports) that have been shared with embed
-        users via the built-in `all_embed_users` group.
+        users via the built-in all_embed_users group.
 
 
-        Unlike `GET /workspace`, this feed is not per-user: every valid embed caller for the
+        Unlike GET /workspace, this feed is not per-user: every valid embed caller for the
         deployment sees the same set, scoped to what the built-in group has been granted. Owner
         identities are blanked out so they are not exposed to embed users.
 
 
-        Accepts the same `folderId`, `types`, `search`, sorting, and cursor-pagination parameters as
-        `GET /workspace`. Folders reachable only because a nested item inside them was shared are
-        surfaced as navigation, but their unshared siblings stay hidden.
+        Accepts the same folderId, types, search, sorting, and cursor-pagination parameters as GET
+        /workspace. Folders reachable only because a nested item inside them was shared are surfaced
+        as navigation, but their unshared siblings stay hidden.
       operationId: sharedWorkspaceObjects
       parameters:
         - in: path
@@ -1229,21 +1227,21 @@ paths:
         changed.
 
 
-        - `name` — rename the workbook.
+        - name — rename the workbook.
 
-        - `meta` — replace the workbook's metadata object.
+        - meta — replace the workbook's metadata object.
 
-        - `folderId` — move the workbook between folders. Set it to a folder id to move the workbook
-        into that folder, or to `null` to move it back to the workspace root.
-
-
-        Access depends on what you change. Renaming or editing metadata requires **edit** access to
-        the workbook. Moving the workbook (any request that includes `folderId`) requires **manage**
-        access to the workbook, plus **edit** access to the destination folder when moving into one.
+        - folderId — move the workbook between folders. Set it to a folder id to move the workbook
+        into that folder, or to null to move it back to the workspace root.
 
 
-        To move a workbook you can use either this endpoint or the unified `POST /workspace/move`.
-        Returns `404` if the workbook does not exist or belongs to a different deployment.
+        Access depends on what you change. Renaming or editing metadata requires edit access to the
+        workbook. Moving the workbook (any request that includes folderId) requires manage access to
+        the workbook, plus edit access to the destination folder when moving into one.
+
+
+        To move a workbook you can use either this endpoint or the unified POST /workspace/move.
+        Returns 404 if the workbook does not exist or belongs to a different deployment.
       operationId: updateWorkbook
       parameters:
         - in: path
@@ -1312,15 +1310,15 @@ paths:
         The clone is created in the same folder as the source and named "Copy of {original name}".
         All report references inside the dashboard (and the dashboard draft) are re-pointed at the
         copied reports, so the duplicate is fully self-contained and independent of the original.
-        Per-user view history (last-viewed timestamps) is **not** carried over.
+        Per-user view history (last-viewed timestamps) is not carried over.
 
 
-        Requires **read** access to the source workbook and the **AI BI User** role (or higher). The
-        new workbook is owned by the calling user.
+        Requires read access to the source workbook and the AI BI User role (or higher). The new
+        workbook is owned by the calling user.
 
 
         If the deployment's plan enforces a workbook limit and it has been reached, the request is
-        rejected with `400`. Returns `404` if the workbook does not exist or belongs to a different
+        rejected with 400. Returns 404 if the workbook does not exist or belongs to a different
         deployment.
       operationId: duplicateWorkbook
       parameters:
@@ -1382,25 +1380,25 @@ paths:
         unified, paginated feed.
 
 
-        By default this returns the items at the workspace root. Pass `folderId` to list the
-        contents of a specific folder instead. Folders are always returned ahead of other item types
-        so they render at the top of a listing.
+        By default this returns the items at the workspace root. Pass folderId to list the contents
+        of a specific folder instead. Folders are always returned ahead of other item types so they
+        render at the top of a listing.
 
 
         Supported query parameters:
 
-        - `folderId` — list the contents of this folder (omit for the root).
+        - folderId — list the contents of this folder (omit for the root).
 
-        - `types` — restrict the results to one or more item types (`FOLDER`, `WORKBOOK`, `REPORT`).
-        Repeat the parameter to pass several.
+        - types — restrict the results to one or more item types (FOLDER, WORKBOOK, REPORT). Repeat
+        the parameter to pass several.
 
-        - `search` — case-insensitive substring match on item names; searches across all folders,
-        not just the current level.
+        - search — case-insensitive substring match on item names; searches across all folders, not
+        just the current level.
 
-        - `orderByField` / `orderByDirection` — sort the non-folder items (e.g. by `name`,
-        `updated_at`, `created_at`, or `viewer_last_viewed_at`).
+        - orderByField / orderByDirection — sort the non-folder items (e.g. by name, updated_at,
+        created_at, or viewer_last_viewed_at).
 
-        - `first` / `after` — cursor-based pagination.
+        - first / after — cursor-based pagination.
 
 
         Results are scoped to the calling user: only items the user can access are returned.
@@ -1475,27 +1473,27 @@ paths:
 
         Request body:
 
-        - `type` — the item type: `WORKBOOK`, `REPORT`, or `FOLDER`.
+        - type — the item type: WORKBOOK, REPORT, or FOLDER.
 
-        - `id` — the id of the item to move.
+        - id — the id of the item to move.
 
-        - `folderId` — the destination folder id, or `null` to move the item to the workspace root.
-        For a folder, this becomes its new parent.
+        - folderId — the destination folder id, or null to move the item to the workspace root. For
+        a folder, this becomes its new parent.
 
 
         Access requirements depend on the item type and mirror the per-type rules:
 
-        - **Workbook** — manage access to the workbook, plus edit access to the destination folder
-        when moving into one.
+        - Workbook — manage access to the workbook, plus edit access to the destination folder when
+        moving into one.
 
-        - **Report** — edit access to the report (with the report-manage permission).
+        - Report — edit access to the report (with the report-manage permission).
 
-        - **Folder** — manage access to the folder being moved, plus manage or edit access to the
+        - Folder — manage access to the folder being moved, plus manage or edit access to the
         destination parent folder.
 
 
         Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
-        rejected with `400`. Returns `404` if the item does not exist or belongs to a different
+        rejected with 400. Returns 404 if the item does not exist or belongs to a different
         deployment.
       operationId: moveWorkspaceObject
       parameters:
@@ -1632,19 +1630,19 @@ paths:
   /v1/embed/dashboard/{publicId}:
     get:
       description: >-
-        Returns the dashboard identified by its `publicId` — including its reports/widgets —
-        resolved within the caller's embed session scope, for rendering inside an embedded view.
+        Returns the dashboard identified by its publicId — including its reports/widgets — resolved
+        within the caller's embed session scope, for rendering inside an embedded view.
 
 
         Access is authorized against the embed user: the dashboard is returned when the user owns
         its workbook, has been granted workbook access (folder-based or direct), holds
-        `EmbedDashboardRead` on the dashboard, or when it has been shared with all embed users
-        (creator-mode flow). Returns `404` if the dashboard does not exist or is not visible to the
+        EmbedDashboardRead on the dashboard, or when it has been shared with all embed users
+        (creator-mode flow). Returns 404 if the dashboard does not exist or is not visible to the
         caller.
 
 
         Signed embedding additionally requires the dashboard to have "Allow signed embedding"
-        enabled; the trusted screenshoter and creator-mode session flows are exempt. Returns `403`
+        enabled; the trusted screenshoter and creator-mode session flows are exempt. Returns 403
         when embedding is not permitted for the dashboard.
       operationId: getDashboard
       parameters:
@@ -1666,22 +1664,21 @@ paths:
   /v1/embed/generate-session:
     post:
       description: >-
-        **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API key,
+        🔒 Admin only. Requires administrator privileges — the authenticated principal (API key,
         embed JWT, or any bearer token) must belong to a user with the admin role.
 
 
-        Creates a one-time embed session for a deployment and returns its `sessionId`.
+        Creates a one-time embed session for a deployment and returns its sessionId.
 
 
         The session captures the embed context that will be baked into the embed token once redeemed
-        — the target `deploymentId`, the end user's identity (`externalId` / `email` /
-        `userProfile`), their `groups` and `userAttributes`, and an optional `securityContext`.
-        Exchange the returned `sessionId` for a signed embed JWT via `POST
-        /api/v1/embed/session/token` (single use).
+        — the target deploymentId, the end user's identity (externalId / email / userProfile), their
+        groups and userAttributes, and an optional securityContext. Exchange the returned sessionId
+        for a signed embed JWT via POST /api/v1/embed/session/token (single use).
 
 
-        `deploymentId` is required and the caller must have read access to it. Embedding must be
-        enabled for the tenant, otherwise `403` is returned.
+        deploymentId is required and the caller must have read access to it. Embedding must be
+        enabled for the tenant, otherwise 403 is returned.
       operationId: generateSession
       requestBody:
         content:
@@ -1703,18 +1700,17 @@ paths:
   /v1/embed/session/token:
     post:
       description: >-
-        Exchanges a one-time embed session id (created via `POST /api/v1/embed/generate-session`)
-        for a signed, short-lived embed JWT used to authenticate the embedded analytics in the
-        browser.
+        Exchanges a one-time embed session id (created via POST /api/v1/embed/generate-session) for
+        a signed, short-lived embed JWT used to authenticate the embedded analytics in the browser.
 
 
-        The session is **single-use**: it is consumed (deleted) on the first successful exchange, so
-        a given `sessionId` can be redeemed only once. The returned token is signed with the
-        tenant's embed secret, issued by `cubecloud`, and expires after 24 hours.
+        The session is single-use: it is consumed (deleted) on the first successful exchange, so a
+        given sessionId can be redeemed only once. The returned token is signed with the tenant's
+        embed secret, issued by cubecloud, and expires after 24 hours.
 
 
         This endpoint is unauthenticated — it is called from the embedding client and the session id
-        itself is the credential. Returns `401` if the session id is unknown or has already been
+        itself is the credential. Returns 401 if the session id is unknown or has already been
         redeemed.
       operationId: postTokenBySessionId
       requestBody:
@@ -1736,11 +1732,10 @@ paths:
         - Embed
 components:
   securitySchemes:
-    apiKey:
-      type: apiKey
-      in: header
-      name: Authorization
-      description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.'
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Token authentication. Send `Authorization: Bearer <YOUR_TOKEN>`.'
   schemas:
     AIEngineerCubeCredentialsDTO:
       properties:

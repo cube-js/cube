@@ -6,9 +6,9 @@
 // embed, AI, and workspace areas) and auto-discovers tags, so new public
 // endpoints show up without editing this script.
 //
-// SCIM (/api/scim/v2) is intentionally NOT included: it authenticates with a
-// Bearer token rather than the Api-Key scheme used here, and its docs are
-// hand-curated in api-reference/scim.yaml.
+// SCIM (/api/scim/v2) is intentionally NOT included: its docs are hand-curated
+// in api-reference/scim.yaml. (Both the REST API and SCIM authenticate with a
+// Bearer token; see the securityScheme override below.)
 //
 // The source spec lives in the (private) cubejs-enterprise repo and is NOT in
 // this repo, so there is no hardcoded path — point the script at the spec via
@@ -92,6 +92,19 @@ const TAG_ORDER = [
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants',
 ];
 
+// Mintlify renders the OpenAPI operation `description` as a plain-text node — it
+// does NOT process Markdown or HTML there, so `**bold**` and `` `code` `` would
+// show up literally on the page (verified by headless-rendering with Mintlify CLI
+// 4.2.x). The upstream prose uses both, so flatten those inline markers to plain
+// text. (Parameter/schema descriptions are rendered by a different Mintlify
+// component that DOES handle code spans, so they are intentionally left alone.)
+function flattenInlineMarkdown(s) {
+  if (typeof s !== 'string') return s;
+  return s
+    .replace(/\*\*(.+?)\*\*/gs, '$1') // **bold** -> bold
+    .replace(/`([^`]+)`/g, '$1');     // `code`   -> code
+}
+
 // Strip the " Public" suffix the source appends to every tag and normalize a few
 // acronyms; TAG_MAP overrides win.
 function cleanTag(raw) {
@@ -122,6 +135,11 @@ for (const [key, val] of Object.entries(src.paths)) {
     kept++;
     if (Array.isArray(val[m].tags)) {
       val[m].tags = val[m].tags.map(cleanTag);
+    }
+    // Mintlify shows the operation description as plain text; flatten inline
+    // Markdown so `**bold**`/`` `code` `` don't render literally.
+    if (typeof val[m].description === 'string') {
+      val[m].description = flattenInlineMarkdown(val[m].description);
     }
     // strip "XxxController." prefix from operationId for clean page slugs
     if (typeof val[m].operationId === 'string') {
@@ -212,19 +230,18 @@ const out = {
       variables: { tenant: { default: 'your-tenant', description: 'Your Cube Cloud tenant subdomain' } },
     },
   ],
-  security: [{ apiKey: [] }],
+  security: [{ bearerAuth: [] }],
   tags: orderedTags.map((t) => ({ name: t })),
   paths,
   components: {
-    // The public API authenticates REST clients with an API key sent as
-    // `Authorization: Api-Key <token>`. The source spec defines a bearer/JWT
-    // scheme that does not reflect the primary runtime auth, so we override it.
+    // The public REST API authenticates with a token sent as
+    // `Authorization: Bearer <token>` (an API key or an OAuth access token). The
+    // source spec's scheme does not reflect the primary runtime auth, so override.
     securitySchemes: {
-      apiKey: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'Authorization',
-        description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.',
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'Token authentication. Send `Authorization: Bearer <YOUR_TOKEN>`.',
       },
     },
     schemas: sortedSchemas,
