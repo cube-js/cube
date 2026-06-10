@@ -200,6 +200,15 @@ and don't write the path by hand. Well-known audiences (AWS/GCP/Azure)
 don't need this — their SDKs read fixed, standard env vars that Cube
 already populates.
 
+The example below — a custom config for the Snowflake driver — combines
+both fields: a `scp` custom claim (which Snowflake requires for role
+authorization) and a Target Env Var of `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`.
+The [Snowflake OIDC guide][ref-oidc-snowflake] walks through the full setup.
+
+<Frame>
+  <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for a custom Snowflake audience: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
+</Frame>
+
 ## Trust mechanism
 
 The receiving system trusts Cube tokens by referencing two things:
