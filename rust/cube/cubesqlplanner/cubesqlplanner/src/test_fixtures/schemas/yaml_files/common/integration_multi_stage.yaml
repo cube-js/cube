@@ -194,6 +194,35 @@ cubes:
                 - orders.status
                 - orders.category
 
+          - name: amount_reduce_created_at
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+
+          # Non-sum outer aggregation forces the JOIN-model path (not
+          # window-eligible) — exercises the partition_filter site of
+          # cube-js/cube#10854.
+          - name: max_amount_reduce_created_at
+            type: max
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+
+          # grain.include also forces the JOIN-model path; bare time-dim
+          # exclude via the grain directive.
+          - name: amount_grain_exclude_created_at_include_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.created_at
+                include:
+                    - orders.category
+
           - name: amount_group_by_status
             type: sum
             sql: "{CUBE.total_amount}"

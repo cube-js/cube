@@ -538,24 +538,7 @@ impl MultiStageMemberQueryPlanner {
     }
 
     fn member_partition_by_logical(&self, grain: &MultiStageGrain) -> Vec<Rc<MemberSymbol>> {
-        let dimensions = self.all_dimensions();
-        let dimensions = if let Some(exclude) = &grain.exclude {
-            dimensions
-                .into_iter()
-                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
-                .collect_vec()
-        } else {
-            dimensions
-        };
-        let dimensions = if let Some(keep_only) = &grain.keep_only {
-            dimensions
-                .into_iter()
-                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
-                .collect_vec()
-        } else {
-            dimensions
-        };
-        dimensions
+        grain.partition_dimensions(&self.all_dimensions())
     }
 
     fn query_order_by(&self) -> Result<Vec<OrderByItem>, CubeError> {

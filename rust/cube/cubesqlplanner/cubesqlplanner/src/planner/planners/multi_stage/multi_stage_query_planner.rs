@@ -279,35 +279,6 @@ impl MultiStageQueryPlanner {
         }
     }
 
-    /// Applies the partition-shaping part of `grain` to a parent-state
-    /// dimension list: `exclude` removes matching dims, then `keep_only`
-    /// intersects what's left. `include` is appended outside this helper
-    /// via `add_dimensions`.
-    ///
-    /// FIXME: merge with `MultiStageMemberQueryPlanner::member_partition_by_logical`
-    /// — both apply the same grain reshape on different inputs; keeping two
-    /// copies invites silent drift when only one is updated.
-    fn partition_filter(
-        dims: &Vec<Rc<MemberSymbol>>,
-        grain: &MultiStageGrain,
-    ) -> Vec<Rc<MemberSymbol>> {
-        let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &grain.exclude {
-            dims.iter()
-                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
-                .cloned()
-                .collect()
-        } else {
-            dims.clone()
-        };
-        if let Some(keep_only) = &grain.keep_only {
-            dims.into_iter()
-                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
-                .collect()
-        } else {
-            dims
-        }
-    }
-
     /// Default child-generation path: for each measure or
     /// multi-stage-dimension dependency, recurses into
     /// `make_queries_descriptions` and adds the result as an input
@@ -556,8 +527,8 @@ impl MultiStageQueryPlanner {
                     )
                 {
                     let grain = multi_stage_member.grain();
-                    let dims = Self::partition_filter(new_state.dimensions(), grain);
-                    let time_dims = Self::partition_filter(new_state.time_dimensions(), grain);
+                    let dims = grain.partition_dimensions(new_state.dimensions());
+                    let time_dims = grain.partition_dimensions(new_state.time_dimensions());
                     new_state.set_dimensions(dims);
                     new_state.set_time_dimensions(time_dims);
                 }
