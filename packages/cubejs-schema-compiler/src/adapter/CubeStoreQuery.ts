@@ -358,6 +358,11 @@ export class CubeStoreQuery extends BaseQuery {
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
     templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
+    // CubeStore has no native FULL OUTER JOIN (it is emulated via LEFT JOIN chains), and its
+    // distributed join executor assumes the left-most table is the split root, so RIGHT/FULL
+    // across partitioned tables is unsafe. Don't push those join types down to CubeStore.
+    delete templates.join_types.full;
+    delete templates.join_types.right;
     return templates;
   }
 }

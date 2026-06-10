@@ -995,6 +995,14 @@ impl SqlTemplates {
         self.render_template("join_types/inner", context! {})
     }
 
+    pub fn full_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/full", context! {})
+    }
+
+    pub fn right_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/right", context! {})
+    }
+
     pub fn query_aliased(&self, query: &str, alias: &str) -> Result<String, CubeError> {
         let bracketed_query = format!("({})", query);
         let quoted_alias = self.quote_identifier(alias)?;

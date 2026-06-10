@@ -3459,6 +3459,7 @@ impl WrappedSelectNode {
                 }
 
                 match join_type {
+                    // Right/Full are only generated on the non-push-to-Cube path
                     JoinType::Inner | JoinType::Left => {
                         // Do nothing
                     }
@@ -3596,6 +3597,7 @@ impl WrappedSelectNode {
             };
 
             let join_type = match join_type {
+                // Right/Full are only generated on the non-push-to-Cube path
                 JoinType::Left => generator.get_sql_templates().left_join()?,
                 JoinType::Inner => generator.get_sql_templates().inner_join()?,
                 _ => {
@@ -3868,6 +3870,8 @@ impl WrappedSelectNode {
             let join_type_sql = match join_type {
                 JoinType::Left => generator.get_sql_templates().left_join()?,
                 JoinType::Inner => generator.get_sql_templates().inner_join()?,
+                JoinType::Right => generator.get_sql_templates().right_join()?,
+                JoinType::Full => generator.get_sql_templates().full_join()?,
                 _ => {
                     return Err(CubeError::internal(format!(
                         "Unsupported join type for join subquery: {join_type:?}"

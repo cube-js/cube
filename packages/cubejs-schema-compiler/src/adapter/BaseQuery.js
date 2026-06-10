@@ -4631,6 +4631,10 @@ export class BaseQuery {
         series_bounds_cast: '{{ expr }}',
         bool_param_cast: '{{ expr }}',
         number_param_cast: '{{ expr }}',
+        // Tesseract uses its own join type templates, decoupled from `join_types`
+        // which are used by the SQL API push down. FULL is opt-in per dialect.
+        join_types_inner: 'INNER',
+        join_types_left: 'LEFT',
       },
       filters: {
         equals: '{{ column }} = {{ value }}{{ is_null_check }}',
@@ -4661,6 +4665,8 @@ export class BaseQuery {
       join_types: {
         inner: 'INNER',
         left: 'LEFT',
+        right: 'RIGHT',
+        full: 'FULL',
       },
       window_frame_types: {
         rows: 'ROWS',
