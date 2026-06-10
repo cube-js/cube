@@ -10,7 +10,7 @@ different authentication:
 | --- | --- | --- |
 | **Core Data API** | Query your data model over HTTP — run queries (`/v1/load`) and read metadata (`/v1/meta`) | Cube API token (a JWT) sent **directly** in the `Authorization` header — no prefix |
 | **AI API** | Stream conversations with Cube AI agents (`/chat/stream-chat-state`) | Cube Cloud API key with the **`Api-Key`** prefix |
-| **Platform API** | Manage Cube Cloud — deployments, reports, workbooks, users, policies, and more | **`Api-Key`** prefix for REST; **`Bearer`** for SCIM 2.0 |
+| **Platform API** | Manage Cube Cloud — deployments, reports, workbooks, users, policies, and more | **`Bearer`** prefix for REST and SCIM 2.0 |
 
 The exact header for each is shown above. The Platform and SCIM schemes are
 detailed on the [Authentication](/api-reference/authentication) page; the Core
@@ -61,12 +61,12 @@ https://{tenant}.cubecloud.dev/api
 | --- | --- | --- |
 | [Deployments](/api-reference/deployments/get-deployments) | `/v1/deployments` | v1 |
 | [Environments](/api-reference/environments/get-deployment-environments) | `/v1/deployments/{deploymentId}/environments` | v1 |
-| [Folders](/api-reference/folders/get-folders) | `/v1/deployments/{deploymentId}/folders` | v1 |
-| [Reports](/api-reference/reports/get-report-folders) | `/v1/deployments/{deploymentId}/reports` | v1 |
+| [Folders](/api-reference/folders/list-folders) | `/v1/deployments/{deploymentId}/folders` | v1 |
+| [Reports](/api-reference/reports/list-reports) | `/v1/deployments/{deploymentId}/reports` | v1 |
 | [Workbooks](/api-reference/workbooks/get-workbooks) | `/v1/deployments/{deploymentId}/workbooks` | v1 |
-| [Notifications](/api-reference/notifications/get-notifications) | `/v1/deployments/{deploymentId}/notifications` | v1 |
-| [Workspace](/api-reference/workspace/shared-workspace-objects) | `/v1/deployments/{deploymentId}/workspace` | v1 |
-| [Embed](/api-reference/embed/get-dashboard) | `/v1/embed` | v1 |
+| [Notifications](/api-reference/notifications/list-scheduled-notifications) | `/v1/deployments/{deploymentId}/notifications` | v1 |
+| [Workspace](/api-reference/workspace/list-shared-workspace-items) | `/v1/deployments/{deploymentId}/workspace` | v1 |
+| [Embed](/api-reference/embed/get-an-embeddable-dashboard) | `/v1/embed` | v1 |
 | [Embed Tenants](/api-reference/embed-tenants/get-groups) | `/v1/embed-tenants` | v1 |
 | [Users (SCIM)](/api-reference/scim-users/list-users) | `/scim/v2/Users` | SCIM 2.0 |
 | [Groups (SCIM)](/api-reference/scim-groups/list-groups) | `/scim/v2/Groups` | SCIM 2.0 |
@@ -119,7 +119,7 @@ import { createCubePlatformClient } from '@cube-dev/platform-client';
 const client = createCubePlatformClient({
   baseUrl: 'https://<tenant>.cubecloud.dev',
   // Returned on every request — provide the Platform API auth header.
-  getHeaders: () => ({ Authorization: `Api-Key ${process.env.CUBE_API_KEY}` }),
+  getHeaders: () => ({ Authorization: `Bearer ${process.env.CUBE_API_KEY}` }),
 });
 
 const { data, error } = await client.fetchClient.GET('/api/v1/deployments/', {

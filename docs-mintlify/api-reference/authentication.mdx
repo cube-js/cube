@@ -1,43 +1,29 @@
 ---
 title: Authentication
-description: Authenticate REST requests with an API key and SCIM requests with a bearer token.
+description: Authenticate REST and SCIM requests with a token sent using the Bearer prefix.
 ---
 
-How you authenticate depends on which API you call. The REST management API
-(`/api/v1/…`) uses an API key; the SCIM API (`/api/scim/v2/…`) uses a bearer
-token. Both are sent in the `Authorization` header, and only HTTPS is accepted.
+How you authenticate depends on which API you call. Both the REST management API
+(`/api/v1/…`) and the SCIM API (`/api/scim/v2/…`) take a token in the
+`Authorization` header with the `Bearer` prefix, and only HTTPS is accepted.
 
 ## REST API (`/api/v1`)
 
-Authenticate deployment, report, and workbook requests with an API key from your
-Cube Cloud account, sent with the `Api-Key` prefix:
+Authenticate deployment, report, and workbook requests with a token sent using
+the `Bearer` prefix:
 
 ```text
-Authorization: Api-Key <YOUR_API_KEY>
+Authorization: Bearer <YOUR_TOKEN>
 ```
 
-Generate an API key (access token) in your Cube Cloud account settings.
+The token can be an API key generated in your Cube Cloud account settings, or an
+OAuth access token from Cube Cloud's OAuth flow — both are sent the same way.
 
 ```bash
 curl --request GET \
   --url 'https://<tenant>.cubecloud.dev/api/v1/deployments' \
-  --header 'Authorization: Api-Key <YOUR_API_KEY>'
+  --header 'Authorization: Bearer <YOUR_TOKEN>'
 ```
-
-The REST API also accepts a `Bearer` prefix for OAuth access tokens, for
-integrations built on Cube Cloud's OAuth flow:
-
-```text
-Authorization: Bearer <YOUR_OAUTH_ACCESS_TOKEN>
-```
-
-<Note>
-
-`Bearer` here authenticates an **OAuth access token**, not your API key — the two
-are validated differently. Send API keys with the `Api-Key` prefix; a Cube Cloud
-API key sent as `Bearer` will be rejected. (SCIM is the exception — see below.)
-
-</Note>
 
 ## SCIM API (`/api/scim/v2`)
 
