@@ -230,6 +230,60 @@ view(`active_users`, {
 
 </CodeGroup>
 
+#### `auto_run`
+
+In the Cube cloud platform, you can use the `auto_run` key in a view's `meta`
+to control whether [workbook][ref-workbook-running] queries against the view
+run automatically. By default, a workbook re-runs the query every time a data
+consumer changes it — adds a member, edits a filter, and so on. Setting
+`auto_run: false` turns this off for the view: the query only runs when the
+user clicks **Run query**.
+
+This is useful for views backed by heavy or expensive queries, where running
+on every change would be wasteful.
+
+<Info>
+
+Please note, currently `auto_run` is defined inside the `meta` property; this
+may change in the future.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      auto_run: false
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    auto_run: false
+  }
+});
+```
+
+</CodeGroup>
+
+The setting only provides the default for the view. Data consumers can toggle
+auto-run on or off in each workbook tab, and their choice takes precedence
+over the view's default. When `auto_run` is not set, auto-run is on.
+
 #### `default_ui_filters`
 
 In the Cube cloud platform, you can use the `default_ui_filters` key in a
@@ -872,6 +926,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-playground]: /docs/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
 [ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
+[ref-workbook-running]: /docs/explore-analyze/workbooks/querying-data#running-queries
 [ref-extension]: /docs/data-modeling/extending-cubes
 [ref-dim-name]: /reference/data-modeling/dimensions#name
 [ref-dim-title]: /reference/data-modeling/dimensions#title
