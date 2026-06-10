@@ -24,6 +24,9 @@ GRANT SELECT ON FUTURE TABLES IN DATABASE ABC TO ROLE XYZ;
 
 - [Account/Server URL][snowflake-docs-account-id] for Snowflake.
 - User name and password or an RSA private key for the Snowflake account.
+  In Cube Cloud, you can authenticate with [OIDC workload
+  identity][ref-oidc-snowflake] instead — the same role grants apply to the
+  mapped service user.
 - Optionally, the warehouse name, the user role, and the database name.
 
 ## Setup
@@ -63,6 +66,29 @@ The following fields are required when creating a Snowflake connection:
   <img src="https://ucarecdn.com/2a113d20-33ca-4634-b6fa-8886df4d215c/" alt="Cube Cloud Snowflake Configuration Screen" />
 </Frame>
 
+#### OIDC workload identity
+
+Instead of a password or key pair, Cube Cloud deployments can authenticate
+to Snowflake with [OIDC workload identity][ref-oidc-snowflake]: a Snowflake
+External OAuth integration trusts Cube's OIDC issuer, and the driver
+presents a short-lived Cube-minted token — no long-lived secrets to
+provision or rotate. Set the `OAUTH` authenticator and point the driver at
+the token file Cube maintains, omitting `CUBEJS_DB_USER` /
+`CUBEJS_DB_PASS`:
+
+```dotenv
+CUBEJS_DB_TYPE=snowflake
+CUBEJS_DB_SNOWFLAKE_ACCOUNT=acme-analytics
+CUBEJS_DB_SNOWFLAKE_WAREHOUSE=MY_SNOWFLAKE_WAREHOUSE
+CUBEJS_DB_NAME=my_snowflake_database
+CUBEJS_DB_SNOWFLAKE_ROLE=CUBE_ROLE
+CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR=OAUTH
+CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH=/var/cube/<tenant-id>/<deployment-id>/cube_cloud_token_snowflake
+```
+
+See the [Snowflake OIDC guide][ref-oidc-snowflake] for the security
+integration, service user, and token config setup.
+
 Cube Cloud also supports connecting to data sources within private VPCs
 if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 [VPC connectivity guide][ref-cloud-conf-vpc] for details.
@@ -79,8 +105,8 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 | [`CUBEJS_DB_SNOWFLAKE_ROLE`](/reference/configuration/environment-variables#cubejs_db_snowflake_role)                           | The Snowflake role to use when connecting to the database                                                                                           | [A valid Snowflake role][snowflake-docs-roles] in the account          |    ❌    |
 | [`CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`](/reference/configuration/environment-variables#cubejs_db_snowflake_client_session_keep_alive)      | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |
 | [`CUBEJS_DB_NAME`](/reference/configuration/environment-variables#cubejs_db_name)                                     | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |
-| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)                                     | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |
-| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)                                     | The password used to connect to the database                                                                                                        | A valid database password                                              |    ✅    |
+| [`CUBEJS_DB_USER`](/reference/configuration/environment-variables#cubejs_db_user)                                     | The username used to connect to the database                                                                                                        | A valid database username                                              | ✅<sup>1</sup> |
+| [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)                                     | The password used to connect to the database                                                                                                        | A valid database password                                              | ✅<sup>1</sup> |
 | [`CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`](/reference/configuration/environment-variables#cubejs_db_snowflake_authenticator)                  | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`, `OAUTH`                                  |    ❌    |
 | [`CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY`](/reference/configuration/environment-variables#cubejs_db_snowflake_private_key)                    | The content of the private RSA key                                                                                                                  | Content of the private RSA key (encrypted or not)                      |    ❌    |
 | [`CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`](/reference/configuration/environment-variables#cubejs_db_snowflake_private_key_path)               | The path to the private RSA key                                                                                                                     | A valid path to the private RSA key                                    |    ❌    |
@@ -91,6 +117,8 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 | [`CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE`](/reference/configuration/environment-variables#cubejs_db_snowflake_quoted_identifiers_ignore_case) | Whether or not [quoted identifiers should be case insensitive][link-snowflake-quoted-identifiers]. Default is `false`                               | `true`, `false`                                                        |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)                                 | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)                                 | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                                                  | A valid number                                                         |    ❌    |
+
+<sup>1</sup> Required when using password-based authentication. Not required with `SNOWFLAKE_JWT` (key pair) or with `OAUTH` — including [OIDC workload identity][ref-oidc-snowflake] in Cube Cloud, where the driver reads a Cube-minted token from [`CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`](/reference/configuration/environment-variables#cubejs_db_snowflake_oauth_token_path).
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
@@ -222,6 +250,7 @@ connections are made over HTTPS.
 [google-cloud-storage]: https://cloud.google.com/storage
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
+[ref-oidc-snowflake]: /admin/deployment/oidc/snowflake
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-account-id]:

@@ -78,7 +78,7 @@
                     ]
                   },
                   "docs/explore-analyze/charts/custom",
-              {
+                  {
                     "group": "Configure charts",
                     "root": "docs/explore-analyze/charts/configuration/index",
                     "pages": [
@@ -162,7 +162,6 @@
                   "docs/data-modeling/access-control/context"
                 ]
               },
-              
               {
                 "group": "Dynamic Data Models",
                 "root": "docs/data-modeling/dynamic/index",
@@ -357,7 +356,8 @@
                 "pages": [
                   "admin/deployment/oidc/aws",
                   "admin/deployment/oidc/gcp",
-                  "admin/deployment/oidc/azure"
+                  "admin/deployment/oidc/azure",
+                  "admin/deployment/oidc/snowflake"
                 ]
               }
             ]
@@ -481,7 +481,7 @@
                   "reference/data-modeling/cube-package",
                   "reference/data-modeling/cube_dbt",
                   "reference/data-modeling/lkml2cube"
-                ] 
+                ]
               }
             ]
           },

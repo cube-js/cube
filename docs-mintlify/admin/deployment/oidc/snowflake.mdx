@@ -1,0 +1,173 @@
+---
+title: Snowflake
+sidebarTitle: Snowflake
+description: Configure Snowflake External OAuth to trust Cube's OIDC issuer and connect the Snowflake driver with short-lived tokens instead of passwords or key pairs.
+---
+
+This guide walks through configuring [Snowflake External OAuth][snowflake-external-oauth]
+to trust Cube's OIDC issuer. Once set up, the Snowflake driver authenticates
+with a short-lived JWT minted by Cube Cloud — no passwords, key pairs, or
+other long-lived secrets to provision or rotate.
+
+If you haven't enabled OIDC for your tenant yet, start with the
+[OIDC overview][ref-oidc-overview].
+
+<Info>
+
+Available on the [Enterprise plan](https://cube.dev/pricing).
+
+</Info>
+
+## Prerequisites
+
+- The Cube tenant has OIDC enabled under **Admin → OIDC**.
+- The `ACCOUNTADMIN` role (or equivalent privileges) in your Snowflake
+  account — creating a security integration requires it.
+- Your [Snowflake account identifier][snowflake-docs-account-id] in
+  `<orgname>-<account_name>` format, e.g. `acme-analytics`.
+- Your tenant slug — the leftmost label of your tenant's console URL,
+  referenced as `<tenant-name>` throughout (full issuer URL:
+  `https://<tenant-name>.cubecloud.dev`).
+
+<Warning>
+
+The SQL statements and env vars in this guide use angle-bracket placeholders —
+`<tenant-name>`, `<account-identifier>`, `<deployment-id>`, etc. **Replace
+each placeholder with your real value** before copying.
+
+</Warning>
+
+## How it works
+
+Snowflake External OAuth validates each connection's access token against
+your Cube tenant's issuer: it fetches the JWKS over the public internet,
+checks the signature, issuer, and audience, maps the token's `sub` claim to
+a Snowflake user, and authorizes the session role through the token's `scp`
+claim. Cube's credentials broker keeps a fresh token on disk inside every
+deployment, and the Snowflake driver re-reads it for each new connection.
+
+The `scp` claim is the part that's easy to miss: Snowflake grants session
+roles **exclusively** through it. A token without `scp` authenticates fine
+but fails role authorization with *"The role requested in the connection …
+is not listed in the Access Token"*. Cube emits it via the token config's
+**Custom Claims** field, as set up below.
+
+## Step 1: Create the token config
+
+In **Admin → OIDC**, click **Add Config** and create a config with:
+
+| Field                    | Value                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| **Audience Type**        | `Custom`                                                                                         |
+| **Name**                 | `snowflake` — becomes the token file name, `cube_cloud_token_snowflake`                          |
+| **Custom Audience**      | `https://<account-identifier>.snowflakecomputing.com`                                            |
+| **Subject Claim Format** | Keep the default, or pick a richer template — the rendered `sub` must match the Snowflake user's `LOGIN_NAME` you create in step 3 |
+| **Custom Claims**        | Claim `scp` with value `session:role-any`                                                        |
+
+`session:role-any` lets the driver request any role granted to the mapped
+user (the role itself is pinned by `CUBEJS_DB_SNOWFLAKE_ROLE` in step 4 and
+by what you actually grant in step 3). To pin the role inside the token
+instead, set the claim value to `session:role:<role-name>` and use
+`EXTERNAL_OAUTH_ANY_ROLE_MODE = 'DISABLE'` in step 2.
+
+## Step 2: Create the External OAuth security integration
+
+In a Snowflake worksheet, as `ACCOUNTADMIN`:
+
+```sql
+CREATE SECURITY INTEGRATION CUBE_CLOUD_EXTERNAL_OAUTH
+  TYPE = EXTERNAL_OAUTH
+  ENABLED = TRUE
+  EXTERNAL_OAUTH_TYPE = CUSTOM
+  EXTERNAL_OAUTH_ISSUER = 'https://<tenant-name>.cubecloud.dev'
+  EXTERNAL_OAUTH_JWS_KEYS_URL = 'https://<tenant-name>.cubecloud.dev/.well-known/jwks.json'
+  EXTERNAL_OAUTH_AUDIENCE_LIST = ('https://<account-identifier>.snowflakecomputing.com')
+  EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
+  EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
+  EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE';
+```
+
+The issuer and audience must match the token config from step 1 exactly.
+Snowflake fetches the JWKS from your tenant's public endpoint, so no key
+material changes hands.
+
+## Step 3: Create the service user and role
+
+The integration maps the token's `sub` claim to a Snowflake user via
+`LOGIN_NAME`. With the default subject claim format the rendered `sub` is
+`cube:deployment:<deployment-id>` — the deployment ID is the number in your
+deployment's console URL (`/deployments/<deployment-id>/…`). If you chose a
+different template in step 1, use the dialog's live preview to see the
+exact rendered value.
+
+```sql
+CREATE ROLE CUBE_ROLE;
+
+CREATE USER CUBE_SVC
+  TYPE = SERVICE
+  LOGIN_NAME = 'cube:deployment:<deployment-id>'
+  DEFAULT_ROLE = CUBE_ROLE
+  DEFAULT_WAREHOUSE = <warehouse>;
+
+GRANT ROLE CUBE_ROLE TO USER CUBE_SVC;
+GRANT USAGE ON WAREHOUSE <warehouse> TO ROLE CUBE_ROLE;
+
+-- Grant the role read access to the data Cube serves, e.g.:
+GRANT USAGE ON DATABASE <database> TO ROLE CUBE_ROLE;
+GRANT USAGE ON ALL SCHEMAS IN DATABASE <database> TO ROLE CUBE_ROLE;
+GRANT SELECT ON ALL TABLES IN DATABASE <database> TO ROLE CUBE_ROLE;
+```
+
+`TYPE = SERVICE` blocks password logins for this user entirely — it can
+only authenticate through the federation.
+
+## Step 4: Configure the deployment
+
+Set the following in the deployment's environment variables, omitting
+`CUBEJS_DB_USER` / `CUBEJS_DB_PASS`:
+
+```dotenv
+CUBEJS_DB_TYPE=snowflake
+CUBEJS_DB_SNOWFLAKE_ACCOUNT=<account-identifier>
+CUBEJS_DB_SNOWFLAKE_WAREHOUSE=<warehouse>
+CUBEJS_DB_NAME=<database>
+CUBEJS_DB_SNOWFLAKE_ROLE=CUBE_ROLE
+CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR=OAUTH
+CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH=/var/cube/<tenant-id>/<deployment-id>/cube_cloud_token_snowflake
+```
+
+The token path points at the file Cube's credentials broker maintains inside
+the deployment: `/var/cube/<tenant-id>/<deployment-id>/cube_cloud_token_<name>`,
+where `<name>` is the token config name from step 1. The deployment ID is
+the number in the deployment's console URL; if you don't know your numeric
+tenant ID, contact Cube support. The driver re-reads the file on every new
+connection, so the broker's automatic refresh (see
+[token lifecycle][ref-oidc-token-lifecycle]) is picked up without restarts.
+
+## Verifying the setup
+
+Open the deployment's Playground and run any query against the Snowflake
+data source. On the Snowflake side, a successful federation shows up in the
+login history with `OAUTH_ACCESS_TOKEN` as the authentication factor:
+
+```sql
+SELECT event_timestamp, user_name, first_authentication_factor, is_success
+FROM TABLE(SNOWFLAKE.INFORMATION_SCHEMA.LOGIN_HISTORY_BY_USER(USER_NAME => 'CUBE_SVC'))
+ORDER BY event_timestamp DESC;
+```
+
+Common failure modes:
+
+| Error                                                                  | Cause                                                                                                                |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Invalid OAuth access token`                                             | Issuer or audience mismatch between the token config and the security integration, or the JWKS URL is unreachable.     |
+| `The role … is not listed in the Access Token or was filtered`           | The `scp` custom claim is missing from the token config, or the role isn't granted to the mapped user.                 |
+| `User … not found` / mapping errors                                      | The rendered `sub` doesn't match the Snowflake user's `LOGIN_NAME` — compare against the dialog's live preview.        |
+| `File … provided by CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH does not exist` | Wrong token path (check tenant/deployment IDs and the config name), or the deployment hasn't finished starting yet.    |
+
+[ref-oidc-overview]: /admin/deployment/oidc
+[ref-oidc-token-lifecycle]: /admin/deployment/oidc#token-lifecycle
+[snowflake-docs-account-id]:
+  https://docs.snowflake.com/en/user-guide/admin-account-identifier
+[snowflake-external-oauth]:
+  https://docs.snowflake.com/en/user-guide/oauth-ext-custom
