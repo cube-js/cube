@@ -38,7 +38,6 @@ export interface CompilerApiOptions {
   allowUngroupedWithoutPrimaryKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
   schemaVersion?: () => string | object | Promise<string | object>;
-  contextToRoles?: (context: Context) => string[] | Promise<string[]>;
   contextToGroups?: (context: Context) => string[] | Promise<string[]>;
   compileContext?: any;
   allowJsDuplicatePropsInSchema?: boolean;
@@ -103,8 +102,6 @@ export class CompilerApi {
 
   public schemaVersion?: () => string | object | Promise<string | object>;
 
-  protected readonly contextToRoles?: (context: Context) => string[] | Promise<string[]>;
-
   protected readonly contextToGroups?: (context: Context) => string[] | Promise<string[]>;
 
   protected readonly compileContext?: any;
@@ -145,7 +142,6 @@ export class CompilerApi {
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.schemaVersion = this.options.schemaVersion;
-    this.contextToRoles = this.options.contextToRoles;
     this.contextToGroups = this.options.contextToGroups;
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
@@ -377,13 +373,6 @@ export class CompilerApi {
     }
   }
 
-  protected async getRolesFromContext(context: Context): Promise<Set<string>> {
-    if (!this.contextToRoles) {
-      return new Set();
-    }
-    return new Set(await this.contextToRoles(context));
-  }
-
   protected async getGroupsFromContext(context: Context): Promise<Set<string>> {
     if (!this.contextToGroups) {
       return new Set();
@@ -430,7 +419,8 @@ export class CompilerApi {
     const cache = compilers.compilerCache.getRbacCacheInstance();
     const cacheKey = `${cube.name}_${this.hashRequestContext(context)}`;
     if (!cache.has(cacheKey)) {
-      const userRoles = await this.getRolesFromContext(context);
+      // `contextToRoles` has been removed; `role`-based policies only match `role: '*'`.
+      const userRoles = new Set<string>();
       const userGroups = await this.getGroupsFromContext(context);
       const policies = cube.accessPolicy.filter((policy: AccessPolicyDefinition) => {
         // Validate that policy doesn't have both role and group/groups - this is invalid
@@ -503,7 +493,7 @@ export class CompilerApi {
    * This method rewrites the query according to RBAC row level security policies.
    *
    * If RBAC is enabled, it looks at all the Cubes from the query with accessPolicy defined.
-   * It extracts all policies applicable to for the current user context (contextToRoles() + conditions).
+   * It extracts all policies applicable to for the current user context (contextToGroups() + conditions).
    * It then generates a rls filter by
    * - combining all filters for the same role with AND
    * - combining all filters for different roles with OR

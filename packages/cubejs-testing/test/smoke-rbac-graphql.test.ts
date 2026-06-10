@@ -34,9 +34,9 @@ describe('GraphQL Schema Caching and RBAC', () => {
     await birdbox.stop();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-  async function graphqlRequest(role: string, query: string): Promise<any> {
+  async function graphqlRequest(group: string, query: string): Promise<any> {
     const token = sign({
-      auth: { roles: [role] },
+      auth: { groups: [group] },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '1h' });
 
     const baseUrl = birdbox.configuration.apiUrl.replace('/cubejs-api/v1', '');
@@ -51,7 +51,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
     return res.json();
   }
 
-  test('all roles see the same unfiltered schema', async () => {
+  test('all groups see the same unfiltered schema', async () => {
     const introspectionQuery = '{ __type(name: "OrdersMembers") { fields { name } } }';
 
     const resultA = await graphqlRequest('tenant-a', introspectionQuery);
@@ -106,7 +106,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
     expect(restrictedResult.errors[0].message).toContain('You requested hidden member');
   });
 
-  test('default role cannot query any fields - complete denial returns errors', async () => {
+  test('default group cannot query any fields - complete denial returns errors', async () => {
     const result1 = await graphqlRequest('default', `{
       cube(where: { orders: {} }) {
         orders { internalCode }

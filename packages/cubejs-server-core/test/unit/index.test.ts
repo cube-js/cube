@@ -31,8 +31,6 @@ class CubejsServerCoreOpen extends CubejsServerCore {
 
 // Mock to expose protected methods for testing
 class CompilerApiOpen extends CompilerApi {
-  public getRolesFromContext = super.getRolesFromContext;
-
   public getGroupsFromContext = super.getGroupsFromContext;
 }
 
@@ -437,33 +435,6 @@ describe('index.test', () => {
   });
 
   describe('CompilerApi validation', () => {
-    test('Should allow both contextToRoles and contextToGroups together', () => {
-      const logger = jest.fn(() => {});
-
-      expect(() => new CompilerApi(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles: async () => ['admin'],
-          contextToGroups: async () => ['analytics']
-        }
-      )).not.toThrow();
-    });
-
-    test('Should allow only contextToRoles', () => {
-      const logger = jest.fn(() => {});
-
-      expect(() => new CompilerApi(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles: async () => ['admin']
-        }
-      )).not.toThrow();
-    });
-
     test('Should allow only contextToGroups', () => {
       const logger = jest.fn(() => {});
 
@@ -475,24 +446,6 @@ describe('index.test', () => {
           contextToGroups: async () => ['analytics']
         }
       )).not.toThrow();
-    });
-
-    test('contextToRoles should be called and return expected roles', async () => {
-      const logger = jest.fn(() => {});
-      const contextToRoles = jest.fn(async () => ['admin', 'manager']);
-
-      const compilerApi = new CompilerApiOpen(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles
-        }
-      );
-
-      const roles = await compilerApi.getRolesFromContext({ securityContext: { userId: 123 } });
-      expect(contextToRoles).toHaveBeenCalledWith({ securityContext: { userId: 123 } });
-      expect(roles).toEqual(new Set(['admin', 'manager']));
     });
 
     test('contextToGroups should be called and return expected groups', async () => {
