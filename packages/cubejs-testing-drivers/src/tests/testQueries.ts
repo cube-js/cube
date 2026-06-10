@@ -2689,5 +2689,14 @@ from
       `);
       expect(res.rows).toMatchSnapshot();
     });
+
+    executePg('SQL API: Date/time comparison with DATE() function in SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT MEASURE(BigECommerce.totalQuantity) as qty
+        FROM BigECommerce
+        WHERE CAST(BigECommerce.orderDate AS DATE) = DATE('2020-01-01')
+      `);
+      expect(res.rows).toEqual([{ qty: 4 }]);
+    });
   });
 }
