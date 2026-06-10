@@ -740,16 +740,13 @@ specify the filter explicitly.
 
 Default filters are useful for governance scenarios where a view should
 always be scoped to a particular value (e.g., a tenant, region, or currency).
-They can also be used to provide a sensible default that consumers can override
-by adding their own filter on the same member, by leveraging the [`unless`](#unless)
-parameter.
+To provide sensible defaults that data consumers can edit or remove in the UI,
+use [`meta.default_ui_filters`](#default_ui_filters) instead.
 
 <Note>
 
 `default_filters` are enforced on every query against the view, including
-filter suggestions. If you want UI-only default filters that data
-consumers can edit or remove in Cube Cloud workbooks, use
-[`meta.default_ui_filters`](#default_ui_filters) instead.
+filter suggestions.
 
 </Note>
 
