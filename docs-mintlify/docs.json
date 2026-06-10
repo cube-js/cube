@@ -364,6 +364,7 @@
           {
             "group": "Monitoring",
             "pages": [
+              "admin/monitoring/usage-analytics",
               "admin/monitoring/query-history",
               "admin/monitoring/pre-aggregations",
               "admin/monitoring/performance",
