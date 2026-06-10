@@ -13,6 +13,9 @@ and **BigQuery Job User** roles enabled. If you plan to use pre-aggregations,
 the account will need the **BigQuery Data Editor** role instead of **BigQuery Data Viewer**. 
 You can learn more about acquiring
 Google BigQuery credentials [here][bq-docs-getting-started].
+In Cube Cloud, you can authenticate with [OIDC workload identity
+federation][ref-oidc-gcp-bigquery] instead of a key file — the same roles
+apply to the impersonated service account.
 
 </Info>
 
@@ -59,6 +62,28 @@ The following fields are required when creating a BigQuery connection:
   <img src="https://ucarecdn.com/9fdfbd5d-5556-48b3-aa6e-fff0f24b30e9/" alt="Cube Cloud BigQuery Configuration Screen" />
 </Frame>
 
+#### OIDC workload identity federation
+
+Instead of a service account key file, Cube Cloud deployments can
+authenticate to BigQuery with [OIDC workload identity
+federation][ref-oidc-gcp-bigquery]: a Workload Identity Federation provider
+in your GCP project trusts Cube's OIDC issuer, and the driver authenticates
+through the GCP default credential chain — no JSON key to provision or
+rotate. Select **OIDC workload identity federation** in the connection
+wizard, or set the equivalent environment variables:
+
+```dotenv
+CUBEJS_DB_TYPE=bigquery
+CUBEJS_DB_BQ_PROJECT_ID=my-bigquery-project-12345
+GCP_POOL_AUDIENCE=//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/cube-pool/providers/cube
+GCP_SERVICE_ACCOUNT_EMAIL=cube-deployment@my-bigquery-project-12345.iam.gserviceaccount.com
+```
+
+`GCP_SERVICE_ACCOUNT_EMAIL` selects the service account Cube impersonates;
+leave it unset to authenticate as the federated principal directly. See the
+[GCP OIDC guide][ref-oidc-gcp-bigquery] for the Workload Identity Pool,
+provider, and IAM setup.
+
 Cube Cloud also supports connecting to data sources within private VPCs
 if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 [VPC connectivity guide][ref-cloud-conf-vpc] for details.
@@ -70,13 +95,17 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 | Environment Variable           | Description                                                                                                                                                                                     | Possible Values                                                         | Required |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | :------: |
 | [`CUBEJS_DB_BQ_PROJECT_ID`](/reference/configuration/environment-variables#cubejs_db_bq_project_id)      | The Google BigQuery project ID to connect to                                                                                                                                                    | A valid Google BigQuery Project ID                                      |    ✅    |
-| [`CUBEJS_DB_BQ_KEY_FILE`](/reference/configuration/environment-variables#cubejs_db_bq_key_file)        | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                   | A valid Google BigQuery JSON key file                                   |    ✅    |
+| [`CUBEJS_DB_BQ_KEY_FILE`](/reference/configuration/environment-variables#cubejs_db_bq_key_file)        | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                   | A valid Google BigQuery JSON key file                                   |    ✅<sup>1</sup>    |
 | [`CUBEJS_DB_BQ_CREDENTIALS`](/reference/configuration/environment-variables#cubejs_db_bq_credentials)     | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
 | [`CUBEJS_DB_BQ_LOCATION`](/reference/configuration/environment-variables#cubejs_db_bq_location)        | The Google BigQuery dataset location to connect to. Required if used with pre-aggregations outside of US. If not set then BQ driver will fail with `Dataset was not found in location US` error | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ⚠️    |
 | [`CUBEJS_DB_EXPORT_BUCKET`](/reference/configuration/environment-variables#cubejs_db_export_bucket)      | The name of a bucket in cloud storage                                                                                                                                                           | A valid bucket name from cloud storage                                  |    ❌    |
 | [`CUBEJS_DB_EXPORT_BUCKET_TYPE`](/reference/configuration/environment-variables#cubejs_db_export_bucket_type) | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+<sup>1</sup> Not required when authenticating with [OIDC workload identity
+federation][ref-oidc-gcp-bigquery] in Cube Cloud, or when providing the key
+material via [`CUBEJS_DB_BQ_CREDENTIALS`](/reference/configuration/environment-variables#cubejs_db_bq_credentials).
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
@@ -154,5 +183,6 @@ BigQuery connections are made over HTTPS.
   https://support.google.com/a/answer/7378726?hl=en
 [ref-caching-large-preaggs]: /docs/pre-aggregations/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-oidc-gcp-bigquery]: /admin/deployment/oidc/gcp#bigquery
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [self-preaggs-batching]: #batching
