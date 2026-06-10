@@ -765,9 +765,7 @@ impl MultiStageQueryPlanner {
 
                 let alias = scope.next_cte_name();
 
-                let rolling_window_descr = if measure.is_running_total() {
-                    RollingWindowDescription::new_running_total(time_dimension, base_time_dimension)
-                } else if let Some(granularity) =
+                let rolling_window_descr = if let Some(granularity) =
                     self.get_to_date_rolling_granularity(&rolling_window)?
                 {
                     RollingWindowDescription::new_to_date(
