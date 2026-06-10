@@ -473,7 +473,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   private titleize(name: string): string {
-    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    const titleized = inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    // Capitalize common identifier acronyms so e.g. `userId` reads as "User ID"
+    // rather than "User Id" and an `id` member becomes "ID" instead of "Id".
+    return titleized.replace(/\bId(s?)\b/g, (_match, plural) => `ID${plural}`);
   }
 
   private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
