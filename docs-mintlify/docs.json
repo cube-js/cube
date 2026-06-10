@@ -740,7 +740,6 @@
                 "group": "Reports",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
-                  "GET /v1/deployments/{deploymentId}/report-folders",
                   "GET /v1/deployments/{deploymentId}/reports",
                   "POST /v1/deployments/{deploymentId}/reports",
                   "GET /v1/deployments/{deploymentId}/reports/{reportId}",
