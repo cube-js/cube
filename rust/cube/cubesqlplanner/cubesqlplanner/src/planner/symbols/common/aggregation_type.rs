@@ -11,7 +11,6 @@ pub enum AggregationType {
     CountDistinct,
     CountDistinctApprox,
     NumberAgg,
-    RunningTotal,
 }
 
 impl AggregationType {
@@ -24,7 +23,6 @@ impl AggregationType {
             "countDistinct" | "count_distinct" => Ok(Self::CountDistinct),
             "countDistinctApprox" | "count_distinct_approx" => Ok(Self::CountDistinctApprox),
             "numberAgg" | "number_agg" => Ok(Self::NumberAgg),
-            "runningTotal" | "running_total" => Ok(Self::RunningTotal),
             other => Err(CubeError::user(format!(
                 "Unknown aggregation type: '{}'",
                 other
@@ -35,7 +33,7 @@ impl AggregationType {
     pub fn is_additive(&self) -> bool {
         matches!(
             self,
-            Self::Sum | Self::Min | Self::Max | Self::CountDistinctApprox | Self::RunningTotal
+            Self::Sum | Self::Min | Self::Max | Self::CountDistinctApprox
         )
     }
 
@@ -52,7 +50,6 @@ impl AggregationType {
             Self::CountDistinct => "countDistinct",
             Self::CountDistinctApprox => "countDistinctApprox",
             Self::NumberAgg => "numberAgg",
-            Self::RunningTotal => "runningTotal",
         }
     }
 }
@@ -99,10 +96,6 @@ mod tests {
             AggregationType::from_str("numberAgg").unwrap(),
             AggregationType::NumberAgg
         );
-        assert_eq!(
-            AggregationType::from_str("runningTotal").unwrap(),
-            AggregationType::RunningTotal
-        );
     }
 
     #[test]
@@ -119,10 +112,6 @@ mod tests {
             AggregationType::from_str("number_agg").unwrap(),
             AggregationType::NumberAgg
         );
-        assert_eq!(
-            AggregationType::from_str("running_total").unwrap(),
-            AggregationType::RunningTotal
-        );
     }
 
     #[test]
@@ -134,7 +123,6 @@ mod tests {
         assert!(!AggregationType::CountDistinct.is_additive());
         assert!(AggregationType::CountDistinctApprox.is_additive());
         assert!(!AggregationType::NumberAgg.is_additive());
-        assert!(AggregationType::RunningTotal.is_additive());
     }
 
     #[test]
@@ -146,7 +134,6 @@ mod tests {
         assert!(!AggregationType::Min.is_distinct());
         assert!(!AggregationType::Max.is_distinct());
         assert!(!AggregationType::NumberAgg.is_distinct());
-        assert!(!AggregationType::RunningTotal.is_distinct());
     }
 
     #[test]
@@ -159,7 +146,6 @@ mod tests {
             AggregationType::CountDistinct,
             AggregationType::CountDistinctApprox,
             AggregationType::NumberAgg,
-            AggregationType::RunningTotal,
         ];
         for v in &variants {
             let s = v.as_str();

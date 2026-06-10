@@ -200,21 +200,6 @@ export class BigqueryQuery extends BaseQuery {
    * Overridden from BaseQuery to support BigQuery strict data types for
    * joining conditions (note timeStampCast)
    */
-  public override runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom: string, dateTo: string, dateField: string, dimensionDateFrom: string, _dimensionDateTo: string) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
-        ]
-      );
-  }
-
-  /**
-   * Should be protected, but BaseQuery is in js
-   * Overridden from BaseQuery to support BigQuery strict data types for
-   * joining conditions (note timeStampCast)
-   */
   public override rollingWindowToDateJoinCondition(granularity) {
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {

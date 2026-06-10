@@ -116,7 +116,6 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
                 "avg" => ColumnType::Double,
                 "min" => ColumnType::Double,
                 "max" => ColumnType::Double,
-                "runningTotal" => ColumnType::Double,
                 _ => from_type,
             },
             _ => from_type,

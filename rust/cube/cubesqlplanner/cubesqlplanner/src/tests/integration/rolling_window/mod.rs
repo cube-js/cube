@@ -12,7 +12,6 @@ mod multiple_rolling;
 mod offset_no_granularity;
 mod offset_variations;
 mod order_and_limit;
-mod running_total;
 mod time_dimension_variations;
 mod timezone;
 mod to_date_variations;
