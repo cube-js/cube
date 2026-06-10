@@ -64,7 +64,7 @@ features:
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
 | Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
 | Removed    | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    | v1.3.0    |
-| Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7    |           |
+| Removed    | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7     | v1.7.0    |
 | Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
 | Deprecated | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   |           |
 | Removed    | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     | v1.7.0    |
@@ -402,6 +402,8 @@ no more updates. Please upgrade to Node.js 20 or higher.
 ### `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`
 
 **Deprecated in Release: v1.2.7**
+
+**Removed in Release: v1.7.0**
 
 This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
 
