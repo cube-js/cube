@@ -304,8 +304,6 @@ pub struct NormalizedQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub renew_query: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResultType>,
