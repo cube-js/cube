@@ -302,7 +302,7 @@ describe('Cube RBAC Engine', () => {
    * Two-dimensional policy overlap test (matches diagram in CompilerApi.ts:559-647)
    *
    * Policy 1 (group "*"): covers members a, b, id with row filter R1 (id < 500)
-   * Policy 2 (group "policy2_role"): covers members b, c, id with row filter R2 (id >= 500)
+   * Policy 2 (group "policy2_group"): covers members b, c, id with row filter R2 (id >= 500)
    *
    *   Members
    *     ^
@@ -320,7 +320,7 @@ describe('Cube RBAC Engine', () => {
     let connection: PgClient;
 
     beforeAll(async () => {
-      // User is in group policy2_role, so both Policy 1 (*) and Policy 2 apply
+      // User is in group policy2_group, so both Policy 1 (*) and Policy 2 apply
       connection = await createPostgresClient('policy_test', 'policy_test_password');
     });
 
@@ -555,9 +555,9 @@ describe('Cube RBAC Engine', () => {
    *
    * conditional_masking_test cube:
    *   - group "*": member_level includes=[], member_masking includes="*"
-   *   - group "conditional_mask_role": member_level includes="*", row_level filter product_id <= 3
+   *   - group "conditional_mask_group": member_level includes="*", row_level filter product_id <= 3
    *
-   * For conditional_mask_user (group: conditional_mask_role):
+   * For conditional_mask_user (group: conditional_mask_group):
    *   - product_id dimension: rows with product_id <= 3 show real value, others show masked (-1 for price)
    */
   describe('RBAC conditional masking with row-level filters via SQL API', () => {
@@ -587,7 +587,7 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    // Smoke test: only one filter policy matches (conditional_mask_role). For an
+    // Smoke test: only one filter policy matches (conditional_mask_group). For an
     // aggregate measure (total_price), a per-row CASE WHEN over the row filter would
     // reference product_id at row grain while the measure is aggregated. Since
     // product_id is not in the GROUP BY, the conditional CASE must NOT be triggered —
@@ -654,8 +654,8 @@ describe('Cube RBAC Engine', () => {
 
   /**
    * Multiple conditional policies use OR across policies:
-   *   - group "conditional_mask_role": product_id <= 3
-   *   - group "conditional_mask_role_extra": product_id = 5
+   *   - group "conditional_mask_group": product_id <= 3
+   *   - group "conditional_mask_group_extra": product_id = 5
    *
    * For conditional_mask_multi_user (both groups):
    *   Unmasked when product_id <= 3 OR product_id = 5, masked otherwise.

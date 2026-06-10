@@ -32,7 +32,7 @@ cubes:
         member_masking:
           includes: "*"
 
-      - group: "conditional_mask_role"
+      - group: "conditional_mask_group"
         member_level:
           includes: "*"
         row_level:
@@ -42,7 +42,7 @@ cubes:
               values:
                 - "3"
 
-      - group: "conditional_mask_role_extra"
+      - group: "conditional_mask_group_extra"
         member_level:
           includes: "*"
         row_level:

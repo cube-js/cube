@@ -25,4 +25,4 @@ cubes:
         type: time
 
     access_policy:
-      - group: some_role
+      - group: some_group

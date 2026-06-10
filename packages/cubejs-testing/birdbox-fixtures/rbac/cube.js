@@ -108,7 +108,7 @@ module.exports = {
       };
     }
     // User for testing two-dimensional policy overlap (matches diagram in CompilerApi.ts)
-    // Has policy2_role, so both Policy 1 (*) and Policy 2 (policy2_role) apply
+    // Has policy2_group, so both Policy 1 (*) and Policy 2 (policy2_group) apply
     if (user === 'policy_test') {
       if (password && password !== 'policy_test_password') {
         throw new Error(`Password doesn't match for ${user}`);
@@ -120,7 +120,7 @@ module.exports = {
           auth: {
             username: 'policy_test',
             userAttributes: {},
-            groups: ['policy2_role'],
+            groups: ['policy2_group'],
           },
         },
       };
@@ -243,7 +243,7 @@ module.exports = {
           auth: {
             username: 'conditional_mask_user',
             userAttributes: {},
-            groups: ['conditional_mask_role'],
+            groups: ['conditional_mask_group'],
           },
         },
       };
@@ -259,7 +259,7 @@ module.exports = {
           auth: {
             username: 'conditional_mask_multi_user',
             userAttributes: {},
-            groups: ['conditional_mask_role', 'conditional_mask_role_extra'],
+            groups: ['conditional_mask_group', 'conditional_mask_group_extra'],
           },
         },
       };
