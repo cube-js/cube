@@ -65,7 +65,9 @@ In **Admin → OIDC**, click **Add Config** and create a config with:
 | **Custom Claims**        | Claim `scp` with value `session:role-any`                                                        |
 | **Target Env Var**       | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`                                                           |
 
-{/* TODO: screenshot — Add OIDC Token Config dialog filled in for Snowflake (Custom audience, scp custom claim, target env var) */}
+<Frame>
+  <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
+</Frame>
 
 The **Target Env Var** is how the driver finds the token: Cube sets that
 env var to the token file path in every execution context — deployed pods,
