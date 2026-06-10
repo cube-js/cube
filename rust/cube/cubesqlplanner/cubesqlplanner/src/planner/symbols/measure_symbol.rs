@@ -1,4 +1,4 @@
-use super::common::{AggregationType, Case, CompiledMemberPath, MultiStageProperties};
+use super::common::{Case, CompiledMemberPath, MultiStageProperties};
 use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
@@ -450,14 +450,9 @@ impl MeasureSymbol {
         self.rolling_window().is_some()
     }
 
-    pub fn is_running_total(&self) -> bool {
-        matches!(&self.kind, MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::RunningTotal)
-    }
-
-    /// True for rolling-window measures and running-total
-    /// aggregations.
+    /// True for rolling-window measures.
     pub fn is_cumulative(&self) -> bool {
-        self.is_rolling_window() || self.is_running_total()
+        self.is_rolling_window()
     }
 
     pub fn measure_filters(&self) -> &Vec<Rc<SqlCall>> {

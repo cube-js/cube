@@ -24,9 +24,7 @@ pub use cte::Cte;
 pub use cube_ref_evaluator::CubeRefEvaluator;
 pub use expression::{Expr, MemberExpression};
 pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
-pub use join::{
-    Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition, RollingTotalJoinCondition,
-};
+pub use join::{Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition};
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use references_builder::ReferencesBuilder;
