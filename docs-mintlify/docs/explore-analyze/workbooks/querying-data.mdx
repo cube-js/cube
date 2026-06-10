@@ -9,6 +9,21 @@ description: In the Semantic Query tab, you can query the semantic layer. On the
 
 On the left side, you can select a semantic view you would like to query. Inside the semantic view, you can see the measures and dimensions grouped either by cubes or folders. You can search within your semantic view to find the relevant member.
 
+## Running queries
+
+As you build a query — adding members, changing filters, adjusting sorting —
+the workbook runs it automatically and refreshes the results. You can turn
+this off with the auto-run toggle in the query controls: with auto-run
+disabled, the results are marked as outdated while you edit the query, and
+the query only runs when you click **Run query**. The toggle applies to the
+current tab only.
+
+A data model author can change the default for a semantic view with the
+[`meta.auto_run`][ref-auto-run] parameter — selecting a view with
+`auto_run: false` starts the tab with auto-run disabled. This is useful for
+views that are expensive to query. You can still toggle auto-run back on at
+any time.
+
 ## Filtering
 
 Dimensions and measures can be added as filters to focus on specific rows of data.
@@ -185,4 +200,5 @@ the model behaves as intended.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
+[ref-auto-run]: /reference/data-modeling/view#auto_run
 
