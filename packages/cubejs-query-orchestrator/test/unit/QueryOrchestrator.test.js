@@ -357,7 +357,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'basic'
     };
     const promise = queryOrchestrator.fetchQuery(query);
@@ -386,7 +386,7 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_number_and_count_week20191101'
         }],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'indexes'
     };
     const result = await queryOrchestrator.fetchQuery(query);
@@ -413,7 +413,7 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_number_and_count_week20191102'
         }],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'index is part of query key'
     });
     await new Promise(resolve => setTimeout(() => resolve(), 400));
@@ -431,7 +431,7 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
         indexesSql: [],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'index is part of query key'
     });
     console.log(result.data[0]);
@@ -457,7 +457,7 @@ describe('QueryOrchestrator', () => {
         }],
         external: true
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'external indexes'
     };
     const result = await queryOrchestrator.fetchQuery(query);
@@ -489,7 +489,7 @@ describe('QueryOrchestrator', () => {
         external: true,
         dataSource: 'bar'
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'external join',
       dataSource: 'foo',
       external: true
@@ -523,7 +523,7 @@ describe('QueryOrchestrator', () => {
         external: true,
         dataSource: 'csv',
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'csv import'
     };
     const result = await queryOrchestrator.fetchQuery(query);
@@ -546,7 +546,7 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
         dataSource: 'foo'
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'non default data source pre-aggregation',
       dataSource: 'foo',
     };
@@ -564,7 +564,7 @@ describe('QueryOrchestrator', () => {
         renewalThreshold: 21600,
         queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
       },
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'non default data source query',
       dataSource: 'foo',
     };
@@ -588,7 +588,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count_and_very_very_very_very_very_very_long20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'silent truncate'
     };
     let thrown = true;
@@ -615,7 +615,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20181101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders_too_big AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2018-11-01T00:00:00Z', '2018-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'cancel pre-aggregation'
     };
     try {
@@ -641,7 +641,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'save structure versions'
     });
 
@@ -658,7 +658,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders1', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'save structure versions'
     });
 
@@ -678,7 +678,7 @@ describe('QueryOrchestrator', () => {
           loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
           invalidateKeyQueries: [['SELECT 2', []]]
         }],
-        renewQuery: true,
+        cacheMode: 'must-revalidate',
         requestId: 'save structure versions'
       });
     }
@@ -777,7 +777,7 @@ describe('QueryOrchestrator', () => {
     // start renew refresh as scheduled refresh does
     const refresh = queryOrchestrator.fetchQuery({
       ...baseQuery,
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: `${requestId}: start refresh`
     });
 
@@ -905,7 +905,7 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
         external: true,
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'load cache should respect external flag'
     };
     const internalPreAggregation = {
@@ -922,7 +922,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.internal AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'load cache should respect external flag'
     };
     await queryOrchestrator.fetchQuery(internalPreAggregation);
@@ -947,7 +947,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
         invalidateKeyQueries: [['SELECT 2', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation version entries'
     });
 
@@ -964,7 +964,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations_2.orders AS SELECT * FROM public.orders', []],
         invalidateKeyQueries: [['SELECT 3', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation version entries'
     });
 
@@ -1023,7 +1023,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation schema cache'
     });
 
@@ -1040,7 +1040,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE pre_aggregations_2.orders AS SELECT * FROM public.orders WHERE tenant_id = 2', []],
         invalidateKeyQueries: [['SELECT 2', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation schema cache'
     });
 
@@ -1057,7 +1057,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation schema cache'
     });
 
@@ -1499,7 +1499,7 @@ describe('QueryOrchestrator', () => {
         ]
       },
       preAggregations: [],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'loadRefreshKeys should respect external flag'
     };
 
@@ -1562,7 +1562,7 @@ describe('QueryOrchestrator', () => {
         dataSource: 'mockDriverUnloadWithoutTempTableSupport',
         external: true,
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
 
       requestId: 'basic'
     };
@@ -1589,7 +1589,7 @@ describe('QueryOrchestrator', () => {
         dataSource: 'streaming',
         external: true,
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
 
       requestId: 'basic'
     };
@@ -1616,7 +1616,7 @@ describe('QueryOrchestrator', () => {
         external: true,
         streamOffset: 'earliest'
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
 
       requestId: 'basic'
     };
@@ -1646,7 +1646,7 @@ describe('QueryOrchestrator', () => {
         streamOffset: 'earliest',
         readOnly: true
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
 
       requestId: 'basic'
     };

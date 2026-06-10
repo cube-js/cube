@@ -140,8 +140,6 @@ interface Query {
   totalQuery?: boolean;
   order?: any;
   timezone?: string;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode; // used after query normalization
   cache?: CacheMode; // Used in public interface
   ungrouped?: boolean;

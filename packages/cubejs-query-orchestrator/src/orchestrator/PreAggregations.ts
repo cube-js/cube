@@ -545,7 +545,7 @@ export class PreAggregations {
             maxPartitions: this.options.maxPartitions,
             maxSourceRowLimit: this.options.maxSourceRowLimit,
             isJob: queryBody.isJob,
-            waitForRenew: queryBody.cacheMode !== undefined ? queryBody.cacheMode === 'must-revalidate' : queryBody.renewQuery,
+            waitForRenew: queryBody.cacheMode === 'must-revalidate',
             // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
             forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
             requestId: queryBody.requestId,
@@ -664,7 +664,7 @@ export class PreAggregations {
         {
           maxPartitions: this.options.maxPartitions,
           maxSourceRowLimit: this.options.maxSourceRowLimit,
-          waitForRenew: queryBody.cacheMode !== undefined ? queryBody.cacheMode === 'must-revalidate' : queryBody.renewQuery,
+          waitForRenew: queryBody.cacheMode === 'must-revalidate',
           requestId: queryBody.requestId,
           externalRefresh: this.externalRefresh,
           compilerCacheFn: queryBody.compilerCacheFn,
