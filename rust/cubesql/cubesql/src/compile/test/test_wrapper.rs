@@ -1262,6 +1262,128 @@ ORDER BY 1,2,3,4
     );
 }
 
+/// Regression test for grouped-grouped join SQL push down (Tableau-style query).
+/// Join condition columns must be remapped to generated aliases of the joined
+/// subqueries — otherwise the generated ON clause references the original column
+/// name (e.g. `"t0"."My Notes"`) which does not exist in the aliased subqueries.
+#[tokio::test]
+async fn test_wrapper_grouped_join_grouped_condition_remapping() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT "t0"."Customer Gender" AS "Customer Gender",
+    SUM("t2"."__measure__1") AS "sum:measure:ok"
+FROM (
+    SELECT
+        customer_gender AS "Customer Gender",
+        notes AS "My Notes"
+    FROM KibanaSampleDataEcommerce
+    GROUP BY 1, 2
+) "t0"
+INNER JOIN (
+    SELECT
+        notes AS "My Notes",
+        AVG(avgPrice) AS "__measure__1"
+    FROM KibanaSampleDataEcommerce
+    GROUP BY 1
+) "t2" ON ("t0"."My Notes" = "t2"."My Notes")
+GROUP BY 1
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("INNER JOIN ("));
+    assert!(
+        !sql.contains(r#""My Notes""#),
+        "join condition leaked original column name instead of remapped alias:\n{}",
+        sql
+    );
+}
+
+/// Regression test for window expression on top of a grouped join subquery
+/// (Sigma-style query). Window expr rebase in converter must keep field names
+/// consistent with column references in plans above.
+#[tokio::test]
+async fn test_wrapper_window_over_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH
+        "qt_0" AS (
+            SELECT
+                "ta_1".content "ca_1",
+                DATE_TRUNC('month', "ta_2".order_date) "ca_2",
+                CASE
+                    WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
+                    ELSE 0
+                END "ca_3"
+            FROM KibanaSampleDataEcommerce "ta_2"
+            JOIN Logs "ta_1"
+                ON "ta_2".__cubeJoinField = "ta_1".__cubeJoinField
+            GROUP BY
+                "ca_1",
+                "ca_2"
+        ),
+        "qt_1" AS (
+            SELECT
+                RANK() OVER (
+                    PARTITION BY DATE_TRUNC('month', "ta_3"."ca_2")
+                    ORDER BY
+                        DATE_TRUNC('month', "ta_3"."ca_2"),
+                        CASE
+                            WHEN sum("ta_3"."ca_3") IS NOT NULL THEN sum("ta_3"."ca_3")
+                            ELSE 0
+                        END DESC,
+                        "ta_3"."ca_1"
+                ) "ca_4",
+                DATE_TRUNC('month', "ta_3"."ca_2") "ca_5",
+                "ta_3"."ca_1" "ca_6",
+                CASE
+                    WHEN sum("ta_3"."ca_3") IS NOT NULL THEN sum("ta_3"."ca_3")
+                    ELSE 0
+                END "ca_7"
+            FROM "qt_0" "ta_3"
+            GROUP BY
+                "ca_5",
+                "ca_6"
+        )
+        SELECT
+            "ta_4"."ca_5" "ca_8",
+            "ta_4"."ca_6" "ca_9",
+            "ta_4"."ca_7" "ca_10"
+        FROM "qt_1" "ta_4"
+        WHERE "ta_4"."ca_4" <= 1
+        ORDER BY
+            "ca_8" ASC,
+            "ca_10" DESC,
+            "ca_9" ASC
+        ;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
 /// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
 #[tokio::test]
 async fn test_wrapper_limit_zero() {
