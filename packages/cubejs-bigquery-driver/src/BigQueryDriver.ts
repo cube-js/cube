@@ -345,19 +345,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
     const rowStream = new HydrationStream();
 
-    // Use stream.pipeline rather than stream.pipe so that:
-    //  (a) errors emitted by the BigQuery source stream (e.g. an HTTP
-    //      response that fails type coercion in BigQuery) propagate to the
-    //      returned rowStream's `error` event instead of escaping as an
-    //      unhandled rejection and killing the Node process — see
-    //      cube-js/cube#10875.
-    //  (b) consumer-side destruction of rowStream propagates back to the
-    //      BigQuery source stream, preventing the source from continuing to
-    //      page results into the void after the consumer has gone away.
+    // pipeline() instead of pipe(): pipe() doesn't forward source errors,
+    // so mid-stream BigQuery errors would crash the process, see #10875.
+    // Errors are propagated to rowStream, which consumers listen on.
     pipeline(stream, rowStream, () => {
-      // No-op: pipeline destroys rowStream with the error on its own; the
-      // callback exists only to satisfy the pipeline signature and to
-      // prevent an unhandled rejection inside pipeline itself.
+      // pipeline already destroys rowStream with the error
     });
 
     return {
