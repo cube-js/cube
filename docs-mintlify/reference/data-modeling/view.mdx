@@ -297,6 +297,8 @@ Unlike [`default_filters`](#default_filters), which are enforced on every query
 against the view, `default_ui_filters` only provide a starting point for the
 workbook UI: they don't apply to queries made through APIs or other
 visualization tools, and workbook users can freely modify or remove them.
+They also only apply to new queries — defining or changing them in the data
+model does not add them to existing queries.
 
 The following operators are supported: `equals`, `notEquals`, `contains`,
 `notContains`, `startsWith`, `notStartsWith`, `endsWith`, `notEndsWith`, `gt`,
