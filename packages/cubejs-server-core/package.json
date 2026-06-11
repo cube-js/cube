@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-server-core"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "index.js",
   "types": "dist/src/index.d.ts",
@@ -69,7 +69,7 @@
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^29",
     "@types/jsonwebtoken": "^9.0.2",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/node-fetch": "^2.5.7",
     "@types/ramda": "^0.27.34",
     "@types/uuid": "^8.3.0",
