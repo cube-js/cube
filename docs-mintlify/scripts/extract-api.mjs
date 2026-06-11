@@ -6,9 +6,9 @@
 // embed, AI, and workspace areas) and auto-discovers tags, so new public
 // endpoints show up without editing this script.
 //
-// SCIM (/api/scim/v2) is intentionally NOT included: it authenticates with a
-// Bearer token rather than the Api-Key scheme used here, and its docs are
-// hand-curated in api-reference/scim.yaml.
+// SCIM (/api/scim/v2) is intentionally NOT included: its docs are hand-curated
+// in api-reference/scim.yaml. (Both the REST API and SCIM authenticate with a
+// Bearer token; see the securityScheme override below.)
 //
 // The source spec lives in the (private) cubejs-enterprise repo and is NOT in
 // this repo, so there is no hardcoded path — point the script at the spec via
@@ -75,6 +75,8 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /v1/app-theme',
   'GET /v1/ai-engineer/active-region',
   'GET /v1/ai-engineer/settings',
+  // Report folders listing — not part of the public docs surface.
+  'GET /v1/deployments/{deploymentId}/report-folders',
 ]);
 
 // Explicit display names for tags whose auto-cleaned form would be unclear or
@@ -91,6 +93,40 @@ const TAG_ORDER = [
   'Users', 'Groups', 'User Groups', 'User Attributes', 'Resource Policies',
   'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants',
 ];
+
+// Mintlify renders the OpenAPI operation `description` as a plain-text node — it
+// does NOT process Markdown or HTML there, so `**bold**` and `` `code` `` show up
+// literally on the page (verified by headless-rendering with Mintlify CLI 4.2.x).
+// The fix is to move the prose into the `x-mint.content` extension instead, which
+// Mintlify DOES render as MDX (so bold/italic/code render), and drop the plain
+// `description` so it isn't also shown unformatted. See applyDescription() below.
+// (Parameter/schema descriptions render fine via a different component, so they
+// are left alone.)
+
+// x-mint.content is MDX, where `{...}` is a JS expression — unescaped prose braces
+// (e.g. `Copy of {original name}`) break the page. Escape braces OUTSIDE inline
+// code spans (inside backticks they're literal and must stay as-is). `**bold**`
+// and `` `code` `` are valid MDX and pass through untouched.
+function toMintContent(s) {
+  return s
+    .split(/(`[^`]*`)/) // keep code spans as their own (odd-index) segments
+    .map((seg, i) => (i % 2 === 1 ? seg : seg.replace(/[{}]/g, (c) => '\\' + c)))
+    .join('');
+}
+
+// Move an operation's Markdown description into x-mint.content (rendered as MDX)
+// and remove the plain `description` so it is not also rendered unformatted.
+//
+// NB: do NOT also set x-mint.metadata.description — Mintlify injects that into the
+// generated page's MDX frontmatter, where prose containing `"`, `:` or `{` breaks
+// the YAML parse (500 / "multiline key may not be an implicit key"). The page just
+// loses its `<meta name="description">`, which is an acceptable trade for not
+// crashing the page.
+function applyDescription(op) {
+  if (typeof op.description !== 'string') return;
+  op['x-mint'] = { content: toMintContent(op.description) };
+  delete op.description;
+}
 
 // Strip the " Public" suffix the source appends to every tag and normalize a few
 // acronyms; TAG_MAP overrides win.
@@ -123,6 +159,9 @@ for (const [key, val] of Object.entries(src.paths)) {
     if (Array.isArray(val[m].tags)) {
       val[m].tags = val[m].tags.map(cleanTag);
     }
+    // Mintlify shows the operation description as plain text, so move the prose
+    // into x-mint.content (rendered as MDX) and keep a plain copy for SEO.
+    applyDescription(val[m]);
     // strip "XxxController." prefix from operationId for clean page slugs
     if (typeof val[m].operationId === 'string') {
       val[m].operationId = val[m].operationId.replace(/^[^.]*\./, '');
@@ -212,19 +251,18 @@ const out = {
       variables: { tenant: { default: 'your-tenant', description: 'Your Cube Cloud tenant subdomain' } },
     },
   ],
-  security: [{ apiKey: [] }],
+  security: [{ bearerAuth: [] }],
   tags: orderedTags.map((t) => ({ name: t })),
   paths,
   components: {
-    // The public API authenticates REST clients with an API key sent as
-    // `Authorization: Api-Key <token>`. The source spec defines a bearer/JWT
-    // scheme that does not reflect the primary runtime auth, so we override it.
+    // The public REST API authenticates with a token sent as
+    // `Authorization: Bearer <token>` (an API key or an OAuth access token). The
+    // source spec's scheme does not reflect the primary runtime auth, so override.
     securitySchemes: {
-      apiKey: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'Authorization',
-        description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.',
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'Token authentication. Send `Authorization: Bearer <YOUR_TOKEN>`.',
       },
     },
     schemas: sortedSchemas,

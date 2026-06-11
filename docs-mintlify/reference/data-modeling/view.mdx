@@ -230,6 +230,137 @@ view(`active_users`, {
 
 </CodeGroup>
 
+#### `auto_run`
+
+In the Cube cloud platform, you can use the `auto_run` key in a view's `meta`
+to control whether [workbook][ref-workbook-running] queries against the view
+run automatically. By default, a workbook re-runs the query every time a data
+consumer changes it — adds a member, edits a filter, and so on. Setting
+`auto_run: false` turns this off for the view: the query only runs when the
+user clicks **Run query**.
+
+This is useful for views backed by heavy or expensive queries, where running
+on every change would be wasteful.
+
+<Info>
+
+Please note, currently `auto_run` is defined inside the `meta` property; this
+may change in the future.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      auto_run: false
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    auto_run: false
+  }
+});
+```
+
+</CodeGroup>
+
+The setting only provides the default for the view. Data consumers can toggle
+auto-run on or off in each workbook tab, and their choice takes precedence
+over the view's default. When `auto_run` is not set, auto-run is on.
+
+#### `default_ui_filters`
+
+In the Cube cloud platform, you can use the `default_ui_filters` key in a
+view's `meta` to define default filters for [workbooks][ref-workbook-filtering].
+When the view is selected in a new workbook tab, these filters are
+pre-populated as regular, fully editable filters — data consumers can change
+their values, switch operators, or remove them entirely.
+
+Each entry has the same shape as a [`default_filters`](#default_filters) entry:
+a `member` (a dimension or measure exposed by the view), an `operator`, and a
+list of `values`.
+
+<Info>
+
+Please note, currently default UI filters are defined inside the `meta`
+property; this may change in the future.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      default_ui_filters:
+        - member: status
+          operator: equals
+          values:
+            - completed
+        - member: created_at
+          operator: inDateRange
+          values:
+            - 2024-01-01
+            - 2024-12-31
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    default_ui_filters: [
+      {
+        member: `status`,
+        operator: `equals`,
+        values: [`completed`]
+      },
+      {
+        member: `created_at`,
+        operator: `inDateRange`,
+        values: [`2024-01-01`, `2024-12-31`]
+      }
+    ]
+  }
+});
+```
+
+</CodeGroup>
+
+Unlike [`default_filters`](#default_filters), which are enforced on every query
+against the view, `default_ui_filters` only provide a starting point for the
+workbook UI: they don't apply to queries made through APIs or other
+visualization tools, and workbook users can freely modify or remove them.
+They also only apply to new queries — defining or changing them in the data
+model does not add them to existing queries.
+
 ### `cubes`
 
 Use `cubes` parameter in view to include exposed cubes in bulk. You can build
@@ -657,9 +788,15 @@ specify the filter explicitly.
 
 Default filters are useful for governance scenarios where a view should
 always be scoped to a particular value (e.g., a tenant, region, or currency).
-They can also be used to provide a sensible default that consumers can override
-by adding their own filter on the same member, by leveraging the [`unless`](#unless)
-parameter.
+To provide sensible defaults that data consumers can edit or remove in the UI,
+use [`meta.default_ui_filters`](#default_ui_filters) instead.
+
+<Note>
+
+`default_filters` are enforced on every query against the view, including
+filter suggestions.
+
+</Note>
 
 <CodeGroup>
 
@@ -788,6 +925,8 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-apis-support]: /reference#data-modeling
 [ref-playground]: /docs/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
+[ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
+[ref-workbook-running]: /docs/explore-analyze/workbooks/querying-data#running-queries
 [ref-extension]: /docs/data-modeling/extending-cubes
 [ref-dim-name]: /reference/data-modeling/dimensions#name
 [ref-dim-title]: /reference/data-modeling/dimensions#title

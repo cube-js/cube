@@ -100,12 +100,14 @@ deployments in the tenant.
 | **Audience**              | The JWT `aud` claim value. Pre-set for `AWS` (`sts.amazonaws.com`) and `Azure` (`api://AzureADTokenExchange`). For `GCP` you supply the **Workload Identity Federation provider resource path** (`//iam.googleapis.com/projects/.../providers/...`) — there is no global GCP audience. User-supplied for `Custom`. |
 | **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`).                     |
 | **Subject Claim Format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
+| **Custom Claims**         | Optional extra JWT claims emitted verbatim in every minted token — see [Custom claims](#custom-claims) below.            |
+| **Target Env Var**        | Custom audience type only: env var Cube populates with the token file path in every execution context — see [Custom token configs](#custom-token-configs) below. |
 
 You can have one config per well-known audience type (AWS, GCP, Azure) plus
-any number of custom configs for tools like Snowflake or Databricks. A
-deployment that integrates with several clouds simultaneously gets a separate
-token file per audience — the Cube runtime picks the right one based on which
-SDK is making the call.
+any number of custom configs for tools like [Snowflake][ref-oidc-snowflake]
+or Databricks. A deployment that integrates with several clouds
+simultaneously gets a separate token file per audience — the Cube runtime
+picks the right one based on which SDK is making the call.
 
 ### Subject claim format
 
@@ -159,6 +161,53 @@ until their TTL expires (up to 1h). Plan trust-policy rollouts so the new
 a window where both formats are in flight.
 
 </Note>
+
+### Custom claims
+
+Some token consumers authorize through claims beyond `iss`/`sub`/`aud`. The
+canonical example is [Snowflake External OAuth][ref-oidc-snowflake], which
+grants session roles exclusively through the `scp` claim — a token without
+it authenticates but fails role authorization. The **Custom Claims** field
+on a token config adds such claims to every token minted for that audience.
+
+Each claim is a name plus a value. Values are emitted as strings; to emit
+an array claim, comma-separate the values (a trailing comma forces a
+one-element array). For example, claim `scp` with value `session:role-any`
+covers the Snowflake case.
+
+Custom claims are deliberately constrained:
+
+- The registered JWT claims (`iss`, `sub`, `aud`, `exp`, `iat`, `nbf`,
+  `jti`) and anything under the `cube:` namespace cannot be overridden —
+  those carry the token's identity semantics and stay authoritative.
+- Values are strings or arrays of strings only, with bounded lengths.
+
+Like subject-format changes, custom-claim changes take up to one hour to
+fully propagate as cached tokens expire.
+
+### Custom token configs
+
+For `Custom` audiences, the driver or SDK on the other side reads the token
+from a file. Where that file lives depends on **where the deployment is
+running** — deployed pods, a dev-mode worker, and a test-connection probe
+each keep it in a different place — so the path must never be hard-coded.
+
+The **Target Env Var** field solves this: name the env var the consumer
+reads (e.g. `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` for the Snowflake
+driver), and Cube sets it to the correct token-file path in every context.
+Leave `CUBEJS_DB_USER` / `CUBEJS_DB_PASS` (or the equivalent secret) unset
+and don't write the path by hand. Well-known audiences (AWS/GCP/Azure)
+don't need this — their SDKs read fixed, standard env vars that Cube
+already populates.
+
+The example below — a custom config for the Snowflake driver — combines
+both fields: a `scp` custom claim (which Snowflake requires for role
+authorization) and a Target Env Var of `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`.
+The [Snowflake data source page][ref-oidc-snowflake] walks through the full setup.
+
+<Frame>
+  <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for a custom Snowflake audience: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
+</Frame>
 
 ## Trust mechanism
 
@@ -319,6 +368,7 @@ which resource and when, without ever issuing a long-lived credential.
 [ref-oidc-aws]: /admin/deployment/oidc/aws
 [ref-oidc-gcp]: /admin/deployment/oidc/gcp
 [ref-oidc-azure]: /admin/deployment/oidc/azure
+[ref-oidc-snowflake]: /admin/connect-to-data/data-sources/snowflake#oidc-workload-identity
 [ref-env-vars]: /admin/deployment#environment-variables
 [ref-data-sources]: /admin/connect-to-data/data-sources
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format

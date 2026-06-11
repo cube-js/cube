@@ -58,12 +58,30 @@ Configuration** in your deployment.
 
 </Info>
 
-In Cube Cloud, select AWS Athena** when creating a new deployment and fill in
+In Cube Cloud, select **AWS Athena** when creating a new deployment and fill in
 the required fields:
 
 <Frame>
   <img src="https://ucarecdn.com/d30fa31d-e6ea-4a73-9950-1786634a1e32/" alt="Cube Cloud AWS Athena Configuration Screen" />
 </Frame>
+
+#### OIDC workload identity
+
+Instead of static credentials, Cube Cloud deployments can authenticate to
+Athena with [OIDC workload identity][ref-oidc-aws-athena]: an IAM role in
+your account trusts Cube's OIDC issuer, and the driver assumes it through
+the AWS SDK's default credential chain — no access keys to provision or
+rotate.
+
+```dotenv
+CUBEJS_DB_TYPE=athena
+AWS_ROLE_ARN=arn:aws:iam::123456789012:role/cube-deployment-acme
+CUBEJS_AWS_REGION=us-east-1
+CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
+```
+
+See the [AWS OIDC guide][ref-oidc-aws-athena] for the IAM role, trust
+policy, and permissions setup.
 
 Cube Cloud also supports connecting to data sources within private VPCs
 if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
@@ -87,7 +105,7 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 | [`CUBEJS_DB_SCHEMA`](/reference/configuration/environment-variables#cubejs_db_schema)                              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)                            | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                     | A valid number                                   |    ❌    |
 
-<sup>1</sup> Either provide [`CUBEJS_AWS_KEY`](/reference/configuration/environment-variables#cubejs_aws_key) and [`CUBEJS_AWS_SECRET`](/reference/configuration/environment-variables#cubejs_aws_secret) for static credentials, or use [`CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN`](/reference/configuration/environment-variables#cubejs_aws_athena_assume_role_arn) for role-based authentication. When using role assumption without static credentials, the driver will use the AWS SDK's default credential chain (IAM instance profile, EKS IRSA, etc.).
+<sup>1</sup> Either provide [`CUBEJS_AWS_KEY`](/reference/configuration/environment-variables#cubejs_aws_key) and [`CUBEJS_AWS_SECRET`](/reference/configuration/environment-variables#cubejs_aws_secret) for static credentials, or use [`CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN`](/reference/configuration/environment-variables#cubejs_aws_athena_assume_role_arn) for role-based authentication. When using role assumption without static credentials, the driver will use the AWS SDK's default credential chain (IAM instance profile, EKS IRSA, or [OIDC workload identity][ref-oidc-aws-athena] in Cube Cloud).
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
@@ -171,5 +189,6 @@ connections are made over HTTPS.
   https://prestodb.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
 [ref-caching-large-preaggs]: /docs/pre-aggregations/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-oidc-aws-athena]: /admin/deployment/oidc/aws#athena
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [self-preaggs-batching]: #batching

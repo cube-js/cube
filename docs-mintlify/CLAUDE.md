@@ -13,6 +13,14 @@ cd docs-mintlify
 yarn dev    # Start the Mintlify dev server
 ```
 
+## Naming conventions
+
+Product naming conventions (product names, taxonomy, deployment types, plan
+tiers, API names) are maintained in a shared rules file — follow it in all
+docs content:
+
+@../.cursor/rules/namings-rule.mdc
+
 ## Writing style
 
 - **Tone**: professional, direct, instructive. Address the reader as "you" (second person).
