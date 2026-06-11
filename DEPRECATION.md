@@ -52,7 +52,7 @@ features:
 | Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
 | Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
-| Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
+| Removed    | [`dbType`](#dbtype)                                                                                                               | v0.30.30   | v1.7.0    |
 | Removed    | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
@@ -312,9 +312,11 @@ recommend [using Cube Store as a solution][ref-caching-in-prod].
 
 **Deprecated in Release: v0.30.30**
 
-Using `dbType` is now deprecated, and we recommend using
-[`driverFactory`][self-driver-factory] to return a `DriverConfig` object
-instead.
+**Removed in Release: v1.7.0**
+
+`dbType` has been removed. Passing `CreateOptions.dbType` now throws an error.
+Use [`driverFactory`][self-driver-factory] to return a `DriverConfig` object
+(`{ type, ... }`) instead, or set the `CUBEJS_DB_TYPE` environment variable.
 
 ### Serverless Deployments
 

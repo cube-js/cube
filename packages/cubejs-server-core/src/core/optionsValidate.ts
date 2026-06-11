@@ -58,7 +58,6 @@ const schemaOptions = Joi.object().keys({
   processSubscriptionsInterval: Joi.number(),
   webSocketsBasePath: Joi.string(),
   // server-core CoreCreateOptions
-  dbType: dbTypes,
   externalDbType: dbTypes,
   schemaPath: Joi.string(),
   basePath: Joi.string(),
