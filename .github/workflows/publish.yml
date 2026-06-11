@@ -27,10 +27,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 22.x
+      - name: Install Node.js 24.x
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           registry-url: 'https://registry.npmjs.org/'
       - name: Upgrade npm for OIDC support
         run: npm install -g npm@11.7.0
@@ -75,7 +75,7 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [24]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
@@ -154,7 +154,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [22.x]
+        node-version: [24.x]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "fallback"]
         include:
@@ -243,7 +243,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [22.x]
+        node-version: [24.x]
         python-version: ["fallback"]
         os-version: [windows-2022]
         include:
