@@ -1130,8 +1130,7 @@ const RowLevelPolicySchema = Joi.object().keys({
   allowAll: Joi.boolean().valid(true).strict(),
 }).xor('filters', 'allowAll');
 
-const RolePolicySchema = Joi.object().keys({
-  role: Joi.string(),
+const GroupPolicySchema = Joi.object().keys({
   group: Joi.string(),
   groups: Joi.array().items(Joi.string()),
   memberLevel: MemberLevelPolicySchema,
@@ -1142,9 +1141,7 @@ const RolePolicySchema = Joi.object().keys({
   })),
 })
   .nand('group', 'groups') // Cannot have both group and groups
-  .nand('role', 'group') // Cannot have both role and group
-  .nand('role', 'groups') // Cannot have both role and groups
-  .or('role', 'group', 'groups') // Must have at least one
+  .or('group', 'groups') // Must have at least one
   .with('memberMasking', 'memberLevel'); // memberMasking requires memberLevel
 
 /* *****************************
@@ -1199,7 +1196,7 @@ const baseSchema = {
   dimensions: DimensionsSchema,
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
-  accessPolicy: Joi.array().items(RolePolicySchema.required()),
+  accessPolicy: Joi.array().items(GroupPolicySchema.required()),
   hierarchies: hierarchySchema,
 };
 
