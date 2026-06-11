@@ -65,7 +65,6 @@ class Configuration:
     context_to_cube_store_router_id: Union[str, Callable[[RequestContext], str]]
     driver_factory: Callable[[RequestContext], Dict]
     external_driver_factory: Callable[[RequestContext], Dict]
-    db_type: Union[str, Callable[[RequestContext], str]]
     check_auth: Callable
     check_sql_auth: Callable
     can_switch_sql_user: Callable
@@ -113,7 +112,6 @@ class Configuration:
         self.context_to_cube_store_router_id = None
         self.driver_factory = None
         self.external_driver_factory = None
-        self.db_type = None
         self.check_auth = None
         self.check_sql_auth = None
         self.can_switch_sql_user = None
