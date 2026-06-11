@@ -36,6 +36,10 @@ pub type TestFn = Box<
 pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
     let test_list = vec![
         t("insert", insert),
+        t(
+            "repartition_multi_node_consistency",
+            repartition_multi_node_consistency,
+        ),
         t("select_test", select_test),
         t("refresh_selects", refresh_selects),
         t("negative_numbers", negative_numbers),
@@ -11688,6 +11692,81 @@ async fn join_multi_partition_large(service: Box<dyn SqlClient>) -> Result<(), C
         .await?;
     assert_eq!(to_rows(&count_result), vec![vec![TableValue::Int(150)]]);
     Ok(())
+}
+
+async fn repartition_multi_node_consistency(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.numbers (num int)")
+        .await?;
+
+    let n: i64 = 200;
+    for i in 0..n {
+        service
+            .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+            .await?;
+    }
+
+    // Wait until the table has split and repartition jobs have drained every
+    // inactive parent partition (no active chunk left on an inactive partition),
+    // while the full row set stays readable throughout.
+    let mut stabilized = false;
+    let (mut active_parts, mut pending, mut count) = (0i64, true, 0i64);
+    for _ in 0..150 {
+        let active_parts_df = service
+            .exec_query("SELECT count(*) FROM system.partitions WHERE active = true")
+            .await?;
+        active_parts = scalar_i64(&active_parts_df);
+
+        let inactive = service
+            .exec_query("SELECT id FROM system.partitions WHERE active = false")
+            .await?;
+        let inactive_ids: HashSet<i64> = to_rows(&inactive)
+            .iter()
+            .filter_map(|r| match &r[0] {
+                TableValue::Int(v) => Some(*v),
+                _ => None,
+            })
+            .collect();
+
+        let active_chunks = service
+            .exec_query("SELECT partition_id FROM system.chunks WHERE active = true")
+            .await?;
+        pending = to_rows(&active_chunks).iter().any(|r| match &r[0] {
+            TableValue::Int(v) => inactive_ids.contains(v),
+            _ => false,
+        });
+
+        let count_df = service
+            .exec_query("SELECT count(*) FROM foo.numbers")
+            .await?;
+        count = scalar_i64(&count_df);
+
+        if active_parts > 1 && !pending && count == n {
+            stabilized = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(
+        stabilized,
+        "repartition did not stabilize: active_partitions={}, pending_repartition={}, count={} (want active>1, pending=false, count={})",
+        active_parts, pending, count, n
+    );
+
+    let sum = service
+        .exec_query("SELECT sum(num) FROM foo.numbers")
+        .await?;
+    assert_eq!(to_rows(&sum), vec![vec![TableValue::Int(n * (n - 1) / 2)]]);
+
+    Ok(())
+}
+
+fn scalar_i64(d: &DataFrame) -> i64 {
+    match d.get_rows().get(0).map(|r| &r.values()[0]) {
+        Some(TableValue::Int(v)) => *v,
+        _ => 0,
+    }
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

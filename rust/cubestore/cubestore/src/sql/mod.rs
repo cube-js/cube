@@ -3505,6 +3505,91 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn repartition_keeps_data_consistent() -> Result<(), CubeError> {
+        Config::test("repartition_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service
+                    .exec_query("CREATE SCHEMA foo")
+                    .await?
+                    .collect()
+                    .await?;
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num int)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let n: i64 = 200;
+                for i in 0..n {
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                        .await?
+                        .collect()
+                        .await?;
+                }
+
+                // Wait until repartition jobs have drained every inactive parent partition.
+                let mut drained = false;
+                for _ in 0..300 {
+                    let pending = services
+                        .meta_store
+                        .all_inactive_partitions_to_repartition()
+                        .await?;
+                    if pending.is_empty() {
+                        drained = true;
+                        break;
+                    }
+                    Delay::new(Duration::from_millis(50)).await;
+                }
+                assert!(
+                    drained,
+                    "inactive partitions were not fully repartitioned in time"
+                );
+
+                // The partition must have actually split.
+                let active = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await?;
+                assert!(
+                    active.len() > 1,
+                    "expected partition to split, got {} active partitions",
+                    active.len()
+                );
+
+                // Data must be complete and correct after repartition.
+                let result = service
+                    .exec_query("SELECT count(*) from foo.numbers")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(n)]));
+
+                let result = service
+                    .exec_query("SELECT sum(num) from foo.numbers")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    result.get_rows()[0],
+                    Row::new(vec![TableValue::Int(n * (n - 1) / 2)])
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn decimal_partition_pruning() -> Result<(), CubeError> {
         Config::test("decimal_partition_pruning")
             .update_config(|mut c| {
