@@ -521,7 +521,12 @@ fn append_csv_value(
         builder
             .as_any_mut()
             .downcast_mut::<datafusion::arrow::array::StringBuilder>()
-            .unwrap()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Expected StringBuilder for String column '{}' during CSV import",
+                    column.get_name()
+                ))
+            })?
             .append_value(value);
         return Ok(());
     }
