@@ -121,7 +121,6 @@ type BaseRequest = {
 };
 
 type RequestQuery = Record<string, any> | Record<string, any>[] & {
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
 };
 

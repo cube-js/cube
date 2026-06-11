@@ -746,34 +746,6 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.offset).toBe(10);
     });
 
-    it('sets renewQuery', async () => {
-      const cube = createCubeApi();
-      jest
-        .spyOn(cube, 'request')
-        .mockImplementation(fetchMock(load))
-        .mockImplementationOnce(fetchMock(meta));
-
-      const filter = {
-        member: 'Orders.status',
-        operator: 'equals',
-        values: ['invalid'],
-      };
-
-      const wrapper = shallowMount(QueryBuilder, {
-        props: {
-          cubeApi: cube,
-          query: {
-            filters: [filter],
-            renewQuery: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      expect(wrapper.vm.renewQuery).toBe(true);
-    });
-
     it('ignore order if empty', async () => {
       const cube = createCubeApi();
       jest

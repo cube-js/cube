@@ -120,7 +120,6 @@ export default {
       availableSegments: [],
       limit: null,
       offset: null,
-      renewQuery: false,
       order: null,
       prevValidatedQuery: null,
       granularities: GRANULARITIES,
@@ -151,7 +150,6 @@ export default {
       removeLimit,
       setOffset,
       removeOffset,
-      renewQuery,
       order,
       orderMembers,
     } = this;
@@ -180,7 +178,6 @@ export default {
         removeLimit,
         setOffset,
         removeOffset,
-        renewQuery,
         order,
         orderMembers,
         setOrder: this.setOrder,
@@ -349,10 +346,6 @@ export default {
         if (this.order) {
           validatedQuery.order = this.order;
         }
-
-        if (this.renewQuery) {
-          validatedQuery.renewQuery = this.renewQuery;
-        }
       }
 
       if (
@@ -430,7 +423,6 @@ export default {
         filters = [],
         limit,
         offset,
-        renewQuery,
         order,
       } = query || this.initialQuery;
 
@@ -476,7 +468,6 @@ export default {
       this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
       this.limit = limit || 10000;
       this.offset = offset || null;
-      this.renewQuery = renewQuery || false;
       this.order = order || null;
     },
     addMember(element, member) {

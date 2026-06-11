@@ -66,7 +66,7 @@ features:
 | Removed    | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    | v1.3.0    |
 | Removed    | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7     | v1.7.0    |
 | Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
-| Deprecated | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   |           |
+| Removed    | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   | v1.7.0    |
 | Removed    | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     | v1.7.0    |
 | Deprecated | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     |           |
 
@@ -424,8 +424,10 @@ no more new features, only security updates. Please upgrade to Node.js 22 or hig
 
 **Deprecated in Release: v1.3.73**
 
-This parameter is deprecated and will be removed in future releases. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
-options and use the new `cache` parameter of the `/v1/load` endpoint instead.
+**Removed in Release: v1.7.0**
+
+This parameter has been removed. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
+options and use the `cache` parameter of the `/v1/load` endpoint instead.
 
 ### Elasticsearch driver
 
