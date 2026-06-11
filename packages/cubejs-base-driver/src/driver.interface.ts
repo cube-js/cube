@@ -61,7 +61,13 @@ export interface TableCSVData extends DownloadTableBase {
   /**
    * An array of unloaded CSV data temporary URLs.
    */
-  csvFile: string[];
+  csvFile?: string[];
+
+  /**
+   * An array of unloaded Parquet data GCS URIs (gs://bucket/object).
+   * Used when the driver exports as Parquet instead of CSV.gz.
+   */
+  parquetFile?: string[];
 
   /**
    * Unloaded data fields types.
@@ -113,7 +119,7 @@ export function isDownloadTableMemoryData(tableData: any): tableData is TableMem
 }
 
 export function isDownloadTableCSVData(tableData: any): tableData is TableCSVData {
-  return Boolean(tableData.csvFile);
+  return Boolean(tableData.csvFile || tableData.parquetFile);
 }
 
 export type DownloadTableData = TableMemoryData | TableCSVData | StreamTableData | StreamingSourceTableData;

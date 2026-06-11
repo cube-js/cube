@@ -351,34 +351,27 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async unload(table: string): Promise<TableCSVData> {
-    if (!this.bucket) {
-      throw new Error('Unload is not configured');
-    }
-
-    const destination = this.bucket.file(`${table}-*.csv.gz`);
-    const [schema, tableName] = table.split('.');
-    const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
-    const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
-    await this.waitForJobResult(job, { table }, false);
-    // There is an implementation for extracting and signing urls from S3
-    // @see BaseDriver->extractUnloadedFilesFromS3()
-    // Please use that if you need. Here is a different flow
-    // because bigquery requires storage/bucket object for other things,
-    // and there is no need to initiate another one (created in extractUnloadedFilesFromS3()).
-    const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
-    const urls = await Promise.all(files.map(async file => {
-      const [url] = await file.getSignedUrl({
-        action: 'read',
-        expires: new Date(new Date().getTime() + 60 * 60 * 1000),
-      });
-      return url;
-    }));
-
-    return {
-      exportBucketCsvEscapeSymbol: this.options.exportBucketCsvEscapeSymbol,
-      csvFile: urls,
-    };
+  if (!this.bucket) {
+    throw new Error('Unload is not configured');
   }
+  // Delete stale files from any previous export for this table prefix
+  // to prevent prefix listing from picking up files from failed/concurrent runs.
+  const [staleFiles] = await this.bucket.getFiles({ prefix: `${table}-` });
+  await Promise.all(staleFiles.map(f => f.delete().catch(() => {}))); 
+
+  const destination = this.bucket.file(`${table}-*.parquet`);
+  const [schema, tableName] = table.split('.');
+  const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
+  const [job] = await bigQueryTable.createExtractJob(destination, { format: 'PARQUET' });
+  await this.waitForJobResult(job, { table }, false);
+  const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
+  const bucketName = this.bucket.name;
+  const urls = files.map(file => `gs://${bucketName}/${file.name}`);
+
+  return {
+    parquetFile: urls,
+  };
+}
 
   public async loadPreAggregationIntoTable(
     preAggregationTableName: string,

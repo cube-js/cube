@@ -77,6 +77,7 @@ impl ImportFormat {
                     ImportFormat::CSVOptions {
                         delimiter, quote, ..
                     } => (delimiter.unwrap_or(','), quote.is_none()),
+                    ImportFormat::Parquet => unreachable!("Parquet cannot reach CSV delimiter match"),
                 };
 
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
@@ -168,6 +169,13 @@ impl ImportFormat {
                     Ok(Some(Row::new(row)))
                 });
                 Ok(rows.boxed())
+            }
+            ImportFormat::Parquet => {
+                // Unreachable: do_import dispatches Parquet before row_stream is called.
+                // Required for exhaustive match.
+                Err(CubeError::internal(
+                    "row_stream called for Parquet format — this should never happen".to_string(),
+                ))
             }
         }
     }
@@ -587,15 +595,89 @@ impl ImportServiceImpl {
             self.meta_store
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
-            Ok((temp_file, None))
-        } else {
-            Ok((
-                File::open(location).await.map_err(|e| {
-                    CubeError::internal(format!("Open location {}: {}", location, e))
-                })?,
-                None,
-            ))
+            Ok((temp_file, None))    } else if location.starts_with("gs://") {
+        // GCS object-store URL: download to a local temp file using
+        // the Google Cloud Storage JSON API with WIF/ADC credentials.
+        use tokio::fs::File as TokioFile;
+        use tokio::io::AsyncWriteExt;
+
+        // Parse gs://bucket/object into GCS JSON API URL
+        let without_scheme = location.trim_start_matches("gs://");
+        let slash_pos = without_scheme.find('/').ok_or_else(|| {
+            CubeError::internal(format!("Invalid gs:// URL (no slash after bucket): {}", location))
+        })?;
+        let bucket = &without_scheme[..slash_pos];
+        let object = &without_scheme[slash_pos + 1..];
+        let encoded_object = object.replace('/', "%2F");
+        let gcs_url = format!(
+            "https://storage.googleapis.com/storage/v1/b/{}/o/{}?alt=media",
+            bucket, encoded_object
+        );
+
+        // Get an ADC access token via the GKE metadata server
+        let token_resp = reqwest::Client::new()
+            .get("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token")
+            .header("Metadata-Flavor", "Google")
+            .send()
+            .await
+            .map_err(|e| CubeError::internal(format!("GCS token fetch error for {}: {}", location, e)))?;
+
+        let token_json: serde_json::Value = token_resp.json().await
+            .map_err(|e| CubeError::internal(format!("GCS token parse error for {}: {}", location, e)))?;
+        let access_token = token_json["access_token"]
+            .as_str()
+            .ok_or_else(|| CubeError::internal(format!("No access_token in metadata response for {}", location)))?
+            .to_string();
+
+        let tmp = tempfile::NamedTempFile::new()
+            .map_err(|e| CubeError::internal(format!("GCS temp file create error for {}: {}", location, e)))?;
+        let tmp_path = tmp.into_temp_path();
+        let tmp_path_buf = tmp_path.to_path_buf();
+
+        let mut response = reqwest::Client::new()
+            .get(&gcs_url)
+            .bearer_auth(&access_token)
+            .send()
+            .await
+            .map_err(|e| CubeError::internal(format!("GCS download error for {}: {}", location, e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CubeError::internal(format!(
+                "GCS download HTTP {} for {}: {}", status, location, body
+            )));
         }
+
+        {
+            let mut out = TokioFile::create(&tmp_path_buf).await
+                .map_err(|e| CubeError::internal(format!("GCS temp write error for {}: {}", location, e)))?;
+            while let Some(chunk) = response.chunk().await
+                .map_err(|e| CubeError::internal(format!("GCS chunk error for {}: {}", location, e)))? {
+                out.write_all(&chunk).await
+                    .map_err(|e| CubeError::internal(format!("GCS write error for {}: {}", location, e)))?;
+            }
+            out.flush().await
+                .map_err(|e| CubeError::internal(format!("GCS flush error for {}: {}", location, e)))?;
+        }
+
+        let size = tmp_path_buf.metadata().map(|m| m.len()).unwrap_or(0);
+        self.meta_store
+            .update_location_download_size(table_id, location.to_string(), size)
+            .await?;
+        log::info!("Import downloaded {} ({} bytes) via GCS API", location, size);
+
+        let file = File::open(&tmp_path_buf).await
+            .map_err(|e| CubeError::internal(format!("Open downloaded GCS file {}: {}", location, e)))?;
+        Ok((file, Some(tmp_path)))
+    } else {
+        Ok((
+            File::open(location).await.map_err(|e| {
+                CubeError::internal(format!("Open location {}: {}", location, e))
+            })?,
+            None,
+        ))
+    }
     }
 
     async fn download_http_location(
@@ -717,6 +799,14 @@ impl ImportServiceImpl {
         let (file, tmp_path) = self
             .resolve_location(location, table.get_id(), &temp_dir)
             .await?;
+
+        // Parquet: bypass row_stream, read RecordBatches via DataFusion Parquet reader
+        if let ImportFormat::Parquet = format {
+            return self
+                .do_import_parquet(table, location, tmp_path, data_loaded_size)
+                .await;
+        }
+
         let mut row_stream = format
             .row_stream(
                 file,
@@ -766,6 +856,138 @@ impl ImportServiceImpl {
         ingestion.wait_completion().await
     }
 
+    /// Import a Parquet file that has been downloaded to `tmp_path`.
+    ///
+    /// Uses `datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder`
+    /// (already compiled into CubeStore for internal .chunk.parquet queries).
+    /// Converts each Arrow `RecordBatch` to CubeStore `Row`s using the same
+    /// column-type mapping as `ImportFormat::parse_column_value_str`.
+    async fn do_import_parquet(
+        &self,
+        table: &IdRow<Table>,
+        location: &str,
+        _tmp_path: Option<TempPath>,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
+    ) -> Result<(), CubeError> {
+        use datafusion::arrow::array::Array;
+        use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+        // Resolve the local path from tmp_path or re-download.
+        // resolve_location already downloaded the file; the local path is
+        // stored in tmp_path.  We need the string path.
+        let local_path = match &_tmp_path {
+            Some(p) => p.to_path_buf(),
+            None => {
+                return Err(CubeError::internal(format!(
+                    "Parquet import: no local temp path for location '{}'",
+                    location
+                )));
+            }
+        };
+
+        let std_file = std::fs::File::open(&local_path).map_err(|e| {
+            CubeError::internal(format!(
+                "Parquet import: cannot open '{}': {}",
+                local_path.display(),
+                e
+            ))
+        })?;
+
+        let builder =
+            ParquetRecordBatchReaderBuilder::try_new(std_file).map_err(|e| {
+                CubeError::internal(format!(
+                    "Parquet import: cannot read schema from '{}': {}",
+                    local_path.display(),
+                    e
+                ))
+            })?;
+
+        let mut reader = builder.build().map_err(|e| {
+            CubeError::internal(format!(
+                "Parquet import: cannot build reader for '{}': {}",
+                local_path.display(),
+                e
+            ))
+        })?;
+
+        let table_cols = table.get_row().get_columns().clone();
+
+        let mut ingestion = Ingestion::new(
+            self.meta_store.clone(),
+            self.chunk_store.clone(),
+            self.limits.clone(),
+            table.clone(),
+        );
+
+        let finish =
+            |builders: Vec<Box<dyn ArrayBuilder>>| -> Vec<ArrayRef> {
+                builders.into_iter().map(|mut b| b.finish()).collect()
+            };
+
+        let mut array_builders = create_array_builders(&table_cols);
+        let mut num_rows: usize = 0;
+
+        while let Some(batch_result) = reader.next() {
+            let batch = batch_result.map_err(|e| {
+                CubeError::internal(format!("Parquet import: error reading batch: {}", e))
+            })?;
+
+            for row_idx in 0..batch.num_rows() {
+                let mut row = vec![TableValue::Null; table_cols.len()];
+
+                for (col_idx, col) in table_cols.iter().enumerate() {
+                    // Find the matching column in the Parquet schema by name
+                    let parquet_col_idx = batch
+                        .schema()
+                        .fields()
+                        .iter()
+                        .position(|f| f.name() == col.get_name());
+
+                    let val = if let Some(pidx) = parquet_col_idx {
+                        let arr = batch.column(pidx);
+                        if arr.is_null(row_idx) {
+                            TableValue::Null
+                        } else {
+                            // Format the value as a string then use existing
+                            // parse_column_value_str to convert to TableValue.
+                            // This is not the fastest path but it is correct and
+                            // reuses all existing type-parsing logic.
+                            let val_str = arrow_array_value_to_string(arr, row_idx)?;
+                            ImportFormat::parse_column_value_str(col, &val_str)?
+                        }
+                    } else {
+                        TableValue::Null
+                    };
+                    row[col_idx] = val;
+                }
+
+                append_row(&mut array_builders, &table_cols, &Row::new(row));
+                num_rows += 1;
+
+                if num_rows >= self.config_obj.wal_split_threshold() as usize {
+                    let mut to_add = create_array_builders(&table_cols);
+                    mem::swap(&mut array_builders, &mut to_add);
+                    num_rows = 0;
+
+                    let built = finish(to_add);
+                    if let Some(ref dls) = data_loaded_size {
+                        dls.add(columns_vec_buffer_size(&built));
+                    }
+                    ingestion.queue_data_frame(built).await?;
+                }
+            }
+        }
+
+        mem::drop(_tmp_path); // release temp file
+
+        let built = finish(array_builders);
+        if let Some(ref dls) = data_loaded_size {
+            dls.add(columns_vec_buffer_size(&built));
+        }
+        ingestion.queue_data_frame(built).await?;
+        ingestion.wait_completion().await
+    }
+
     fn estimate_rows(location: &str, size: Option<u64>) -> u64 {
         if let Some(size) = size {
             let uncompressed_size = if location.contains(".gz") {
@@ -779,6 +1001,137 @@ impl ImportServiceImpl {
             7_000_000
         }
     }
+}
+
+/// Convert a single element of an Arrow array to a String suitable for
+/// `ImportFormat::parse_column_value_str`.
+///
+/// Covers all column types emitted by the BigQuery Parquet exporter.
+fn arrow_array_value_to_string(
+    arr: &dyn datafusion::arrow::array::Array,
+    idx: usize,
+) -> Result<String, CubeError> {
+    use datafusion::arrow::array::*;
+    use datafusion::arrow::datatypes::DataType;
+
+    let s = match arr.data_type() {
+        DataType::Utf8 => arr
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::LargeUtf8 => arr
+            .as_any()
+            .downcast_ref::<LargeStringArray>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Boolean => arr
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Int8 => arr
+            .as_any()
+            .downcast_ref::<Int8Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Int16 => arr
+            .as_any()
+            .downcast_ref::<Int16Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Int32 => arr
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Int64 => arr
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::UInt8 => arr
+            .as_any()
+            .downcast_ref::<UInt8Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::UInt16 => arr
+            .as_any()
+            .downcast_ref::<UInt16Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::UInt32 => arr
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::UInt64 => arr
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Float32 => arr
+            .as_any()
+            .downcast_ref::<Float32Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Float64 => arr
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .map(|a| a.value(idx).to_string()),
+        DataType::Decimal128(_, scale) => arr
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .map(|a| {
+                let raw = a.value(idx);
+                let scale = *scale as u32;
+                let divisor = 10i128.pow(scale);
+                if divisor == 0 {
+                    raw.to_string()
+                } else {
+                    format!("{}.{:0>width$}", raw / divisor, (raw % divisor).abs(), width = scale as usize)
+                }
+            }),
+        DataType::Date32 => arr
+            .as_any()
+            .downcast_ref::<Date32Array>()
+            .map(|a| {
+                // Days since epoch → YYYY-MM-DD
+                let days = a.value(idx) as i64;
+                let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                let date = epoch + chrono::Duration::days(days);
+                date.format("%Y-%m-%d").to_string()
+            }),
+        DataType::Timestamp(unit, _tz) => {
+            use datafusion::arrow::datatypes::TimeUnit;
+            let nanos = match unit {
+                TimeUnit::Second => arr
+                    .as_any()
+                    .downcast_ref::<TimestampSecondArray>()
+                    .map(|a| a.value(idx) as i128 * 1_000_000_000),
+                TimeUnit::Millisecond => arr
+                    .as_any()
+                    .downcast_ref::<TimestampMillisecondArray>()
+                    .map(|a| a.value(idx) as i128 * 1_000_000),
+                TimeUnit::Microsecond => arr
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .map(|a| a.value(idx) as i128 * 1_000),
+                TimeUnit::Nanosecond => arr
+                    .as_any()
+                    .downcast_ref::<TimestampNanosecondArray>()
+                    .map(|a| a.value(idx) as i128),
+            };
+            nanos.map(|ns| {
+                let secs = (ns / 1_000_000_000) as i64;
+                let nsecs = (ns % 1_000_000_000).abs() as u32;
+                let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(secs, nsecs)
+                    .unwrap_or_default();
+                dt.format("%Y-%m-%d %H:%M:%S%.f").to_string()
+            })
+        }
+        other => {
+            return Err(CubeError::user(format!(
+                "Parquet import: unsupported Arrow type {:?} — cannot convert to string",
+                other
+            )));
+        }
+    };
+
+    s.ok_or_else(|| {
+        CubeError::internal(format!(
+            "Parquet import: downcast failed for Arrow type {:?}",
+            arr.data_type()
+        ))
+    })
 }
 
 #[async_trait]
@@ -922,6 +1275,10 @@ impl LocationHelper {
                 Err(e) => Err(e),
             }?
         } else if location.starts_with("stream://") {
+            None
+        } else if location.starts_with("gs://") || location.starts_with("s3://") {
+            // Remote object-store URLs: file hasn't been downloaded yet.
+            // Return None (unknown size); estimate_rows handles this gracefully.
             None
         } else {
             Some(tokio::fs::metadata(location).await?.len())

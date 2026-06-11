@@ -616,6 +616,7 @@ pub enum ImportFormat {
         quote: Option<char>,
         has_header: bool,
     },
+    Parquet,
 }
 
 data_frame_from! {
