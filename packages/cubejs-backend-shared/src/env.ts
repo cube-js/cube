@@ -712,7 +712,7 @@ const variables: Record<string, (...args: any) => any> = {
 
   /**
    * Whether queries are executed automatically without requiring an
-   * explicit user confirmation.
+   * explicit user confirmation. Only used in Cube Cloud.
    */
   autoRunMode: (): boolean => get('CUBEJS_AUTO_RUN_MODE')
     .default('true')
