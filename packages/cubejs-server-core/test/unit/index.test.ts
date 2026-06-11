@@ -103,12 +103,12 @@ describe('index.test', () => {
 
   test('Should throw error, dbType has been removed (string)', () => {
     expect(() => new CubejsServerCore(<any>{ dbType: 'mysql' }))
-      .toThrowError(/CreateOptions.dbType has been deprecated and removed/);
+      .toThrowError(/CreateOptions.dbType was removed in v1\.7\.0/);
   });
 
   test('Should throw error, dbType has been removed (func)', () => {
     expect(() => new CubejsServerCore(<any>{ dbType: () => 'postgres' }))
-      .toThrowError(/CreateOptions.dbType has been deprecated and removed/);
+      .toThrowError(/CreateOptions.dbType was removed in v1\.7\.0/);
   });
 
   test('Should throw error, invalid options', () => {

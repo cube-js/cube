@@ -59,7 +59,7 @@ describe('OptsHandler class', () => {
     expect(() => new CubejsServerCoreExposed(<any>{
       ...conf,
       dbType: (() => 'postgres'),
-    })).toThrow('CreateOptions.dbType has been deprecated and removed');
+    })).toThrow('CreateOptions.dbType was removed in v1.7.0');
   });
 
   test('must handle vanilla CreateOptions', async () => {
