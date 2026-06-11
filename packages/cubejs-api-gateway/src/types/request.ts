@@ -24,6 +24,7 @@ interface RequestContext {
   appName?: string,
   protocol?: string,
   apiType?: string,
+  queryMetadata?: Record<string, string>,
 }
 
 /**
@@ -90,6 +91,15 @@ type SecurityContextExtractorFn =
 type ExtendContextFn =
   (req: ExpressRequest) =>
     Promise<RequestExtension> | RequestExtension;
+
+/**
+ * Function that returns key/value metadata to attach to each query sent to
+ * the data source (e.g. BigQuery job labels). Receives the full request
+ * context so both securityContext and requestId are available.
+ */
+type QueryMetadataFn =
+  (context: RequestContext) =>
+    Record<string, string> | Promise<Record<string, string>>;
 
 type ErrorResponse = {
   error: string,
@@ -234,6 +244,7 @@ export {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  QueryMetadataFn,
   ResponseResultFn,
   MetaResponseResultFn,
   BaseRequest,

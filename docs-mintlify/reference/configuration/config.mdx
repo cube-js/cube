@@ -1160,6 +1160,43 @@ environment documentation][ref-exec-environment-globals].
 
 </Info>
 
+### `query_metadata`
+
+Called on each REST/GraphQL API request to produce a key/value map that is attached to
+the queries Cube sends to the data source. Both `requestId` and `securityContext` are
+available, so tenant data and per-request trace IDs can be included in one place.
+
+Data sources consume this map according to their own capabilities — BigQuery attaches the
+entries as [job labels][ref-bq-job-labels] that surface in `INFORMATION_SCHEMA.JOBS`.
+
+Called on each request. Supports async functions.
+
+<Info>
+
+`query_metadata` is applied only to requests that go through the REST/GraphQL API. It is
+not applied to refresh worker execution or the SQL API.
+
+</Info>
+
+```javascript title="JavaScript"
+module.exports = {
+  queryMetadata: ({ requestId, securityContext }) => ({
+    tenant:     securityContext.tenantId,
+    team:       securityContext.team,
+    request_id: requestId,
+  }),
+};
+```
+
+Set the `x-request-id` header in your upstream application or AI agent to pass a trace ID
+through to the data source:
+
+```http
+x-request-id: session-tenant42-20240611-abc123
+```
+
+[ref-bq-job-labels]: /admin/connect-to-data/data-sources/google-bigquery#job-labels
+
 ### `check_auth`
 
 Used in the [REST (JSON) API][ref-rest-api]. Default implementation parses the [JSON

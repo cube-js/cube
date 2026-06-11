@@ -6,6 +6,7 @@ import {
   ContextToApiScopesFn,
   ExtendContextFn,
   JWTOptions,
+  QueryMetadataFn,
   QueryRewriteFn,
   UserBackgroundContext,
 } from '@cubejs-backend/api-gateway';
@@ -224,6 +225,7 @@ export interface CreateOptions {
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
   schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
+  queryMetadata?: QueryMetadataFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[] | ScheduledRefreshTimeZonesFn;
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;

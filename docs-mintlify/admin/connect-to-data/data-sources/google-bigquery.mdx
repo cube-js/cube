@@ -79,6 +79,65 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+
+## Job Labels
+
+BigQuery job labels surface in [`INFORMATION_SCHEMA.JOBS`][bq-docs-jobs-schema] and enable
+cost attribution and usage tracking by tenant, team, or request type.
+
+Use the `queryMetadata` configuration option to attach labels to every BigQuery job Cube
+creates. The hook receives the full request context — including `securityContext` (tenant
+data) and `requestId` (trace ID) — so both static and dynamic labels are available in one
+place:
+
+```javascript
+// cube.js
+module.exports = {
+  queryMetadata: ({ requestId, securityContext }) => ({
+    tenant:     securityContext.tenantId,
+    team:       securityContext.team,
+    request_id: requestId,
+  }),
+};
+```
+
+### Trace correlation via request ID
+
+When your upstream application or AI agent sets the `x-request-id` HTTP header on requests
+to Cube, that value is used verbatim as the `requestId` and flows through to the BigQuery
+job label. This lets you join `INFORMATION_SCHEMA.JOBS` back to the originating session or
+trace:
+
+```http
+# Set this header in your application or AI agent when calling Cube's REST API
+x-request-id: session-tenant42-20240611-abc123
+```
+
+```sql
+-- Find BigQuery cost for a specific upstream session
+SELECT
+  job_id,
+  total_bytes_billed,
+  total_slot_ms,
+  labels
+FROM `region-us`.INFORMATION_SCHEMA.JOBS
+WHERE labels['request_id'] = 'session-tenant42-20240611-abc123'
+```
+
+The `x-request-id` header is the primary source; the [W3C `traceparent`][w3c-traceparent]
+header is also supported as a fallback. If neither is set, Cube generates a UUID.
+
+<Note>
+
+BigQuery label values are sanitized automatically: characters outside `[a-z0-9_-]` are
+replaced with `_`, values are lowercased, and values longer than 63 characters are
+truncated. Label keys must satisfy BigQuery constraints and are used as-is.
+
+</Note>
+
+[bq-docs-jobs-schema]: https://cloud.google.com/bigquery/docs/information-schema-jobs
+[w3c-traceparent]: https://www.w3.org/TR/trace-context/#traceparent-header
+
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx

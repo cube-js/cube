@@ -154,6 +154,8 @@ class ApiGateway {
 
   protected readonly extendContext?: ExtendContextFn;
 
+  protected readonly queryMetadataFn?: ApiGatewayOptions['queryMetadata'];
+
   protected readonly dataSourceStorage: any;
 
   public readonly checkAuthFn: PreparedCheckAuthFn;
@@ -212,6 +214,7 @@ class ApiGateway {
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
+    this.queryMetadataFn = options.queryMetadata;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
@@ -1667,7 +1670,8 @@ class ApiGateway {
       contextSymbols: {
         securityContext: this.securityContextExtractor(context),
       },
-      requestId: context.requestId
+      requestId: context.requestId,
+      queryMetadata: context.queryMetadata,
     };
   }
 
@@ -1807,6 +1811,7 @@ class ApiGateway {
       values: sqlQuery.sql[1],
       cacheMode: normalizedQuery.cacheMode,
       requestId: context.requestId,
+      queryMetadata: context.queryMetadata,
       context,
       persistent: false,
     }];
@@ -1830,6 +1835,7 @@ class ApiGateway {
         values: totalQuery.sql[1],
         cacheMode: normalizedTotal.cacheMode,
         requestId: context.requestId,
+        queryMetadata: context.queryMetadata,
         context
       });
     }
@@ -1950,6 +1956,7 @@ class ApiGateway {
         values: sqlQuery.sql[1],
         cacheMode: 'stale-if-slow',
         requestId: context.requestId,
+        queryMetadata: context.queryMetadata,
         context,
         persistent: true,
         forceNoCache: true,
@@ -2330,6 +2337,9 @@ class ApiGateway {
     req.securityContext = securityContext;
 
     const extensions = typeof this.extendContext === 'function' ? await this.extendContext(req) : {};
+    const queryMetadata = typeof this.queryMetadataFn === 'function'
+      ? await this.queryMetadataFn({ securityContext, requestId })
+      : undefined;
 
     return {
       securityContext,
@@ -2337,6 +2347,7 @@ class ApiGateway {
       authInfo: securityContext,
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
+      queryMetadata,
       ...extensions,
     };
   }

@@ -50,6 +50,7 @@ interface BigQueryDriverOptions extends BigQueryOptions {
    * The export bucket CSV file escape symbol.
    */
   exportBucketCsvEscapeSymbol?: string,
+
 }
 
 type BigQueryDriverOptionsInitialized =
@@ -423,7 +424,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     options: any,
     withResults: boolean = true
   ): Promise<T> {
-    const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
+    const labels = this.buildJobLabels(options);
+    const jobQuery = labels ? { ...bigQueryQuery, labels: { ...bigQueryQuery.labels, ...labels } } : bigQueryQuery;
+    const [job] = await this.bigquery.createQueryJob(jobQuery);
     return <any> this.waitForJobResult(job, options, withResults);
   }
 
@@ -446,6 +449,27 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     throw new Error(
       `BigQuery job timeout reached ${this.options.pollTimeout}ms`,
     );
+  }
+
+  /**
+   * Sanitizes a value so it satisfies BigQuery label constraints:
+   * lowercase letters, numerals, hyphens, and underscores only; max 63 chars.
+   */
+  private sanitizeBigQueryLabelValue(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '_')
+      .substring(0, 63);
+  }
+
+  private buildJobLabels(options?: QueryOptions): Record<string, string> | undefined {
+    const meta = options?.queryMetadata;
+    if (!meta) return undefined;
+    const labels: Record<string, string> = {};
+    for (const [k, v] of Object.entries(meta)) {
+      labels[k] = this.sanitizeBigQueryLabelValue(String(v));
+    }
+    return Object.keys(labels).length ? labels : undefined;
   }
 
   public quoteIdentifier(identifier: string) {
