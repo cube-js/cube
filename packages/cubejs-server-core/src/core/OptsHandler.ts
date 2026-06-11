@@ -158,21 +158,20 @@ export class OptsHandler {
 
   /**
    * Default database factory function.
-   */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   */
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
     const type = <DatabaseType>getEnv('dbType', {
       dataSource: assertDataSource(ctx.dataSource),
       preAggregations: ctx.preAggregations,
     });
+
     return { type };
   }
 
-  /**
-   * Async driver factory getter.
-   */
   private getDriverFactory(opts: CreateOptions): DriverFactoryInternalFn {
     const { driverFactory } = opts;
     this.decoratedFactory = !driverFactory;
+
     return async (ctx: DriverContext) => {
       if (!driverFactory) {
         if (!this.driverFactoryType) {
@@ -183,6 +182,7 @@ export class OptsHandler {
             'BaseDriver or DriverConfig.'
           );
         }
+
         // TODO (buntarb): wrapping this call with assertDriverFactoryResult
         // change assertions sequence and cause a fail of few tests. Review it.
         return this.defaultDriverFactory(ctx);
@@ -194,21 +194,21 @@ export class OptsHandler {
     };
   }
 
-  /**
-   * Async driver type getter.
-   */
   private getDbType(
     opts: CreateOptions & {
       driverFactory: DriverFactoryInternalFn,
     },
   ): DbTypeInternalFn {
     const { driverFactory } = opts;
+
     return async (ctx: DriverContext) => {
       let val: undefined | BaseDriver | DriverConfig;
       let type: DatabaseType;
+
       if (!this.driverFactoryType) {
         val = await driverFactory(ctx);
       }
+
       if (
         this.driverFactoryType === 'BaseDriver' &&
         process.env.CUBEJS_DB_TYPE
@@ -217,6 +217,7 @@ export class OptsHandler {
       } else if (this.driverFactoryType === 'DriverConfig') {
         type = (<DriverConfig>(val || await driverFactory(ctx))).type;
       }
+
       return type;
     };
   }
