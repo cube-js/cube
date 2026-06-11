@@ -13,9 +13,9 @@
   integrity sha512-1Yjs2SvM8TflER/OD3cOjhWWOZb58A2t7wpE2S9XfBYTiIl+XFhQG2bjy4Pu1I+EAlCNUzRDYDdFwFYUKvXcIA==
 
 "@achrinza/node-ipc@^9.2.5":
-  version "9.2.9"
-  resolved "https://registry.yarnpkg.com/@achrinza/node-ipc/-/node-ipc-9.2.9.tgz#ab4815d9b16f1c83a479fe8791522a3abebb1c6a"
-  integrity sha512-7s0VcTwiK/0tNOVdSX9FWMeFdOEcsAOz9HesBldXxFMaGvIak7KC2z9tV9EgsQXn6KUsWsfIkViMNuIo0GoZDQ==
+  version "9.2.10"
+  resolved "https://registry.yarnpkg.com/@achrinza/node-ipc/-/node-ipc-9.2.10.tgz#aa17def30e134e8c0a8738ffc13e50c08a753ff0"
+  integrity sha512-rCkw57K82y1XA9KwBmuMrupFQr9VOS4Rn77vW2UD2j0+HjlP/npSON9COkUIfocd95B4wv5EpfWMr6lGD4lN3A==
   dependencies:
     "@node-ipc/js-queue" "2.0.3"
     event-pubsub "4.3.0"
@@ -2799,14 +2799,13 @@
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
 
-"@cubejs-backend/jdbc@^0.8.1":
-  version "0.8.1"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/jdbc/-/jdbc-0.8.1.tgz#32e21fcbf35f91028864396503620c83c2779261"
-  integrity sha512-dM/9V4IFe6vEcgHqAAAJ84EUnjxk1KjqJW26q2zKvDDW+31Fk9WzLEbzR1KdfYySWK7j+rMdOqGvHp8w89XGTQ==
+"@cubejs-backend/jdbc@^0.9.0":
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/jdbc/-/jdbc-0.9.0.tgz#793494ba9e17aab94d3d776e80d7c74837390fd9"
+  integrity sha512-6CupwVoqA9riWAyBlU3+HwRdVKBY85mX8tgSBQKJxXN5wcJYV2drOErnhY6C0uIshWuMPnFUHKme00JON29wWQ==
   dependencies:
     async "^3.2.6"
-    java "^0.14"
-    lodash "^4.17.21"
+    java "^0.18"
     uuid "^11.1.0"
     winston "^3.17.0"
 
@@ -10398,7 +10397,7 @@ async@^2.6.4:
   dependencies:
     lodash "^4.17.14"
 
-async@^3.2.0, async@^3.2.3, async@^3.2.4, async@^3.2.5, async@^3.2.6:
+async@^3.2.0, async@^3.2.3, async@^3.2.4, async@^3.2.6:
   version "3.2.6"
   resolved "https://registry.yarnpkg.com/async/-/async-3.2.6.tgz#1b0728e14929d51b85b449b7f06e27c1145e38ce"
   integrity sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA==
@@ -16981,17 +16980,15 @@ jake@^10.8.5:
     filelist "^1.0.4"
     minimatch "^3.1.2"
 
-java@^0.14, java@^0.14.0:
-  version "0.14.0"
-  resolved "https://registry.yarnpkg.com/java/-/java-0.14.0.tgz#28528f462aa23cca7b99e07fbc3130460ff70493"
-  integrity sha512-fXqNZvzQTl9cOFK4Rx7lobpgdWh9HKyjD56aerCZ9ETrVepvI6/wH1PUodieUc2ekf4cUOsHfM7aliWZAwU5Zg==
+java@^0.18, java@^0.18.0:
+  version "0.18.0"
+  resolved "https://registry.yarnpkg.com/java/-/java-0.18.0.tgz#8a339bc872c76755909f0e376cd465fa1985e997"
+  integrity sha512-DX9IJcYRMIGII4MIbw27xsU64h4EBfa+JHo0WpDQ2T61RYiRJXnEWdr4DNcTl18T6l8KjQGomEvdCSUYFKvkUw==
   dependencies:
-    async "^3.2.5"
     find-java-home "^2.0.0"
-    glob "^10.3.10"
-    lodash "^4.17.21"
-    nan "^2.18.0"
-    node-gyp "^10.0.1"
+    glob "^11.0.3"
+    nan "^2.23.0"
+    node-gyp "^11.5.0"
 
 javascript-stringify@^2.0.1:
   version "2.1.0"
@@ -19343,10 +19340,10 @@ named-placeholders@^1.1.3:
   dependencies:
     lru-cache "^7.14.1"
 
-nan@^2.18.0, nan@^2.19.0, nan@^2.20.0:
-  version "2.22.0"
-  resolved "https://registry.yarnpkg.com/nan/-/nan-2.22.0.tgz#31bc433fc33213c97bad36404bb68063de604de3"
-  integrity sha512-nbajikzWTMwsW+eSsNm3QwlOs7het9gGJU5dDZzRTQGk03vyBOauxgI4VakDzE0PtsGTmXPsXTbbjVhRwR5mpw==
+nan@^2.19.0, nan@^2.20.0, nan@^2.23.0:
+  version "2.27.0"
+  resolved "https://registry.yarnpkg.com/nan/-/nan-2.27.0.tgz#804e389f4c0e39b729a17eca85c80ebc4355c4c4"
+  integrity sha512-hC+0LidcL3XE4rp1C4H54KujgXKzbfyTngZTwBByQxsOxCEKZT0MPQ4hOKUH2jU1OYstqdDH4onyHPDzcV0XdQ==
 
 nanoid@^3.3.11:
   version "3.3.11"
@@ -19592,7 +19589,7 @@ node-gyp@8.x:
     tar "^6.1.2"
     which "^2.0.2"
 
-node-gyp@^10.0.0, node-gyp@^10.0.1:
+node-gyp@^10.0.0:
   version "10.3.1"
   resolved "https://registry.yarnpkg.com/node-gyp/-/node-gyp-10.3.1.tgz#1dd1a1a1c6c5c59da1a76aea06a062786b2c8a1a"
   integrity sha512-Pp3nFHBThHzVtNY7U6JfPjvT/DTE8+o/4xKsLQtBoU+j2HLsGlhcfzflAoUreaJbNmYnX+LlLi0qjV8kpyO6xQ==
@@ -19608,7 +19605,7 @@ node-gyp@^10.0.0, node-gyp@^10.0.1:
     tar "^6.2.1"
     which "^4.0.0"
 
-node-gyp@^11.0.0:
+node-gyp@^11.0.0, node-gyp@^11.5.0:
   version "11.5.0"
   resolved "https://registry.yarnpkg.com/node-gyp/-/node-gyp-11.5.0.tgz#82661b5f40647a7361efe918e3cea76d297fcc56"
   integrity sha512-ra7Kvlhxn5V9Slyus0ygMa2h+UqExPqUIkfk7Pc8QTLT956JLSy51uWFwHtIYy0vI8cB4BDhc/S03+880My/LQ==
