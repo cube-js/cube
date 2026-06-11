@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-cli"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "bin": {
     "cubejs": "dist/src/index.js"
@@ -59,7 +59,7 @@
     "@types/inquirer": "^7.3.1",
     "@types/jest": "^29",
     "@types/jsonwebtoken": "^9.0.2",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/semver": "^7.5.8",
     "husky": "^4.2.3",
     "jest": "^29",

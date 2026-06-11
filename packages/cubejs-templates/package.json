@@ -12,7 +12,7 @@
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",

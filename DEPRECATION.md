@@ -65,10 +65,11 @@ features:
 | Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
 | Removed    | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    | v1.3.0    |
 | Removed    | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7     | v1.7.0    |
-| Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
+| Removed    | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    | v1.7.0    |
 | Removed    | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   | v1.7.0    |
 | Removed    | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     | v1.7.0    |
 | Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
+| Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 
 ### Node.js 8
 
@@ -417,10 +418,10 @@ This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_
 
 ### Node.js 20
 
-**Deprecated in Release: v1.3.0**
+**Removed in Release: v1.7.0**
 
-Node.js 20 is in maintenance mode from [November 22, 2024][link-nodejs-eol]. This means
-no more new features, only security updates. Please upgrade to Node.js 22 or higher.
+Node.js 20 reached [End of Life on April 30, 2026][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 22 or higher.
 
 ### `renewQuery` parameter of the `/v1/load` endpoint
 
@@ -447,3 +448,9 @@ The Elasticsearch driver has been removed.
 
 The `context_to_roles` configuration option has been removed. Please use `context_to_groups` instead.
 
+### Node.js 22
+
+**Deprecated in Release: v1.7.0**
+
+Node.js 22 is in maintenance mode from [October 21, 2025][link-nodejs-eol]. This means
+no more new features, only security updates. Please upgrade to Node.js 24 or higher.
