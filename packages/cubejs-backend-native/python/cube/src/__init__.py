@@ -77,7 +77,6 @@ class Configuration:
     semantic_layer_sync: Union[Dict, Callable[[], Dict]]
     pre_aggregations_schema: Union[Callable[[RequestContext], str], str]
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
-    context_to_roles: Callable[[RequestContext], list[str]]
     context_to_groups: Callable[[RequestContext], list[str]]
     fast_reload: bool
 
@@ -128,7 +127,6 @@ class Configuration:
         self.semantic_layer_sync = None
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
-        self.context_to_roles = None
         self.context_to_groups = None
         self.fast_reload = None
 

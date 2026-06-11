@@ -20,7 +20,6 @@ const DEFAULT_API_TOKEN = sign({
   auth: {
     username: 'nobody',
     userAttributes: {},
-    roles: [],
   },
 }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
   expiresIn: '2 days'
@@ -149,7 +148,7 @@ describe('Cube RBAC Engine', () => {
 
     test('row-level filters from cube AND view layers are both applied', async () => {
       // The underlying `orders` cube policy restricts rows to id IN {1, 10, 11}
-      // (role "*" → id = 1, role admin → id = 10 OR id = 11). The view adds its
+      // (group "*" → id = 1, group admin → id = 10 OR id = 11). The view adds its
       // own row filter id < 11. Both layers must apply (AND), so the visible ids
       // are the intersection: {1, 10}.
       const res = await connection.query('SELECT id FROM orders_two_layer_test ORDER BY id');
@@ -302,8 +301,8 @@ describe('Cube RBAC Engine', () => {
   /**
    * Two-dimensional policy overlap test (matches diagram in CompilerApi.ts:559-647)
    *
-   * Policy 1 (role "*"): covers members a, b, id with row filter R1 (id < 500)
-   * Policy 2 (role "policy2_role"): covers members b, c, id with row filter R2 (id >= 500)
+   * Policy 1 (group "*"): covers members a, b, id with row filter R1 (id < 500)
+   * Policy 2 (group "policy2_group"): covers members b, c, id with row filter R2 (id >= 500)
    *
    *   Members
    *     ^
@@ -321,7 +320,7 @@ describe('Cube RBAC Engine', () => {
     let connection: PgClient;
 
     beforeAll(async () => {
-      // User has policy2_role, so both Policy 1 (*) and Policy 2 apply
+      // User is in group policy2_group, so both Policy 1 (*) and Policy 2 apply
       connection = await createPostgresClient('policy_test', 'policy_test_password');
     });
 
@@ -447,9 +446,9 @@ describe('Cube RBAC Engine', () => {
    *   - count_d measure: mask with 34567
    *
    * Three user profiles:
-   *   - masking_viewer: role "*" only → all members masked (memberLevel includes=[])
-   *   - masking_full: has masking_full_access role → full access to all members
-   *   - masking_partial: has masking_partial role → id, public_dim, total_quantity unmasked; rest masked
+   *   - masking_viewer: group "*" only → all members masked (memberLevel includes=[])
+   *   - masking_full: has masking_full_access group → full access to all members
+   *   - masking_partial: has masking_partial group → id, public_dim, total_quantity unmasked; rest masked
    */
   describe('RBAC data masking via SQL API (masking_viewer)', () => {
     let connection: PgClient;
@@ -555,10 +554,10 @@ describe('Cube RBAC Engine', () => {
    * Rows matching the filter see unmasked values; other rows see masked values.
    *
    * conditional_masking_test cube:
-   *   - role "*": member_level includes=[], member_masking includes="*"
-   *   - role "conditional_mask_role": member_level includes="*", row_level filter product_id <= 3
+   *   - group "*": member_level includes=[], member_masking includes="*"
+   *   - group "conditional_mask_group": member_level includes="*", row_level filter product_id <= 3
    *
-   * For conditional_mask_user (role: conditional_mask_role):
+   * For conditional_mask_user (group: conditional_mask_group):
    *   - product_id dimension: rows with product_id <= 3 show real value, others show masked (-1 for price)
    */
   describe('RBAC conditional masking with row-level filters via SQL API', () => {
@@ -588,7 +587,7 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    // Smoke test: only one filter policy matches (conditional_mask_role). For an
+    // Smoke test: only one filter policy matches (conditional_mask_group). For an
     // aggregate measure (total_price), a per-row CASE WHEN over the row filter would
     // reference product_id at row grain while the measure is aggregated. Since
     // product_id is not in the GROUP BY, the conditional CASE must NOT be triggered —
@@ -655,10 +654,10 @@ describe('Cube RBAC Engine', () => {
 
   /**
    * Multiple conditional policies use OR across policies:
-   *   - role "conditional_mask_role": product_id <= 3
-   *   - role "conditional_mask_role_extra": product_id = 5
+   *   - group "conditional_mask_group": product_id <= 3
+   *   - group "conditional_mask_group_extra": product_id = 5
    *
-   * For conditional_mask_multi_user (both roles):
+   * For conditional_mask_multi_user (both groups):
    *   Unmasked when product_id <= 3 OR product_id = 5, masked otherwise.
    */
   describe('RBAC conditional masking with multiple policies (OR across policies)', () => {
@@ -772,7 +771,7 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('masking_view_masked returns masked values for default role', async () => {
+    test('masking_view_masked returns masked values for default group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
@@ -783,7 +782,7 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    test('masking_view_over_hidden_cube returns masked values for default role', async () => {
+    test('masking_view_over_hidden_cube returns masked values for default group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
@@ -806,7 +805,7 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('masking_view_masked returns real values for masking_full_access role', async () => {
+    test('masking_view_masked returns real values for masking_full_access group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
@@ -815,8 +814,8 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    test('masking_view_over_hidden_cube returns real values for masking_full_access role', async () => {
-      // The underlying cube hides all members, but masking_full_access role
+    test('masking_view_over_hidden_cube returns real values for masking_full_access group', async () => {
+      // The underlying cube hides all members, but masking_full_access group
       // gets full access through the view's own policy.
       const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
@@ -836,7 +835,6 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'masking_viewer',
         userAttributes: {},
-        roles: [],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -846,7 +844,7 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'masking_full',
         userAttributes: {},
-        roles: ['masking_full_access'],
+        groups: ['masking_full_access'],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -856,7 +854,7 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'masking_partial',
         userAttributes: {},
-        roles: ['masking_partial'],
+        groups: ['masking_partial'],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -992,7 +990,7 @@ describe('Cube RBAC Engine', () => {
 
     test('view: masking_view — cube masking still applied through view', async () => {
       // masking_view grants full access at view level, but the underlying
-      // cube masks all members for role "*". Masking follows RLS pattern.
+      // cube masks all members for group "*". Masking follows RLS pattern.
       const result = await maskingViewerClient.load({
         measures: ['masking_view.count'],
         dimensions: ['masking_view.secret_number'],
@@ -1166,7 +1164,6 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'sc_test',
         userAttributes: {},
-        roles: [],
         groups: [],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
@@ -1401,7 +1398,7 @@ describe('Cube RBAC Engine', () => {
           canHaveAdmin: true,
           minDefaultId: 10000,
         },
-        roles: ['admin', 'ownder', 'hr'],
+        groups: ['admin'],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -1611,7 +1608,6 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       auth: {
         username: 'sc_test',
         userAttributes: {},
-        roles: [],
         groups: [],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {

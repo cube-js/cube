@@ -4,7 +4,7 @@ view('users_view', {
     includes: '*',
   }],
   accessPolicy: [{
-    role: '*',
+    group: '*',
     rowLevel: {
       filters: [{
         member: 'id',
