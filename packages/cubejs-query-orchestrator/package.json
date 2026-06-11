@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-query-orchestrator"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -39,7 +39,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.57",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/ramda": "^0.27.32",
     "@types/uuid": "^8.3.0",
     "jest": "^29",

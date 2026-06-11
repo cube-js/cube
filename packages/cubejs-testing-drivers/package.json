@@ -12,7 +12,7 @@
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "tsc": "tsc",
@@ -93,7 +93,7 @@
     "@cubejs-client/ws-transport": "1.6.57",
     "@jest/globals": "^29",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "dotenv": "^16.0.3",
     "env-var": "^6.3.0",
     "fs-extra": "^11.1.1",

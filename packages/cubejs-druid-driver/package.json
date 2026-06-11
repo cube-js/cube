@@ -10,7 +10,7 @@
     "directory": "packages/cubejs-druid-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -36,7 +36,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.57",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "jest": "^29",
     "testcontainers": "^10.28.0",
     "typescript": "~5.2.2"

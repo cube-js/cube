@@ -12,7 +12,7 @@
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "cypress:open": "kill-port 4000 && TEST_PLAYGROUND_PORT=3080 yarn cypress:birdbox",
@@ -127,7 +127,7 @@
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "cypress": "14.0.0",
     "cypress-image-snapshot": "^4.0.1",
     "cypress-localstorage-commands": "^1.4.5",

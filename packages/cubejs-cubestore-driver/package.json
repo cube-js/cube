@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-cubestore-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "README.md",
@@ -43,7 +43,7 @@
     "@cubejs-backend/linter": "1.6.57",
     "@types/csv-write-stream": "^2.0.0",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/ws": "^7.4.0",
     "jest": "^29",
     "typescript": "~5.2.2"

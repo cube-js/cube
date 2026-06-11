@@ -33,7 +33,7 @@
     "lint:fix": "eslint --fix test/ js/ --ext .ts"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/js"
@@ -41,7 +41,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.57",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "cargo-cp-artifact": "^0.1.9",
     "jest": "^29",
     "jest-bench": "^29",

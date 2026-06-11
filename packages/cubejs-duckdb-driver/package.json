@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-duckdb-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/src",
@@ -37,7 +37,7 @@
     "@cubejs-backend/linter": "1.6.57",
     "@cubejs-backend/testing-shared": "1.6.57",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "jest": "^29",
     "typescript": "~5.2.2"
   },

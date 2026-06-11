@@ -17,7 +17,7 @@
     "dist/src/*"
   ],
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "author": "Cube Dev, Inc.",
   "repository": {
@@ -32,7 +32,7 @@
     "@types/cli-progress": "^3.9.1",
     "@types/decompress": "^4.2.7",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/node-fetch": "^2.5.8",
     "@types/shelljs": "^0.8.5",
     "@types/throttle-debounce": "^2.1.0",
