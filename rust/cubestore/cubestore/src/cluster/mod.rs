@@ -962,19 +962,46 @@ impl Cluster for ClusterImpl {
             .filter(|c| !c.get_row().in_memory())
             .collect::<Vec<_>>();
 
-        for chunk in chunks {
-            let node = self.node_name_for_chunk_repartition(&chunk).await?;
+        if self.config_obj.batch_repartition_enabled() {
+            // FIXME: one job per partition that batches all persisted chunks, but
+            // keyed on a chunk (RepartitionChunk), not the partition. We reuse the
+            // existing job type instead of a dedicated per-partition JobType so an
+            // older binary stays able to deserialize it across `latest`/`release`
+            // channel switches (a new variant would make its whole job shard
+            // unreadable). The anchor is the smallest persisted chunk id so add_job
+            // dedups to a single job per partition; the worker resolves the
+            // partition from it and processes the anchor last (see
+            // repartition_partition_chunks). An old binary just repartitions this
+            // one chunk and drains the rest via its own per-chunk path.
+            if let Some(anchor_chunk_id) = chunks.iter().map(|c| c.get_id()).min() {
+                let node = self.node_name_by_partition(p);
+                let job = self
+                    .meta_store
+                    .add_job(Job::new(
+                        RowKey::Table(TableId::Chunks, anchor_chunk_id),
+                        JobType::RepartitionChunk,
+                        node.to_string(),
+                    ))
+                    .await?;
+                if job.is_some() {
+                    self.notify_job_runner(node).await?;
+                }
+            }
+        } else {
+            for chunk in chunks {
+                let node = self.node_name_for_chunk_repartition(&chunk).await?;
 
-            let job = self
-                .meta_store
-                .add_job(Job::new(
-                    RowKey::Table(TableId::Chunks, chunk.get_id()),
-                    JobType::RepartitionChunk,
-                    node.to_string(),
-                ))
-                .await?;
-            if job.is_some() {
-                self.notify_job_runner(node).await?;
+                let job = self
+                    .meta_store
+                    .add_job(Job::new(
+                        RowKey::Table(TableId::Chunks, chunk.get_id()),
+                        JobType::RepartitionChunk,
+                        node.to_string(),
+                    ))
+                    .await?;
+                if job.is_some() {
+                    self.notify_job_runner(node).await?;
+                }
             }
         }
         Ok(())

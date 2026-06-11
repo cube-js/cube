@@ -249,6 +249,13 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         chunk_id: u64,
         data_loaded_size: Arc<DataLoadedSize>,
     ) -> Result<(), CubeError>;
+    async fn repartition_partition_chunks(
+        &self,
+        partition_id: u64,
+        anchor_chunk_id: u64,
+        time_budget: std::time::Duration,
+        data_loaded_size: Arc<DataLoadedSize>,
+    ) -> Result<(), CubeError>;
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
     async fn has_in_memory_chunk(
         &self,
@@ -581,6 +588,70 @@ impl ChunkDataStore for ChunkStore {
             .swap_chunks(old_chunks, new_chunk_ids, replay_handle_id.clone())
             .await?;
 
+        Ok(())
+    }
+
+    async fn repartition_partition_chunks(
+        &self,
+        partition_id: u64,
+        anchor_chunk_id: u64,
+        time_budget: std::time::Duration,
+        data_loaded_size: Arc<DataLoadedSize>,
+    ) -> Result<(), CubeError> {
+        let start = std::time::Instant::now();
+        let mut chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?
+            .into_iter()
+            .filter(|c| !c.get_row().in_memory())
+            .map(|c| c.get_id())
+            .collect::<Vec<_>>();
+        // FIXME: anchor_chunk_id is the chunk carried in the RepartitionChunk
+        // job's row_reference (see job_processor). In steady state the scheduler
+        // picks it deterministically (smallest persisted chunk id) so add_job
+        // dedups to a single job per partition, and we process the anchor LAST so
+        // it stays active and keeps holding that dedup key until the job finishes.
+        // That single-job guarantee is steady-state only: across a latest/release
+        // channel switch a per-chunk job and this anchor job can target the same
+        // chunks. Correctness there does NOT rely on dedup — it rests on
+        // swap_chunks being atomic (it deactivates the source chunk under a rocks
+        // transaction and rejects a swap whose source is already inactive), so a
+        // chunk is ever repartitioned exactly once regardless of how many jobs
+        // race for it.
+        chunks.sort_by_key(|&id| id == anchor_chunk_id);
+        // Process chunks one at a time so peak memory stays at a single chunk.
+        // Each repartition_chunk commits its own swap, so a partial run is safe:
+        // a follow-up job re-reads only the still-active chunks and continues.
+        // The budget bounds how long this job holds its runner slot; granularity
+        // is one chunk, so a single oversized chunk may overshoot the budget.
+        for chunk_id in chunks {
+            if let Err(e) = self
+                .repartition_chunk(chunk_id, data_loaded_size.clone())
+                .await
+            {
+                // Losing the swap race (another job repartitioned this chunk
+                // first) leaves it inactive — that work is already done, so keep
+                // draining the rest instead of failing the whole batch. Any other
+                // error leaves the chunk active and is a genuine failure.
+                let still_active = self
+                    .meta_store
+                    .get_chunk(chunk_id)
+                    .await
+                    .map_or(false, |c| c.get_row().active());
+                if still_active {
+                    return Err(e);
+                }
+                log::debug!(
+                    "Skipping chunk {} lost to a concurrent repartition: {}",
+                    chunk_id,
+                    e
+                );
+            }
+            if start.elapsed() >= time_budget {
+                break;
+            }
+        }
         Ok(())
     }
 
@@ -1180,6 +1251,172 @@ mod tests {
             let expected: Vec<ArrayRef> = vec![foos, boos, sums];
             assert_eq!(res.columns(), &expected);
         }
+    }
+
+    #[tokio::test]
+    async fn repartition_partition_chunks_yields_on_budget() {
+        let config = Config::test("repartition_partition_chunks_yields_on_budget");
+        let path = "/tmp/test_repartition_yield";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
+                PathBuf::from(chunk_store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                Path::new(path),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+                10,
+            );
+
+            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    col.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
+            let partition = meta_store
+                .get_active_partitions_by_index_id(index.get_id())
+                .await
+                .unwrap()[0]
+                .clone();
+
+            // Two persisted chunks with real data on the parent partition.
+            let mut chunk_ids = Vec::new();
+            for range in [0..10i64, 10..20i64] {
+                let rows = range
+                    .map(|i| Row::new(vec![TableValue::Int(i)]))
+                    .collect::<Vec<_>>();
+                let data = rows_to_columns(&col, &rows);
+                let (chunk, file_size) = chunk_store
+                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
+                    .await
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                meta_store
+                    .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
+                    .await
+                    .unwrap();
+                chunk_ids.push(chunk.get_id());
+            }
+
+            // Split the parent into two children so swap_active_partitions does not
+            // take the single-child re-parent path; the chunks are left active by
+            // passing an empty chunk list, giving an inactive parent with 2 active
+            // persisted chunks (the state a repartition job runs against).
+            let dest1 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let dest2 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let mid = Row::new(vec![TableValue::Int(10)]);
+            meta_store
+                .swap_active_partitions(
+                    vec![(partition.clone(), vec![])],
+                    // file_size must be non-zero (set_file_size rejects 0); the
+                    // children carry no main table data (row_count 0), so it is a
+                    // placeholder — repartition writes new chunks onto them.
+                    vec![(dest1.clone(), 1), (dest2.clone(), 1)],
+                    vec![
+                        (0, (None, Some(mid.clone())), (None, Some(mid.clone()))),
+                        (0, (Some(mid.clone()), None), (Some(mid.clone()), None)),
+                    ],
+                )
+                .await
+                .unwrap();
+
+            let anchor = *chunk_ids.iter().min().unwrap();
+
+            // Zero budget must still process exactly one chunk (progress guarantee),
+            // then yield. The anchor is processed last, so it is the one left active.
+            chunk_store
+                .repartition_partition_chunks(
+                    partition.get_id(),
+                    anchor,
+                    std::time::Duration::from_secs(0),
+                    DataLoadedSize::new(),
+                )
+                .await
+                .unwrap();
+            let remaining = meta_store
+                .get_chunks_by_partition(partition.get_id(), false)
+                .await
+                .unwrap();
+            assert_eq!(
+                remaining.len(),
+                1,
+                "zero-budget run must yield after exactly one chunk"
+            );
+            assert_eq!(
+                remaining[0].get_id(),
+                anchor,
+                "anchor must be processed last and remain active after a yield"
+            );
+
+            // A large budget drains the remainder.
+            chunk_store
+                .repartition_partition_chunks(
+                    partition.get_id(),
+                    anchor,
+                    std::time::Duration::from_secs(600),
+                    DataLoadedSize::new(),
+                )
+                .await
+                .unwrap();
+            let remaining = meta_store
+                .get_chunks_by_partition(partition.get_id(), false)
+                .await
+                .unwrap();
+            assert!(
+                remaining.is_empty(),
+                "remaining chunks must drain with a large budget"
+            );
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path);
+        let _ = fs::remove_dir_all(chunk_remote_store_path);
     }
 }
 
