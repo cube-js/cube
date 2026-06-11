@@ -33,7 +33,9 @@ use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use crate::metastore::chunks::{ChunkIndexKey, ChunkRocksIndex};
 use crate::metastore::index::IndexIndexKey;
-use crate::metastore::job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus, JobType};
+use crate::metastore::job::{
+    Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobRunnerPool, JobStatus, JobType,
+};
 use crate::metastore::multi_index::{
     MultiIndexIndexKey, MultiPartition, MultiPartitionIndexKey, MultiPartitionRocksIndex,
     MultiPartitionRocksTable,
@@ -1125,7 +1127,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn start_processing_job(
         &self,
         server_name: String,
-        long_term: bool,
+        pool: JobRunnerPool,
     ) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn update_status(&self, job_id: u64, status: JobStatus) -> Result<IdRow<Job>, CubeError>;
     async fn update_heart_beat(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
@@ -4202,7 +4204,7 @@ impl MetaStore for RocksMetaStore {
     async fn start_processing_job(
         &self,
         server_name: String,
-        long_term: bool,
+        pool: JobRunnerPool,
     ) -> Result<Option<IdRow<Job>>, CubeError> {
         self.write_operation("start_processing_job", move |db_ref, batch_pipe| {
             let table = JobRocksTable::new(db_ref);
@@ -4212,7 +4214,7 @@ impl MetaStore for RocksMetaStore {
                     &JobRocksIndex::ByShard,
                 )?
                 .into_iter()
-                .filter(|j| j.get_row().is_long_term() == long_term)
+                .filter(|j| j.get_row().matches_pool(pool))
                 //We use min_by instead of the max_by because of min_by returns the first element
                 //if priority is equal while max_by returns the last element
                 .min_by(|a, b| b.get_row().priority().cmp(&a.get_row().priority()));
@@ -7025,7 +7027,7 @@ mod tests {
                 .await?;
 
             let job = meta_store
-                .start_processing_job("node1".to_string(), false)
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
@@ -7035,7 +7037,7 @@ mod tests {
             );
 
             let job = meta_store
-                .start_processing_job("node1".to_string(), false)
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
@@ -7045,7 +7047,7 @@ mod tests {
             );
 
             let job = meta_store
-                .start_processing_job("node1".to_string(), false)
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
@@ -7055,7 +7057,7 @@ mod tests {
             );
 
             let job = meta_store
-                .start_processing_job("node1".to_string(), false)
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
@@ -7065,7 +7067,7 @@ mod tests {
             );
 
             let job = meta_store
-                .start_processing_job("node2".to_string(), false)
+                .start_processing_job("node2".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
@@ -7075,7 +7077,7 @@ mod tests {
             );
 
             let job = meta_store
-                .start_processing_job("node2".to_string(), false)
+                .start_processing_job("node2".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
@@ -7085,7 +7087,7 @@ mod tests {
             );
 
             let job = meta_store
-                .start_processing_job("node2".to_string(), false)
+                .start_processing_job("node2".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
@@ -7095,7 +7097,7 @@ mod tests {
             );
 
             let job = meta_store
-                .start_processing_job("node2".to_string(), false)
+                .start_processing_job("node2".to_string(), JobRunnerPool::Regular)
                 .await?
                 .unwrap();
             assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
@@ -7151,7 +7153,7 @@ mod tests {
             // never the streaming import.
             let mut short_term = Vec::new();
             while let Some(job) = meta_store
-                .start_processing_job("node1".to_string(), false)
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
             {
                 short_term.push((
@@ -7171,7 +7173,7 @@ mod tests {
 
             // Long-term pool picks only the streaming CSV import.
             let job = meta_store
-                .start_processing_job("node1".to_string(), true)
+                .start_processing_job("node1".to_string(), JobRunnerPool::LongTerm)
                 .await?
                 .unwrap();
             assert_eq!(
@@ -7183,7 +7185,80 @@ mod tests {
                 &JobType::TableImportCSV("stream:topic".to_string())
             );
             assert!(meta_store
-                .start_processing_job("node1".to_string(), true)
+                .start_processing_job("node1".to_string(), JobRunnerPool::LongTerm)
+                .await?
+                .is_none());
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn csv_import_pool_test() -> Result<(), CubeError> {
+        let config = Config::test("csv_import_pool_test");
+        let store_path = env::current_dir()?.join("test-csv-import-pool-local");
+        let remote_store_path = env::current_dir()?.join("test-csv-import-pool-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, 1),
+                    JobType::TableImportCSV("file.csv".to_string()),
+                    "node1".to_string(),
+                ))
+                .await?;
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, 2),
+                    JobType::TableImportCSV("stream:topic".to_string()),
+                    "node1".to_string(),
+                ))
+                .await?;
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 1),
+                    JobType::PartitionCompaction,
+                    "node1".to_string(),
+                ))
+                .await?;
+
+            // The reserved CSV pool picks only the non-stream CSV import and ignores
+            // compaction and streaming imports.
+            let job = meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::CsvImport)
+                .await?
+                .unwrap();
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Tables, 1)
+            );
+            assert!(meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::CsvImport)
+                .await?
+                .is_none());
+
+            // The regular pool still handles the remaining compaction job; the CSV import
+            // is already reserved above, so it is not picked twice.
+            let job = meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
+                .await?
+                .unwrap();
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 1)
+            );
+            assert!(meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
                 .is_none());
         }
