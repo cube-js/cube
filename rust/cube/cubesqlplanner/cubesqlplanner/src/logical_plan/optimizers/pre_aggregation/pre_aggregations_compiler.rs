@@ -578,11 +578,13 @@ impl PreAggregationsCompiler {
         }
 
         symbols.into_iter().next().ok_or_else(|| {
-            // Render the reference the way the JS planner sees it (cube refs
-            // as plain cube names) and match its error message format.
             let path = sql_call.debug_sql(true);
             let member_name = path.rsplit('.').next().unwrap_or(&path);
-            CubeError::user(format!("'{}' not found for path '{}'", member_name, path))
+
+            CubeError::user(format!(
+                "'{}' not found for path '{}' in pre-aggregation '{}.{}'",
+                member_name, path, name.cube_name, name.name
+            ))
         })
     }
 
@@ -660,7 +662,7 @@ mod tests {
                       - count
                     time_dimension: created_at
                     granularity: day
-                  - name: broken_rollup
+                  - name: broken_rollup_unsupported
                     type: rollup
                     measures:
                       - count
@@ -709,11 +711,11 @@ mod tests {
     #[test]
     fn test_time_dimension_resolved_to_cube_ref_returns_error() {
         let ctx = create_time_dimension_context();
-        let err = compile_pre_agg(&ctx, "broken_rollup")
+        let err = compile_pre_agg(&ctx, "broken_rollup_unsupported")
             .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
         assert_eq!(
             err.message,
-            "'created_at' not found for path 'orders.created_at'"
+            "'created_at' not found for path 'orders.created_at' in pre-aggregation 'orders.broken_rollup_unsupported'"
         );
     }
 
@@ -724,7 +726,7 @@ mod tests {
             .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
         assert_eq!(
             err.message,
-            "'created_at' not found for path 'orders.created_at'"
+            "'created_at' not found for path 'orders.created_at' in pre-aggregation 'orders.broken_rollup_no_granularity'"
         );
     }
 
@@ -737,7 +739,7 @@ mod tests {
             .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
         assert_eq!(
             err.message,
-            "'created_at_day' not found for path 'orders.created_at_day'"
+            "'created_at_day' not found for path 'orders.created_at_day' in pre-aggregation 'orders.broken_rollup_granularity_suffix'"
         );
     }
 
