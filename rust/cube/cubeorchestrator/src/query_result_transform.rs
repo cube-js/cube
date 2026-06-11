@@ -3491,7 +3491,6 @@ mod tests {
             total: None,
             total_query: None,
             timezone: None,
-            renew_query: None,
             ungrouped: None,
             response_format: None,
             filters: None,

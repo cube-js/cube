@@ -147,8 +147,8 @@ describe('PreAggregations', () => {
 
   const basicQuery: any = createBasicQuery();
   const basicQueryExternal = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }] });
-  const basicQueryWithRenew = createBasicQuery({ renewQuery: true });
-  const basicQueryExternalWithRenew = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }], renewQuery: true });
+  const basicQueryWithRenew = createBasicQuery({ cacheMode: 'must-revalidate' });
+  const basicQueryExternalWithRenew = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }], cacheMode: 'must-revalidate' });
 
   beforeEach(() => {
     mockDriver = new MockDriver();
