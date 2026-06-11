@@ -37,7 +37,7 @@ use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::streaming::StreamingService;
-use crate::table::data::{append_row, create_array_builders};
+use crate::table::data::{append_value, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
 use crate::util::decimal::{Decimal, Decimal96};
@@ -50,18 +50,12 @@ use tokio::time::{sleep, Duration};
 pub mod limits;
 
 impl ImportFormat {
-    async fn row_stream(
-        &self,
-        file: File,
-        location: String,
-        columns: Vec<Column>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
-        let reader: Pin<Box<dyn AsyncBufRead + Send>> = if location.contains(".gz") {
+    fn open_reader(file: File, location: &str) -> Pin<Box<dyn AsyncBufRead + Send>> {
+        if location.contains(".gz") {
             Box::pin(BufReader::new(GzipDecoder::new(BufReader::new(file))))
         } else {
             Box::pin(BufReader::new(file))
-        };
-        self.row_stream_from_reader(reader, columns)
+        }
     }
 
     pub fn row_stream_from_reader<'a>(
@@ -70,114 +64,27 @@ impl ImportFormat {
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError>
     {
-        match self {
-            ImportFormat::CSV | ImportFormat::CSVNoHeader | ImportFormat::CSVOptions { .. } => {
-                let (delimiter, disable_quoting) = match self {
-                    ImportFormat::CSV | ImportFormat::CSVNoHeader => (',', false),
-                    ImportFormat::CSVOptions {
-                        delimiter, quote, ..
-                    } => (delimiter.unwrap_or(','), quote.is_none()),
-                };
-
-                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
-                    Box::pin(CsvLineStream::new(reader, disable_quoting));
-
-                let mut header_mapping = match self {
-                    ImportFormat::CSVNoHeader
-                    | ImportFormat::CSVOptions {
-                        has_header: false, ..
-                    } => Some(
-                        columns
-                            .iter()
-                            .enumerate()
-                            .map(|(i, c)| (i, c.clone()))
-                            .collect(),
-                    ),
-                    _ => None,
-                };
-
-                if delimiter as u16 > 255 {
-                    return Err(CubeError::user(format!(
-                        "Non ASCII delimiters are unsupported: '{}'",
-                        delimiter
-                    )));
+        let mut parser = CsvImportParser::new(self, columns)?;
+        let disable_quoting = parser.disable_quoting;
+        let num_columns = parser.columns.len();
+        let lines_stream = CsvLineStream::new(reader, disable_quoting);
+        let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
+            let line = line?;
+            let mut row = vec![TableValue::Null; num_columns];
+            let is_data_row = parser.visit_line(line.as_str(), |insert_pos, column, value| {
+                if let Some(value) = value {
+                    row[insert_pos] = ImportFormat::parse_column_value_str(column, value)
+                        .map_err(|e| parse_value_error(value, column, e))?;
                 }
-
-                let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
-                    let str = line?;
-
-                    let mut parser =
-                        CsvLineParser::new(delimiter as u8, disable_quoting, str.as_str());
-
-                    if header_mapping.is_none() {
-                        let mut mapping = Vec::new();
-                        for _ in 0..columns.len() {
-                            let next_column_buf = parser.next_value()?;
-                            let next_column = next_column_buf.as_ref();
-                            let (insert_pos, to_insert) = columns
-                                .iter()
-                                .find_position(|c| c.get_name() == &next_column)
-                                .map(|(i, c)| (i, c.clone()))
-                                .ok_or(CubeError::user(format!(
-                                    "Column '{}' is not found during import in {:?}",
-                                    next_column, columns
-                                )))?;
-                            mapping.push((insert_pos, to_insert));
-                            parser.advance()?;
-                        }
-                        header_mapping = Some(mapping);
-                        return Ok(None);
-                    }
-
-                    let resolved_mapping = header_mapping.as_ref().ok_or(CubeError::user(
-                        "Header is required for CSV import".to_string(),
-                    ))?;
-
-                    let mut row = vec![TableValue::Null; columns.len()];
-
-                    for (insert_pos, column) in resolved_mapping.iter() {
-                        let value_buf = parser.next_value()?;
-                        let value = value_buf.as_ref();
-
-                        if value == "" || value == "\\N" || value == "\\\\N" {
-                            row[*insert_pos] = TableValue::Null;
-                        } else {
-                            let mut value_buf_opt = Some(value_buf);
-                            row[*insert_pos] =
-                                ImportFormat::parse_column_value(column, &mut value_buf_opt)
-                                    .map_err(|e| {
-                                        if let Some(value_buf) = value_buf_opt {
-                                            CubeError::user(format!(
-                                                "Can't parse '{}' column value for '{}' column: {}",
-                                                value_buf.as_ref(),
-                                                column.get_name(),
-                                                e
-                                            ))
-                                        } else {
-                                            CubeError::user(format!(
-                                                "Can't parse column value for '{}' column: {}",
-                                                column.get_name(),
-                                                e
-                                            ))
-                                        }
-                                    })?;
-                        }
-
-                        parser.advance()?;
-                    }
-                    Ok(Some(Row::new(row)))
-                });
-                Ok(rows.boxed())
-            }
-        }
-    }
-
-    fn parse_column_value(
-        column: &Column,
-        value_buf: &mut Option<MaybeOwnedStr>,
-    ) -> Result<TableValue, CubeError> {
-        let value = value_buf.as_ref().unwrap().as_ref();
-        ImportFormat::parse_column_value_str(column, value)
+                Ok(())
+            })?;
+            Ok(if is_data_row {
+                Some(Row::new(row))
+            } else {
+                None
+            })
+        });
+        Ok(rows.boxed())
     }
 
     pub fn parse_column_value_str(column: &Column, value: &str) -> Result<TableValue, CubeError> {
@@ -492,6 +399,137 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
     }
 }
 
+/// Splits a CSV line into fields and resolves them to table column positions, lazily consuming
+/// the header row on first call. The destination of each parsed value is left to the visitor, so
+/// both the `Row`-producing path and the direct-to-builder import path share identical mapping,
+/// header and null-marker handling.
+struct CsvImportParser {
+    delimiter: u8,
+    disable_quoting: bool,
+    columns: Vec<Column>,
+    header_mapping: Option<Vec<(usize, Column)>>,
+}
+
+impl CsvImportParser {
+    fn new(format: &ImportFormat, columns: Vec<Column>) -> Result<Self, CubeError> {
+        let (delimiter, disable_quoting) = match format {
+            ImportFormat::CSV | ImportFormat::CSVNoHeader => (',', false),
+            ImportFormat::CSVOptions {
+                delimiter, quote, ..
+            } => (delimiter.unwrap_or(','), quote.is_none()),
+        };
+        if delimiter as u16 > 255 {
+            return Err(CubeError::user(format!(
+                "Non ASCII delimiters are unsupported: '{}'",
+                delimiter
+            )));
+        }
+        let header_mapping = match format {
+            ImportFormat::CSVNoHeader
+            | ImportFormat::CSVOptions {
+                has_header: false, ..
+            } => Some(
+                columns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| (i, c.clone()))
+                    .collect(),
+            ),
+            _ => None,
+        };
+        Ok(Self {
+            delimiter: delimiter as u8,
+            disable_quoting,
+            columns,
+            header_mapping,
+        })
+    }
+
+    /// Returns `false` when the line was consumed as the header, `true` for a data row. The visitor
+    /// is called once per table column (`None` value = null), so every builder advances exactly
+    /// once per row. A header that resolves two fields to the same column is rejected, since that
+    /// would append twice to one column and desync the builder lengths.
+    fn visit_line<F>(&mut self, line: &str, mut visit: F) -> Result<bool, CubeError>
+    where
+        F: FnMut(usize, &Column, Option<&str>) -> Result<(), CubeError>,
+    {
+        let mut parser = CsvLineParser::new(self.delimiter, self.disable_quoting, line);
+        if self.header_mapping.is_none() {
+            let mut mapping = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for _ in 0..self.columns.len() {
+                let next_column_buf = parser.next_value()?;
+                let next_column = next_column_buf.as_ref();
+                let (insert_pos, to_insert) = self
+                    .columns
+                    .iter()
+                    .find_position(|c| c.get_name() == &next_column)
+                    .map(|(i, c)| (i, c.clone()))
+                    .ok_or_else(|| {
+                        CubeError::user(format!(
+                            "Column '{}' is not found during import in {:?}",
+                            next_column, self.columns
+                        ))
+                    })?;
+                if !seen.insert(insert_pos) {
+                    return Err(CubeError::user(format!(
+                        "Duplicate column '{}' in CSV header",
+                        to_insert.get_name()
+                    )));
+                }
+                mapping.push((insert_pos, to_insert));
+                parser.advance()?;
+            }
+            self.header_mapping = Some(mapping);
+            return Ok(false);
+        }
+
+        let mapping = self.header_mapping.as_ref().unwrap();
+        for (insert_pos, column) in mapping.iter() {
+            let value_buf = parser.next_value()?;
+            let value = value_buf.as_ref();
+            let value = if value == "" || value == "\\N" || value == "\\\\N" {
+                None
+            } else {
+                Some(value)
+            };
+            visit(*insert_pos, column, value)?;
+            parser.advance()?;
+        }
+        Ok(true)
+    }
+}
+
+fn parse_value_error(value: &str, column: &Column, e: CubeError) -> CubeError {
+    CubeError::user(format!(
+        "Can't parse '{}' column value for '{}' column: {}",
+        value,
+        column.get_name(),
+        e
+    ))
+}
+
+/// Parses a CSV field and appends it directly into the Arrow builder, bypassing `Row`/`TableValue`.
+/// Strings are appended verbatim (no `TableValue::String` allocation); other types reuse the shared
+/// `parse_column_value_str` + `append_value` logic.
+fn append_csv_value(
+    builder: &mut dyn ArrayBuilder,
+    column: &Column,
+    value: &str,
+) -> Result<(), CubeError> {
+    if matches!(column.get_column_type(), ColumnType::String) {
+        builder
+            .as_any_mut()
+            .downcast_mut::<datafusion::arrow::array::StringBuilder>()
+            .unwrap()
+            .append_value(value);
+        return Ok(());
+    }
+    let value = ImportFormat::parse_column_value_str(column, value)?;
+    append_value(builder, column.get_column_type(), &value);
+    Ok(())
+}
+
 #[async_trait]
 pub trait LocationsValidator: DIService + Send + Sync {
     async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
@@ -717,13 +755,10 @@ impl ImportServiceImpl {
         let (file, tmp_path) = self
             .resolve_location(location, table.get_id(), &temp_dir)
             .await?;
-        let mut row_stream = format
-            .row_stream(
-                file,
-                location.to_string(),
-                table.get_row().get_columns().clone(),
-            )
-            .await?;
+        let reader = ImportFormat::open_reader(file, location);
+        let mut parser = CsvImportParser::new(&format, table.get_row().get_columns().clone())?;
+        let disable_quoting = parser.disable_quoting;
+        let mut lines = Box::pin(CsvLineStream::new(reader, disable_quoting));
 
         let mut ingestion = Ingestion::new(
             self.meta_store.clone(),
@@ -739,24 +774,38 @@ impl ImportServiceImpl {
         let table_cols = table.get_row().get_columns().as_slice();
         let mut builders = create_array_builders(table_cols);
         let mut num_rows = 0;
-        while let Some(row) = row_stream.next().await {
-            if let Some(row) = row? {
-                append_row(&mut builders, table_cols, &row);
-                num_rows += 1;
-
-                if num_rows >= self.config_obj.wal_split_threshold() as usize {
-                    let mut to_add = create_array_builders(table_cols);
-                    mem::swap(&mut builders, &mut to_add);
-                    num_rows = 0;
-
-                    let builded_rows = finish(to_add);
-
-                    if let Some(data_loaded_size) = &data_loaded_size {
-                        data_loaded_size.add(columns_vec_buffer_size(&builded_rows));
+        while let Some(line) = lines.next().await {
+            let line = line?;
+            let is_data_row = parser.visit_line(line.as_str(), |insert_pos, column, value| {
+                let builder = builders[insert_pos].as_mut();
+                match value {
+                    None => {
+                        append_value(builder, column.get_column_type(), &TableValue::Null);
                     }
-
-                    ingestion.queue_data_frame(builded_rows).await?;
+                    Some(value) => {
+                        append_csv_value(builder, column, value)
+                            .map_err(|e| parse_value_error(value, column, e))?;
+                    }
                 }
+                Ok(())
+            })?;
+            if !is_data_row {
+                continue;
+            }
+            num_rows += 1;
+
+            if num_rows >= self.config_obj.wal_split_threshold() as usize {
+                let mut to_add = create_array_builders(table_cols);
+                mem::swap(&mut builders, &mut to_add);
+                num_rows = 0;
+
+                let builded_rows = finish(to_add);
+
+                if let Some(data_loaded_size) = &data_loaded_size {
+                    data_loaded_size.add(columns_vec_buffer_size(&builded_rows));
+                }
+
+                ingestion.queue_data_frame(builded_rows).await?;
             }
         }
 
@@ -1004,16 +1053,61 @@ impl Ingestion {
 #[cfg(test)]
 mod tests {
     use crate::cube_ext::ordfloat::OrdF64;
-    use crate::import::{parse_binary_data, parse_decimal};
+    use crate::import::{
+        append_csv_value, parse_binary_data, parse_decimal, CsvImportParser, CsvLineStream,
+    };
     use crate::metastore::{Column, ColumnType, HllFlavour, ImportFormat};
+    use crate::table::data::{append_value, create_array_builders, rows_to_columns};
     use crate::table::{Row, TableValue, TimestampValue};
     use crate::util::decimal::{Decimal, Decimal96};
     use crate::util::int96::Int96;
     use cubehll::HllSketch;
+    use datafusion::arrow::array::ArrayRef;
     use indoc::indoc;
     use std::pin::Pin;
     use tokio::io::{AsyncBufRead, BufReader};
     use tokio_stream::StreamExt;
+
+    /// Runs the direct-to-builder import path (the one used by `do_import`) over a CSV reader and
+    /// returns the finished Arrow columns, mirroring how `collect_rows` exercises the `Row` path.
+    async fn collect_columns(
+        format: ImportFormat,
+        reader: Pin<Box<dyn AsyncBufRead + Send>>,
+        columns: Vec<Column>,
+    ) -> Vec<ArrayRef> {
+        let mut parser = CsvImportParser::new(&format, columns.clone()).unwrap();
+        let disable_quoting = parser.disable_quoting;
+        let mut builders = create_array_builders(&columns);
+        let mut lines = Box::pin(CsvLineStream::new(reader, disable_quoting));
+        while let Some(line) = lines.next().await {
+            let line = line.unwrap();
+            parser
+                .visit_line(line.as_str(), |insert_pos, column, value| {
+                    let builder = builders[insert_pos].as_mut();
+                    match value {
+                        None => append_value(builder, column.get_column_type(), &TableValue::Null),
+                        Some(value) => append_csv_value(builder, column, value)?,
+                    }
+                    Ok(())
+                })
+                .unwrap();
+        }
+        builders.into_iter().map(|mut b| b.finish()).collect()
+    }
+
+    fn arrays_to_rows(arrays: &[ArrayRef]) -> Vec<Row> {
+        let num_rows = arrays.first().map(|a| a.len()).unwrap_or(0);
+        (0..num_rows)
+            .map(|ri| {
+                Row::new(
+                    arrays
+                        .iter()
+                        .map(|a| TableValue::from_array(a.as_ref(), ri))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
 
     async fn collect_rows(
         format: ImportFormat,
@@ -1362,6 +1456,98 @@ mod tests {
                 TableValue::Bytes(pg_expected),
                 TableValue::Bytes(sf_expected),
             ])]
+        );
+    }
+
+    // Both paths are compared through identical Arrow reconstruction to neutralize any
+    // representation differences and isolate "does the builder path produce the same data".
+    fn assert_paths_match(columns: &[Column], row_path: Vec<Row>, builder_path: Vec<ArrayRef>) {
+        assert_eq!(
+            arrays_to_rows(&rows_to_columns(columns, &row_path)),
+            arrays_to_rows(&builder_path)
+        );
+    }
+
+    #[tokio::test]
+    async fn builder_path_matches_row_path_no_header() {
+        let data = concat!(
+            "hello,42,1.50,2020-01-01T00:00:00.000Z,true,AQID\n",
+            ",,,,,\n",
+            r#""a,b",bad,2.5,2020-01-01T00:00:00.000Z,f,01 02"#,
+            "\n"
+        );
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+            Column::new(
+                "C".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                2,
+            ),
+            Column::new("D".to_string(), ColumnType::Timestamp, 3),
+            Column::new("E".to_string(), ColumnType::Boolean, 4),
+            Column::new("F".to_string(), ColumnType::Bytes, 5),
+        ];
+        let row_path = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        let builder_path = collect_columns(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        assert_paths_match(&columns, row_path, builder_path);
+    }
+
+    #[tokio::test]
+    async fn builder_path_matches_row_path_with_header() {
+        // Header reorders columns; second data row carries nulls in the reordered positions.
+        let data = "C,A,B\ntrue,hello,42\n,world,\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+            Column::new("C".to_string(), ColumnType::Boolean, 2),
+        ];
+        let row_path = collect_rows(
+            ImportFormat::CSV,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        let builder_path = collect_columns(
+            ImportFormat::CSV,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        assert_paths_match(&columns, row_path, builder_path);
+    }
+
+    #[tokio::test]
+    async fn duplicate_header_column_is_rejected() {
+        // Two header fields resolving to the same column would append twice to one builder and
+        // desync column lengths, so it must be a hard error rather than silent last-write-wins.
+        let data = "A,A\n1,2\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Int, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+        ];
+        let mut stream = ImportFormat::CSV
+            .row_stream_from_reader(Box::pin(BufReader::new(data.as_bytes())), columns)
+            .unwrap();
+        let first = stream.next().await.unwrap();
+        let err = first.unwrap_err().to_string();
+        assert!(
+            err.contains("Duplicate column"),
+            "unexpected error: {}",
+            err
         );
     }
 }
