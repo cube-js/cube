@@ -119,7 +119,7 @@ export class DevServer {
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
-        dbType: options.dbType || null,
+        dbType: null,
         shouldStartConnectionWizardFlow: !this.options.isReadyForQueryProcessing(),
         livePreview: options.livePreview,
         isDocker: isDocker(),
