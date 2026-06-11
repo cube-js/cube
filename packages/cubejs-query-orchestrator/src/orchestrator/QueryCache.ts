@@ -70,8 +70,6 @@ export type Query = {
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
@@ -83,8 +81,6 @@ export type QueryBody = {
   values?: string[];
   loadRefreshKeysOnly?: boolean;
   scheduledRefresh?: boolean;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   requestId?: string;
   external?: boolean;
@@ -286,8 +282,7 @@ export class QueryCache {
       }
     }
 
-    // renewQuery has been deprecated, but keeping it for now
-    if (queryBody.cacheMode === 'must-revalidate' || queryBody.renewQuery) {
+    if (queryBody.cacheMode === 'must-revalidate') {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(
         query,

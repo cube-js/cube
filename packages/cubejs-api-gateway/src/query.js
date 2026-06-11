@@ -187,8 +187,6 @@ const querySchema = Joi.object().keys({
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
-  // @deprecated
-  renewQuery: Joi.boolean(),
   cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   cache: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   ungrouped: Joi.boolean(),
@@ -304,19 +302,12 @@ function parseInputMemberExpression(expression) {
 function normalizeQueryCacheMode(query, cacheMode) {
   if (cacheMode !== undefined) {
     query.cacheMode = cacheMode;
-  } else if (!query.cache && query?.renewQuery !== undefined) {
-    // TODO: Drop this when renewQuery will be removed
-    query.cacheMode = query.renewQuery === true
-      ? 'must-revalidate'
-      : 'stale-if-slow';
   } else if (!query.cache) {
     query.cacheMode = 'stale-if-slow';
   } else {
     query.cacheMode = query.cache;
   }
 
-  // TODO: Drop this when renewQuery will be removed
-  query.renewQuery = undefined;
   query.cache = undefined;
 
   return query;

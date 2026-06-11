@@ -138,11 +138,6 @@ export function validateQuery(query: Record<string, any>): Query {
     sanitizedQuery.timezone = query.timezone;
   }
 
-  // It's not supported yet
-  // if (query.renewQuery === true) {
-  //   sanitizedQuery.renewQuery = query.renewQuery;
-  // }
-
   if (query.ungrouped === true) {
     sanitizedQuery.ungrouped = query.ungrouped;
   }
