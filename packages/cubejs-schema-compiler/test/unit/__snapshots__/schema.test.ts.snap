@@ -404,7 +404,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (no additions): accessPolicy 1`] = `
 Array [
   Object {
-    "role": "*",
+    "group": "*",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -415,6 +415,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludes": Array [
         "status",
@@ -433,7 +434,6 @@ Array [
         "orders.sfUsers",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {
@@ -451,7 +451,7 @@ Array [
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (no additions): accessPolicy 2`] = `
 Array [
   Object {
-    "role": "*",
+    "group": "*",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -462,6 +462,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludes": Array [
         "status",
@@ -480,7 +481,6 @@ Array [
         "ordersExt.sfUsers",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {
@@ -701,7 +701,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (no additions): accessPolicy 1`] = `
 Array [
   Object {
-    "role": "common",
+    "group": "common",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -712,6 +712,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludesMembers": Array [],
       "includes": Array [
@@ -721,7 +722,6 @@ Array [
         "orders.status",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {
@@ -771,7 +771,7 @@ Array [
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (no additions): accessPolicy 2`] = `
 Array [
   Object {
-    "role": "common",
+    "group": "common",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -782,6 +782,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludesMembers": Array [],
       "includes": Array [
@@ -791,7 +792,6 @@ Array [
         "ordersExt.status",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {
@@ -1048,7 +1048,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (no additions): accessPolicy 1`] = `
 Array [
   Object {
-    "role": "*",
+    "group": "*",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -1059,6 +1059,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludes": Array [
         "status",
@@ -1077,7 +1078,6 @@ Array [
         "orders.sfUsers",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {
@@ -1095,7 +1095,7 @@ Array [
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (no additions): accessPolicy 2`] = `
 Array [
   Object {
-    "role": "*",
+    "group": "*",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -1106,6 +1106,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludes": Array [
         "status",
@@ -1124,7 +1125,6 @@ Array [
         "ordersExt.sfUsers",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {
@@ -1345,7 +1345,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (no additions): accessPolicy 1`] = `
 Array [
   Object {
-    "role": "common",
+    "group": "common",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -1356,6 +1356,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludesMembers": Array [],
       "includes": Array [
@@ -1365,7 +1366,6 @@ Array [
         "orders.status",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {
@@ -1415,7 +1415,7 @@ Array [
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (no additions): accessPolicy 2`] = `
 Array [
   Object {
-    "role": "common",
+    "group": "common",
     "rowLevel": Object {
       "allowAll": true,
     },
@@ -1426,6 +1426,7 @@ Array [
         "if": [Function],
       },
     ],
+    "group": "admin",
     "memberLevel": Object {
       "excludesMembers": Array [],
       "includes": Array [
@@ -1435,7 +1436,6 @@ Array [
         "ordersExt.status",
       ],
     },
-    "role": "admin",
     "rowLevel": Object {
       "filters": Array [
         Object {

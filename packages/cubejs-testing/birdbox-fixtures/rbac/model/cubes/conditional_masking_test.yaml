@@ -26,13 +26,13 @@ cubes:
         type: sum
 
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
           includes: "*"
 
-      - role: "conditional_mask_role"
+      - group: "conditional_mask_group"
         member_level:
           includes: "*"
         row_level:
@@ -42,7 +42,7 @@ cubes:
               values:
                 - "3"
 
-      - role: "conditional_mask_role_extra"
+      - group: "conditional_mask_group_extra"
         member_level:
           includes: "*"
         row_level:

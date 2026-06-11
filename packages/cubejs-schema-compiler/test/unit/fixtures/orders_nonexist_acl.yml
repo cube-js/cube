@@ -57,10 +57,10 @@ cubes:
         scheduled_refresh: true
 
     accessPolicy:
-      - role: common
+      - group: common
         rowLevel:
           allowAll: true
-      - role: admin
+      - group: admin
         conditions:
           - if: "{ security_context.isNotBlocked }"
         rowLevel:

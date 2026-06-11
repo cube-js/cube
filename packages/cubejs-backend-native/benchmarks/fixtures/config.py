@@ -96,14 +96,6 @@ def logger(msg, params):
 
 
 @config
-def context_to_roles(ctx):
-    # Removed print statements for benchmarking
-    return [
-        "admin",
-    ]
-
-
-@config
 def context_to_groups(ctx):
     # Removed print statements for benchmarking
     return [

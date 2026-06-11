@@ -535,7 +535,6 @@ export interface PyConfiguration {
   contextToApiScopes?: () => Promise<string[]>
   scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
   scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
-  contextToRoles?: (ctx: unknown) => Promise<string[]>
   contextToGroups?: (ctx: unknown) => Promise<string[]>
 }
 

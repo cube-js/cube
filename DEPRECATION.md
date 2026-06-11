@@ -68,7 +68,7 @@ features:
 | Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
 | Removed    | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   | v1.7.0    |
 | Removed    | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     | v1.7.0    |
-| Deprecated | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     |           |
+| Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
 
 ### Node.js 8
 
@@ -441,5 +441,7 @@ The Elasticsearch driver has been removed.
 
 **Deprecated in Release: v1.6.4**
 
-The `context_to_roles` configuration option is deprecated and will be removed in a future
-release. Please use `context_to_groups` instead.
+**Removed in Release: v1.7.0**
+
+The `context_to_roles` configuration option has been removed. Please use `context_to_groups` instead.
+
