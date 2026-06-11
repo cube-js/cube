@@ -161,12 +161,6 @@ export type DriverConfig = {
   type: DatabaseType,
 } & DriverOptions;
 
-/**
- * @deprecated CreateOptions.dbType has been removed. Use driverFactory
- * returning a DriverConfig, or the CUBEJS_DB_TYPE environment variable.
- */
-export type DbTypeFn = (context: DriverContext) =>
-  DatabaseType | Promise<DatabaseType>;
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 

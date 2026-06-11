@@ -48,8 +48,9 @@ export class OptsHandler {
   ) {
     this.assertOptions(createOptions);
     const options = cloneDeep(this.createOptions);
-    options.driverFactory = this.getDriverFactory(options);
-    options.dbType = this.getDbType(options);
+    const driverFactory = this.getDriverFactory(options);
+    options.driverFactory = driverFactory;
+    options.dbType = this.getDbType(driverFactory);
     this.initializedOptions = this.initializeCoreOptions(options);
   }
 
@@ -81,9 +82,10 @@ export class OptsHandler {
   private assertOptions(opts: CreateOptions) {
     if ((opts as any).dbType) {
       throw new Error(
-        'CreateOptions.dbType has been deprecated and removed. ' +
+        'CreateOptions.dbType was removed in v1.7.0. ' +
         'Use driverFactory instead (return a DriverConfig `{ type, ... }`), ' +
-        'or set the CUBEJS_DB_TYPE environment variable.'
+        'or set the CUBEJS_DB_TYPE environment variable. ' +
+        'See https://github.com/cube-js/cube/blob/master/DEPRECATION.md#dbtype'
       );
     }
 
@@ -195,12 +197,8 @@ export class OptsHandler {
   }
 
   private getDbType(
-    opts: CreateOptions & {
-      driverFactory: DriverFactoryInternalFn,
-    },
+    driverFactory: DriverFactoryInternalFn,
   ): DbTypeInternalFn {
-    const { driverFactory } = opts;
-
     return async (ctx: DriverContext) => {
       let val: undefined | BaseDriver | DriverConfig;
       let type: DatabaseType;
