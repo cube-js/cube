@@ -1003,12 +1003,32 @@ impl Ingestion {
 
 #[cfg(test)]
 mod tests {
-    use crate::import::parse_decimal;
-    use crate::metastore::{Column, ColumnType, ImportFormat};
-    use crate::table::{Row, TableValue};
+    use crate::cube_ext::ordfloat::OrdF64;
+    use crate::import::{parse_binary_data, parse_decimal};
+    use crate::metastore::{Column, ColumnType, HllFlavour, ImportFormat};
+    use crate::table::{Row, TableValue, TimestampValue};
+    use crate::util::decimal::{Decimal, Decimal96};
+    use crate::util::int96::Int96;
+    use cubehll::HllSketch;
     use indoc::indoc;
-    use tokio::io::BufReader;
+    use std::pin::Pin;
+    use tokio::io::{AsyncBufRead, BufReader};
     use tokio_stream::StreamExt;
+
+    async fn collect_rows(
+        format: ImportFormat,
+        reader: Pin<Box<dyn AsyncBufRead + Send>>,
+        columns: Vec<Column>,
+    ) -> Vec<Row> {
+        let mut row_stream = format.row_stream_from_reader(reader, columns).unwrap();
+        let mut rows = vec![];
+        while let Some(row) = row_stream.next().await {
+            if let Some(row) = row.unwrap() {
+                rows.push(row);
+            }
+        }
+        rows
+    }
 
     #[test]
     fn parse_decimal_test() {
@@ -1028,42 +1048,73 @@ mod tests {
             parse_decimal("-200.040000", 5).unwrap().to_string(5),
             "-200.04",
         );
+
+        // A value too large to fit i128 at the target scale is an error, not a silent Null.
+        let huge = format!("1{}", "0".repeat(40));
+        let err = parse_decimal(&huge, 5).unwrap_err().to_string();
+        assert!(err.contains("precision"), "unexpected error: {}", err);
     }
 
     #[tokio::test]
     async fn read_nulls() {
-        let data = indoc! {"
-            one,1
-            ,
-            three,3
+        // Every null marker ("", \N, \\N) must short-circuit to Null *before* type parsing,
+        // including for Decimal/Timestamp where the parser would otherwise raise an error.
+        let data = indoc! {r"
+            real,42,1.50,2020-01-01T00:00:00.000Z
+            ,,,
+            \N,\N,\N,\N
+            \\N,\\N,\\N,\\N
         "};
-        let csv_reader = Box::pin(BufReader::new(data.as_bytes()));
         let columns = vec![
             Column::new("A".to_string(), ColumnType::String, 0),
             Column::new("B".to_string(), ColumnType::Int, 1),
+            Column::new(
+                "C".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                2,
+            ),
+            Column::new("D".to_string(), ColumnType::Timestamp, 3),
         ];
-        let mut row_stream = ImportFormat::CSVNoHeader
-            .row_stream_from_reader(csv_reader, columns)
-            .unwrap();
-        let mut rows = vec![];
-        while let Some(row) = row_stream.next().await {
-            if let Some(row) = row.unwrap() {
-                rows.push(row)
-            }
-        }
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns,
+        )
+        .await;
+        let nulls = || Row::new(vec![TableValue::Null; 4]);
         assert_eq!(
             rows,
             vec![
                 Row::new(vec![
-                    TableValue::String("one".to_string()),
-                    TableValue::Int(1)
+                    TableValue::String("real".to_string()),
+                    TableValue::Int(42),
+                    TableValue::Decimal(Decimal::new(150000)), // 1.50 * 10^5
+                    TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
                 ]),
-                Row::new(vec![TableValue::Null, TableValue::Null]),
-                Row::new(vec![
-                    TableValue::String("three".to_string()),
-                    TableValue::Int(3)
-                ]),
+                nulls(),
+                nulls(),
+                nulls(),
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn quoted_empty_is_null() {
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new("\"\",\"\"\n".as_bytes())),
+            vec![
+                Column::new("A".to_string(), ColumnType::String, 0),
+                Column::new("B".to_string(), ColumnType::Int, 1),
+            ],
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![TableValue::Null, TableValue::Null])]
         );
     }
     #[tokio::test]
@@ -1114,6 +1165,203 @@ mod tests {
                     TableValue::Boolean(true),
                 ]),
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_numeric_types() {
+        let data = "123456789012345,3.5,200.35,-200.04\nabc,1.5,,\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Int96, 0),
+            Column::new("B".to_string(), ColumnType::Float, 1),
+            Column::new(
+                "C".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                2,
+            ),
+            Column::new(
+                "D".to_string(),
+                ColumnType::Decimal96 {
+                    scale: 5,
+                    precision: 30,
+                },
+                3,
+            ),
+        ];
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns,
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![
+                Row::new(vec![
+                    TableValue::Int96(Int96::new(123456789012345)),
+                    TableValue::Float(OrdF64(3.5)),
+                    TableValue::Decimal(Decimal::new(20035000)), // 200.35 * 10^5
+                    TableValue::Decimal96(Decimal96::new(-20004000)), // -200.04 * 10^5
+                ]),
+                // Unparseable int -> Null, empty decimal cells -> Null.
+                Row::new(vec![
+                    TableValue::Null,
+                    TableValue::Float(OrdF64(1.5)),
+                    TableValue::Null,
+                    TableValue::Null,
+                ]),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_bytes_and_timestamp() {
+        // "AQID" is base64 for [1, 2, 3]; "01 02 03" is the space-separated hex form.
+        let data = "AQID,01 02 03,2020-01-01T00:00:00.000Z\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Bytes, 0),
+            Column::new("B".to_string(), ColumnType::Bytes, 1),
+            Column::new("C".to_string(), ColumnType::Timestamp, 2),
+        ];
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns,
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![
+                TableValue::Bytes(vec![1, 2, 3]),
+                TableValue::Bytes(vec![1, 2, 3]),
+                TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
+            ])]
+        );
+    }
+
+    fn quoted_columns() -> Vec<Column> {
+        vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::String, 1),
+            Column::new("C".to_string(), ColumnType::String, 2),
+        ]
+    }
+
+    fn quoted_expected() -> Vec<Row> {
+        // Field B carries a quoted newline; field C carries an escaped quote.
+        vec![Row::new(vec![
+            TableValue::String("a,b".to_string()),
+            TableValue::String("line1\nline2".to_string()),
+            TableValue::String("say \"hi\"".to_string()),
+        ])]
+    }
+
+    #[tokio::test]
+    async fn quoted_fields_with_delimiter_newline_and_escapes() {
+        let data = "\"a,b\",\"line1\nline2\",\"say \"\"hi\"\"\"\n";
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            quoted_columns(),
+        )
+        .await;
+        assert_eq!(rows, quoted_expected());
+    }
+
+    #[tokio::test]
+    async fn quoting_survives_chunk_boundaries() {
+        // A 1-byte read buffer forces quotes and newlines to straddle poll_fill_buf calls.
+        let data = "\"a,b\",\"line1\nline2\",\"say \"\"hi\"\"\"\n";
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::with_capacity(1, data.as_bytes())),
+            quoted_columns(),
+        )
+        .await;
+        assert_eq!(rows, quoted_expected());
+    }
+
+    #[tokio::test]
+    async fn parse_failures_are_typed() {
+        // Int/Int96: an unparseable value is silently coerced to Null.
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new("xx,yy\n".as_bytes())),
+            vec![
+                Column::new("A".to_string(), ColumnType::Int, 0),
+                Column::new("B".to_string(), ColumnType::Int96, 1),
+            ],
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![TableValue::Null, TableValue::Null])]
+        );
+
+        // Float/Decimal/Timestamp: an unparseable value is a hard error, not Null.
+        let failing = [
+            ColumnType::Float,
+            ColumnType::Decimal {
+                scale: 5,
+                precision: 18,
+            },
+            ColumnType::Timestamp,
+        ];
+        for col_type in failing {
+            let columns = vec![Column::new("A".to_string(), col_type.clone(), 0)];
+            let mut row_stream = ImportFormat::CSVNoHeader
+                .row_stream_from_reader(Box::pin(BufReader::new("xx\n".as_bytes())), columns)
+                .unwrap();
+            let first = row_stream.next().await.unwrap();
+            assert!(first.is_err(), "expected parse error for {:?}", col_type);
+        }
+    }
+
+    #[tokio::test]
+    async fn parse_hll_flavors_reserialize() {
+        // HLL columns are not raw Bytes: the value is decoded and re-serialized via
+        // HllSketch::write(). Pin the round-trip so a plain-Bytes path would regress.
+        // Airlift/ZetaSketch store the decoded bytes verbatim, so the two re-serializing
+        // flavors are used here: Postgres (binary input) and Snowflake (JSON input).
+        let pg_expected = HllSketch::read_hll_storage_spec(&parse_binary_data("11 8b 7f").unwrap())
+            .unwrap()
+            .write();
+        let sf_expected =
+            HllSketch::read_snowflake(r#"{ "precision": 1, "dense": [0, 0], "version": 4 }"#)
+                .unwrap()
+                .write();
+
+        // Field B is the Snowflake JSON, CSV-quoted with doubled inner quotes.
+        let data = concat!(
+            r#"11 8b 7f,"{ ""precision"": 1, ""dense"": [0, 0], ""version"": 4 }""#,
+            "\n"
+        );
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            vec![
+                Column::new(
+                    "A".to_string(),
+                    ColumnType::HyperLogLog(HllFlavour::Postgres),
+                    0,
+                ),
+                Column::new(
+                    "B".to_string(),
+                    ColumnType::HyperLogLog(HllFlavour::Snowflake),
+                    1,
+                ),
+            ],
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![
+                TableValue::Bytes(pg_expected),
+                TableValue::Bytes(sf_expected),
+            ])]
         );
     }
 }
