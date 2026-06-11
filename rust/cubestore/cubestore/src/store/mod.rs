@@ -598,7 +598,7 @@ impl ChunkDataStore for ChunkStore {
         time_budget: std::time::Duration,
         data_loaded_size: Arc<DataLoadedSize>,
     ) -> Result<(), CubeError> {
-        let start = std::time::SystemTime::now();
+        let start = std::time::Instant::now();
         let mut chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
@@ -648,7 +648,7 @@ impl ChunkDataStore for ChunkStore {
                     e
                 );
             }
-            if start.elapsed().map_or(false, |e| e >= time_budget) {
+            if start.elapsed() >= time_budget {
                 break;
             }
         }
