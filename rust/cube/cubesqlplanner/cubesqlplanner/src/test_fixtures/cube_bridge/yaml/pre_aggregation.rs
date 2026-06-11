@@ -142,5 +142,12 @@ fn build_array_references(members: Vec<String>) -> Result<Rc<dyn MemberSql>, Cub
 }
 
 fn build_single_reference(member: String) -> Result<Rc<dyn MemberSql>, CubeError> {
-    MockMemberSql::pre_agg_single_ref(member).map(|m| Rc::new(m) as Rc<dyn MemberSql>)
+    // Template syntax like "{CUBE}.created_at" models JS references built via
+    // string interpolation (e.g. `${CUBE}.created_at`), where the member name
+    // is literal text rather than a symbol path.
+    if member.contains('{') {
+        MockMemberSql::new(member).map(|m| Rc::new(m) as Rc<dyn MemberSql>)
+    } else {
+        MockMemberSql::pre_agg_single_ref(member).map(|m| Rc::new(m) as Rc<dyn MemberSql>)
+    }
 }
