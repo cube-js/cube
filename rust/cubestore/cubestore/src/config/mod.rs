@@ -497,6 +497,17 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    /// When enabled, an inactive parent partition is repartitioned by a single
+    /// per-partition job that loops over its persisted chunks, instead of one
+    /// job per chunk. Kept as a flag for emergency rollback.
+    fn batch_repartition_enabled(&self) -> bool;
+
+    /// Time budget for a single batch repartition job. The job yields its runner
+    /// slot once the budget is exceeded (after the current chunk); the remainder
+    /// is drained by a follow-up job via the cascade. Kept separate from
+    /// import_job_timeout, which is the hard stuck-job kill, not a fairness knob.
+    fn repartition_chunks_time_budget_secs(&self) -> u64;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -639,6 +650,8 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub batch_repartition_enabled: bool,
+    pub repartition_chunks_time_budget_secs: u64,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -935,6 +948,12 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+    fn batch_repartition_enabled(&self) -> bool {
+        self.batch_repartition_enabled
+    }
+    fn repartition_chunks_time_budget_secs(&self) -> u64 {
+        self.repartition_chunks_time_budget_secs
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1515,6 +1534,11 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                batch_repartition_enabled: env_bool("CUBESTORE_BATCH_REPARTITION", true),
+                repartition_chunks_time_budget_secs: env_parse(
+                    "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
+                    60,
+                ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -1749,6 +1773,8 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                batch_repartition_enabled: true,
+                repartition_chunks_time_budget_secs: 60,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2498,6 +2524,7 @@ impl Config {
         self.injector
             .register_typed::<dyn JobProcessor, _, _, _>(async move |i| {
                 JobProcessorImpl::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

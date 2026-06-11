@@ -3504,6 +3504,82 @@ mod tests {
         Ok(())
     }
 
+    async fn assert_repartition_drains_and_keeps_data(
+        services: &CubeServices,
+    ) -> Result<(), CubeError> {
+        let service = &services.sql_service;
+
+        service
+            .exec_query("CREATE SCHEMA foo")
+            .await?
+            .collect()
+            .await?;
+
+        service
+            .exec_query("CREATE TABLE foo.numbers (num int)")
+            .await?
+            .collect()
+            .await?;
+
+        let n: i64 = 200;
+        for i in 0..n {
+            service
+                .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                .await?
+                .collect()
+                .await?;
+        }
+
+        // Wait until repartition jobs have drained every inactive parent partition.
+        let mut drained = false;
+        for _ in 0..300 {
+            let pending = services
+                .meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?;
+            if pending.is_empty() {
+                drained = true;
+                break;
+            }
+            Delay::new(Duration::from_millis(50)).await;
+        }
+        assert!(
+            drained,
+            "inactive partitions were not fully repartitioned in time"
+        );
+
+        // The partition must have actually split.
+        let active = services
+            .meta_store
+            .get_active_partitions_by_index_id(1)
+            .await?;
+        assert!(
+            active.len() > 1,
+            "expected partition to split, got {} active partitions",
+            active.len()
+        );
+
+        // Data must be complete and correct after repartition.
+        let result = service
+            .exec_query("SELECT count(*) from foo.numbers")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(n)]));
+
+        let result = service
+            .exec_query("SELECT sum(num) from foo.numbers")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![TableValue::Int(n * (n - 1) / 2)])
+        );
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn repartition_keeps_data_consistent() -> Result<(), CubeError> {
         Config::test("repartition_keeps_data_consistent")
@@ -3513,77 +3589,42 @@ mod tests {
                 c
             })
             .start_test(async move |services| {
-                let service = services.sql_service;
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
 
-                service
-                    .exec_query("CREATE SCHEMA foo")
-                    .await?
-                    .collect()
-                    .await?;
+    #[tokio::test]
+    async fn repartition_legacy_per_chunk_path() -> Result<(), CubeError> {
+        Config::test("repartition_legacy_per_chunk_path")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.batch_repartition_enabled = false;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
 
-                service
-                    .exec_query("CREATE TABLE foo.numbers (num int)")
-                    .await?
-                    .collect()
-                    .await?;
-
-                let n: i64 = 200;
-                for i in 0..n {
-                    service
-                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
-                        .await?
-                        .collect()
-                        .await?;
-                }
-
-                // Wait until repartition jobs have drained every inactive parent partition.
-                let mut drained = false;
-                for _ in 0..300 {
-                    let pending = services
-                        .meta_store
-                        .all_inactive_partitions_to_repartition()
-                        .await?;
-                    if pending.is_empty() {
-                        drained = true;
-                        break;
-                    }
-                    Delay::new(Duration::from_millis(50)).await;
-                }
-                assert!(
-                    drained,
-                    "inactive partitions were not fully repartitioned in time"
-                );
-
-                // The partition must have actually split.
-                let active = services
-                    .meta_store
-                    .get_active_partitions_by_index_id(1)
-                    .await?;
-                assert!(
-                    active.len() > 1,
-                    "expected partition to split, got {} active partitions",
-                    active.len()
-                );
-
-                // Data must be complete and correct after repartition.
-                let result = service
-                    .exec_query("SELECT count(*) from foo.numbers")
-                    .await?
-                    .collect()
-                    .await?;
-                assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(n)]));
-
-                let result = service
-                    .exec_query("SELECT sum(num) from foo.numbers")
-                    .await?
-                    .collect()
-                    .await?;
-                assert_eq!(
-                    result.get_rows()[0],
-                    Row::new(vec![TableValue::Int(n * (n - 1) / 2)])
-                );
-
-                Ok::<(), CubeError>(())
+    #[tokio::test]
+    async fn repartition_small_time_budget_drains_via_cascade() -> Result<(), CubeError> {
+        // A 1s budget forces most per-partition jobs to yield before draining all
+        // chunks; the cascade must reschedule until the parent is empty.
+        Config::test("repartition_small_time_budget_drains_via_cascade")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.batch_repartition_enabled = true;
+                c.repartition_chunks_time_budget_secs = 1;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
             })
             .await;
         Ok(())
