@@ -15,6 +15,8 @@ If the picker is empty, create the report first in a workbook tab — only publi
 
 Charts respect [controls][ref-controls] — filters and time granularity switchers — placed on the same dashboard. A single control can drive multiple charts at once: its value is applied to every chart whose query references the targeted dimension.
 
+If some controls are incompatible with a chart's query, the chart skips them and shows a warning icon. See [Incompatible controls][ref-incompatible-controls] for details.
+
 ## Updating charts
 
 Charts on a published dashboard reflect the most recent published version of the workbook. To change the query, switch the chart type, or restyle the visualization, edit the underlying report in the workbook and publish a new version of the dashboard.
@@ -27,4 +29,5 @@ Use **Hide Title** in the widget's settings menu to suppress the title on the da
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-incompatible-controls]: /docs/explore-analyze/dashboards/widgets/controls#incompatible-controls
 [ref-text]: /docs/explore-analyze/dashboards/widgets/text
