@@ -7109,6 +7109,89 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn job_pool_selector_test() -> Result<(), CubeError> {
+        let config = Config::test("job_pool_selector_test");
+        let store_path = env::current_dir()?.join("test-job-pool-selector-local");
+        let remote_store_path = env::current_dir()?.join("test-job-pool-selector-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, 1),
+                    JobType::TableImportCSV("file.csv".to_string()),
+                    "node1".to_string(),
+                ))
+                .await?;
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, 2),
+                    JobType::TableImportCSV("stream:topic".to_string()),
+                    "node1".to_string(),
+                ))
+                .await?;
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 1),
+                    JobType::PartitionCompaction,
+                    "node1".to_string(),
+                ))
+                .await?;
+
+            // Short-term pool picks the non-stream CSV import and the compaction,
+            // never the streaming import.
+            let mut short_term = Vec::new();
+            while let Some(job) = meta_store
+                .start_processing_job("node1".to_string(), false)
+                .await?
+            {
+                short_term.push((
+                    job.get_row().row_reference().clone(),
+                    job.get_row().job_type().clone(),
+                ));
+            }
+            assert_eq!(short_term.len(), 2);
+            assert!(short_term.contains(&(
+                RowKey::Table(TableId::Tables, 1),
+                JobType::TableImportCSV("file.csv".to_string())
+            )));
+            assert!(short_term.contains(&(
+                RowKey::Table(TableId::Partitions, 1),
+                JobType::PartitionCompaction
+            )));
+
+            // Long-term pool picks only the streaming CSV import.
+            let job = meta_store
+                .start_processing_job("node1".to_string(), true)
+                .await?
+                .unwrap();
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Tables, 2)
+            );
+            assert_eq!(
+                job.get_row().job_type(),
+                &JobType::TableImportCSV("stream:topic".to_string())
+            );
+            assert!(meta_store
+                .start_processing_job("node1".to_string(), true)
+                .await?
+                .is_none());
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
+    }
 }
 
 impl RocksMetaStore {
