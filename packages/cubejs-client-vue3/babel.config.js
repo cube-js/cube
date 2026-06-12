@@ -1,4 +1,3 @@
 module.exports = {
-  presets: ['@vue/app'],
-  plugins: ['@babel/plugin-proposal-optional-chaining'],
+  presets: [['@babel/preset-env', { targets: { node: 'current' } }]],
 };
