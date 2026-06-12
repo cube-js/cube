@@ -29,7 +29,7 @@ use datafusion::arrow::array::{
     Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
-use datafusion::arrow::compute::SortOptions;
+use datafusion::arrow::compute::{filter_record_batch, SortOptions};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::ipc::reader::StreamReader;
 use datafusion::arrow::ipc::writer::StreamWriter;
@@ -82,6 +82,7 @@ use datafusion::physical_plan::{
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
+use datafusion_proto::bytes::Serializeable;
 use futures_util::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
@@ -840,17 +841,7 @@ impl CubeTable {
         let predicate = if let Some(key_columns) = &unique_key_columns {
             // Filters passed to a scan reference only this table's columns, so matching
             // by bare column name is enough.
-            let pushable = filters
-                .iter()
-                .filter(|f| {
-                    !f.is_volatile()
-                        && f.column_refs()
-                            .iter()
-                            .all(|c| key_columns.iter().any(|k| k.get_name() == &c.name))
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            combine_filters(&pushable)
+            dedup_safe_unique_key_filter(filters, key_columns)
         } else {
             combine_filters(filters)
         };
@@ -2366,6 +2357,103 @@ impl SerializedRecordBatchStream {
 /// Combines an array of filter expressions into a single filter expression
 /// consisting of the input filter expressions joined with logical AND.
 /// Returns None if the filters array is empty.
+/// The subset of `filters` that commutes with last-row dedup on a unique-key table:
+/// non-volatile and referencing only unique-key columns. Such filters select whole
+/// version groups, so applying them below the dedup (or to raw chunks) can't resurrect
+/// an overwritten row. Combined into a single predicate, or `None` when nothing is
+/// pushable. Shared by the scan-time per-stream `FilterExec` and the worker-side
+/// in-memory chunk pre-filter so the two can't diverge.
+pub fn dedup_safe_unique_key_filter(filters: &[Expr], key_columns: &[&Column]) -> Option<Expr> {
+    let pushable = filters
+        .iter()
+        .filter(|f| {
+            !f.is_volatile()
+                && f.column_refs()
+                    .iter()
+                    .all(|c| key_columns.iter().any(|k| k.get_name() == &c.name))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    combine_filters(&pushable)
+}
+
+fn filter_batch_by_predicate(
+    predicate: &dyn PhysicalExpr,
+    batch: &RecordBatch,
+) -> Result<RecordBatch, CubeError> {
+    let mask = predicate.evaluate(batch)?.into_array(batch.num_rows())?;
+    let mask = mask
+        .as_any()
+        .downcast_ref::<BooleanArray>()
+        .ok_or_else(|| {
+            CubeError::internal(
+                "Pushable chunk filter did not evaluate to a boolean mask".to_string(),
+            )
+        })?;
+    Ok(filter_record_batch(batch, mask)?)
+}
+
+/// Trim loaded in-memory chunks by the per-index pushable predicate computed at planning
+/// time, before they are serialized and shipped over IPC to the select subprocess. The
+/// subprocess re-applies the same predicate, so this only reduces payload and is never
+/// relied on for correctness — any failure is logged and the affected chunks are left
+/// untrimmed rather than failing the query. Filtered batches keep their (possibly
+/// zero-row) schema.
+pub fn filter_in_memory_chunks_for_worker(
+    plan: &SerializedPlan,
+    chunks: &mut HashMap<u64, Vec<RecordBatch>>,
+) {
+    let groups = plan.in_memory_chunk_filter_groups();
+    if groups.is_empty() {
+        return;
+    }
+    let session_state =
+        QueryPlannerImpl::minimal_session_state_from_final_config(SessionConfig::new()).build();
+    'group: for (bytes, chunk_ids) in groups {
+        let predicate = match Expr::from_bytes_with_registry(&bytes, &session_state) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("Skipping in-memory chunk pre-filter, can't decode predicate: {e}");
+                continue;
+            }
+        };
+        // All chunks of a group share the index schema, so the physical expression is built
+        // once (lazily, from the first non-empty batch) and reused across the group.
+        let mut phys: Option<Arc<dyn PhysicalExpr>> = None;
+        for id in chunk_ids {
+            let Some(batches) = chunks.get_mut(&id) else {
+                continue;
+            };
+            for b in batches.iter_mut() {
+                if b.num_rows() == 0 {
+                    continue;
+                }
+                if phys.is_none() {
+                    match b
+                        .schema()
+                        .as_ref()
+                        .clone()
+                        .to_dfschema()
+                        .and_then(|s| session_state.create_physical_expr(predicate.clone(), &s))
+                    {
+                        Ok(p) => phys = Some(p),
+                        Err(e) => {
+                            warn!(
+                                "Skipping in-memory chunk pre-filter, can't build predicate: {e}"
+                            );
+                            continue 'group;
+                        }
+                    }
+                }
+                match filter_batch_by_predicate(phys.as_ref().unwrap().as_ref(), b) {
+                    Ok(filtered) => *b = filtered,
+                    Err(e) => warn!("Skipping in-memory chunk {id} pre-filter: {e}"),
+                }
+            }
+        }
+    }
+}
+
 fn combine_filters(filters: &[Expr]) -> Option<Expr> {
     if filters.is_empty() {
         return None;

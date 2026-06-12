@@ -44,7 +44,9 @@ use crate::queryplanner::panic::PanicWorkerSerialized;
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
+use crate::queryplanner::query_executor::{
+    dedup_safe_unique_key_filter, ClusterSendExec, CubeTable, InlineTableProvider,
+};
 use crate::queryplanner::rolling::RollingWindowAggregateSerialized;
 use crate::queryplanner::serialized_plan::PreSerializedPlan;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, InlineSnapshot, PartitionSnapshot};
@@ -70,6 +72,7 @@ use datafusion::logical_expr::{
 };
 use datafusion::physical_expr::{Distribution, LexRequirement};
 use datafusion::physical_planner::{ExtensionPlanner, PhysicalPlanner};
+use datafusion_proto::bytes::Serializeable;
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
@@ -94,6 +97,12 @@ pub struct PlanningMeta {
     #[serde(deserialize_with = "de_vec_as_map")]
     #[serde(serialize_with = "se_vec_as_map")]
     pub multi_part_subtree: HashMap<u64, MultiPartition>,
+    /// Aligned 1:1 with `indices`: the proto-encoded dedup-safe pushable predicate for
+    /// each unique-key index scan, used by the worker to trim in-memory chunks before
+    /// IPC. `None` when the index has no unique key or nothing is pushable. `#[serde(default)]`
+    /// so plans from an older router (no field) decode as "no pre-filter".
+    #[serde(default)]
+    pub pushable_chunk_filters: Vec<Option<Vec<u8>>>,
 }
 
 fn se_vec_as_map<S: Serializer>(m: &HashMap<u64, MultiPartition>, s: S) -> Result<S::Ok, S::Error> {
@@ -194,6 +203,36 @@ pub async fn choose_index_ext(
         i.partitions = pick_partitions(i, c, ps)?;
     }
 
+    // Precompute, per index scan, the dedup-safe pushable predicate so the worker can
+    // trim in-memory chunks before IPC without re-deriving it from the plan. Encoding
+    // failures degrade to `None` (no pre-filter); correctness is unaffected since the
+    // subprocess re-applies the predicate. Reuses exactly the filters that already gate
+    // partition pruning above.
+    let pushable_chunk_filters = indices
+        .iter()
+        .zip(collector.constraints.iter())
+        .map(|(i, c)| {
+            let table = i.table_path.table.get_row();
+            let key_columns = table.unique_key_columns()?;
+            let predicate = dedup_safe_unique_key_filter(&c.filters, &key_columns)?;
+            // Filters reach the scan provider unqualified, and the worker applies the
+            // predicate against the bare index schema. Strip relation qualifiers so column
+            // references resolve there.
+            let predicate = predicate
+                .transform(|e| {
+                    Ok(match e {
+                        Expr::Column(col) => common::tree_node::Transformed::yes(Expr::Column(
+                            common::Column::new_unqualified(col.name),
+                        )),
+                        other => common::tree_node::Transformed::no(other),
+                    })
+                })
+                .map(|t| t.data)
+                .ok()?;
+            predicate.to_bytes().ok().map(|b| b.to_vec())
+        })
+        .collect::<Vec<_>>();
+
     // We have enough information to finalize the logical plan.
     let mut r = ChooseIndex {
         chosen_indices: &indices,
@@ -231,6 +270,7 @@ pub async fn choose_index_ext(
         PlanningMeta {
             indices,
             multi_part_subtree,
+            pushable_chunk_filters,
         },
     ))
 }
