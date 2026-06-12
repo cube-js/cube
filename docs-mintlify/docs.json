@@ -211,6 +211,7 @@
               "docs/integrations/microsoft-excel",
               "docs/integrations/google-sheets",
               "docs/integrations/snowflake-semantic-views",
+              "docs/integrations/dbt",
               {
                 "group": "Semantic Layer Sync",
                 "root": "docs/integrations/semantic-layer-sync/index",
