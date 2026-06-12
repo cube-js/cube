@@ -14,8 +14,7 @@
     "Cube Dev, Inc."
   ],
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "lint": "vue-cli-service lint",
+    "lint": "eslint src tests",
     "test": "jest",
     "unit": "npm run test:unit",
     "test:unit": "jest",
@@ -32,18 +31,11 @@
     "ramda": "^0.27.0"
   },
   "devDependencies": {
-    "@babel/plugin-proposal-optional-chaining": "^7",
-    "@vue/babel-preset-app": "^5",
-    "@vue/cli-plugin-babel": "^5.0",
-    "@vue/cli-plugin-eslint": "^5.0",
-    "@vue/cli-service": "^5.0",
+    "@babel/core": "^7",
+    "@babel/preset-env": "^7",
     "@vue/test-utils": "^2.4",
-    "@vue/vue3-jest": "^29",
-    "babel-core": "7.0.0-bridge.0",
-    "babel-eslint": "^10.1.0",
     "babel-jest": "^29",
     "eslint": "^7.21.0",
-    "eslint-plugin-vue": "^6.2.1",
     "jest": "^29",
     "jest-environment-jsdom": "^29",
     "vue": "^3.0"
@@ -54,20 +46,17 @@
   "eslintConfig": {
     "root": true,
     "env": {
-      "node": true
+      "es2021": true,
+      "node": true,
+      "jest": true
     },
     "extends": [
-      "plugin:vue/essential",
       "eslint:recommended"
     ],
     "rules": {},
     "parserOptions": {
-      "parser": "babel-eslint"
-    }
-  },
-  "postcss": {
-    "plugins": {
-      "autoprefixer": {}
+      "ecmaVersion": 2021,
+      "sourceType": "module"
     }
   },
   "browserslist": [
