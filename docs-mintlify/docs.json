@@ -620,6 +620,7 @@
                   "recipes/data-modeling/nested-aggregates",
                   "recipes/data-modeling/filtered-aggregates",
                   "recipes/data-modeling/share-of-total",
+                  "recipes/data-modeling/semi-additive-measures",
                   "recipes/data-modeling/period-over-period",
                   "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
                   "recipes/data-modeling/using-dynamic-measures",
