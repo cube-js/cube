@@ -393,7 +393,8 @@
               "admin/ai/skills",
               "admin/ai/memory-isolation",
               "admin/ai/multi-agent",
-              "admin/ai/bring-your-own-model"
+              "admin/ai/bring-your-own-model",
+              "admin/ai/evals"
             ]
           },
           {

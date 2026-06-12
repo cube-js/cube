@@ -62,6 +62,27 @@ Mintlify provides these components (used throughout the docs):
 Content inside callouts and steps is plain MDX. Internal links are root-relative
 (`/admin/ai/skills`), not file paths.
 
+## Preview features
+
+Every page documenting a feature that is in **preview** must open with a `<Warning>`
+callout — placed right after the frontmatter, before the body — saying the feature is
+in preview and that the user should reach out to the Cube support team to activate it
+for their account:
+
+```mdx
+<Warning>
+
+<Feature name> is currently in preview, and the user experience and file format may
+still change. Reach out to the [Cube support team](/admin/account-billing/support)
+to activate this feature for your account.
+
+</Warning>
+```
+
+Adapt the "may still change" sentence per feature; the "in preview" + "reach out to
+the Cube support team to activate it for your account" parts are required. Do not
+expose internal feature-flag names in public docs.
+
 ## Images and screenshots
 
 Wrap screenshots in `<Frame>` and store assets under `images/`. When a screenshot is
