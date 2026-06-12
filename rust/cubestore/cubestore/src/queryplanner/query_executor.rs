@@ -25,8 +25,8 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
-    Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float32Array,
+    Float64Array, Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
 use datafusion::arrow::compute::{filter_record_batch, SortOptions};
@@ -2178,6 +2178,16 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                 DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
+                DataType::Float32 => {
+                    let a = array.as_any().downcast_ref::<Float32Array>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Float((a.value(i) as f64).into())
+                        });
+                    }
+                }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
@@ -2263,7 +2273,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Binary => Ok(ColumnType::Bytes),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
-        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Float),
+        DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Float),
         // TODO upgrade DF
         // DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
         //     scale: scale as i32,
@@ -2516,6 +2526,8 @@ mod tests {
             Field::new("uint32", DataType::UInt32, true),
             Field::new("int32", DataType::Int32, true),
             Field::new("str32", DataType::Utf8, true),
+            Field::new("float32", DataType::Float32, true),
+            Field::new("float64", DataType::Float64, true),
         ]));
         let result = batches_to_dataframe(vec![RecordBatch::try_new(
             schema,
@@ -2523,21 +2535,43 @@ mod tests {
                 Arc::new(UInt32Array::from_iter(vec![Some(1), None])) as ArrayRef,
                 Arc::new(Int32Array::from_iter(vec![Some(1), None])) as ArrayRef,
                 Arc::new(StringArray::from_iter(vec![Some("test".to_string()), None])) as ArrayRef,
+                Arc::new(Float32Array::from_iter(vec![Some(1.5f32), None])) as ArrayRef,
+                Arc::new(Float64Array::from_iter(vec![Some(2.5f64), None])) as ArrayRef,
             ],
         )?])?;
 
+        assert_eq!(
+            result.get_columns()[3].get_column_type(),
+            &ColumnType::Float
+        );
         assert_eq!(
             result.get_rows(),
             &vec![
                 Row::new(vec![
                     TableValue::Int(1),
                     TableValue::Int(1),
-                    TableValue::String("test".to_string())
+                    TableValue::String("test".to_string()),
+                    TableValue::Float((1.5f32 as f64).into()),
+                    TableValue::Float(2.5f64.into()),
                 ]),
-                Row::new(vec![TableValue::Null, TableValue::Null, TableValue::Null,])
+                Row::new(vec![
+                    TableValue::Null,
+                    TableValue::Null,
+                    TableValue::Null,
+                    TableValue::Null,
+                    TableValue::Null,
+                ])
             ]
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_arrow_to_column_type_floats() -> Result<(), CubeError> {
+        assert_eq!(arrow_to_column_type(DataType::Float16)?, ColumnType::Float);
+        assert_eq!(arrow_to_column_type(DataType::Float32)?, ColumnType::Float);
+        assert_eq!(arrow_to_column_type(DataType::Float64)?, ColumnType::Float);
         Ok(())
     }
 }
