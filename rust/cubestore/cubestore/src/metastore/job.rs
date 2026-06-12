@@ -54,6 +54,17 @@ fn get_job_type_priority(j: &JobType) -> u32 {
     }
 }
 
+/// A job runner pool. Each runner serves exactly one pool and only picks up jobs that
+/// belong to it. `CsvImport` overlaps with `Regular`: non-stream CSV imports stay eligible
+/// for regular runners and additionally get a reserved pool so they progress even when all
+/// regular runners are busy with compaction/repartition.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum JobRunnerPool {
+    Regular,
+    LongTerm,
+    CsvImport,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub enum JobStatus {
     Scheduled(String),
@@ -125,6 +136,21 @@ impl Job {
         match &self.job_type {
             JobType::TableImportCSV(location) if Table::is_stream_location(location) => true,
             _ => false,
+        }
+    }
+
+    pub fn is_csv_import(&self) -> bool {
+        matches!(
+            &self.job_type,
+            JobType::TableImportCSV(location) if !Table::is_stream_location(location)
+        )
+    }
+
+    pub fn matches_pool(&self, pool: JobRunnerPool) -> bool {
+        match pool {
+            JobRunnerPool::Regular => !self.is_long_term(),
+            JobRunnerPool::LongTerm => self.is_long_term(),
+            JobRunnerPool::CsvImport => self.is_csv_import(),
         }
     }
 
@@ -213,5 +239,41 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn job(job_type: JobType) -> Job {
+        Job::new(
+            RowKey::Table(TableId::Tables, 1),
+            job_type,
+            "node".to_string(),
+        )
+    }
+
+    #[test]
+    fn matches_pool_routing() {
+        let file_import = job(JobType::TableImportCSV("file.csv".to_string()));
+        let stream_import = job(JobType::TableImportCSV("stream:topic".to_string()));
+        let compaction = job(JobType::PartitionCompaction);
+
+        // Non-stream CSV import stays eligible for the regular pool and additionally
+        // for the reserved CSV pool, but is never long-term.
+        assert!(file_import.matches_pool(JobRunnerPool::Regular));
+        assert!(file_import.matches_pool(JobRunnerPool::CsvImport));
+        assert!(!file_import.matches_pool(JobRunnerPool::LongTerm));
+
+        // Streaming CSV import is long-term only.
+        assert!(!stream_import.matches_pool(JobRunnerPool::Regular));
+        assert!(!stream_import.matches_pool(JobRunnerPool::CsvImport));
+        assert!(stream_import.matches_pool(JobRunnerPool::LongTerm));
+
+        // Everything else belongs to the regular pool only.
+        assert!(compaction.matches_pool(JobRunnerPool::Regular));
+        assert!(!compaction.matches_pool(JobRunnerPool::CsvImport));
+        assert!(!compaction.matches_pool(JobRunnerPool::LongTerm));
     }
 }

@@ -2,7 +2,7 @@ use crate::cluster::ingestion::job_processor::JobProcessor;
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::config::ConfigObj;
 use crate::import::ImportService;
-use crate::metastore::job::{Job, JobStatus, JobType};
+use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::table::Table;
 use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
@@ -32,7 +32,7 @@ pub struct JobRunner {
     pub server_name: String,
     pub notify: Arc<Notify>,
     pub stop_token: CancellationToken,
-    pub is_long_term: bool,
+    pub pool: JobRunnerPool,
     pub job_processor: Arc<dyn JobProcessor>,
 }
 
@@ -57,7 +57,7 @@ impl JobRunner {
     async fn fetch_and_process(&self) -> Result<(), CubeError> {
         let job = self
             .meta_store
-            .start_processing_job(self.server_name.to_string(), self.is_long_term)
+            .start_processing_job(self.server_name.to_string(), self.pool)
             .await?;
         if let Some(to_process) = job {
             self.run_local(to_process).await?;

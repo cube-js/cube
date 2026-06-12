@@ -28,7 +28,7 @@ use crate::config::is_router;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
 use crate::metastore::chunks::chunk_file_name;
-use crate::metastore::job::{Job, JobStatus, JobType};
+use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::{
     deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey,
     TableId,
@@ -220,6 +220,7 @@ pub struct ClusterImpl {
     server_addresses: Vec<String>,
     job_notify: Arc<Notify>,
     long_running_job_notify: Arc<Notify>,
+    csv_import_job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
     #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
@@ -541,6 +542,7 @@ impl Cluster for ClusterImpl {
             // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
             self.job_notify.notify_one();
             self.long_running_job_notify.notify_one();
+            self.csv_import_job_notify.notify_one();
         } else {
             self.send_to_worker(&node_name, NetworkMessage::NotifyJobListeners)
                 .await?;
@@ -916,6 +918,7 @@ impl Cluster for ClusterImpl {
                 // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
                 self.job_notify.notify_one();
                 self.long_running_job_notify.notify_one();
+                self.csv_import_job_notify.notify_one();
                 NetworkMessage::NotifyJobListenersSuccess
             }
             NetworkMessage::NotifyJobListenersSuccess => {
@@ -1113,6 +1116,7 @@ impl ClusterImpl {
             cluster_transport,
             job_notify: Arc::new(Notify::new()),
             long_running_job_notify: Arc::new(Notify::new()),
+            csv_import_job_notify: Arc::new(Notify::new()),
             meta_store_sender,
             #[cfg(not(target_os = "windows"))]
             select_process_pool: RwLock::new(None),
@@ -1180,11 +1184,21 @@ impl ClusterImpl {
             job_processor
         };
 
-        for i in
-            0..self.config_obj.job_runners_count() + self.config_obj.long_term_job_runners_count()
-        {
+        let regular_count = self.config_obj.job_runners_count();
+        let long_term_count = self.config_obj.long_term_job_runners_count();
+        let csv_import_count = self.config_obj.csv_import_job_runners_count();
+        for i in 0..regular_count + long_term_count + csv_import_count {
             // TODO number of job event loops
-            let is_long_running = i >= self.config_obj.job_runners_count();
+            let (pool, notify) = if i < regular_count {
+                (JobRunnerPool::Regular, self.job_notify.clone())
+            } else if i < regular_count + long_term_count {
+                (
+                    JobRunnerPool::LongTerm,
+                    self.long_running_job_notify.clone(),
+                )
+            } else {
+                (JobRunnerPool::CsvImport, self.csv_import_job_notify.clone())
+            };
             let job_runner = JobRunner {
                 config_obj: self.config_obj.clone(),
                 meta_store: self.meta_store.clone(),
@@ -1193,13 +1207,9 @@ impl ClusterImpl {
                 import_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 process_rate_limiter: self.process_rate_limiter.clone(),
                 server_name: self.server_name.clone(),
-                notify: if is_long_running {
-                    self.long_running_job_notify.clone()
-                } else {
-                    self.job_notify.clone()
-                },
+                notify,
                 stop_token: self.stop_token.clone(),
-                is_long_term: is_long_running,
+                pool,
                 job_processor: job_processor.clone(),
             };
             futures.push(cube_ext::spawn(async move {
@@ -1212,6 +1222,7 @@ impl ClusterImpl {
         let stop_token = self.stop_token.clone();
         let long_running_job_notify = self.long_running_job_notify.clone();
         let job_notify = self.job_notify.clone();
+        let csv_import_job_notify = self.csv_import_job_notify.clone();
 
         futures.push(cube_ext::spawn(async move {
             loop {
@@ -1222,6 +1233,7 @@ impl ClusterImpl {
                     _ = Delay::new(Duration::from_secs(5)) => {
                         job_notify.notify_one();
                         long_running_job_notify.notify_one();
+                        csv_import_job_notify.notify_one();
                     }
                 };
             }
