@@ -711,6 +711,14 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Whether queries are executed automatically without requiring an
+   * explicit user confirmation. Only used in Cube Cloud.
+   */
+  autoRunMode: (): boolean => get('CUBEJS_AUTO_RUN_MODE')
+    .default('true')
+    .asBoolStrict(),
+
+  /**
    * Query stream `highWaterMark` value.
    */
   dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
