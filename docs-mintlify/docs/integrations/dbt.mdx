@@ -22,19 +22,12 @@ review them before they reach production.
 
 When you run a pull, Cube:
 
-1. Creates an isolated, ephemeral sandbox.
-2. Clones your dbt repository into the sandbox (shallow clone; a subdirectory is
-   sparse-checked-out when you specify a project path).
-3. Installs dbt and the adapter for your database.
-4. Runs `dbt deps` and then `dbt parse` to produce the project's `manifest.json`.
-   **No connection to your data warehouse is made during a pull** — the manifest is
-   built from the project code alone.
-5. Converts each dbt model in the manifest into a cube definition (one `.yml` file
-   per model).
-6. Commits the generated files to your current development branch.
+1. Reads your dbt project from its Git repository.
+2. Converts each dbt model into a cube definition (one `.yml` file per model).
+3. Commits the generated files to your current development branch.
 
-Because the pull uses `dbt parse` (not `dbt run`), it never queries or modifies your
-warehouse. It only reads your dbt project and writes cube files.
+**No connection to your data warehouse is made during a pull.** Cube only reads your
+dbt project code and writes cube files — it never queries or modifies your warehouse.
 
 ## Prerequisites
 
@@ -69,7 +62,7 @@ Expand the **dbt project (optional)** section.
 | Field | Description |
 | --- | --- |
 | **Repository URL** | The HTTPS clone URL of the repo that contains your dbt project, e.g. `https://github.com/your-org/your-repo.git`. |
-| **Access token (PAT)** | A personal access token with read access to the repository. Stored **encrypted** in the deployment's environment variables and never returned to the browser. Leave it unchanged to reuse the existing token. |
+| **Access token (PAT)** | A personal access token with read access to the repository. Leave it unchanged to reuse the existing token. |
 | **Project path** | The path to the dbt project inside the repository (the folder containing `dbt_project.yml`). Use `.` if the project is at the repository root. |
 | **dbt target schema** | The schema your production dbt run builds models into (the `schema` of your production target in `profiles.yml`). Generated cubes will reference the tables in this schema. |
 
@@ -77,9 +70,8 @@ Expand the **dbt project (optional)** section.
 
 <Step title="Test the connection">
 
-Click **Test connection**. Cube performs a lightweight reachability check against the
-repository using your URL and token (no clone, no data transferred) and reports the
-result:
+Click **Test connection**. Cube checks that the repository is reachable with your
+URL and token and reports the result:
 
 - **"Repository is reachable with this token"** — you're good to save.
 - An error message identifying the problem (invalid/expired token, repository not
@@ -95,9 +87,8 @@ Click **Save dbt settings**.
 
 </Steps>
 
-These settings are stored as deployment environment variables (`DBT_GIT_SOURCE_URL`,
-`DBT_GIT_SOURCE_TOKEN`, `DBT_GIT_SOURCE_PROJECT_PATH`, `DBT_DEFAULT_SCHEMA`). They are
-used only by the dbt Pull sandbox — saving them does not restart your deployment.
+The access token is stored encrypted and is never returned to the browser. Saving
+these settings does not restart your deployment.
 
 ## Pull the models
 
@@ -143,11 +134,9 @@ that no longer correspond to a dbt model. See
 
 <Step title="Start the pull">
 
-Click **Start Pull**. A progress toast tracks the pull through its stages (creating
-the sandbox, cloning, installing dependencies, running `dbt deps`, parsing, processing
-the manifest, writing files) and ends with **"dbt pull completed (N cubes)"**. The
-generated files appear in your file tree under the output path, on your development
-branch.
+Click **Start Pull**. A progress toast tracks the pull and ends with
+**"dbt pull completed (N cubes)"**. The generated files appear in your file tree
+under the output path, on your development branch.
 
 </Step>
 
@@ -161,13 +150,13 @@ workflow.
 dbt Pull converts **models and their columns**. dbt **metrics, semantic models, and
 tests are not imported.**
 
-For each dbt model in the manifest:
+For each dbt model in your project:
 
 - **One cube** is created (one `.yml` file per model), named
   `<name prefix><model name>` with title `<title prefix><model alias or name>`.
-- **`sql_table`** is set to the model's fully-qualified relation, built from the
-  manifest as `database.schema.model` (empty parts are dropped, so e.g. Postgres
-  yields `schema.model`).
+- **`sql_table`** is set to the model's fully-qualified relation,
+  `database.schema.model` (empty parts are dropped, so e.g. Postgres yields
+  `schema.model`).
 - **Each column becomes a dimension.** The dimension type is inferred from the
   column's `data_type` where available, otherwise from the column name:
 
@@ -272,16 +261,15 @@ The message identifies the cause:
 
 <Accordion title="A pull fails partway through">
 
-The error message includes the underlying command output (from `git`, `dbt`, or
-dependency installation). Common causes:
+The error message describes what failed. Common causes:
 
 - The dbt project doesn't exist at the configured **Project path** (no
   `dbt_project.yml` there).
-- A `dbt deps` / `dbt parse` failure in the project — the same failure you'd see
-  running dbt locally.
+- A failure in the dbt project itself — the same failure you'd see running dbt
+  locally.
 
-Transient failures (network, sandbox startup) are retried automatically; persistent
-errors fail fast with a message describing the problem.
+Transient failures are retried automatically; persistent errors fail with a message
+describing the problem.
 
 </Accordion>
 
@@ -304,7 +292,7 @@ into the **dbt target schema** you configured, and that the schema matches.
 
 <Accordion title="A generated cube points at the wrong table or schema">
 
-The `sql_table` is derived from your dbt manifest and the **dbt target schema**
+The `sql_table` is derived from your dbt project and the **dbt target schema**
 setting. Verify that **dbt target schema** matches where your models actually land,
 and that any per-model schema/database overrides in dbt are what you expect.
 
