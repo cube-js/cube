@@ -1,0 +1,43 @@
+---
+title: Dedicated Infrastructure on AWS
+sidebarTitle: AWS
+description: Connect Cube's Dedicated Infrastructure on AWS to your VPCs and corporate networks, or deploy the entire data plane inside your own AWS account via BYOC.
+---
+
+On AWS, Cube offers single-tenant Dedicated Infrastructure operated by Cube,
+and Bring Your Own Cloud (BYOC) operated inside your own AWS account. Both
+options support private network connectivity so that data source traffic — and,
+optionally, Cube API traffic — never traverses the public internet.
+
+## Backend connectivity (Cube → your network)
+
+Use these options to give Cube private access to your data sources, auth
+providers, BI APIs targeted by Semantic Layer Sync, and anything else Cube
+needs to query. See [Backend and frontend connectivity][backend-frontend] for
+the full picture.
+
+- [**AWS PrivateLink**][aws-private-link] — let Cube reach data sources (your
+  own services, Snowflake, Databricks, etc.) over PrivateLink endpoint services
+  you expose.
+- [**VPC Peering**][aws-vpc-peering] — establish a VPC peering connection
+  between the Cube VPC and your own VPC for access to internal data sources.
+
+## Frontend connectivity (your clients → Cube)
+
+Use this option to expose Cube's APIs to your applications, browsers, BI
+tools, embedded analytics clients, and Semantic Layer Sync-generated configs
+over a private network. Public endpoints can be disabled entirely on request.
+
+- [**Private API Connectivity**][aws-private-api-connectivity] — expose Cube's
+  HTTP and SQL APIs over AWS PrivateLink.
+
+## Bring Your Own Cloud
+
+If you'd like the entire Cube data plane to live inside your own AWS account,
+see [Bring Your Own Cloud on AWS][aws-byoc].
+
+[aws-private-link]: /admin/deployment/dedicated/aws/private-link
+[aws-vpc-peering]: /admin/deployment/dedicated/aws/vpc-peering
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[aws-byoc]: /admin/deployment/dedicated/aws/byoc
+[backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

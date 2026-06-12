@@ -7,7 +7,7 @@ use crate::sql::parser::{
     CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand,
     Statement as CubeStoreStatement, SystemCommand,
 };
-use crate::sql::{QueryPlans, SqlQueryContext, SqlService};
+use crate::sql::{QueryPlans, QueryResult, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::metrics;
@@ -526,31 +526,8 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::Result { key } => {
-                let ack_result = self.cachestore.queue_result_by_path(key.value).await?;
-                let rows = if let Some(ack_result) = ack_result {
-                    vec![ack_result.into_queue_result_row()]
-                } else {
-                    vec![]
-                };
-
-                (
-                    Arc::new(DataFrame::new(
-                        vec![
-                            Column::new("payload".to_string(), ColumnType::String, 0),
-                            Column::new("type".to_string(), ColumnType::String, 1),
-                        ],
-                        rows,
-                    )),
-                    None,
-                    true,
-                )
-            }
-            QueueCommand::ResultByExternalId { key } => {
-                let ack_result = self
-                    .cachestore
-                    .queue_result_by_external_id(key.value)
-                    .await?;
+            QueueCommand::Result { key, external_id } => {
+                let ack_result = self.cachestore.queue_result(key, external_id).await?;
 
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]
@@ -563,6 +540,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -584,6 +563,8 @@ impl CacheStoreSqlService {
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("type".to_string(), ColumnType::String, 1),
+                            Column::new("id".to_string(), ColumnType::String, 2),
+                            Column::new("external_id".to_string(), ColumnType::String, 3),
                         ],
                         rows,
                     )),
@@ -625,18 +606,18 @@ impl CacheStoreSqlService {
 
 #[async_trait]
 impl SqlService for CacheStoreSqlService {
-    async fn exec_query(&self, q: &str) -> Result<Arc<DataFrame>, CubeError> {
+    async fn exec_query(&self, q: &str) -> Result<QueryResult, CubeError> {
         self.exec_query_with_context(SqlQueryContext::default(), q)
             .await
     }
 
     async fn exec_query_with_context(
         &self,
-        ctx: SqlQueryContext,
+        mut ctx: SqlQueryContext,
         query: &str,
-    ) -> Result<Arc<DataFrame>, CubeError> {
+    ) -> Result<QueryResult, CubeError> {
         let stmt = {
-            let mut parser = CubeStoreParser::new(query)?;
+            let mut parser = CubeStoreParser::new(query, ctx.parameters.take())?;
             parser.parse_statement()?
         };
 
@@ -654,25 +635,25 @@ impl SqlService for CacheStoreSqlService {
                 match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
                         app_metrics::META_QUERIES.increment();
-                        Ok(Arc::new(
+                        Ok(QueryResult::Frame(Arc::new(
                             self.query_planner.execute_meta_plan(logical_plan).await?,
-                        ))
+                        )))
                     }
                     _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
                 }
             }
             CubeStoreStatement::System(command) => match command {
-                SystemCommand::CacheStore(command) => {
-                    self.exec_system_command_with_context(ctx, command).await
-                }
+                SystemCommand::CacheStore(command) => Ok(QueryResult::Frame(
+                    self.exec_system_command_with_context(ctx, command).await?,
+                )),
                 _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
             },
-            CubeStoreStatement::Queue(command) => {
-                self.exec_queue_command_with_context(ctx, command).await
-            }
-            CubeStoreStatement::Cache(command) => {
-                self.exec_cache_command_with_context(ctx, command).await
-            }
+            CubeStoreStatement::Queue(command) => Ok(QueryResult::Frame(
+                self.exec_queue_command_with_context(ctx, command).await?,
+            )),
+            CubeStoreStatement::Cache(command) => Ok(QueryResult::Frame(
+                self.exec_cache_command_with_context(ctx, command).await?,
+            )),
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }

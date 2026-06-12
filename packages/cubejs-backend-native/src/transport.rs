@@ -14,13 +14,13 @@ use crate::{
 };
 use async_trait::async_trait;
 use cubeorchestrator::query_result_transform::RequestResultData;
-use cubesql::compile::arrow::datatypes::Schema;
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response, transform_response, CacheMode, MemberField, RecordBatch, SchemaRef,
+    build_response_schema, convert_transport_response_columnar, transform_columnar_response,
+    CacheMode, MemberField, RecordBatch, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
-    SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
+    SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponseColumnar,
     TransportMetaResponse,
 };
 use cubesql::{
@@ -156,7 +156,7 @@ impl TransportService for NodeBridgeTransport {
                 Box::new(move |cx, v| {
                     let obj = v
                         .downcast::<JsObject, _>(cx)
-                        .map_err(|e| CubeError::user(e.to_string()))?;
+                        .map_err(|e| CubeError::internal(e.to_string()))?;
 
                     let member_to_data_source_obj = obj
                         .get::<JsObject, _, _>(cx, "memberToDataSource")
@@ -203,10 +203,10 @@ impl TransportService for NodeBridgeTransport {
         trace!("[transport] Meta <- {:?} <hidden>", response.compiler_id);
 
         let compiler_id = Uuid::parse_str(response.compiler_id.as_ref().ok_or_else(|| {
-            CubeError::user(format!("No compiler_id in response: {:?}", response))
+            CubeError::internal(format!("No compiler_id in response: {:?}", response))
         })?)
         .map_err(|e| {
-            CubeError::user(format!(
+            CubeError::internal(format!(
                 "Can't parse compiler id: {:?} error: {}",
                 response.compiler_id, e
             ))
@@ -246,10 +246,10 @@ impl TransportService for NodeBridgeTransport {
         .await?;
 
         let compiler_id = Uuid::parse_str(response.compiler_id.as_ref().ok_or_else(|| {
-            CubeError::user(format!("No compiler_id in response: {:?}", response))
+            CubeError::internal(format!("No compiler_id in response: {:?}", response))
         })?)
         .map_err(|e| {
-            CubeError::user(format!(
+            CubeError::internal(format!(
                 "Can't parse compiler id: {:?} error: {}",
                 response.compiler_id, e
             ))
@@ -275,10 +275,15 @@ impl TransportService for NodeBridgeTransport {
             .as_ref()
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let req_id_spanned = if request_id.contains("-span-") {
+            request_id.clone()
+        } else {
+            format!("{}-span-1", request_id)
+        };
 
         let extra = serde_json::to_string(&LoadRequest {
             request: TransportRequest {
-                id: format!("{}-span-{}", request_id, 1),
+                id: req_id_spanned,
                 meta: Some(meta.clone()),
             },
             query: query.clone(),
@@ -304,29 +309,29 @@ impl TransportService for NodeBridgeTransport {
 
         let sql = response
             .get("sql")
-            .ok_or_else(|| CubeError::user(format!("No sql in response: {}", response)))?
+            .ok_or_else(|| CubeError::internal(format!("No sql in response: {}", response)))?
             .get("sql")
-            .ok_or_else(|| CubeError::user(format!("No sql in response: {}", response)))?;
+            .ok_or_else(|| CubeError::internal(format!("No sql in response: {}", response)))?;
         Ok(SqlResponse {
             sql: SqlQuery {
                 sql: sql
                     .get(0)
                     .ok_or_else(|| {
-                        CubeError::user(format!("No sql array in response: {}", response))
+                        CubeError::internal(format!("No sql array in response: {}", response))
                     })?
                     .as_str()
                     .ok_or_else(|| {
-                        CubeError::user(format!("SQL not a string in response: {}", response))
+                        CubeError::internal(format!("SQL not a string in response: {}", response))
                     })?
                     .to_string(),
                 values: sql
                     .get(1)
                     .ok_or_else(|| {
-                        CubeError::user(format!("No sql array in response: {}", response))
+                        CubeError::internal(format!("No sql array in response: {}", response))
                     })?
                     .as_array()
                     .ok_or_else(|| {
-                        CubeError::user(format!("No sql array in response: {}", response))
+                        CubeError::internal(format!("No sql array in response: {}", response))
                     })?
                     .iter()
                     .map(|v| -> Result<_, CubeError> { Ok(v.as_str().map(|s| s.to_string())) })
@@ -363,9 +368,14 @@ impl TransportService for NodeBridgeTransport {
 
         loop {
             req_seq_id += 1;
+            let req_id_spanned = if request_id.contains("-span-") {
+                request_id.clone()
+            } else {
+                format!("{}-span-{}", request_id, req_seq_id)
+            };
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, req_seq_id),
+                    id: req_id_spanned,
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -433,6 +443,7 @@ impl TransportService for NodeBridgeTransport {
                                 .map_cube_err("Can't deserialize RequestResultData from getRootResultObject")?;
 
                             wrapper.last_refresh_time = result_data.last_refresh_time;
+                            wrapper.external = result_data.external.unwrap_or(false);
 
                             native_wrapped_results.push(wrapper);
                         }
@@ -453,11 +464,16 @@ impl TransportService for NodeBridgeTransport {
             if let Err(e) = &result {
                 if e.message.to_lowercase().contains("continue wait") {
                     if throw_continue_wait {
-                        return Err(CubeError::internal("Continue wait".to_string()));
+                        return Err(CubeError::continue_wait());
                     }
                     continue;
                 }
             }
+
+            #[cfg(debug_assertions)]
+            trace!("[transport] Request <- {:?}", result);
+            #[cfg(not(debug_assertions))]
+            trace!("[transport] Request <- <hidden>");
 
             match result? {
                 ValueFromJs::String(result) => {
@@ -465,11 +481,6 @@ impl TransportService for NodeBridgeTransport {
                         Ok(json) => json,
                         Err(err) => return Err(CubeError::internal(err.to_string())),
                     };
-
-                    #[cfg(debug_assertions)]
-                    trace!("[transport] Request <- {:?}", response);
-                    #[cfg(not(debug_assertions))]
-                    trace!("[transport] Request <- <hidden>");
 
                     if let Some(error_value) = response.get("error") {
                         match error_value {
@@ -480,9 +491,7 @@ impl TransportService for NodeBridgeTransport {
                                             "[transport] load - throwing continue wait, requestId: {}",
                                             request_id
                                         );
-                                        return Err(CubeError::internal(
-                                            "Continue wait".to_string(),
-                                        ));
+                                        return Err(CubeError::continue_wait());
                                     }
 
                                     debug!(
@@ -507,34 +516,35 @@ impl TransportService for NodeBridgeTransport {
                         }
                     };
 
-                    let response = match serde_json::from_value::<TransportLoadResponse>(response) {
-                        Ok(v) => v,
-                        Err(err) => {
-                            return Err(CubeError::user(err.to_string()));
-                        }
-                    };
+                    let response =
+                        match serde_json::from_value::<TransportLoadResponseColumnar>(response) {
+                            Ok(v) => v,
+                            Err(err) => {
+                                return Err(CubeError::internal(err.to_string()));
+                            }
+                        };
 
-                    break convert_transport_response(response, schema.clone(), member_fields)
-                        .map_err(|err| CubeError::user(err.to_string()));
+                    break convert_transport_response_columnar(
+                        response,
+                        schema.clone(),
+                        member_fields,
+                    );
                 }
                 ValueFromJs::ResultWrapper(result_wrappers) => {
                     break result_wrappers
                         .into_iter()
                         .map(|mut wrapper| {
-                            let updated_schema = if let Some(last_refresh_time) =
-                                wrapper.last_refresh_time.clone()
-                            {
-                                let mut metadata = schema.metadata().clone();
-                                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
-                                Arc::new(Schema::new_with_metadata(
-                                    schema.fields().to_vec(),
-                                    metadata,
-                                ))
-                            } else {
-                                schema.clone()
-                            };
+                            let updated_schema = build_response_schema(
+                                &schema,
+                                wrapper.last_refresh_time.clone(),
+                                wrapper.external,
+                            );
 
-                            transform_response(&mut wrapper, updated_schema, &member_fields)
+                            transform_columnar_response(
+                                &mut wrapper,
+                                updated_schema,
+                                &member_fields,
+                            )
                         })
                         .collect::<Result<Vec<_>, _>>();
                 }
@@ -564,6 +574,11 @@ impl TransportService for NodeBridgeTransport {
 
         loop {
             req_seq_id += 1;
+            let req_id_spanned = if request_id.contains("-span-") {
+                request_id.clone()
+            } else {
+                format!("{}-span-{}", request_id, req_seq_id)
+            };
             let native_auth = ctx
                 .as_any()
                 .downcast_ref::<NativeSQLAuthContext>()
@@ -571,7 +586,7 @@ impl TransportService for NodeBridgeTransport {
 
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, req_seq_id),
+                    id: req_id_spanned,
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -600,7 +615,7 @@ impl TransportService for NodeBridgeTransport {
             if let Err(e) = &res {
                 if e.message.to_lowercase().contains("continue wait") {
                     if throw_continue_wait {
-                        return Err(CubeError::internal("Continue wait".to_string()));
+                        return Err(CubeError::continue_wait());
                     }
                     continue;
                 }
@@ -638,7 +653,7 @@ impl TransportService for NodeBridgeTransport {
             Box::new(move |cx, v| {
                 let obj = v
                     .downcast::<JsBoolean, _>(cx)
-                    .map_err(|e| CubeError::user(e.to_string()))?;
+                    .map_err(|e| CubeError::internal(e.to_string()))?;
                 Ok(obj.value(cx))
             }),
         )
@@ -659,15 +674,18 @@ impl TransportService for NodeBridgeTransport {
             .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
-        let request_id = span_id
+        let mut request_id = span_id
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+        if !request_id.contains("-span-") {
+            request_id = format!("{}-span-1", request_id);
+        }
         call_raw_js_with_channel_as_callback(
             self.channel.clone(),
             self.log_load_event.clone(),
             LogEvent {
                 request: TransportRequest {
-                    id: format!("{}-span-1", request_id),
+                    id: request_id,
                     meta: Some(meta_fields.clone()),
                 },
                 session: SessionContext {
@@ -721,6 +739,6 @@ pub trait MapCubeErrExt<T> {
 
 impl<T, E: Display> MapCubeErrExt<T> for Result<T, E> {
     fn map_cube_err(self, message: &str) -> Result<T, CubeError> {
-        self.map_err(|e| CubeError::user(format!("{}: {}", message, e)))
+        self.map_err(|e| CubeError::internal(format!("{}: {}", message, e)))
     }
 }

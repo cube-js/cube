@@ -45,6 +45,7 @@ export class MysqlQuery extends BaseQuery {
     if (this.useNamedTimezones) {
       return `CONVERT_TZ(${field}, @@session.time_zone, '${this.timezone}')`;
     }
+
     return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
@@ -194,6 +195,8 @@ export class MysqlQuery extends BaseQuery {
     templates.types.timestamp = 'DATETIME';
     delete templates.types.interval;
     templates.types.binary = 'BLOB';
+    // MySQL has no FULL OUTER JOIN
+    delete templates.join_types.full;
 
     templates.expressions.concat_strings = 'CONCAT({{ strings | join(\',\' ) }})';
 
@@ -233,6 +236,8 @@ export class MysqlQuery extends BaseQuery {
       'SELECT CAST(date_from AS DATETIME) AS date_from,\n' +
       '       CAST(DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME) AS date_to\n' +
       'FROM date_series';
+    templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
 
     return templates;
   }

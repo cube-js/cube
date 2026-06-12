@@ -1,0 +1,77 @@
+---
+title: Microsoft Power BI
+description: "Microsoft Power BI is a popular business intelligence tool."
+---
+
+[Microsoft Power BI][link-powerbi] is a popular business intelligence tool.
+
+Cube Cloud works with both [Power BI Desktop and Power BI Service][link-powerbi-desktop-vs-service].
+If you're using Power BI Service, you need to set up an [on-premises data gateway][link-powerbi-gateway].
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/vgrFPOMuJJs"
+  title="YouTube video"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+## Connect to the DAX API
+
+Cube Cloud provides the [DAX API][ref-dax-api] for the native Power BI connectivity.
+
+
+In Power BI Desktop, choose the **SQL Server Analysis Services database** option
+when connecting to a data source. Then, enter the DAX API credentials and choose
+**Windows** authentication. It accomodates both [Kerberos][ref-kerberos] and
+[NTLM][ref-ntlm] methods.
+
+To find your DAX API credentials, go to the [Integrations][ref-integrations-apis] page,
+click **API credentials**, and choose the **DAX API** tab.
+
+### Authentication methods
+
+Cube Cloud supports the following authentication methods for Power BI:
+
+| Application | Authentication | Notes |
+| --- | --- | --- |
+| Power BI Desktop | [NTLM][ref-ntlm-desktop] | 🟡 Works well for testing purposes |
+| Power BI Desktop | [Kerberos][ref-kerberos] | 🟢 Recommended for production |
+| Power BI Service | [NTLM][ref-ntlm] + [Kerberos][ref-kerberos] | 🟢 Recommended for production.<br/>Requires [on-premises data gateway][ref-opdg] |
+
+### Connection methods
+
+Cube uses Power BI's [_live connection_][link-powerbi-live] mode. You compose
+queries using the Power BI UI, and they run against your Cube semantic model in
+real time, so you always work with up-to-date data and an up-to-date model.
+
+<Warning>
+
+Power BI's other connection methods, [_DirectQuery_][link-powerbi-directquery]
+and _import mode_, are not supported. Because writing your own DAX queries
+requires _DirectQuery_, custom DAX queries are not supported either.
+
+</Warning>
+
+## Connect to the SQL API
+
+You can connect a Cube deployment to Power BI using the [SQL API][ref-sql-api]
+as if Cube is a Postgres database. It would provide much more limited functionality
+than the DAX API. However, this is the only option when using Cube Core.
+
+
+[link-powerbi]: https://www.microsoft.com/en-gb/power-platform/products/power-bi/
+[link-powerbi-desktop-vs-service]: https://learn.microsoft.com/en-us/power-bi/fundamentals/service-service-vs-desktop
+[link-powerbi-gateway]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
+[ref-dax-api]: /reference/dax-api
+[ref-integrations-apis]: /docs/workspace/integrations#view-api-credentials
+[ref-sql-api]: /reference/sql-api
+[ref-sls]: /docs/integrations/semantic-layer-sync
+[ref-kerberos]: /docs/integrations/power-bi/kerberos
+[ref-ntlm]: /docs/integrations/power-bi/ntlm
+[ref-ntlm-desktop]: /docs/integrations/power-bi/ntlm#power-bi-desktop
+[link-powerbi-live]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-directquery-about#live-connections
+[link-powerbi-directquery]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-directquery-about
+[ref-opdg]: /docs/integrations/power-bi/ntlm#configuration

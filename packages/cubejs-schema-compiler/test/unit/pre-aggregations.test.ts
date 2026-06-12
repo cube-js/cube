@@ -364,6 +364,150 @@ describe('pre-aggregations', () => {
     expect(indexesSql[1].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_agg_index');
   });
 
+  it('pre-aggregation index with time dimension granularity column', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(
+      `
+        cube('Orders', {
+          sql: \`SELECT * FROM orders\`,
+
+          measures: {
+            count: {
+              type: 'count',
+            },
+          },
+
+          dimensions: {
+            created_at: {
+              sql: \`created_at\`,
+              type: 'time',
+            },
+            status: {
+              sql: \`status\`,
+              type: 'string',
+            },
+          },
+
+          preAggregations: {
+            ordersByHour: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status],
+              timeDimension: CUBE.created_at,
+              granularity: 'hour',
+              indexes: {
+                time_index: {
+                  columns: [CUBE.created_at.hour],
+                },
+                time_and_status_index: {
+                  columns: [CUBE.created_at.hour, CUBE.status],
+                },
+              },
+            },
+          },
+        });
+      `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['Orders.count'],
+      timeDimensions: [{
+        dimension: 'Orders.created_at',
+        granularity: 'hour',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      dimensions: ['Orders.status']
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    expect(preAggregationsDescription.length).toBeGreaterThan(0);
+
+    const { indexesSql, createTableIndexes } = preAggregationsDescription[0];
+    expect(indexesSql.length).toEqual(2);
+
+    const [timeIndexSql] = indexesSql[0].sql;
+    expect(timeIndexSql).toContain('"orders__created_at_hour"');
+    expect(timeIndexSql).not.toContain('"orders__created_at__hour"');
+
+    const [timeAndStatusIndexSql] = indexesSql[1].sql;
+    expect(timeAndStatusIndexSql).toContain('"orders__created_at_hour"');
+    expect(timeAndStatusIndexSql).toContain('"orders__status"');
+
+    expect(createTableIndexes[0].columns).toContain('"orders__created_at_hour"');
+    expect(createTableIndexes[1].columns).toContain('"orders__created_at_hour"');
+    expect(createTableIndexes[1].columns).toContain('"orders__status"');
+  });
+
+  it('pre-aggregation index with time dimension granularity column (YAML)', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'orders',
+            sql_table: 'orders',
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'created_at',
+                sql: 'created_at',
+                type: 'time',
+              },
+              {
+                name: 'status',
+                sql: 'status',
+                type: 'string',
+              }
+            ],
+            preAggregations: [
+              {
+                name: 'orders_by_hour',
+                measures: ['count'],
+                dimensions: ['status'],
+                timeDimension: 'created_at',
+                granularity: 'hour',
+                indexes: [
+                  {
+                    name: 'time_granularity_index',
+                    columns: ['created_at.hour', 'status']
+                  }
+                ]
+              }
+            ]
+          },
+        ]
+      })
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['orders.count'],
+      timeDimensions: [{
+        dimension: 'orders.created_at',
+        granularity: 'hour',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      dimensions: ['orders.status']
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    expect(preAggregationsDescription.length).toBeGreaterThan(0);
+
+    const { indexesSql, createTableIndexes } = preAggregationsDescription[0];
+    expect(indexesSql.length).toEqual(1);
+
+    const [indexSql] = indexesSql[0].sql;
+    expect(indexSql).toContain('"orders__created_at_hour"');
+    expect(indexSql).not.toContain('"orders__created_at__hour"');
+    expect(indexSql).toContain('"orders__status"');
+
+    expect(createTableIndexes[0].columns).toContain('"orders__created_at_hour"');
+    expect(createTableIndexes[0].columns).toContain('"orders__status"');
+  });
+
   it('pre-aggregation with FILTER_PARAMS', async () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
       createSchemaYaml({
@@ -748,6 +892,91 @@ describe('pre-aggregations', () => {
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
       expect(preAggregationsDescription.length).toEqual(1);
       expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.pre_agg_with_multiplied_measures');
+    });
+  });
+
+  describe('originalSql pre-aggregation with sqlTable', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+      cube(\`orders\`, {
+        sqlTable: \`public.orders\`,
+
+        measures: {
+          count: {
+            type: \`count\`,
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          status: {
+            sql: \`status\`,
+            type: \`string\`,
+          },
+          created_at: {
+            sql: \`created_at\`,
+            type: \`time\`,
+          },
+        },
+
+        preAggregations: {
+          main: {
+            type: \`originalSql\`,
+          },
+          partitioned: {
+            type: \`originalSql\`,
+            partitionGranularity: \`month\`,
+            timeDimension: CUBE.created_at,
+          },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it('generates sql and loadSql for non-partitioned originalSql pre-aggregation', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['orders.count'],
+        dimensions: ['orders.status'],
+        preAggregationsSchema: '',
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
+      const originalSqlDesc = preAggregationsDescription.find((d: any) => d.type === 'originalSql');
+      expect(originalSqlDesc).toBeDefined();
+
+      // preAggregationSql() must produce a valid SELECT from the sqlTable
+      expect(originalSqlDesc.sql[0]).toMatch(/SELECT \* FROM public\.orders/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/CREATE TABLE/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/SELECT \* FROM public\.orders/);
+    });
+
+    it('generates sql and loadSql for partitioned originalSql pre-aggregation', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['orders.count'],
+        timeDimensions: [{
+          dimension: 'orders.created_at',
+          granularity: 'month',
+          dateRange: ['2017-01-01', '2017-03-31'],
+        }],
+        preAggregationsSchema: '',
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.length).toBeGreaterThanOrEqual(1);
+      const originalSqlDesc = preAggregationsDescription.find((d: any) => d.type === 'originalSql');
+      expect(originalSqlDesc).toBeDefined();
+
+      // preAggregationSql() must produce a valid SELECT from the sqlTable
+      expect(originalSqlDesc.sql[0]).toMatch(/SELECT \* FROM public\.orders/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/CREATE TABLE/);
+      expect(originalSqlDesc.loadSql[0]).toMatch(/SELECT \* FROM public\.orders/);
     });
   });
 });

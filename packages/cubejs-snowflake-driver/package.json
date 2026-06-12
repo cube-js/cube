@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.24",
+  "version": "1.6.57",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-snowflake-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/src",
@@ -21,15 +21,16 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "integration": "vitest run",
+    "integration:snowflake": "vitest run",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.0",
-    "@cubejs-backend/base-driver": "1.6.24",
-    "@cubejs-backend/shared": "1.6.24",
-    "date-fns-timezone": "^0.1.4",
-    "snowflake-sdk": "^2.2.0"
+    "@cubejs-backend/base-driver": "1.6.57",
+    "@cubejs-backend/shared": "1.6.57",
+    "snowflake-sdk": "^2.4.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
@@ -39,7 +40,8 @@
     "extends": "../cubejs-linter"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.24",
-    "typescript": "~5.2.2"
+    "@cubejs-backend/linter": "1.6.57",
+    "typescript": "~5.2.2",
+    "vitest": "^4"
   }
 }

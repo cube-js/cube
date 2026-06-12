@@ -141,6 +141,16 @@
         "measures": [
           "CUBE.countApproxByCustomer"
         ]
+      },
+      {
+        "name": "TBuildOnlyHalfYear",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "build_only_half_year",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity"
+        ]
       }
     ],
     "BigECommerce": [
@@ -183,6 +193,13 @@
         "dimensions": ["CUBE.productName"],
         "measures": [
           "CUBE.countApproxByCustomer"
+        ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
+        "measures": [
+          "CUBE.totalProfit"
         ]
       }
     ]
@@ -230,6 +247,8 @@
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
     "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
 
     "---------------------------------------",
     "Custom Granularities                   ",
@@ -291,6 +310,7 @@
     "filtering ECommerce: endsWith + dimensions, first",
     "filtering ECommerce: endsWith + dimensions, second",
     "querying BigECommerce: rolling window YTD (month + week)",
-    "querying BigECommerce: rolling window YTD (month + week + no gran)"
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation"
   ]
 }

@@ -11,13 +11,10 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
-      - 'rust/cubesqlplanner/**'
-      - 'rust/cubenativeutils/**'
+      - 'rust/cube/**'
       - 'rust/cubesql/**'
     branches:
       - master
-env:
-  CUBEJS_TESSERACT_ORCHESTRATOR: true
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04

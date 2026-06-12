@@ -23,6 +23,8 @@ pub use topk::MIN_TOPK_STREAM_ROWS;
 mod filter_by_key_range;
 pub mod info_schema;
 mod inline_aggregate;
+#[cfg(test)]
+mod is_not_distinct_from_join_test;
 pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
@@ -55,12 +57,14 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::topk::ClusterAggregateTopKLower;
 
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::optimizations::is_not_distinct_from_join_keys::IsNotDistinctFromJoinKeysRule;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
 use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
+use crate::trace::{OpGuard, OpKind};
 use crate::{app_metrics, metastore, CubeError};
 use async_trait::async_trait;
 use core::fmt;
@@ -138,7 +142,9 @@ impl QueryPlanner for QueryPlannerImpl {
         trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
         let pre_execution_context_time = SystemTime::now();
+        let ec_guard = OpGuard::start(OpKind::Planning, "plan.session_context");
         let ctx = self.execution_context()?;
+        drop(ec_guard);
 
         let post_execution_context_time = SystemTime::now();
         app_metrics::DATA_QUERY_LOGICAL_PLAN_EXECUTION_CONTEXT_TIME_US.report(
@@ -160,7 +166,9 @@ impl QueryPlanner for QueryPlannerImpl {
         let query_planner = SqlToRel::new_with_options(&schema_provider, sql_to_rel_options());
 
         let pre_statement_to_plan_time = SystemTime::now();
+        let stp_guard = OpGuard::start(OpKind::Planning, "plan.statement_to_plan");
         let mut logical_plan = query_planner.statement_to_plan(statement)?;
+        drop(stp_guard);
         let post_statement_to_plan_time = SystemTime::now();
         app_metrics::DATA_QUERY_LOGICAL_PLAN_QUERY_PLANNER_SETUP_TIME_US.report(
             pre_statement_to_plan_time
@@ -190,7 +198,9 @@ impl QueryPlanner for QueryPlannerImpl {
         );
 
         let logical_plan_optimize_time = SystemTime::now();
+        let opt_guard = OpGuard::start(OpKind::Planning, "plan.optimize");
         logical_plan = state.optimize(&logical_plan)?;
+        drop(opt_guard);
         let post_optimize_time = SystemTime::now();
         app_metrics::DATA_QUERY_LOGICAL_PLAN_OPTIMIZE_TIME_US.report(
             post_optimize_time
@@ -216,6 +226,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             let choose_index_ext_start = SystemTime::now();
             post_is_data_select_query_time = choose_index_ext_start;
+            let choose_guard = OpGuard::start_wrapper(OpKind::Planning, "plan.choose_index");
             let (logical_plan, meta) = choose_index_ext(
                 logical_plan,
                 &self.meta_store.as_ref(),
@@ -227,6 +238,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 &logical_plan,
                 &meta.multi_part_subtree,
             )?;
+            drop(choose_guard);
             app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US
                 .report(choose_index_ext_start.elapsed()?.as_micros() as i64);
             QueryPlan::Select(
@@ -286,9 +298,19 @@ impl QueryPlannerImpl {
     /// optimizer rules or other parameters affecting execution performance.  This is used by
     /// `QueryPlannerImpl::make_execution_context`.
     pub fn minimal_session_state_from_final_config(config: SessionConfig) -> SessionStateBuilder {
+        Self::minimal_session_state_from_final_config_with_runtime(
+            config,
+            Arc::new(RuntimeEnv::default()),
+        )
+    }
+
+    pub fn minimal_session_state_from_final_config_with_runtime(
+        config: SessionConfig,
+        runtime_env: Arc<RuntimeEnv>,
+    ) -> SessionStateBuilder {
         let mut state_builder = SessionStateBuilder::new()
             .with_config(config)
-            .with_runtime_env(Arc::new(RuntimeEnv::default()))
+            .with_runtime_env(runtime_env)
             .with_default_features();
         state_builder
             .aggregate_functions()
@@ -303,7 +325,14 @@ impl QueryPlannerImpl {
 
     const EXECUTION_BATCH_SIZE: usize = 4096;
 
-    pub fn make_execution_context(mut config: SessionConfig) -> SessionContext {
+    pub fn make_execution_context(config: SessionConfig) -> SessionContext {
+        Self::make_execution_context_with_runtime(config, Arc::new(RuntimeEnv::default()))
+    }
+
+    pub fn make_execution_context_with_runtime(
+        mut config: SessionConfig,
+        runtime_env: Arc<RuntimeEnv>,
+    ) -> SessionContext {
         // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
         // include all necessary configs.
         config
@@ -314,8 +343,9 @@ impl QueryPlannerImpl {
         config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
-        let state = Self::minimal_session_state_from_final_config(config)
+        let state = Self::minimal_session_state_from_final_config_with_runtime(config, runtime_env)
             .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
+            .with_optimizer_rule(Arc::new(IsNotDistinctFromJoinKeysRule {}))
             .build();
 
         let context = SessionContext::new_with_state(state);
@@ -677,9 +707,9 @@ pub trait InfoSchemaTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError>;
+    ) -> Result<Vec<Self::T>, CubeError>;
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>>;
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef>;
 
     fn schema(&self) -> Vec<Field>;
 }
@@ -711,11 +741,7 @@ macro_rules! base_info_schema_table_def {
             ) -> Result<datafusion::arrow::record_batch::RecordBatch, crate::CubeError> {
                 let rows = self.rows(ctx, limit).await?;
                 let schema = self.schema_ref();
-                let columns = self.columns();
-                let columns = columns
-                    .into_iter()
-                    .map(|c| c(rows.clone()))
-                    .collect::<Vec<_>>();
+                let columns = self.columns(rows);
                 Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
                     schema, columns,
                 )?)
@@ -1046,7 +1072,11 @@ pub mod tests {
     use pretty_assertions::assert_eq;
 
     fn initial_plan(s: &str, ctx: MetaStoreSchemaProvider) -> LogicalPlan {
-        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+        let statement = match CubeStoreParser::new(s, None)
+            .unwrap()
+            .parse_statement()
+            .unwrap()
+        {
             Statement::Statement(s) => s,
             other => panic!("not a statement, actual {:?}", other),
         };
@@ -1063,7 +1093,7 @@ pub mod tests {
             Arc::new(test_utils::MetaStoreMock {}),
             Arc::new(test_utils::CacheStoreMock {}),
             &vec![],
-            Arc::new(SqlResultCache::new(1 << 20, None, 10000)),
+            Arc::new(SqlResultCache::new(1 << 20, None, 10000, None)),
             Arc::new(SessionContext::new().state()),
         )
     }

@@ -378,7 +378,7 @@ export function QueryBuilderExtras() {
                   <InfoIconButton
                     tooltip="Click to learn more about the query format"
                     tooltipSuffix=""
-                    to="!https://cube.dev/docs/product/apis-integrations/rest-api/query-format#query-properties"
+                    to="!https://cube.dev/reference/core-data-apis/rest-api/query-format"
                   />
                 </Space>
                 <Checkbox
@@ -600,7 +600,7 @@ export function QueryBuilderLimitSelect() {
         <InfoIconButton
           tooltip="Click to learn more about the row limit"
           tooltipSuffix=""
-          to="!https://cube.dev/docs/product/apis-integrations/queries#row-limit"
+          to="!https://cube.dev/reference/core-data-apis/rest-api/query-format#row-limit"
         />
       }
       selectedKey={query.limit == null ? '0' : String(query.limit)}

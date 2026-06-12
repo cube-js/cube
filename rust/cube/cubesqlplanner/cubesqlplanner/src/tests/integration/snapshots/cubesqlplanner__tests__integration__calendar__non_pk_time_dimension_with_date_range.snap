@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/calendar.rs
+expression: result
+---
+custom_calendar__retail_date
+----------------------------
+2025-02-02 00:00:00         
+2025-02-03 00:00:00         
+2025-02-04 00:00:00         
+2025-02-05 00:00:00         
+2025-02-06 00:00:00

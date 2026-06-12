@@ -15,15 +15,25 @@ import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
+import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
+import { resolveNamedNumericFormat, STANDARD_FORMAT_SPECIFIERS, DEFAULT_FORMAT_SPECIFIER } from './named-numeric-formats';
 
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type CustomNumericFormat = { type: 'custom-numeric'; value: string; alias?: string };
 export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
 export type DimensionLinkFormat = { type: 'link'; label?: string };
 export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
 export type MeasureFormat = string | CustomNumericFormat;
+
+export type FormatDescription = {
+  name: string;
+  specifier: string;
+  currency?: string;
+};
+
+const EXCLUDED_MEASURE_TYPES = new Set(['string', 'boolean', 'time']);
 
 // Extended types for cube symbols with all runtime properties
 export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
@@ -40,6 +50,17 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   cumulative?: boolean;
   aggType?: string;
   keyReference?: string;
+  currency?: string;
+  links?: Array<{
+    name: string;
+    label: string;
+    url?: (...args: any[]) => string;
+    dashboard?: string;
+    icon?: string;
+    target?: 'blank' | 'self';
+    params?: Array<{ key: string; value: (...args: any[]) => string }>;
+  }>;
+  synthetic?: boolean;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -69,6 +90,8 @@ export type MeasureConfig = {
   description?: string;
   shortTitle: string;
   format?: MeasureFormat;
+  formatDescription?: FormatDescription;
+  currency?: string;
   cumulativeTotal: boolean;
   cumulative: boolean;
   type: string;
@@ -84,6 +107,16 @@ export type MeasureConfig = {
   public: boolean;
 };
 
+export type LinkConfig = {
+  name: string;
+  label: string;
+  dashboard?: string;
+  icon?: string;
+  target: 'blank' | 'self';
+  primary?: boolean;
+  params?: string[];
+};
+
 export type DimensionConfig = {
   name: string;
   title: string;
@@ -92,6 +125,8 @@ export type DimensionConfig = {
   shortTitle: string;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  formatDescription?: FormatDescription;
+  currency?: string;
   meta?: any;
   isVisible: boolean;
   public: boolean;
@@ -100,6 +135,8 @@ export type DimensionConfig = {
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
   key?: string;
+  links?: LinkConfig[];
+  synthetic?: boolean;
 };
 
 export type SegmentConfig = {
@@ -125,6 +162,7 @@ export type CubeConfig = {
   isVisible: boolean;
   public: boolean;
   description?: string;
+  viewGroups?: string[];
   connectedComponent: number;
   meta?: any;
   measures: MeasureConfig[];
@@ -148,6 +186,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly contextEvaluator: ContextEvaluator;
 
+  private readonly viewGroupEvaluator: ViewGroupEvaluator;
+
   private readonly joinGraph: JoinGraph;
 
   public cubes: TransformedCube[];
@@ -161,15 +201,21 @@ export class CubeToMetaTransformer implements CompilerInterface {
     cubeValidator: CubeValidator,
     cubeEvaluator: CubeEvaluator,
     contextEvaluator: ContextEvaluator,
+    viewGroupEvaluator: ViewGroupEvaluator,
     joinGraph: JoinGraph
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
     this.cubeEvaluator = cubeEvaluator;
     this.contextEvaluator = contextEvaluator;
+    this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
     this.cubes = [];
     this.queries = [];
+  }
+
+  public get viewGroups(): CompiledViewGroup[] {
+    return this.viewGroupEvaluator.compiledViewGroups;
   }
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
@@ -225,6 +271,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     const nestedFolders: NestedFolder[] = (extendedCube.folders || []).map((f: Folder) => processFolder(f));
 
+    const viewGroupNames = extendedCube.isView
+      ? this.viewGroupEvaluator.viewGroupsForView(cubeName)
+      : [];
+
     return {
       config: {
         name: cubeName,
@@ -233,6 +283,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
         isVisible: isCubeVisible,
         public: isCubeVisible,
         description: extendedCube.description,
+        ...(viewGroupNames.length > 0 ? { viewGroups: viewGroupNames } : {}),
         connectedComponent: this.joinGraph.connectedComponents()[cubeName],
         meta: extendedCube.meta,
         measures: Object.entries(extendedCube.measures || {}).map((nameToMetric: [string, any]) => {
@@ -251,18 +302,23 @@ export class CubeToMetaTransformer implements CompilerInterface {
             ? this.isVisible(extendedDimDef, !extendedDimDef.primaryKey)
             : false;
           const granularitiesObj = extendedDimDef.granularities;
+          const dimType = this.dimensionDataType(extendedDimDef.type || 'string');
+          const dimFormat = this.transformDimensionFormat(extendedDimDef);
+          const dimCurrency = extendedDimDef.currency?.toUpperCase();
 
           return {
             name: `${cubeName}.${dimensionName}`,
             title: this.title(cubeTitle, nameToDimension, false),
-            type: this.dimensionDataType(extendedDimDef.type || 'string'),
+            type: dimType,
             description: extendedDimDef.description,
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
               extendedDimDef.suggestFilterValues == null
                 ? true
                 : extendedDimDef.suggestFilterValues,
-            format: this.transformDimensionFormat(extendedDimDef),
+            format: dimFormat,
+            formatDescription: this.resolveFormatDescription(dimFormat, dimType, false, dimCurrency),
+            currency: dimCurrency,
             meta: extendedDimDef.meta,
             isVisible: dimensionVisibility,
             public: dimensionVisibility,
@@ -280,6 +336,18 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 : undefined,
             order: extendedDimDef.order,
             key: extendedDimDef.keyReference,
+            ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
+              name: link.name,
+              label: link.label,
+              ...(link.dashboard ? { dashboard: typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard } : {}),
+              icon: link.icon,
+              target: link.target || 'blank',
+              ...(link.primary ? { primary: true } : {}),
+              ...(link.params && Array.isArray(link.params) && link.params.length > 0
+                ? { params: link.params.map((p: any) => (typeof p.key === 'function' ? p.key() : p.key)) }
+                : {}),
+            })) } : {}),
+            ...(extendedDimDef.synthetic ? { synthetic: true } : {}),
           };
         }),
         segments: Object.entries(extendedCube.segments || {}).map((nameToSegment: [string, any]) => {
@@ -375,12 +443,17 @@ export class CubeToMetaTransformer implements CompilerInterface {
       }
     }
 
+    const format = this.transformMeasureFormat(extendedMetricDef.format);
+    const currency = extendedMetricDef.currency?.toUpperCase();
+
     return {
       name,
       title: this.title(cubeTitle, nameToMetric, false),
       description: extendedMetricDef.description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
-      format: this.transformMeasureFormat(extendedMetricDef.format),
+      format,
+      formatDescription: this.resolveFormatDescription(format, type, true, currency),
+      currency,
       cumulativeTotal: isCumulative,
       cumulative: isCumulative,
       type,
@@ -400,43 +473,99 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   private titleize(name: string): string {
-    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    const titleized = inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    // Capitalize common identifier acronyms so e.g. `userId` reads as "User ID"
+    // rather than "User Id" and an `id` member becomes "ID" instead of "Id".
+    return titleized.replace(/\bId(s?)\b/g, (_match, plural) => `ID${plural}`);
   }
 
-  private transformDimensionFormat({ format, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
-    if (!format || typeof format === 'object') {
-      return format;
+  private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
+    if (!formatOrName || typeof formatOrName === 'object') {
+      return formatOrName;
     }
 
+    // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
+    const resolved = resolveNamedNumericFormat(formatOrName);
+    if (resolved) {
+      return { type: 'custom-numeric', value: resolved, alias: formatOrName };
+    }
+
+    // Existing standard formats stay as-is (breaking change to convert these)
     const standardFormats = ['imageUrl', 'currency', 'percent', 'number', 'id'];
-    if (standardFormats.includes(format)) {
-      return format;
+    if (standardFormats.includes(formatOrName)) {
+      return formatOrName;
     }
 
     // Custom time format for time dimensions
     if (type === 'time') {
-      return { type: 'custom-time', value: format };
+      return { type: 'custom-time', value: formatOrName };
     }
 
-    // Custom numeric format for number dimensions
+    // Custom numeric format for number dimensions (raw d3-format specifier)
     if (type === 'number') {
-      return { type: 'custom-numeric', value: format };
+      return { type: 'custom-numeric', value: formatOrName };
     }
 
-    return format;
+    return formatOrName;
   }
 
-  private transformMeasureFormat(format: string | undefined): MeasureFormat | undefined {
-    if (!format) {
+  private transformMeasureFormat(formatOrName: string | undefined): MeasureFormat | undefined {
+    if (!formatOrName) {
       return undefined;
     }
 
-    const standardFormats = ['percent', 'currency', 'number'];
-    if (standardFormats.includes(format)) {
-      return format;
+    // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
+    const resolved = resolveNamedNumericFormat(formatOrName);
+    if (resolved) {
+      return { type: 'custom-numeric', value: resolved, alias: formatOrName };
     }
 
-    // Custom numeric format
-    return { type: 'custom-numeric', value: format };
+    // Existing standard formats stay as-is (breaking change to convert these)
+    const standardFormats = ['percent', 'currency', 'number'];
+    if (standardFormats.includes(formatOrName)) {
+      return formatOrName;
+    }
+
+    // Custom numeric format (raw d3-format specifier)
+    return { type: 'custom-numeric', value: formatOrName };
+  }
+
+  /**
+   * Resolves a format into a FormatDescription.
+   * - Measures: returned for all types except string, boolean, and time.
+   * - Dimensions: returned only for number type.
+   */
+  private resolveFormatDescription(
+    format: MeasureFormat | DimensionFormat | undefined,
+    type: string,
+    isMeasure: boolean,
+    currency?: string,
+  ): FormatDescription | undefined {
+    if (isMeasure) {
+      if (EXCLUDED_MEASURE_TYPES.has(type)) {
+        return undefined;
+      }
+    } else if (type !== 'number') {
+      return undefined;
+    }
+
+    let desc: FormatDescription;
+
+    if (format && typeof format === 'object' && format.type === 'custom-numeric') {
+      desc = {
+        name: format.alias || 'custom',
+        specifier: format.value,
+      };
+    } else if (typeof format === 'string' && STANDARD_FORMAT_SPECIFIERS[format]) {
+      desc = { ...STANDARD_FORMAT_SPECIFIERS[format] };
+    } else {
+      desc = { ...DEFAULT_FORMAT_SPECIFIER };
+    }
+
+    if (currency) {
+      desc.currency = currency;
+    }
+
+    return desc;
   }
 }

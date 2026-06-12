@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/subquery_dimensions.rs
+expression: result
+---
+sales__category | customers__total_spend | customers__count
+----------------+------------------------+-----------------
+online          | 130.00                 | 1               
+online          | 200.00                 | 1               
+retail          | 40.00                  | 1               
+retail          | 130.00                 | 1               
+retail          | NULL                   | 1

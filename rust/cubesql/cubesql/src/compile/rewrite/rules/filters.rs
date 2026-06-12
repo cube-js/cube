@@ -64,6 +64,87 @@ pub struct FilterRules {
     eval_stable_functions: bool,
 }
 
+/// Shape of a SQL LIKE pattern once escape sequences have been resolved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LikePatternShape {
+    /// No wildcards: matches the literal exactly.
+    Equals,
+    /// Trailing `%` wildcard only.
+    StartsWith,
+    /// Leading `%` wildcard only.
+    EndsWith,
+    /// Both leading and trailing `%` wildcards.
+    Contains,
+}
+
+/// Parse a SQL LIKE pattern using `escape_char` as the escape character.
+///
+/// Returns the pattern shape and its unescaped literal portion (with `\%`,
+/// `\_`, `\\` resolved to `%`, `_`, `\`), or `None` if the pattern contains
+/// an internal wildcard — i.e. an unescaped `_`, or an unescaped `%` that is
+/// not the very first or very last token — since such patterns cannot be
+/// represented by Cube's equals/contains/startsWith/endsWith filter operators.
+fn parse_like_pattern(pattern: &str, escape_char: char) -> Option<(LikePatternShape, String)> {
+    enum Token {
+        Literal(char),
+        Percent,
+        Underscore,
+    }
+
+    let mut tokens: Vec<Token> = Vec::with_capacity(pattern.len());
+    let mut chars = pattern.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == escape_char {
+            match chars.peek().copied() {
+                Some(next) if next == '%' || next == '_' || next == escape_char => {
+                    chars.next();
+                    tokens.push(Token::Literal(next));
+                }
+                _ => {
+                    // Escape char with no following %/_/escape — keep the
+                    // escape char itself as a literal so input semantics are
+                    // preserved rather than silently dropped.
+                    tokens.push(Token::Literal(c));
+                }
+            }
+            continue;
+        }
+        match c {
+            '%' => tokens.push(Token::Percent),
+            '_' => tokens.push(Token::Underscore),
+            _ => tokens.push(Token::Literal(c)),
+        }
+    }
+
+    let starts_with_percent = matches!(tokens.first(), Some(Token::Percent));
+    let ends_with_percent = matches!(tokens.last(), Some(Token::Percent));
+
+    let start = if starts_with_percent { 1 } else { 0 };
+    let end = if ends_with_percent {
+        tokens.len() - 1
+    } else {
+        tokens.len()
+    };
+
+    let mut literal = String::new();
+    if end > start {
+        for tok in &tokens[start..end] {
+            match tok {
+                Token::Literal(c) => literal.push(*c),
+                Token::Percent | Token::Underscore => return None,
+            }
+        }
+    }
+
+    let shape = match (starts_with_percent, ends_with_percent) {
+        (false, false) => LikePatternShape::Equals,
+        (false, true) => LikePatternShape::StartsWith,
+        (true, false) => LikePatternShape::EndsWith,
+        (true, true) => LikePatternShape::Contains,
+    };
+    Some((shape, literal))
+}
+
 impl FilterRules {
     fn inlist_expr_list(&self, exprs: Vec<impl Display>) -> String {
         inlist_expr_list(exprs, self.config_obj.push_down_pull_up_split())
@@ -3660,73 +3741,60 @@ impl FilterRules {
                                         },
                                     };
 
-                                    let op = match literal {
-                                        ScalarValue::Utf8(Some(value)) => match op {
-                                            "contains" => {
-                                                let starts_with_pcnt = value.starts_with("%");
-                                                let ends_with_pcnt = value.ends_with("%");
-                                                match (starts_with_pcnt, ends_with_pcnt) {
-                                                    (false, false) => "equals",
-                                                    (false, true) => "startsWith",
-                                                    (true, false) => "endsWith",
-                                                    (true, true) => "contains",
-                                                }
-                                            }
-                                            "notContains" => {
-                                                let starts_with_pcnt = value.starts_with("%");
-                                                let ends_with_pcnt = value.ends_with("%");
-                                                match (starts_with_pcnt, ends_with_pcnt) {
-                                                    (false, false) => "notEquals",
-                                                    (false, true) => "notStartsWith",
-                                                    (true, false) => "notEndsWith",
-                                                    (true, true) => "notContains",
-                                                }
-                                            }
-                                            _ => op,
-                                        },
-                                        _ => op,
+                                    // LIKE-family operators are handled
+                                    // separately so that `\%`, `\_`, `\\`
+                                    // escape sequences in the pattern are
+                                    // resolved before the literal is placed
+                                    // into the CubeScan filter value, and so
+                                    // that patterns with internal wildcards
+                                    // are not silently misrepresented as
+                                    // equals/contains/startsWith/endsWith.
+                                    let is_like_op = matches!(
+                                        expr_op,
+                                        Operator::Like
+                                            | Operator::ILike
+                                            | Operator::NotLike
+                                            | Operator::NotILike,
+                                    );
+
+                                    let (op, like_value): (&str, Option<String>) = if is_like_op {
+                                        let value = match literal {
+                                            ScalarValue::Utf8(Some(value)) => value,
+                                            _ => continue,
+                                        };
+                                        let Some((shape, unescaped)) =
+                                            parse_like_pattern(value, '\\')
+                                        else {
+                                            continue;
+                                        };
+                                        let negated = matches!(
+                                            expr_op,
+                                            Operator::NotLike | Operator::NotILike,
+                                        );
+                                        let op = match (shape, negated) {
+                                            (LikePatternShape::Equals, false) => "equals",
+                                            (LikePatternShape::StartsWith, false) => "startsWith",
+                                            (LikePatternShape::EndsWith, false) => "endsWith",
+                                            (LikePatternShape::Contains, false) => "contains",
+                                            (LikePatternShape::Equals, true) => "notEquals",
+                                            (LikePatternShape::StartsWith, true) => "notStartsWith",
+                                            (LikePatternShape::EndsWith, true) => "notEndsWith",
+                                            (LikePatternShape::Contains, true) => "notContains",
+                                        };
+                                        (op, Some(unescaped))
+                                    } else {
+                                        (op, None)
                                     };
 
                                     let values = match literal {
                                         ScalarValue::Utf8(Some(value)) => vec![{
-                                            if op == "startsWith"
+                                            if let Some(like_value) = like_value {
+                                                like_value
+                                            } else if op == "startsWith"
                                                 && value.starts_with("^^")
                                                 && value.ends_with(".*$")
                                             {
                                                 value[2..value.len() - 3].to_string()
-                                            } else if op == "contains" || op == "notContains" {
-                                                if value.starts_with("%") && value.ends_with("%") {
-                                                    let without_wildcard =
-                                                        value[1..value.len() - 1].to_string();
-                                                    if without_wildcard.contains("%") {
-                                                        continue;
-                                                    }
-                                                    without_wildcard
-                                                } else {
-                                                    value.to_string()
-                                                }
-                                            } else if op == "startsWith" || op == "notStartsWith" {
-                                                if value.ends_with("%") {
-                                                    let without_wildcard =
-                                                        value[..value.len() - 1].to_string();
-                                                    if without_wildcard.contains("%") {
-                                                        continue;
-                                                    }
-                                                    without_wildcard
-                                                } else {
-                                                    value.to_string()
-                                                }
-                                            } else if op == "endsWith" || op == "notEndsWith" {
-                                                if let Some(without_wildcard) =
-                                                    value.strip_prefix("%")
-                                                {
-                                                    if without_wildcard.contains("%") {
-                                                        continue;
-                                                    }
-                                                    without_wildcard.to_string()
-                                                } else {
-                                                    value.to_string()
-                                                }
                                             } else {
                                                 value.to_string()
                                             }

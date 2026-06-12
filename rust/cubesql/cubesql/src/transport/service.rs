@@ -292,7 +292,7 @@ impl TransportService for HttpTransport {
         _throw_continue_wait: bool,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
-            return Err(CubeError::internal(
+            return Err(CubeError::user(
                 "Changing security context (__user) is not supported in the standalone mode"
                     .to_string(),
             ));
@@ -312,7 +312,7 @@ impl TransportService for HttpTransport {
 
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {
-            query: Some(query),
+            query: Some(Box::new(query)),
             query_type: Some("multi".to_string()),
             cache: cache_mode,
         };
@@ -424,6 +424,7 @@ impl SqlTemplates {
     pub fn select(
         &self,
         from: String,
+        joins: Vec<String>,
         projection: Vec<AliasedColumn>,
         group_by: Vec<AliasedColumn>,
         group_descs: Vec<Option<GroupingSetDesc>>,
@@ -463,6 +464,7 @@ impl SqlTemplates {
             "statements/select",
             context! {
                 from => from,
+                joins => joins,
                 select_concat => select_concat,
                 group_by => group_by_expr,
                 aggregate => aggregate,
@@ -542,14 +544,13 @@ impl SqlTemplates {
     }
 
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
-        let quote = self
-            .templates
-            .get("quotes/identifiers")
-            .ok_or_else(|| CubeError::user("quotes/identifiers template not found".to_string()))?;
+        let quote = self.templates.get("quotes/identifiers").ok_or_else(|| {
+            CubeError::internal("quotes/identifiers template not found".to_string())
+        })?;
         let escape = self
             .templates
             .get("quotes/escape")
-            .ok_or_else(|| CubeError::user("quotes/escape template not found".to_string()))?;
+            .ok_or_else(|| CubeError::internal("quotes/escape template not found".to_string()))?;
         Ok(format!(
             "{}{}{}",
             quote,
@@ -789,7 +790,7 @@ impl SqlTemplates {
         } else if self.contains_template(INTERVAL_SINGLE_TEMPLATE) {
             self.interval_single_expr(num, date_part)
         } else {
-            Err(CubeError::internal(
+            Err(CubeError::unsupported(
                 "Interval template generation is not supported".to_string(),
             ))
         }
@@ -903,7 +904,7 @@ impl SqlTemplates {
             LikeType::Like => "like",
             LikeType::ILike => "ilike",
             _ => {
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::unsupported(format!(
                     "Error rendering template: like type {} is not supported",
                     like_type
                 )))
@@ -912,7 +913,12 @@ impl SqlTemplates {
 
         let rendered_like = self.render_template(
             &format!("expressions/{}", expression_name),
-            context! { expr => expr, negated => negated, pattern => pattern },
+            context! {
+                expr => expr,
+                negated => negated,
+                pattern => pattern,
+                default_escape => escape_char.is_none(),
+            },
         )?;
 
         let Some(escape_char) = escape_char else {
@@ -972,7 +978,7 @@ impl SqlTemplates {
             DataType::Duration(_) | DataType::Interval(_) => "interval",
             DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "binary",
             dt => {
-                return Err(CubeError::internal(format!(
+                return Err(CubeError::unsupported(format!(
                     "Can't generate SQL for type {:?}: not supported",
                     dt
                 )))
@@ -987,5 +993,34 @@ impl SqlTemplates {
 
     pub fn inner_join(&self) -> Result<String, CubeError> {
         self.render_template("join_types/inner", context! {})
+    }
+
+    pub fn full_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/full", context! {})
+    }
+
+    pub fn right_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/right", context! {})
+    }
+
+    pub fn query_aliased(&self, query: &str, alias: &str) -> Result<String, CubeError> {
+        let bracketed_query = format!("({})", query);
+        let quoted_alias = self.quote_identifier(alias)?;
+        self.render_template(
+            "expressions/query_aliased",
+            context! { query => bracketed_query, quoted_alias => quoted_alias },
+        )
+    }
+
+    pub fn join(
+        &self,
+        join_type: &str,
+        source: &str,
+        condition: &str,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "statements/join",
+            context! { join_type => join_type, source => source, condition => condition },
+        )
     }
 }

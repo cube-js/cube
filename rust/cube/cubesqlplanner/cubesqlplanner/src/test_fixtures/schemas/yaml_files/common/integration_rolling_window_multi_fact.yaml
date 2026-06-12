@@ -1,0 +1,82 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM mf_customers"
+      joins:
+          - name: payments
+            relationship: one_to_many
+            sql: "{customers}.id = {payments.customer_id}"
+          - name: messages
+            relationship: one_to_many
+            sql: "{customers}.id = {messages.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+          - name: registered_at
+            type: time
+            sql: registered_at
+      measures:
+          - name: count
+            type: count
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+
+    - name: payments
+      sql: "SELECT * FROM mf_payments"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: amount
+            type: number
+            sql: amount
+          - name: payment_type
+            type: string
+            sql: payment_type
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: rolling_sum_7d
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 7 day
+
+    - name: messages
+      sql: "SELECT * FROM mf_messages"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: rolling_count_7d
+            type: count
+            rolling_window:
+                trailing: 7 day

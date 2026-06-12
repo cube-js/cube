@@ -71,8 +71,9 @@ export class HiveQuery extends BaseQuery {
         ungroupedAliases: R.fromPairs(this.forSelect().map((m: any) => [m.measure || m.dimension, m.aliasName()]))
       }
     );
-    return `SELECT ${select} FROM (${ungrouped}) AS ${this.escapeColumnName('hive_wrapper')}
-    ${this.groupByClause()}${this.baseHaving(this.measureFilters)}${this.orderBy()}${this.groupByDimensionLimit()}`;
+    const query = `SELECT ${select} FROM (${ungrouped}) AS ${this.escapeColumnName('hive_wrapper')}
+    ${this.groupByClause()}`;
+    return this.baseHaving(query, this.measureFilters) + this.orderBy() + this.groupByDimensionLimit();
   }
 
   public seriesSql(timeDimension) {

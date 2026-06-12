@@ -242,6 +242,71 @@ Response:
 }
 ```
 
+## `{base_path}/v1/convert-query`
+
+Takes an API query in the specified input format and converts it to the specified
+output format. Currently, only conversion from [SQL API][ref-sql-api] queries to
+[REST API][ref-rest-api] queries is supported.
+
+This endpoint is useful for translating SQL API queries into equivalent REST API
+queries that can be used with the [`/v1/load`](#base_pathv1load) endpoint.
+
+Request parameters (JSON body):
+
+| Parameter, type | Description | Required |
+| --- | --- | --- |
+| `input`, `string` | Input query format. Use `sql` for [SQL API][ref-sql-api] queries | ✅ Yes |
+| `output`, `string` | Output query format. Use `rest` for [REST API][ref-rest-api] queries | ✅ Yes |
+| `query`, `string` | Input query in the specified format | ✅ Yes |
+
+The response will contain a JSON object with the following properties:
+
+| Property, type | Description |
+| --- | --- |
+| `status`, `string` | Query conversion status, `ok` or `error` |
+| `query`, `object` | Converted query in the [REST API query format][ref-rest-api-query-format] (only present when `status` is `ok`) |
+| `error`, `string` | Error message (only present when `status` is `error`) |
+
+An error will be returned if the input query can't be converted to the specified
+output format, e.g., if the SQL API query requires post-processing on top of
+REST API capabilities or if the SQL API query results in multiple REST API queries.
+
+### Example
+
+Request to convert a SQL API query with a filter:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "sql", "output": "rest", "query": "SELECT MEASURE(total_amount) FROM orders WHERE status = '\''foo'\''"}' \
+  http://localhost:4000/cubejs-api/v1/convert-query
+```
+
+Successful response:
+
+```json
+{
+  "status": "ok",
+  "query": {
+    "measures": [
+      "orders.total_amount"
+    ],
+    "dimensions": [],
+    "filters": [
+      {
+        "member": "orders.status",
+        "operator": "equals",
+        "values": ["foo"]
+      }
+    ],
+    "segments": [],
+    "order": []
+  }
+}
+```
+
 ## `{base_path}/v1/meta`
 
 <InfoBox>
@@ -252,6 +317,11 @@ It provides additional information such as data lineage.
 </InfoBox>
 
 Get meta-information for cubes and views defined in the data model. Information about cubes and views with `public: false` will not be returned.
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `onlyViews` | When set to `true`, the response will include only views (entries with `type: "view"`) and any associated `viewGroups`. Useful for clients that consume views exclusively to avoid loading duplicated cube metadata. Defaults to `false`. | ❌ No |
+| `extended` | If present, returns extended schema information including SQL definitions for cubes and views. | ❌ No |
 
 Response
 
@@ -275,6 +345,15 @@ curl \
   -H "Authorization: TOKEN" \
   -G \
   http://localhost:4000/cubejs-api/v1/meta
+```
+
+Example request to load only views:
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G \
+  http://localhost:4000/cubejs-api/v1/meta?onlyViews=true
 ```
 
 Example response:
@@ -335,6 +414,11 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 
+This endpoint supports [request span annotation][ref-request-span]. You can
+pass the `x-request-id` or `traceparent` HTTP header to propagate your
+request ID through the entire SQL execution chain for tracing and monitoring.
+If neither header is provided, Cube auto-generates a request ID.
+
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, and optionally
 `lastRefreshTime` indicating when the data was last refreshed.
@@ -379,6 +463,18 @@ Response:
 ```json
 {"schema":[{"name":"full_name","column_type":"String"},{"name":"wins","column_type":"Int64"},{"name":"avg_position","column_type":"Double"}],"lastRefreshTime":"2025-01-13T12:00:00.000Z"}
 {"data":[["Max VERSTAPPEN","10","3.730769230769231"],["Lando NORRIS","4","4"],["Charles LECLERC","4","4.730769230769231"],["Oscar PIASTRI","3","4.8076923076923075"],["Andrea Kimi ANTONELLI","0","5"]]}
+```
+
+Request with a custom request ID for tracing:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "x-request-id: my-trace-id-span-1" \
+  -d '{"query": "SELECT 123 AS value"}' \
+  http://localhost:4000/cubejs-api/v1/cubesql
 ```
 
 ## `{base_path}/v1/pre-aggregations/jobs`
@@ -872,6 +968,7 @@ Keep-Alive: timeout=5
 [ref-datasources]: /product/configuration/advanced/multiple-data-sources
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-rest-api]: /product/apis-integrations/rest-api
+[ref-rest-api-query-format]: /product/apis-integrations/rest-api/query-format
 [ref-regular-queries]: /product/apis-integrations/queries#regular-query
 [ref-query-wpp]: /product/apis-integrations/queries#query-with-post-processing
 [ref-query-wpd]: /product/apis-integrations/queries#query-with-pushdown
@@ -883,3 +980,4 @@ Keep-Alive: timeout=5
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /product/apis-integrations/control-plane-api
 [self-metadata-api]: #metadata-api
+[ref-request-span]: /product/apis-integrations/rest-api#request-span-annotation

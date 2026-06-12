@@ -1,0 +1,3872 @@
+[
+  {
+    "source": "/product/administration/sso/okta",
+    "destination": "https://docs.cube.dev/admin/sso/okta/saml",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/saved-reports",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/access-control",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/aws",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/real-time-data-fetch",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/real-time-data-fetch",
+    "permanent": true
+  },
+  {
+    "source": "/guides",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/guides/data-store-cost-saving-guide",
+    "destination": "https://docs.cube.dev/recipes/configuration/data-store-cost-saving-guide",
+    "permanent": true
+  },
+  {
+    "source": "/guides/style-guide",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/style-guide",
+    "permanent": true
+  },
+  {
+    "source": "/guides/designing-metrics",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/designing-metrics",
+    "permanent": true
+  },
+  {
+    "source": "/guides/dbt",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dbt",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/upgrading-cube/migrating-from-express-to-docker",
+    "destination": "https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-exploration/drilldowns",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/drilldowns",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-exploration/cast-numerics",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/cast-numerics",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-exploration/query-history-export",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history-export",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/non-additivity",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/non-additivity",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/incrementally-building-pre-aggregations-for-a-date-range",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/disabling-pre-aggregations",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/disabling-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/using-originalsql-and-rollups-effectively",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/using-originalsql-and-rollups-effectively",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/refreshing-select-partitions",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/refreshing-select-partitions",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/joining-multiple-data-sources",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/joining-multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/getting-unique-values-for-a-field",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/getting-unique-values-for-a-field",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/sorting",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/sorting",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/pagination",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/pagination",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-sources/multiple-sources-same-schema",
+    "destination": "https://docs.cube.dev/recipes/configuration/multiple-sources-same-schema",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-sources/using-ssl-connections-to-data-source",
+    "destination": "https://docs.cube.dev/recipes/configuration/using-ssl-connections-to-data-source",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/environment-variables",
+    "destination": "https://docs.cube.dev/recipes/configuration/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/multitenancy/custom-data-model-per-tenant",
+    "destination": "https://docs.cube.dev/recipes/configuration/custom-data-model-per-tenant",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/code-reusability/environment-variables",
+    "destination": "https://docs.cube.dev/recipes/configuration/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/code-reusability/schema-generation",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/percentiles",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/percentiles",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/nested-aggregates",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/nested-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/filtered-aggregates",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/filtered-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/period-over-period",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/period-over-period",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/custom-granularity",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/custom-granularity",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/custom-calendar",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/custom-calendar",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/snapshots",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/snapshots",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/entity-attribute-value",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/entity-attribute-value",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/using-dynamic-measures",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/dynamic-union-tables",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/string-time-dimensions",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/string-time-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/auth/aws-cognito",
+    "destination": "https://docs.cube.dev/embedding/authentication/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/auth/auth0-guide",
+    "destination": "https://docs.cube.dev/embedding/authentication/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/auth/sql-api-ldap",
+    "destination": "https://docs.cube.dev/embedding/authentication/jwt",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/aws-cognito",
+    "destination": "https://docs.cube.dev/embedding/authentication/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/auth0-guide",
+    "destination": "https://docs.cube.dev/embedding/authentication/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/sql-api-ldap",
+    "destination": "https://docs.cube.dev/embedding/authentication/jwt",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/using-different-schemas-for-tenants",
+    "destination": "https://docs.cube.dev/recipes/configuration/custom-data-model-per-tenant#loading-from-disk",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/controlling-access-to-cubes-and-views",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#controlling-access-to-cubes-and-views",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/role-based-access",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-role-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/column-based-access",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-column-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/controlling-access-to-cubes-and-views",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#controlling-access-to-cubes-and-views",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/role-based-access",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-role-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/column-based-access",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-column-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/access-control/enforcing-mandatory-filters",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-mandatory-filters",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/recipes/enforcing-mandatory-filters",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-mandatory-filters",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/xirr",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/xirr",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/funnels",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/cohort-retention",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/cohort-retention",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/event-analytics",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/event-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/analytics/active-users",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/reference",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/reference/python/cube",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube-package",
+    "permanent": true
+  },
+  {
+    "source": "/reference/python/lkml2cube",
+    "destination": "https://docs.cube.dev/reference/data-modeling/lkml2cube",
+    "permanent": true
+  },
+  {
+    "source": "/reference/python/cube_dbt",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube_dbt",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model",
+    "destination": "https://docs.cube.dev/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/cube",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/dimensions",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/measures",
+    "destination": "https://docs.cube.dev/reference/data-modeling/measures",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/joins",
+    "destination": "https://docs.cube.dev/reference/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/segments",
+    "destination": "https://docs.cube.dev/reference/data-modeling/segments",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/types-and-formats",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/view",
+    "destination": "https://docs.cube.dev/reference/data-modeling/view",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/hierarchies",
+    "destination": "https://docs.cube.dev/reference/data-modeling/hierarchies",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/context-variables",
+    "destination": "https://docs.cube.dev/reference/data-modeling/context-variables",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/data-access-policies",
+    "destination": "https://docs.cube.dev/reference/data-modeling/data-access-policies",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/pre-aggregations",
+    "destination": "https://docs.cube.dev/reference/data-modeling/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/reference/configuration/environment-variables",
+    "destination": "https://docs.cube.dev/reference/configuration/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/advanced/multiple-data-sources",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/advanced/multitenancy",
+    "destination": "https://docs.cube.dev/embedding/multitenancy",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/visual-modeler",
+    "destination": "https://docs.cube.dev/docs/data-modeling/visual-modeler",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/visual-model",
+    "destination": "https://docs.cube.dev/docs/data-modeling/visual-modeler",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/semantic-layer-sync/power-bi",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/powerbi",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-core",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-core",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-react",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-react",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ngx",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-ngx",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-vue",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-vue",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ws-transport",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-ws-transport",
+    "permanent": true
+  },
+  {
+    "source": "/reference/cli",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/reference/graphql-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/rest-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/sql-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/publicity",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/member-level-security",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/fiscal-year-quarter-dimensions",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/custom-granularity",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/semantic-layer-sync",
+    "destination": "https://docs.cube.dev/docs/integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/cloudwatch",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/s3",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/datadog",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/grafana-cloud",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/subquery-dimensions",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/additional-concepts",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/using-dbt",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dbt",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/jinja",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/jinja",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/data-blending",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/dynamic-schema-creation",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/syntax",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/schema-execution-environment",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/concepts",
+    "destination": "https://docs.cube.dev/docs/data-modeling/overview",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/code-reusability-extending-cubes",
+    "destination": "https://docs.cube.dev/docs/data-modeling/extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/working-with-joins",
+    "destination": "https://docs.cube.dev/docs/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/overview",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/introduction",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/cubejs-introduction",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/semantic-layer-sync",
+    "destination": "https://docs.cube.dev/docs/integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/sql-runner",
+    "destination": "https://docs.cube.dev/docs/data-modeling/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/workspace/preferences",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/inspecting-queries",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/inspecting-pre-aggregations",
+    "destination": "https://docs.cube.dev/admin/monitoring/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/development-api",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/dev-tools/dev-playground",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/playground",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/dev-tools/dev-playground",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/playground",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/cube-ide",
+    "destination": "https://docs.cube.dev/docs/data-modeling/data-model-ide",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/cube-ide",
+    "destination": "https://docs.cube.dev/docs/data-modeling/data-model-ide",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/dev-tools/cube-ide",
+    "destination": "https://docs.cube.dev/docs/data-modeling/data-model-ide",
+    "permanent": true
+  },
+  {
+    "source": "/using-the-cubejs-cli",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/access-control/",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
+    "source": "/schema/getting-started",
+    "destination": "https://docs.cube.dev/docs/data-modeling/overview",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/alerts",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/dev-tools/alerts/",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/style-guide",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/style-guide",
+    "permanent": true
+  },
+  {
+    "source": "/recipes",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/examples",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/tutorials",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/configuration/overview",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/connecting-to-the-database",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools",
+    "permanent": true
+  },
+  {
+    "source": "/caching/using-pre-aggregations",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/using-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/caching/running-in-production",
+    "destination": "https://docs.cube.dev/cube-core/running-in-production",
+    "permanent": true
+  },
+  {
+    "source": "/caching",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/caching/pre-aggregations/lambda-pre-aggregations",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/lambda-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/caching/pre-aggregations/getting-started",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/security/context",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context",
+    "permanent": true
+  },
+  {
+    "source": "/security",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control",
+    "permanent": true
+  },
+  {
+    "source": "/apis-integrations",
+    "destination": "https://docs.cube.dev/reference",
+    "permanent": true
+  },
+  {
+    "source": "/workspace/sso/",
+    "destination": "https://docs.cube.dev/admin/sso",
+    "permanent": true
+  },
+  {
+    "source": "/workspace/sso/okta",
+    "destination": "https://docs.cube.dev/admin/sso/okta/saml",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/production-checklist",
+    "destination": "https://docs.cube.dev/admin/deployment/core#production-checklist",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/overview",
+    "destination": "https://docs.cube.dev/cube-core/architecture",
+    "permanent": true
+  },
+  {
+    "source": "/deployment",
+    "destination": "https://docs.cube.dev/cube-core/architecture",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/guide",
+    "destination": "https://docs.cube.dev/cube-core/architecture",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/view",
+    "destination": "https://docs.cube.dev/reference/data-modeling/view",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/types-and-formats",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/types-and-formats",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/segments",
+    "destination": "https://docs.cube.dev/reference/data-modeling/segments",
+    "permanent": true
+  },
+  {
+    "source": "/segments",
+    "destination": "https://docs.cube.dev/reference/data-modeling/segments",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/pre-aggregations",
+    "destination": "https://docs.cube.dev/reference/data-modeling/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/pre-aggregations",
+    "destination": "https://docs.cube.dev/reference/data-modeling/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/measures",
+    "destination": "https://docs.cube.dev/reference/data-modeling/measures",
+    "permanent": true
+  },
+  {
+    "source": "/measures",
+    "destination": "https://docs.cube.dev/reference/data-modeling/measures",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/joins",
+    "destination": "https://docs.cube.dev/reference/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/joins",
+    "destination": "https://docs.cube.dev/reference/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/dimensions",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/dimensions",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/cube",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube",
+    "permanent": true
+  },
+  {
+    "source": "/cube",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started",
+    "destination": "https://docs.cube.dev/docs/getting-started",
+    "permanent": true
+  },
+  {
+    "source": "/faqs/troubleshooting",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/faqs/tips-and-tricks",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/faqs/general",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/execution-environment",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/schema-execution-environment",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/using-dbt",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dbt",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/polymorphic-cubes",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/polymorphic-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/polymorphic-cubes",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/polymorphic-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/polymorphic-cubes",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/polymorphic-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/dynamic-schema-creation",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/schema/dynamic-schema-creation",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/data-blending",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/data-blending",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/data-blending",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/extending-cubes",
+    "destination": "https://docs.cube.dev/docs/data-modeling/extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/extending-cubes",
+    "destination": "https://docs.cube.dev/docs/data-modeling/extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/extending-cubes",
+    "destination": "https://docs.cube.dev/docs/data-modeling/extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/export-import",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/export-import",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/export-import",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/reference/functions-operators",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/reference#sql-functions-and-operators",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/reference/commands",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/reference#sql-commands",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/joins",
+    "destination": "https://docs.cube.dev/docs/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/direction-of-joins",
+    "destination": "https://docs.cube.dev/docs/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/many-to-many-relationship",
+    "destination": "https://docs.cube.dev/docs/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/data-modeling/syntax",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/working-with-yaml",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/schema/getting-started/yaml",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/concepts",
+    "destination": "https://docs.cube.dev/docs/data-modeling/overview",
+    "permanent": true
+  },
+  {
+    "source": "/schema/fundamentals/additional-concepts",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/drill-downs",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/subquery",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/working-with-string-time-dimensions",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures#subquery-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/rest-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/backend/graphql",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/@cubejs-client-vue",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-vue",
+    "permanent": true
+  },
+  {
+    "source": "/@cubejs-client-ngx",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-ngx",
+    "permanent": true
+  },
+  {
+    "source": "/reference/environment-variables",
+    "destination": "https://docs.cube.dev/reference/configuration/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/config",
+    "destination": "https://docs.cube.dev/reference/configuration/config",
+    "permanent": true
+  },
+  {
+    "source": "/monitoring/integrations",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/logs",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations",
+    "permanent": true
+  },
+  {
+    "source": "/monitoring/grafana-cloud",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/monitoring/datadog",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc/gcp",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc/azure",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/connecting-with-a-vpc/aws",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/thoughtspot",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/thoughtspot",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/tableau",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/tableau",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/superset",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/superset",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/using-apache-superset-with-cube-sql",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/superset",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/streamlit",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/streamlit",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/retool",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/retool",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/powerbi",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/powerbi",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/observable",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/observable",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/metabase",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/metabase",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/jupyter",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/jupyter",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/hex",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/hex",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/deepnote",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/deepnote",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/budibase",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/budibase",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/bubble",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/bubble",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/appsmith",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/appsmith",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/ksqldb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/ksqldb",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/trino",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/trino",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/snowflake",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/snowflake",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/sqlite",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/sqlite",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/questdb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/questdb",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/presto",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/presto",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/prestodb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/presto",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/postgres",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/postgres",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/oracle",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/oracle",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/mysql",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/mysql",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/mongodb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/mongodb",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/materialize",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/materialize",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/mssql",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/ms-sql",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/hive-sparksql",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/hive",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/google-bigquery",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/google-bigquery",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/firebolt",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/firebolt",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/elasticsearch",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/elasticsearch",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/druid",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/druid",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/databricks/jdbc",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/databricks-jdbc",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/clickhouse",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/clickhouse",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/aws-redshift",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/aws-redshift",
+    "permanent": true
+  },
+  {
+    "source": "/config/databases/aws-athena",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/aws-athena",
+    "permanent": true
+  },
+  {
+    "source": "/config/multitenancy",
+    "destination": "https://docs.cube.dev/embedding/multitenancy",
+    "permanent": true
+  },
+  {
+    "source": "/config/multiple-data-sources",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/reference/joins",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/joins",
+    "permanent": true
+  },
+  {
+    "source": "/backend/sql/security",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/security",
+    "permanent": true
+  },
+  {
+    "source": "/real-time-data-fetch",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/real-time-data-fetch",
+    "permanent": true
+  },
+  {
+    "source": "/query-format",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/http-api/rest",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api/prefect",
+    "destination": "https://docs.cube.dev/reference/orchestration-api/prefect",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api",
+    "destination": "https://docs.cube.dev/reference/orchestration-api",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api/dagster",
+    "destination": "https://docs.cube.dev/reference/orchestration-api/dagster",
+    "permanent": true
+  },
+  {
+    "source": "/orchestration-api/airflow",
+    "destination": "https://docs.cube.dev/reference/orchestration-api/airflow",
+    "permanent": true
+  },
+  {
+    "source": "/http-api/graphql",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/graphql-api",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction/vue",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/vue",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction/react",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/react",
+    "permanent": true
+  },
+  {
+    "source": "/frontend-introduction/angular",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/angular",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/platforms/docker",
+    "destination": "https://docs.cube.dev/admin/deployment/core",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/pricing",
+    "destination": "https://docs.cube.dev/admin/account-billing/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/platforms/cube-cloud",
+    "destination": "https://docs.cube.dev/admin/deployment/infrastructure",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/limits",
+    "destination": "https://docs.cube.dev/admin/deployment/limits",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/deployment-types",
+    "destination": "https://docs.cube.dev/admin/deployment/deployment-types",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/configuration/custom-domains",
+    "destination": "https://docs.cube.dev/admin/deployment/custom-domains",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/deploys",
+    "destination": "https://docs.cube.dev/admin/deployment/continuous-deployment",
+    "permanent": true
+  },
+  {
+    "source": "/deployment/cloud/auto-suspension",
+    "destination": "https://docs.cube.dev/admin/deployment/auto-suspension",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/learn-more",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/learn-more",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/add-a-pre-aggregation",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/add-a-pre-aggregation",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/query-data",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/query-data",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/create-a-project",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/create-a-project",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/core/overview",
+    "destination": "https://docs.cube.dev/cube-core/getting-started",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started-docker",
+    "destination": "https://docs.cube.dev/cube-core/getting-started",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/docker",
+    "destination": "https://docs.cube.dev/cube-core/getting-started",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/query-from-react-app",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/query-from-react-app",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/query-from-BI",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/query-from-bi",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/create-data-model",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/create-data-model",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/connect-to-snowflake",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/connect-to-snowflake",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/load-data",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/load-data",
+    "permanent": true
+  },
+  {
+    "source": "/getting-started/cloud/overview",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/cli",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/upload-with-cli",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/ssh/gitlab",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-gitlab-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/github",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-github-repository",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/ssh/git",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-git-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/getting-started/ssh/bitbucket",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-bitbucket-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/migrating-from-express-to-docker",
+    "destination": "https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/using-originalsql-and-rollups-effectively",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/using-originalsql-and-rollups-effectively",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/non-additivity",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/non-additivity",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/joining-multiple-data-sources",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/joining-multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/incrementally-building-pre-aggregations-for-a-date-range",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/refreshing-select-partitions",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/refreshing-select-partitions",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/pagination",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/pagination",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/getting-unique-values-for-a-field",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/getting-unique-values-for-a-field",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/enforcing-mandatory-filters",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-mandatory-filters",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/enable-ssl-connections-to-database",
+    "destination": "https://docs.cube.dev/recipes/configuration/using-ssl-connections-to-data-source",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/multiple-sources-same-schema",
+    "destination": "https://docs.cube.dev/recipes/configuration/multiple-sources-same-schema",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/authn-with-auth0",
+    "destination": "https://docs.cube.dev/embedding/authentication/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/security/jwt/auth0",
+    "destination": "https://docs.cube.dev/embedding/authentication/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/authn-with-aws-cognito",
+    "destination": "https://docs.cube.dev/embedding/authentication/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/security/jwt/aws-cognito",
+    "destination": "https://docs.cube.dev/embedding/authentication/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/referencing-dynamic-measures",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/snapshots",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/snapshots",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/percentiles",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/percentiles",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/passing-dynamic-parameters-in-a-query",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/entity-attribute-value",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/entity-attribute-value",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/dynamically-union-tables",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/dynamically-union-tables",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/schema-generation",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/schema-generation",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/funnels",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/funnels",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/event-analytics",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/event-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/event-analytics",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/event-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/cohort-retention",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/cohort-retention",
+    "permanent": true
+  },
+  {
+    "source": "/cohort-retention",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/cohort-retention",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/active-users",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/active-users",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/using-different-schemas-for-tenants",
+    "destination": "https://docs.cube.dev/recipes/configuration/custom-data-model-per-tenant#loading-from-disk",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/role-based-access",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-role-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/controlling-access-to-cubes-and-views",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#controlling-access-to-cubes-and-views",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/column-based-access",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context#enforcing-column-based-access",
+    "permanent": true
+  },
+  {
+    "source": "/reference/configuration/config",
+    "destination": "https://docs.cube.dev/reference/configuration/config",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/access-control",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/api-keys",
+    "destination": "https://docs.cube.dev/admin/account-billing/api-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/api-keys",
+    "destination": "https://docs.cube.dev/admin/account-billing/api-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/audit-log",
+    "destination": "https://docs.cube.dev/admin/monitoring/audit-log",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/audit-log",
+    "destination": "https://docs.cube.dev/admin/monitoring/audit-log",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/chats-history",
+    "destination": "https://docs.cube.dev/admin/monitoring/chats-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/query-history",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/pre-aggregations",
+    "destination": "https://docs.cube.dev/admin/monitoring/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/performance",
+    "destination": "https://docs.cube.dev/admin/monitoring/performance",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/budgets",
+    "destination": "https://docs.cube.dev/admin/account-billing/budgets",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/budgets",
+    "destination": "https://docs.cube.dev/admin/account-billing/budgets",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/chats-history",
+    "destination": "https://docs.cube.dev/admin/monitoring/chats-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/cli",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/cli/reference",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/data-model",
+    "destination": "https://docs.cube.dev/docs/data-modeling/data-model-ide",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/data-model",
+    "destination": "https://docs.cube.dev/docs/data-modeling/data-model-ide",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/dev-mode",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/dev-mode",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/encryption-keys",
+    "destination": "https://docs.cube.dev/admin/deployment/encryption-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/encryption-keys",
+    "destination": "https://docs.cube.dev/admin/deployment/encryption-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/environments",
+    "destination": "https://docs.cube.dev/admin/deployment/environments",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/environments",
+    "destination": "https://docs.cube.dev/admin/deployment/environments",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/integrations",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/cloudwatch",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/s3",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/datadog",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/grafana-cloud",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/new-relic",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/new-relic",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/cloudwatch",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/datadog",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/grafana-cloud",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/new-relic",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/new-relic",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/s3",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/performance",
+    "destination": "https://docs.cube.dev/admin/monitoring/performance",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/playground",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/playground",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/playground",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/playground",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/pre-aggregations",
+    "destination": "https://docs.cube.dev/admin/monitoring/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/preferences",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/query-history",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/recipes/query-history-export",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history-export",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/recipes/query-history-export",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history-export",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/rollup-designer",
+    "destination": "https://docs.cube.dev/admin/monitoring/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/rollup-designer",
+    "destination": "https://docs.cube.dev/admin/monitoring/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/saved-reports",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/workbooks",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/semantic-catalog",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sql-runner",
+    "destination": "https://docs.cube.dev/docs/data-modeling/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sql-runner",
+    "destination": "https://docs.cube.dev/docs/data-modeling/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso",
+    "destination": "https://docs.cube.dev/admin/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso",
+    "destination": "https://docs.cube.dev/admin/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/google-workspace",
+    "destination": "https://docs.cube.dev/admin/sso/google-workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/google-workspace",
+    "destination": "https://docs.cube.dev/admin/sso/google-workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/microsoft-entra-id",
+    "destination": "https://docs.cube.dev/admin/sso/microsoft-entra-id",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/microsoft-entra-id",
+    "destination": "https://docs.cube.dev/admin/sso/microsoft-entra-id",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/okta",
+    "destination": "https://docs.cube.dev/admin/sso/okta/saml",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sso/okta",
+    "destination": "https://docs.cube.dev/admin/sso/okta/saml",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/visual-model",
+    "destination": "https://docs.cube.dev/docs/data-modeling/visual-modeler",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/vizard",
+    "destination": "https://docs.cube.dev/embedding/vizard",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/vizard",
+    "destination": "https://docs.cube.dev/embedding/vizard",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment",
+    "destination": "https://docs.cube.dev/cube-core/architecture",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud",
+    "destination": "https://docs.cube.dev/admin/deployment/infrastructure",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/auto-suspension",
+    "destination": "https://docs.cube.dev/admin/deployment/auto-suspension",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc",
+    "destination": "https://docs.cube.dev/admin/deployment/infrastructure",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/aws/deployment",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/aws/privatelink",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/azure",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/byoc/gcp/deployment",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/gcp/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/continuous-deployment",
+    "destination": "https://docs.cube.dev/admin/deployment/continuous-deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/custom-domains",
+    "destination": "https://docs.cube.dev/admin/deployment/custom-domains",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/deployment-types",
+    "destination": "https://docs.cube.dev/admin/deployment/deployment-types",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/deployments",
+    "destination": "https://docs.cube.dev/admin/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/infrastructure",
+    "destination": "https://docs.cube.dev/admin/deployment/infrastructure",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/limits",
+    "destination": "https://docs.cube.dev/admin/deployment/limits",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/pricing",
+    "destination": "https://docs.cube.dev/admin/account-billing/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/pricing",
+    "destination": "https://docs.cube.dev/admin/account-billing/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers",
+    "destination": "https://docs.cube.dev/admin/deployment/providers",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers/aws",
+    "destination": "https://docs.cube.dev/admin/deployment/providers/aws",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers/azure",
+    "destination": "https://docs.cube.dev/admin/deployment/providers/azure",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/providers/gcp",
+    "destination": "https://docs.cube.dev/admin/deployment/providers/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/scalability",
+    "destination": "https://docs.cube.dev/admin/deployment/scalability",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/support",
+    "destination": "https://docs.cube.dev/admin/account-billing/support",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/aws",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/aws/private-link",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/aws/vpc-peering",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure/private-link",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure/vpc-peering",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/gcp",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/warm-up",
+    "destination": "https://docs.cube.dev/admin/deployment/warm-up",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/core",
+    "destination": "https://docs.cube.dev/admin/deployment/core",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/production-checklist",
+    "destination": "https://docs.cube.dev/admin/deployment/core#production-checklist",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/embedding",
+    "destination": "https://docs.cube.dev/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/dashboards",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding",
+    "destination": "https://docs.cube.dev/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/private-embedding",
+    "destination": "https://docs.cube.dev/embedding/iframe/auth/private",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/signed-embedding",
+    "destination": "https://docs.cube.dev/embedding/iframe/auth/signed",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/embedding/creator-mode",
+    "destination": "https://docs.cube.dev/embedding/iframe/creator-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/distribution",
+    "destination": "https://docs.cube.dev/admin/account-billing/distribution",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/spaces-agents-models",
+    "destination": "https://docs.cube.dev/admin/ai/multi-agent",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/agent-rules",
+    "destination": "https://docs.cube.dev/admin/ai/rules",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/memory-isolation",
+    "destination": "https://docs.cube.dev/admin/ai/memory-isolation",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/user-attributes",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/user-attributes",
+    "permanent": true
+  },
+  {
+    "source": "/product/agentic-analytics/roles-and-permissions",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/roles-and-permissions",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/queries",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/queries",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/joins",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/joins",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/query-format",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/security",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/security",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/dax-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/dax-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/dax-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/dax-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/mdx-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/mdx-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/query-format",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/graphql-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/graphql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/graphql-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/chat-api",
+    "destination": "https://docs.cube.dev/reference/embed-apis/chat-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/ai",
+    "destination": "https://docs.cube.dev/admin/ai",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/ai/agent-rules",
+    "destination": "https://docs.cube.dev/admin/ai/rules",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/ai/memory-isolation",
+    "destination": "https://docs.cube.dev/admin/ai/memory-isolation",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/ai/spaces-agents-models",
+    "destination": "https://docs.cube.dev/admin/ai/multi-agent",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/ai/yaml-config",
+    "destination": "https://docs.cube.dev/admin/ai",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/api-keys",
+    "destination": "https://docs.cube.dev/admin/account-billing/api-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/budgets",
+    "destination": "https://docs.cube.dev/admin/account-billing/budgets",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment",
+    "destination": "https://docs.cube.dev/cube-core/architecture",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/auto-suspension",
+    "destination": "https://docs.cube.dev/admin/deployment/auto-suspension",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/byoc",
+    "destination": "https://docs.cube.dev/admin/deployment/infrastructure",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/byoc/aws",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/byoc/aws/deployment",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/byoc/aws/privatelink",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/byoc/azure",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/byoc/gcp/deployment",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/gcp/byoc",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/continuous-deployment",
+    "destination": "https://docs.cube.dev/admin/deployment/continuous-deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/core",
+    "destination": "https://docs.cube.dev/admin/deployment/core",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/custom-domains",
+    "destination": "https://docs.cube.dev/admin/deployment/custom-domains",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/deployment-types",
+    "destination": "https://docs.cube.dev/admin/deployment/deployment-types",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/deployments",
+    "destination": "https://docs.cube.dev/admin/deployment",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/encryption-keys",
+    "destination": "https://docs.cube.dev/admin/deployment/encryption-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/environments",
+    "destination": "https://docs.cube.dev/admin/deployment/environments",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/infrastructure",
+    "destination": "https://docs.cube.dev/admin/deployment/infrastructure",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/limits",
+    "destination": "https://docs.cube.dev/admin/deployment/limits",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/monitoring",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/monitoring/cloudwatch",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/monitoring/datadog",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/monitoring/grafana-cloud",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/monitoring/new-relic",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/new-relic",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/monitoring/s3",
+    "destination": "https://docs.cube.dev/admin/monitoring/monitoring-integrations/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/providers",
+    "destination": "https://docs.cube.dev/admin/deployment/providers",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/providers/aws",
+    "destination": "https://docs.cube.dev/admin/deployment/providers/aws",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/providers/azure",
+    "destination": "https://docs.cube.dev/admin/deployment/providers/azure",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/providers/gcp",
+    "destination": "https://docs.cube.dev/admin/deployment/providers/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/scalability",
+    "destination": "https://docs.cube.dev/admin/deployment/scalability",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/support",
+    "destination": "https://docs.cube.dev/admin/account-billing/support",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc/aws",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc/aws/private-link",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc/aws/vpc-peering",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/aws/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc/azure",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc/azure/private-link",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/private-link",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc/azure/vpc-peering",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/azure/vpc-peering",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/vpc/gcp",
+    "destination": "https://docs.cube.dev/admin/deployment/dedicated/gcp",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/deployment/warm-up",
+    "destination": "https://docs.cube.dev/admin/deployment/warm-up",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/distribution",
+    "destination": "https://docs.cube.dev/admin/account-billing/distribution",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/monitoring",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/monitoring/audit-log",
+    "destination": "https://docs.cube.dev/admin/monitoring/audit-log",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/monitoring/chats-history",
+    "destination": "https://docs.cube.dev/admin/monitoring/chats-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/monitoring/performance",
+    "destination": "https://docs.cube.dev/admin/monitoring/performance",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/monitoring/pre-aggregations",
+    "destination": "https://docs.cube.dev/admin/monitoring/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/monitoring/query-history",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/monitoring/query-history-export",
+    "destination": "https://docs.cube.dev/admin/monitoring/query-history-export",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/pricing",
+    "destination": "https://docs.cube.dev/admin/account-billing/pricing",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/sso",
+    "destination": "https://docs.cube.dev/admin/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/sso/google-workspace",
+    "destination": "https://docs.cube.dev/admin/sso/google-workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/sso/microsoft-entra-id",
+    "destination": "https://docs.cube.dev/admin/sso/microsoft-entra-id",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/sso/microsoft-entra-id/saml",
+    "destination": "https://docs.cube.dev/admin/sso/microsoft-entra-id/saml",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/sso/microsoft-entra-id/scim",
+    "destination": "https://docs.cube.dev/admin/sso/microsoft-entra-id/scim",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/sso/okta/saml",
+    "destination": "https://docs.cube.dev/admin/sso/okta/saml",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/sso/okta/scim",
+    "destination": "https://docs.cube.dev/admin/sso/okta/scim",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/users-and-permissions",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/manage-users",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/users-and-permissions/custom-roles",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/users-and-permissions/roles-and-permissions",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/roles-and-permissions",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/users-and-permissions/user-attributes",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/user-attributes",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/users-and-permissions/user-groups",
+    "destination": "https://docs.cube.dev/admin/users-and-permissions/user-groups",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/cli",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/cli/reference",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/integrations",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/maintenance-window",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/preferences",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/semantic-catalog",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations",
+    "destination": "https://docs.cube.dev/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/control-plane-api",
+    "destination": "https://docs.cube.dev/reference/control-plane-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis",
+    "destination": "https://docs.cube.dev/reference/core-data-apis",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/dax-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/dax-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/dax-api/cross-view-filter",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/dax-api/cross-view-filter",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/dax-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/dax-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/graphql-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/graphql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/graphql-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/mdx-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/mdx-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/queries",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/queries",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/rest-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/rest-api/query-format",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/rest-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/sql-api",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/sql-api/joins",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/joins",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/sql-api/query-format",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/sql-api/reference",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/core-data-apis/sql-api/security",
+    "destination": "https://docs.cube.dev/reference/core-data-apis/sql-api/security",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/embed-apis",
+    "destination": "https://docs.cube.dev/reference/embed-apis",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/embed-apis/chat-api",
+    "destination": "https://docs.cube.dev/reference/embed-apis/chat-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/embed-apis/generate-session",
+    "destination": "https://docs.cube.dev/reference/embed-apis/generate-session",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/google-sheets",
+    "destination": "https://docs.cube.dev/docs/integrations/google-sheets",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/angular",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/angular",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/react",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/react",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-core",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-core",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ngx",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-ngx",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-react",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-react",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-vue",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-vue",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ws-transport",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-ws-transport",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/javascript-sdk/vue",
+    "destination": "https://docs.cube.dev/reference/javascript-sdk/vue",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/mcp-server",
+    "destination": "https://docs.cube.dev/docs/integrations/mcp-server",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/microsoft-excel",
+    "destination": "https://docs.cube.dev/docs/integrations/microsoft-excel",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/orchestration-api",
+    "destination": "https://docs.cube.dev/reference/orchestration-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/orchestration-api/airflow",
+    "destination": "https://docs.cube.dev/reference/orchestration-api/airflow",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/orchestration-api/dagster",
+    "destination": "https://docs.cube.dev/reference/orchestration-api/dagster",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/orchestration-api/prefect",
+    "destination": "https://docs.cube.dev/reference/orchestration-api/prefect",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/power-bi",
+    "destination": "https://docs.cube.dev/docs/integrations/power-bi",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/recipes/cast-numerics",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/cast-numerics",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/recipes/drilldowns",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/drilldowns",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/recipes/getting-unique-values-for-a-field",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/getting-unique-values-for-a-field",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/recipes/pagination",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/pagination",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/recipes/real-time-data-fetch",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/real-time-data-fetch",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/recipes/sorting",
+    "destination": "https://docs.cube.dev/recipes/core-data-api/sorting",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/semantic-layer-sync",
+    "destination": "https://docs.cube.dev/docs/integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/semantic-layer-sync/metabase",
+    "destination": "https://docs.cube.dev/docs/integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/semantic-layer-sync/preset",
+    "destination": "https://docs.cube.dev/docs/integrations/semantic-layer-sync/preset",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/semantic-layer-sync/superset",
+    "destination": "https://docs.cube.dev/docs/integrations/semantic-layer-sync/superset",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/semantic-layer-sync/tableau",
+    "destination": "https://docs.cube.dev/docs/integrations/tableau",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/snowflake-semantic-views",
+    "destination": "https://docs.cube.dev/docs/integrations/snowflake-semantic-views",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/tableau",
+    "destination": "https://docs.cube.dev/docs/integrations/tableau",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/context",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/context",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/data-access-policies",
+    "destination": "https://docs.cube.dev/docs/data-modeling/data-access-policies",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/member-level-security",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/member-level-security",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods",
+    "destination": "https://docs.cube.dev/embedding/authentication/jwt",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods/auth0",
+    "destination": "https://docs.cube.dev/embedding/authentication/auth0",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods/aws-cognito",
+    "destination": "https://docs.cube.dev/embedding/authentication/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods/identity-provider",
+    "destination": "https://docs.cube.dev/admin/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods/jwt",
+    "destination": "https://docs.cube.dev/embedding/authentication/jwt",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods/kerberos",
+    "destination": "https://docs.cube.dev/docs/integrations/power-bi/kerberos",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods/name-password",
+    "destination": "https://docs.cube.dev/embedding/authentication/jwt",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/methods/ntlm",
+    "destination": "https://docs.cube.dev/docs/integrations/power-bi/ntlm",
+    "permanent": true
+  },
+  {
+    "source": "/product/auth/row-level-security",
+    "destination": "https://docs.cube.dev/docs/data-modeling/access-control/row-level-security",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/getting-started-pre-aggregations",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/getting-started-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/lambda-pre-aggregations",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/lambda-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/matching-pre-aggregations",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/matching-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/recipes/disabling-pre-aggregations",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/disabling-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/recipes/joining-multiple-data-sources",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/joining-multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/recipes/non-additivity",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/non-additivity",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/recipes/refreshing-select-partitions",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/refreshing-select-partitions",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/recipes/using-originalsql-and-rollups-effectively",
+    "destination": "https://docs.cube.dev/recipes/pre-aggregations/using-originalsql-and-rollups-effectively",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/refreshing-pre-aggregations",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/refreshing-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/running-in-production",
+    "destination": "https://docs.cube.dev/cube-core/running-in-production",
+    "permanent": true
+  },
+  {
+    "source": "/product/caching/using-pre-aggregations",
+    "destination": "https://docs.cube.dev/docs/pre-aggregations/using-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration",
+    "destination": "https://docs.cube.dev/admin",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/concurrency",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/concurrency",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/aws-athena",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/aws-athena",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/aws-redshift",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/aws-redshift",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/clickhouse",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/clickhouse",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/databricks-jdbc",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/databricks-jdbc",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/druid",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/druid",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/duckdb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/duckdb",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/elasticsearch",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/elasticsearch",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/firebolt",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/firebolt",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/google-bigquery",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/google-bigquery",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/hive",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/hive",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/ksqldb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/ksqldb",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/materialize",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/materialize",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/mongodb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/mongodb",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/ms-fabric",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/ms-fabric",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/ms-sql",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/ms-sql",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/mysql",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/mysql",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/oracle",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/oracle",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/pinot",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/pinot",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/postgres",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/postgres",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/presto",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/presto",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/questdb",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/questdb",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/risingwave",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/risingwave",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/singlestore",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/singlestore",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/snowflake",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/snowflake",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/sqlite",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/sqlite",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/trino",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/trino",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/data-sources/vertica",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/data-sources/vertica",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/multiple-data-sources",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/multitenancy",
+    "destination": "https://docs.cube.dev/embedding/multitenancy",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/recipes/custom-data-model-per-tenant",
+    "destination": "https://docs.cube.dev/recipes/configuration/custom-data-model-per-tenant",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/recipes/data-store-cost-saving-guide",
+    "destination": "https://docs.cube.dev/recipes/configuration/data-store-cost-saving-guide",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/recipes/environment-variables",
+    "destination": "https://docs.cube.dev/recipes/configuration/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/recipes/multiple-sources-same-schema",
+    "destination": "https://docs.cube.dev/recipes/configuration/multiple-sources-same-schema",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/recipes/using-ssl-connections-to-data-source",
+    "destination": "https://docs.cube.dev/recipes/configuration/using-ssl-connections-to-data-source",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/reference/config",
+    "destination": "https://docs.cube.dev/reference/configuration/config",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/reference/environment-variables",
+    "destination": "https://docs.cube.dev/reference/configuration/environment-variables",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/appsmith",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/appsmith",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/bubble",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/bubble",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/budibase",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/budibase",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/deepnote",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/deepnote",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/excel",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/excel",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/google-sheets",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/google-sheets",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/hashboard",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/hashboard",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/hex",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/hex",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/hightouch",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/hightouch",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/jupyter",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/jupyter",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/klipfolio",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/klipfolio",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/langchain",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/langchain",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/looker-studio",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/looker-studio",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/metabase",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/metabase",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/observable",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/observable",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/powerbi",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/powerbi",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/push-ai",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/push-ai",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/qlik-sense",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/qlik-sense",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/quicksight",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/quicksight",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/retool",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/retool",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/rudderstack",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/rudderstack",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/sigma",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/sigma",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/steep",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/steep",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/streamlit",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/streamlit",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/superset",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/superset",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/tableau",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/tableau",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/thoughtspot",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/thoughtspot",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/visualization-tools/unity-catalog",
+    "destination": "https://docs.cube.dev/admin/connect-to-data/visualization-tools/unity-catalog",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts",
+    "destination": "https://docs.cube.dev/docs/data-modeling/overview",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/calculated-members",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/calendar-cubes",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/calendar-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/code-reusability-extending-cubes",
+    "destination": "https://docs.cube.dev/docs/data-modeling/extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/data-blending",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/multi-fact-queries",
+    "destination": "https://docs.cube.dev/docs/data-modeling/multi-fact-views",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/multi-stage-calculations",
+    "destination": "https://docs.cube.dev/docs/data-modeling/measures",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/polymorphic-cubes",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/polymorphic-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/working-with-joins",
+    "destination": "https://docs.cube.dev/docs/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/data-model-ide",
+    "destination": "https://docs.cube.dev/docs/data-modeling/data-model-ide",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/dev-mode",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/dynamic",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/dynamic/code-reusability-export-and-import",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/dynamic/javascript",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/javascript",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/dynamic/jinja",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/jinja",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/dynamic/schema-execution-environment",
+    "destination": "https://docs.cube.dev/docs/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/overview",
+    "destination": "https://docs.cube.dev/docs/data-modeling/overview",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/active-users",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/cohort-retention",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/cohort-retention",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/custom-calendar",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/custom-calendar",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/custom-granularity",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/custom-granularity",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/dbt",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dbt",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/designing-metrics",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/designing-metrics",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/dynamic-union-tables",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/entity-attribute-value",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/entity-attribute-value",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/event-analytics",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/event-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/filtered-aggregates",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/filtered-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/funnels",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/nested-aggregates",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/nested-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/passing-dynamic-parameters-in-a-query",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/percentiles",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/percentiles",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/period-over-period",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/period-over-period",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/snapshots",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/snapshots",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/string-time-dimensions",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/string-time-dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/style-guide",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/style-guide",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/using-dynamic-measures",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/recipes/xirr",
+    "destination": "https://docs.cube.dev/recipes/data-modeling/xirr",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/context-variables",
+    "destination": "https://docs.cube.dev/reference/data-modeling/context-variables",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/cube",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/cube-package",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube-package",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/cube_dbt",
+    "destination": "https://docs.cube.dev/reference/data-modeling/cube_dbt",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/data-access-policies",
+    "destination": "https://docs.cube.dev/reference/data-modeling/data-access-policies",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/dimensions",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/hierarchies",
+    "destination": "https://docs.cube.dev/reference/data-modeling/hierarchies",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/joins",
+    "destination": "https://docs.cube.dev/reference/data-modeling/joins",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/lkml2cube",
+    "destination": "https://docs.cube.dev/reference/data-modeling/lkml2cube",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/measures",
+    "destination": "https://docs.cube.dev/reference/data-modeling/measures",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/pre-aggregations",
+    "destination": "https://docs.cube.dev/reference/data-modeling/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/segments",
+    "destination": "https://docs.cube.dev/reference/data-modeling/segments",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/types-and-formats",
+    "destination": "https://docs.cube.dev/reference/data-modeling/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/view",
+    "destination": "https://docs.cube.dev/reference/data-modeling/view",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/sql-runner",
+    "destination": "https://docs.cube.dev/docs/data-modeling/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/syntax",
+    "destination": "https://docs.cube.dev/docs/data-modeling/concepts/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/visual-modeler",
+    "destination": "https://docs.cube.dev/docs/data-modeling/visual-modeler",
+    "permanent": true
+  },
+  {
+    "source": "/product/embedding",
+    "destination": "https://docs.cube.dev/embedding",
+    "permanent": true
+  },
+  {
+    "source": "/product/embedding/creator-mode",
+    "destination": "https://docs.cube.dev/embedding/iframe/creator-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/embedding/private-embedding",
+    "destination": "https://docs.cube.dev/embedding/iframe/auth/private",
+    "permanent": true
+  },
+  {
+    "source": "/product/embedding/react-embed-sdk",
+    "destination": "https://docs.cube.dev/embedding/react-embed-sdk",
+    "permanent": true
+  },
+  {
+    "source": "/product/embedding/signed-embedding",
+    "destination": "https://docs.cube.dev/embedding/iframe/auth/signed",
+    "permanent": true
+  },
+  {
+    "source": "/product/embedding/vizard",
+    "destination": "https://docs.cube.dev/embedding/vizard",
+    "permanent": true
+  },
+  {
+    "source": "/product/exploration/analytics-chat",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/analytics-chat",
+    "permanent": true
+  },
+  {
+    "source": "/product/exploration/explore",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/explore",
+    "permanent": true
+  },
+  {
+    "source": "/product/exploration/playground",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/playground",
+    "permanent": true
+  },
+  {
+    "source": "/product/exploration/workbooks",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/workbooks",
+    "permanent": true
+  },
+  {
+    "source": "/product/exploration/workbooks/charts",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/charts",
+    "permanent": true
+  },
+  {
+    "source": "/product/exploration/workbooks/querying-data",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/workbooks/querying-data",
+    "permanent": true
+  },
+  {
+    "source": "/product/exploration/workbooks/source-sql-tabs",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/workbooks/source-sql-tabs",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started",
+    "destination": "https://docs.cube.dev/docs/getting-started",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/cloud",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/cloud/connect-to-snowflake",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/connect-to-snowflake",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/cloud/create-data-model",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/create-data-model",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/cloud/load-data",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/load-data",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/cloud/query-from-bi",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/query-from-bi",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/cloud/query-from-react-app",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/query-from-react-app",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/connect-your-data",
+    "destination": "https://docs.cube.dev/docs/getting-started/connect-your-data",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/core",
+    "destination": "https://docs.cube.dev/cube-core/getting-started",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/core/add-a-pre-aggregation",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/add-a-pre-aggregation",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/core/create-a-project",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/create-a-project",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/core/learn-more",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/learn-more",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/core/query-data",
+    "destination": "https://docs.cube.dev/cube-core/getting-started/query-data",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/create-workbooks-and-dashboards",
+    "destination": "https://docs.cube.dev/docs/getting-started/create-workbooks-and-dashboards",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/databricks",
+    "destination": "https://docs.cube.dev/docs/getting-started/databricks",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/databricks/connect-to-databricks",
+    "destination": "https://docs.cube.dev/docs/getting-started/databricks/connect-to-databricks",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/databricks/create-data-model",
+    "destination": "https://docs.cube.dev/docs/getting-started/databricks/create-data-model",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/databricks/load-data",
+    "destination": "https://docs.cube.dev/docs/getting-started/databricks/load-data",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/databricks/query-from-bi",
+    "destination": "https://docs.cube.dev/docs/getting-started/databricks/query-from-bi",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/databricks/query-from-react-app",
+    "destination": "https://docs.cube.dev/docs/getting-started/cloud/query-from-react-app",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/develop-in-ide",
+    "destination": "https://docs.cube.dev/docs/getting-started/develop-in-ide",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/embed-analytics",
+    "destination": "https://docs.cube.dev/docs/getting-started/embed-analytics",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/migrate-from-core",
+    "destination": "https://docs.cube.dev/docs/getting-started/migrate-from-core/import-github-repository",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-bitbucket-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/migrate-from-core/import-git-repository-via-ssh",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-git-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/migrate-from-core/import-github-repository",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-github-repository",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/import-gitlab-repository-via-ssh",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/migrate-from-core/upload-with-cli",
+    "destination": "https://docs.cube.dev/cube-core/migrate-from-core/upload-with-cli",
+    "permanent": true
+  },
+  {
+    "source": "/product/getting-started/use-analytics-chat",
+    "destination": "https://docs.cube.dev/docs/getting-started/use-analytics-chat",
+    "permanent": true
+  },
+  {
+    "source": "/product/introduction",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/dashboards",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/dashboards",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/notifications",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/notifications",
+    "permanent": true
+  },
+  {
+    "source": "/product/presentation/scheduled-refreshes",
+    "destination": "https://docs.cube.dev/docs/explore-analyze/scheduled-refreshes",
+    "permanent": true
+  },
+  {
+    "source": "/product/:path*",
+    "destination": "https://docs.cube.dev/docs/introduction",
+    "permanent": true
+  }
+]

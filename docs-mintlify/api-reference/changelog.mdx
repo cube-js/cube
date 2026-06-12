@@ -1,0 +1,33 @@
+---
+title: Changelog
+description: Release notes for the Cube Cloud platform client and management API.
+rss: true
+---
+
+{/* GENERATED FILE — do not edit by hand. */}
+{/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
+
+<Update label="2026-06-07" description="v0.1.0" tags={["Added","Changed","Deprecated"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/folders` now supports cursor-based pagination via the `first` and `after` query parameters, and returns an `items` array alongside a `pageInfo` cursor block — matching the other list endpoints.
+
+  ### Changed
+
+  - **BREAKING:** The folders list response type `FoldersFindAllResult` is now `FoldersListResponse`.
+
+  ### Deprecated
+
+  - The `data` and `count` fields on the folders list response are deprecated in favor of `items` and `pageInfo`. They remain populated for backward compatibility.
+</Update>
+
+<Update label="2026-06-05" description="v0.0.20" tags={["Added","Deprecated"]}>
+  ### Added
+
+  - `createCubePlatformClient` — the new name for the client factory.
+  - Cube Platform-branded type and hook names: `CubePlatformClient`, `CubePlatformClientConfig`, `PlatformApiSchemas`, and the react-query exports `CubePlatformApiProvider`, `useCubePlatformApi`, `useCubePlatformApiQuery`, `useCubePlatformApiSuspenseQuery`, `useCubePlatformApiMutation`, `useCubePlatformApiLazyQuery`, `useCubePlatformApiQueryOptions`, `CubePlatformApiQueryKey`, `UseCubePlatformApiLazyQueryResult`.
+
+  ### Deprecated
+
+  - The former `CubeCloud*` / `ConsoleApiSchemas` names are deprecated in favor of the `CubePlatform*` / `PlatformApiSchemas` equivalents. All remain as aliases and will be removed in a future major version: `createCubeCloudApiClient`, `CubeCloudApiClient`, `CubeCloudApiClientConfig`, `ConsoleApiSchemas`, `CubeCloudApiProvider`, `CubeCloudApiProviderProps`, `useCubeCloudApi`, `useCubeCloudApiQuery`, `useCubeCloudApiSuspenseQuery`, `useCubeCloudApiMutation`, `useCubeCloudApiLazyQuery`, `useCubeCloudApiQueryOptions`, `CubeCloudApiQueryKey`, `UseCubeCloudApiLazyQueryResult`.
+</Update>

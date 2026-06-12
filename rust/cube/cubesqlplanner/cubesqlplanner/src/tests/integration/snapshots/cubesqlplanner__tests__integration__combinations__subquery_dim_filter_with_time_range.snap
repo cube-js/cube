@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/combinations.rs
+expression: result
+---
+orders__created_at_month | orders__total_amount
+-------------------------+---------------------
+2025-03-01 00:00:00      | 300.00

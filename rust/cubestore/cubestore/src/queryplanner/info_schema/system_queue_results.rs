@@ -5,7 +5,7 @@ use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array,
+    ArrayRef, BooleanBuilder, StringBuilder, TimestampNanosecondBuilder, UInt64Builder,
 };
 use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
@@ -20,8 +20,8 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.cache_store.queue_results_all(limit).await?))
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.cache_store.queue_results_all(limit).await?)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -39,44 +39,32 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut path_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut expire_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut deleted_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut value_builder = StringBuilder::with_capacity(num_rows, num_rows * 128);
+        let mut external_id_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+
+        for row in rows.into_iter() {
+            id_builder.append_value(row.get_id());
+            let result = row.get_row();
+            path_builder.append_value(result.get_path());
+            expire_builder.append_value(timestamp_nanos_or_panic(result.get_expire()));
+            deleted_builder.append_value(result.is_deleted());
+            value_builder.append_value(result.get_value());
+            external_id_builder.append_option(result.get_external_id().as_deref());
+        }
+
         vec![
-            Box::new(|items| {
-                Arc::new(UInt64Array::from_iter(
-                    items.iter().map(|row| Some(row.get_id())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items
-                        .iter()
-                        .map(|row| Some(row.get_row().get_path().clone())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from_iter_values(
-                    items
-                        .iter()
-                        .map(|row| timestamp_nanos_or_panic(row.get_row().get_expire())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(BooleanArray::from_iter(
-                    items.iter().map(|row| Some(row.get_row().is_deleted())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter_values(
-                    items.iter().map(|row| row.get_row().get_value().clone()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items
-                        .iter()
-                        .map(|row| row.get_row().get_external_id().clone()),
-                ))
-            }),
+            Arc::new(id_builder.finish()),
+            Arc::new(path_builder.finish()),
+            Arc::new(expire_builder.finish()),
+            Arc::new(deleted_builder.finish()),
+            Arc::new(value_builder.finish()),
+            Arc::new(external_id_builder.finish()),
         ]
     }
 }

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/prestodb-driver",
   "description": "Cube.js Presto database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.24",
+  "version": "1.6.57",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -21,15 +21,16 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "jest dist/test",
-    "integration:presto": "jest dist/test",
+    "unit": "jest dist/test/unit",
+    "integration": "jest dist/test/integration",
+    "integration:presto": "jest dist/test/integration",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.6.24",
-    "@cubejs-backend/shared": "1.6.24",
-    "presto-client": "^1.1.0",
+    "@cubejs-backend/base-driver": "1.6.57",
+    "@cubejs-backend/shared": "1.6.57",
+    "presto-client": "1.2.0",
     "ramda": "^0.27.0",
     "sqlstring": "^2.3.1"
   },
@@ -38,7 +39,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.24",
+    "@cubejs-backend/linter": "1.6.57",
     "@types/jest": "^29",
     "jest": "^29",
     "should": "^13.2.3",

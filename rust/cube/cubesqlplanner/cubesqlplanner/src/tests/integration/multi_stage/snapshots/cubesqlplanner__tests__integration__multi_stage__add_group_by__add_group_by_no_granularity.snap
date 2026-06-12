@@ -1,0 +1,21 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/add_group_by.rs
+expression: result
+---
+orders__amount_by_id
+--------------------
+400.00              
+300.00              
+250.00              
+200.00              
+200.00              
+200.00              
+150.00              
+120.00              
+100.00              
+100.00              
+50.00               
+50.00               
+50.00               
+50.00               
+30.00

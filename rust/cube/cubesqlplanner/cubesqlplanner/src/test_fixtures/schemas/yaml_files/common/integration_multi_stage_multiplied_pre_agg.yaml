@@ -1,0 +1,144 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM ms_customers"
+      joins:
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+
+          - name: total_lifetime_value
+            type: sum
+            sql: lifetime_value
+
+          # Multi-stage + time_shift on cross-cube time dim: leaf must be
+          # rendered as a full AggregateMultipliedSubquery (keys subquery +
+          # re-join by primary key).
+          - name: total_lifetime_value_prev_month_by_returns
+            type: number
+            sql: "{CUBE.total_lifetime_value}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+
+          # Rolling window over the same multiplied leaf (one_to_many to
+          # returns): the leaf is an AggregateMultipliedSubquery feeding a
+          # to_date rolling window.
+          - name: total_lifetime_value_ytd
+            type: sum
+            sql: lifetime_value
+            rolling_window:
+                type: to_date
+                granularity: year
+
+      pre_aggregations:
+          # Pre-agg for the multiplied leaf subquery: base total_lifetime_value
+          # aggregated by returns.created_at (one_to_many join).
+          - name: customers_lifetime_by_returns_month
+            type: rollup
+            measures:
+                - total_lifetime_value
+            time_dimension: returns.created_at
+            granularity: month
+
+          # Pre-agg that directly materializes the multi-stage time_shift
+          # measure. Query for it should match this pre-agg as-is.
+          - name: customers_lifetime_prev_month_pre_agg
+            type: rollup
+            measures:
+                - total_lifetime_value_prev_month_by_returns
+            time_dimension: returns.created_at
+            granularity: month
+
+    - name: orders
+      sql: "SELECT * FROM ms_orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: total_amount
+            type: sum
+            sql: amount
+
+          # Plain multi-stage time shift on the cube's own time dim. The
+          # leaf is a simple query on its own; a filter on `returns`
+          # (orders -> customers -> returns, one_to_many) turns it into an
+          # AggregateMultipliedSubquery.
+          - name: amount_prev_month
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: orders.created_at
+
+      pre_aggregations:
+          # Base measure at query grain, no `returns` members — cannot
+          # cover a filter on returns.
+          - name: orders_amount_by_month
+            type: rollup
+            measures:
+                - total_amount
+            time_dimension: orders.created_at
+            granularity: month
+
+          # Same plus the filter dimension from the multiplying join.
+          - name: orders_amount_by_month_and_return_customer
+            type: rollup
+            measures:
+                - total_amount
+            dimensions:
+                - returns.customer_id
+            time_dimension: orders.created_at
+            granularity: month
+
+    - name: returns
+      sql: "SELECT * FROM ms_returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          - name: returns_count_by_month
+            type: rollup
+            measures:
+                - count
+            time_dimension: created_at
+            granularity: month

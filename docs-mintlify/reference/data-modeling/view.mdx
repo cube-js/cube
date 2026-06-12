@@ -1,0 +1,935 @@
+---
+title: Views
+description: Views are curated compositions of cube members that simplify consumption and clarify join paths for downstream tools.
+---
+
+Views sit on top of the data graph of [cubes][ref-ref-cubes] and create a facade of your whole
+data model with which data consumers can interact. They are useful for defining
+metrics, managing governance and data access, and controlling ambiguous join
+paths.
+
+Any view should have the following parameters: [`name`](#name) and [`cubes`](#cubes).
+
+## Parameters
+
+### `name`
+
+The `name` parameter serves as the identifier of a view. It must be unique among
+_all cubes and views_ within a deployment and follow the [naming
+conventions][ref-naming].
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: active_users
+```
+
+```javascript title="JavaScript"
+view(`active_users`, {})
+
+```
+
+</CodeGroup>
+
+### `extends`
+
+You can use the `extends` parameter to [extend views][ref-extension] in order to reuse
+all declared members of a view.
+
+In the example below, `extended_orders` will extend `orders` with an additional join path:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders
+    cubes:
+      - join_path: base_orders
+        includes: "*"
+
+  - name: extended_orders
+    extends: orders
+    cubes:
+      - join_path: base_orders.users
+        includes: "*"
+```
+
+```javascript title="JavaScript"
+view(`orders`, {
+  cubes: [
+    {
+      join_path: `base_orders`,
+      includes: `*`
+    }
+  ]
+})
+
+view(`extended_orders`, {
+  extends: orders,
+  cubes: [
+    {
+      join_path: `base_orders.users`,
+      includes: `*`
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### `title`
+
+Use the `title` parameter to change the display name of the view.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+    title: Product Orders
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`
+})
+```
+
+</CodeGroup>
+
+### `description`
+
+This parameter provides a human-readable description of a view.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+A description can give a hint both to your team and end users, making sure they
+interpret the data correctly.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: active_users
+    description: 14 days rolling count of active users
+```
+
+```javascript title="JavaScript"
+view(`active_users`, {
+  description: `14 days rolling count of active users`
+})
+```
+
+</CodeGroup>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a view. Valid values
+for `public` are `true` and `false`. When set to `false`, this view **cannot**
+be queried through the API. Defaults to `true`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders
+    public: false
+```
+
+```javascript title="JavaScript"
+view(`orders`, {
+  public: false
+})
+```
+
+</CodeGroup>
+
+You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check
+out our
+[Controlling access to cubes and views ](/docs/data-modeling/access-control/recipes/controlling-access-to-cubes-and-views)
+recipe.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: arr
+    description: Annual Recurring Revenue
+    public: COMPILE_CONTEXT.security_context.is_finance
+
+    cubes:
+      - join_path: revenue
+        includes:
+          - arr
+          - date
+
+      - join_path: revenue.customers
+        includes:
+          - plan
+```
+
+```javascript title="JavaScript"
+view(`arr`, {
+  description: `Annual Recurring Revenue`,
+  public: COMPILE_CONTEXT.security_context.is_finance,
+
+  cubes: [
+    {
+      join_path: revenue,
+      includes: [
+        `arr`,
+        `date`
+      ]
+    },
+    {
+      join_path: revenue.customers,
+      includes: `plan`
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+To learn more about using `public` to control visibility based on security
+context, read the [Controlling access to cubes and views
+recipe][ref-recipe-control-access-cubes-views].
+
+### `meta`
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+You can also use the `ai_context` key to provide context to the
+[AI agent][ref-ai-context] without exposing it in the user interface.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: active_users
+    meta:
+      any: value
+      ai_context: >
+        This view shows users active in the last 14 days.
+        Use for engagement analysis questions.
+
+```
+
+```javascript title="JavaScript"
+view(`active_users`, {
+  meta: {
+    any: `value`,
+    ai_context: `This view shows users active in the last 14 days.
+      Use for engagement analysis questions.`
+  }
+})
+```
+
+</CodeGroup>
+
+#### `auto_run`
+
+In the Cube cloud platform, you can use the `auto_run` key in a view's `meta`
+to control whether [workbook][ref-workbook-running] queries against the view
+run automatically. By default, a workbook re-runs the query every time a data
+consumer changes it — adds a member, edits a filter, and so on. Setting
+`auto_run: false` turns this off for the view: the query only runs when the
+user clicks **Run query**.
+
+This is useful for views backed by heavy or expensive queries, where running
+on every change would be wasteful.
+
+<Info>
+
+Please note, currently `auto_run` is defined inside the `meta` property; this
+may change in the future.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      auto_run: false
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    auto_run: false
+  }
+});
+```
+
+</CodeGroup>
+
+The setting only provides the default for the view. Data consumers can toggle
+auto-run on or off in each workbook tab, and their choice takes precedence
+over the view's default. When `auto_run` is not set, auto-run is on.
+
+#### `default_ui_filters`
+
+In the Cube cloud platform, you can use the `default_ui_filters` key in a
+view's `meta` to define default filters for [workbooks][ref-workbook-filtering].
+When the view is selected in a new workbook tab, these filters are
+pre-populated as regular, fully editable filters — data consumers can change
+their values, switch operators, or remove them entirely.
+
+Each entry has the same shape as a [`default_filters`](#default_filters) entry:
+a `member` (a dimension or measure exposed by the view), an `operator`, and a
+list of `values`.
+
+<Info>
+
+Please note, currently default UI filters are defined inside the `meta`
+property; this may change in the future.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      default_ui_filters:
+        - member: status
+          operator: equals
+          values:
+            - completed
+        - member: created_at
+          operator: inDateRange
+          values:
+            - 2024-01-01
+            - 2024-12-31
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    default_ui_filters: [
+      {
+        member: `status`,
+        operator: `equals`,
+        values: [`completed`]
+      },
+      {
+        member: `created_at`,
+        operator: `inDateRange`,
+        values: [`2024-01-01`, `2024-12-31`]
+      }
+    ]
+  }
+});
+```
+
+</CodeGroup>
+
+Unlike [`default_filters`](#default_filters), which are enforced on every query
+against the view, `default_ui_filters` only provide a starting point for the
+workbook UI: they don't apply to queries made through APIs or other
+visualization tools, and workbook users can freely modify or remove them.
+They also only apply to new queries — defining or changing them in the data
+model does not add them to existing queries.
+
+### `cubes`
+
+Use `cubes` parameter in view to include exposed cubes in bulk. You can build
+your view by combining multiple joined cubes together and specifying the path by
+which they should be joined for that particular view.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+
+      - join_path: base_orders.line_items.products
+        includes:
+          - name: name
+            alias: product
+            title: My custom product
+            description: My custom product description
+            format: number
+            meta:
+              some: custom
+              meta: data
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: "*"
+        excludes:
+          - company
+```
+
+```javascript title="JavaScript"
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: [
+        `status`,
+        `created_date`,
+        `total_amount`,
+        `total_amount_shipped`,
+        `count`,
+        `average_order_value`
+      ]
+    },
+    {
+      join_path: base_orders.line_items.products,
+      includes: [
+        {
+          name: `name`,
+          alias: `product`,
+          title: `My custom product`,
+          description: `My custom product description`,
+          format: `number`,
+          meta: {
+            some: `custom`,
+            meta: `data`
+          }
+        }
+      ]
+    },
+    {
+      join_path: base_orders.users,
+      prefix: true
+      includes: `*`,
+      excludes: [
+        `company`
+      ]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+#### `join_path`
+
+When listing cubes to expose, you need to provide a `join_path` parameter.
+It uses the "dot notation" to describe the join path: `cube_1.cube_2.cube_3`.
+
+For the root cube of the view, just use the cube name as in the example
+above for `base_orders`.
+
+#### `includes` and `excludes`
+
+The other required parameter inside the `cubes` block is `includes`. Use it
+to list measures, dimensions, [hierarchies][ref-ref-hierarchies], or segments
+you'd like to include into the view.
+
+To include all members from a cube, use the _includes all_ shorthand: `includes: "*"`.
+In that case, you can also use the `excludes` parameter to list members that
+you'd like to exclude.
+
+#### `prefix`
+
+If you'd like to prefix exposed members with the cube name, you can do so by setting the
+`prefix` parameter to `true`. It will prefix members with the cube name, e.g. `users_city`.
+You can use the [`alias` parameter](#alias) to specify a custom prefix.
+
+#### `alias`
+
+If you'd like to [rename][ref-dim-name] an included member, you can use the `alias`
+parameter.
+
+#### `title`
+
+If you'd like to override the [title][ref-dim-title] of a member, you can use the
+`title` parameter.
+
+#### `description`
+
+If you'd like to override the [description][ref-dim-description] of a member, you
+can use the `description` parameter.
+
+#### `format`
+
+If you'd like to override the [format][ref-dim-format] of a member, you can use the
+`format` parameter.
+
+#### `meta`
+
+If you'd like to override the [metadata][ref-dim-meta] of a member, you can use the
+`meta` parameter. Note that the `meta` is overridded as a whole.
+
+### `folders`
+
+The `folders` parameter is used to organize members of a view (e.g., dimensions,
+hierarchies, measures, etc.) into logical groups. Folders can contain non-overlapping
+subsets of members from a view.
+
+<Info>
+
+Folders display is subject to support in [visualization tools][ref-viz-tools].
+Check [APIs & Integrations][ref-apis-support] for details.
+You can also preview folders in [Playground][ref-playground].
+
+</Info>
+
+Each folder should specify a human-readable name via the `name` parameter and list
+included members via the `includes` parameter:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: customers
+
+    cubes:
+      - join_path: users
+        includes: "*"
+
+      - join_path: users.orders
+        prefix: true
+        includes:
+          - status
+          - price
+          - count
+
+    folders:
+      - name: Basic Details
+        includes:
+          - created_at
+          - location
+          - orders_status
+          - orders_count
+
+      - name: Sensitive Details
+        includes:
+          - name
+          - gender
+```
+
+```javascript title="JavaScript"
+view(`customers`, {
+  cubes: [
+    {
+      join_path: `users`,
+      includes: `*`
+    },
+    {
+      join_path: `users.orders`,
+      prefix: true,
+      includes: [
+        `status`,
+        `price`,
+        `count`
+      ]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Basic Details`,
+      includes: [
+        `created_at`,
+        `location`,
+        `orders_status`,
+        `orders_count`
+      ]
+    },
+
+    {
+      name: `Sensitive Details`,
+      includes: [
+        `name`,
+        `gender`
+      ]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+You can also use the `join_path` parameter within `includes` to add all members from a
+specific [join path](#join_path) without listing them individually. You can mix
+`join_path` with individual member names in the same folder:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes: "*"
+
+      - join_path: base_orders.line_items
+        includes: "*"
+
+      - join_path: base_orders.users
+        includes:
+          - count
+          - name: count_distinct
+            alias: users_distinct_count
+
+    folders:
+      - name: Order Details
+        includes:
+          - join_path: base_orders
+
+      - name: Line Items & Users
+        includes:
+          - join_path: base_orders.line_items
+          - count
+          - users_distinct_count
+```
+
+```javascript title="JavaScript"
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: `*`
+    },
+    {
+      join_path: base_orders.line_items,
+      includes: `*`
+    },
+    {
+      join_path: base_orders.users,
+      includes: [
+        `count`,
+        {
+          name: `count_distinct`,
+          alias: `users_distinct_count`
+        }
+      ]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Order Details`,
+      includes: [
+        { join_path: base_orders }
+      ]
+    },
+    {
+      name: `Line Items & Users`,
+      includes: [
+        { join_path: base_orders.line_items },
+        `count`,
+        `users_distinct_count`
+      ]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+#### Nesting
+
+Nested folders are also supported. The `includes` parameter can contain not only
+references to view members but also other folders:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: customers
+
+    cubes:
+      - join_path: users
+        includes: "*"
+
+      - join_path: users.orders
+        prefix: true
+        includes:
+          - status
+          - price
+          - count
+
+    folders:
+      - name: Customer Information
+        includes:
+          - name: Personal Details
+            includes:
+              - name
+              - gender
+
+          - name: Location
+            includes:
+              - address
+              - postal_code
+              - city
+
+      - name: Order Analytics
+        includes:
+          - orders_status
+          - orders_price
+          
+          - name: Metrics
+            includes:
+              - orders_count
+              - orders_average_value
+```
+
+```javascript title="JavaScript"
+view(`customers`, {
+  cubes: [
+    {
+      join_path: `users`,
+      includes: `*`
+    },
+    {
+      join_path: `users.orders`,
+      prefix: true,
+      includes: [
+        `status`,
+        `price`,
+        `count`
+      ]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Customer Information`,
+      includes: [
+        {
+          name: `Personal Details`,
+          includes: [
+            `name`,
+            `gender`
+          ]
+        },
+        {
+          name: `Location`,
+          includes: [
+            `address`,
+            `postal_code`,
+            `city`
+          ]
+        }
+      ]
+    },
+    {
+      name: `Order Analytics`,
+      includes: [
+        `orders_status`,
+        `orders_price`,
+        {
+          name: `Metrics`,
+          includes: [
+            `orders_count`,
+            `orders_average_value`
+          ]
+        }
+      ]
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+You can still define nested folders in the data model even if some of your [visualization
+tools][ref-viz-tools] do not support them. Check [APIs & Integrations][ref-apis-support]
+for details on the nested folders support.
+
+For tools that do not support nested folders, the nested structure will be flattened:
+by default, the members of nested folders are merged into folders at the root level.
+You can also set the [`CUBEJS_NESTED_FOLDERS_DELIMITER`](/reference/configuration/environment-variables#cubejs_nested_folders_delimiter) environment variable to preserve
+nested folders and give them path-like names, e.g., `Customer Information / Personal
+Details`.
+
+### `default_filters`
+
+The `default_filters` parameter is used to define default filters on a view.
+These filters are applied to every query against the view, narrowing down the
+result set to a specific subset of data without requiring data consumers to
+specify the filter explicitly.
+
+Default filters are useful for governance scenarios where a view should
+always be scoped to a particular value (e.g., a tenant, region, or currency).
+To provide sensible defaults that data consumers can edit or remove in the UI,
+use [`meta.default_ui_filters`](#default_ui_filters) instead.
+
+<Note>
+
+`default_filters` are enforced on every query against the view, including
+filter suggestions.
+
+</Note>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_us
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    default_filters:
+      - member: country
+        operator: equals
+        values:
+          - US
+```
+
+```javascript title="JavaScript"
+view(`orders_us`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  defaultFilters: [
+    {
+      member: `country`,
+      operator: `equals`,
+      values: [`US`]
+    }
+  ]
+});
+```
+
+</CodeGroup>
+
+Each default filter accepts the following parameters:
+
+#### `member`
+
+The name of the dimension to filter on. The member must be exposed by the view.
+
+#### `operator`
+
+The filter operator. Supported operators match the ones available in the
+[REST API query format][ref-rest-query-ops]: `equals`, `notEquals`, `contains`,
+`notContains`, `startsWith`, `notStartsWith`, `endsWith`, `notEndsWith`, `in`,
+`notIn`, `gt`, `gte`, `lt`, `lte`, `set`, `notSet`, `inDateRange`,
+`notInDateRange`, `onTheDate`, `beforeDate`, `beforeOrOnDate`, `afterDate`,
+`afterOrOnDate`.
+
+#### `values`
+
+A list of values for the filter operator. Required for all operators except
+`set` and `notSet`.
+
+#### `unless`
+
+The `unless` parameter optionally lists members that, when referenced in a
+query (either in the projection or in an explicit filter), will cause the
+default filter to be released. This allows consumers to override the
+default filter by querying or filtering by one of the listed members.
+
+If `unless` is not specified, the filter is always applied.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_default_us
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    default_filters:
+      - member: country
+        operator: equals
+        values:
+          - US
+        unless:
+          - country
+```
+
+```javascript title="JavaScript"
+view(`orders_default_us`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  defaultFilters: [
+    {
+      member: `country`,
+      operator: `equals`,
+      values: [`US`],
+      unless: [`country`]
+    }
+  ]
+});
+```
+
+</CodeGroup>
+
+In the example above, the `country = US` filter is applied by default. However,
+if a query explicitly filters on `country` (e.g., `country = FR`), the default
+filter is released and the explicit filter is used instead.
+
+### `access_policy`
+
+The `access_policy` parameter is used to configure [access policies][ref-ref-dap].
+
+[ref-ai-context]: /docs/data-modeling/ai-context
+[ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control/recipes/controlling-access-to-cubes-and-views
+[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-apis]: /reference
+[ref-ref-cubes]: /reference/data-modeling/cube
+[ref-ref-hierarchies]: /reference/data-modeling/hierarchies
+[ref-ref-dap]: /reference/data-modeling/data-access-policies
+[ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
+[ref-apis-support]: /reference#data-modeling
+[ref-playground]: /docs/workspace/playground#viewing-the-data-model
+[ref-viz-tools]: /admin/connect-to-data/visualization-tools
+[ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
+[ref-workbook-running]: /docs/explore-analyze/workbooks/querying-data#running-queries
+[ref-extension]: /docs/data-modeling/extending-cubes
+[ref-dim-name]: /reference/data-modeling/dimensions#name
+[ref-dim-title]: /reference/data-modeling/dimensions#title
+[ref-dim-description]: /reference/data-modeling/dimensions#description
+[ref-dim-format]: /reference/data-modeling/dimensions#format
+[ref-dim-meta]: /reference/data-modeling/dimensions#meta

@@ -22,6 +22,7 @@ export type DuckDBDriverConfiguration = {
   motherDuckToken?: string,
   schema?: string,
   duckdbS3UseCredentialChain?: boolean,
+  preAggregations?: boolean,
 };
 
 type InitPromise = {

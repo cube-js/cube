@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/advanced_features.rs
+expression: result
+---
+orders__status_summary
+----------------------
+high

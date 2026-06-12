@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/filters_segments.rs
+expression: result
+---
+orders__count | orders__total_amount
+--------------+---------------------
+4             | 190.00

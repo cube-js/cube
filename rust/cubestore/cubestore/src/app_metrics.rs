@@ -13,10 +13,16 @@ pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors"
 /// Incoming SQL queries that do data reads.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
+pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
+    metrics::counter("cs.sql.query.data.cache.stale_hit");
 // Approximate number of entries in this cache.
 pub static DATA_QUERIES_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.data.cache.size");
 // Approximate total weighted size of entries in this cache.
 pub static DATA_QUERIES_CACHE_WEIGHT: Gauge = metrics::gauge("cs.sql.query.data.cache.weight");
+pub static DATA_QUERIES_STALE_CACHE_SIZE: Gauge =
+    metrics::gauge("cs.sql.query.data.cache.stale.size");
+pub static DATA_QUERIES_STALE_CACHE_WEIGHT: Gauge =
+    metrics::gauge("cs.sql.query.data.cache.stale.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
 pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");
@@ -73,9 +79,9 @@ pub static QUEUE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.que
 pub static STREAMING_ROWS_READ: Counter = metrics::counter("cs.streaming.rows");
 pub static STREAMING_CHUNKS_READ: Counter = metrics::counter("cs.streaming.chunks");
 pub static STREAMING_LASTOFFSET: Gauge = metrics::gauge("cs.streaming.lastoffset");
-pub static IN_MEMORY_CHUNKS_COUNT: Gauge = metrics::gauge("cs.workers.in_memory_chunks)");
-pub static IN_MEMORY_CHUNKS_ROWS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.rows)");
-pub static IN_MEMORY_CHUNKS_MEMORY: Gauge = metrics::gauge("cs.workers.in_memory_chunks.memory)");
+pub static IN_MEMORY_CHUNKS_COUNT: Gauge = metrics::gauge("cs.workers.in_memory_chunks");
+pub static IN_MEMORY_CHUNKS_ROWS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.rows");
+pub static IN_MEMORY_CHUNKS_MEMORY: Gauge = metrics::gauge("cs.workers.in_memory_chunks.memory");
 pub static STREAMING_IMPORT_TIME: Histogram = metrics::histogram("cs.streaming.import_time.ms");
 pub static STREAMING_PARTITION_TIME: Histogram =
     metrics::histogram("cs.streaming.partition_time.ms");

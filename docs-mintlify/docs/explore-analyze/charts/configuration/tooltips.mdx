@@ -1,0 +1,32 @@
+---
+title: Tooltips
+description: Control which fields appear when a user hovers over a chart mark.
+---
+
+Tooltips appear when a user hovers over a data point in a chart. By default, Cube automatically populates the tooltip with all fields mapped to chart channels. You can customize which fields are shown and in what order.
+
+{/* TODO screenshot: tooltip displayed on a bar chart showing multiple fields (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Default behavior
+
+When a chart is first created, all fields assigned to the chart (X, Y, color, size) are included in the tooltip automatically. The tooltip is enabled by default on all Vega-based chart types (bar, line, area, scatter, heatmap, boxplot) and on map charts.
+
+## Configuring tooltip fields
+
+Open the **Fields** tab of the chart configuration panel. The **Tooltip** section shows the list of fields currently included in the tooltip.
+
+| Action | How |
+|---|---|
+| **Add a field** | Drag a field from **Available fields** into the Tooltip slot |
+| **Remove a field** | Click the **×** on a field token in the Tooltip list |
+| **Reorder fields** | Drag field tokens within the Tooltip list |
+
+{/* TODO screenshot: Tooltip section in the Fields tab with field list (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Disabling tooltips
+
+To turn off tooltips entirely, remove all fields from the Tooltip slot. When the Tooltip slot is empty, no tooltip is shown on hover.
+
+## Tooltip behavior on stacked charts
+
+On stacked bar charts, the tooltip is scoped to the individual stack segment under the cursor — it shows the value for that specific series at that X position, not the total stack value. To display the stack total, use [data labels](/docs/explore-analyze/charts/configuration/data-labels) with the **Simple totals** option.

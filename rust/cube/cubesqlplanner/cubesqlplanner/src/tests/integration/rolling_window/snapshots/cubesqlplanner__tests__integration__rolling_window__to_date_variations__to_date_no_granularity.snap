@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/to_date_variations.rs
+expression: result
+---
+orders__rolling_sum_to_date
+---------------------------
+830.00

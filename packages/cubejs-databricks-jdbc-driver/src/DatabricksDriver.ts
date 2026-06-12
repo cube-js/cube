@@ -188,6 +188,11 @@ export class DatabricksDriver extends JDBCDriver {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -202,12 +207,13 @@ export class DatabricksDriver extends JDBCDriver {
     const dataSource =
       conf.dataSource ||
       assertDataSource('default');
+    const preAggregations = conf.preAggregations || false;
 
     let showSparkProtocolWarn = false;
     let url: string =
       conf?.url ||
-      getEnv('databricksUrl', { dataSource }) ||
-      getEnv('jdbcUrl', { dataSource });
+      getEnv('databricksUrl', { dataSource, preAggregations }) ||
+      getEnv('jdbcUrl', { dataSource, preAggregations });
     if (url.indexOf('jdbc:spark://') !== -1) {
       showSparkProtocolWarn = true;
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
@@ -215,10 +221,10 @@ export class DatabricksDriver extends JDBCDriver {
 
     const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
     const passwd = conf?.token ||
-          getEnv('databricksToken', { dataSource }) ||
+          getEnv('databricksToken', { dataSource, preAggregations }) ||
           pwd;
-    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource });
-    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource });
+    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource, preAggregations });
+    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource, preAggregations });
 
     if (oauthClientId && !oauthClientSecret) {
       throw new Error('Invalid credentials: No OAuth Client Secret provided');
@@ -260,52 +266,52 @@ export class DatabricksDriver extends JDBCDriver {
       },
       catalog:
         conf?.catalog ||
-        getEnv('databricksCatalog', { dataSource }),
-      database: getEnv('dbName', { required: false, dataSource }),
+        getEnv('databricksCatalog', { dataSource, preAggregations }),
+      database: getEnv('dbName', { required: false, dataSource, preAggregations }),
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
+        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource, preAggregations }),
       exportBucket:
         conf?.exportBucket ||
-        getEnv('dbExportBucket', { dataSource }),
+        getEnv('dbExportBucket', { dataSource, preAggregations }),
       exportBucketMountDir:
         conf?.exportBucketMountDir ||
-        getEnv('dbExportBucketMountDir', { dataSource }),
+        getEnv('dbExportBucketMountDir', { dataSource, preAggregations }),
       pollInterval: (
         conf?.pollInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
       // AWS export bucket config
       awsKey:
         conf?.awsKey ||
-        getEnv('dbExportBucketAwsKey', { dataSource }),
+        getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
       awsSecret:
         conf?.awsSecret ||
-        getEnv('dbExportBucketAwsSecret', { dataSource }),
+        getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
       awsRegion:
         conf?.awsRegion ||
-        getEnv('dbExportBucketAwsRegion', { dataSource }),
+        getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
       // Azure export bucket
       azureKey:
         conf?.azureKey ||
-        getEnv('dbExportBucketAzureKey', { dataSource }),
+        getEnv('dbExportBucketAzureKey', { dataSource, preAggregations }),
       exportBucketCsvEscapeSymbol:
-        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       // Azure service principal
       azureTenantId:
         conf?.azureTenantId ||
-        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+        getEnv('dbExportBucketAzureTenantId', { dataSource, preAggregations }),
       azureClientId:
         conf?.azureClientId ||
-        getEnv('dbExportBucketAzureClientId', { dataSource }),
+        getEnv('dbExportBucketAzureClientId', { dataSource, preAggregations }),
       azureClientSecret:
         conf?.azureClientSecret ||
-        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
+        getEnv('dbExportBucketAzureClientSecret', { dataSource, preAggregations }),
       // GCS credentials
       gcsCredentials:
         conf?.gcsCredentials ||
-        getEnv('dbExportGCSCredentials', { dataSource }),
+        getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
     };
     if (config.readOnly === undefined) {
       // we can set readonly to true if there is no bucket config provided

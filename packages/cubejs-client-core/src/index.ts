@@ -1,14 +1,17 @@
 import { v4 as uuidv4 } from 'uuid';
-import ResultSet from './ResultSet';
-import SqlQuery from './SqlQuery';
-import Meta from './Meta';
-import ProgressResult from './ProgressResult';
-import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport';
-import RequestError from './RequestError';
+import ResultSet from './ResultSet.js';
+import SqlQuery from './SqlQuery.js';
+import Meta from './Meta.js';
+import ProgressResult from './ProgressResult.js';
+import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport.js';
+import RequestError from './RequestError.js';
 import {
   CacheMode,
+  DeeplyReadonly,
+  DimensionFormat,
   ExtractTimeMembers,
   LoadResponse,
+  MeasureFormat,
   MetaResponse,
   PivotQuery,
   ProgressResponse,
@@ -16,7 +19,7 @@ import {
   QueryOrder,
   QueryType,
   TransformedQuery
-} from './types';
+} from './types.js';
 
 export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
 
@@ -59,10 +62,6 @@ export type LoadMethodOptions = {
    * Client provided request ID, if client wants to track request onb their own
    */
   baseRequestId?: string;
-};
-
-export type DeeplyReadonly<T> = {
-  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
 };
 
 export type ExtractMembers<T extends DeeplyReadonly<Query>> =
@@ -123,6 +122,7 @@ export type CubeSqlSchemaColumn = {
   name: string;
   // eslint-disable-next-line camelcase
   column_type: string;
+  format?: DimensionFormat | MeasureFormat;
 };
 
 export type CubeSqlResult = {
@@ -164,7 +164,7 @@ function mutexPromise<T>(promise: Promise<T>): Promise<T | null> {
     });
 }
 
-export type ResponseFormat = 'compact' | 'default' | undefined;
+export type ResponseFormat = 'compact' | 'columnar' | 'default' | undefined;
 
 export type CubeApiOptions = {
   /**
@@ -180,7 +180,7 @@ export type CubeApiOptions = {
   pollInterval?: number;
   credentials?: TransportOptions['credentials'];
   parseDateMeasures?: boolean;
-  resType?: 'default' | 'compact';
+  resType?: 'default' | 'compact' | 'columnar';
   castNumerics?: boolean;
   /**
    * How many network errors would be retried before returning to users. Default to 0.
@@ -467,12 +467,12 @@ class CubeApi {
    */
   private patchQueryInternal(query: DeeplyReadonly<Query>, responseFormat: ResponseFormat): DeeplyReadonly<Query> {
     if (
-      responseFormat === 'compact' &&
-      query.responseFormat !== 'compact'
+      (responseFormat === 'compact' || responseFormat === 'columnar') &&
+      query.responseFormat !== responseFormat
     ) {
       return {
         ...query,
-        responseFormat: 'compact',
+        responseFormat,
       };
     } else {
       return query;
@@ -523,6 +523,21 @@ class CubeApi {
             });
             data.push(row);
           });
+          response.results[j].data = data;
+        });
+      } else if (response.results[0].query.responseFormat &&
+        response.results[0].query.responseFormat === 'columnar') {
+        response.results.forEach((result, j) => {
+          const { columns, members } = result.data as unknown as { columns: any[][]; members: string[] };
+          const rowCount = columns[0]?.length ?? 0;
+          const data: Record<string, any>[] = [];
+          for (let i = 0; i < rowCount; i++) {
+            const row: Record<string, any> = {};
+            members.forEach((m, k) => {
+              row[m] = columns[k][i];
+            });
+            data.push(row);
+          }
           response.results[j].data = data;
         });
       }
@@ -606,12 +621,12 @@ class CubeApi {
       ...options
     };
 
-    if (responseFormat === 'compact') {
+    if (responseFormat === 'compact' || responseFormat === 'columnar') {
       if (Array.isArray(query)) {
-        const patched = query.map((q) => this.patchQueryInternal(q, 'compact'));
+        const patched = query.map((q) => this.patchQueryInternal(q, responseFormat));
         return [patched as unknown as QueryType, options];
       } else {
-        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, 'compact');
+        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, responseFormat);
         return [patched as QueryType, options];
       }
     }
@@ -898,12 +913,14 @@ class CubeApi {
 export default (apiToken: string | (() => Promise<string>), options: CubeApiOptions) => new CubeApi(apiToken, options);
 
 export { CubeApi };
-export { default as Meta } from './Meta';
-export { default as SqlQuery } from './SqlQuery';
-export { default as RequestError } from './RequestError';
-export { default as ProgressResult } from './ProgressResult';
-export { default as ResultSet } from './ResultSet';
-export * from './HttpTransport';
-export * from './utils';
-export * from './time';
-export * from './types';
+export { default as Meta } from './Meta.js';
+export { default as SqlQuery } from './SqlQuery.js';
+export { default as RequestError } from './RequestError.js';
+export { default as ProgressResult } from './ProgressResult.js';
+export { default as ResultSet } from './ResultSet.js';
+export * from './HttpTransport.js';
+export * from './utils.js';
+export * from './time.js';
+export * from './types.js';
+// We don't export it for now, because size of builds for cjs/umd users will be affected
+// export * from './format.js';

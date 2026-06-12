@@ -7,11 +7,13 @@ use crate::{
     config::ConfigObj,
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate};
-use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadResponse, V1LoadResult, V1LoadResultDataColumnar,
+};
 pub use datafusion::{
     arrow::{
         array::{
@@ -318,6 +320,18 @@ pub trait ValueObject {
     ) -> std::result::Result<FieldValue<'_>, CubeError>;
 }
 
+pub trait ColumnarValueObject {
+    fn len(&mut self) -> std::result::Result<usize, CubeError>;
+
+    fn column<'a>(
+        &'a mut self,
+        field_name: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<FieldValue<'a>, CubeError>> + 'a>,
+        CubeError,
+    >;
+}
+
 pub struct JsonValueObject {
     rows: Vec<Value>,
 }
@@ -326,6 +340,23 @@ impl JsonValueObject {
     pub fn new(rows: Vec<Value>) -> Self {
         JsonValueObject { rows }
     }
+}
+
+fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_>, CubeError> {
+    Ok(match value {
+        Value::String(s) => FieldValue::String(Cow::Borrowed(s)),
+        Value::Number(n) => FieldValue::Number(n.as_f64().ok_or_else(|| {
+            DataFusionError::Execution(format!("Can't convert {:?} to float", n))
+        })?),
+        Value::Bool(b) => FieldValue::Bool(*b),
+        Value::Null => FieldValue::Null,
+        x => {
+            return Err(CubeError::user(format!(
+                "Expected primitive value but found: {:?}",
+                x
+            )));
+        }
+    })
 }
 
 impl ValueObject for JsonValueObject {
@@ -339,67 +370,116 @@ impl ValueObject for JsonValueObject {
         field_name: &str,
     ) -> std::result::Result<FieldValue<'_>, CubeError> {
         let Some(as_object) = self.rows[index].as_object() else {
-            return Err(CubeError::user(format!(
+            return Err(CubeError::internal(format!(
                 "Unexpected response from Cube, row is not an object: {:?}",
                 self.rows[index]
             )));
         };
 
         let value = as_object.get(field_name).unwrap_or(&Value::Null);
-
-        Ok(match value {
-            Value::String(s) => FieldValue::String(Cow::Borrowed(s)),
-            Value::Number(n) => FieldValue::Number(n.as_f64().ok_or(
-                DataFusionError::Execution(format!("Can't convert {:?} to float", n)),
-            )?),
-            Value::Bool(b) => FieldValue::Bool(*b),
-            Value::Null => FieldValue::Null,
-            x => {
-                return Err(CubeError::user(format!(
-                    "Expected primitive value but found: {:?}",
-                    x
-                )));
-            }
-        })
+        json_value_to_field_value(value)
     }
 }
 
+pub struct JsonColumnarValueObject {
+    members: Vec<String>,
+    columns: Vec<Vec<Value>>,
+}
+
+impl JsonColumnarValueObject {
+    pub fn new(members: Vec<String>, columns: Vec<Vec<Value>>) -> Self {
+        debug_assert!(
+            columns.windows(2).all(|w| w[0].len() == w[1].len()),
+            "columnar response has ragged columns"
+        );
+
+        Self { members, columns }
+    }
+}
+
+impl ColumnarValueObject for JsonColumnarValueObject {
+    fn len(&mut self) -> std::result::Result<usize, CubeError> {
+        Ok(self.columns.first().map(|c| c.len()).unwrap_or(0))
+    }
+
+    fn column<'a>(
+        &'a mut self,
+        field_name: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<FieldValue<'a>, CubeError>> + 'a>,
+        CubeError,
+    > {
+        let Some(idx) = self.members.iter().position(|m| m == field_name) else {
+            // Match the row-mode `JsonValueObject::get` semantics: a missing field
+            // is treated as a column of NULLs.
+            let len = self.columns.first().map(|c| c.len()).unwrap_or(0);
+            return Ok(Box::new((0..len).map(|_| Ok(FieldValue::Null))));
+        };
+
+        let Some(column) = self.columns.get(idx) else {
+            return Err(CubeError::internal(format!(
+                "Unexpected response from Cube, missing column for '{}'",
+                field_name
+            )));
+        };
+
+        Ok(Box::new(column.iter().map(json_value_to_field_value)))
+    }
+}
+
+// `$mode` is one of `row` or `columnar`. The `row` arm calls `$response.get(i, field_name)?`
+// per cell; the `columnar` arm fetches the entire column slice once via
+// `$response.column(field_name)?` and iterates it.
+macro_rules! build_column_iter_loop {
+    (row, $response:expr, $len:expr, $field_name:expr, $value:ident, $body:block) => {{
+        for i in 0..$len {
+            let $value = $response.get(i, $field_name)?;
+            $body
+        }
+    }};
+    (columnar, $response:expr, $len:expr, $field_name:expr, $value:ident, $body:block) => {{
+        for cell in $response.column($field_name)? {
+            let $value = cell?;
+            $body
+        }
+    }};
+}
+
 macro_rules! build_column {
-    ($data_type:expr, $builder_ty:ty, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
+    ($data_type:expr, $builder_ty:ty, $mode:tt, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         let len = $response.len()?;
         let mut builder = <$builder_ty>::new(len);
 
-        build_column_custom_builder!($data_type, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
+        build_column_custom_builder!($data_type, $mode, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
     }}
 }
 
 macro_rules! build_column_custom_builder {
-    ($data_type:expr, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
+    ($data_type:expr, $mode:tt, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         match $field_name {
             MemberField::Member(member) => {
                 let field_name = &member.field_name;
-                for i in 0..$len {
-                    let value = $response.get(i, &field_name)?;
+                build_column_iter_loop!($mode, $response, $len, &field_name, value, {
                     match (value, &mut $builder) {
                         (FieldValue::Null, builder) => builder.append_null()?,
                         $($builder_block)*
                         #[allow(unreachable_patterns)]
                         (v, _) => {
-                            return Err(CubeError::user(format!(
+                            return Err(CubeError::internal(format!(
                                 "Unable to map value {:?} to {:?}",
                                 v,
                                 $data_type
                             )));
                         }
                     };
-                }
+                });
             }
             MemberField::Literal(value) => {
                 for _ in 0..$len {
                     match (value, &mut $builder) {
                         $($scalar_block)*
                         (v, _) => {
-                            return Err(CubeError::user(format!(
+                            return Err(CubeError::internal(format!(
                                 "Unable to map value {:?} to {:?}",
                                 v,
                                 $data_type
@@ -621,7 +701,9 @@ impl CubeScanMemoryStream {
                 } else {
                     err.message
                 };
-                err.message = format!("Database Execution Error: {}", err.message);
+                if !err.message.eq_ignore_ascii_case("continue wait") {
+                    err.message = format!("Database Execution Error: {}", err.message);
+                }
                 Some(Err(ArrowError::ExternalError(Box::new(err))))
             }
             Some(None) => None,
@@ -744,11 +826,17 @@ async fn load_data(
                 } else {
                     err.message
                 };
-                err.message = format!("Database Execution Error: {}", err.message);
+
+                if err.message.eq_ignore_ascii_case("continue wait") {
+                    err.cause = CubeErrorCauseType::ContinueWait;
+                } else {
+                    err.cause = CubeErrorCauseType::DatabaseExecution(err.cause.meta().cloned());
+                }
+
                 ArrowError::ExternalError(Box::new(err))
             })?;
-        let response = result.first();
-        if let Some(data) = response.cloned() {
+
+        if let Some(data) = result.into_iter().next() {
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ExternalError(Box::new(CubeError::user(
@@ -809,377 +897,423 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     Ok(())
 }
 
-pub fn transform_response<V: ValueObject>(
-    response: &mut V,
-    schema: SchemaRef,
-    member_fields: &Vec<MemberField>,
-) -> std::result::Result<RecordBatch, CubeError> {
-    let mut columns = vec![];
+// Body of `transform_response` / `transform_columnar_response`. The two functions differ
+// only in how they iterate per-cell values: row-major (`$mode = row`) goes through
+// `ValueObject::get` per cell, columnar (`$mode = columnar`) fetches the whole column once
+// via `ColumnarValueObject::column`. Per-`DataType` coercion arms are shared.
+macro_rules! transform_response_body {
+    ($mode:tt, $response:expr, $schema:expr, $member_fields:expr) => {{
+        let mut columns = vec![];
 
-    for (i, schema_field) in schema.fields().iter().enumerate() {
-        let field_name = &member_fields[i];
-        let column = match schema_field.data_type() {
-            DataType::Utf8 => {
-                build_column!(
-                    DataType::Utf8,
-                    StringBuilder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::String(v), builder) => builder.append_value(v)?,
-                        (FieldValue::Bool(v), builder) => builder.append_value(if v { "true" } else { "false" })?,
-                        (FieldValue::Number(v), builder) => builder.append_value(v.to_string())?,
-                    },
-                    {
-                        (ScalarValue::Utf8(v), builder) => builder.append_option(v.as_ref())?,
-                    }
-                )
-            }
-            DataType::Int16 => {
-                build_column!(
-                    DataType::Int16,
-                    Int16Builder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
-                        (FieldValue::String(s), builder) => match s.parse::<i16>() {
-                            Ok(v) => builder.append_value(v)?,
-                            Err(error) => {
-                                warn!(
-                                    "Unable to parse value as i16: {}",
-                                    error.to_string()
-                                );
-
-                                builder.append_null()?
-                            }
+        for (i, schema_field) in $schema.fields().iter().enumerate() {
+            let field_name = &$member_fields[i];
+            let column = match schema_field.data_type() {
+                DataType::Utf8 => {
+                    build_column!(
+                        DataType::Utf8,
+                        StringBuilder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::String(v), builder) => builder.append_value(v)?,
+                            (FieldValue::Bool(v), builder) => builder.append_value(if v { "true" } else { "false" })?,
+                            (FieldValue::Number(v), builder) => builder.append_value(v.to_string())?,
                         },
-                    },
-                    {
-                        (ScalarValue::Int16(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Int32 => {
-                build_column!(
-                    DataType::Int32,
-                    Int32Builder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32)?,
-                        (FieldValue::String(s), builder) => match s.parse::<i32>() {
-                            Ok(v) => builder.append_value(v)?,
-                            Err(error) => {
-                                warn!(
-                                    "Unable to parse value as i32: {}",
-                                    error.to_string()
-                                );
-
-                                builder.append_null()?
-                            }
-                        },
-                    },
-                    {
-                        (ScalarValue::Int32(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Int64 => {
-                build_column!(
-                    DataType::Int64,
-                    Int64Builder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64)?,
-                        (FieldValue::String(s), builder)  => match s.parse::<i64>() {
-                            Ok(v) => builder.append_value(v)?,
-                            Err(error) => {
-                                warn!(
-                                    "Unable to parse value as i64: {}",
-                                    error.to_string()
-                                );
-
-                                builder.append_null()?
-                            }
-                        },
-                    },
-                    {
-                        (ScalarValue::Int64(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Float32 => {
-                build_column!(
-                    DataType::Float32,
-                    Float32Builder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
-                        (FieldValue::String(s), builder) => match s.parse::<f32>() {
-                            Ok(v) => builder.append_value(v)?,
-                            Err(error) => {
-                                warn!(
-                                    "Unable to parse value as f32: {}",
-                                    error.to_string()
-                                );
-
-                                builder.append_null()?
-                            }
-                        },
-                    },
-                    {
-                        (ScalarValue::Float32(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Float64 => {
-                build_column!(
-                    DataType::Float64,
-                    Float64Builder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::Number(number), builder) => builder.append_value(number)?,
-                        (FieldValue::String(s), builder) => match s.parse::<f64>() {
-                            Ok(v) => builder.append_value(v)?,
-                            Err(error) => {
-                                warn!(
-                                    "Unable to parse value as f64: {}",
-                                    error.to_string()
-                                );
-
-                                builder.append_null()?
-                            }
-                        },
-                    },
-                    {
-                        (ScalarValue::Float64(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Boolean => {
-                build_column!(
-                    DataType::Boolean,
-                    BooleanBuilder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::Bool(v), builder) => builder.append_value(v)?,
-                        (FieldValue::String(v), builder)  => match v.as_ref() {
-                            "true" | "1" => builder.append_value(true)?,
-                            "false" | "0" => builder.append_value(false)?,
-                            _ => {
-                                log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
-
-                                builder.append_null()?
-                            }
-                        },
-                    },
-                    {
-                        (ScalarValue::Boolean(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                build_column!(
-                    DataType::Timestamp(TimeUnit::Nanosecond, None),
-                    TimestampNanosecondBuilder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::String(s), builder) => {
-                            let timestamp = parse_date_str(s.as_ref())?;
-                            // TODO switch parsing to microseconds
-                            if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
-                                builder.append_null()?;
-                            } else if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
-                                builder.append_value(nanos)?;
-                            } else {
-                                log::error!(
-                                    "Unable to cast timestamp value to nanoseconds: {}",
-                                    timestamp.to_string()
-                                );
-                                builder.append_null()?;
-                            }
-                        },
-                    },
-                    {
-                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Timestamp(TimeUnit::Millisecond, None) => {
-                build_column!(
-                    DataType::Timestamp(TimeUnit::Millisecond, None),
-                    TimestampMillisecondBuilder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::String(s), builder) => {
-                            let timestamp = parse_date_str(s.as_ref())?;
-                            // TODO switch parsing to microseconds
-                            if timestamp.and_utc().timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
-                                builder.append_null()?;
-                            } else {
-                                builder.append_value(timestamp.and_utc().timestamp_millis())?;
-                            }
-                        },
-                    },
-                    {
-                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Date32 => {
-                build_column!(
-                    DataType::Date32,
-                    Date32Builder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::String(s), builder) => {
-                            let date = NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d")
-                                // FIXME: temporary solution for cases when expected type is Date32
-                                // but underlying data is a Timestamp
-                                .or_else(|_| NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%dT00:00:00.000"))
-                                .map_err(|e| {
-                                    DataFusionError::Execution(format!(
-                                        "Can't parse date: '{}': {}",
-                                        s, e
-                                    ))
-                                });
-                            match date {
-                                Ok(date) => {
-                                    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-                                    let days_since_epoch = date.num_days_from_ce()  - epoch.num_days_from_ce();
-                                    builder.append_value(days_since_epoch)?;
-                                }
+                        {
+                            (ScalarValue::Utf8(v), builder) => builder.append_option(v.as_ref())?,
+                        }
+                    )
+                }
+                DataType::Int16 => {
+                    build_column!(
+                        DataType::Int16,
+                        Int16Builder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
+                            (FieldValue::String(s), builder) => match s.parse::<i16>() {
+                                Ok(v) => builder.append_value(v)?,
                                 Err(error) => {
-                                    log::error!(
-                                        "Unable to parse value as Date32: {}",
+                                    warn!(
+                                        "Unable to parse value as i16: {}",
                                         error.to_string()
                                     );
 
                                     builder.append_null()?
                                 }
-                            }
+                            },
+                        },
+                        {
+                            (ScalarValue::Int16(v), builder) => builder.append_option(*v)?,
                         }
-                    },
-                    {
-                        (ScalarValue::Date32(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Decimal(precision, scale) => {
-                let len = response.len()?;
-                let mut builder = DecimalBuilder::new(len, *precision, *scale);
+                    )
+                }
+                DataType::Int32 => {
+                    build_column!(
+                        DataType::Int32,
+                        Int32Builder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32)?,
+                            (FieldValue::String(s), builder) => match s.parse::<i32>() {
+                                Ok(v) => builder.append_value(v)?,
+                                Err(error) => {
+                                    warn!(
+                                        "Unable to parse value as i32: {}",
+                                        error.to_string()
+                                    );
 
-                build_column_custom_builder!(
-                    DataType::Decimal(*precision, *scale),
-                    len,
-                    builder,
-                    response,
-                    field_name,
-                    {
-                        (FieldValue::String(s), builder) => {
-                            let mut parts = s.split(".");
-                            match parts.next() {
-                                None => builder.append_null()?,
-                                Some(int_part) => {
-                                    let frac_part = format!("{:0<width$}", parts.next().unwrap_or(""), width=scale);
-                                    if frac_part.len() > *scale {
-                                        Err(DataFusionError::Execution(format!("Decimal scale is higher than requested: expected {}, got {}", scale, frac_part.len())))?;
+                                    builder.append_null()?
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::Int32(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Int64 => {
+                    build_column!(
+                        DataType::Int64,
+                        Int64Builder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64)?,
+                            (FieldValue::String(s), builder)  => match s.parse::<i64>() {
+                                Ok(v) => builder.append_value(v)?,
+                                Err(error) => {
+                                    warn!(
+                                        "Unable to parse value as i64: {}",
+                                        error.to_string()
+                                    );
+
+                                    builder.append_null()?
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::Int64(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Float32 => {
+                    build_column!(
+                        DataType::Float32,
+                        Float32Builder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
+                            (FieldValue::String(s), builder) => match s.parse::<f32>() {
+                                Ok(v) => builder.append_value(v)?,
+                                Err(error) => {
+                                    warn!(
+                                        "Unable to parse value as f32: {}",
+                                        error.to_string()
+                                    );
+
+                                    builder.append_null()?
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::Float32(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Float64 => {
+                    build_column!(
+                        DataType::Float64,
+                        Float64Builder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::Number(number), builder) => builder.append_value(number)?,
+                            (FieldValue::String(s), builder) => match s.parse::<f64>() {
+                                Ok(v) => builder.append_value(v)?,
+                                Err(error) => {
+                                    warn!(
+                                        "Unable to parse value as f64: {}",
+                                        error.to_string()
+                                    );
+
+                                    builder.append_null()?
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::Float64(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Boolean => {
+                    build_column!(
+                        DataType::Boolean,
+                        BooleanBuilder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::Bool(v), builder) => builder.append_value(v)?,
+                            (FieldValue::String(v), builder)  => match v.as_ref() {
+                                "true" | "1" => builder.append_value(true)?,
+                                "false" | "0" => builder.append_value(false)?,
+                                _ => {
+                                    log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
+
+                                    builder.append_null()?
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::Boolean(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                    build_column!(
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        TimestampNanosecondBuilder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::String(s), builder) => {
+                                let timestamp = parse_date_str(s.as_ref())?;
+                                // TODO switch parsing to microseconds
+                                if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
+                                    builder.append_value(nanos)?;
+                                } else {
+                                    log::error!(
+                                        "Unable to cast timestamp value to nanoseconds: {}",
+                                        timestamp
+                                    );
+                                    builder.append_null()?;
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Timestamp(TimeUnit::Millisecond, None) => {
+                    build_column!(
+                        DataType::Timestamp(TimeUnit::Millisecond, None),
+                        TimestampMillisecondBuilder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::String(s), builder) => {
+                                let timestamp = parse_date_str(s.as_ref())?;
+                                builder.append_value(timestamp.and_utc().timestamp_millis())?;
+                            },
+                        },
+                        {
+                            (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Date32 => {
+                    build_column!(
+                        DataType::Date32,
+                        Date32Builder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::String(s), builder) => {
+                                match parse_date_str(s.as_ref()) {
+                                    Ok(timestamp) => {
+                                        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                                        let days_since_epoch = timestamp.date().num_days_from_ce()
+                                            - epoch.num_days_from_ce();
+                                        builder.append_value(days_since_epoch)?;
                                     }
-                                    if let Some(_) = parts.next() {
-                                        Err(DataFusionError::Execution(format!("Unable to parse decimal, value contains two dots: {}", s)))?;
-                                    }
-                                    let decimal_str = format!("{}{}", int_part, frac_part);
-                                    if decimal_str.len() > *precision {
-                                        Err(DataFusionError::Execution(format!("Decimal precision is higher than requested: expected {}, got {}", precision, decimal_str.len())))?;
-                                    }
-                                    if let Ok(value) = decimal_str.parse::<i128>() {
-                                        builder.append_value(value)?;
-                                    } else {
-                                        Err(DataFusionError::Execution(format!("Unable to parse decimal as an i128: {}", decimal_str)))?;
+                                    Err(error) => {
+                                        log::error!(
+                                            "Unable to parse value as Date32: {}",
+                                            error
+                                        );
+                                        builder.append_null()?
                                     }
                                 }
-                            };
-                        },
-                    },
-                    {
-                        (ScalarValue::Decimal128(v, _, _), builder) => {
-                            // TODO: check precision and scale, adjust accordingly
-                            if let Some(v) = v {
-                                builder.append_value(*v)?;
-                            } else {
-                                builder.append_null()?;
                             }
                         },
-                    }
-                )
-            }
-            DataType::Interval(IntervalUnit::YearMonth) => {
-                build_column!(
-                    DataType::Interval(IntervalUnit::YearMonth),
-                    IntervalYearMonthBuilder,
-                    response,
-                    field_name,
-                    {
-                        // TODO
-                    },
-                    {
-                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Interval(IntervalUnit::DayTime) => {
-                build_column!(
-                    DataType::Interval(IntervalUnit::DayTime),
-                    IntervalDayTimeBuilder,
-                    response,
-                    field_name,
-                    {
-                        // TODO
-                    },
-                    {
-                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Interval(IntervalUnit::MonthDayNano) => {
-                build_column!(
-                    DataType::Interval(IntervalUnit::MonthDayNano),
-                    IntervalMonthDayNanoBuilder,
-                    response,
-                    field_name,
-                    {
-                        // TODO
-                    },
-                    {
-                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(*v)?,
-                    }
-                )
-            }
-            DataType::Null => {
-                let len = response.len()?;
-                let array = NullArray::new(len);
-                Arc::new(array)
-            }
-            t => {
-                return Err(CubeError::user(format!(
-                    "Type {} is not supported in response transformation from Cube",
-                    t,
-                )))
-            }
-        };
+                        {
+                            (ScalarValue::Date32(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Decimal(precision, scale) => {
+                    let len = $response.len()?;
+                    let mut builder = DecimalBuilder::new(len, *precision, *scale);
 
-        columns.push(column);
+                    build_column_custom_builder!(
+                        DataType::Decimal(*precision, *scale),
+                        $mode,
+                        len,
+                        builder,
+                        $response,
+                        field_name,
+                        {
+                            (FieldValue::String(s), builder) => {
+                                let mut parts = s.split(".");
+                                match parts.next() {
+                                    None => builder.append_null()?,
+                                    Some(int_part) => {
+                                        let frac_part = format!("{:0<width$}", parts.next().unwrap_or(""), width=scale);
+                                        if frac_part.len() > *scale {
+                                            Err(DataFusionError::Execution(format!("Decimal scale is higher than requested: expected {}, got {}", scale, frac_part.len())))?;
+                                        }
+                                        if let Some(_) = parts.next() {
+                                            Err(DataFusionError::Execution(format!("Unable to parse decimal, value contains two dots: {}", s)))?;
+                                        }
+                                        let decimal_str = format!("{}{}", int_part, frac_part);
+                                        if decimal_str.len() > *precision {
+                                            Err(DataFusionError::Execution(format!("Decimal precision is higher than requested: expected {}, got {}", precision, decimal_str.len())))?;
+                                        }
+                                        if let Ok(value) = decimal_str.parse::<i128>() {
+                                            builder.append_value(value)?;
+                                        } else {
+                                            Err(DataFusionError::Execution(format!("Unable to parse decimal as an i128: {}", decimal_str)))?;
+                                        }
+                                    }
+                                };
+                            },
+                        },
+                        {
+                            (ScalarValue::Decimal128(v, _, _), builder) => {
+                                // TODO: check precision and scale, adjust accordingly
+                                if let Some(v) = v {
+                                    builder.append_value(*v)?;
+                                } else {
+                                    builder.append_null()?;
+                                }
+                            },
+                        }
+                    )
+                }
+                DataType::Interval(IntervalUnit::YearMonth) => {
+                    build_column!(
+                        DataType::Interval(IntervalUnit::YearMonth),
+                        IntervalYearMonthBuilder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            // TODO
+                        },
+                        {
+                            (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Interval(IntervalUnit::DayTime) => {
+                    build_column!(
+                        DataType::Interval(IntervalUnit::DayTime),
+                        IntervalDayTimeBuilder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            // TODO
+                        },
+                        {
+                            (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Interval(IntervalUnit::MonthDayNano) => {
+                    build_column!(
+                        DataType::Interval(IntervalUnit::MonthDayNano),
+                        IntervalMonthDayNanoBuilder,
+                        $mode,
+                        $response,
+                        field_name,
+                        {
+                            // TODO
+                        },
+                        {
+                            (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(*v)?,
+                        }
+                    )
+                }
+                DataType::Null => {
+                    let len = $response.len()?;
+                    let array = NullArray::new(len);
+                    Arc::new(array)
+                }
+                t => {
+                    return Err(CubeError::internal(format!(
+                        "Type {} is not supported in response transformation from Cube",
+                        t,
+                    )))
+                }
+            };
+
+            columns.push(column);
+        }
+
+        Ok(RecordBatch::try_new($schema.clone(), columns)?)
+    }};
+}
+
+pub fn transform_response<V: ValueObject>(
+    response: &mut V,
+    schema: SchemaRef,
+    member_fields: &Vec<MemberField>,
+) -> std::result::Result<RecordBatch, CubeError> {
+    transform_response_body!(row, response, schema, member_fields)
+}
+
+pub fn transform_columnar_response<C: ColumnarValueObject>(
+    response: &mut C,
+    schema: SchemaRef,
+    member_fields: &Vec<MemberField>,
+) -> std::result::Result<RecordBatch, CubeError> {
+    transform_response_body!(columnar, response, schema, member_fields)
+}
+
+/// Builds a schema with `lastRefreshTime` / `external` metadata.
+///
+/// `lastRefreshTime` is passed through unchanged. The `external` marker is
+/// added when the flag is set so downstream code can tell that the result
+/// was served from an external (CubeStore) pre-aggregation — the case
+/// where cubesql's own cache-freshness decisions actually need to look at
+/// the pre-agg refresh, as internal pre-aggregations hit the source DB
+/// and rely on its own caching.
+pub fn build_response_schema(
+    schema: &SchemaRef,
+    last_refresh_time: Option<String>,
+    external: bool,
+) -> SchemaRef {
+    if last_refresh_time.is_none() && !external {
+        return schema.clone();
     }
 
-    Ok(RecordBatch::try_new(schema.clone(), columns)?)
+    let mut metadata = schema.metadata().clone();
+    if let Some(t) = last_refresh_time {
+        metadata.insert("lastRefreshTime".to_string(), t);
+    }
+    if external {
+        metadata.insert("external".to_string(), "true".to_string());
+    }
+
+    Arc::new(Schema::new_with_metadata(
+        schema.fields().to_vec(),
+        metadata,
+    ))
 }
 
 pub fn convert_transport_response(
@@ -1190,20 +1324,45 @@ pub fn convert_transport_response(
     response
         .results
         .into_iter()
-        .map(|r| {
-            let mut response = JsonValueObject::new(r.data.clone());
-            let updated_schema = if let Some(last_refresh_time) = r.last_refresh_time.clone() {
-                let mut metadata = schema.metadata().clone();
-                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
-                Arc::new(Schema::new_with_metadata(
-                    schema.fields().to_vec(),
-                    metadata,
-                ))
-            } else {
-                schema.clone()
-            };
+        .map(|result| {
+            let V1LoadResult {
+                data,
+                last_refresh_time,
+                external,
+                ..
+            } = result;
+
+            let mut response = JsonValueObject::new(data);
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
 
             transform_response(&mut response, updated_schema, &member_fields)
+        })
+        .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
+}
+
+pub fn convert_transport_response_columnar(
+    response: V1LoadResponse<V1LoadResultDataColumnar>,
+    schema: SchemaRef,
+    member_fields: Vec<MemberField>,
+) -> std::result::Result<Vec<RecordBatch>, CubeError> {
+    response
+        .results
+        .into_iter()
+        .map(|result| {
+            let V1LoadResult {
+                data,
+                last_refresh_time,
+                external,
+                ..
+            } = result;
+            let V1LoadResultDataColumnar { members, columns } = data;
+
+            let mut response = JsonColumnarValueObject::new(members, columns);
+            let updated_schema =
+                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
+
+            transform_columnar_response(&mut response, updated_schema, &member_fields)
         })
         .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
 }
@@ -1220,7 +1379,9 @@ mod tests {
     use cubeclient::models::V1LoadResponse;
     use datafusion::{
         arrow::{
-            array::{BooleanArray, Float64Array, StringArray, TimestampNanosecondArray},
+            array::{
+                BooleanArray, Date32Array, Float64Array, StringArray, TimestampNanosecondArray,
+            },
             datatypes::{Field, Schema},
         },
         execution::{
@@ -1231,6 +1392,92 @@ mod tests {
         scalar::ScalarValue,
     };
     use std::{collections::HashMap, result::Result};
+
+    fn build_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new("c", DataType::Int64, true)]))
+    }
+
+    #[test]
+    fn build_response_schema_no_metadata_when_nothing_to_add() {
+        let schema = build_schema();
+        let updated = build_response_schema(&schema, None, false);
+        assert!(updated.metadata().is_empty());
+    }
+
+    #[test]
+    fn build_response_schema_passes_through_last_refresh_time() {
+        let schema = build_schema();
+        let updated =
+            build_response_schema(&schema, Some("2024-01-01T00:00:00.000Z".to_string()), false);
+        assert_eq!(
+            updated.metadata().get("lastRefreshTime"),
+            Some(&"2024-01-01T00:00:00.000Z".to_string())
+        );
+        assert!(updated.metadata().get("external").is_none());
+    }
+
+    #[test]
+    fn build_response_schema_passes_through_last_refresh_time_for_external() {
+        // External (CubeStore) flag must NOT alter `lastRefreshTime` — it's
+        // passed through unchanged. The marker reports the external hit.
+        let schema = build_schema();
+        let stale = "2000-01-01T00:00:00.000Z".to_string();
+        let updated = build_response_schema(&schema, Some(stale.clone()), true);
+
+        assert_eq!(updated.metadata().get("lastRefreshTime"), Some(&stale));
+        assert_eq!(
+            updated.metadata().get("external"),
+            Some(&"true".to_string())
+        );
+    }
+
+    #[test]
+    fn build_response_schema_sets_only_marker_when_no_last_refresh_time() {
+        let schema = build_schema();
+        // No incoming last_refresh_time, but external flag is set — emit
+        // only the marker; do NOT synthesize a `lastRefreshTime`.
+        let updated = build_response_schema(&schema, None, true);
+        assert!(updated.metadata().get("lastRefreshTime").is_none());
+        assert_eq!(
+            updated.metadata().get("external"),
+            Some(&"true".to_string())
+        );
+    }
+
+    #[test]
+    fn convert_transport_response_threads_external_flag_into_schema_metadata() {
+        // End-to-end coverage of the row-format `convert_transport_response`
+        // path: a V1LoadResponse with `external: true` and a
+        // `lastRefreshTime` should produce a RecordBatch whose schema
+        // metadata has the `external` marker set and `lastRefreshTime`
+        // passed through unchanged.
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": [{"c": 1}],
+                    "lastRefreshTime": "2000-01-01T00:00:00.000Z",
+                    "external": true
+                }]
+            }
+        "#;
+        let response: V1LoadResponse = serde_json::from_str(raw).unwrap();
+        let schema = build_schema();
+        let member_fields = vec![MemberField::regular("c".to_string())];
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+        let metadata = batches[0].schema().metadata().clone();
+
+        assert_eq!(metadata.get("external"), Some(&"true".to_string()));
+        assert_eq!(
+            metadata.get("lastRefreshTime"),
+            Some(&"2000-01-01T00:00:00.000Z".to_string())
+        );
+    }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
@@ -1286,11 +1533,11 @@ mod tests {
                             "timeDimensions": []
                         },
                         "data": [
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
-                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderDate": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 2"},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderDate": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 3"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 4"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
+                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderTimestamp": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2022-01-01", "KibanaSampleDataEcommerce.city": "City 2"},
+                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderTimestamp": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2023-01-01", "KibanaSampleDataEcommerce.city": "City 3"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderTimestamp": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "9999-12-31", "KibanaSampleDataEcommerce.city": "City 4"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
                         ]
                     }]
                 }
@@ -1298,7 +1545,6 @@ mod tests {
 
                 let result: V1LoadResponse = serde_json::from_str(response).unwrap();
                 convert_transport_response(result, schema.clone(), member_fields)
-                    .map_err(|err| CubeError::user(err.to_string()))
             }
 
             async fn load_stream(
@@ -1343,7 +1589,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_df_cube_scan_execute() {
+    async fn test_df_cube_scan_execute() -> Result<(), CubeError> {
         assert_eq!(std::mem::size_of::<FieldValue>(), 24);
 
         let schema = Arc::new(Schema::new(vec![
@@ -1355,7 +1601,7 @@ mod tests {
                 false,
             ),
             Field::new(
-                "KibanaSampleDataEcommerce.orderDate",
+                "KibanaSampleDataEcommerce.orderTimestamp",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
                 false,
             ),
@@ -1366,6 +1612,11 @@ mod tests {
                 false,
             ),
             Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, false),
+            Field::new(
+                "KibanaSampleDataEcommerce.orderDate",
+                DataType::Date32,
+                false,
+            ),
         ]));
 
         let scan_node = CubeScanExecutionPlan {
@@ -1388,6 +1639,7 @@ mod tests {
                 ]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.isBool".to_string(),
+                    "KibanaSampleDataEcommerce.orderTimestamp".to_string(),
                     "KibanaSampleDataEcommerce.orderDate".to_string(),
                     "KibanaSampleDataEcommerce.city".to_string(),
                 ]),
@@ -1410,9 +1662,7 @@ mod tests {
             config_obj: crate::config::Config::test().config_obj(),
         };
 
-        let runtime = Arc::new(
-            RuntimeEnv::new(RuntimeConfig::new()).expect("Unable to create RuntimeEnv for testing"),
-        );
+        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
         let task = Arc::new(TaskContext::new(
             "test".to_string(),
             "session".to_string(),
@@ -1421,8 +1671,8 @@ mod tests {
             HashMap::new(),
             runtime,
         ));
-        let stream = scan_node.execute(0, task).await.unwrap();
-        let batches = common::collect(stream).await.unwrap();
+        let stream = scan_node.execute(0, task).await?;
+        let batches = common::collect(stream).await?;
 
         assert_eq!(
             batches[0],
@@ -1472,9 +1722,17 @@ mod tests {
                         Some("City 4"),
                         None
                     ])) as ArrayRef,
+                    Arc::new(Date32Array::from(vec![
+                        None,
+                        Some(18993),
+                        Some(19358),
+                        Some(2_932_896),
+                        None,
+                    ])) as ArrayRef,
                 ],
-            )
-            .unwrap()
-        )
+            )?
+        );
+
+        Ok(())
     }
 }

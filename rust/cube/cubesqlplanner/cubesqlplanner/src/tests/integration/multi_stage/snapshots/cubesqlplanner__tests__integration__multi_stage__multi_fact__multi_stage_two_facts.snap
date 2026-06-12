@@ -1,0 +1,21 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/multi_fact.rs
+expression: result
+---
+customers__name | orders__amount_by_id | returns__total_refund
+----------------+----------------------+----------------------
+Alice           | 200.00               | 130.00               
+Alice           | 120.00               | 130.00               
+Alice           | 100.00               | 130.00               
+Alice           | 50.00                | 130.00               
+Alice           | 30.00                | 130.00               
+Bob             | 300.00               | 180.00               
+Bob             | 200.00               | 180.00               
+Bob             | 150.00               | 180.00               
+Bob             | 50.00                | 180.00               
+Bob             | 50.00                | 180.00               
+Charlie         | 400.00               | 250.00               
+Charlie         | 250.00               | 250.00               
+Charlie         | 200.00               | 250.00               
+Charlie         | 100.00               | 250.00               
+Charlie         | 50.00                | 250.00

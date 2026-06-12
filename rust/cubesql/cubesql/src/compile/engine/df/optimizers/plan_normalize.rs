@@ -71,492 +71,61 @@ fn plan_normalize(
     optimizer_config: &OptimizerConfig,
 ) -> Result<LogicalPlan> {
     match plan {
-        LogicalPlan::Projection(Projection {
-            expr,
-            input,
-            schema: _,
-            alias,
-        }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let schema = input.schema();
-            let new_expr = expr
-                .iter()
-                .map(|expr| {
-                    expr_normalize_stacked(
-                        optimizer,
-                        expr,
-                        schema,
-                        remapped_columns,
-                        optimizer_config,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let alias = alias.clone();
-
-            *remapped_columns = HashMap::new();
-            for (expr, new_expr) in expr.iter().zip(new_expr.iter()) {
-                let old_name = expr.name(&DFSchema::empty())?;
-                let new_name = new_expr.name(&DFSchema::empty())?;
-                if old_name != new_name {
-                    let old_column = Column {
-                        relation: alias.clone(),
-                        name: old_name,
-                    };
-                    let new_column = Column {
-                        relation: alias.clone(),
-                        name: new_name,
-                    };
-                    remapped_columns.insert(old_column, new_column);
-                }
-            }
-
-            LogicalPlanBuilder::from(input)
-                .project_with_alias(new_expr, alias)?
-                .build()
+        LogicalPlan::Projection(node) => {
+            normalize_projection(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Filter(Filter { predicate, input }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let schema = input.schema();
-            let predicate = expr_normalize_stacked(
-                optimizer,
-                predicate,
-                schema,
-                remapped_columns,
-                optimizer_config,
-            )?;
-
-            LogicalPlanBuilder::from(input).filter(predicate)?.build()
+        LogicalPlan::Filter(node) => {
+            normalize_filter(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Window(Window {
-            input,
-            window_expr,
-            schema: _,
-        }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let schema = input.schema();
-            let new_window_expr = window_expr
-                .iter()
-                .map(|expr| {
-                    expr_normalize_stacked(
-                        optimizer,
-                        expr,
-                        schema,
-                        remapped_columns,
-                        optimizer_config,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            for (window_expr, new_window_expr) in window_expr.iter().zip(new_window_expr.iter()) {
-                let old_name = window_expr.name(&DFSchema::empty())?;
-                let new_name = new_window_expr.name(&DFSchema::empty())?;
-                if old_name != new_name {
-                    let old_column = Column::from_name(old_name);
-                    let new_column = Column::from_name(new_name);
-                    remapped_columns.insert(old_column, new_column);
-                }
-            }
-
-            LogicalPlanBuilder::from(input)
-                .window(new_window_expr)?
-                .build()
+        LogicalPlan::Window(node) => {
+            normalize_window(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Aggregate(Aggregate {
-            input,
-            group_expr,
-            aggr_expr,
-            schema: _,
-        }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let schema = input.schema();
-            let new_group_expr = group_expr
-                .iter()
-                .map(|expr| {
-                    expr_normalize_stacked(
-                        optimizer,
-                        expr,
-                        schema,
-                        remapped_columns,
-                        optimizer_config,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let new_aggr_expr = aggr_expr
-                .iter()
-                .map(|expr| {
-                    expr_normalize_stacked(
-                        optimizer,
-                        expr,
-                        schema,
-                        remapped_columns,
-                        optimizer_config,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            *remapped_columns = HashMap::new();
-            for (group_expr, new_group_expr) in group_expr.iter().zip(new_group_expr.iter()) {
-                let old_name = group_expr.name(&DFSchema::empty())?;
-                let new_name = new_group_expr.name(&DFSchema::empty())?;
-                if old_name != new_name {
-                    let old_column = Column::from_name(old_name);
-                    let new_column = Column::from_name(new_name);
-                    remapped_columns.insert(old_column, new_column);
-                }
-            }
-            for (aggr_expr, new_aggr_expr) in aggr_expr.iter().zip(new_aggr_expr.iter()) {
-                let old_name = aggr_expr.name(&DFSchema::empty())?;
-                let new_name = new_aggr_expr.name(&DFSchema::empty())?;
-                if old_name != new_name {
-                    let old_column = Column::from_name(old_name);
-                    let new_column = Column::from_name(new_name);
-                    remapped_columns.insert(old_column, new_column);
-                }
-            }
-
-            LogicalPlanBuilder::from(input)
-                .aggregate(new_group_expr, new_aggr_expr)?
-                .build()
+        LogicalPlan::Aggregate(node) => {
+            normalize_aggregate(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Sort(Sort { expr, input }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let schema = input.schema();
-            let expr = expr
-                .iter()
-                .map(|expr| {
-                    expr_normalize_stacked(
-                        optimizer,
-                        expr,
-                        schema,
-                        remapped_columns,
-                        optimizer_config,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            LogicalPlanBuilder::from(input).sort(expr)?.build()
+        LogicalPlan::Sort(node) => {
+            normalize_sort(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Join(Join {
-            left,
-            right,
-            on,
-            join_type,
-            join_constraint,
-            schema: _,
-            null_equals_null,
-        }) => {
-            let mut right_remapped_columns = HashMap::new();
-            let left = Arc::new(plan_normalize(
-                optimizer,
-                left,
-                remapped_columns,
-                optimizer_config,
-            )?);
-            let right = Arc::new(plan_normalize(
-                optimizer,
-                right,
-                &mut right_remapped_columns,
-                optimizer_config,
-            )?);
-            let on = on
-                .iter()
-                .map(|(left_column, right_column)| {
-                    let left_column = column_normalize(left_column, remapped_columns)?;
-                    let right_column = column_normalize(right_column, &right_remapped_columns)?;
-                    Ok((left_column, right_column))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let join_type = *join_type;
-            let join_constraint = *join_constraint;
-            let schema = Arc::new(build_join_schema(
-                &left.schema(),
-                &right.schema(),
-                &join_type,
-            )?);
-            let null_equals_null = *null_equals_null;
-
-            remapped_columns.extend(right_remapped_columns);
-
-            Ok(LogicalPlan::Join(Join {
-                left,
-                right,
-                on,
-                join_type,
-                join_constraint,
-                schema,
-                null_equals_null,
-            }))
+        LogicalPlan::Join(node) => {
+            normalize_join(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::CrossJoin(CrossJoin {
-            left,
-            right,
-            schema: _,
-        }) => {
-            let mut right_remapped_columns = HashMap::new();
-            let left = plan_normalize(optimizer, left, remapped_columns, optimizer_config)?;
-            let right = plan_normalize(
-                optimizer,
-                right,
-                &mut right_remapped_columns,
-                optimizer_config,
-            )?;
-
-            remapped_columns.extend(right_remapped_columns);
-
-            LogicalPlanBuilder::from(left).cross_join(&right)?.build()
+        LogicalPlan::CrossJoin(node) => {
+            normalize_cross_join(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Repartition(Repartition {
-            input,
-            partitioning_scheme,
-        }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let schema = input.schema();
-            let partitioning_scheme = match partitioning_scheme {
-                Partitioning::RoundRobinBatch(n) => Partitioning::RoundRobinBatch(*n),
-                Partitioning::Hash(exprs, n) => {
-                    let exprs = exprs
-                        .iter()
-                        .map(|expr| {
-                            expr_normalize_stacked(
-                                optimizer,
-                                expr,
-                                schema,
-                                remapped_columns,
-                                optimizer_config,
-                            )
-                        })
-                        .collect::<Result<Vec<_>>>()?;
-
-                    Partitioning::Hash(exprs, *n)
-                }
-            };
-
-            LogicalPlanBuilder::from(input)
-                .repartition(partitioning_scheme)?
-                .build()
+        LogicalPlan::Repartition(node) => {
+            normalize_repartition(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Union(Union {
-            inputs,
-            schema: _,
-            alias,
-        }) => {
-            let mut plan = None;
-            for input in inputs {
-                let mut new_remapped_columns = HashMap::new();
-                let input = plan_normalize(
-                    optimizer,
-                    input,
-                    &mut new_remapped_columns,
-                    optimizer_config,
-                )?;
-                if let Some(last_plan) = plan.take() {
-                    plan = Some(union_with_alias(last_plan, input, alias.clone())?);
-                } else {
-                    plan = Some(input);
-                    *remapped_columns = new_remapped_columns;
-                }
-            }
-
-            plan.ok_or_else(|| {
-                DataFusionError::Internal("Found UNION plan with no inputs".to_string())
-            })
+        LogicalPlan::Union(node) => {
+            normalize_union(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::TableScan(TableScan {
-            table_name,
-            source,
-            projection,
-            projected_schema,
-            filters,
-            fetch,
-        }) => {
-            let table_name = table_name.clone();
-            let source = Arc::clone(source);
-            let projection = projection.clone();
-            let projected_schema = Arc::clone(projected_schema);
-            let filters = filters
-                .iter()
-                .map(|expr| {
-                    expr_normalize_stacked(
-                        optimizer,
-                        expr,
-                        &projected_schema,
-                        remapped_columns,
-                        optimizer_config,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let fetch = *fetch;
-
-            Ok(LogicalPlan::TableScan(TableScan {
-                table_name,
-                source,
-                projection,
-                projected_schema,
-                filters,
-                fetch,
-            }))
+        LogicalPlan::TableScan(node) => {
+            normalize_table_scan(optimizer, node, remapped_columns, optimizer_config)
         }
-
         p @ LogicalPlan::EmptyRelation(_) => Ok(p.clone()),
-
-        LogicalPlan::Limit(Limit { skip, fetch, input }) => {
-            let skip = *skip;
-            let fetch = *fetch;
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-
-            LogicalPlanBuilder::from(input).limit(skip, fetch)?.build()
+        LogicalPlan::Limit(node) => {
+            normalize_limit(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Subquery(Subquery {
-            input,
-            subqueries,
-            types,
-            schema: _,
-        }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let mut new_subqueries = Vec::with_capacity(subqueries.len());
-            for subquery in subqueries {
-                let mut subquery_remapped_columns = HashMap::new();
-                let new_subquery = plan_normalize(
-                    optimizer,
-                    subquery,
-                    &mut subquery_remapped_columns,
-                    optimizer_config,
-                )?;
-                new_subqueries.push(new_subquery);
-                remapped_columns.extend(subquery_remapped_columns);
-            }
-            let types = types.clone();
-
-            LogicalPlanBuilder::from(input)
-                .subquery(new_subqueries, types)?
-                .build()
+        LogicalPlan::Subquery(node) => {
+            normalize_subquery(optimizer, node, remapped_columns, optimizer_config)
         }
-
         p @ LogicalPlan::CreateExternalTable(_) => Ok(p.clone()),
-
-        LogicalPlan::CreateMemoryTable(CreateMemoryTable { name, input }) => {
-            let name = name.clone();
-            let input = Arc::new(plan_normalize(
-                optimizer,
-                input,
-                remapped_columns,
-                optimizer_config,
-            )?);
-            Ok(LogicalPlan::CreateMemoryTable(CreateMemoryTable {
-                name,
-                input,
-            }))
+        LogicalPlan::CreateMemoryTable(node) => {
+            normalize_create_memory_table(optimizer, node, remapped_columns, optimizer_config)
         }
-
         p @ LogicalPlan::CreateCatalogSchema(_) => Ok(p.clone()),
-
         p @ LogicalPlan::DropTable(_) => Ok(p.clone()),
-
-        LogicalPlan::Values(Values { schema, values }) => {
-            let values = values
-                .iter()
-                .map(|row| {
-                    row.iter()
-                        .map(|expr| {
-                            expr_normalize_stacked(
-                                optimizer,
-                                expr,
-                                schema,
-                                remapped_columns,
-                                optimizer_config,
-                            )
-                        })
-                        .collect::<Result<Vec<_>>>()
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            LogicalPlanBuilder::values(values)?.build()
+        LogicalPlan::Values(node) => {
+            normalize_values(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Explain(Explain {
-            verbose,
-            plan,
-            stringified_plans: _,
-            schema: _,
-        }) => {
-            let verbose = *verbose;
-            let plan = plan_normalize(optimizer, plan, remapped_columns, optimizer_config)?;
-
-            *remapped_columns = HashMap::new();
-
-            LogicalPlanBuilder::from(plan)
-                .explain(verbose, false)?
-                .build()
+        LogicalPlan::Explain(node) => {
+            normalize_explain(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::Analyze(Analyze {
-            verbose,
-            input,
-            schema: _,
-        }) => {
-            let verbose = *verbose;
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-
-            *remapped_columns = HashMap::new();
-
-            LogicalPlanBuilder::from(input)
-                .explain(verbose, true)?
-                .build()
+        LogicalPlan::Analyze(node) => {
+            normalize_analyze(optimizer, node, remapped_columns, optimizer_config)
         }
-
-        LogicalPlan::TableUDFs(TableUDFs {
-            expr,
-            input,
-            schema: _,
-        }) => {
-            let input = Arc::new(plan_normalize(
-                optimizer,
-                input,
-                remapped_columns,
-                optimizer_config,
-            )?);
-            let schema = input.schema();
-            let new_expr = expr
-                .iter()
-                .map(|expr| {
-                    expr_normalize_stacked(
-                        optimizer,
-                        expr,
-                        schema,
-                        remapped_columns,
-                        optimizer_config,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let new_schema = build_table_udf_schema(&input, &new_expr)?;
-
-            for (expr, new_expr) in expr.iter().zip(new_expr.iter()) {
-                let old_name = expr.name(&DFSchema::empty())?;
-                let new_name = new_expr.name(&DFSchema::empty())?;
-                if old_name != new_name {
-                    let old_column = Column::from_name(old_name);
-                    let new_column = Column::from_name(new_name);
-                    remapped_columns.insert(old_column, new_column);
-                }
-            }
-
-            Ok(LogicalPlan::TableUDFs(TableUDFs {
-                expr: new_expr,
-                input,
-                schema: new_schema,
-            }))
+        LogicalPlan::TableUDFs(node) => {
+            normalize_table_udfs(optimizer, node, remapped_columns, optimizer_config)
         }
-
         p @ LogicalPlan::Extension(_) => {
             // TODO: we don't know how to optimize generic `Extension` node,
             // but we might need this if we implement our own `Extension` nodes
@@ -565,13 +134,582 @@ fn plan_normalize(
             *remapped_columns = HashMap::new();
             Ok(p.clone())
         }
-
-        LogicalPlan::Distinct(Distinct { input }) => {
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-
-            LogicalPlanBuilder::from(input).distinct()?.build()
+        LogicalPlan::Distinct(node) => {
+            normalize_distinct(optimizer, node, remapped_columns, optimizer_config)
         }
     }
+}
+
+#[inline(never)]
+fn normalize_projection(
+    optimizer: &PlanNormalize,
+    node: &Projection,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Projection {
+        expr,
+        input,
+        schema: _,
+        alias,
+    } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+    let schema = input.schema();
+    let new_expr = expr
+        .iter()
+        .map(|expr| {
+            expr_normalize_stacked(optimizer, expr, schema, remapped_columns, optimizer_config)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let alias = alias.clone();
+
+    *remapped_columns = HashMap::new();
+    for (expr, new_expr) in expr.iter().zip(new_expr.iter()) {
+        let old_name = expr.name(&DFSchema::empty())?;
+        let new_name = new_expr.name(&DFSchema::empty())?;
+        if old_name != new_name {
+            let old_column = Column {
+                relation: alias.clone(),
+                name: old_name,
+            };
+            let new_column = Column {
+                relation: alias.clone(),
+                name: new_name,
+            };
+            remapped_columns.insert(old_column, new_column);
+        }
+    }
+
+    LogicalPlanBuilder::from(input)
+        .project_with_alias(new_expr, alias)?
+        .build()
+}
+
+#[inline(never)]
+fn normalize_filter(
+    optimizer: &PlanNormalize,
+    node: &Filter,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Filter { predicate, input } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+    let schema = input.schema();
+    let predicate = expr_normalize_stacked(
+        optimizer,
+        predicate,
+        schema,
+        remapped_columns,
+        optimizer_config,
+    )?;
+
+    LogicalPlanBuilder::from(input).filter(predicate)?.build()
+}
+
+#[inline(never)]
+fn normalize_window(
+    optimizer: &PlanNormalize,
+    node: &Window,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Window {
+        input,
+        window_expr,
+        schema: _,
+    } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+    let schema = input.schema();
+    let new_window_expr = window_expr
+        .iter()
+        .map(|expr| {
+            expr_normalize_stacked(optimizer, expr, schema, remapped_columns, optimizer_config)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    for (window_expr, new_window_expr) in window_expr.iter().zip(new_window_expr.iter()) {
+        let old_name = window_expr.name(&DFSchema::empty())?;
+        let new_name = new_window_expr.name(&DFSchema::empty())?;
+        if old_name != new_name {
+            let old_column = Column::from_name(old_name);
+            let new_column = Column::from_name(new_name);
+            remapped_columns.insert(old_column, new_column);
+        }
+    }
+
+    LogicalPlanBuilder::from(input)
+        .window(new_window_expr)?
+        .build()
+}
+
+#[inline(never)]
+fn normalize_aggregate(
+    optimizer: &PlanNormalize,
+    node: &Aggregate,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Aggregate {
+        input,
+        group_expr,
+        aggr_expr,
+        schema: _,
+    } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+    let schema = input.schema();
+    let new_group_expr = group_expr
+        .iter()
+        .map(|expr| {
+            expr_normalize_stacked(optimizer, expr, schema, remapped_columns, optimizer_config)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let new_aggr_expr = aggr_expr
+        .iter()
+        .map(|expr| {
+            expr_normalize_stacked(optimizer, expr, schema, remapped_columns, optimizer_config)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    *remapped_columns = HashMap::new();
+    for (group_expr, new_group_expr) in group_expr.iter().zip(new_group_expr.iter()) {
+        let old_name = group_expr.name(&DFSchema::empty())?;
+        let new_name = new_group_expr.name(&DFSchema::empty())?;
+        if old_name != new_name {
+            let old_column = Column::from_name(old_name);
+            let new_column = Column::from_name(new_name);
+            remapped_columns.insert(old_column, new_column);
+        }
+    }
+    for (aggr_expr, new_aggr_expr) in aggr_expr.iter().zip(new_aggr_expr.iter()) {
+        let old_name = aggr_expr.name(&DFSchema::empty())?;
+        let new_name = new_aggr_expr.name(&DFSchema::empty())?;
+        if old_name != new_name {
+            let old_column = Column::from_name(old_name);
+            let new_column = Column::from_name(new_name);
+            remapped_columns.insert(old_column, new_column);
+        }
+    }
+
+    LogicalPlanBuilder::from(input)
+        .aggregate(new_group_expr, new_aggr_expr)?
+        .build()
+}
+
+#[inline(never)]
+fn normalize_sort(
+    optimizer: &PlanNormalize,
+    node: &Sort,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Sort { expr, input } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+    let schema = input.schema();
+    let expr = expr
+        .iter()
+        .map(|expr| {
+            expr_normalize_stacked(optimizer, expr, schema, remapped_columns, optimizer_config)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    LogicalPlanBuilder::from(input).sort(expr)?.build()
+}
+
+#[inline(never)]
+fn normalize_join(
+    optimizer: &PlanNormalize,
+    node: &Join,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Join {
+        left,
+        right,
+        on,
+        join_type,
+        join_constraint,
+        schema: _,
+        null_equals_null,
+    } = node;
+    let mut right_remapped_columns = HashMap::new();
+    let left = Arc::new(plan_normalize(
+        optimizer,
+        left,
+        remapped_columns,
+        optimizer_config,
+    )?);
+    let right = Arc::new(plan_normalize(
+        optimizer,
+        right,
+        &mut right_remapped_columns,
+        optimizer_config,
+    )?);
+    let on = on
+        .iter()
+        .map(|(left_column, right_column)| {
+            let left_column = column_normalize(left_column, remapped_columns)?;
+            let right_column = column_normalize(right_column, &right_remapped_columns)?;
+            Ok((left_column, right_column))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let join_type = *join_type;
+    let join_constraint = *join_constraint;
+    let schema = Arc::new(build_join_schema(
+        &left.schema(),
+        &right.schema(),
+        &join_type,
+    )?);
+    let null_equals_null = *null_equals_null;
+
+    remapped_columns.extend(right_remapped_columns);
+
+    Ok(LogicalPlan::Join(Join {
+        left,
+        right,
+        on,
+        join_type,
+        join_constraint,
+        schema,
+        null_equals_null,
+    }))
+}
+
+#[inline(never)]
+fn normalize_cross_join(
+    optimizer: &PlanNormalize,
+    node: &CrossJoin,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let CrossJoin {
+        left,
+        right,
+        schema: _,
+    } = node;
+    let mut right_remapped_columns = HashMap::new();
+    let left = plan_normalize(optimizer, left, remapped_columns, optimizer_config)?;
+    let right = plan_normalize(
+        optimizer,
+        right,
+        &mut right_remapped_columns,
+        optimizer_config,
+    )?;
+
+    remapped_columns.extend(right_remapped_columns);
+
+    LogicalPlanBuilder::from(left).cross_join(&right)?.build()
+}
+
+#[inline(never)]
+fn normalize_repartition(
+    optimizer: &PlanNormalize,
+    node: &Repartition,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Repartition {
+        input,
+        partitioning_scheme,
+    } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+    let schema = input.schema();
+    let partitioning_scheme = match partitioning_scheme {
+        Partitioning::RoundRobinBatch(n) => Partitioning::RoundRobinBatch(*n),
+        Partitioning::Hash(exprs, n) => {
+            let exprs = exprs
+                .iter()
+                .map(|expr| {
+                    expr_normalize_stacked(
+                        optimizer,
+                        expr,
+                        schema,
+                        remapped_columns,
+                        optimizer_config,
+                    )
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            Partitioning::Hash(exprs, *n)
+        }
+    };
+
+    LogicalPlanBuilder::from(input)
+        .repartition(partitioning_scheme)?
+        .build()
+}
+
+#[inline(never)]
+fn normalize_union(
+    optimizer: &PlanNormalize,
+    node: &Union,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Union {
+        inputs,
+        schema: _,
+        alias,
+    } = node;
+    let mut plan = None;
+    for input in inputs {
+        let mut new_remapped_columns = HashMap::new();
+        let input = plan_normalize(
+            optimizer,
+            input,
+            &mut new_remapped_columns,
+            optimizer_config,
+        )?;
+        if let Some(last_plan) = plan.take() {
+            plan = Some(union_with_alias(last_plan, input, alias.clone())?);
+        } else {
+            plan = Some(input);
+            *remapped_columns = new_remapped_columns;
+        }
+    }
+
+    plan.ok_or_else(|| DataFusionError::Internal("Found UNION plan with no inputs".to_string()))
+}
+
+#[inline(never)]
+fn normalize_table_scan(
+    optimizer: &PlanNormalize,
+    node: &TableScan,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let TableScan {
+        table_name,
+        source,
+        projection,
+        projected_schema,
+        filters,
+        fetch,
+    } = node;
+    let table_name = table_name.clone();
+    let source = Arc::clone(source);
+    let projection = projection.clone();
+    let projected_schema = Arc::clone(projected_schema);
+    let filters = filters
+        .iter()
+        .map(|expr| {
+            expr_normalize_stacked(
+                optimizer,
+                expr,
+                &projected_schema,
+                remapped_columns,
+                optimizer_config,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let fetch = *fetch;
+
+    Ok(LogicalPlan::TableScan(TableScan {
+        table_name,
+        source,
+        projection,
+        projected_schema,
+        filters,
+        fetch,
+    }))
+}
+
+#[inline(never)]
+fn normalize_limit(
+    optimizer: &PlanNormalize,
+    node: &Limit,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Limit { skip, fetch, input } = node;
+    let skip = *skip;
+    let fetch = *fetch;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+
+    LogicalPlanBuilder::from(input).limit(skip, fetch)?.build()
+}
+
+#[inline(never)]
+fn normalize_subquery(
+    optimizer: &PlanNormalize,
+    node: &Subquery,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Subquery {
+        input,
+        subqueries,
+        types,
+        schema: _,
+    } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+    let mut new_subqueries = Vec::with_capacity(subqueries.len());
+    for subquery in subqueries {
+        let mut subquery_remapped_columns = HashMap::new();
+        let new_subquery = plan_normalize(
+            optimizer,
+            subquery,
+            &mut subquery_remapped_columns,
+            optimizer_config,
+        )?;
+        new_subqueries.push(new_subquery);
+        remapped_columns.extend(subquery_remapped_columns);
+    }
+    let types = types.clone();
+
+    LogicalPlanBuilder::from(input)
+        .subquery(new_subqueries, types)?
+        .build()
+}
+
+#[inline(never)]
+fn normalize_create_memory_table(
+    optimizer: &PlanNormalize,
+    node: &CreateMemoryTable,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let CreateMemoryTable { name, input } = node;
+    let name = name.clone();
+    let input = Arc::new(plan_normalize(
+        optimizer,
+        input,
+        remapped_columns,
+        optimizer_config,
+    )?);
+    Ok(LogicalPlan::CreateMemoryTable(CreateMemoryTable {
+        name,
+        input,
+    }))
+}
+
+#[inline(never)]
+fn normalize_values(
+    optimizer: &PlanNormalize,
+    node: &Values,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Values { schema, values } = node;
+    let values = values
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|expr| {
+                    expr_normalize_stacked(
+                        optimizer,
+                        expr,
+                        schema,
+                        remapped_columns,
+                        optimizer_config,
+                    )
+                })
+                .collect::<Result<Vec<_>>>()
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    LogicalPlanBuilder::values(values)?.build()
+}
+
+#[inline(never)]
+fn normalize_explain(
+    optimizer: &PlanNormalize,
+    node: &Explain,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Explain {
+        verbose,
+        plan,
+        stringified_plans: _,
+        schema: _,
+    } = node;
+    let verbose = *verbose;
+    let plan = plan_normalize(optimizer, plan, remapped_columns, optimizer_config)?;
+
+    *remapped_columns = HashMap::new();
+
+    LogicalPlanBuilder::from(plan)
+        .explain(verbose, false)?
+        .build()
+}
+
+#[inline(never)]
+fn normalize_analyze(
+    optimizer: &PlanNormalize,
+    node: &Analyze,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Analyze {
+        verbose,
+        input,
+        schema: _,
+    } = node;
+    let verbose = *verbose;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+
+    *remapped_columns = HashMap::new();
+
+    LogicalPlanBuilder::from(input)
+        .explain(verbose, true)?
+        .build()
+}
+
+#[inline(never)]
+fn normalize_table_udfs(
+    optimizer: &PlanNormalize,
+    node: &TableUDFs,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let TableUDFs {
+        expr,
+        input,
+        schema: _,
+    } = node;
+    let input = Arc::new(plan_normalize(
+        optimizer,
+        input,
+        remapped_columns,
+        optimizer_config,
+    )?);
+    let schema = input.schema();
+    let new_expr = expr
+        .iter()
+        .map(|expr| {
+            expr_normalize_stacked(optimizer, expr, schema, remapped_columns, optimizer_config)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let new_schema = build_table_udf_schema(&input, &new_expr)?;
+
+    for (expr, new_expr) in expr.iter().zip(new_expr.iter()) {
+        let old_name = expr.name(&DFSchema::empty())?;
+        let new_name = new_expr.name(&DFSchema::empty())?;
+        if old_name != new_name {
+            let old_column = Column::from_name(old_name);
+            let new_column = Column::from_name(new_name);
+            remapped_columns.insert(old_column, new_column);
+        }
+    }
+
+    Ok(LogicalPlan::TableUDFs(TableUDFs {
+        expr: new_expr,
+        input,
+        schema: new_schema,
+    }))
+}
+
+#[inline(never)]
+fn normalize_distinct(
+    optimizer: &PlanNormalize,
+    node: &Distinct,
+    remapped_columns: &mut HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<LogicalPlan> {
+    let Distinct { input } = node;
+    let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+
+    LogicalPlanBuilder::from(input).distinct()?.build()
 }
 
 fn expr_normalize_stacked(
@@ -1443,13 +1581,52 @@ mod tests {
                 .expect("Failed to build plan");
 
             // Create a deeply nested OR expression
-            let deeply_nested_filter = create_deeply_nested_or_expr("value", 500);
+            let deeply_nested_filter = create_deeply_nested_or_expr("value", 512);
 
             let plan = LogicalPlanBuilder::from(table_scan)
                 .filter(deeply_nested_filter)
                 .expect("Failed to add filter")
                 .build()
                 .expect("Failed to build plan");
+
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+        });
+
+        Ok(())
+    }
+
+    // `plan_normalize` recurses once per plan node, so its own stack frame is paid
+    // on every level. Guard that a deeply nested plan (not just a deeply nested
+    // expression, see `test_stack_overflow_deeply_nested_or`) stays within the
+    // stack: before the per-arm `#[inline(never)]` split this overflowed in dev
+    // profile because every level paid for the largest match arm.
+    #[test]
+    fn test_stack_overflow_deeply_nested_plan() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
+
+            let schema = Schema::new(vec![
+                Field::new("id", DataType::Int32, false),
+                Field::new("value", DataType::Int32, true),
+            ]);
+
+            let mut plan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
+
+            // Deeply nest the plan itself (chain of Filter nodes).
+            for _ in 0..512 {
+                plan = LogicalPlanBuilder::from(plan)
+                    .filter(col("value").eq(lit(0i32)))
+                    .expect("Failed to add filter")
+                    .build()
+                    .expect("Failed to build plan");
+            }
 
             let optimizer = PlanNormalize::new(&cube_ctx);
             optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();

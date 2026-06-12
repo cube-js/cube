@@ -1,0 +1,186 @@
+---
+title: Custom ordering for categorical values
+description: "This recipe shows how to define a custom sort order for dimension values that don't follow alphabetical or numeric ordering."
+---
+
+## Use case
+
+When working with categorical dimensions like pipeline stages, priority levels,
+or status values, you often need to sort them in a specific business-meaningful
+order rather than alphabetically. For example, a sales pipeline might have
+stages like *Pipeline*, *Best Case*, *Most Likely*, *Commit*, and *Closed*
+that should always appear in that funnel order.
+
+Sometimes stages are prefixed with numbers (e.g., *1. Pipeline*, *2. Best
+Case*) which makes alphabetical sorting work. But when they don't have
+numbers, alphabetical order produces results that don't match the business
+logic.
+
+There are two ways to solve this:
+
+- **At query time** — write a `CASE` expression directly in a [semantic
+SQL][ref-sql-api] query. This is the fastest way to get results and works
+great when you're exploring data in a [workbook][ref-workbooks] or asking AI
+to build a query for you.
+- **In the data model** — add a permanent dimension with the ordering logic.
+This is the right choice when the same sort order is reused across many
+queries, dashboards, or consumers.
+
+## Query-level approach
+
+You can define a custom ordering dimension directly in a semantic SQL query
+without changing the data model. This is especially useful when working in
+workbooks — you can ask AI to sort results in a specific order and it will
+generate the appropriate `CASE` expression for you.
+
+```sql
+SELECT
+  deals.forecast_category,
+  CASE
+    WHEN deals.forecast_category = 'Pipeline' THEN 1
+    WHEN deals.forecast_category = 'Best Case' THEN 2
+    WHEN deals.forecast_category = 'Most Likely' THEN 3
+    WHEN deals.forecast_category = 'Commit' THEN 4
+    WHEN deals.forecast_category = 'Closed' THEN 5
+    ELSE 6
+  END AS funnel_order,
+  MEASURE(total_amount) AS total_amount
+FROM
+  deals
+GROUP BY
+  1, 2
+ORDER BY
+  2 ASC
+```
+
+The `CASE` expression creates an inline `funnel_order` column that maps each
+category to its position. The query then sorts by that column instead of by
+the category name.
+
+This approach requires no changes to the data model and is ideal for ad-hoc
+analysis. In a workbook, you can simply ask the AI assistant something like
+*"sort forecast categories in pipeline order: Pipeline, Best Case, Most
+Likely, Commit, Closed"* and it will generate a query like the one above.
+
+## Data model approach
+
+When the same custom order is needed across multiple queries, dashboards, or
+BI tools, it's better to encode it as a dimension in the data model. This
+way any consumer can sort by it without re-implementing the `CASE` logic.
+
+Consider the following data model with a `forecast_category` dimension that
+has no inherent sort order:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: deals
+    sql_table: deals
+
+    dimensions:
+      - name: forecast_category
+        sql: forecast_category
+        type: string
+
+      - name: forecast_category_order
+        sql: |
+          CASE
+            WHEN {forecast_category} = 'Pipeline' THEN 1
+            WHEN {forecast_category} = 'Best Case' THEN 2
+            WHEN {forecast_category} = 'Most Likely' THEN 3
+            WHEN {forecast_category} = 'Commit' THEN 4
+            WHEN {forecast_category} = 'Closed' THEN 5
+            ELSE 6
+          END
+        type: number
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+```
+
+```javascript title="JavaScript"
+cube(`deals`, {
+  sql_table: `deals`,
+
+  dimensions: {
+    forecast_category: {
+      sql: `forecast_category`,
+      type: `string`
+    },
+
+    forecast_category_order: {
+      sql: `
+        CASE
+          WHEN ${forecast_category} = 'Pipeline' THEN 1
+          WHEN ${forecast_category} = 'Best Case' THEN 2
+          WHEN ${forecast_category} = 'Most Likely' THEN 3
+          WHEN ${forecast_category} = 'Commit' THEN 4
+          WHEN ${forecast_category} = 'Closed' THEN 5
+          ELSE 6
+        END
+      `,
+      type: `number`
+    }
+  },
+
+  measures: {
+    total_amount: {
+      sql: `amount`,
+      type: `sum`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+The `forecast_category_order` dimension uses a `CASE` expression to assign a
+numeric position to each category value. This dimension references the
+`forecast_category` dimension so that the mapping stays consistent.
+
+The `ELSE 6` clause handles any unexpected values, placing them at the end
+of the sort order.
+
+Once the dimension is in the data model, queries become straightforward:
+
+```sql
+SELECT
+  forecast_category,
+  forecast_category_order,
+  MEASURE(total_amount)
+FROM
+  deals
+GROUP BY
+  1, 2
+ORDER BY
+  2 ASC
+```
+
+## Result
+
+Both approaches produce the same result — a business-meaningful funnel order
+instead of alphabetical sorting:
+
+| Forecast Category | funnel_order | Total Amount   |
+| ----------------- | -----------: | -------------: |
+| Pipeline          |            1 | $17,830,500    |
+| Best Case         |            2 | $6,786,250     |
+| Most Likely       |            3 | $537,499.70    |
+| Commit            |            4 | $688,000       |
+| Closed            |            5 | $9,232,800.46  |
+
+This pattern works for any set of categorical values that need a custom order:
+support ticket priorities, project phases, approval workflows, and so on.
+
+Use the **query-level approach** when you need a quick, one-off sort order
+while exploring data. Use the **data model approach** when the ordering is a
+stable business rule that should be available to all consumers.
+
+
+[ref-data-apis]: /reference#data-apis
+[ref-sql-api]: /reference/sql-api
+[ref-custom-sorting]: /recipes/core-data-api/sorting
+[ref-workbooks]: /docs/workspace/workbooks

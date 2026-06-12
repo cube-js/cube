@@ -19,6 +19,8 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(orderBy|order_by)\.[0-9]+\.sql$/,
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeShift|time_shift)\.[0-9]+\.(timeDimension|time_dimension)$/,
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(reduceBy|reduce_by|groupBy|group_by|addGroupBy|add_group_by)$/,
+  /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.filter\.(exclude|keepOnly|keep_only)$/,
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.grain\.(exclude|keepOnly|keep_only|include)$/,
   /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.case\.switch$/,
   /^dimensions\.[_a-zA-Z][_a-zA-Z0-9]*\.(reduceBy|reduce_by|groupBy|group_by|addGroupBy|add_group_by|key)$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
@@ -26,6 +28,9 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensions|time_dimensions)\.\d+\.dimension$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(outputColumnTypes|output_column_types)\.\d+\.member$/,
   /^contextMembers$/,
+  /^views$/,
+  /^(viewGroup|view_group)$/,
+  /^(viewGroups|view_groups)$/,
   /^includes$/,
   /^excludes$/,
   /^hierarchies\.[_a-zA-Z][_a-zA-Z0-9]*\.levels$/,
@@ -34,7 +39,12 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.member$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.values$/,
   /^(accessPolicy|access_policy)\.[0-9]+\.conditions.[0-9]+\.if$/,
+  /^(defaultFilters|default_filters)\.[0-9]+\.member$/,
+  /^(defaultFilters|default_filters)\.[0-9]+\.values$/,
+  /^(defaultFilters|default_filters)\.[0-9]+\.unless$/,
   /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.mask\.sql$/,
+  /^dimensions\.[_a-zA-Z][_a-zA-Z0-9]*\.links\.[0-9]+\.url$/,
+  /^dimensions\.[_a-zA-Z][_a-zA-Z0-9]*\.links\.[0-9]+\.params\.[0-9]+\.value$/,
 ];
 
 export const transpiledFields: Set<String> = new Set<String>();
@@ -68,7 +78,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
                 this.knownIdentifiersInjectVisitor('extends', name => this.cubeDictionary.resolveCube(name))
               );
             }
-          } else if (path.node.callee.name === 'context') {
+          } else if (path.node.callee.name === 'context' || path.node.callee.name === 'view_group') {
             args[args.length - 1].traverse(this.sqlAndReferencesFieldVisitor(null));
           }
         }
@@ -214,17 +224,22 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
   protected static collectKnownIdentifiersAndTransform(resolveSymbol: SymbolResolver, path: NodePath): string[] {
     const identifiers: string[] = [];
+    const isAccessPolicy = this.isAccessPolicyPath(path);
 
     if (path.node.type === 'Identifier') {
-      CubePropContextTranspiler.matchAndTransformIdentifier(path, resolveSymbol, identifiers);
+      CubePropContextTranspiler.transformCubeCloudShorthandIdentifier(path as NodePath<t.Identifier>, identifiers, isAccessPolicy, resolveSymbol);
+      if (path.node.type === 'Identifier') {
+        CubePropContextTranspiler.matchAndTransformIdentifier(path, resolveSymbol, identifiers);
+      }
     }
 
     path.traverse({
       Identifier: (p) => {
+        CubePropContextTranspiler.transformCubeCloudShorthandIdentifier(p, identifiers, isAccessPolicy, resolveSymbol);
         CubePropContextTranspiler.matchAndTransformIdentifier(p, resolveSymbol, identifiers);
       },
       MemberExpression: (p) => {
-        CubePropContextTranspiler.transformUserAttributesMemberExpression(p);
+        CubePropContextTranspiler.transformCubeCloudShorthandMemberExpression(p, isAccessPolicy, resolveSymbol);
       }
     });
 
@@ -238,39 +253,83 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       ) &&
       resolveSymbol(path.node.name)
     ) {
-      // Special handling for userAttributes - replace in parameter list with securityContext
-      const fullPath = this.fullPath(path);
-      if ((path.node.name === 'userAttributes' || path.node.name === 'user_attributes') && (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))) {
-        identifiers.push('securityContext');
-      } else {
-        identifiers.push(path.node.name);
-      }
+      identifiers.push(path.node.name);
     }
   }
 
-  protected static transformUserAttributesMemberExpression(path: NodePath<t.MemberExpression>) {
-    // Check if this is userAttributes.someProperty (object should be identifier named 'userAttributes')
-    const fullPath = this.fullPath(path);
-    if (
-      (t.isIdentifier(path.node.object, { name: 'userAttributes' }) || t.isIdentifier(path.node.object, { name: 'user_attributes' })) &&
-      (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
-    ) {
-      // Replace userAttributes with securityContext.cubeCloud.userAttributes
-      const securityContext = t.identifier('securityContext');
-      const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
-      const userAttributes = t.memberExpression(cubeCloud, t.identifier('userAttributes'));
-      const newMemberExpression = t.memberExpression(userAttributes, path.node.property, path.node.computed);
+  private static readonly CUBE_CLOUD_SHORTHAND_IDENTIFIERS = ['userAttributes', 'user_attributes', 'groups'];
 
+  private static isAccessPolicyPath(path: NodePath): boolean {
+    // @ts-ignore
+    const target = (!path?.node?.key && path?.parentPath && t.isObjectProperty(path.parentPath.node))
+      ? path.parentPath
+      : path;
+    const fp = this.fullPath(target);
+    return fp.startsWith('accessPolicy') || fp.startsWith('access_policy');
+  }
+
+  private static securityContextIdentifier(isAccessPolicy: boolean): t.Identifier {
+    return t.identifier(isAccessPolicy ? 'securityContext' : 'SECURITY_CONTEXT');
+  }
+
+  private static isShadowedByFunctionParam(name: string, path: NodePath): boolean {
+    let current: NodePath | null = path.parentPath;
+    while (current) {
+      const { node } = current;
+      if (
+        (t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)) &&
+        node.params.some(p => t.isIdentifier(p) && p.name === name)
+      ) {
+        return true;
+      }
+      current = current.parentPath;
+    }
+    return false;
+  }
+
+  protected static transformCubeCloudShorthandIdentifier(path: NodePath<t.Identifier>, identifiers: string[], isAccessPolicy: boolean, resolveSymbol: SymbolResolver) {
+    if (!this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.name)) {
+      return;
+    }
+    if (resolveSymbol(path.node.name)) {
+      return;
+    }
+    if (
+      path.parent &&
+      (path.parent.type === 'MemberExpression' || path.parent.type === 'OptionalMemberExpression') &&
+      path.key === 'property'
+    ) {
+      return;
+    }
+    if (this.isShadowedByFunctionParam(path.node.name, path)) {
+      return;
+    }
+    const contextId = this.securityContextIdentifier(isAccessPolicy);
+    const cubeCloud = t.memberExpression(contextId, t.identifier('cubeCloud'));
+    const prop = path.node.name === 'user_attributes' ? 'userAttributes' : path.node.name;
+    const newExpr = t.memberExpression(cubeCloud, t.identifier(prop));
+    path.replaceWith(newExpr);
+    identifiers.push(contextId.name);
+  }
+
+  protected static transformCubeCloudShorthandMemberExpression(path: NodePath<t.MemberExpression>, isAccessPolicy: boolean, resolveSymbol: SymbolResolver) {
+    if (
+      t.isIdentifier(path.node.object) &&
+      this.CUBE_CLOUD_SHORTHAND_IDENTIFIERS.includes(path.node.object.name) &&
+      !resolveSymbol(path.node.object.name) &&
+      !this.isShadowedByFunctionParam(path.node.object.name, path)
+    ) {
+      const contextId = this.securityContextIdentifier(isAccessPolicy);
+      const cubeCloud = t.memberExpression(contextId, t.identifier('cubeCloud'));
+      const prop = path.node.object.name === 'user_attributes' ? 'userAttributes' : path.node.object.name;
+      const shorthand = t.memberExpression(cubeCloud, t.identifier(prop));
+      const newMemberExpression = t.memberExpression(shorthand, path.node.property, path.node.computed);
       path.replaceWith(newMemberExpression);
     } else if (
-      t.isMemberExpression(path.node.object) &&
+      (t.isMemberExpression(path.node.object) || t.isOptionalMemberExpression(path.node.object)) &&
       t.isIdentifier(path.node.object.property, { name: 'user_attributes' }) &&
-      !path.node.object.computed &&
-      (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))
+      !path.node.object.computed
     ) {
-      // Also handle case where user_attributes appears within a MemberExpression chain like
-      // securityContext.cubeCloud.user_attributes
-      // We need to convert user_attributes to userAttributes in such chains
       const newObject = t.memberExpression(
         path.node.object.object,
         t.identifier('userAttributes'),

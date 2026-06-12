@@ -240,8 +240,15 @@ dimension in your query.
 
 </WarningBox>
 
-_When querying a view,_ data masking follows the same pattern as row-level
-security: masking rules from both the view and relevant cubes are applied.
+<WarningBox>
+
+Unlike [member-level access policies][ref-dap-mls], which are **not** inherited
+from cubes when querying through views, data masking rules **are** applied from
+both the view and the relevant cubes. If you define masking on both a cube and a
+view that uses that cube, the masking will be applied twice. To avoid unexpected
+results, define masking rules on either the cube or the view, but not both.
+
+</WarningBox>
 
 For more details on available parameters, check out the
 [`member_masking` reference][ref-ref-dap-masking].

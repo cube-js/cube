@@ -80,11 +80,12 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return { query, denied: false };
   },
 
-  async metaConfig() {
-    return [
+  async metaConfig(_ctx, options: any = {}) {
+    const cubes = [
       {
         config: {
           name: 'Foo',
+          type: 'cube',
           description: 'cube from compilerApi mock',
           measures: [
             {
@@ -125,7 +126,48 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
           ],
         },
       },
+      {
+        config: {
+          name: 'FooView',
+          type: 'view',
+          description: 'view from compilerApi mock',
+          viewGroups: ['analytics'],
+          measures: [
+            {
+              name: 'FooView.bar',
+              isVisible: true,
+            },
+          ],
+          dimensions: [
+            {
+              name: 'FooView.id',
+              isVisible: true,
+            },
+          ],
+          segments: [],
+        },
+      },
     ];
+
+    if (options.includeCompilerId || options.includeViewGroups) {
+      const result: any = { cubes };
+      if (options.includeCompilerId) {
+        result.compilerId = 'mock-compiler-id';
+      }
+      if (options.includeViewGroups) {
+        result.viewGroups = [
+          {
+            name: 'analytics',
+            title: 'Analytics',
+            description: 'Analytics related views',
+            views: ['FooView'],
+          },
+        ];
+      }
+      return result;
+    }
+
+    return cubes;
   },
 
   async metaConfigExtended() {
@@ -162,6 +204,26 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
           ],
         },
       },
+      {
+        config: {
+          name: 'FooView',
+          type: 'view',
+          description: 'view from compilerApi mock',
+          measures: [
+            {
+              name: 'FooView.bar',
+              isVisible: true,
+            },
+          ],
+          dimensions: [
+            {
+              name: 'FooView.id',
+              isVisible: true,
+            },
+          ],
+          segments: [],
+        },
+      },
     ];
 
     const cubeDefinitions = {
@@ -169,7 +231,11 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
         sql: () => 'SELECT * FROM Foo',
         measures: {},
         dimension: {},
-      }
+      },
+      FooView: {
+        measures: {},
+        dimensions: {},
+      },
     };
 
     return {
