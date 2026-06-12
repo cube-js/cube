@@ -19,7 +19,6 @@ use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
 use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
-use crate::util::batch_memory::record_batch_buffer_size;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -295,11 +294,16 @@ impl CompactionServiceImpl {
                 continue;
             }
 
+            let chunk_inputs = chunk_runs
+                .into_iter()
+                .map(|run| try_make_memory_data_source(&[run], schema.clone(), None))
+                .collect::<Result<Vec<_>, _>>()?;
+
             // Get merged RecordBatch
             let batches_stream = merge_chunks(
                 key_size,
                 main_table.clone(),
-                chunk_runs,
+                chunk_inputs,
                 unique_key.clone(),
                 aggregate_columns.clone(),
                 task_context.clone(),
@@ -389,10 +393,15 @@ impl CompactionServiceImpl {
             return Ok(());
         }
 
+        let chunk_inputs = chunk_runs
+            .into_iter()
+            .map(|run| try_make_memory_data_source(&[run], schema.clone(), None))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
-            chunk_runs,
+            chunk_inputs,
             unique_key.clone(),
             aggregate_columns.clone(),
             task_context,
@@ -501,47 +510,34 @@ impl CompactionService for CompactionServiceImpl {
 
         let partition_id = partition.get_id();
 
-        // Each chunk is read as a separate already-sorted run so that the chunks can be merged
-        // with a k-way SortPreservingMergeExec instead of being concatenated and re-sorted.
-        let mut chunk_runs: Vec<Vec<RecordBatch>> = Vec::new();
+        // Each chunk is streamed from parquet as a separate already-sorted run and merged with a
+        // k-way SortPreservingMergeExec, instead of reading every chunk into memory and
+        // concatenating + re-sorting. Bytes read are tracked via TraceDataLoadedExec.
+        let mut chunk_inputs: Vec<Arc<dyn ExecutionPlan>> = Vec::new();
         let mut chunks_to_use = Vec::new();
-        let mut chunks_total_size = 0;
-        let num_columns = index.get_row().columns().len();
+        let mut chunks_total_file_size = 0u64;
 
         for chunk in chunks.iter() {
-            let mut run = Vec::new();
-            for b in self
+            let chunk_exec = self
                 .chunk_store
-                .get_chunk_columns_with_preloaded_meta(
-                    chunk.clone(),
-                    partition.clone(),
-                    index.clone(),
-                )
-                .await?
-            {
-                assert_eq!(
-                    num_columns,
-                    b.num_columns(),
-                    "Column len mismatch for {:?} and {:?}",
-                    index,
-                    chunk
-                );
-                chunks_total_size += record_batch_buffer_size(&b);
-                if b.num_rows() > 0 {
-                    run.push(b);
-                }
-            }
-            if !run.is_empty() {
-                chunk_runs.push(run);
-            }
+                .chunk_exec(chunk.clone(), partition.clone(), index.clone())
+                .await?;
+            chunk_inputs.push(Arc::new(TraceDataLoadedExec::new(
+                chunk_exec,
+                data_loaded_size.clone(),
+            )));
             chunks_to_use.push(chunk.clone());
-            if chunks_total_size > self.config.compaction_chunks_in_memory_size_threshold() as usize
-            {
+            // This caps a single compaction by the chunks' on-disk (compressed parquet) byte size.
+            // The threshold (CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD) is expressed in
+            // uncompressed in-memory bytes, so for a given value this admits more data per merge by
+            // roughly the parquet compression ratio. That is acceptable because chunks are streamed
+            // and memory is not the binding constraint here; the row-count cap above bounds the
+            // merge regardless.
+            chunks_total_file_size += chunk.get_row().file_size().unwrap_or(0);
+            if chunks_total_file_size > self.config.compaction_chunks_in_memory_size_threshold() {
                 break;
             }
         }
-
-        data_loaded_size.add(chunks_total_size);
 
         let chunks = chunks_to_use;
 
@@ -697,7 +693,7 @@ impl CompactionService for CompactionServiceImpl {
         let records = merge_chunks(
             key_size,
             main_table,
-            chunk_runs,
+            chunk_inputs,
             unique_key,
             aggregate_columns,
             task_context,
@@ -1426,12 +1422,12 @@ async fn write_to_files_by_keys(
 }
 
 /// Builds a `SendableRecordBatchStream` merging the persistent partition data `l` with the
-/// already-sorted chunk runs `r` (one inner vector per chunk). Inputs are merged with a k-way
-/// `SortPreservingMergeExec` instead of being concatenated and re-sorted.
+/// already-sorted chunk inputs `r` (one sorted ExecutionPlan per chunk). Inputs are merged with a
+/// k-way `SortPreservingMergeExec` instead of being concatenated and re-sorted.
 pub async fn merge_chunks(
     key_size: usize,
     l: Arc<dyn ExecutionPlan>,
-    r: Vec<Vec<RecordBatch>>,
+    r: Vec<Arc<dyn ExecutionPlan>>,
     unique_key_columns: Option<Vec<&crate::metastore::Column>>,
     aggregate_columns: Option<Vec<AggregateColumn>>,
     task_context: Arc<TaskContext>,
@@ -1450,10 +1446,10 @@ pub async fn merge_chunks(
     let inputs: Arc<dyn ExecutionPlan> = if r.is_empty() {
         l
     } else {
-        Arc::new(UnionExec::new(vec![
-            l,
-            try_make_memory_data_source(&r, schema, None)?,
-        ]))
+        let mut union_inputs = Vec::with_capacity(r.len() + 1);
+        union_inputs.push(l);
+        union_inputs.extend(r);
+        Arc::new(UnionExec::new(union_inputs))
     };
     let mut res: Arc<dyn ExecutionPlan> =
         Arc::new(SortPreservingMergeExec::new(LexOrdering::new(key), inputs));
@@ -1628,30 +1624,27 @@ mod tests {
             )?])
         });
         let cols_to_move = cols.clone();
-        chunk_store
-            .expect_get_chunk_columns_with_preloaded_meta()
-            .returning(move |c, _i, _p| {
-                let limit = match c.get_id() {
-                    1 => 10,
-                    2 => 16,
-                    3 => 20,
-                    4 => 2,
-                    _ => unimplemented!(),
-                };
-                let mut strings = Vec::with_capacity(limit);
-                for i in 0..limit {
-                    strings.push(format!("foo{}", i));
-                }
-                // Chunks are always written sorted by the index sort key.
-                strings.sort();
-                let schema = Arc::new(Schema::new(vec![<&Column as Into<Field>>::into(
-                    &cols_to_move[0],
-                )]));
-                Ok(vec![RecordBatch::try_new(
-                    schema,
-                    vec![Arc::new(StringArray::from(strings))],
-                )?])
-            });
+        chunk_store.expect_chunk_exec().returning(move |c, _p, _i| {
+            let limit = match c.get_id() {
+                1 => 10,
+                2 => 16,
+                3 => 20,
+                4 => 2,
+                _ => unimplemented!(),
+            };
+            let mut strings = Vec::with_capacity(limit);
+            for i in 0..limit {
+                strings.push(format!("foo{}", i));
+            }
+            // Chunks are always written sorted by the index sort key.
+            strings.sort();
+            let schema = Arc::new(Schema::new(vec![<&Column as Into<Field>>::into(
+                &cols_to_move[0],
+            )]));
+            let batch =
+                RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(strings))])?;
+            Ok(try_make_memory_data_source(&[vec![batch]], schema, None)?)
+        });
 
         config.expect_partition_split_threshold().returning(|| 20);
         config

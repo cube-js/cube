@@ -2,6 +2,11 @@ pub mod compaction;
 
 use async_trait::async_trait;
 use datafusion::arrow::compute::{concat_batches, SortOptions};
+use datafusion::config::TableParquetOptions;
+use datafusion::datasource::listing::PartitionedFile;
+use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
+use datafusion::datasource::physical_plan::{FileScanConfig, ParquetSource};
+use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::common::collect as common_collect;
@@ -276,6 +281,15 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         partition: IdRow<Partition>,
         index: IdRow<Index>,
     ) -> Result<(Vec<Vec<RecordBatch>>, Vec<u64>), CubeError>;
+    /// Returns a single-partition ExecutionPlan over one chunk's data, sorted by the index sort
+    /// key. Persisted chunks are scanned from parquet (streamed); in-memory chunks are served
+    /// from memory.
+    async fn chunk_exec(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+    ) -> Result<Arc<dyn ExecutionPlan>, CubeError>;
     async fn add_memory_chunk(
         &self,
         chunk_name: String,
@@ -465,10 +479,15 @@ impl ChunkDataStore for ChunkStore {
         )
         .task_ctx();
 
+        let chunk_inputs = chunk_runs
+            .into_iter()
+            .map(|run| try_make_memory_data_source(&[run], schema.clone(), None))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
-            chunk_runs,
+            chunk_inputs,
             unique_key.clone(),
             aggregate_columns.clone(),
             task_context,
@@ -733,6 +752,43 @@ impl ChunkDataStore for ChunkStore {
         }
 
         Ok((runs, non_empty_chunk_ids))
+    }
+
+    async fn chunk_exec(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        if chunk.get_row().in_memory() {
+            let batches = self
+                .get_chunk_columns_with_preloaded_meta(chunk, partition, index)
+                .await?;
+            Ok(try_make_memory_data_source(&[batches], schema, None)?)
+        } else {
+            let (local_file, _) = self.download_chunk(chunk, partition, index).await?;
+            let session_config = self
+                .metadata_cache_factory
+                .cache_factory()
+                .make_session_config();
+            let parquet_source = ParquetSource::new(
+                TableParquetOptions::default(),
+                get_reader_options_customizer(&session_config),
+            )
+            .with_parquet_file_reader_factory(
+                self.metadata_cache_factory
+                    .cache_factory()
+                    .make_noop_cache(),
+            );
+            let file_scan = FileScanConfig::new(
+                ObjectStoreUrl::local_filesystem(),
+                schema,
+                Arc::new(parquet_source),
+            )
+            .with_file(PartitionedFile::from_path(local_file)?);
+            Ok(Arc::new(DataSourceExec::new(Arc::new(file_scan))))
+        }
     }
 
     async fn has_in_memory_chunk(
