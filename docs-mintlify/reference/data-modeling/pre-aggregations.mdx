@@ -1733,7 +1733,7 @@ pre-aggregation definition.
 <Note>
 
 A query can only target an aggregating index when every measure it uses is
-[additive](/docs/pre-aggregations/getting-started-pre-aggregations#additivity)
+[additive](/docs/pre-aggregations/matching-pre-aggregations)
 (e.g. built on `sum`, `count`, `min`, `max`, or `countDistinctApprox`), and every
 dimension and filter in the query is one of the index's `columns`. Non-additive
 measures, such as `avg` or exact `countDistinct`, cannot use an aggregating index.
@@ -1810,7 +1810,7 @@ cube(`orders`, {
 
 [ref-caching-lambda-preaggs]: /docs/pre-aggregations/lambda-pre-aggregations
 [ref-caching-partitioning]: /docs/pre-aggregations/using-pre-aggregations#partitioning
-[ref-caching-preaggs-target]: /docs/pre-aggregations/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries
+[ref-caching-preaggs-target]: /docs/pre-aggregations/matching-pre-aggregations#matching-algorithm
 [ref-config-downstream-superset]: /admin/connect-to-data/visualization-tools/superset
 [ref-cube-refreshkey]: /reference/data-modeling/cube#refresh_key
 [ref-production-checklist-refresh]: /docs/deployment/production-checklist#set-up-refresh-worker

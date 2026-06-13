@@ -1134,7 +1134,7 @@ option](/reference/configuration/config#context_to_api_scopes).
 
 ## `CUBEJS_DEV_MODE`
 
-If `true`, enables [development mode](/admin/connect-to-data#development-mode).
+If `true`, enables [development mode](/docs/data-modeling/dev-mode).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1469,7 +1469,7 @@ option](/reference/configuration/config#can_switch_sql_user).
 ## `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY`
 
 If `true`, disables the primary key inclusion check for
-[ungrouped queries](/reference/queries#ungrouped-query).
+[ungrouped queries](/reference/core-data-apis/queries#ungrouped-query).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1508,7 +1508,7 @@ Queries without an explicit `LIMIT` still use [`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](
 ## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
 
 If `true`, prevents adding implicit [default `ORDER BY`
-clause](/reference/queries#order) for [SQL API][ref-sql-api] queries.
+clause](/reference/core-data-apis/queries#order) for [SQL API][ref-sql-api] queries.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -2068,7 +2068,7 @@ The port for a Cube deployment to listen to API connections on.
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
-[ref-row-limit]: /reference/queries#row-limit
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
@@ -2081,6 +2081,6 @@ The port for a Cube deployment to listen to API connections on.
 [ref-mdx-api]: /reference/mdx-api
 [ref-mdx-api-locale]: /reference/mdx-api#measure-format
 [ref-time-dimensions]: /reference/data-modeling/dimensions#type
-[ref-time-zone]: /reference/queries#time-zone
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
