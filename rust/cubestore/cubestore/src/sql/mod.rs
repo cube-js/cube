@@ -918,8 +918,17 @@ impl SqlService for SqlServiceImpl {
                 partitioned_index,
             } => {
                 log::info!(
-                    "[csv-import-timing] create_table request received: {}",
-                    name
+                    "[csv-import-timing] create_table request received: {} loc_hashes={:?}",
+                    name,
+                    locations.as_ref().map(|ls| ls
+                        .iter()
+                        .map(|l| {
+                            use std::hash::{Hash, Hasher};
+                            let mut h = std::collections::hash_map::DefaultHasher::new();
+                            l.hash(&mut h);
+                            format!("{:x}", h.finish())
+                        })
+                        .collect::<Vec<_>>())
                 );
                 app_metrics::DATA_QUERIES.add_with_tags(
                     1,
