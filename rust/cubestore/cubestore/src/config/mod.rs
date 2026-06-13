@@ -2215,7 +2215,10 @@ impl Config {
     }
 
     pub async fn configure_meta_store(&self) {
-        let (metastore_event_sender, _) = broadcast::channel(8192); // TODO config
+        // Bounded broadcast of metastore events; sized for bursts (e.g. orphaned-job cleanup
+        // emitting hundreds of UpdateJob events at once). Listeners that still lag past this fall
+        // back to authoritative metastore re-checks rather than failing.
+        let (metastore_event_sender, _) = broadcast::channel(32768);
         let metastore_event_sender_to_move = metastore_event_sender.clone();
 
         if let Some(_) = self.config_obj.metastore_remote_address() {
