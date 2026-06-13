@@ -87,6 +87,20 @@ impl ImportFormat {
         Ok(rows.boxed())
     }
 
+    /// Estimated in-memory Arrow buffer footprint of a single appended value, used to
+    /// cap a data frame by size during import. Mirrors `columns_vec_buffer_size` accounting
+    /// closely enough to drive the split; exactness is unnecessary for a threshold.
+    fn estimate_arrow_value_size(column_type: &ColumnType, value: Option<&str>) -> usize {
+        match column_type {
+            ColumnType::String | ColumnType::Bytes | ColumnType::HyperLogLog(_) => {
+                value.map_or(0, |v| v.len()) + 4
+            }
+            ColumnType::Int | ColumnType::Timestamp | ColumnType::Float => 8,
+            ColumnType::Int96 | ColumnType::Decimal { .. } | ColumnType::Decimal96 { .. } => 16,
+            ColumnType::Boolean => 1,
+        }
+    }
+
     pub fn parse_column_value_str(column: &Column, value: &str) -> Result<TableValue, CubeError> {
         Ok(match column.get_column_type() {
             ColumnType::String => TableValue::String(value.to_string()),
@@ -777,12 +791,17 @@ impl ImportServiceImpl {
         };
 
         let table_cols = table.get_row().get_columns().as_slice();
+        let row_threshold = self.config_obj.wal_split_threshold() as usize;
+        let size_threshold = self.config_obj.wal_split_size_threshold_bytes() as usize;
         let mut builders = create_array_builders(table_cols);
         let mut num_rows = 0;
+        let mut estimated_bytes = 0;
         while let Some(line) = lines.next().await {
             let line = line?;
             let is_data_row = parser.visit_line(line.as_str(), |insert_pos, column, value| {
                 let builder = builders[insert_pos].as_mut();
+                estimated_bytes +=
+                    ImportFormat::estimate_arrow_value_size(column.get_column_type(), value);
                 match value {
                     None => {
                         append_value(builder, column.get_column_type(), &TableValue::Null);
@@ -799,10 +818,11 @@ impl ImportServiceImpl {
             }
             num_rows += 1;
 
-            if num_rows >= self.config_obj.wal_split_threshold() as usize {
+            if num_rows >= row_threshold || estimated_bytes >= size_threshold {
                 let mut to_add = create_array_builders(table_cols);
                 mem::swap(&mut builders, &mut to_add);
                 num_rows = 0;
+                estimated_bytes = 0;
 
                 let builded_rows = finish(to_add);
 

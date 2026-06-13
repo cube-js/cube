@@ -393,6 +393,8 @@ pub trait ConfigObj: DIService {
 
     fn wal_split_threshold(&self) -> u64;
 
+    fn wal_split_size_threshold_bytes(&self) -> u64;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn select_worker_idle_timeout(&self) -> u64;
@@ -587,6 +589,7 @@ pub struct ConfigObjImpl {
     pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub compaction_chunks_threshold_multiplier: f64,
     pub compaction_chunks_in_memory_size_threshold: u64,
     pub compaction_chunks_max_lifetime_threshold: u64,
     pub compaction_in_memory_chunks_max_lifetime_threshold: u64,
@@ -597,6 +600,7 @@ pub struct ConfigObjImpl {
     pub compaction_in_memory_chunks_ratio_check_threshold: u64,
     pub compaction_in_memory_chunks_schedule_period_secs: u64,
     pub wal_split_threshold: u64,
+    pub wal_split_size_threshold_bytes: u64,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
@@ -709,11 +713,15 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn compaction_chunks_total_size_threshold(&self) -> u64 {
-        self.compaction_chunks_total_size_threshold
+        (self.compaction_chunks_total_size_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
-        self.compaction_chunks_count_threshold
+        (self.compaction_chunks_count_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
     fn compaction_chunks_in_memory_size_threshold(&self) -> u64 {
@@ -754,6 +762,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn wal_split_threshold(&self) -> u64 {
         self.wal_split_threshold
+    }
+
+    fn wal_split_size_threshold_bytes(&self) -> u64 {
+        self.wal_split_size_threshold_bytes
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -1330,6 +1342,10 @@ impl Config {
                     1048576 * 8,
                 ),
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
+                compaction_chunks_threshold_multiplier: env_parse(
+                    "CUBESTORE_COMPACTION_CHUNKS_THRESHOLD_MULTIPLIER",
+                    3.0_f64,
+                ),
                 compaction_chunks_in_memory_size_threshold: env_parse_size(
                     "CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD",
                     1 * 1024 * 1024 * 1024,
@@ -1533,6 +1549,12 @@ impl Config {
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
+                wal_split_size_threshold_bytes: env_parse_size(
+                    "CUBESTORE_WAL_SPLIT_SIZE_THRESHOLD",
+                    100 * 1024 * 1024,
+                    None,
+                    None,
+                ) as u64,
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
                 csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 0),
@@ -1720,6 +1742,7 @@ impl Config {
                 partition_size_split_threshold_bytes: 2 * 1024,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
+                compaction_chunks_threshold_multiplier: 1.0,
                 compaction_chunks_in_memory_size_threshold: 3 * 1024 * 1024 * 1024,
                 compaction_chunks_total_size_threshold: 10,
                 compaction_chunks_max_lifetime_threshold: 600,
@@ -1778,6 +1801,7 @@ impl Config {
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
                 wal_split_threshold: 262144,
+                wal_split_size_threshold_bytes: 100 * 1024 * 1024,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
