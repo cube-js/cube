@@ -80,6 +80,23 @@ The name of the AWS Athena catalog to use for queries.
 | ------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid Athena Catalog name][aws-athena-catalog] | N/A                    | N/A                   |
 
+## `CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN`
+
+The ARN of the IAM role to assume for Athena access.
+
+| Possible Values      | Default in Development | Default in Production |
+| -------------------- | ---------------------- | --------------------- |
+| A valid IAM role ARN | N/A                    | N/A                   |
+
+## `CUBEJS_AWS_ATHENA_ASSUME_ROLE_EXTERNAL_ID`
+
+The external ID to use when assuming the IAM role, if required by the role's
+trust policy.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A string        | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_SCHEMA`
 
 The name of the schema to use as `information_schema` filter. Reduces count of
@@ -139,7 +156,7 @@ it should be adjusted accordingly.
 
 <Info>
 
-Previously, this environment variable was named [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_scheduled_refresh_concurrency).
+Previously, this environment variable was named `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`.
 
 </Info>
 
@@ -754,6 +771,72 @@ for pre-aggregation generation.
 | -------------------------------------------------- | ---------------------- | --------------------- |
 | Whether to force fetch columns in ordinal position | `true`                 | `true`               |
 
+## `CUBEJS_DB_HIVE_TYPE`
+
+The type of Hive server to connect to.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `HIVE`, `CDH`   | `HIVE`                 | `HIVE`                |
+
+## `CUBEJS_DB_HIVE_VER`
+
+The version of the Hive server to connect to.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A valid Hive version | `2.1.1`               | `2.1.1`               |
+
+## `CUBEJS_DB_HIVE_THRIFT_VER`
+
+The version of the Thrift protocol used to connect to Hive.
+
+| Possible Values       | Default in Development | Default in Production |
+| --------------------- | ---------------------- | --------------------- |
+| A valid Thrift version | `0.9.3`               | `0.9.3`               |
+
+## `CUBEJS_DB_HIVE_CDH_VER`
+
+The Cloudera Distribution Hadoop (CDH) version, used when `CUBEJS_DB_HIVE_TYPE`
+is set to `CDH`.
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid CDH version | N/A                   | N/A                   |
+
+## `CUBEJS_DB_KAFKA_HOST`
+
+Kafka broker host(s) for [Kafka streams mode](/admin/connect-to-data/data-sources/ksqldb#kafka-streams-mode).
+Multiple brokers can be comma-separated.
+
+| Possible Values          | Default in Development | Default in Production |
+| ------------------------ | ---------------------- | --------------------- |
+| A valid Kafka broker URL | N/A                    | N/A                   |
+
+## `CUBEJS_DB_KAFKA_USER`
+
+Username for Kafka broker authentication (SASL PLAIN).
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid Kafka username | N/A                    | N/A                   |
+
+## `CUBEJS_DB_KAFKA_PASS`
+
+Password for Kafka broker authentication (SASL PLAIN).
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid Kafka password | N/A                    | N/A                   |
+
+## `CUBEJS_DB_KAFKA_USE_SSL`
+
+If `true`, enables SASL_SSL for the Kafka connection.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_MATERIALIZE_CLUSTER`
 
 The cluster name to use when connecting to [Materialize](/admin/connect-to-data/data-sources/materialize).
@@ -772,6 +855,38 @@ to be [configured][mysql-server-tz-support] properly.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
+
+## `CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER`
+
+The Redshift cluster identifier. Required for IAM authentication.
+
+| Possible Values            | Default in Development | Default in Production |
+| -------------------------- | ---------------------- | --------------------- |
+| A valid cluster identifier | N/A                    | N/A                   |
+
+## `CUBEJS_DB_REDSHIFT_AWS_REGION`
+
+The AWS region of the Redshift cluster. Required for IAM authentication.
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid AWS region | N/A                    | N/A                   |
+
+## `CUBEJS_DB_REDSHIFT_ASSUME_ROLE_ARN`
+
+The ARN of the IAM role to assume for cross-account access.
+
+| Possible Values      | Default in Development | Default in Production |
+| -------------------- | ---------------------- | --------------------- |
+| A valid IAM role ARN | N/A                    | N/A                   |
+
+## `CUBEJS_DB_REDSHIFT_ASSUME_ROLE_EXTERNAL_ID`
+
+The external ID for the assumed role's trust policy.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A string        | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_SNOWFLAKE_ACCOUNT`
 
@@ -863,6 +978,22 @@ The Snowflake warehouse to use when connecting to the database.
 | ---------------------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account | N/A                    | N/A                   |
 
+## `CUBEJS_DB_SNOWFLAKE_HOST`
+
+Host address to which the driver should connect.
+
+| Possible Values  | Default in Development | Default in Production |
+| ---------------- | ---------------------- | --------------------- |
+| A valid hostname | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE`
+
+Whether or not [quoted identifiers should be case insensitive](https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_PINOT_NULL_HANDLING`
 
 The Startree/Pinot null value support. If `true`, enables null handling.
@@ -886,6 +1017,46 @@ If `true`, enables SSL encryption for database connections from Cube.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_CA`
+
+The contents of a CA bundle in PEM format, or a path to one. For more
+information, check the `options.ca` property for TLS Secure Contexts [in the
+Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values                    | Default in Development | Default in Production |
+| ---------------------------------- | ---------------------- | --------------------- |
+| A valid CA bundle or a path to one | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_CERT`
+
+The contents of an SSL certificate in PEM format, or a path to one. For more
+information, check the `options.cert` property for TLS Secure Contexts [in the
+Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values                          | Default in Development | Default in Production |
+| ---------------------------------------- | ---------------------- | --------------------- |
+| A valid SSL certificate or a path to one | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_KEY`
+
+The contents of a private key in PEM format, or a path to one. For more
+information, check the `options.key` property for TLS Secure Contexts [in the
+Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values                          | Default in Development | Default in Production |
+| ---------------------------------------- | ---------------------- | --------------------- |
+| A valid SSL private key or a path to one | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SSL_SERVERNAME`
+
+The server name to use for SNI (Server Name Indication) when establishing the
+TLS connection. For more information, check the `options.servername` property
+for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options].
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid host name | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_TYPE`
 
@@ -1912,3 +2083,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-time-dimensions]: /reference/data-modeling/dimensions#type
 [ref-time-zone]: /reference/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
+[nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
