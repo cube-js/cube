@@ -50,7 +50,7 @@ Name | Type | Description | Optional? |
 `cubeApi` | `CubeApi` | A `CubeApi` instance to use. Taken from the context if the param is not passed | ✅ Yes |
 `resetResultSetOnChange` | `boolean` | When `true` the resultSet will be reset to `null` first | ✅ Yes |
 `skip` | `boolean` | Query execution will be skipped when `skip` is set to `true`. You can use this flag to avoid sending incomplete queries. | ✅ Yes |
-`subscribe` | `boolean` | Use continuous fetch behavior. See [Real-Time Data Fetch](/reference/recipes/real-time-data-fetch) | ✅ Yes |
+`subscribe` | `boolean` | Use continuous fetch behavior. See [Real-Time Data Fetch](/recipes/core-data-api/real-time-data-fetch) | ✅ Yes |
 `cache` | [`CacheMode`](/reference/javascript-sdk/reference/cubejs-client-core#types-cache-mode) | Server-side cache policy for query execution. Does not control client-side caching. See [cache control][ref-cache-control] for details on available strategies. | ✅ Yes |
 `castNumerics` | `boolean` | Pass `true` if you'd like all members with the `number` type to be automatically converted to JavaScript `Number` type. Note that this is a potentially unsafe operation since numbers more than [`Number.MAX_SAFE_INTEGER`][link-mdn-max-safe-integer] or less than `Number.MIN_SAFE_INTEGER` can't be represented as JavaScript `Number` | ✅ Yes |
 
