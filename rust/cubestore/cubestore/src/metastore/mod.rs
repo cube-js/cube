@@ -1544,6 +1544,15 @@ impl RocksMetaStore {
         &self,
         node: String,
     ) -> Result<Vec<u64>, CubeError> {
+        // In-memory chunks are only produced by streaming ingestion, i.e. tables with
+        // in_memory_ingest() (a seq column). With no such table there is nothing to discover, so
+        // skip the full chunks-table scan entirely. The check reads the in-RAM table cache (kept
+        // fresh on table changes), so it costs nothing in the common no-streaming case.
+        let tables = self.get_tables_with_path(false).await?;
+        if !tables.iter().any(|t| t.table.get_row().in_memory_ingest()) {
+            return Ok(Vec::new());
+        }
+
         if let Some(by_node) = self.in_memory_compaction_cached().await? {
             return Ok(by_node.get(&node).cloned().unwrap_or_default());
         }
@@ -5593,6 +5602,102 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn in_memory_compaction_discovery_streaming_gate() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test("in_memory_compaction_discovery_gate");
+        let store_path = env::current_dir()?.join("test-imcd-local");
+        let remote_store_path = env::current_dir()?.join("test-imcd-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+            // No select_workers in test config => node_name_by_partition resolves to server_name.
+            let node = config.config_obj().server_name().clone();
+            let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+            meta_store.create_schema("s".to_string(), false).await?;
+
+            // Regular table (no unique key) => not in_memory_ingest. Even with in-memory chunks
+            // present, node discovery is gated off and returns nothing (no full chunks scan).
+            meta_store
+                .create_table(
+                    "s".to_string(),
+                    "regular".to_string(),
+                    cols.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await?;
+            let reg_partition = meta_store.get_partition(1).await?;
+            let reg_chunk = meta_store
+                .create_chunk(reg_partition.get_id(), 10, None, None, true)
+                .await?;
+            meta_store.chunk_uploaded(reg_chunk.get_id()).await?;
+            assert!(meta_store
+                .get_partitions_for_in_memory_compaction(node.clone())
+                .await?
+                .is_empty());
+
+            // Streaming table (unique key => seq column => in_memory_ingest). Now discovery runs
+            // and returns partitions holding active in-memory chunks.
+            meta_store
+                .create_table(
+                    "s".to_string(),
+                    "stream".to_string(),
+                    cols.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(vec!["name".to_string()]),
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await?;
+            let stream_partition = meta_store.get_partition(2).await?;
+            let stream_chunk = meta_store
+                .create_chunk(stream_partition.get_id(), 10, None, None, true)
+                .await?;
+            meta_store.chunk_uploaded(stream_chunk.get_id()).await?;
+            let found = meta_store
+                .get_partitions_for_in_memory_compaction(node.clone())
+                .await?;
+            assert!(found
+                .iter()
+                .any(|(p, _, _, _)| p.get_id() == stream_partition.get_id()));
+        }
+        let _ = fs::remove_dir_all(store_path);
+        let _ = fs::remove_dir_all(remote_store_path);
         Ok(())
     }
 
