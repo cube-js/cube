@@ -2400,11 +2400,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "FIXME(early-split): by_file_size now sizes splits by pending-chunk bytes (eager split-by-file-size); partition-count assertions are tuned to the old lagged semantics and need updating"]
     async fn partition_compaction_decimal96() {
         Config::test("partition_compaction_decimal96")
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
+                // Keep the split row-based: this test covers decimal handling, not size split.
+                c.partition_size_split_threshold_bytes = 1024 * 1024;
                 c
             })
             .start_test(async move |services| {
@@ -2457,7 +2458,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "FIXME(early-split): by_file_size now sizes splits by pending-chunk bytes (eager split-by-file-size); partition-count assertions are tuned to the old lagged semantics and need updating"]
     async fn partition_split_by_file_size() {
         Config::test("partition_split_by_file_size")
             .update_config(|mut c| {
@@ -2506,7 +2506,9 @@ mod tests {
                     .get_active_partitions_by_index_id(1)
                     .await
                     .unwrap();
-                assert_eq!(partitions.len(), 1);
+                // Eager split-by-file-size: the first compaction already splits because the
+                // pending chunks exceed partition_size_split_threshold_bytes.
+                assert!(partitions.len() > 1);
                 let values = (0..10)
                     .map(|_| format!("('{}', '{}')", "a".repeat(10), "b".repeat(10)))
                     .collect::<Vec<_>>()

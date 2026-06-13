@@ -917,19 +917,6 @@ impl SqlService for SqlServiceImpl {
                 unique_key,
                 partitioned_index,
             } => {
-                log::info!(
-                    "[csv-import-timing] create_table request received: {} loc_hashes={:?}",
-                    name,
-                    locations.as_ref().map(|ls| ls
-                        .iter()
-                        .map(|l| {
-                            use std::hash::{Hash, Hasher};
-                            let mut h = std::collections::hash_map::DefaultHasher::new();
-                            l.hash(&mut h);
-                            format!("{:x}", h.finish())
-                        })
-                        .collect::<Vec<_>>())
-                );
                 app_metrics::DATA_QUERIES.add_with_tags(
                     1,
                     Some(&vec![metrics::format_tag("command", "create_table")]),
@@ -3324,12 +3311,13 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "FIXME(early-split): by_file_size now sizes splits by pending-chunk bytes (eager split-by-file-size); the right table fragments past max_joined_partitions, count/limit need updating"]
     async fn over_10k_join() -> Result<(), CubeError> {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
             c.compaction_chunks_count_threshold = 50;
-            c.max_joined_partitions = 10;
+            // Eager split-by-file-size fragments the right table further; lift the join cap
+            // above the resulting partition count (this test asserts join correctness, not the cap).
+            c.max_joined_partitions = 50;
             c
         }).start_test(async move |services| {
             let service = services.sql_service;
@@ -4058,11 +4046,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "FIXME(early-split): by_file_size now sizes splits by pending-chunk bytes (eager split-by-file-size); partition-count assertions are tuned to the old lagged semantics and need updating"]
     async fn inactive_partitions_cleanup() -> Result<(), CubeError> {
         Config::test("inactive_partitions_cleanup")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
+                // Keep a single active partition: this test covers inactive-file GC, not size split.
+                c.partition_size_split_threshold_bytes = 1024 * 1024;
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
                 c.meta_store_log_upload_interval = 1;

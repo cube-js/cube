@@ -309,29 +309,15 @@ impl JobRunner {
                     let job_processor = self.job_processor.clone();
                     Ok(cube_ext::spawn(async move {
                         let is_streaming = Table::is_stream_location(&location);
-                        let loc_hash = {
-                            use std::hash::{Hash, Hasher};
-                            let mut h = std::collections::hash_map::DefaultHasher::new();
-                            location.hash(&mut h);
-                            format!("{:x}", h.finish())
-                        };
                         let data_loaded_size = if is_streaming {
                             None
                         } else {
                             Some(DataLoadedSize::new())
                         };
                         if !is_streaming {
-                            info!(
-                                "[csv-import-timing] import job start (before budget wait): table_id={} loc_hash={}",
-                                table_id, loc_hash
-                            );
                             let wait_ms = process_rate_limiter
                                 .wait_for_allow(TaskType::Job, timeout)
                                 .await?; //TODO config, may be same ad orphaned timeout
-                            info!(
-                                "[csv-import-timing] import job budget acquired (after wait): table_id={} loc_hash={} wait_ms={}",
-                                table_id, loc_hash, wait_ms
-                            );
                             match job_processor.process_job(job_to_move).await {
                                 Ok(job_res) => {
                                     let trace_obj =
@@ -348,19 +334,9 @@ impl JobRunner {
                                             trace_index,
                                         )
                                         .await;
-                                    info!(
-                                        "[csv-import-timing] import job completed: table_id={} loc_hash={} data_loaded={}",
-                                        table_id, loc_hash, job_res.data_loaded_size()
-                                    );
                                     Ok(())
                                 }
-                                Err(e) => {
-                                    info!(
-                                        "[csv-import-timing] import job failed: table_id={} loc_hash={} err={}",
-                                        table_id, loc_hash, e
-                                    );
-                                    Err(e)
-                                }
+                                Err(e) => Err(e),
                             }
                         } else {
                             import_service
