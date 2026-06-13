@@ -25,7 +25,7 @@ Run the query to the REST (JSON) API and get the results.
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_pathv1running-queryrequestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
 
 Response
 
@@ -413,7 +413,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_pathv1running-queryrequestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, and optionally
@@ -468,7 +468,7 @@ queries matching the given request ID across all query queues.
 
 The request ID can be obtained from the `x-request-id` header sent with
 the original query request to endpoints like
-[`/v1/load`](#base_pathv1load) or [`/v1/cubesql`](#base_pathv1cubesql).
+[`/v1/load`](#base_path/v1/load) or [`/v1/cubesql`](#base_path/v1/cubesql).
 
 | Parameter | Description | Required |
 | --- | --- | --- |
