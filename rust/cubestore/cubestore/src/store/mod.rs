@@ -1468,6 +1468,25 @@ impl ChunkStore {
             .await?;
         let sort_key_size = index.get_row().sort_key_size() as usize;
 
+        if sort_key_size > columns.len() {
+            // The chunk data has fewer columns than the index sort key expects (schema/version
+            // mismatch). Treat as corrupt data and deactivate the table rather than panicking on
+            // the `columns[0..sort_key_size]` slice below.
+            let error_message = format!(
+                "Index {:?} expects a sort key of {} columns but incoming chunk data has only {} columns",
+                index,
+                sort_key_size,
+                columns.len()
+            );
+            deactivate_table_due_to_corrupt_data(
+                self.meta_store.clone(),
+                index.get_row().table_id(),
+                error_message.clone(),
+            )
+            .await?;
+            return Err(CubeError::corrupt_data(error_message));
+        }
+
         let mut remaining_rows: Vec<u64> = (0..columns[0].len() as u64).collect_vec();
         {
             let (columns_again, remaining_rows_again) =
