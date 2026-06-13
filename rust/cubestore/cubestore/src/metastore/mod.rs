@@ -1460,6 +1460,7 @@ pub struct RocksMetaStore {
     store: Arc<RocksStore>,
     cached_tables: Arc<CachedTables>,
     disk_space_cache: Arc<RwLock<Option<(HashMap<String, u64>, SystemTime)>>>,
+    disk_space_compute_lock: Arc<tokio::sync::Mutex<()>>,
     upload_loop: Arc<WorkerLoop>,
 }
 
@@ -1483,12 +1484,29 @@ impl RocksMetaStore {
             store,
             cached_tables: Arc::new(CachedTables::new()),
             disk_space_cache: Arc::new(RwLock::new(None)),
+            disk_space_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
             upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
         })
     }
 
     pub fn reset_cached_tables(&self) {
         self.cached_tables.reset();
+    }
+
+    async fn disk_space_cached(&self) -> Result<Option<HashMap<String, u64>>, CubeError> {
+        Ok(
+            if let Some((sizes, time)) = self.disk_space_cache.read().await.as_ref() {
+                let cache_duration =
+                    Duration::from_secs(self.store.config.disk_space_cache_duration_secs());
+                if time.elapsed()? < cache_duration {
+                    Some(sizes.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
+        )
     }
 
     pub async fn load_from_dump(
@@ -2712,65 +2730,61 @@ impl MetaStore for RocksMetaStore {
         &self,
         node: Option<String>,
     ) -> Result<u64, CubeError> {
-        let cached = if let Some((sizes, time)) = self.disk_space_cache.read().await.as_ref() {
-            let cache_duration =
-                Duration::from_secs(self.store.config.disk_space_cache_duration_secs());
-            if time.elapsed()? < cache_duration {
-                Some(sizes.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        let sizes_map = if let Some(sizes) = cached {
+        let sizes_map = if let Some(sizes) = self.disk_space_cached().await? {
             sizes
         } else {
-            let config = self.store.config.clone();
-            let partitions_map = self
-                .read_operation_out_of_queue("get_used_disk_space", move |db| {
-                    let mut partitions_map: HashMap<u64, (u64, String)> = HashMap::new();
-                    for p in PartitionRocksTable::new(db.clone()).scan_all_rows()? {
-                        let p = p?;
-                        partitions_map.insert(
-                            p.get_id(),
-                            (
-                                p.get_row().file_size().unwrap_or(0),
-                                node_name_by_partition(config.as_ref(), &p),
-                            ),
-                        );
-                    }
-                    for c in ChunkRocksTable::new(db.clone()).scan_all_rows()? {
-                        let c = c?;
-                        if let Some((ref mut size, _)) =
-                            partitions_map.get_mut(&c.get_row().get_partition_id())
-                        {
-                            *size = c.get_row().file_size().unwrap_or(0);
-                        }
-                    }
-                    Ok(partitions_map)
-                })
-                .await?;
-
-            let workers = if self.store.config.select_workers().is_empty() {
-                vec![self.store.config.server_name().clone()]
+            // Single-flight: serialize the scan so a burst of concurrent callers
+            // (e.g. many partition writes during an import/repartition) share one
+            // computation instead of each materializing a full metastore scan.
+            let _compute_guard = self.disk_space_compute_lock.lock().await;
+            if let Some(sizes) = self.disk_space_cached().await? {
+                sizes
             } else {
-                self.store.config.select_workers().clone()
-            };
+                let config = self.store.config.clone();
+                let partitions_map = self
+                    .read_operation_out_of_queue("get_used_disk_space", move |db| {
+                        let mut partitions_map: HashMap<u64, (u64, String)> = HashMap::new();
+                        for p in PartitionRocksTable::new(db.clone()).scan_all_rows()? {
+                            let p = p?;
+                            partitions_map.insert(
+                                p.get_id(),
+                                (
+                                    p.get_row().file_size().unwrap_or(0),
+                                    node_name_by_partition(config.as_ref(), &p),
+                                ),
+                            );
+                        }
+                        for c in ChunkRocksTable::new(db.clone()).scan_all_rows()? {
+                            let c = c?;
+                            if let Some((ref mut size, _)) =
+                                partitions_map.get_mut(&c.get_row().get_partition_id())
+                            {
+                                *size = c.get_row().file_size().unwrap_or(0);
+                            }
+                        }
+                        Ok(partitions_map)
+                    })
+                    .await?;
 
-            let mut map = workers
-                .into_iter()
-                .map(|n| (n, 0))
-                .collect::<HashMap<String, u64>>();
+                let workers = if self.store.config.select_workers().is_empty() {
+                    vec![self.store.config.server_name().clone()]
+                } else {
+                    self.store.config.select_workers().clone()
+                };
 
-            for (_, (size, node)) in partitions_map.into_iter() {
-                map.entry(node).and_modify(|s| *s += size).or_insert(0);
+                let mut map = workers
+                    .into_iter()
+                    .map(|n| (n, 0))
+                    .collect::<HashMap<String, u64>>();
+
+                for (_, (size, node)) in partitions_map.into_iter() {
+                    map.entry(node).and_modify(|s| *s += size).or_insert(0);
+                }
+
+                *self.disk_space_cache.write().await = Some((map.clone(), SystemTime::now()));
+
+                map
             }
-
-            let mut cache = self.disk_space_cache.write().await;
-            *cache = Some((map.clone(), SystemTime::now()));
-
-            map
         };
 
         let res = if let Some(node_name) = node {

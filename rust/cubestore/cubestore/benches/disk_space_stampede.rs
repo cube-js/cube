@@ -194,22 +194,25 @@ fn main() {
         "\n=== disk-space-check stampede (cache_secs={}) ===",
         cache_secs
     );
-    println!("{:>5}  {:>14}  {:>16}", "K", "peak (MB)", "per-call (MB)");
-    let mut single = 0.0f64;
-    for (idx, &k) in concurrency.iter().enumerate() {
+    println!(
+        "{:>5}  {:>12}  {:>16}",
+        "K", "peak (MB)", "total alloc (MB)"
+    );
+    for &k in concurrency.iter() {
         ALLOCATOR.reset_stats();
         runtime.block_on(run_concurrent(&ms, k));
         let peak = mb(ALLOCATOR.peak_allocated());
-        if idx == 0 {
-            single = peak.max(1.0);
-        }
-        println!("{:>5}  {:>14.1}  {:>16.1}", k, peak, peak / k as f64);
+        let total = mb(ALLOCATOR.total_allocated());
+        println!("{:>5}  {:>12.1}  {:>16.1}", k, peak, total);
     }
     println!(
-        "\nsequential K={} peak: {:.1} MB  (single concurrent scan ~= {:.1} MB)",
+        "\nsequential K={} peak: {:.1} MB",
         concurrency.iter().max().unwrap(),
-        mb(seq_peak),
-        single
+        mb(seq_peak)
     );
-    println!("stampede multiplier: peak(K) grows ~linearly with K while sequential stays flat.");
+    println!(
+        "peak (MB) = max live memory: flat in K => no memory stampede (streaming scan).\n\
+         total alloc (MB) = work done: flat in K with cache_secs>0 => single-flight\n\
+         dedup (one scan shared by all waiters); ~linear in K would mean every caller scanned."
+    );
 }
