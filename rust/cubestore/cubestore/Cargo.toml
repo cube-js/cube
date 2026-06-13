@@ -136,10 +136,6 @@ harness = false
 name = "metastore"
 harness = false
 
-[[bench]]
-name = "disk_space_stampede"
-harness = false
-
 [features]
 # When enabled, child processes will die whenever parent process exits.
 # Highly recomended for production, available only on Linux with prctl system call.

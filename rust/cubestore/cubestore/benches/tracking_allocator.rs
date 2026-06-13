@@ -33,18 +33,6 @@ impl TrackingAllocator {
         self.total_allocated.store(0, Ordering::Relaxed);
     }
 
-    pub fn peak_allocated(&self) -> usize {
-        self.peak_allocated.load(Ordering::Relaxed)
-    }
-
-    pub fn current_allocated(&self) -> usize {
-        self.current_allocated.load(Ordering::Relaxed)
-    }
-
-    pub fn total_allocated(&self) -> usize {
-        self.total_allocated.load(Ordering::Relaxed)
-    }
-
     pub fn print_stats(&self) {
         let allocations = self.allocations.load(Ordering::Relaxed);
         let deallocations = self.deallocations.load(Ordering::Relaxed);
