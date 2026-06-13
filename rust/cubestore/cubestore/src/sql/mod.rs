@@ -917,6 +917,10 @@ impl SqlService for SqlServiceImpl {
                 unique_key,
                 partitioned_index,
             } => {
+                log::info!(
+                    "[csv-import-timing] create_table request received: {}",
+                    name
+                );
                 app_metrics::DATA_QUERIES.add_with_tags(
                     1,
                     Some(&vec![metrics::format_tag("command", "create_table")]),

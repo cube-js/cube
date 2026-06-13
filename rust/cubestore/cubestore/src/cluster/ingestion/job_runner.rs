@@ -315,9 +315,17 @@ impl JobRunner {
                             Some(DataLoadedSize::new())
                         };
                         if !is_streaming {
+                            info!(
+                                "[csv-import-timing] import job start (before budget wait): table_id={}",
+                                table_id
+                            );
                             let wait_ms = process_rate_limiter
                                 .wait_for_allow(TaskType::Job, timeout)
                                 .await?; //TODO config, may be same ad orphaned timeout
+                            info!(
+                                "[csv-import-timing] import job budget acquired (after wait): table_id={} wait_ms={}",
+                                table_id, wait_ms
+                            );
                             match job_processor.process_job(job_to_move).await {
                                 Ok(job_res) => {
                                     let trace_obj =
