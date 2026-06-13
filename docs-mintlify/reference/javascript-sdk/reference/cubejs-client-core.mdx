@@ -5,7 +5,7 @@ description: Vanilla JavaScript client for Cube.
 
 ## `cube`
 
->  **cube**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cubeapi)*
+>  **cube**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeApiOptions](#cubeapioptions)): *[CubeApi](#cubeapi)*
 
 Creates an instance of the `CubeApi`. The API entry point.
 
@@ -53,17 +53,17 @@ const cubeApi = cube(
 Name | Type | Description |
 ------ | ------ | ------ |
 apiToken | string &#124;  () => *Promise‹string›* | [API token][ref-security] is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
-options | [CubeApiOptions](#types-cube-js-api-options) | - |
+options | [CubeApiOptions](#cubeapioptions) | - |
 
->  **cube**(**options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cubeapi)*
+>  **cube**(**options**: [CubeApiOptions](#cubeapioptions)): *[CubeApi](#cubeapi)*
 
 ## `defaultHeuristics`
 
->  **defaultHeuristics**(**newQuery**: [Query](#query-1), **oldQuery**: [Query](#query-1), **options**: [TDefaultHeuristicsOptions](#tdefaultheuristicsoptions)): *any*
+>  **defaultHeuristics**(**newQuery**: [Query](#query-2), **oldQuery**: [Query](#query-2), **options**: [TDefaultHeuristicsOptions](#tdefaultheuristicsoptions)): *any*
 
 ## `defaultOrder`
 
->  **defaultOrder**(**query**: [Query](#query-1)): *object*
+>  **defaultOrder**(**query**: [Query](#query-2)): *object*
 
 ## `movePivotItem`
 
@@ -75,17 +75,17 @@ Main class for accessing Cube API
 
 ### `dryRun`
 
-> **dryRun**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[TDryRunResponse](#tdryrunresponse)›*
+> **dryRun**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[TDryRunResponse](#tdryrunresponse)›*
 
-> **dryRun**(**query**: [Query](#query-1) | [Query](#query-1)[], **options**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[TDryRunResponse](#tdryrunresponse)›): *void*
+> **dryRun**(**query**: [Query](#query-2) | [Query](#query-2)[], **options**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[TDryRunResponse](#tdryrunresponse)›): *void*
 
 Get query related meta without query execution
 
 ### `load`
 
->  **load**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[ResultSet](#resultset)›*
+>  **load**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[ResultSet](#resultset)›*
 
->  **load**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)›): *void*
+>  **load**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)›): *void*
 
 Fetch data for the passed `query`.
 
@@ -148,23 +148,23 @@ try {
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#query-1) &#124; [Query](#query-1)[] | [Query object][ref-query-format]  |
+query | [Query](#query-2) &#124; [Query](#query-2)[] | [Query object][ref-query-format]  |
 options? | [LoadMethodOptions](#loadmethodoptions) | - |
 callback? | [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)› | - |
 
 ### `meta`
 
->  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[Meta](#meta-1)›*
+>  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[Meta](#meta-2)›*
 
->  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[Meta](#meta-1)›): *void*
+>  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[Meta](#meta-2)›): *void*
 
 Get meta description of cubes available for querying.
 
 ### `sql`
 
->  **sql**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[SqlQuery](#sqlquery)›*
+>  **sql**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[SqlQuery](#sqlquery)›*
 
->  **sql**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[SqlQuery](#sqlquery)›): *void*
+>  **sql**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[SqlQuery](#sqlquery)›): *void*
 
 Get generated SQL string for the given `query`.
 
@@ -172,13 +172,13 @@ Get generated SQL string for the given `query`.
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#query-1) &#124; [Query](#query-1)[] | [Query object][ref-query-format]  |
+query | [Query](#query-2) &#124; [Query](#query-2)[] | [Query object][ref-query-format]  |
 options? | [LoadMethodOptions](#loadmethodoptions) | - |
 callback? | [LoadMethodCallback](#loadmethodcallback)‹[SqlQuery](#sqlquery)› | - |
 
 ### `subscribe`
 
->  **subscribe**(**query**: [Query](#query-1) | [Query](#query-1)[], **options**: [LoadMethodOptions](#loadmethodoptions) | null, **callback**: [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)›): *void*
+>  **subscribe**(**query**: [Query](#query-2) | [Query](#query-2)[], **options**: [LoadMethodOptions](#loadmethodoptions) | null, **callback**: [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)›): *void*
 
 Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](/recipes/core-data-api/real-time-data-fetch)
 
@@ -231,7 +231,7 @@ Contains information about available cubes and it's members.
 
 ### `membersForQuery`
 
->  **membersForQuery**(**query**: [Query](#query-1) | null, **memberType**: [MemberType](#membertype)): *[TCubeMeasure](#tcubemeasure)[] | [TCubeDimension](#tcubedimension)[] | [TCubeMember](#tcubemember)[]*
+>  **membersForQuery**(**query**: [Query](#query-2) | null, **memberType**: [MemberType](#membertype)): *[TCubeMeasure](#tcubemeasure)[] | [TCubeDimension](#tcubedimension)[] | [TCubeMember](#tcubemember)[]*
 
 Get all members of a specific type for a given query.
 If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -240,7 +240,7 @@ If empty query is provided no filtering is done based on query context and all a
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#query-1) &#124; null | context query to provide filtering of members available to add to this query  |
+query | [Query](#query-2) &#124; null | context query to provide filtering of members available to add to this query  |
 memberType | [MemberType](#membertype) | - |
 
 ### `resolveMember`
@@ -386,7 +386,7 @@ resultSet.decompose().forEach((currentResultSet) => {
 
 ### `drillDown`
 
->  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drilldownlocator), **pivotConfig?**: [PivotConfig](#pivotconfig)): *[Query](#query-1) | null*
+>  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drilldownlocator), **pivotConfig?**: [PivotConfig](#pivotconfig)): *[Query](#query-2) | null*
 
 Returns a measure drill down query.
 
@@ -490,7 +490,7 @@ You can find the examples of using the `pivotConfig` [here](#pivotconfig)
 
 ### `query`
 
->  **query**(): *[Query](#query-1)*
+>  **query**(): *[Query](#query-2)*
 
 ### `rawData`
 
@@ -504,7 +504,7 @@ Can be used to stash the `ResultSet` in a storage and restored later with [deser
 
 ### `series`
 
->  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#pivotconfig)): *[Series](#series-1)‹SeriesItem›[]*
+>  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#pivotconfig)): *[Series](#series-2)‹SeriesItem›[]*
 
 Returns an array of series with key, title and series data.
 ```js
@@ -840,7 +840,7 @@ Name | Type |
 annotation | [QueryAnnotations](#queryannotations) |
 data | T[] |
 lastRefreshTime | string |
-query | [Query](#query-1) |
+query | [Query](#query-2) |
 
 ### `MemberType`
 
@@ -912,7 +912,7 @@ y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
 ### `PivotQuery`
 
-> **PivotQuery**: *[Query](#query-1) & object*
+> **PivotQuery**: *[Query](#query-2) & object*
 
 ### `PivotRow`
 
@@ -948,9 +948,9 @@ ungrouped? | boolean |
 
 Name | Type |
 ------ | ------ |
-dimensions | Record‹string, [Annotation](#annotation-1)› |
-measures | Record‹string, [Annotation](#annotation-1)› |
-timeDimensions | Record‹string, [Annotation](#annotation-1)› |
+dimensions | Record‹string, [Annotation](#annotation-2)› |
+measures | Record‹string, [Annotation](#annotation-2)› |
+timeDimensions | Record‹string, [Annotation](#annotation-2)› |
 
 ### `QueryOrder`
 
@@ -1031,14 +1031,14 @@ type | [TCubeMemberType](#tcubemembertype) |
 
 Name | Type |
 ------ | ------ |
-meta | [Meta](#meta-1) |
+meta | [Meta](#meta-2) |
 sessionGranularity? | [TimeDimensionGranularity](#timedimensiongranularity) |
 
 ### `TDryRunResponse`
 
 Name | Type |
 ------ | ------ |
-normalizedQueries | [Query](#query-1)[] |
+normalizedQueries | [Query](#query-2)[] |
 pivotQuery | [PivotQuery](#pivotquery) |
 queryOrder | Array‹object› |
 queryType | [QueryType](#querytype) |
