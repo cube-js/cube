@@ -2726,26 +2726,31 @@ impl MetaStore for RocksMetaStore {
         let sizes_map = if let Some(sizes) = cached {
             sizes
         } else {
-            let (partitions, chunks) = self.get_all_partitions_and_chunks_out_of_queue().await?;
-            let mut partitions_map = partitions
-                .into_iter()
-                .map(|p| {
-                    (
-                        p.get_id(),
-                        (
-                            p.get_row().file_size().unwrap_or(0),
-                            node_name_by_partition(self.store.config.as_ref(), &p),
-                        ),
-                    )
+            let config = self.store.config.clone();
+            let partitions_map = self
+                .read_operation_out_of_queue("get_used_disk_space", move |db| {
+                    let mut partitions_map: HashMap<u64, (u64, String)> = HashMap::new();
+                    for p in PartitionRocksTable::new(db.clone()).scan_all_rows()? {
+                        let p = p?;
+                        partitions_map.insert(
+                            p.get_id(),
+                            (
+                                p.get_row().file_size().unwrap_or(0),
+                                node_name_by_partition(config.as_ref(), &p),
+                            ),
+                        );
+                    }
+                    for c in ChunkRocksTable::new(db.clone()).scan_all_rows()? {
+                        let c = c?;
+                        if let Some((ref mut size, _)) =
+                            partitions_map.get_mut(&c.get_row().get_partition_id())
+                        {
+                            *size = c.get_row().file_size().unwrap_or(0);
+                        }
+                    }
+                    Ok(partitions_map)
                 })
-                .collect::<HashMap<u64, (u64, String)>>();
-            for c in chunks.into_iter() {
-                if let Some((ref mut size, _)) =
-                    partitions_map.get_mut(&c.get_row().get_partition_id())
-                {
-                    *size = c.get_row().file_size().unwrap_or(0);
-                }
-            }
+                .await?;
 
             let workers = if self.store.config.select_workers().is_empty() {
                 vec![self.store.config.server_name().clone()]
