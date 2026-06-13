@@ -1461,6 +1461,8 @@ pub struct RocksMetaStore {
     cached_tables: Arc<CachedTables>,
     disk_space_cache: Arc<RwLock<Option<(HashMap<String, u64>, SystemTime)>>>,
     disk_space_compute_lock: Arc<tokio::sync::Mutex<()>>,
+    in_memory_compaction_cache: Arc<RwLock<Option<(HashMap<String, Vec<u64>>, SystemTime)>>>,
+    in_memory_compaction_compute_lock: Arc<tokio::sync::Mutex<()>>,
     upload_loop: Arc<WorkerLoop>,
 }
 
@@ -1485,6 +1487,8 @@ impl RocksMetaStore {
             cached_tables: Arc::new(CachedTables::new()),
             disk_space_cache: Arc::new(RwLock::new(None)),
             disk_space_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
+            in_memory_compaction_cache: Arc::new(RwLock::new(None)),
+            in_memory_compaction_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
             upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
         })
     }
@@ -1507,6 +1511,79 @@ impl RocksMetaStore {
                 None
             },
         )
+    }
+
+    async fn in_memory_compaction_cached(
+        &self,
+    ) -> Result<Option<HashMap<String, Vec<u64>>>, CubeError> {
+        Ok(
+            if let Some((by_node, time)) = self.in_memory_compaction_cache.read().await.as_ref() {
+                // Kept short (one scheduling period) so freshly written in-memory chunks
+                // are still discovered promptly and not left to pile up on workers.
+                let cache_duration = Duration::from_secs(
+                    self.store
+                        .config
+                        .compaction_in_memory_chunks_schedule_period_secs(),
+                );
+                if time.elapsed()? < cache_duration {
+                    Some(by_node.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
+        )
+    }
+
+    // Discovery of which partitions hold active in-memory chunks is a full chunks-table scan run
+    // by every node's in-memory compaction job. Memoize it (short TTL + single-flight) so a burst
+    // of concurrent jobs shares one scan instead of each scanning the whole table. Only per-node
+    // partition ids are cached (no chunk data) — chunks are re-read fresh by the caller.
+    async fn in_memory_compaction_partition_ids(
+        &self,
+        node: String,
+    ) -> Result<Vec<u64>, CubeError> {
+        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+            return Ok(by_node.get(&node).cloned().unwrap_or_default());
+        }
+        let _compute_guard = self.in_memory_compaction_compute_lock.lock().await;
+        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+            return Ok(by_node.get(&node).cloned().unwrap_or_default());
+        }
+
+        let config = self.store.config.clone();
+        let by_node = self
+            .read_operation_out_of_queue("in_memory_compaction_partition_ids", move |db_ref| {
+                let chunks_table = ChunkRocksTable::new(db_ref.clone());
+                let mut partition_ids = HashSet::new();
+                for c in chunks_table.scan_all_rows()? {
+                    let c = c?;
+                    if c.get_row().active() && c.get_row().in_memory() {
+                        partition_ids.insert(c.get_row().get_partition_id());
+                    }
+                }
+
+                let partitions_table = PartitionRocksTable::new(db_ref.clone());
+                let mut by_node: HashMap<String, Vec<u64>> = HashMap::new();
+                for id in partition_ids {
+                    if let Some(partition) = partitions_table.get_row(id)? {
+                        if partition.get_row().is_active()
+                            && partition.get_row().multi_partition_id.is_none()
+                        {
+                            by_node
+                                .entry(node_name_by_partition(config.as_ref(), &partition))
+                                .or_default()
+                                .push(id);
+                        }
+                    }
+                }
+                Ok(by_node)
+            })
+            .await?;
+
+        *self.in_memory_compaction_cache.write().await = Some((by_node.clone(), SystemTime::now()));
+        Ok(by_node.get(&node).cloned().unwrap_or_default())
     }
 
     pub async fn load_from_dump(
@@ -3258,47 +3335,53 @@ impl MetaStore for RocksMetaStore {
         )>,
         CubeError,
     > {
-        let config = self.store.config.clone();
+        // Which partitions on this node hold active in-memory chunks comes from a short-lived
+        // shared cache (single-flight), so concurrent compaction jobs share one full-table scan
+        // instead of each running it. The chunks themselves are re-read fresh per partition below
+        // (indexed by partition) so compaction always acts on current data.
+        let partition_ids = self.in_memory_compaction_partition_ids(node).await?;
+        if partition_ids.is_empty() {
+            return Ok(Vec::new());
+        }
         self.read_operation_out_of_queue("get_partitions_for_in_memory_compaction", move |db_ref| {
-            let chunks_table = ChunkRocksTable::new(db_ref.clone());
-
-            let mut partitions_map = HashMap::new();
-            for c in chunks_table.scan_all_rows()? {
-                let c = c?;
-                if c.get_row().active() && c.get_row().in_memory() {
-                    partitions_map
-                        .entry(c.get_row().get_partition_id())
-                        .or_insert(Vec::new())
-                        .push(c);
-                }
-            }
-
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
-
-            let mut result = Vec::with_capacity(partitions_map.len());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
             let index_table = IndexRocksTable::new(db_ref.clone());
             let table_table = TableRocksTable::new(db_ref.clone());
 
-            for (id, chunks) in partitions_map.into_iter() {
-                if let Some(partition) = partitions_table.get_row(id)? {
-                    if partition.get_row().is_active()
-                        && partition.get_row().multi_partition_id.is_none()
-                        && node_name_by_partition(config.as_ref(), &partition) == node
-                    {
-                        let index = index_table
-                            .get_row(partition.get_row().get_index_id())?
-                            .ok_or(CubeError::internal(format!(
-                                "Index {} is not found for partition: {}",
-                                partition.get_row().get_index_id(),
-                                id
-                            )))?;
-                        let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
-
-                        result.push((partition, index, table, chunks));
-                    }
+            let mut result = Vec::with_capacity(partition_ids.len());
+            for id in partition_ids {
+                // A cached id may point to a partition that was compacted/split away since the
+                // scan — re-validate against the fresh snapshot and skip if it no longer applies.
+                let partition = match partitions_table.get_row(id)? {
+                    Some(p) => p,
+                    None => continue,
+                };
+                if !partition.get_row().is_active()
+                    || partition.get_row().multi_partition_id.is_some()
+                {
+                    continue;
                 }
+                // include_inactive=true so the predicate below is exactly the original
+                // (active && in_memory) over all of the partition's chunks, without depending on
+                // the active() => uploaded() invariant that include_inactive=false would assume.
+                let chunks = Self::chunks_by_partition(id, &chunks_table, true)?
+                    .into_iter()
+                    .filter(|c| c.get_row().active() && c.get_row().in_memory())
+                    .collect::<Vec<_>>();
+                if chunks.is_empty() {
+                    continue;
+                }
+                let index = index_table
+                    .get_row(partition.get_row().get_index_id())?
+                    .ok_or(CubeError::internal(format!(
+                        "Index {} is not found for partition: {}",
+                        partition.get_row().get_index_id(),
+                        id
+                    )))?;
+                let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
+                result.push((partition, index, table, chunks));
             }
-
             Ok(result)
         })
         .await
