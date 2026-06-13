@@ -238,7 +238,7 @@ to them.
 
 `rollup_join` is an ephemeral pre-aggregation that relies on referenced rollups
 when queries are executed. Setting
-[`scheduled_refresh`](#parameters-scheduled-refresh) to `true` is unnecessary
+[`scheduled_refresh`](#scheduled_refresh) to `true` is unnecessary
 for `rollup_join` and will result in an error. Appropriate freshness controls
 should be set on referenced rollups instead.
 
@@ -999,7 +999,7 @@ existing tables.
 <Warning>
 
 Because incremental refreshes generate their own SQL, you **must not** use the
-[`sql`](#parameters-refresh-key-sql) property here.
+[`sql`](#refresh_key) property here.
 
 </Warning>
 
@@ -1063,7 +1063,7 @@ triggers a refresh for partitions where the end date lies within the
 <Warning>
 
 Because incremental refreshes generate their own SQL, you **must not** use the
-[`sql`](#parameters-refresh-key-sql) property here.
+[`sql`](#refresh_key) property here.
 
 </Warning>
 
@@ -1517,7 +1517,7 @@ cube(`orders`, {
 This option allows to define [indexes][ref-indexes]. Indexes are used to
 fine-tune pre-aggregation performance when pre-aggregations have significant
 cardinality. (For [aggregating indexes][ref-aggregating-indexes], see the
-[`type` option](#type-1) below.)
+[`type` option](#type-2) below.)
 
 Here's how you can define an index:
 

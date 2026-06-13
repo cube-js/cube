@@ -17,9 +17,9 @@ the local database (bootstrapped in the `docker-compose.yml` file) which has the
 same data model.
 
 To enable multitenancy, use the
-[`contextToAppId`](/reference/configuration/config#contexttoappid) function to
+[`contextToAppId`](/reference/configuration/config#context_to_app_id) function to
 provide distinct identifiers for each tenant. Also, implement the
-[`driverFactory`](/reference/configuration/config#driverfactory) function where
+[`driverFactory`](/reference/configuration/config#driver_factory) function where
 you can select a data source based on the tenant name.
 [JSON Web Token](/docs/data-modeling/access-control) includes information about the tenant name in
 the `tenant` property of the `securityContext`.

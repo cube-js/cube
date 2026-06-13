@@ -294,7 +294,7 @@ cube(`companies`, {
 
 </CodeGroup>
 
-It is recommended to prefer the [`sql_table`](#parameters-sql-table) parameter
+It is recommended to prefer the [`sql_table`](#sql_table) parameter
 over the `sql` parameter for all cubes that are supposed to use queries like
 this: `SELECT * FROM table`.
 
@@ -302,7 +302,7 @@ this: `SELECT * FROM table`.
 
 The `sql_table` parameter is used as a concise way for defining a cube that uses
 a query like this: `SELECT * FROM table`. Instead of using the
-[`sql`](#parameters-sql) parameter, use `sql_table` with the table name that this
+[`sql`](#sql) parameter, use `sql_table` with the table name that this
 cube will query.
 
 <CodeGroup>
@@ -657,7 +657,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 
 
 [ref-ai-context]: /docs/data-modeling/ai-context
-[ref-config-driverfactory]: /reference/configuration/config#driverfactory
+[ref-config-driverfactory]: /reference/configuration/config#driver_factory
 [ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control
 [ref-naming]: /docs/data-modeling/syntax#naming
 [ref-playground]: /docs/explore-analyze/playground
