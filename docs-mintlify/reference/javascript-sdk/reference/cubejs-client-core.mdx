@@ -5,7 +5,7 @@ description: Vanilla JavaScript client for Cube.
 
 ## `cube`
 
->  **cube**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cube-api)*
+>  **cube**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cubeapi)*
 
 Creates an instance of the `CubeApi`. The API entry point.
 
@@ -55,19 +55,19 @@ Name | Type | Description |
 apiToken | string &#124;  () => *Promise‹string›* | [API token][ref-security] is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
 options | [CubeApiOptions](#types-cube-js-api-options) | - |
 
->  **cube**(**options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cube-api)*
+>  **cube**(**options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cubeapi)*
 
 ## `defaultHeuristics`
 
->  **defaultHeuristics**(**newQuery**: [Query](#types-query), **oldQuery**: [Query](#types-query), **options**: [TDefaultHeuristicsOptions](#types-t-default-heuristics-options)): *any*
+>  **defaultHeuristics**(**newQuery**: [Query](#query-1), **oldQuery**: [Query](#query-1), **options**: [TDefaultHeuristicsOptions](#tdefaultheuristicsoptions)): *any*
 
 ## `defaultOrder`
 
->  **defaultOrder**(**query**: [Query](#types-query)): *object*
+>  **defaultOrder**(**query**: [Query](#query-1)): *object*
 
 ## `movePivotItem`
 
->  **movePivotItem**(**pivotConfig**: [PivotConfig](#types-pivot-config), **sourceIndex**: number, **destinationIndex**: number, **sourceAxis**: TSourceAxis, **destinationAxis**: TSourceAxis): *[PivotConfig](#types-pivot-config)*
+>  **movePivotItem**(**pivotConfig**: [PivotConfig](#pivotconfig), **sourceIndex**: number, **destinationIndex**: number, **sourceAxis**: TSourceAxis, **destinationAxis**: TSourceAxis): *[PivotConfig](#pivotconfig)*
 
 ## `CubeApi`
 
@@ -75,17 +75,17 @@ Main class for accessing Cube API
 
 ### `dryRun`
 
-> **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[TDryRunResponse](#types-t-dry-run-response)›*
+> **dryRun**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[TDryRunResponse](#tdryrunresponse)›*
 
-> **dryRun**(**query**: [Query](#types-query) | [Query](#types-query)[], **options**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[TDryRunResponse](#types-t-dry-run-response)›): *void*
+> **dryRun**(**query**: [Query](#query-1) | [Query](#query-1)[], **options**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[TDryRunResponse](#tdryrunresponse)›): *void*
 
 Get query related meta without query execution
 
 ### `load`
 
->  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[ResultSet](#result-set)›*
+>  **load**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[ResultSet](#resultset)›*
 
->  **load**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
+>  **load**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)›): *void*
 
 Fetch data for the passed `query`.
 
@@ -148,23 +148,23 @@ try {
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object][ref-query-format]  |
-options? | [LoadMethodOptions](#types-load-method-options) | - |
-callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)› | - |
+query | [Query](#query-1) &#124; [Query](#query-1)[] | [Query object][ref-query-format]  |
+options? | [LoadMethodOptions](#loadmethodoptions) | - |
+callback? | [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)› | - |
 
 ### `meta`
 
->  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[Meta](#meta)›*
+>  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[Meta](#meta-1)›*
 
->  **meta**(**options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[Meta](#meta)›): *void*
+>  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[Meta](#meta-1)›): *void*
 
 Get meta description of cubes available for querying.
 
 ### `sql`
 
->  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options)): *Promise‹[SqlQuery](#sql-query)›*
+>  **sql**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[SqlQuery](#sqlquery)›*
 
->  **sql**(**query**: [Query](#types-query) | [Query](#types-query)[], **options?**: [LoadMethodOptions](#types-load-method-options), **callback?**: [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)›): *void*
+>  **sql**(**query**: [Query](#query-1) | [Query](#query-1)[], **options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[SqlQuery](#sqlquery)›): *void*
 
 Get generated SQL string for the given `query`.
 
@@ -172,13 +172,13 @@ Get generated SQL string for the given `query`.
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object][ref-query-format]  |
-options? | [LoadMethodOptions](#types-load-method-options) | - |
-callback? | [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)› | - |
+query | [Query](#query-1) &#124; [Query](#query-1)[] | [Query object][ref-query-format]  |
+options? | [LoadMethodOptions](#loadmethodoptions) | - |
+callback? | [LoadMethodCallback](#loadmethodcallback)‹[SqlQuery](#sqlquery)› | - |
 
 ### `subscribe`
 
->  **subscribe**(**query**: [Query](#types-query) | [Query](#types-query)[], **options**: [LoadMethodOptions](#types-load-method-options) | null, **callback**: [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)›): *void*
+>  **subscribe**(**query**: [Query](#query-1) | [Query](#query-1)[], **options**: [LoadMethodOptions](#loadmethodoptions) | null, **callback**: [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)›): *void*
 
 Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](/recipes/core-data-api/real-time-data-fetch)
 
@@ -209,7 +209,7 @@ Default transport implementation.
 
 ### constructor
 
->  **new HttpTransport**(**options**: [TransportOptions](#types-transport-options)): *[HttpTransport](#http-transport)*
+>  **new HttpTransport**(**options**: [TransportOptions](#transportoptions)): *[HttpTransport](#httptransport)*
 
 ### `request`
 
@@ -227,11 +227,11 @@ Contains information about available cubes and it's members.
 
 ### `filterOperatorsForMember`
 
->  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#types-member-type) | [MemberType](#types-member-type)[]): *any*
+>  **filterOperatorsForMember**(**memberName**: string, **memberType**: [MemberType](#membertype) | [MemberType](#membertype)[]): *any*
 
 ### `membersForQuery`
 
->  **membersForQuery**(**query**: [Query](#types-query) | null, **memberType**: [MemberType](#types-member-type)): *[TCubeMeasure](#types-t-cube-measure)[] | [TCubeDimension](#types-t-cube-dimension)[] | [TCubeMember](#types-t-cube-member)[]*
+>  **membersForQuery**(**query**: [Query](#query-1) | null, **memberType**: [MemberType](#membertype)): *[TCubeMeasure](#tcubemeasure)[] | [TCubeDimension](#tcubedimension)[] | [TCubeMember](#tcubemember)[]*
 
 Get all members of a specific type for a given query.
 If empty query is provided no filtering is done based on query context and all available members are retrieved.
@@ -240,12 +240,12 @@ If empty query is provided no filtering is done based on query context and all a
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) &#124; null | context query to provide filtering of members available to add to this query  |
-memberType | [MemberType](#types-member-type) | - |
+query | [Query](#query-1) &#124; null | context query to provide filtering of members available to add to this query  |
+memberType | [MemberType](#membertype) | - |
 
 ### `resolveMember`
 
->  **resolveMember**‹**T**›(**memberName**: string, **memberType**: T | T[]): *object | [TCubeMemberByType](#types-t-cube-member-by-type)‹T›*
+>  **resolveMember**‹**T**›(**memberName**: string, **memberType**: T | T[]): *object | [TCubeMemberByType](#tcubememberbytype)‹T›*
 
 Get meta information for a cube member
 Member meta information contains:
@@ -262,7 +262,7 @@ Member meta information contains:
 
 **Type parameters:**
 
-- **T**: *[MemberType](#types-member-type)*
+- **T**: *[MemberType](#membertype)*
 
 **Parameters:**
 
@@ -287,15 +287,15 @@ Provides a convenient interface for data manipulation.
 
 ### `annotation`
 
->  **annotation**(): *[QueryAnnotations](#types-query-annotations)*
+>  **annotation**(): *[QueryAnnotations](#queryannotations)*
 
 ### `chartPivot`
 
->  **chartPivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[ChartPivotRow](#types-chart-pivot-row)[]*
+>  **chartPivot**(**pivotConfig?**: [PivotConfig](#pivotconfig)): *[ChartPivotRow](#chartpivotrow)[]*
 
 Returns normalized query result data in the following format.
 
-You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
+You can find the examples of using the `pivotConfig` [here](#pivotconfig)
 ```js
 // For the query
 {
@@ -316,7 +316,7 @@ You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
 ]
 
 ```
-When using `chartPivot()` or `seriesNames()`, you can pass `aliasSeries` in the [pivotConfig](#types-pivot-config)
+When using `chartPivot()` or `seriesNames()`, you can pass `aliasSeries` in the [pivotConfig](#pivotconfig)
 to give each series a unique prefix. This is useful for `blending queries` which use the same measure multiple times.
 
 ```js
@@ -386,7 +386,7 @@ resultSet.decompose().forEach((currentResultSet) => {
 
 ### `drillDown`
 
->  **drillDown**(**drillDownLocator**: [DrillDownLocator](#types-drill-down-locator), **pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Query](#types-query) | null*
+>  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drilldownlocator), **pivotConfig?**: [PivotConfig](#pivotconfig)): *[Query](#query-1) | null*
 
 Returns a measure drill down query.
 
@@ -447,13 +447,13 @@ const drillDownResponse = useCubeQuery(
 
 ### `pivot`
 
->  **pivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[PivotRow](#types-pivot-row)[]*
+>  **pivot**(**pivotConfig?**: [PivotConfig](#pivotconfig)): *[PivotRow](#pivotrow)[]*
 
-Base method for pivoting [ResultSet](#result-set) data.
+Base method for pivoting [ResultSet](#resultset) data.
 Most of the times shouldn't be used directly and [`chartPivot`](#chartpivot)
 or [`tablePivot`](#tablepivot) should be used instead.
 
-You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
+You can find the examples of using the `pivotConfig` [here](#pivotconfig)
 ```js
 // For query
 {
@@ -490,7 +490,7 @@ You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
 
 ### `query`
 
->  **query**(): *[Query](#types-query)*
+>  **query**(): *[Query](#query-1)*
 
 ### `rawData`
 
@@ -500,11 +500,11 @@ You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
 
 >  **serialize**(): *Object*
 
-Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#result-set-deserialize)
+Can be used to stash the `ResultSet` in a storage and restored later with [deserialize](#deserialize)
 
 ### `series`
 
->  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[Series](#types-series)‹SeriesItem›[]*
+>  **series**‹**SeriesItem**›(**pivotConfig?**: [PivotConfig](#pivotconfig)): *[Series](#series-1)‹SeriesItem›[]*
 
 Returns an array of series with key, title and series data.
 ```js
@@ -539,7 +539,7 @@ Returns an array of series with key, title and series data.
 
 ### `seriesNames`
 
->  **seriesNames**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[SeriesNamesColumn](#types-series-names-column)[]*
+>  **seriesNames**(**pivotConfig?**: [PivotConfig](#pivotconfig)): *[SeriesNamesColumn](#seriesnamescolumn)[]*
 
 Returns an array of series objects, containing `key` and `title` parameters.
 ```js
@@ -565,7 +565,7 @@ Returns an array of series objects, containing `key` and `title` parameters.
 
 ### `tableColumns`
 
->  **tableColumns**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *[TableColumn](#types-table-column)[]*
+>  **tableColumns**(**pivotConfig?**: [PivotConfig](#pivotconfig)): *[TableColumn](#tablecolumn)[]*
 
 Returns an array of column definitions for `tablePivot`.
 
@@ -661,11 +661,11 @@ then `tableColumns` will group the table head and return
 
 ### `tablePivot`
 
->  **tablePivot**(**pivotConfig?**: [PivotConfig](#types-pivot-config)): *Array‹object›*
+>  **tablePivot**(**pivotConfig?**: [PivotConfig](#pivotconfig)): *Array‹object›*
 
 Returns normalized query result data prepared for visualization in the table format.
 
-You can find the examples of using the `pivotConfig` [here](#types-pivot-config)
+You can find the examples of using the `pivotConfig` [here](#pivotconfig)
 
 For example:
 ```js
@@ -690,7 +690,7 @@ For example:
 
 ### `deserialize`
 
-> `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#result-set)‹TData›*
+> `static` **deserialize**‹**TData**›(**data**: Object, **options?**: Object): *[ResultSet](#resultset)‹TData›*
 
 ```js
 import { ResultSet } from '@cubejs-client/core';
@@ -711,18 +711,18 @@ const resultSet = ResultSet.deserialize(tmp);
 
 Name | Type | Description |
 ------ | ------ | ------ |
-data | Object | the result of [serialize](#result-set-serialize)  |
+data | Object | the result of [serialize](#serialize)  |
 options? | Object | - |
 
 ### `getNormalizedPivotConfig`
 
-> `static` **getNormalizedPivotConfig**(**query**: [PivotQuery](#types-pivot-query), **pivotConfig?**: Partial‹[PivotConfig](#types-pivot-config)›): *[PivotConfig](#types-pivot-config)*
+> `static` **getNormalizedPivotConfig**(**query**: [PivotQuery](#pivotquery), **pivotConfig?**: Partial‹[PivotConfig](#pivotconfig)›): *[PivotConfig](#pivotconfig)*
 
 ## `SqlQuery`
 
 ### `rawQuery`
 
->  **rawQuery**(): *[SqlData](#types-sql-data)*
+>  **rawQuery**(): *[SqlData](#sqldata)*
 
 ### `sql`
 
@@ -755,11 +755,11 @@ Cache mode options for query execution. See [cache control][ref-cache-control] f
 
 Name | Type |
 ------ | ------ |
-and? | [BinaryFilter](#types-binary-filter)[] |
+and? | [BinaryFilter](#binaryfilter)[] |
 dimension? | string |
 member? | string |
-operator | [BinaryOperator](#types-binary-operator) |
-or? | [BinaryFilter](#types-binary-filter)[] |
+operator | [BinaryOperator](#binaryoperator) |
+or? | [BinaryFilter](#binaryfilter)[] |
 values | string[] |
 
 ### `BinaryOperator`
@@ -790,7 +790,7 @@ credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
 headers? | Record‹string, string› | - |
 parseDateMeasures? | boolean | - |
 pollInterval? | number | - |
-transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
+transport? | [ITransport](#itransport) | Transport implementation to use. [HttpTransport](#httptransport) will be used by default. |
 signal? | AbortSignal | AbortSignal to cancel requests |
 
 ### `DateRange`
@@ -806,7 +806,7 @@ yValues? | string[] |
 
 ### `Filter`
 
-> **Filter**: *[BinaryFilter](#types-binary-filter) | [UnaryFilter](#types-unary-filter)*
+> **Filter**: *[BinaryFilter](#binaryfilter) | [UnaryFilter](#unaryfilter)*
 
 ### `LoadMethodCallback`
 
@@ -816,7 +816,7 @@ yValues? | string[] |
 
 Name | Type | Optional? | Description |
 ------ | ------ | ------ | --- |
-`cache` | [`CacheMode`](#types-cache-mode) | ✅ Yes | Server-side cache policy for query execution. Does not control client-side caching. See [cache control][ref-cache-control] for details on available strategies. |
+`cache` | [`CacheMode`](#cachemode) | ✅ Yes | Server-side cache policy for query execution. Does not control client-side caching. See [cache control][ref-cache-control] for details on available strategies. |
 `castNumerics` | `boolean` | ✅ Yes | Pass `true` if you'd like all members with the `number` type to be automatically converted to JavaScript `Number` type. Note that this is a potentially unsafe operation since numbers more than [`Number.MAX_SAFE_INTEGER`][link-mdn-max-safe-integer] or less than `Number.MIN_SAFE_INTEGER` can't be represented as JavaScript `Number` |
 `mutexKey` | `string` | ✅ Yes | Key to store the current request's MUTEX inside the `mutexObj`. MUTEX object is used to reject orphaned queries results when new queries are sent. For example: if two queries are sent with the same `mutexKey` only the last one will return results. |
 `mutexObj` | `Object` | ✅ Yes | Object to store MUTEX |
@@ -829,18 +829,18 @@ Name | Type | Optional? | Description |
 
 Name | Type |
 ------ | ------ |
-pivotQuery | [PivotQuery](#types-pivot-query) |
-queryType | [QueryType](#types-query-type) |
-results | [LoadResponseResult](#types-load-response-result)‹T›[] |
+pivotQuery | [PivotQuery](#pivotquery) |
+queryType | [QueryType](#querytype) |
+results | [LoadResponseResult](#loadresponseresult)‹T›[] |
 
 ### `LoadResponseResult`
 
 Name | Type |
 ------ | ------ |
-annotation | [QueryAnnotations](#types-query-annotations) |
+annotation | [QueryAnnotations](#queryannotations) |
 data | T[] |
 lastRefreshTime | string |
-query | [Query](#types-query) |
+query | [Query](#query-1) |
 
 ### `MemberType`
 
@@ -904,7 +904,7 @@ resultSet.tablePivot({
 
 Name | Type | Description |
 ------ | ------ | ------ |
-aliasSeries? | string[] | Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#result-set-chart-pivot) |
+aliasSeries? | string[] | Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#chartpivot) |
 fillMissingDates? | boolean &#124; null | **`true` by default.** If set to `true`, missing dates on the time dimensions will be filled with `fillWithValue` or `0` by default for all measures. Note: setting this option to `true` will override any `order` applied to the query. |
 fillWithValue? | string &#124; null | Value to autofill all the missing date's measure. |
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
@@ -912,7 +912,7 @@ y? | string[] | Dimensions to put on **y** or **columns** axis. |
 
 ### `PivotQuery`
 
-> **PivotQuery**: *[Query](#types-query) & object*
+> **PivotQuery**: *[Query](#query-1) & object*
 
 ### `PivotRow`
 
@@ -933,14 +933,14 @@ timeElapsed | number |
 Name | Type |
 ------ | ------ |
 dimensions? | string[] |
-filters? | [Filter](#types-filter)[] |
+filters? | [Filter](#filter)[] |
 limit? | number |
 measures? | string[] |
 offset? | number |
-order? | [TQueryOrderObject](#types-t-query-order-object) &#124; [TQueryOrderArray](#types-t-query-order-array) |
+order? | [TQueryOrderObject](#tqueryorderobject) &#124; [TQueryOrderArray](#tqueryorderarray) |
 renewQuery? | boolean |
 segments? | string[] |
-timeDimensions? | [TimeDimension](#types-time-dimension)[] |
+timeDimensions? | [TimeDimension](#timedimension)[] |
 timezone? | string |
 ungrouped? | boolean |
 
@@ -948,9 +948,9 @@ ungrouped? | boolean |
 
 Name | Type |
 ------ | ------ |
-dimensions | Record‹string, [Annotation](#types-annotation)› |
-measures | Record‹string, [Annotation](#types-annotation)› |
-timeDimensions | Record‹string, [Annotation](#types-annotation)› |
+dimensions | Record‹string, [Annotation](#annotation-1)› |
+measures | Record‹string, [Annotation](#annotation-1)› |
+timeDimensions | Record‹string, [Annotation](#annotation-1)› |
 
 ### `QueryOrder`
 
@@ -980,7 +980,7 @@ yValues | string[] |
 
 Name | Type |
 ------ | ------ |
-sql | [SqlData](#types-sql-data) |
+sql | [SqlData](#sqldata) |
 
 ### `SqlData`
 
@@ -990,7 +990,7 @@ aliasNameToMember | Record‹string, string› |
 cacheKeyQueries | object |
 dataSource | boolean |
 external | boolean |
-sql | [SqlQueryTuple](#types-sql-query-tuple) |
+sql | [SqlQueryTuple](#sqlquerytuple) |
 
 ### `SqlQueryTuple`
 
@@ -998,11 +998,11 @@ sql | [SqlQueryTuple](#types-sql-query-tuple) |
 
 ### `TCubeDimension`
 
-> **TCubeDimension**: *[TCubeMember](#types-t-cube-member) & object*
+> **TCubeDimension**: *[TCubeMember](#tcubemember) & object*
 
 ### `TCubeMeasure`
 
-> **TCubeMeasure**: *[TCubeMember](#types-t-cube-member) & object*
+> **TCubeMeasure**: *[TCubeMember](#tcubemember) & object*
 
 ### `TCubeMember`
 
@@ -1013,7 +1013,7 @@ shortTitle | string |
 title | string |
 isVisible? | boolean |
 meta? | any |
-type | [TCubeMemberType](#types-t-cube-member-type) |
+type | [TCubeMemberType](#tcubemembertype) |
 
 ### `TCubeMemberByType`
 
@@ -1025,23 +1025,23 @@ type | [TCubeMemberType](#types-t-cube-member-type) |
 
 ### `TCubeSegment`
 
-> **TCubeSegment**: *Pick‹[TCubeMember](#types-t-cube-member), "name" | "shortTitle" | "title"›*
+> **TCubeSegment**: *Pick‹[TCubeMember](#tcubemember), "name" | "shortTitle" | "title"›*
 
 ### `TDefaultHeuristicsOptions`
 
 Name | Type |
 ------ | ------ |
-meta | [Meta](#meta) |
-sessionGranularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
+meta | [Meta](#meta-1) |
+sessionGranularity? | [TimeDimensionGranularity](#timedimensiongranularity) |
 
 ### `TDryRunResponse`
 
 Name | Type |
 ------ | ------ |
-normalizedQueries | [Query](#types-query)[] |
-pivotQuery | [PivotQuery](#types-pivot-query) |
+normalizedQueries | [Query](#query-1)[] |
+pivotQuery | [PivotQuery](#pivotquery) |
 queryOrder | Array‹object› |
-queryType | [QueryType](#types-query-type) |
+queryType | [QueryType](#querytype) |
 
 ### `TFlatFilter`
 
@@ -1049,12 +1049,12 @@ Name | Type |
 ------ | ------ |
 dimension? | string |
 member? | string |
-operator | [BinaryOperator](#types-binary-operator) |
+operator | [BinaryOperator](#binaryoperator) |
 values | string[] |
 
 ### `TQueryOrderArray`
 
-> **TQueryOrderArray**: *Array‹[string, [QueryOrder](#types-query-order)]›*
+> **TQueryOrderArray**: *Array‹[string, [QueryOrder](#queryorder)]›*
 
 ### `TQueryOrderObject`
 
@@ -1062,7 +1062,7 @@ values | string[] |
 
 Name | Type |
 ------ | ------ |
-children? | [TableColumn](#types-table-column)[] |
+children? | [TableColumn](#tablecolumn)[] |
 dataIndex | string |
 format? | any |
 key | string |
@@ -1073,18 +1073,18 @@ type | string &#124; number |
 
 ### `TimeDimension`
 
-> **TimeDimension**: *[TimeDimensionComparison](#types-time-dimension-comparison) | [TimeDimensionRanged](#types-time-dimension-ranged)*
+> **TimeDimension**: *[TimeDimensionComparison](#timedimensioncomparison) | [TimeDimensionRanged](#timedimensionranged)*
 
 ### `TimeDimensionBase`
 
 Name | Type |
 ------ | ------ |
 dimension | string |
-granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
+granularity? | [TimeDimensionGranularity](#timedimensiongranularity) |
 
 ### `TimeDimensionComparison`
 
-> **TimeDimensionComparison**: *[TimeDimensionBase](#types-time-dimension-base) & object*
+> **TimeDimensionComparison**: *[TimeDimensionBase](#timedimensionbase) & object*
 
 ### `TimeDimensionGranularity`
 
@@ -1092,7 +1092,7 @@ granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
 
 ### `TimeDimensionRanged`
 
-> **TimeDimensionRanged**: *[TimeDimensionBase](#types-time-dimension-base) & object*
+> **TimeDimensionRanged**: *[TimeDimensionBase](#timedimensionbase) & object*
 
 ### `TransportOptions`
 
@@ -1108,11 +1108,11 @@ signal? | AbortSignal | AbortSignal to cancel requests |
 
 Name | Type |
 ------ | ------ |
-and? | [UnaryFilter](#types-unary-filter)[] |
+and? | [UnaryFilter](#unaryfilter)[] |
 dimension? | string |
 member? | string |
-operator | [UnaryOperator](#types-unary-operator) |
-or? | [UnaryFilter](#types-unary-filter)[] |
+operator | [UnaryOperator](#unaryoperator) |
+or? | [UnaryFilter](#unaryfilter)[] |
 values? | never |
 
 ### `UnaryOperator`
