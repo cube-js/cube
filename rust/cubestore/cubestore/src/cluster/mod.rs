@@ -182,12 +182,6 @@ pub trait Cluster: DIService + Send + Sync {
         chunk: &IdRow<Chunk>,
     ) -> Result<String, CubeError>;
 
-    async fn node_name_for_import(
-        &self,
-        table_id: u64,
-        location: &str,
-    ) -> Result<String, CubeError>;
-
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage;
 
     async fn process_metastore_message(&self, m: NetworkMessage) -> NetworkMessage;
@@ -768,21 +762,6 @@ impl Cluster for ClusterImpl {
         } else {
             Ok(pick_worker_by_ids(self.config_obj.as_ref(), [chunk.get_id()]).to_string())
         }
-    }
-
-    async fn node_name_for_import(
-        &self,
-        table_id: u64,
-        location: &str,
-    ) -> Result<String, CubeError> {
-        let workers = self.config_obj.select_workers();
-        if workers.is_empty() {
-            return Ok(self.server_name.to_string());
-        }
-        let mut hasher = DefaultHasher::new();
-        table_id.hash(&mut hasher);
-        location.hash(&mut hasher);
-        Ok(workers[(hasher.finish() % workers.len() as u64) as usize].to_string())
     }
 
     async fn warmup_partition(
@@ -2223,6 +2202,37 @@ pub fn pick_worker_by_ids<'a>(
     workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
 }
 
+/// Load-aware placement for a single CSV import: pick the worker with the fewest in-flight
+/// imports (per `counts`), breaking ties with the stable hash of (table_id, location). Workers
+/// absent from `counts` are treated as zero. The caller owns `counts` and increments the chosen
+/// worker between calls so a batch placed in one loop spreads evenly without re-scanning.
+pub fn pick_import_worker(
+    config: &dyn ConfigObj,
+    table_id: u64,
+    location: &str,
+    counts: &HashMap<String, u64>,
+) -> String {
+    let workers = config.select_workers();
+    if workers.is_empty() {
+        return config.server_name().to_string();
+    }
+
+    let min_count = workers
+        .iter()
+        .map(|w| counts.get(w).copied().unwrap_or(0))
+        .min()
+        .unwrap();
+    let min_set: Vec<&String> = workers
+        .iter()
+        .filter(|w| counts.get(*w).copied().unwrap_or(0) == min_count)
+        .collect();
+
+    let mut hasher = DefaultHasher::new();
+    table_id.hash(&mut hasher);
+    location.hash(&mut hasher);
+    min_set[(hasher.finish() % min_set.len() as u64) as usize].to_string()
+}
+
 /// Same as [pick_worker_by_ids], but uses ranges of partitions. This is a hack
 /// to keep the same node for partitions produced by compaction that merged
 /// chunks into the main table of a single partition.
@@ -2242,4 +2252,147 @@ pub fn pick_worker_by_partitions<'a>(
         partition.get_row().get_index_id().hash(&mut hasher);
     }
     workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use std::fs;
+
+    fn config_with_workers(name: &str, workers: Vec<String>) -> Arc<dyn ConfigObj> {
+        Config::test(name)
+            .update_config(|mut c| {
+                c.select_workers = workers;
+                c
+            })
+            .config_obj()
+    }
+
+    #[test]
+    fn pick_import_worker_load_aware() {
+        let config = config_with_workers(
+            "pick_import_worker_load_aware",
+            vec![
+                "worker1".to_string(),
+                "worker2".to_string(),
+                "worker3".to_string(),
+            ],
+        );
+        // worker1 loaded, worker2 lightly loaded, worker3 absent (counts as 0).
+        let counts = HashMap::from([("worker1".to_string(), 3), ("worker2".to_string(), 1)]);
+        assert_eq!(
+            pick_import_worker(config.as_ref(), 100, "new-loc", &counts),
+            "worker3"
+        );
+    }
+
+    #[test]
+    fn pick_import_worker_converges_to_even_spread() {
+        let config = config_with_workers(
+            "pick_import_worker_converges_to_even_spread",
+            (0..4).map(|i| format!("worker{}", i)).collect(),
+        );
+        // Emulate one placement loop: pick + locally increment, as the scheduler does.
+        let mut counts: HashMap<String, u64> = HashMap::new();
+        for i in 0..40u64 {
+            let node = pick_import_worker(config.as_ref(), i, &format!("loc-{}", i), &counts);
+            *counts.entry(node).or_insert(0) += 1;
+        }
+        assert_eq!(counts.values().sum::<u64>(), 40);
+        for i in 0..4 {
+            assert_eq!(counts.get(&format!("worker{}", i)).copied(), Some(10));
+        }
+    }
+
+    #[test]
+    fn pick_import_worker_tie_break_is_hash_stable() {
+        let config = config_with_workers(
+            "pick_import_worker_tie_break_is_hash_stable",
+            vec![
+                "worker1".to_string(),
+                "worker2".to_string(),
+                "worker3".to_string(),
+            ],
+        );
+        // All workers tie at 0: pick is the stable hash over the full set, deterministic.
+        let counts = HashMap::new();
+        let first = pick_import_worker(config.as_ref(), 7, "loc-7", &counts);
+        let second = pick_import_worker(config.as_ref(), 7, "loc-7", &counts);
+        assert_eq!(first, second);
+        assert!(config.select_workers().contains(&first));
+    }
+
+    #[test]
+    fn pick_import_worker_empty_workers_fallback() {
+        let config = config_with_workers("pick_import_worker_empty_workers_fallback", vec![]);
+        assert!(config.select_workers().is_empty());
+        let counts = HashMap::new();
+        assert_eq!(
+            &pick_import_worker(config.as_ref(), 1, "loc", &counts),
+            config.server_name()
+        );
+    }
+
+    #[tokio::test]
+    async fn in_flight_import_jobs_by_node_counts_scheduled_and_processing() {
+        async fn add_import_job(
+            meta_store: &Arc<dyn MetaStore>,
+            table_id: u64,
+            location: &str,
+            node: &str,
+            processing: bool,
+        ) {
+            let job = meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, table_id),
+                    JobType::TableImportCSV(location.to_string()),
+                    node.to_string(),
+                ))
+                .await
+                .unwrap()
+                .unwrap();
+            if processing {
+                meta_store
+                    .update_status(job.get_id(), JobStatus::ProcessingBy(node.to_string()))
+                    .await
+                    .unwrap();
+            }
+        }
+
+        // The jobs' nodes must be in select_workers, otherwise the scheduler's reconcile loop
+        // (remove_jobs_on_non_exists_nodes) would drop them out from under the scan.
+        let config = Config::test("in_flight_import_jobs_by_node_counts_scheduled_and_processing")
+            .update_config(|mut c| {
+                c.select_workers = vec![
+                    "worker1".to_string(),
+                    "worker2".to_string(),
+                    "worker3".to_string(),
+                ];
+                c
+            });
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+
+        let services = config.configure().await;
+        services.start_processing_loops().await.unwrap();
+        let meta_store = services.meta_store.clone();
+
+        // worker1 has 3 (mix of scheduled/processing), worker2 has 1, worker3 has none.
+        add_import_job(&meta_store, 1, "loc-1", "worker1", false).await;
+        add_import_job(&meta_store, 2, "loc-2", "worker1", true).await;
+        add_import_job(&meta_store, 3, "loc-3", "worker1", false).await;
+        add_import_job(&meta_store, 4, "loc-4", "worker2", true).await;
+        // Stream imports must not be counted.
+        add_import_job(&meta_store, 5, "stream:topic", "worker3", false).await;
+
+        let counts = meta_store.in_flight_import_jobs_by_node().await.unwrap();
+        assert_eq!(counts.get("worker1").copied(), Some(3));
+        assert_eq!(counts.get("worker2").copied(), Some(1));
+        assert_eq!(counts.get("worker3").copied(), None);
+
+        services.stop_processing_loops().await.unwrap();
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+    }
 }

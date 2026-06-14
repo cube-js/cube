@@ -1,4 +1,4 @@
-use crate::cluster::{pick_worker_by_ids, Cluster};
+use crate::cluster::{pick_import_worker, pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -47,6 +47,9 @@ pub struct SchedulerImpl {
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
     in_memory_chunks_to_delete: Mutex<Vec<(String, String)>>, //(node, chunk_is)
     node_last_actions: Mutex<HashMap<String, LastNodeActionTimes>>,
+    // Serializes load-aware import placement so concurrent CREATE TABLE events don't read
+    // the same in-flight counts and pile onto the same worker before either job is scheduled.
+    import_placement_lock: Mutex<()>,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -102,6 +105,7 @@ impl SchedulerImpl {
             in_memory_chunks_to_delete: Mutex::new(Vec::with_capacity(1000)),
             node_last_actions: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
+            import_placement_lock: Mutex::new(()),
         }
     }
 
@@ -1159,20 +1163,32 @@ impl SchedulerImpl {
     ) -> Result<(), CubeError> {
         let table = self.meta_store.get_table_by_id(table_id).await?;
         if !table.get_row().sealed() {
-            for &l in locations {
-                let node = self.cluster.node_name_for_import(table_id, &l).await?;
-                let job = self
-                    .meta_store
-                    .add_job(Job::new(
-                        RowKey::Table(TableId::Tables, table_id),
-                        JobType::TableImportCSV(l.clone()),
-                        node.to_string(),
-                    ))
-                    .await?;
-                if job.is_some() {
-                    // TODO queue failover
-                    self.cluster.notify_job_runner(node).await?;
+            // Hold the lock across the whole table so concurrent CREATE TABLE placements don't
+            // read the same starting counts and pile onto the same workers. The in-flight counts
+            // are scanned once; subsequent placements within the loop update them in memory.
+            let mut nodes_to_notify = Vec::new();
+            {
+                let _guard = self.import_placement_lock.lock().await;
+                let mut counts = self.meta_store.in_flight_import_jobs_by_node().await?;
+                for &l in locations {
+                    let node = pick_import_worker(self.config.as_ref(), table_id, l, &counts);
+                    let job = self
+                        .meta_store
+                        .add_job(Job::new(
+                            RowKey::Table(TableId::Tables, table_id),
+                            JobType::TableImportCSV(l.clone()),
+                            node.clone(),
+                        ))
+                        .await?;
+                    if job.is_some() {
+                        *counts.entry(node.clone()).or_insert(0) += 1;
+                        nodes_to_notify.push(node);
+                    }
                 }
+            }
+            for node in nodes_to_notify {
+                // TODO queue failover
+                self.cluster.notify_job_runner(node).await?;
             }
         }
         Ok(())
