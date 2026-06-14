@@ -583,13 +583,20 @@ impl CompactionService for CompactionServiceImpl {
             ) as usize)
                 // Do not allow to much of new partitions to limit partition accuracy trade off
                 .min(16);
-            let new_partitions_count_by_file_size =
-                if let Some(partition_file_size) = partition.get_row().file_size() {
+            // Size the split by the bytes actually being written: the existing main table plus
+            // the pending chunks merged in this pass. A partition with a small (or empty) main
+            // table but large accumulated chunks must still split by size in a single pass,
+            // otherwise it under-splits and re-splits on the next round.
+            let new_partitions_count_by_file_size = {
+                let total_file_size =
+                    partition.get_row().file_size().unwrap_or(0) + chunks_total_file_size;
+                if total_file_size > 0 {
                     let threshold = self.config.partition_size_split_threshold_bytes();
-                    (div_ceil(partition_file_size, threshold) as usize).min(16)
+                    (div_ceil(total_file_size, threshold) as usize).min(16)
                 } else {
                     1
-                };
+                }
+            };
 
             let new_partitions_count =
                 new_partitions_count_by_rows.max(new_partitions_count_by_file_size);
@@ -2397,6 +2404,8 @@ mod tests {
         Config::test("partition_compaction_decimal96")
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
+                // Keep the split row-based: this test covers decimal handling, not size split.
+                c.partition_size_split_threshold_bytes = 1024 * 1024;
                 c
             })
             .start_test(async move |services| {
@@ -2497,7 +2506,9 @@ mod tests {
                     .get_active_partitions_by_index_id(1)
                     .await
                     .unwrap();
-                assert_eq!(partitions.len(), 1);
+                // Eager split-by-file-size: the first compaction already splits because the
+                // pending chunks exceed partition_size_split_threshold_bytes.
+                assert!(partitions.len() > 1);
                 let values = (0..10)
                     .map(|_| format!("('{}', '{}')", "a".repeat(10), "b".repeat(10)))
                     .collect::<Vec<_>>()
