@@ -539,7 +539,12 @@ impl TableCreator {
                 .validate_table_location(table.get_id(), stream_location)
                 .await?;
         }
-        let imports = listener.wait_for_job_results(wait_for).await?;
+        // Poll job statuses from the metastore every 30s as a safety net: if an import
+        // completion event is lost/dropped by the broadcast channel, the periodic re-check still
+        // observes it so finalize doesn't hang and leave the table stuck "processing".
+        let imports = listener
+            .wait_for_job_results_with_poll(wait_for, Some(Duration::from_secs(30)))
+            .await?;
         for r in imports {
             if let JobEvent::Error(_, _, e) = r {
                 return Err(CubeError::user(format!("Create table failed: {}", e)));

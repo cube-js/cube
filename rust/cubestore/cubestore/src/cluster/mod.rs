@@ -746,6 +746,7 @@ impl Cluster for ClusterImpl {
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
             receiver: self.meta_store_sender.subscribe(),
+            meta_store: self.meta_store.clone(),
         }
     }
 
@@ -1018,6 +1019,7 @@ pub trait MessageStream: Send + Sync {
 
 pub struct JobResultListener {
     receiver: Receiver<MetaStoreEvent>,
+    meta_store: Arc<dyn MetaStore>,
 }
 
 impl JobResultListener {
@@ -1038,52 +1040,160 @@ impl JobResultListener {
             .unwrap())
     }
 
+    /// Resolve the current outcome of each still-pending job directly from the metastore.
+    /// Used when broadcast events can't be relied on (channel lag, or the periodic safety poll).
+    /// A job that is gone from the metastore finished and was deleted, but after the fact we can't
+    /// tell success from orphan/error — report Orphaned so the caller retries rather than treating
+    /// a possibly-incomplete result as success.
+    async fn resolve_pending_from_metastore(
+        &self,
+        results: Vec<(RowKey, JobType)>,
+        res: &mut Vec<JobEvent>,
+    ) -> Result<Vec<(RowKey, JobType)>, CubeError> {
+        let mut still_pending = Vec::new();
+        for (row_key, job_type) in results.into_iter() {
+            match self
+                .meta_store
+                .get_job_by_ref(row_key.clone(), job_type.clone())
+                .await?
+            {
+                Some(job) => match job.get_row().status() {
+                    JobStatus::Completed => res.push(JobEvent::Success(row_key, job_type)),
+                    JobStatus::Error(e) => {
+                        res.push(JobEvent::Error(row_key, job_type, e.to_string()))
+                    }
+                    JobStatus::Timeout => res.push(JobEvent::Error(
+                        row_key,
+                        job_type,
+                        "Job timed out".to_string(),
+                    )),
+                    JobStatus::Orphaned => res.push(JobEvent::Orphaned(row_key, job_type)),
+                    JobStatus::Scheduled(_) | JobStatus::ProcessingBy(_) => {
+                        still_pending.push((row_key, job_type))
+                    }
+                },
+                None => res.push(JobEvent::Orphaned(row_key, job_type)),
+            }
+        }
+        Ok(still_pending)
+    }
+
     pub async fn wait_for_job_results(
+        self,
+        results: Vec<(RowKey, JobType)>,
+    ) -> Result<Vec<JobEvent>, CubeError> {
+        self.wait_for_job_results_with_poll(results, None).await
+    }
+
+    /// Like `wait_for_job_results`, but when `poll_interval` is set it also actively re-checks
+    /// pending job statuses in the metastore whenever no event arrives within the interval. This
+    /// keeps the wait live even if completion events are lost or dropped by the broadcast channel
+    /// (used by the import finalize path, where a missed event would otherwise leave the table
+    /// stuck "processing" forever).
+    pub async fn wait_for_job_results_with_poll(
         mut self,
         mut results: Vec<(RowKey, JobType)>,
+        poll_interval: Option<Duration>,
     ) -> Result<Vec<JobEvent>, CubeError> {
         let mut res = Vec::new();
+        // Independent wall-clock timer for the safety re-check. It must NOT be a per-iteration
+        // recv timeout: the receiver sees every metastore event, so on a busy router unrelated
+        // events would reset such a timeout and it would never fire — exactly where a missed
+        // completion event is most likely. An `interval` only advances its deadline when a tick
+        // completes, so repeatedly cancelling tick() while recv wins keeps the cadence; with a
+        // `biased` select the due tick wins even when the channel is saturated with ready events.
+        let mut poll_timer = poll_interval.map(|interval| {
+            let mut timer =
+                tokio::time::interval_at(tokio::time::Instant::now() + interval, interval);
+            timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            timer
+        });
         loop {
-            if results.len() == 0 {
+            if results.is_empty() {
                 return Ok(res);
             }
-            let event = self.receiver.recv().await?;
-            if let MetaStoreEvent::UpdateJob(old, new) = &event {
-                if old.get_row().status() != new.get_row().status() {
-                    let job_event = match new.get_row().status() {
-                        JobStatus::Scheduled(_) => None,
-                        JobStatus::ProcessingBy(_) => None,
-                        JobStatus::Completed => Some(JobEvent::Success(
-                            new.get_row().row_reference().clone(),
-                            new.get_row().job_type().clone(),
-                        )),
-                        JobStatus::Timeout => Some(JobEvent::Error(
-                            new.get_row().row_reference().clone(),
-                            new.get_row().job_type().clone(),
-                            "Job timed out".to_string(),
-                        )),
-                        JobStatus::Orphaned => Some(JobEvent::Orphaned(
-                            new.get_row().row_reference().clone(),
-                            new.get_row().job_type().clone(),
-                        )),
-                        JobStatus::Error(e) => Some(JobEvent::Error(
-                            new.get_row().row_reference().clone(),
-                            new.get_row().job_type().clone(),
-                            e.to_string(),
-                        )),
-                    };
-                    if let Some(event) = job_event {
-                        if let JobEvent::Success(k, t) | JobEvent::Error(k, t, _) = &event {
-                            if let Some((index, _)) = results
-                                .iter()
-                                .find_position(|(row_key, job_type)| k == row_key && t == job_type)
-                            {
-                                res.push(event);
-                                results.remove(index);
+            let mut needs_recheck = false;
+            tokio::select! {
+                biased;
+                // Pends forever when no poll_interval, so this arm is effectively disabled then.
+                _ = async {
+                    match poll_timer.as_mut() {
+                        Some(timer) => {
+                            timer.tick().await;
+                        }
+                        None => std::future::pending::<()>().await,
+                    }
+                } => {
+                    needs_recheck = true;
+                }
+                recv_result = self.receiver.recv() => {
+                    match recv_result {
+                        Ok(event) => {
+                            if let MetaStoreEvent::UpdateJob(old, new) = &event {
+                                if old.get_row().status() != new.get_row().status() {
+                                    let job_event = match new.get_row().status() {
+                                        JobStatus::Scheduled(_) => None,
+                                        JobStatus::ProcessingBy(_) => None,
+                                        JobStatus::Completed => Some(JobEvent::Success(
+                                            new.get_row().row_reference().clone(),
+                                            new.get_row().job_type().clone(),
+                                        )),
+                                        JobStatus::Timeout => Some(JobEvent::Error(
+                                            new.get_row().row_reference().clone(),
+                                            new.get_row().job_type().clone(),
+                                            "Job timed out".to_string(),
+                                        )),
+                                        JobStatus::Orphaned => Some(JobEvent::Orphaned(
+                                            new.get_row().row_reference().clone(),
+                                            new.get_row().job_type().clone(),
+                                        )),
+                                        JobStatus::Error(e) => Some(JobEvent::Error(
+                                            new.get_row().row_reference().clone(),
+                                            new.get_row().job_type().clone(),
+                                            e.to_string(),
+                                        )),
+                                    };
+                                    if let Some(event) = job_event {
+                                        if let JobEvent::Success(k, t)
+                                        | JobEvent::Orphaned(k, t)
+                                        | JobEvent::Error(k, t, _) = &event
+                                        {
+                                            if let Some((index, _)) =
+                                                results.iter().find_position(|(row_key, job_type)| {
+                                                    k == row_key && t == job_type
+                                                })
+                                            {
+                                                res.push(event);
+                                                results.remove(index);
+                                            }
+                                        }
+                                    }
+                                }
                             }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            // The channel overflowed and dropped messages — the completion events
+                            // we were waiting for may have been among them. Re-derive pending jobs
+                            // authoritatively instead of failing finalize.
+                            log::warn!(
+                                "JobResultListener lagged by {} events; re-checking {} pending job(s) from metastore",
+                                n,
+                                results.len()
+                            );
+                            needs_recheck = true;
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                            return Err(CubeError::internal(
+                                "JobResultListener event channel closed".to_string(),
+                            ));
                         }
                     }
                 }
+            }
+            if needs_recheck {
+                results = self
+                    .resolve_pending_from_metastore(results, &mut res)
+                    .await?;
             }
         }
     }

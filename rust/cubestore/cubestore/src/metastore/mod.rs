@@ -1460,6 +1460,9 @@ pub struct RocksMetaStore {
     store: Arc<RocksStore>,
     cached_tables: Arc<CachedTables>,
     disk_space_cache: Arc<RwLock<Option<(HashMap<String, u64>, SystemTime)>>>,
+    disk_space_compute_lock: Arc<tokio::sync::Mutex<()>>,
+    in_memory_compaction_cache: Arc<RwLock<Option<(HashMap<String, Vec<u64>>, SystemTime)>>>,
+    in_memory_compaction_compute_lock: Arc<tokio::sync::Mutex<()>>,
     upload_loop: Arc<WorkerLoop>,
 }
 
@@ -1483,12 +1486,113 @@ impl RocksMetaStore {
             store,
             cached_tables: Arc::new(CachedTables::new()),
             disk_space_cache: Arc::new(RwLock::new(None)),
+            disk_space_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
+            in_memory_compaction_cache: Arc::new(RwLock::new(None)),
+            in_memory_compaction_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
             upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
         })
     }
 
     pub fn reset_cached_tables(&self) {
         self.cached_tables.reset();
+    }
+
+    async fn disk_space_cached(&self) -> Result<Option<HashMap<String, u64>>, CubeError> {
+        Ok(
+            if let Some((sizes, time)) = self.disk_space_cache.read().await.as_ref() {
+                let cache_duration =
+                    Duration::from_secs(self.store.config.disk_space_cache_duration_secs());
+                if time.elapsed()? < cache_duration {
+                    Some(sizes.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
+        )
+    }
+
+    async fn in_memory_compaction_cached(
+        &self,
+    ) -> Result<Option<HashMap<String, Vec<u64>>>, CubeError> {
+        Ok(
+            if let Some((by_node, time)) = self.in_memory_compaction_cache.read().await.as_ref() {
+                // Kept short (one scheduling period) so freshly written in-memory chunks
+                // are still discovered promptly and not left to pile up on workers.
+                let cache_duration = Duration::from_secs(
+                    self.store
+                        .config
+                        .compaction_in_memory_chunks_schedule_period_secs(),
+                );
+                if time.elapsed()? < cache_duration {
+                    Some(by_node.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
+        )
+    }
+
+    // Discovery of which partitions hold active in-memory chunks is a full chunks-table scan run
+    // by every node's in-memory compaction job. Memoize it (short TTL + single-flight) so a burst
+    // of concurrent jobs shares one scan instead of each scanning the whole table. Only per-node
+    // partition ids are cached (no chunk data) — chunks are re-read fresh by the caller.
+    async fn in_memory_compaction_partition_ids(
+        &self,
+        node: String,
+    ) -> Result<Vec<u64>, CubeError> {
+        // In-memory chunks are only produced by streaming ingestion, i.e. tables with
+        // in_memory_ingest() (a seq column). With no such table there is nothing to discover, so
+        // skip the full chunks-table scan entirely. The check reads the in-RAM table cache (kept
+        // fresh on table changes), so it costs nothing in the common no-streaming case.
+        let tables = self.get_tables_with_path(false).await?;
+        if !tables.iter().any(|t| t.table.get_row().in_memory_ingest()) {
+            return Ok(Vec::new());
+        }
+
+        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+            return Ok(by_node.get(&node).cloned().unwrap_or_default());
+        }
+        let _compute_guard = self.in_memory_compaction_compute_lock.lock().await;
+        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+            return Ok(by_node.get(&node).cloned().unwrap_or_default());
+        }
+
+        let config = self.store.config.clone();
+        let by_node = self
+            .read_operation_out_of_queue("in_memory_compaction_partition_ids", move |db_ref| {
+                let chunks_table = ChunkRocksTable::new(db_ref.clone());
+                let mut partition_ids = HashSet::new();
+                for c in chunks_table.scan_all_rows()? {
+                    let c = c?;
+                    if c.get_row().active() && c.get_row().in_memory() {
+                        partition_ids.insert(c.get_row().get_partition_id());
+                    }
+                }
+
+                let partitions_table = PartitionRocksTable::new(db_ref.clone());
+                let mut by_node: HashMap<String, Vec<u64>> = HashMap::new();
+                for id in partition_ids {
+                    if let Some(partition) = partitions_table.get_row(id)? {
+                        if partition.get_row().is_active()
+                            && partition.get_row().multi_partition_id.is_none()
+                        {
+                            by_node
+                                .entry(node_name_by_partition(config.as_ref(), &partition))
+                                .or_default()
+                                .push(id);
+                        }
+                    }
+                }
+                Ok(by_node)
+            })
+            .await?;
+
+        *self.in_memory_compaction_cache.write().await = Some((by_node.clone(), SystemTime::now()));
+        Ok(by_node.get(&node).cloned().unwrap_or_default())
     }
 
     pub async fn load_from_dump(
@@ -2712,60 +2816,61 @@ impl MetaStore for RocksMetaStore {
         &self,
         node: Option<String>,
     ) -> Result<u64, CubeError> {
-        let cached = if let Some((sizes, time)) = self.disk_space_cache.read().await.as_ref() {
-            let cache_duration =
-                Duration::from_secs(self.store.config.disk_space_cache_duration_secs());
-            if time.elapsed()? < cache_duration {
-                Some(sizes.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        let sizes_map = if let Some(sizes) = cached {
+        let sizes_map = if let Some(sizes) = self.disk_space_cached().await? {
             sizes
         } else {
-            let (partitions, chunks) = self.get_all_partitions_and_chunks_out_of_queue().await?;
-            let mut partitions_map = partitions
-                .into_iter()
-                .map(|p| {
-                    (
-                        p.get_id(),
-                        (
-                            p.get_row().file_size().unwrap_or(0),
-                            node_name_by_partition(self.store.config.as_ref(), &p),
-                        ),
-                    )
-                })
-                .collect::<HashMap<u64, (u64, String)>>();
-            for c in chunks.into_iter() {
-                if let Some((ref mut size, _)) =
-                    partitions_map.get_mut(&c.get_row().get_partition_id())
-                {
-                    *size = c.get_row().file_size().unwrap_or(0);
-                }
-            }
-
-            let workers = if self.store.config.select_workers().is_empty() {
-                vec![self.store.config.server_name().clone()]
+            // Single-flight: serialize the scan so a burst of concurrent callers
+            // (e.g. many partition writes during an import/repartition) share one
+            // computation instead of each materializing a full metastore scan.
+            let _compute_guard = self.disk_space_compute_lock.lock().await;
+            if let Some(sizes) = self.disk_space_cached().await? {
+                sizes
             } else {
-                self.store.config.select_workers().clone()
-            };
+                let config = self.store.config.clone();
+                let partitions_map = self
+                    .read_operation_out_of_queue("get_used_disk_space", move |db| {
+                        let mut partitions_map: HashMap<u64, (u64, String)> = HashMap::new();
+                        for p in PartitionRocksTable::new(db.clone()).scan_all_rows()? {
+                            let p = p?;
+                            partitions_map.insert(
+                                p.get_id(),
+                                (
+                                    p.get_row().file_size().unwrap_or(0),
+                                    node_name_by_partition(config.as_ref(), &p),
+                                ),
+                            );
+                        }
+                        for c in ChunkRocksTable::new(db.clone()).scan_all_rows()? {
+                            let c = c?;
+                            if let Some((ref mut size, _)) =
+                                partitions_map.get_mut(&c.get_row().get_partition_id())
+                            {
+                                *size = c.get_row().file_size().unwrap_or(0);
+                            }
+                        }
+                        Ok(partitions_map)
+                    })
+                    .await?;
 
-            let mut map = workers
-                .into_iter()
-                .map(|n| (n, 0))
-                .collect::<HashMap<String, u64>>();
+                let workers = if self.store.config.select_workers().is_empty() {
+                    vec![self.store.config.server_name().clone()]
+                } else {
+                    self.store.config.select_workers().clone()
+                };
 
-            for (_, (size, node)) in partitions_map.into_iter() {
-                map.entry(node).and_modify(|s| *s += size).or_insert(0);
+                let mut map = workers
+                    .into_iter()
+                    .map(|n| (n, 0))
+                    .collect::<HashMap<String, u64>>();
+
+                for (_, (size, node)) in partitions_map.into_iter() {
+                    map.entry(node).and_modify(|s| *s += size).or_insert(0);
+                }
+
+                *self.disk_space_cache.write().await = Some((map.clone(), SystemTime::now()));
+
+                map
             }
-
-            let mut cache = self.disk_space_cache.write().await;
-            *cache = Some((map.clone(), SystemTime::now()));
-
-            map
         };
 
         let res = if let Some(node_name) = node {
@@ -3239,47 +3344,53 @@ impl MetaStore for RocksMetaStore {
         )>,
         CubeError,
     > {
-        let config = self.store.config.clone();
+        // Which partitions on this node hold active in-memory chunks comes from a short-lived
+        // shared cache (single-flight), so concurrent compaction jobs share one full-table scan
+        // instead of each running it. The chunks themselves are re-read fresh per partition below
+        // (indexed by partition) so compaction always acts on current data.
+        let partition_ids = self.in_memory_compaction_partition_ids(node).await?;
+        if partition_ids.is_empty() {
+            return Ok(Vec::new());
+        }
         self.read_operation_out_of_queue("get_partitions_for_in_memory_compaction", move |db_ref| {
-            let chunks_table = ChunkRocksTable::new(db_ref.clone());
-
-            let mut partitions_map = HashMap::new();
-            for c in chunks_table.scan_all_rows()? {
-                let c = c?;
-                if c.get_row().active() && c.get_row().in_memory() {
-                    partitions_map
-                        .entry(c.get_row().get_partition_id())
-                        .or_insert(Vec::new())
-                        .push(c);
-                }
-            }
-
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
-
-            let mut result = Vec::with_capacity(partitions_map.len());
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
             let index_table = IndexRocksTable::new(db_ref.clone());
             let table_table = TableRocksTable::new(db_ref.clone());
 
-            for (id, chunks) in partitions_map.into_iter() {
-                if let Some(partition) = partitions_table.get_row(id)? {
-                    if partition.get_row().is_active()
-                        && partition.get_row().multi_partition_id.is_none()
-                        && node_name_by_partition(config.as_ref(), &partition) == node
-                    {
-                        let index = index_table
-                            .get_row(partition.get_row().get_index_id())?
-                            .ok_or(CubeError::internal(format!(
-                                "Index {} is not found for partition: {}",
-                                partition.get_row().get_index_id(),
-                                id
-                            )))?;
-                        let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
-
-                        result.push((partition, index, table, chunks));
-                    }
+            let mut result = Vec::with_capacity(partition_ids.len());
+            for id in partition_ids {
+                // A cached id may point to a partition that was compacted/split away since the
+                // scan — re-validate against the fresh snapshot and skip if it no longer applies.
+                let partition = match partitions_table.get_row(id)? {
+                    Some(p) => p,
+                    None => continue,
+                };
+                if !partition.get_row().is_active()
+                    || partition.get_row().multi_partition_id.is_some()
+                {
+                    continue;
                 }
+                // include_inactive=true so the predicate below is exactly the original
+                // (active && in_memory) over all of the partition's chunks, without depending on
+                // the active() => uploaded() invariant that include_inactive=false would assume.
+                let chunks = Self::chunks_by_partition(id, &chunks_table, true)?
+                    .into_iter()
+                    .filter(|c| c.get_row().active() && c.get_row().in_memory())
+                    .collect::<Vec<_>>();
+                if chunks.is_empty() {
+                    continue;
+                }
+                let index = index_table
+                    .get_row(partition.get_row().get_index_id())?
+                    .ok_or(CubeError::internal(format!(
+                        "Index {} is not found for partition: {}",
+                        partition.get_row().get_index_id(),
+                        id
+                    )))?;
+                let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
+                result.push((partition, index, table, chunks));
             }
-
             Ok(result)
         })
         .await
@@ -5491,6 +5602,102 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn in_memory_compaction_discovery_streaming_gate() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test("in_memory_compaction_discovery_gate");
+        let store_path = env::current_dir()?.join("test-imcd-local");
+        let remote_store_path = env::current_dir()?.join("test-imcd-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+            // No select_workers in test config => node_name_by_partition resolves to server_name.
+            let node = config.config_obj().server_name().clone();
+            let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+            meta_store.create_schema("s".to_string(), false).await?;
+
+            // Regular table (no unique key) => not in_memory_ingest. Even with in-memory chunks
+            // present, node discovery is gated off and returns nothing (no full chunks scan).
+            meta_store
+                .create_table(
+                    "s".to_string(),
+                    "regular".to_string(),
+                    cols.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await?;
+            let reg_partition = meta_store.get_partition(1).await?;
+            let reg_chunk = meta_store
+                .create_chunk(reg_partition.get_id(), 10, None, None, true)
+                .await?;
+            meta_store.chunk_uploaded(reg_chunk.get_id()).await?;
+            assert!(meta_store
+                .get_partitions_for_in_memory_compaction(node.clone())
+                .await?
+                .is_empty());
+
+            // Streaming table (unique key => seq column => in_memory_ingest). Now discovery runs
+            // and returns partitions holding active in-memory chunks.
+            meta_store
+                .create_table(
+                    "s".to_string(),
+                    "stream".to_string(),
+                    cols.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(vec!["name".to_string()]),
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await?;
+            let stream_partition = meta_store.get_partition(2).await?;
+            let stream_chunk = meta_store
+                .create_chunk(stream_partition.get_id(), 10, None, None, true)
+                .await?;
+            meta_store.chunk_uploaded(stream_chunk.get_id()).await?;
+            let found = meta_store
+                .get_partitions_for_in_memory_compaction(node.clone())
+                .await?;
+            assert!(found
+                .iter()
+                .any(|(p, _, _, _)| p.get_id() == stream_partition.get_id()));
+        }
+        let _ = fs::remove_dir_all(store_path);
+        let _ = fs::remove_dir_all(remote_store_path);
         Ok(())
     }
 
