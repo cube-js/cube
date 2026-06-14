@@ -1290,6 +1290,14 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
             let cache = Cache::new_lru_cache(rocksdb_config.cache_capacity)?;
             block_opts.set_block_cache(&cache);
 
+            // A fixed_prefix(13) extractor is set above, so this builds a prefix bloom by
+            // default; the hot path is whole-key point-gets (RowKey::Table(table_id, id)),
+            // so enable whole-key filtering too. Blooms are per-SST and materialize lazily
+            // on flush/compaction, so existing SSTs open and read fine without one (a one-time
+            // online compact_range would give immediate full coverage but is not required).
+            block_opts.set_bloom_filter(10.0, false);
+            block_opts.set_whole_key_filtering(true);
+
             block_opts
         };
 
@@ -1319,6 +1327,14 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
 
             let cache = Cache::new_lru_cache(rocksdb_config.cache_capacity)?;
             block_opts.set_block_cache(&cache);
+
+            // A fixed_prefix(13) extractor is set above, so this builds a prefix bloom by
+            // default; the hot path is whole-key point-gets (RowKey::Table(table_id, id)),
+            // so enable whole-key filtering too. Blooms are per-SST and materialize lazily
+            // on flush/compaction, so existing SSTs open and read fine without one (a one-time
+            // online compact_range would give immediate full coverage but is not required).
+            block_opts.set_bloom_filter(10.0, false);
+            block_opts.set_whole_key_filtering(true);
 
             block_opts
         };
