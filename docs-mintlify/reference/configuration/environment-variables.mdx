@@ -1846,12 +1846,22 @@ insertion.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `262144`               | `262144`              |
 
+## `CUBESTORE_CHUNKS_COUNT_THRESHOLD`
+
+The number of chunks a partition can accumulate before Cube Store compacts them into
+a single chunk.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `4`                    | `4`                   |
+
 ## `CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD`
 
 The number of chunks at which a table's partitions are considered ready during table
-creation. When set, it must not be lower than `CUBESTORE_CHUNKS_COUNT_THRESHOLD`,
-otherwise compaction would never reduce the number of chunks below this threshold. By
-default, it is not set.
+creation. When set, it must not be lower than
+[`CUBESTORE_CHUNKS_COUNT_THRESHOLD`](#cubestore_chunks_count_threshold), otherwise
+compaction would never reduce the number of chunks below this threshold. By default,
+it is not set.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
