@@ -1126,6 +1126,7 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn delete_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
+    async fn delete_unknown_jobs(&self) -> Result<u64, CubeError>;
     async fn start_processing_job(
         &self,
         server_name: String,
@@ -4250,6 +4251,12 @@ impl MetaStore for RocksMetaStore {
     #[tracing::instrument(level = "trace", skip(self))]
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
         self.write_operation("add_job", move |db_ref, batch_pipe| {
+            // Unknown is a read-time fallback for variants written by a newer binary;
+            // this binary must never create one (the cleanup sweep would delete it).
+            debug_assert!(
+                !matches!(job.job_type(), JobType::Unknown),
+                "refusing to add a job with an unknown type"
+            );
             let table = JobRocksTable::new(db_ref.clone());
 
             let result = table.get_row_ids_by_index(
@@ -4354,6 +4361,53 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    async fn delete_unknown_jobs(&self) -> Result<u64, CubeError> {
+        // Cheap gate so the common steady state (no unknown jobs) doesn't take the
+        // single-writer queue every reconcile tick: scan out of queue first.
+        let has_unknown = self
+            .read_operation_out_of_queue("scan_unknown_jobs", move |db_ref| {
+                Ok(JobRocksTable::new(db_ref)
+                    .all_rows()?
+                    .into_iter()
+                    .any(|j| matches!(j.get_row().job_type(), JobType::Unknown)))
+            })
+            .await?;
+        if !has_unknown {
+            return Ok(0);
+        }
+
+        self.write_operation("delete_unknown_jobs", move |db_ref, batch_pipe| {
+            let table = JobRocksTable::new(db_ref);
+            let unknown = table
+                .all_rows()?
+                .into_iter()
+                .filter(|j| matches!(j.get_row().job_type(), JobType::Unknown))
+                .collect::<Vec<_>>();
+            if unknown.is_empty() {
+                return Ok(0);
+            }
+            for job in unknown.iter() {
+                log::warn!(
+                    "Removing job {} with an unknown type (written by a newer CubeStore version): {:?}",
+                    job.get_id(),
+                    job.get_row()
+                );
+                table.delete(job.get_id(), batch_pipe)?;
+            }
+            // delete() recomputes the RowReference index key from the row's job_type,
+            // which we read as Unknown — but the stored key was written by a newer
+            // binary over the real variant, so that delete leaves the original
+            // (unique) index entry dangling. Rebuild it in the same write so the
+            // cleanup commits atomically and a later upgrade never sees a phantom job.
+            let index: Box<dyn BaseRocksSecondaryIndex<Job>> =
+                Box::new(JobRocksIndex::RowReference);
+            table.rebuild_index(&index)?;
+            Ok(unknown.len() as u64)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn start_processing_job(
         &self,
         server_name: String,
@@ -4367,6 +4421,10 @@ impl MetaStore for RocksMetaStore {
                     &JobRocksIndex::ByShard,
                 )?
                 .into_iter()
+                // Jobs with an unknown type were written by a newer binary; this
+                // worker can't run them. Skip silently here — they are reported and
+                // removed by the scheduler's cleanup_unknown_jobs sweep.
+                .filter(|j| !matches!(j.get_row().job_type(), JobType::Unknown))
                 .filter(|j| j.get_row().matches_pool(pool))
                 //We use min_by instead of the max_by because of min_by returns the first element
                 //if priority is equal while max_by returns the last element
@@ -7510,6 +7568,94 @@ mod tests {
                 .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
                 .is_none());
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn start_processing_job_skips_unknown() -> Result<(), CubeError> {
+        let config = Config::test("start_processing_job_skips_unknown");
+        let store_path = env::current_dir()?.join("test-skip-unknown-local");
+        let remote_store_path = env::current_dir()?.join("test-skip-unknown-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+            // Simulate a job written by a newer binary: insert an Unknown-typed row
+            // directly (add_job intentionally refuses Unknown). It must not block the
+            // worker from picking up its other scheduled jobs.
+            meta_store
+                .write_operation("test_insert_unknown_job", |db_ref, batch_pipe| {
+                    JobRocksTable::new(db_ref).insert(
+                        Job::new(
+                            RowKey::Table(TableId::Partitions, 1),
+                            JobType::Unknown,
+                            "node1".to_string(),
+                        ),
+                        batch_pipe,
+                    )?;
+                    Ok(())
+                })
+                .await?;
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 2),
+                    JobType::PartitionCompaction,
+                    "node1".to_string(),
+                ))
+                .await?;
+
+            let job = meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
+                .await?
+                .expect("the known job must be selected, not blocked by the unknown one");
+            assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 2)
+            );
+
+            // The Unknown job is still scheduled but never selected.
+            assert!(meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
+                .await?
+                .is_none());
+
+            // Scan paths over all jobs keep working (the unknown job is still present).
+            assert!(meta_store
+                .get_orphaned_jobs(Duration::from_secs(0))
+                .await
+                .is_ok());
+
+            // The cleanup sweep removes the unknown job and leaves the known one.
+            assert_eq!(meta_store.delete_unknown_jobs().await?, 1);
+            assert_eq!(meta_store.delete_unknown_jobs().await?, 0);
+
+            let remaining = meta_store.all_jobs().await?;
+            assert_eq!(remaining.len(), 1);
+            assert_eq!(
+                remaining[0].get_row().job_type(),
+                &JobType::PartitionCompaction
+            );
+
+            // The RowReference index is consistent after the cleanup-time rebuild:
+            // re-adding a job for the freed reference works (no phantom dedup hit).
+            assert!(meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 1),
+                    JobType::PartitionCompaction,
+                    "node1".to_string(),
+                ))
+                .await?
+                .is_some());
         }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());

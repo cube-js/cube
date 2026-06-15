@@ -631,6 +631,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn delete_unknown_jobs(&self) -> Result<u64, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn start_processing_job(
         &self,
         _server_name: String,
