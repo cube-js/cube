@@ -1161,6 +1161,22 @@ This allows reusing pre-aggregations across environments, saving both time and c
 
 </Info>
 
+## `CUBEJS_PRE_AGGREGATIONS_DB_*`
+
+Connection variables for a dedicated data source used to build and store the default
+data source's pre-aggregations, instead of its own connection. They mirror the regular
+`CUBEJS_DB_*` connection variables — for example `CUBEJS_PRE_AGGREGATIONS_DB_TYPE`,
+`CUBEJS_PRE_AGGREGATIONS_DB_HOST`, `CUBEJS_PRE_AGGREGATIONS_DB_PORT`,
+`CUBEJS_PRE_AGGREGATIONS_DB_USER`, `CUBEJS_PRE_AGGREGATIONS_DB_PASS`, and
+`CUBEJS_PRE_AGGREGATIONS_DB_SSL`. For a [named data source][ref-config-multiple-ds-decorating-env],
+use the decorated form `CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*`.
+
+| Possible Values                              | Default in Development | Default in Production |
+| -------------------------------------------- | ---------------------- | --------------------- |
+| Same as the corresponding `CUBEJS_DB_*` variable | N/A                | N/A                   |
+
+See [pre-aggregation data source][ref-preagg-data-source] for details and examples.
+
 ## `CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`
 
 If `true`, allows non-strict date range matching for pre-aggregations by default.
@@ -1298,7 +1314,7 @@ option](/reference/configuration/config#can_switch_sql_user).
 ## `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY`
 
 If `true`, disables the primary key inclusion check for
-[ungrouped queries](/reference/queries#ungrouped-query).
+[ungrouped queries](/reference/core-data-apis/queries#ungrouped-query).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1337,7 +1353,7 @@ Queries without an explicit `LIMIT` still use [`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](
 ## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
 
 If `true`, prevents adding implicit [default `ORDER BY`
-clause](/reference/queries#order) for [SQL API][ref-sql-api] queries.
+clause](/reference/core-data-apis/queries#order) for [SQL API][ref-sql-api] queries.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1882,6 +1898,7 @@ The port for a Cube deployment to listen to API connections on.
 [ref-config-db]: /admin/connect-to-data/data-sources
 [ref-config-multiple-ds-cloud]: /admin/connect-to-data/multiple-data-sources
 [ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
+[ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-config-sched-refresh-timer]: /reference/configuration/config#scheduled_refresh_timer
 [ref-rest-scopes]: /reference/rest-api#configuration-api-scopes
 [snowflake-docs-account-id]:
@@ -1897,7 +1914,7 @@ The port for a Cube deployment to listen to API connections on.
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /reference/sql-api
 [ref-sql-api-streaming]: /reference/sql-api#streaming
-[ref-row-limit]: /reference/queries#row-limit
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
@@ -1910,5 +1927,5 @@ The port for a Cube deployment to listen to API connections on.
 [ref-mdx-api]: /reference/mdx-api
 [ref-mdx-api-locale]: /reference/mdx-api#measure-format
 [ref-time-dimensions]: /reference/data-modeling/dimensions#type
-[ref-time-zone]: /reference/queries#time-zone
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
