@@ -1,5 +1,5 @@
 use crate::config::injection::DIService;
-use crate::config::{Config, ConfigObj};
+use crate::config::{Config, ConfigObj, RepartitionStrategy};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::table::Table;
@@ -222,17 +222,14 @@ impl JobIsolatedProcessor {
                     }
                     let data_loaded_size = DataLoadedSize::new();
                     app_metrics::JOBS_REPARTITION_CHUNK.add(1);
-                    // FIXME: a RepartitionChunk job whose chunk_id is used as an
-                    // anchor for the whole partition (batch_repartition_enabled).
-                    // We deliberately overload the existing RepartitionChunk type
-                    // instead of introducing a dedicated per-partition JobType:
-                    // a new JobType variant cannot be deserialized by an older
-                    // binary, which would make the whole job shard unreadable when
-                    // a deployment switches between the `latest` and `release`
-                    // channels (version can move both ways at any time). Reusing a
-                    // known type keeps both directions safe — an old binary just
-                    // repartitions the single anchor chunk. See repartition_partition_chunks.
-                    let r = if self.config_obj.batch_repartition_enabled() {
+                    // PerPartition reuses the RepartitionChunk job with the smallest chunk
+                    // as the anchor (one job per partition) and merges all its chunks;
+                    // PerChunk gets one job per chunk and repartitions just that chunk. We
+                    // overload the existing RepartitionChunk type (no new JobType) so an
+                    // older binary stays able to deserialize it across channel switches.
+                    let r = if self.config_obj.repartition_strategy()
+                        == RepartitionStrategy::PerPartition
+                    {
                         let partition_id = chunk.get_row().get_partition_id();
                         let time_budget = Duration::from_secs(
                             self.config_obj.repartition_chunks_time_budget_secs(),

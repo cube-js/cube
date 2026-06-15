@@ -540,11 +540,6 @@ pub trait ConfigObj: DIService {
     /// default (hash placement); kept as a flag for rollout/rollback.
     fn load_aware_import_placement_enabled(&self) -> bool;
 
-    /// When enabled, an inactive parent partition is repartitioned by a single
-    /// per-partition job that loops over its persisted chunks, instead of one
-    /// job per chunk. Kept as a flag for emergency rollback.
-    fn batch_repartition_enabled(&self) -> bool;
-
     /// Time budget for a single batch repartition job. The job yields its runner
     /// slot once the budget is exceeded (after the current chunk); the remainder
     /// is drained by a follow-up job via the cascade. Kept separate from
@@ -567,13 +562,11 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
-    /// Byte budget for prefetching persisted chunk parquets ahead of a batch
-    /// repartition job. A sequential producer downloads upcoming chunks (anchor
-    /// last) while the job processes the current one, bounded so that no more
-    /// than this many bytes of fetched-but-unprocessed data sit on local disk.
-    /// The env value accepts size suffixes (e.g. `512MB`). `None` (env unset) or
-    /// `Some(0)` disables prefetching.
-    fn repartition_prefetch_budget_bytes(&self) -> Option<u64>;
+    /// When enabled, a merge group's chunk parquets (PerPartition / Range strategies) are
+    /// downloaded concurrently before building the merge inputs, instead of one at a time.
+    /// The group is already bounded by repartition_merge_max_input_files and the download
+    /// pool by download_concurrency, so no extra budget is needed. Off by default.
+    fn repartition_concurrent_download(&self) -> bool;
 
     /// Which repartition strategy to use for an inactive parent's persisted chunks.
     /// Defaults to PerChunk.
@@ -733,12 +726,11 @@ pub struct ConfigObjImpl {
     pub upload_to_remote: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
-    pub batch_repartition_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
     pub push_partial_aggregate_below_merge_enabled: bool,
     pub compaction_split_by_total_file_size_enabled: bool,
     pub prefilter_in_memory_chunks_enabled: bool,
-    pub repartition_prefetch_budget_bytes: Option<u64>,
+    pub repartition_concurrent_download: bool,
     pub repartition_strategy: RepartitionStrategy,
     pub repartition_merge_max_input_files: usize,
     pub repartition_merge_max_rows: u64,
@@ -1054,9 +1046,6 @@ impl ConfigObj for ConfigObjImpl {
     fn load_aware_import_placement_enabled(&self) -> bool {
         self.load_aware_import_placement_enabled
     }
-    fn batch_repartition_enabled(&self) -> bool {
-        self.batch_repartition_enabled
-    }
     fn repartition_chunks_time_budget_secs(&self) -> u64 {
         self.repartition_chunks_time_budget_secs
     }
@@ -1069,8 +1058,8 @@ impl ConfigObj for ConfigObjImpl {
     fn prefilter_in_memory_chunks_enabled(&self) -> bool {
         self.prefilter_in_memory_chunks_enabled
     }
-    fn repartition_prefetch_budget_bytes(&self) -> Option<u64> {
-        self.repartition_prefetch_budget_bytes
+    fn repartition_concurrent_download(&self) -> bool {
+        self.repartition_concurrent_download
     }
     fn repartition_strategy(&self) -> RepartitionStrategy {
         self.repartition_strategy
@@ -1737,7 +1726,6 @@ impl Config {
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
                     false,
                 ),
-                batch_repartition_enabled: env_bool("CUBESTORE_BATCH_REPARTITION", false),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
                     60,
@@ -1754,12 +1742,10 @@ impl Config {
                     "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
                     false,
                 ),
-                repartition_prefetch_budget_bytes: env_parse_optional_size(
-                    "CUBESTORE_REPARTITION_PREFETCH_BUDGET",
-                    None,
-                    None,
-                )
-                .map(|n| n as u64),
+                repartition_concurrent_download: env_bool(
+                    "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
+                    false,
+                ),
                 repartition_strategy: env_repartition_strategy(),
                 repartition_merge_max_input_files: env_parse(
                     "CUBESTORE_REPARTITION_MERGE_MAX_INPUT_FILES",
@@ -2007,14 +1993,13 @@ impl Config {
                 upload_to_remote: true,
                 enable_topk: true,
                 load_aware_import_placement_enabled: false,
-                batch_repartition_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
                 push_partial_aggregate_below_merge_enabled: true,
                 compaction_split_by_total_file_size_enabled: false,
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
-                repartition_prefetch_budget_bytes: None,
+                repartition_concurrent_download: false,
                 repartition_strategy: RepartitionStrategy::PerChunk,
                 repartition_merge_max_input_files: 50,
                 repartition_merge_max_rows: 4_000_000,

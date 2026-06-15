@@ -39,7 +39,7 @@ use std::{
 use crate::app_metrics;
 use crate::cluster::{node_name_by_partition, Cluster};
 use crate::config::injection::DIService;
-use crate::config::{ConfigObj, RepartitionStrategy};
+use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
@@ -58,7 +58,7 @@ use log::trace;
 use mockall::automock;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use tokio::sync::{mpsc, OwnedSemaphorePermit, RwLock, Semaphore};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
@@ -615,6 +615,10 @@ impl ChunkDataStore for ChunkStore {
         Ok(())
     }
 
+    // PerPartition repartition: this single job (keyed on the anchor chunk) k-way merges
+    // the parent's persisted chunks in groups and splits them into the active children at
+    // the wal-split limit. anchor_chunk_id is the dedup key (smallest persisted chunk);
+    // chunks are processed anchor-last so it stays active until the run finishes/yields.
     async fn repartition_partition_chunks(
         &self,
         partition_id: u64,
@@ -623,80 +627,15 @@ impl ChunkDataStore for ChunkStore {
         data_loaded_size: Arc<DataLoadedSize>,
     ) -> Result<(), CubeError> {
         let start = std::time::Instant::now();
-
-        // PerPartition strategy: this single job k-way merges the parent's persisted
-        // chunks in groups and splits them into the active children at the wal-split
-        // limit, rather than splitting each chunk independently below.
-        if self.config.repartition_strategy() == RepartitionStrategy::PerPartition {
-            return self
-                .repartition_partition_chunks_merged(
-                    partition_id,
-                    anchor_chunk_id,
-                    self.config.repartition_merge_max_input_files().max(1),
-                    start,
-                    time_budget,
-                    data_loaded_size,
-                )
-                .await;
-        }
-
-        let mut chunks = self
-            .meta_store
-            .get_chunks_by_partition(partition_id, false)
-            .await?
-            .into_iter()
-            .filter(|c| !c.get_row().in_memory())
-            .collect::<Vec<_>>();
-        // FIXME: anchor_chunk_id is the chunk carried in the RepartitionChunk
-        // job's row_reference (see job_processor). In steady state the scheduler
-        // picks it deterministically (smallest persisted chunk id) so add_job
-        // dedups to a single job per partition, and we process the anchor LAST so
-        // it stays active and keeps holding that dedup key until the job finishes.
-        // That single-job guarantee is steady-state only: across a latest/release
-        // channel switch a per-chunk job and this anchor job can target the same
-        // chunks. Correctness there does NOT rely on dedup — it rests on
-        // swap_chunks being atomic (it deactivates the source chunk under a rocks
-        // transaction and rejects a swap whose source is already inactive), so a
-        // chunk is ever repartitioned exactly once regardless of how many jobs
-        // race for it.
-        //
-        // Order: anchor last, the rest by ascending id. The ascending order also
-        // drives the prefetch producer below, which warms upcoming chunks while
-        // the current one is processed.
-        chunks.sort_by_key(|c| (c.get_id() == anchor_chunk_id, c.get_id()));
-
-        let prefetch_budget = self
-            .config
-            .repartition_prefetch_budget_bytes()
-            .filter(|&b| b > 0);
-
-        // Process chunks one at a time so peak memory stays at a single chunk.
-        // Each repartition_chunk commits its own swap, so a partial run is safe:
-        // a follow-up job re-reads only the still-active chunks and continues.
-        // The budget bounds how long this job holds its runner slot; granularity
-        // is one chunk, so a single oversized chunk may overshoot the budget.
-        match prefetch_budget {
-            Some(budget) => {
-                self.repartition_partition_chunks_prefetched(
-                    chunks,
-                    budget,
-                    start,
-                    time_budget,
-                    data_loaded_size,
-                )
-                .await
-            }
-            None => {
-                for chunk in chunks {
-                    self.repartition_chunk_tolerant(chunk.get_id(), data_loaded_size.clone())
-                        .await?;
-                    if start.elapsed() >= time_budget {
-                        break;
-                    }
-                }
-                Ok(())
-            }
-        }
+        self.repartition_partition_chunks_merged(
+            partition_id,
+            anchor_chunk_id,
+            self.config.repartition_merge_max_input_files().max(1),
+            start,
+            time_budget,
+            data_loaded_size,
+        )
+        .await
     }
 
     // Repartition the active persisted chunks of one inclusive [start, end] chunk-id
@@ -951,108 +890,6 @@ impl ChunkDataStore for ChunkStore {
 }
 
 impl ChunkStore {
-    // Repartition a single chunk, tolerating the swap race. Losing the swap
-    // (another job repartitioned this chunk first) leaves it inactive — that
-    // work is already done, so we keep draining the rest instead of failing the
-    // whole batch. Any other error leaves the chunk active and is a genuine
-    // failure that propagates.
-    async fn repartition_chunk_tolerant(
-        &self,
-        chunk_id: u64,
-        data_loaded_size: Arc<DataLoadedSize>,
-    ) -> Result<(), CubeError> {
-        if let Err(e) = self.repartition_chunk(chunk_id, data_loaded_size).await {
-            let still_active = self
-                .meta_store
-                .get_chunk(chunk_id)
-                .await
-                .map_or(false, |c| c.get_row().active());
-            if still_active {
-                return Err(e);
-            }
-            log::debug!(
-                "Skipping chunk {} lost to a concurrent repartition: {}",
-                chunk_id,
-                e
-            );
-        }
-        Ok(())
-    }
-
-    // Prefetch variant of the repartition loop. A sequential producer downloads
-    // upcoming chunk parquets (in the order given, anchor last) into the local
-    // cache while the consumer processes the current chunk. A byte-budget
-    // semaphore bounds how much fetched-but-unprocessed data sits on disk: each
-    // chunk holds permits worth its file size from before its download starts
-    // until the consumer finishes processing it. download_file is idempotent and
-    // dedups in-flight downloads, so the consumer's repartition_chunk just hits
-    // the warm local file. Chunks prefetched past the time budget stay on local
-    // disk and warm the follow-up job, which lands on the same node by partition.
-    async fn repartition_partition_chunks_prefetched(
-        &self,
-        chunks: Vec<IdRow<Chunk>>,
-        budget: u64,
-        start: std::time::Instant,
-        time_budget: std::time::Duration,
-        data_loaded_size: Arc<DataLoadedSize>,
-    ) -> Result<(), CubeError> {
-        let capacity = budget.min(u32::MAX as u64) as usize;
-        let semaphore = Arc::new(Semaphore::new(capacity));
-        let (tx, mut rx) = mpsc::channel::<(u64, OwnedSemaphorePermit)>(chunks.len().max(1));
-
-        let remote_fs = self.remote_fs.clone();
-        let producer: JoinHandle<()> = cube_ext::spawn(async move {
-            for chunk in chunks {
-                // A chunk with no recorded file_size is billed at the full budget
-                // (conservative) rather than ~free, so an unknown-size prefetch can't
-                // overshoot the on-disk budget. Persisted chunks normally have a size.
-                let permits = chunk
-                    .get_row()
-                    .file_size()
-                    .unwrap_or(capacity as u64)
-                    .min(capacity as u64)
-                    .max(1) as u32;
-                let permit = match semaphore.clone().acquire_many_owned(permits).await {
-                    Ok(p) => p,
-                    Err(_) => return,
-                };
-                let file_size = chunk.get_row().file_size();
-                let remote_path = ChunkStore::chunk_file_name(chunk.clone());
-                // Warm the local cache; ignore errors here — the consumer's
-                // repartition_chunk re-issues the download and surfaces a genuine
-                // failure with proper handling (including table deactivation).
-                if let Err(e) = remote_fs.download_file(remote_path, file_size).await {
-                    log::debug!("Prefetch of chunk {} failed: {}", chunk.get_id(), e);
-                }
-                if tx.send((chunk.get_id(), permit)).await.is_err() {
-                    // Consumer stopped (time budget reached); drop the rest.
-                    return;
-                }
-            }
-        });
-
-        let result = async {
-            while let Some((chunk_id, permit)) = rx.recv().await {
-                let res = self
-                    .repartition_chunk_tolerant(chunk_id, data_loaded_size.clone())
-                    .await;
-                // Free this chunk's disk budget so the producer can advance.
-                drop(permit);
-                res?;
-                if start.elapsed() >= time_budget {
-                    break;
-                }
-            }
-            Ok(())
-        }
-        .await;
-
-        // Stop the producer even if it is blocked mid-download; the queued
-        // download itself proceeds independently, so an abort leaks nothing.
-        producer.abort();
-        result
-    }
-
     // Streaming merge variant of repartition. The parent's persisted chunks are
     // merged k-way (in groups of <= max_group input files) and the sorted stream is
     // split directly into the parent's already-active children at the wal-split
@@ -1246,6 +1083,27 @@ impl ChunkStore {
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
         };
         let schema = Arc::new(arrow_schema(index.get_row()));
+
+        // Download the group's chunk parquets into the local cache concurrently before
+        // building the merge inputs, so downloads overlap instead of running one-at-a-time
+        // in chunk_exec below. The group is bounded by max_input_files and the download
+        // pool by download_concurrency. download_file is idempotent so chunk_exec then hits
+        // the cache.
+        if self.config.repartition_concurrent_download() {
+            let mut downloads = Vec::with_capacity(group.len());
+            for chunk in group.iter() {
+                let file_size = chunk.get_row().file_size();
+                let remote_path = ChunkStore::chunk_file_name(chunk.clone());
+                let remote_fs = self.remote_fs.clone();
+                downloads.push(cube_ext::spawn(async move {
+                    // Warm the cache; a genuine error surfaces later in chunk_exec.
+                    let _ = remote_fs.download_file(remote_path, file_size).await;
+                }));
+            }
+            for d in downloads {
+                let _ = d.await;
+            }
+        }
 
         let mut chunk_inputs: Vec<Arc<dyn ExecutionPlan>> = Vec::with_capacity(group.len());
         for chunk in group.iter() {
@@ -1829,349 +1687,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn repartition_partition_chunks_yields_on_budget() {
-        let config =
-            Config::test("repartition_partition_chunks_yields_on_budget").update_config(|mut c| {
-                c.repartition_strategy = RepartitionStrategy::PerChunk;
-                c
-            });
-        let path = "/tmp/test_repartition_yield";
-        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
-        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
-
-        let _ = DB::destroy(&Options::default(), path);
-        let _ = fs::remove_dir_all(chunk_store_path.clone());
-        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
-        {
-            let remote_fs = LocalDirRemoteFs::new(
-                Some(PathBuf::from(chunk_remote_store_path.clone())),
-                PathBuf::from(chunk_store_path.clone()),
-            );
-            let meta_store = RocksMetaStore::new(
-                Path::new(path),
-                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
-                config.config_obj(),
-            )
-            .unwrap();
-            let chunk_store = ChunkStore::new(
-                meta_store.clone(),
-                remote_fs.clone(),
-                Arc::new(MockCluster::new()),
-                config.config_obj(),
-                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
-                10,
-            );
-
-            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
-            let table = meta_store
-                .create_table(
-                    "foo".to_string(),
-                    "bar".to_string(),
-                    col.clone(),
-                    None,
-                    None,
-                    vec![],
-                    true,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    false,
-                    None,
-                )
-                .await
-                .unwrap();
-            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
-            let partition = meta_store
-                .get_active_partitions_by_index_id(index.get_id())
-                .await
-                .unwrap()[0]
-                .clone();
-
-            // Two persisted chunks with real data on the parent partition.
-            let mut chunk_ids = Vec::new();
-            for range in [0..10i64, 10..20i64] {
-                let rows = range
-                    .map(|i| Row::new(vec![TableValue::Int(i)]))
-                    .collect::<Vec<_>>();
-                let data = rows_to_columns(&col, &rows);
-                let (chunk, file_size) = chunk_store
-                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
-                    .await
-                    .unwrap()
-                    .await
-                    .unwrap()
-                    .unwrap();
-                meta_store
-                    .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
-                    .await
-                    .unwrap();
-                chunk_ids.push(chunk.get_id());
-            }
-
-            // Split the parent into two children so swap_active_partitions does not
-            // take the single-child re-parent path; the chunks are left active by
-            // passing an empty chunk list, giving an inactive parent with 2 active
-            // persisted chunks (the state a repartition job runs against).
-            let dest1 = meta_store
-                .create_partition(Partition::new_child(&partition, None))
-                .await
-                .unwrap();
-            let dest2 = meta_store
-                .create_partition(Partition::new_child(&partition, None))
-                .await
-                .unwrap();
-            let mid = Row::new(vec![TableValue::Int(10)]);
-            meta_store
-                .swap_active_partitions(
-                    vec![(partition.clone(), vec![])],
-                    // file_size must be non-zero (set_file_size rejects 0); the
-                    // children carry no main table data (row_count 0), so it is a
-                    // placeholder — repartition writes new chunks onto them.
-                    vec![(dest1.clone(), 1), (dest2.clone(), 1)],
-                    vec![
-                        (0, (None, Some(mid.clone())), (None, Some(mid.clone()))),
-                        (0, (Some(mid.clone()), None), (Some(mid.clone()), None)),
-                    ],
-                )
-                .await
-                .unwrap();
-
-            let anchor = *chunk_ids.iter().min().unwrap();
-
-            // Zero budget must still process exactly one chunk (progress guarantee),
-            // then yield. The anchor is processed last, so it is the one left active.
-            chunk_store
-                .repartition_partition_chunks(
-                    partition.get_id(),
-                    anchor,
-                    std::time::Duration::from_secs(0),
-                    DataLoadedSize::new(),
-                )
-                .await
-                .unwrap();
-            let remaining = meta_store
-                .get_chunks_by_partition(partition.get_id(), false)
-                .await
-                .unwrap();
-            assert_eq!(
-                remaining.len(),
-                1,
-                "zero-budget run must yield after exactly one chunk"
-            );
-            assert_eq!(
-                remaining[0].get_id(),
-                anchor,
-                "anchor must be processed last and remain active after a yield"
-            );
-
-            // A large budget drains the remainder.
-            chunk_store
-                .repartition_partition_chunks(
-                    partition.get_id(),
-                    anchor,
-                    std::time::Duration::from_secs(600),
-                    DataLoadedSize::new(),
-                )
-                .await
-                .unwrap();
-            let remaining = meta_store
-                .get_chunks_by_partition(partition.get_id(), false)
-                .await
-                .unwrap();
-            assert!(
-                remaining.is_empty(),
-                "remaining chunks must drain with a large budget"
-            );
-        }
-        let _ = DB::destroy(&Options::default(), path);
-        let _ = fs::remove_dir_all(chunk_store_path);
-        let _ = fs::remove_dir_all(chunk_remote_store_path);
-    }
-
-    #[tokio::test]
-    async fn repartition_partition_chunks_prefetch_drains() {
-        // Same parent/chunk setup as repartition_partition_chunks_yields_on_budget,
-        // but with prefetch enabled, asserting the prefetch path keeps the yield
-        // (one chunk, anchor last) and drain semantics intact.
-        let config =
-            Config::test("repartition_partition_chunks_prefetch_drains").update_config(|mut c| {
-                c.repartition_strategy = RepartitionStrategy::PerChunk;
-                c.repartition_prefetch_budget_bytes = Some(64 * 1024 * 1024);
-                c
-            });
-        let path = "/tmp/test_repartition_prefetch";
-        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
-        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
-
-        let _ = DB::destroy(&Options::default(), path);
-        let _ = fs::remove_dir_all(chunk_store_path.clone());
-        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
-        {
-            let remote_fs = LocalDirRemoteFs::new(
-                Some(PathBuf::from(chunk_remote_store_path.clone())),
-                PathBuf::from(chunk_store_path.clone()),
-            );
-            let meta_store = RocksMetaStore::new(
-                Path::new(path),
-                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
-                config.config_obj(),
-            )
-            .unwrap();
-            let chunk_store = ChunkStore::new(
-                meta_store.clone(),
-                remote_fs.clone(),
-                Arc::new(MockCluster::new()),
-                config.config_obj(),
-                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
-                10,
-            );
-
-            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
-            meta_store
-                .create_schema("foo".to_string(), false)
-                .await
-                .unwrap();
-            let table = meta_store
-                .create_table(
-                    "foo".to_string(),
-                    "bar".to_string(),
-                    col.clone(),
-                    None,
-                    None,
-                    vec![],
-                    true,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    false,
-                    None,
-                )
-                .await
-                .unwrap();
-            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
-            let partition = meta_store
-                .get_active_partitions_by_index_id(index.get_id())
-                .await
-                .unwrap()[0]
-                .clone();
-
-            let mut chunk_ids = Vec::new();
-            for range in [0..10i64, 10..20i64, 20..30i64] {
-                let rows = range
-                    .map(|i| Row::new(vec![TableValue::Int(i)]))
-                    .collect::<Vec<_>>();
-                let data = rows_to_columns(&col, &rows);
-                let (chunk, file_size) = chunk_store
-                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
-                    .await
-                    .unwrap()
-                    .await
-                    .unwrap()
-                    .unwrap();
-                meta_store
-                    .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
-                    .await
-                    .unwrap();
-                chunk_ids.push(chunk.get_id());
-            }
-
-            let dest1 = meta_store
-                .create_partition(Partition::new_child(&partition, None))
-                .await
-                .unwrap();
-            let dest2 = meta_store
-                .create_partition(Partition::new_child(&partition, None))
-                .await
-                .unwrap();
-            let mid = Row::new(vec![TableValue::Int(15)]);
-            meta_store
-                .swap_active_partitions(
-                    vec![(partition.clone(), vec![])],
-                    vec![(dest1.clone(), 1), (dest2.clone(), 1)],
-                    vec![
-                        (0, (None, Some(mid.clone())), (None, Some(mid.clone()))),
-                        (0, (Some(mid.clone()), None), (Some(mid.clone()), None)),
-                    ],
-                )
-                .await
-                .unwrap();
-
-            let anchor = *chunk_ids.iter().min().unwrap();
-
-            // Zero budget still processes exactly one chunk, then yields; the
-            // anchor is processed last so it stays active even though the producer
-            // may have prefetched the others ahead.
-            chunk_store
-                .repartition_partition_chunks(
-                    partition.get_id(),
-                    anchor,
-                    std::time::Duration::from_secs(0),
-                    DataLoadedSize::new(),
-                )
-                .await
-                .unwrap();
-            let remaining = meta_store
-                .get_chunks_by_partition(partition.get_id(), false)
-                .await
-                .unwrap();
-            assert_eq!(
-                remaining.len(),
-                2,
-                "zero-budget prefetch run must yield after exactly one chunk"
-            );
-            assert!(
-                remaining.iter().any(|c| c.get_id() == anchor),
-                "anchor must be processed last and remain active after a yield"
-            );
-
-            // A large budget drains the remainder through the prefetch path.
-            chunk_store
-                .repartition_partition_chunks(
-                    partition.get_id(),
-                    anchor,
-                    std::time::Duration::from_secs(600),
-                    DataLoadedSize::new(),
-                )
-                .await
-                .unwrap();
-            let remaining = meta_store
-                .get_chunks_by_partition(partition.get_id(), false)
-                .await
-                .unwrap();
-            assert!(
-                remaining.is_empty(),
-                "remaining chunks must drain with a large budget under prefetch"
-            );
-        }
-        let _ = DB::destroy(&Options::default(), path);
-        let _ = fs::remove_dir_all(chunk_store_path);
-        let _ = fs::remove_dir_all(chunk_remote_store_path);
-    }
-
-    #[tokio::test]
     async fn repartition_merge_drains_and_yields() {
         // Merge path with a group cap of 2: the parent's 3 persisted chunks are
         // merged in groups and split into two children. A zero budget yields after
         // the first group (anchor, processed last, stays active); a large budget
         // drains the rest. Row counts must be conserved across the children.
         let config = Config::test("repartition_merge_drains_and_yields").update_config(|mut c| {
-            c.repartition_strategy = RepartitionStrategy::PerPartition;
+            c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
             c.repartition_merge_max_input_files = 2;
             c
         });
@@ -2533,7 +2055,7 @@ mod tests {
         // A group whose chunks are all empty produces no new chunks; the merge path
         // must deactivate the sources directly instead of failing on an empty swap.
         let config = Config::test("repartition_merge_drains_empty_group").update_config(|mut c| {
-            c.repartition_strategy = RepartitionStrategy::PerPartition;
+            c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
             c.repartition_merge_max_input_files = 4;
             c
         });

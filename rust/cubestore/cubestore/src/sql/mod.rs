@@ -3605,7 +3605,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
-                c.batch_repartition_enabled = false;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerChunk;
                 c
             })
             .start_test(async move |services| {
@@ -3616,16 +3616,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn repartition_prefetch_keeps_data_consistent() -> Result<(), CubeError> {
-        // Batch repartition with chunk parquet prefetch enabled must drain and
-        // keep data consistent end-to-end (real downloads through the prefetch
-        // producer/consumer path).
-        Config::test("repartition_prefetch_keeps_data_consistent")
+    async fn repartition_concurrent_download_keeps_data_consistent() -> Result<(), CubeError> {
+        // PerPartition merge with concurrent chunk download enabled must drain and keep
+        // data consistent end-to-end (real concurrent downloads in the merge group build).
+        Config::test("repartition_concurrent_download_keeps_data_consistent")
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
-                c.batch_repartition_enabled = true;
-                c.repartition_prefetch_budget_bytes = Some(64 * 1024 * 1024);
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 4;
+                c.repartition_concurrent_download = true;
                 c
             })
             .start_test(async move |services| {
@@ -3721,7 +3721,8 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
-                c.batch_repartition_enabled = true;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 2;
                 c.repartition_chunks_time_budget_secs = 1;
                 c
             })
