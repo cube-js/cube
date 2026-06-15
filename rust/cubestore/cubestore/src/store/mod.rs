@@ -1099,11 +1099,23 @@ impl ChunkStore {
             .collect::<Vec<_>>();
         chunks.sort_by_key(|c| (c.get_id() == anchor_chunk_id, c.get_id()));
 
-        let groups = chunks
-            .chunks(max_group)
-            .map(|g| g.to_vec())
-            .collect::<Vec<_>>();
-        for group in groups {
+        // Group the chunks the same way the range strategy slices its jobs: cut a group
+        // once it reaches max_rows rows or max_group chunks, whichever comes first. The
+        // anchor is last, so it lands in the final group and stays active until the run
+        // finishes or yields on the time budget.
+        let max_rows = self.config.repartition_merge_max_rows().max(1);
+        let mut i = 0;
+        while i < chunks.len() {
+            let mut group = Vec::new();
+            let mut rows = 0u64;
+            while i < chunks.len() {
+                rows += chunks[i].get_row().get_row_count();
+                group.push(chunks[i].clone());
+                i += 1;
+                if rows >= max_rows || group.len() >= max_group {
+                    break;
+                }
+            }
             self.merge_chunk_group_into_children(
                 &partition,
                 &index,
@@ -1251,6 +1263,12 @@ impl ChunkStore {
                 .make_session_config(),
         )
         .task_ctx();
+        // merge_chunks aggregates / last-row-dedups the group, the same way compaction
+        // does. For unique-key tables the full sort key ends with the seq column, so the
+        // surviving row is the one with the max seq (latest); group order only decides
+        // ties on the full sort key, i.e. rows with identical (unique key, seq) that are
+        // duplicates anyway. Dedup is group-local and re-applied at query/compaction time
+        // over the child's chunks, so the final result matches the per-chunk path.
         let records = merge_chunks(
             key_size,
             Arc::new(EmptyExec::new(schema.clone())),
