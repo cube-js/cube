@@ -397,6 +397,8 @@ impl JobRunner {
                     Self::fail_job_row_key(job)
                 }
             }
+            // Defense-in-depth: start_processing_job never selects an Unknown job, so
+            // this arm is not a live path — it just guarantees we never panic on one.
             JobType::Unknown => Err(CubeError::internal(format!(
                 "Unknown job type, likely written by a newer CubeStore version: {:?}",
                 job

@@ -4251,6 +4251,12 @@ impl MetaStore for RocksMetaStore {
     #[tracing::instrument(level = "trace", skip(self))]
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
         self.write_operation("add_job", move |db_ref, batch_pipe| {
+            // Unknown is a read-time fallback for variants written by a newer binary;
+            // this binary must never create one (the cleanup sweep would delete it).
+            debug_assert!(
+                !matches!(job.job_type(), JobType::Unknown),
+                "refusing to add a job with an unknown type"
+            );
             let table = JobRocksTable::new(db_ref.clone());
 
             let result = table.get_row_ids_by_index(
@@ -4356,42 +4362,49 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn delete_unknown_jobs(&self) -> Result<u64, CubeError> {
-        let deleted = self
-            .write_operation("delete_unknown_jobs", move |db_ref, batch_pipe| {
-                let table = JobRocksTable::new(db_ref);
-                let unknown = table
+        // Cheap gate so the common steady state (no unknown jobs) doesn't take the
+        // single-writer queue every reconcile tick: scan out of queue first.
+        let has_unknown = self
+            .read_operation_out_of_queue("scan_unknown_jobs", move |db_ref| {
+                Ok(JobRocksTable::new(db_ref)
                     .all_rows()?
                     .into_iter()
-                    .filter(|j| matches!(j.get_row().job_type(), JobType::Unknown))
-                    .collect::<Vec<_>>();
-                for job in unknown.iter() {
-                    log::warn!(
-                        "Removing job {} with an unknown type (written by a newer CubeStore version): {:?}",
-                        job.get_id(),
-                        job.get_row()
-                    );
-                    table.delete(job.get_id(), batch_pipe)?;
-                }
-                Ok(unknown.len() as u64)
+                    .any(|j| matches!(j.get_row().job_type(), JobType::Unknown)))
             })
             .await?;
-
-        if deleted > 0 {
-            // delete() recomputes the RowReference index key from the row's job_type,
-            // which we read as Unknown — but the stored key was written by a newer
-            // binary over the real variant, so the original (unique) index entry is
-            // left dangling. Rebuild it so a later upgrade doesn't see a phantom job.
-            self.write_operation("rebuild_jobs_row_reference_index", move |db_ref, _| {
-                let table = JobRocksTable::new(db_ref);
-                let index: Box<dyn BaseRocksSecondaryIndex<Job>> =
-                    Box::new(JobRocksIndex::RowReference);
-                table.rebuild_index(&index)?;
-                Ok(())
-            })
-            .await?;
+        if !has_unknown {
+            return Ok(0);
         }
 
-        Ok(deleted)
+        self.write_operation("delete_unknown_jobs", move |db_ref, batch_pipe| {
+            let table = JobRocksTable::new(db_ref);
+            let unknown = table
+                .all_rows()?
+                .into_iter()
+                .filter(|j| matches!(j.get_row().job_type(), JobType::Unknown))
+                .collect::<Vec<_>>();
+            if unknown.is_empty() {
+                return Ok(0);
+            }
+            for job in unknown.iter() {
+                log::warn!(
+                    "Removing job {} with an unknown type (written by a newer CubeStore version): {:?}",
+                    job.get_id(),
+                    job.get_row()
+                );
+                table.delete(job.get_id(), batch_pipe)?;
+            }
+            // delete() recomputes the RowReference index key from the row's job_type,
+            // which we read as Unknown — but the stored key was written by a newer
+            // binary over the real variant, so that delete leaves the original
+            // (unique) index entry dangling. Rebuild it in the same write so the
+            // cleanup commits atomically and a later upgrade never sees a phantom job.
+            let index: Box<dyn BaseRocksSecondaryIndex<Job>> =
+                Box::new(JobRocksIndex::RowReference);
+            table.rebuild_index(&index)?;
+            Ok(unknown.len() as u64)
+        })
+        .await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -7576,14 +7589,21 @@ mod tests {
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )?;
-            // An Unknown job (as if written by a newer binary) must not block the
+            // Simulate a job written by a newer binary: insert an Unknown-typed row
+            // directly (add_job intentionally refuses Unknown). It must not block the
             // worker from picking up its other scheduled jobs.
             meta_store
-                .add_job(Job::new(
-                    RowKey::Table(TableId::Partitions, 1),
-                    JobType::Unknown,
-                    "node1".to_string(),
-                ))
+                .write_operation("test_insert_unknown_job", |db_ref, batch_pipe| {
+                    JobRocksTable::new(db_ref).insert(
+                        Job::new(
+                            RowKey::Table(TableId::Partitions, 1),
+                            JobType::Unknown,
+                            "node1".to_string(),
+                        ),
+                        batch_pipe,
+                    )?;
+                    Ok(())
+                })
                 .await?;
             meta_store
                 .add_job(Job::new(
