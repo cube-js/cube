@@ -501,6 +501,11 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    /// When enabled, a TableImportCSV job is placed on the worker with the fewest in-flight
+    /// CSV imports (load-aware), instead of by stateless hash of (table_id, location). Off by
+    /// default (hash placement); kept as a flag for rollout/rollback.
+    fn load_aware_import_placement_enabled(&self) -> bool;
+
     /// When enabled, an inactive parent partition is repartitioned by a single
     /// per-partition job that loops over its persisted chunks, instead of one
     /// job per chunk. Kept as a flag for emergency rollback.
@@ -657,6 +662,7 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub load_aware_import_placement_enabled: bool,
     pub batch_repartition_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
     pub allow_decimal128: bool,
@@ -967,6 +973,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+    fn load_aware_import_placement_enabled(&self) -> bool {
+        self.load_aware_import_placement_enabled
     }
     fn batch_repartition_enabled(&self) -> bool {
         self.batch_repartition_enabled
@@ -1564,6 +1573,10 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                load_aware_import_placement_enabled: env_bool(
+                    "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
+                    false,
+                ),
                 batch_repartition_enabled: env_bool("CUBESTORE_BATCH_REPARTITION", true),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
@@ -1806,6 +1819,7 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                load_aware_import_placement_enabled: false,
                 batch_repartition_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
                 allow_decimal128: false,
