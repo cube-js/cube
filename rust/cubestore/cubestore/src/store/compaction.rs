@@ -1673,6 +1673,10 @@ mod tests {
             .expect_compaction_chunks_total_size_threshold()
             .returning(|| 30);
 
+        config
+            .expect_compaction_split_by_total_file_size_enabled()
+            .returning(|| false);
+
         let compaction_service = CompactionServiceImpl::new(
             metastore.clone(),
             Arc::new(chunk_store),
