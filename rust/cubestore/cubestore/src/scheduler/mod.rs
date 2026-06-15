@@ -292,6 +292,16 @@ impl SchedulerImpl {
         }
 
         if let Err(e) = warn_long_fut(
+            "Removing unknown jobs",
+            Duration::from_millis(5000),
+            self.remove_unknown_jobs(),
+        )
+        .await
+        {
+            error!("Error removing unknown jobs: {}", e);
+        }
+
+        if let Err(e) = warn_long_fut(
             "Table import reconciliation",
             Duration::from_millis(5000),
             self.reconcile_table_imports(),
@@ -681,6 +691,14 @@ impl SchedulerImpl {
         for job in jobs_to_remove.into_iter() {
             log::info!("Removing job {:?} on non-existing node", job);
             self.meta_store.delete_job(job.get_id()).await?;
+        }
+        Ok(())
+    }
+
+    async fn remove_unknown_jobs(&self) -> Result<(), CubeError> {
+        let deleted = self.meta_store.delete_unknown_jobs().await?;
+        if deleted > 0 {
+            crate::app_metrics::JOBS_UNKNOWN_DELETED.add(deleted as i64);
         }
         Ok(())
     }

@@ -397,6 +397,10 @@ impl JobRunner {
                     Self::fail_job_row_key(job)
                 }
             }
+            JobType::Unknown => Err(CubeError::internal(format!(
+                "Unknown job type, likely written by a newer CubeStore version: {:?}",
+                job
+            ))),
         }
     }
 
