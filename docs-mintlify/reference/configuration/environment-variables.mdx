@@ -1765,6 +1765,17 @@ The timeout for SQL queries in seconds.
 | ------------------- | ---------------------- | --------------------- |
 | A number in seconds | `120`                  | `120`                 |
 
+## `CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE`
+
+Enables stale-while-revalidate behavior for Cube Store's SQL result cache. When set
+to a number of seconds, a cached result that has expired is still served for up to
+that many seconds while the cache is refreshed in the background. Set to `0` to
+disable.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A number in seconds | `0`                    | `0`                   |
+
 ## `CUBESTORE_REMOTE_DIR`
 
 A path on the local filesystem to store metadata and datasets from all nodes as
@@ -1834,6 +1845,17 @@ insertion.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `262144`               | `262144`              |
+
+## `CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD`
+
+The number of chunks at which a table's partitions are considered ready during table
+creation. When set, it must not be lower than `CUBESTORE_CHUNKS_COUNT_THRESHOLD`,
+otherwise compaction would never reduce the number of chunks below this threshold. By
+default, it is not set.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | N/A                    | N/A                   |
 
 ## `CUBESTORE_WORKER_PORT`
 
