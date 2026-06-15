@@ -394,6 +394,7 @@
               "admin/ai/memory-isolation",
               "admin/ai/multi-agent",
               "admin/ai/bring-your-own-model",
+              "admin/ai/mcp-connectors",
               "admin/ai/evals"
             ]
           },
