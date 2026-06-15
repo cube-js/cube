@@ -1111,6 +1111,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn get_wals_for_table(&self, table_id: u64) -> Result<Vec<IdRow<WAL>>, CubeError>;
 
     async fn all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
+    async fn in_flight_import_jobs_by_node(&self) -> Result<HashMap<String, u64>, CubeError>;
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn get_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
     async fn get_job_by_ref(
@@ -4201,6 +4202,28 @@ impl MetaStore for RocksMetaStore {
     async fn all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
         self.read_operation_out_of_queue("all_jobs", move |db_ref| {
             Ok(JobRocksTable::new(db_ref).all_rows()?)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn in_flight_import_jobs_by_node(&self) -> Result<HashMap<String, u64>, CubeError> {
+        self.read_operation_out_of_queue("in_flight_import_jobs_by_node", move |db_ref| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            let mut counts: HashMap<String, u64> = HashMap::new();
+            for job in jobs_table.scan_all_rows()? {
+                let job = job?;
+                if !job.get_row().is_csv_import() {
+                    continue;
+                }
+                match job.get_row().status() {
+                    JobStatus::Scheduled(node) | JobStatus::ProcessingBy(node) => {
+                        *counts.entry(node.to_string()).or_insert(0) += 1;
+                    }
+                    _ => {}
+                }
+            }
+            Ok(counts)
         })
         .await
     }

@@ -1439,6 +1439,93 @@ mod tests {
         let _ = fs::remove_dir_all(chunk_store_path);
         let _ = fs::remove_dir_all(chunk_remote_store_path);
     }
+
+    #[tokio::test]
+    async fn partition_rows_deactivates_table_on_column_count_mismatch() {
+        let config = Config::test("partition_rows_column_count_mismatch");
+        let path = "/tmp/test_partition_rows_mismatch";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
+                PathBuf::from(chunk_store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                Path::new(path),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+                10,
+            );
+
+            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    col.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
+
+            // The index has 1 column; feed 2 columns to simulate a chunk written under a
+            // different (wider) schema. The mismatch must be treated as corrupt data, not
+            // retried forever via failing RepartitionChunk jobs.
+            let mismatched: Vec<ArrayRef> = vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3])),
+                Arc::new(Int64Array::from(vec![4, 5, 6])),
+            ];
+            let err = chunk_store
+                .partition_rows(index.get_id(), mismatched, false)
+                .await
+                .unwrap_err();
+            assert!(
+                err.message
+                    .contains("expects 1 columns but incoming chunk data has 2 columns"),
+                "unexpected error: {}",
+                err.message
+            );
+
+            // The table is deactivated (marked not ready) instead of looping.
+            let table = meta_store.get_table_by_id(table.get_id()).await.unwrap();
+            assert!(!table.get_row().is_ready());
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path);
+        let _ = fs::remove_dir_all(chunk_remote_store_path);
+    }
 }
 
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
@@ -1468,14 +1555,17 @@ impl ChunkStore {
             .await?;
         let sort_key_size = index.get_row().sort_key_size() as usize;
 
-        if sort_key_size > columns.len() {
-            // The chunk data has fewer columns than the index sort key expects (schema/version
-            // mismatch). Treat as corrupt data and deactivate the table rather than panicking on
-            // the `columns[0..sort_key_size]` slice below.
+        let expected_columns = index.get_row().get_columns().len();
+        if columns.len() != expected_columns {
+            // The chunk data column count doesn't match the index schema (schema/version
+            // mismatch, e.g. an id collision after restoring a stale metastore copy). Treat as
+            // corrupt data and deactivate the table rather than panicking on the
+            // `columns[0..sort_key_size]` slice below or failing RecordBatch::try_new in
+            // post_process_columns.
             let error_message = format!(
-                "Index {:?} expects a sort key of {} columns but incoming chunk data has only {} columns",
+                "Index {:?} expects {} columns but incoming chunk data has {} columns",
                 index,
-                sort_key_size,
+                expected_columns,
                 columns.len()
             );
             deactivate_table_due_to_corrupt_data(
