@@ -3589,6 +3589,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerChunk;
                 c
             })
             .start_test(async move |services| {
@@ -3643,8 +3644,47 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
-                c.batch_repartition_enabled = true;
-                c.repartition_merge_max_input_files = Some(4);
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 4;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_range_jobs_keep_data_consistent() -> Result<(), CubeError> {
+        // Range-job mechanism: schedule_repartition slices the parent's chunks into
+        // RepartitionRange jobs (by row cap), each merging its range into the children
+        // in one swap. Must drain and keep data consistent end-to-end.
+        Config::test("repartition_range_jobs_keep_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::Range;
+                c.repartition_merge_max_rows = 40;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_range_jobs_small_rows_keep_data_consistent() -> Result<(), CubeError> {
+        // A tiny row cap plus a chunk-count cap forces many small RepartitionRange jobs.
+        Config::test("repartition_range_jobs_small_rows_keep_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::Range;
+                c.repartition_merge_max_rows = 10;
+                c.repartition_merge_max_input_files = 2;
                 c
             })
             .start_test(async move |services| {
@@ -3662,8 +3702,8 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 20;
                 c.compaction_chunks_count_threshold = 10;
-                c.batch_repartition_enabled = true;
-                c.repartition_merge_max_input_files = Some(2);
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 2;
                 c
             })
             .start_test(async move |services| {

@@ -260,6 +260,30 @@ impl JobIsolatedProcessor {
                     Self::fail_job_row_key(job)
                 }
             }
+            JobType::RepartitionRange(end_chunk_id) => {
+                if let RowKey::Table(TableId::Chunks, start_chunk_id) = job.row_reference() {
+                    let start_chunk_id = *start_chunk_id;
+                    let end_chunk_id = *end_chunk_id;
+                    let data_loaded_size = DataLoadedSize::new();
+                    app_metrics::JOBS_REPARTITION_CHUNK.add(1);
+                    let r = self
+                        .chunk_store
+                        .repartition_chunk_range(
+                            start_chunk_id,
+                            end_chunk_id,
+                            data_loaded_size.clone(),
+                        )
+                        .await;
+                    if let Err(e) = r {
+                        app_metrics::JOBS_REPARTITION_CHUNK_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_REPARTITION_CHUNK_COMPLETED.add(1);
+                    Ok(JobProcessResult::new(data_loaded_size.get()))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
             _ => Err(CubeError::internal(format!(
                 "Job {:?} cannot be processed in separate process",
                 job.job_type()

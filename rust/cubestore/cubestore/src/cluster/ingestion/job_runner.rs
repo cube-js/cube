@@ -397,6 +397,47 @@ impl JobRunner {
                     Self::fail_job_row_key(job)
                 }
             }
+            JobType::RepartitionRange(_) => {
+                if let RowKey::Table(TableId::Chunks, start_chunk_id) = job.row_reference() {
+                    let start_chunk_id = *start_chunk_id;
+                    let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
+                    let job_to_move = job.clone();
+                    let job_processor = self.job_processor.clone();
+                    Ok(cube_ext::spawn(async move {
+                        let wait_ms = process_rate_limiter
+                            .wait_for_allow(TaskType::Job, timeout)
+                            .await?;
+                        let chunk = metastore.get_chunk(start_chunk_id).await?;
+                        let (_, _, table, _) = metastore
+                            .get_partition_for_compaction(chunk.get_row().get_partition_id())
+                            .await?;
+                        let table_id = table.get_id();
+                        let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                        let trace_index = TraceIndex {
+                            table_id: Some(table_id),
+                            trace_obj,
+                        };
+                        match job_processor.process_job(job_to_move).await {
+                            Ok(job_res) => {
+                                process_rate_limiter
+                                    .commit_task_usage(
+                                        TaskType::Job,
+                                        job_res.data_loaded_size() as i64,
+                                        wait_ms,
+                                        trace_index,
+                                    )
+                                    .await;
+                                Ok(())
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
             // Defense-in-depth: start_processing_job never selects an Unknown job, so
             // this arm is not a live path — it just guarantees we never panic on one.
             JobType::Unknown => Err(CubeError::internal(format!(

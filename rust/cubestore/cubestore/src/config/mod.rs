@@ -361,6 +361,37 @@ pub struct Config {
     injector: Arc<Injector>,
 }
 
+/// How an inactive parent's persisted chunks are repartitioned into its children.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepartitionStrategy {
+    /// One chunk at a time, each split independently into the children.
+    PerChunk,
+    /// One job per partition that k-way merges all its chunks in groups and splits the
+    /// merged stream into the children at the wal-split limit.
+    PerPartition,
+    /// Many jobs sliced at schedule time, each merging an inclusive chunk-id range;
+    /// spreads across workers by the hash of the range bounds.
+    Range,
+}
+
+impl FromStr for RepartitionStrategy {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "per_chunk" | "perchunk" | "per-chunk" => Ok(RepartitionStrategy::PerChunk),
+            "per_partition" | "perpartition" | "per-partition" => {
+                Ok(RepartitionStrategy::PerPartition)
+            }
+            "range" => Ok(RepartitionStrategy::Range),
+            _ => Err(format!(
+                "unknown repartition strategy '{}' (expected per_chunk, per_partition or range)",
+                s
+            )),
+        }
+    }
+}
+
 #[automock]
 pub trait ConfigObj: DIService {
     fn partition_split_threshold(&self) -> u64;
@@ -544,12 +575,17 @@ pub trait ConfigObj: DIService {
     /// `Some(0)` disables prefetching.
     fn repartition_prefetch_budget_bytes(&self) -> Option<u64>;
 
-    /// Max number of persisted input chunks merged in one group when repartitioning
-    /// an inactive parent. `Some(m >= 2)` streams the parent's chunks through a k-way
-    /// merge in groups of up to m and splits each group into the active children at
-    /// the wal-split limit, capping each merge+swap group at m chunks. `None` /
-    /// `Some(0)` / `Some(1)` disable the merge path.
-    fn repartition_merge_max_input_files(&self) -> Option<usize>;
+    /// Which repartition strategy to use for an inactive parent's persisted chunks.
+    /// Defaults to PerChunk.
+    fn repartition_strategy(&self) -> RepartitionStrategy;
+
+    /// Cap on the number of chunks merged together in one Merge group / RepartitionRange.
+    /// Bounds the concurrent parquet readers, the k-way merge width, the swap size and
+    /// (since a range downloads its chunks sequentially) the per-job download time.
+    fn repartition_merge_max_input_files(&self) -> usize;
+
+    /// Cap on the total rows merged together in one Merge group / RepartitionRange.
+    fn repartition_merge_max_rows(&self) -> u64;
 
     fn allow_decimal128(&self) -> bool;
 
@@ -703,7 +739,9 @@ pub struct ConfigObjImpl {
     pub compaction_split_by_total_file_size_enabled: bool,
     pub prefilter_in_memory_chunks_enabled: bool,
     pub repartition_prefetch_budget_bytes: Option<u64>,
-    pub repartition_merge_max_input_files: Option<usize>,
+    pub repartition_strategy: RepartitionStrategy,
+    pub repartition_merge_max_input_files: usize,
+    pub repartition_merge_max_rows: u64,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1034,8 +1072,14 @@ impl ConfigObj for ConfigObjImpl {
     fn repartition_prefetch_budget_bytes(&self) -> Option<u64> {
         self.repartition_prefetch_budget_bytes
     }
-    fn repartition_merge_max_input_files(&self) -> Option<usize> {
+    fn repartition_strategy(&self) -> RepartitionStrategy {
+        self.repartition_strategy
+    }
+    fn repartition_merge_max_input_files(&self) -> usize {
         self.repartition_merge_max_input_files
+    }
+    fn repartition_merge_max_rows(&self) -> u64 {
+        self.repartition_merge_max_rows
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1369,6 +1413,24 @@ where
     })
 }
 
+// Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
+// back to per_chunk, so a typo in the strategy env never takes the process down.
+fn env_repartition_strategy() -> RepartitionStrategy {
+    match env::var("CUBESTORE_REPARTITION_STRATEGY") {
+        Ok(v) => match v.parse::<RepartitionStrategy>() {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using per_chunk",
+                    e
+                );
+                RepartitionStrategy::PerChunk
+            }
+        },
+        Err(_) => RepartitionStrategy::PerChunk,
+    }
+}
+
 impl Config {
     fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
         let trigger_size = match cache_max_size >> 20 {
@@ -1698,8 +1760,14 @@ impl Config {
                     None,
                 )
                 .map(|n| n as u64),
-                repartition_merge_max_input_files: env_optparse(
+                repartition_strategy: env_repartition_strategy(),
+                repartition_merge_max_input_files: env_parse(
                     "CUBESTORE_REPARTITION_MERGE_MAX_INPUT_FILES",
+                    50,
+                ),
+                repartition_merge_max_rows: env_parse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
+                    4_000_000,
                 ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
@@ -1947,7 +2015,9 @@ impl Config {
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
                 repartition_prefetch_budget_bytes: None,
-                repartition_merge_max_input_files: None,
+                repartition_strategy: RepartitionStrategy::PerChunk,
+                repartition_merge_max_input_files: 50,
+                repartition_merge_max_rows: 4_000_000,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2813,4 +2883,26 @@ pub async fn uses_remote_metastore(i: &Injector) -> bool {
 
 pub fn is_router(c: &dyn ConfigObj) -> bool {
     !c.worker_bind_address().is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repartition_strategy_from_str() {
+        assert_eq!(
+            "per_chunk".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerChunk
+        );
+        assert_eq!(
+            "per_partition".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerPartition
+        );
+        assert_eq!(
+            "RANGE".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::Range
+        );
+        assert!("nonsense".parse::<RepartitionStrategy>().is_err());
+    }
 }

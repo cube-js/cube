@@ -1,5 +1,5 @@
 use crate::cluster::{pick_import_worker, pick_worker_by_ids, Cluster};
-use crate::config::ConfigObj;
+use crate::config::{ConfigObj, RepartitionStrategy};
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
@@ -633,8 +633,26 @@ impl SchedulerImpl {
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
+            // Range-based repartition slices an inactive parent over ALL its chunks
+            // (active and inactive) so the [start, end] ranges stay pinned to chunk ids.
+            // While such a parent is still draining, keep its inactive chunks: deleting
+            // them would shift the slicing boundaries on the next re-slice. Once the
+            // parent has no active chunks it is no longer in this set and its inactive
+            // chunks are collected normally.
+            let keep_parents: HashSet<u64> =
+                if self.config.repartition_strategy() == RepartitionStrategy::Range {
+                    self.meta_store
+                        .all_inactive_partitions_to_repartition()
+                        .await?
+                        .into_iter()
+                        .map(|p| p.get_id())
+                        .collect()
+                } else {
+                    HashSet::new()
+                };
             let ids = persistent_inactive
                 .iter()
+                .filter(|c| !keep_parents.contains(&c.get_row().get_partition_id()))
                 .map(|c| c.get_id())
                 .collect::<Vec<_>>();
             for part in ids.as_slice().chunks(10000) {
@@ -859,20 +877,25 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::DeleteJob(job) = event {
             match job.get_row().job_type() {
-                JobType::RepartitionChunk => match job.get_row().row_reference() {
-                    RowKey::Table(TableId::Chunks, c) => {
-                        let c = self.meta_store.get_chunk(*c).await?;
-                        let p = self
-                            .meta_store
-                            .get_partition(c.get_row().get_partition_id())
-                            .await?;
-                        self.schedule_repartition_if_needed(&p).await?
+                JobType::RepartitionChunk | JobType::RepartitionRange(_) => {
+                    match job.get_row().row_reference() {
+                        RowKey::Table(TableId::Chunks, c) => {
+                            let c = self.meta_store.get_chunk(*c).await?;
+                            let p = self
+                                .meta_store
+                                .get_partition(c.get_row().get_partition_id())
+                                .await?;
+                            // Re-slice the parent: drains any range whose job has not run
+                            // yet and picks up a tail chunk that landed after the previous
+                            // slicing (re-slicing is id-pinned, so existing ranges dedup).
+                            self.schedule_repartition_if_needed(&p).await?
+                        }
+                        _ => panic!(
+                            "Unexpected row reference: {:?}",
+                            job.get_row().row_reference()
+                        ),
                     }
-                    _ => panic!(
-                        "Unexpected row reference: {:?}",
-                        job.get_row().row_reference()
-                    ),
-                },
+                }
                 JobType::MultiPartitionSplit => match job.get_row().row_reference() {
                     RowKey::Table(TableId::MultiPartitions, m) => {
                         self.schedule_finish_multi_split_if_needed(*m).await?

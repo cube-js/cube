@@ -26,7 +26,7 @@ use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConn
 use crate::config::injection::{DIService, Injector};
 use crate::config::is_router;
 #[allow(unused_imports)]
-use crate::config::{Config, ConfigObj};
+use crate::config::{Config, ConfigObj, RepartitionStrategy};
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::{
@@ -945,17 +945,74 @@ impl Cluster for ClusterImpl {
             .filter(|c| !c.get_row().in_memory())
             .collect::<Vec<_>>();
 
-        if self.config_obj.batch_repartition_enabled() {
-            // FIXME: one job per partition that batches all persisted chunks, but
-            // keyed on a chunk (RepartitionChunk), not the partition. We reuse the
-            // existing job type instead of a dedicated per-partition JobType so an
-            // older binary stays able to deserialize it across `latest`/`release`
-            // channel switches (a new variant would make its whole job shard
-            // unreadable). The anchor is the smallest persisted chunk id so add_job
-            // dedups to a single job per partition; the worker resolves the
-            // partition from it and processes the anchor last (see
-            // repartition_partition_chunks). An old binary just repartitions this
-            // one chunk and drains the rest via its own per-chunk path.
+        if self.config_obj.repartition_strategy() == RepartitionStrategy::Range {
+            // Slice the parent's persisted chunks into RepartitionRange jobs. Walk ALL
+            // chunks (active and inactive) sorted by id so the [start, end] boundaries
+            // stay pinned to chunk ids and don't shift when chunks deactivate; cut a
+            // range once its rows reach max_rows or its chunk count reaches the fan-in
+            // cap, so a range never merges an unbounded number of chunks at once. A
+            // range is only scheduled when it still has an active chunk; the end is
+            // carried as the job's data, not its dedup key, so a tail that extends the
+            // trailing range dedups on the start.
+            let max_rows = self.config_obj.repartition_merge_max_rows();
+            let max_files = self.config_obj.repartition_merge_max_input_files();
+            let mut all = self
+                .meta_store
+                .get_chunks_by_partition(p.get_id(), true)
+                .await?
+                .into_iter()
+                .filter(|c| !c.get_row().in_memory())
+                .collect::<Vec<_>>();
+            all.sort_by_key(|c| c.get_id());
+
+            let mut i = 0;
+            while i < all.len() {
+                let start = all[i].get_id();
+                let mut rows = 0u64;
+                let mut count = 0usize;
+                let mut end = start;
+                let mut has_active = false;
+                while i < all.len() {
+                    let c = &all[i];
+                    rows += c.get_row().get_row_count();
+                    count += 1;
+                    end = c.get_id();
+                    has_active |= c.get_row().active();
+                    i += 1;
+                    if rows >= max_rows || count >= max_files {
+                        break;
+                    }
+                }
+                if has_active {
+                    let node =
+                        pick_worker_by_ids(self.config_obj.as_ref(), [start, end]).to_string();
+                    let job = self
+                        .meta_store
+                        .add_job(Job::new(
+                            RowKey::Table(TableId::Chunks, start),
+                            JobType::RepartitionRange(end),
+                            node.clone(),
+                        ))
+                        .await?;
+                    if job.is_some() {
+                        self.notify_job_runner(node).await?;
+                    }
+                }
+            }
+        } else if self.config_obj.repartition_strategy() == RepartitionStrategy::PerPartition
+            || self.config_obj.batch_repartition_enabled()
+        {
+            // One job per partition that batches all persisted chunks, but keyed on a
+            // chunk (RepartitionChunk), not the partition. We reuse the existing job
+            // type instead of a dedicated per-partition JobType so an older binary stays
+            // able to deserialize it across `latest`/`release` channel switches (a new
+            // variant would make its whole job shard unreadable). The anchor is the
+            // smallest persisted chunk id so add_job dedups to a single job per
+            // partition; the worker resolves the partition from it and processes the
+            // anchor last (see repartition_partition_chunks). The PerPartition strategy
+            // requires this single-job form: a per-chunk job under it would re-merge the
+            // whole partition. An old binary just repartitions this one chunk and drains
+            // the rest via its own per-chunk path.
             if let Some(anchor_chunk_id) = chunks.iter().map(|c| c.get_id()).min() {
                 let node = self.node_name_by_partition(p);
                 let job = self
