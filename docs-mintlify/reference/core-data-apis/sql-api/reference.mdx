@@ -163,6 +163,16 @@ The `SET` command changes a session variable to a new value.
 
 Use `SET` with the `cube_cache` session variable for [cache control][ref-sql-cache-control].
 
+You can also set the session time zone with `SET TIME ZONE` (or `SET TIMEZONE`):
+
+```sql
+SET TIME ZONE 'Europe/Rome';
+SET TIME ZONE 'UTC';
+```
+
+Use `DEFAULT` to reset the time zone to its default. The `LOCAL` form
+(`SET TIME ZONE LOCAL`) is not supported.
+
 ## SQL functions and operators
 
 SQL API currently implements a subset of functions and operators [supported by
