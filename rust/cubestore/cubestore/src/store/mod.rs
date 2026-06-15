@@ -1830,7 +1830,11 @@ mod tests {
 
     #[tokio::test]
     async fn repartition_partition_chunks_yields_on_budget() {
-        let config = Config::test("repartition_partition_chunks_yields_on_budget");
+        let config =
+            Config::test("repartition_partition_chunks_yields_on_budget").update_config(|mut c| {
+                c.repartition_strategy = RepartitionStrategy::PerChunk;
+                c
+            });
         let path = "/tmp/test_repartition_yield";
         let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
         let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
@@ -2001,6 +2005,7 @@ mod tests {
         // (one chunk, anchor last) and drain semantics intact.
         let config =
             Config::test("repartition_partition_chunks_prefetch_drains").update_config(|mut c| {
+                c.repartition_strategy = RepartitionStrategy::PerChunk;
                 c.repartition_prefetch_budget_bytes = Some(64 * 1024 * 1024);
                 c
             });
