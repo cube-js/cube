@@ -1652,7 +1652,7 @@ impl Config {
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
                     false,
                 ),
-                batch_repartition_enabled: env_bool("CUBESTORE_BATCH_REPARTITION", true),
+                batch_repartition_enabled: env_bool("CUBESTORE_BATCH_REPARTITION", false),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
                     60,
