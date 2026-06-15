@@ -583,13 +583,20 @@ impl CompactionService for CompactionServiceImpl {
             ) as usize)
                 // Do not allow to much of new partitions to limit partition accuracy trade off
                 .min(16);
-            // Size the split by the bytes actually being written: the existing main table plus
-            // the pending chunks merged in this pass. A partition with a small (or empty) main
-            // table but large accumulated chunks must still split by size in a single pass,
-            // otherwise it under-splits and re-splits on the next round.
+            // Size the split by file size. By default this counts only the existing main table.
+            // When compaction_split_by_total_file_size_enabled is on, the pending chunks merged in
+            // this pass are added too, so a partition with a small (or empty) main table but large
+            // accumulated chunks splits by size in a single pass instead of under-splitting and
+            // re-splitting on the next round.
             let new_partitions_count_by_file_size = {
+                let pending_file_size = if self.config.compaction_split_by_total_file_size_enabled()
+                {
+                    chunks_total_file_size
+                } else {
+                    0
+                };
                 let total_file_size =
-                    partition.get_row().file_size().unwrap_or(0) + chunks_total_file_size;
+                    partition.get_row().file_size().unwrap_or(0) + pending_file_size;
                 if total_file_size > 0 {
                     let threshold = self.config.partition_size_split_threshold_bytes();
                     (div_ceil(total_file_size, threshold) as usize).min(16)
@@ -2463,6 +2470,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 2000;
                 c.partition_size_split_threshold_bytes = 10000;
+                c.compaction_split_by_total_file_size_enabled = true;
                 c
             })
             .start_test(async move |services| {

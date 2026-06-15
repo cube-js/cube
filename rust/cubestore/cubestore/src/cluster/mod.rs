@@ -1581,13 +1581,15 @@ impl ClusterImpl {
 
         // Trim in-memory chunks by the dedup-safe pushable predicate before they cross
         // IPC to the select subprocess (which re-applies the same predicate anyway).
-        let chunk_filter_guard =
-            crate::trace::OpGuard::start(OpKind::Execution, "chunks.prefilter");
-        crate::queryplanner::query_executor::filter_in_memory_chunks_for_worker(
-            &plan_node,
-            &mut chunk_id_to_record_batches,
-        );
-        drop(chunk_filter_guard);
+        if self.config_obj.prefilter_in_memory_chunks_enabled() {
+            let chunk_filter_guard =
+                crate::trace::OpGuard::start(OpKind::Execution, "chunks.prefilter");
+            crate::queryplanner::query_executor::filter_in_memory_chunks_for_worker(
+                &plan_node,
+                &mut chunk_id_to_record_batches,
+            );
+            drop(chunk_filter_guard);
+        }
 
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
