@@ -278,6 +278,19 @@ cube(`users`, {
 
 </CodeGroup>
 
+<Note>
+
+You can safely reference a member whose `sql` is a compound expression, such as
+arithmetic (`{price} + {tax}`) or boolean logic (`{is_paid} OR {is_pending}`). When you
+reference such a member inside an arithmetic or logical expression, Cube wraps it in
+parentheses automatically, so operator precedence is preserved. For example, if
+`price_with_tax` is defined as `{price} + {tax}`, then referencing it as
+`{price_with_tax} * {quantity}` generates `(price + tax) * quantity`. Cube only adds these
+parentheses where they are needed — a reference that already sits in a safe position, such as
+a function argument (`ABS({price_with_tax})`) or a `CAST(...)`, is left unwrapped.
+
+</Note>
+
 This syntax works great for simple use cases. However, there are cases
 (like [subquery][ref-subquery]) when you'd like to reference members of
 other cubes. See below how to do that.
