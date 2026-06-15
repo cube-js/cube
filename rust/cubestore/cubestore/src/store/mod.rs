@@ -1003,10 +1003,13 @@ impl ChunkStore {
         let remote_fs = self.remote_fs.clone();
         let producer: JoinHandle<()> = cube_ext::spawn(async move {
             for chunk in chunks {
+                // A chunk with no recorded file_size is billed at the full budget
+                // (conservative) rather than ~free, so an unknown-size prefetch can't
+                // overshoot the on-disk budget. Persisted chunks normally have a size.
                 let permits = chunk
                     .get_row()
                     .file_size()
-                    .unwrap_or(0)
+                    .unwrap_or(capacity as u64)
                     .min(capacity as u64)
                     .max(1) as u32;
                 let permit = match semaphore.clone().acquire_many_owned(permits).await {
@@ -1144,26 +1147,38 @@ impl ChunkStore {
             )
         });
 
+        // No active children in the parent's range is treated as a transient topology
+        // read (e.g. a concurrent split swapping children to grandchildren between our
+        // separate metastore reads), NOT corruption: return an error so the scheduler
+        // retries instead of deactivating a possibly-healthy table.
+        if children.is_empty() {
+            return Err(CubeError::internal(format!(
+                "Repartition of {} found no active children in its range; will retry",
+                partition.get_id()
+            )));
+        }
+
+        // Children that are present but do not tile the parent's range exactly (gap or
+        // overlap) is genuine metadata corruption — rows could be routed into a child
+        // whose range does not contain them. Deactivate the table, the same response
+        // partition_rows gives when a row cannot be assigned to any partition.
         let bounds_eq = |a: Option<&Row>, b: Option<&Row>| match (a, b) {
             (None, None) => true,
             (Some(x), Some(y)) => cmp_min_rows(key_size, Some(x), Some(y)) == Ordering::Equal,
             _ => false,
         };
-        let tiles_parent = !children.is_empty()
-            && bounds_eq(
-                children[0].get_row().get_min_val().as_ref(),
-                partition.get_row().get_min_val().as_ref(),
+        let tiles_parent = bounds_eq(
+            children[0].get_row().get_min_val().as_ref(),
+            partition.get_row().get_min_val().as_ref(),
+        ) && bounds_eq(
+            children.last().unwrap().get_row().get_max_val().as_ref(),
+            partition.get_row().get_max_val().as_ref(),
+        ) && children.windows(2).all(|w| {
+            bounds_eq(
+                w[0].get_row().get_max_val().as_ref(),
+                w[1].get_row().get_min_val().as_ref(),
             )
-            && bounds_eq(
-                children.last().unwrap().get_row().get_max_val().as_ref(),
-                partition.get_row().get_max_val().as_ref(),
-            )
-            && children.windows(2).all(|w| {
-                bounds_eq(
-                    w[0].get_row().get_max_val().as_ref(),
-                    w[1].get_row().get_min_val().as_ref(),
-                )
-            });
+        });
         if !tiles_parent {
             let message = format!(
                 "Repartition of {} found children that do not tile its range: {:?}",

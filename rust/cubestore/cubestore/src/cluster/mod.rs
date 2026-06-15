@@ -954,8 +954,11 @@ impl Cluster for ClusterImpl {
             // range is only scheduled when it still has an active chunk; the end is
             // carried as the job's data, not its dedup key, so a tail that extends the
             // trailing range dedups on the start.
-            let max_rows = self.config_obj.repartition_merge_max_rows();
-            let max_files = self.config_obj.repartition_merge_max_input_files();
+            // Clamp to >= 1 so a misconfigured 0 cap doesn't break the inner loop before
+            // adding any chunk. Even 1 degrades to one chunk per range (no merge gain);
+            // the sane range is >= 2.
+            let max_rows = self.config_obj.repartition_merge_max_rows().max(1);
+            let max_files = self.config_obj.repartition_merge_max_input_files().max(1);
             let mut all = self
                 .meta_store
                 .get_chunks_by_partition(p.get_id(), true)
