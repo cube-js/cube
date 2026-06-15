@@ -792,7 +792,10 @@ impl ImportServiceImpl {
 
         let table_cols = table.get_row().get_columns().as_slice();
         let row_threshold = self.config_obj.wal_split_threshold() as usize;
-        let size_threshold = self.config_obj.wal_split_size_threshold_bytes() as usize;
+        let size_threshold = self
+            .config_obj
+            .wal_split_size_threshold_bytes()
+            .map(|v| v as usize);
         let mut builders = create_array_builders(table_cols);
         let mut num_rows = 0;
         let mut estimated_bytes = 0;
@@ -800,8 +803,10 @@ impl ImportServiceImpl {
             let line = line?;
             let is_data_row = parser.visit_line(line.as_str(), |insert_pos, column, value| {
                 let builder = builders[insert_pos].as_mut();
-                estimated_bytes +=
-                    ImportFormat::estimate_arrow_value_size(column.get_column_type(), value);
+                if size_threshold.is_some() {
+                    estimated_bytes +=
+                        ImportFormat::estimate_arrow_value_size(column.get_column_type(), value);
+                }
                 match value {
                     None => {
                         append_value(builder, column.get_column_type(), &TableValue::Null);
@@ -818,7 +823,8 @@ impl ImportServiceImpl {
             }
             num_rows += 1;
 
-            if num_rows >= row_threshold || estimated_bytes >= size_threshold {
+            let over_size_threshold = size_threshold.map_or(false, |t| estimated_bytes >= t);
+            if num_rows >= row_threshold || over_size_threshold {
                 let mut to_add = create_array_builders(table_cols);
                 mem::swap(&mut builders, &mut to_add);
                 num_rows = 0;

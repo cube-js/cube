@@ -55,6 +55,7 @@ use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 
 use crate::table::{Row, TableValue};
 
+use crate::util::lock::acquire_lock;
 use crate::util::WorkerLoop;
 use crate::{meta_store_table_impl, CubeError};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -1557,7 +1558,11 @@ impl RocksMetaStore {
         if let Some(by_node) = self.in_memory_compaction_cached().await? {
             return Ok(by_node.get(&node).cloned().unwrap_or_default());
         }
-        let _compute_guard = self.in_memory_compaction_compute_lock.lock().await;
+        let _compute_guard = acquire_lock(
+            "in-memory compaction discovery compute",
+            self.in_memory_compaction_compute_lock.lock(),
+        )
+        .await?;
         if let Some(by_node) = self.in_memory_compaction_cached().await? {
             return Ok(by_node.get(&node).cloned().unwrap_or_default());
         }
@@ -2823,7 +2828,21 @@ impl MetaStore for RocksMetaStore {
             // Single-flight: serialize the scan so a burst of concurrent callers
             // (e.g. many partition writes during an import/repartition) share one
             // computation instead of each materializing a full metastore scan.
-            let _compute_guard = self.disk_space_compute_lock.lock().await;
+            let _compute_guard =
+                match acquire_lock("disk space compute", self.disk_space_compute_lock.lock()).await
+                {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        log::error!(
+                        "Timed out waiting for the disk space scan lock: {}. The single-flight \
+                         scan is stuck; reporting 0 used disk space so the disk-space check \
+                         passes. THE DISK-SPACE LIMIT IS NOT BEING ENFORCED until the scan \
+                         recovers.",
+                        e
+                    );
+                        return Ok(0);
+                    }
+                };
             if let Some(sizes) = self.disk_space_cached().await? {
                 sizes
             } else {
