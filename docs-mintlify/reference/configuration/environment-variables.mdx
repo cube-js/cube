@@ -1106,6 +1106,14 @@ The logging level for Cube.
 | -------------------------------- | ---------------------- | --------------------- |
 | `error`, `info`, `trace`, `warn` | `warn`                 | `warn`                |
 
+<Note>
+
+In production, Cube emits logs as structured JSON — one JSON object per line,
+each including a `level` field with the log level. In development, logs are
+emitted as human-readable text.
+
+</Note>
+
 See also `CUBESTORE_LOG_LEVEL`.
 See also the [`logger` configuration option](/reference/configuration/config#logger).
 
