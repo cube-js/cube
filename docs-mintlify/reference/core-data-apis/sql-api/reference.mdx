@@ -383,12 +383,22 @@ of the PostgreSQL documentation.
 | `MIN` | Computes the minimum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `SUM` | Computes the sum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `MEASURE` | Works with measures of [any type][ref-sql-api-aggregate-functions] | ✅ Yes | <nobr>❌ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `STRING_AGG` | Concatenates the input values into a string, separated by a delimiter (supports `DISTINCT`) | ✅ Yes | ❌ No |
+| `PERCENTILE_CONT` | Computes a continuous percentile, used with `WITHIN GROUP (ORDER BY ...)` | ✅ Yes | ❌ No |
 
 In projections in inner parts of post-processing queries:
 * `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
 [compatible types][ref-sql-api-aggregate-functions].
 * If `COUNT(*)` is specified, Cube will query the **first** measure of type `count`
 of the relevant cube.
+
+<Note>
+
+`PERCENTILE_CONT` pushdown is only available on data sources whose SQL dialect
+supports it. It is not supported with BigQuery, ClickHouse, Microsoft SQL Server,
+MySQL, or Presto.
+
+</Note>
 
 ### Aggregate functions for statistics
 
@@ -408,6 +418,29 @@ of the PostgreSQL documentation.
 | `STDDEV_SAMP` | Computes the sample standard deviation of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `VAR_POP` | Computes the population variance of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `VAR_SAMP` | Computes the sample variance of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Window functions
+
+<Info>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/tutorial-window.html)
+of the PostgreSQL documentation.
+
+</Info>
+
+Window functions are supported via [query pushdown][ref-qpd] only; they are not
+available in [query post-processing][ref-qpp]. Two kinds are supported:
+
+- **Aggregate functions used as window functions** — any supported aggregate
+  function (such as `SUM`, `AVG`, `COUNT`, `MIN`, or `MAX`) combined with an
+  `OVER (...)` clause.
+- **The `LAG` and `LEAD` window functions:**
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `LAG` | Returns the value from a row at a given offset before the current row within its partition | ✅ Yes | ❌ No |
+| `LEAD` | Returns the value from a row at a given offset after the current row within its partition | ✅ Yes | ❌ No |
 
 ### Row and array comparisons
 
@@ -437,8 +470,8 @@ See the [XIRR recipe](/recipes/data-modeling/xirr) for more details.
 </Note>
 
 
-[ref-qpd]: /reference/sql-api/query-format#query-pushdown
-[ref-qpp]: /reference/sql-api/query-format#query-post-processing
+[ref-qpd]: /reference/core-data-apis/sql-api/query-format#query-pushdown
+[ref-qpp]: /reference/core-data-apis/sql-api/query-format#query-post-processing
 [ref-sql-api]: /reference/sql-api
 [ref-sql-api-aggregate-functions]: /reference/sql-api/query-format#aggregate-functions
 [link-postgres-funcs]: https://www.postgresql.org/docs/current/functions.html
