@@ -1435,6 +1435,119 @@ async fn write_to_files_by_keys(
     Ok(row_counts)
 }
 
+/// One chunk file produced by `write_chunks_split_into_children`: which child (index into the
+/// ordered children list) it belongs to, the temp file it was written to, its row count and the
+/// min/max sort-key rows. Empty children yield an entry with `num_rows == 0`.
+pub(crate) struct WrittenChunk {
+    pub child_index: usize,
+    pub file: String,
+    pub num_rows: usize,
+    pub min: Vec<TableValue>,
+    pub max: Vec<TableValue>,
+}
+
+/// Splits a sorted [records] stream into chunk files for repartitioning a parent's chunks into its
+/// already-active children. Cuts a new file whenever a row crosses into the next child (per the
+/// exclusive upper bounds in [boundaries], one per child except the last) OR the current file
+/// reaches [rows_per_chunk]. [files] must over-estimate the number of produced files
+/// (`children + ceil(num_rows / rows_per_chunk)` is a safe bound). Returns the produced files in
+/// order; the caller creates a chunk per non-empty file under `children[child_index]`.
+pub(crate) async fn write_chunks_split_into_children(
+    records: SendableRecordBatchStream,
+    store: ParquetTableStore,
+    table: &IdRow<Table>,
+    files: Vec<String>,
+    boundaries: Vec<Row>,
+    rows_per_chunk: usize,
+) -> Result<Vec<WrittenChunk>, CubeError> {
+    assert!(rows_per_chunk > 0);
+    let key_size = store.key_size() as usize;
+    // Route on the partition-split key prefix (the authoritative partition boundary),
+    // but record chunk min/max on the full sort key.
+    let partition_split_key_size = store.partition_split_key_size() as usize;
+    let written = Arc::new(Mutex::new(vec![WrittenChunk {
+        child_index: 0,
+        file: files[0].clone(),
+        num_rows: 0,
+        min: Vec::new(),
+        max: Vec::new(),
+    }]));
+    let written_ref = written.clone();
+    let files_ref = files.clone();
+    // Current child index == number of boundaries already crossed.
+    let mut current_child = 0usize;
+    let mut next_file = 1usize;
+
+    let pick_writer = move |b: &RecordBatch| -> WriteBatchTo {
+        let n = b.num_rows();
+        let mut written = written_ref.lock().unwrap();
+
+        let rows_until_boundary = if current_child < boundaries.len() {
+            let mut i = 0;
+            while i < n
+                && cmp_partition_key(
+                    partition_split_key_size,
+                    boundaries[current_child].values().as_slice(),
+                    b.columns(),
+                    i,
+                ) > Ordering::Equal
+            {
+                i += 1;
+            }
+            i
+        } else {
+            n
+        };
+
+        let cur = written.last_mut().unwrap();
+        let rows_until_size = rows_per_chunk.saturating_sub(cur.num_rows);
+        let cut = rows_until_boundary.min(rows_until_size);
+
+        if cut >= n {
+            if n > 0 {
+                if cur.num_rows == 0 {
+                    cur.min = TableValue::from_columns(&b.columns()[0..key_size], 0);
+                }
+                cur.max = TableValue::from_columns(&b.columns()[0..key_size], n - 1);
+                cur.num_rows += n;
+            }
+            return WriteBatchTo::Current;
+        }
+
+        if cut > 0 {
+            if cur.num_rows == 0 {
+                cur.min = TableValue::from_columns(&b.columns()[0..key_size], 0);
+            }
+            cur.max = TableValue::from_columns(&b.columns()[0..key_size], cut - 1);
+            cur.num_rows += cut;
+        }
+
+        // Boundary cut advances the child; a pure size cut keeps the same child.
+        if rows_until_boundary <= rows_until_size {
+            current_child += 1;
+        }
+        let file = files_ref[next_file].clone();
+        next_file += 1;
+        written.push(WrittenChunk {
+            child_index: current_child,
+            file,
+            num_rows: 0,
+            min: Vec::new(),
+            max: Vec::new(),
+        });
+        WriteBatchTo::Next {
+            rows_for_current: cut,
+        }
+    };
+
+    write_to_files_impl(records, store, files, table, pick_writer).await?;
+
+    Ok(Arc::try_unwrap(written)
+        .map_err(|_| CubeError::internal("write_chunks stats still borrowed".to_string()))?
+        .into_inner()
+        .unwrap())
+}
+
 /// Builds a `SendableRecordBatchStream` merging the persistent partition data `l` with the
 /// already-sorted chunk inputs `r` (one sorted ExecutionPlan per chunk). Inputs are merged with a
 /// k-way `SortPreservingMergeExec` instead of being concatenated and re-sorted.

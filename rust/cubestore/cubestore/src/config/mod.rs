@@ -544,6 +544,13 @@ pub trait ConfigObj: DIService {
     /// `Some(0)` disables prefetching.
     fn repartition_prefetch_budget_bytes(&self) -> Option<u64>;
 
+    /// Max number of persisted input chunks merged in one group when repartitioning
+    /// an inactive parent. `Some(m >= 2)` streams the parent's chunks through a k-way
+    /// merge in groups of up to m and splits each group into the active children at
+    /// the wal-split limit, capping each merge+swap group at m chunks. `None` /
+    /// `Some(0)` / `Some(1)` disable the merge path.
+    fn repartition_merge_max_input_files(&self) -> Option<usize>;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -696,6 +703,7 @@ pub struct ConfigObjImpl {
     pub compaction_split_by_total_file_size_enabled: bool,
     pub prefilter_in_memory_chunks_enabled: bool,
     pub repartition_prefetch_budget_bytes: Option<u64>,
+    pub repartition_merge_max_input_files: Option<usize>,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1025,6 +1033,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn repartition_prefetch_budget_bytes(&self) -> Option<u64> {
         self.repartition_prefetch_budget_bytes
+    }
+    fn repartition_merge_max_input_files(&self) -> Option<usize> {
+        self.repartition_merge_max_input_files
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1687,6 +1698,9 @@ impl Config {
                     None,
                 )
                 .map(|n| n as u64),
+                repartition_merge_max_input_files: env_optparse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_INPUT_FILES",
+                ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -1933,6 +1947,7 @@ impl Config {
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
                 repartition_prefetch_budget_bytes: None,
+                repartition_merge_max_input_files: None,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,

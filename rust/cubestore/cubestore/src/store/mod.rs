@@ -41,10 +41,10 @@ use crate::cluster::{node_name_by_partition, Cluster};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
-use crate::queryplanner::trace_data_loaded::DataLoadedSize;
-use crate::table::data::cmp_partition_key;
+use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
+use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
-use compaction::{merge_chunks, merge_replay_handles};
+use compaction::{merge_chunks, merge_replay_handles, write_chunks_split_into_children};
 use datafusion::arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -617,6 +617,27 @@ impl ChunkDataStore for ChunkStore {
         data_loaded_size: Arc<DataLoadedSize>,
     ) -> Result<(), CubeError> {
         let start = std::time::Instant::now();
+
+        // Merge path: stream the parent's persisted chunks through a k-way merge and
+        // split into the active children at the wal-split limit, instead of emitting
+        // one chunk per (old chunk x child). Enabled by a group cap of >= 2.
+        if let Some(max_group) = self
+            .config
+            .repartition_merge_max_input_files()
+            .filter(|&m| m >= 2)
+        {
+            return self
+                .repartition_partition_chunks_merged(
+                    partition_id,
+                    anchor_chunk_id,
+                    max_group,
+                    start,
+                    time_budget,
+                    data_loaded_size,
+                )
+                .await;
+        }
+
         let mut chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
@@ -960,6 +981,311 @@ impl ChunkStore {
         // download itself proceeds independently, so an abort leaks nothing.
         producer.abort();
         result
+    }
+
+    // Streaming merge variant of repartition. The parent's persisted chunks are
+    // merged k-way (in groups of <= max_group input files) and the sorted stream is
+    // split directly into the parent's already-active children at the wal-split
+    // limit, producing full-size chunks in one streaming pass. Each group commits
+    // with a single atomic swap_chunks; correctness against a concurrent job racing
+    // for the same chunks rests on that swap rejecting an already-inactive source
+    // (the loser's new chunks stay inactive and are GC'd). The anchor sits in the
+    // last group so it stays active (holding the job dedup key) until the run
+    // finishes or yields on the time budget.
+    async fn repartition_partition_chunks_merged(
+        &self,
+        partition_id: u64,
+        anchor_chunk_id: u64,
+        max_group: usize,
+        start: std::time::Instant,
+        time_budget: std::time::Duration,
+        data_loaded_size: Arc<DataLoadedSize>,
+    ) -> Result<(), CubeError> {
+        let partition = self.meta_store.get_partition(partition_id).await?;
+        if partition.get_row().is_active() {
+            return Err(CubeError::internal(format!(
+                "Tried to repartition active partition: {:?}",
+                partition
+            )));
+        }
+        let index = self
+            .meta_store
+            .get_index(partition.get_row().get_index_id())
+            .await?;
+        let table = self
+            .meta_store
+            .get_table_by_id(index.get_row().table_id())
+            .await?;
+        let key_size = index.get_row().sort_key_size() as usize;
+
+        // The parent's children: active partitions of the index whose range lies
+        // within the parent's range, ordered by min bound. Their interior min bounds
+        // are the split boundaries fed to the writer, so order by the same bound the
+        // writer routes on (get_min_val) to keep the boundary sequence monotonic.
+        let mut children = self
+            .meta_store
+            .get_active_partitions_by_index_id(index.get_id())
+            .await?
+            .into_iter()
+            .filter(|c| Self::partition_within(&partition, c, key_size))
+            .collect::<Vec<_>>();
+        children.sort_by(|a, b| {
+            cmp_min_rows(
+                key_size,
+                a.get_row().get_min_val().as_ref(),
+                b.get_row().get_min_val().as_ref(),
+            )
+        });
+
+        // The children must tile the parent's range exactly: matching outer bounds and
+        // touching interior bounds, leaving no gap a row could fall through. Anything
+        // else means the partition metadata is inconsistent (same condition
+        // partition_rows guards), so deactivate the table rather than silently routing
+        // rows into a child whose range does not contain them.
+        let bounds_eq = |a: Option<&Row>, b: Option<&Row>| match (a, b) {
+            (None, None) => true,
+            (Some(x), Some(y)) => cmp_min_rows(key_size, Some(x), Some(y)) == Ordering::Equal,
+            _ => false,
+        };
+        let tiles_parent = !children.is_empty()
+            && bounds_eq(
+                children[0].get_row().get_min_val().as_ref(),
+                partition.get_row().get_min_val().as_ref(),
+            )
+            && bounds_eq(
+                children.last().unwrap().get_row().get_max_val().as_ref(),
+                partition.get_row().get_max_val().as_ref(),
+            )
+            && children.windows(2).all(|w| {
+                bounds_eq(
+                    w[0].get_row().get_max_val().as_ref(),
+                    w[1].get_row().get_min_val().as_ref(),
+                )
+            });
+        if !tiles_parent {
+            let message = format!(
+                "Repartition of {} found children that do not tile its range: {:?}",
+                partition_id,
+                children.iter().map(|c| c.get_id()).collect::<Vec<_>>()
+            );
+            deactivate_table_due_to_corrupt_data(
+                self.meta_store.clone(),
+                index.get_row().table_id(),
+                message.clone(),
+            )
+            .await?;
+            return Err(CubeError::internal(message));
+        }
+
+        let boundaries: Vec<Row> = children
+            .iter()
+            .skip(1)
+            .map(|c| c.get_row().get_min_val().clone())
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| {
+                CubeError::internal("Child partition without a min bound during repartition".into())
+            })?;
+
+        let mut chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?
+            .into_iter()
+            .filter(|c| !c.get_row().in_memory())
+            .collect::<Vec<_>>();
+        chunks.sort_by_key(|c| (c.get_id() == anchor_chunk_id, c.get_id()));
+        if chunks.is_empty() {
+            return Ok(());
+        }
+
+        let wal_split = table
+            .get_row()
+            .partition_split_threshold_or_default(self.config.partition_split_threshold())
+            as usize;
+        let unique_key = table.get_row().unique_key_columns();
+        let aggregate_columns = match index.get_row().get_type() {
+            IndexType::Regular => None,
+            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
+        };
+        let schema = Arc::new(arrow_schema(index.get_row()));
+
+        let groups = chunks
+            .chunks(max_group)
+            .map(|g| g.to_vec())
+            .collect::<Vec<_>>();
+        for group in groups {
+            let mut chunk_inputs: Vec<Arc<dyn ExecutionPlan>> = Vec::with_capacity(group.len());
+            for chunk in group.iter() {
+                let exec = self
+                    .chunk_exec(chunk.clone(), partition.clone(), index.clone())
+                    .await?;
+                chunk_inputs.push(Arc::new(TraceDataLoadedExec::new(
+                    exec,
+                    data_loaded_size.clone(),
+                )));
+            }
+
+            let task_context = QueryPlannerImpl::make_execution_context(
+                self.metadata_cache_factory
+                    .cache_factory()
+                    .make_session_config(),
+            )
+            .task_ctx();
+            let records = merge_chunks(
+                key_size,
+                Arc::new(EmptyExec::new(schema.clone())),
+                chunk_inputs,
+                unique_key.clone(),
+                aggregate_columns.clone(),
+                task_context,
+            )
+            .await?;
+
+            for child in children.iter() {
+                self.check_node_disk_space(child).await?;
+            }
+
+            let group_rows: u64 = group.iter().map(|c| c.get_row().get_row_count()).sum();
+            let max_files = children.len() + (group_rows as usize).div_ceil(wal_split.max(1)) + 1;
+            // A random salt keeps temp paths unique even if two repartition jobs ever
+            // run for the same partition concurrently (e.g. across a channel switch).
+            let salt = rand::random::<u64>();
+            let mut files = Vec::with_capacity(max_files);
+            for i in 0..max_files {
+                files.push(
+                    self.remote_fs
+                        .temp_upload_path(format!(
+                            "repartition/{}-{:x}-{}.chunk.parquet",
+                            partition_id, salt, i
+                        ))
+                        .await?,
+                );
+            }
+            let store = ParquetTableStore::new(
+                index.get_row().clone(),
+                ROW_GROUP_SIZE,
+                self.metadata_cache_factory.clone(),
+            );
+            let written = write_chunks_split_into_children(
+                records,
+                store,
+                &table,
+                files,
+                boundaries.clone(),
+                wal_split.max(1),
+            )
+            .await?;
+
+            let mut new_chunk_ids: Vec<(u64, Option<u64>)> = Vec::new();
+            for w in written {
+                if w.num_rows == 0 {
+                    let _ = tokio::fs::remove_file(&w.file).await;
+                    continue;
+                }
+                let child = &children[w.child_index];
+                let chunk = self
+                    .meta_store
+                    .create_chunk(
+                        child.get_id(),
+                        w.num_rows,
+                        Some(Row::new(w.min)),
+                        Some(Row::new(w.max)),
+                        false,
+                    )
+                    .await?;
+                let remote = ChunkStore::chunk_file_name(chunk.clone());
+                let file_size = self.remote_fs.upload_file(w.file, remote).await?;
+                new_chunk_ids.push((chunk.get_id(), Some(file_size)));
+            }
+
+            let group_ids: Vec<u64> = group.iter().map(|c| c.get_id()).collect();
+
+            // A fully empty group (every source chunk had no rows) produces no new
+            // chunks; swap_chunks rejects an empty activation list, so just deactivate
+            // the sources directly, matching the per-chunk path's empty-chunk handling.
+            if new_chunk_ids.is_empty() {
+                self.meta_store.deactivate_chunks(group_ids).await?;
+                if start.elapsed() >= time_budget {
+                    break;
+                }
+                continue;
+            }
+
+            // Carry the oldest insert time across the merge so repartitioned chunks
+            // keep their real age (the min, mirroring how replay handles are merged)
+            // instead of looking freshly inserted.
+            let oldest_insert_at = group
+                .iter()
+                .filter_map(|c| c.get_row().oldest_insert_at().clone())
+                .min();
+            self.meta_store
+                .chunk_update_last_inserted(
+                    new_chunk_ids.iter().map(|c| c.0).collect(),
+                    oldest_insert_at,
+                )
+                .await?;
+
+            let replay_handle_id =
+                merge_replay_handles(self.meta_store.clone(), &group, table.get_id()).await?;
+            if let Err(e) = self
+                .meta_store
+                .swap_chunks(group_ids.clone(), new_chunk_ids, replay_handle_id)
+                .await
+            {
+                // Group-level race tolerance: if any source chunk is already inactive
+                // a concurrent job won the swap, so the work is done — the new chunks
+                // we created stay inactive and are GC'd. If all sources are still
+                // active the swap failed for a real reason.
+                let mut all_active = true;
+                for id in &group_ids {
+                    let active = self
+                        .meta_store
+                        .get_chunk(*id)
+                        .await
+                        .map_or(false, |c| c.get_row().active());
+                    if !active {
+                        all_active = false;
+                        break;
+                    }
+                }
+                if all_active {
+                    return Err(e);
+                }
+                log::debug!(
+                    "Skipping repartition group lost to a concurrent swap: {}",
+                    e
+                );
+            }
+
+            if start.elapsed() >= time_budget {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    // A child partition lies within the parent when its lower bound is >= the
+    // parent's (None = -inf) and its upper bound is <= the parent's (None = +inf),
+    // compared on the partition-key prefix.
+    fn partition_within(
+        parent: &IdRow<Partition>,
+        child: &IdRow<Partition>,
+        key_size: usize,
+    ) -> bool {
+        let lower_ok = cmp_min_rows(
+            key_size,
+            child.get_row().get_min_val().as_ref(),
+            parent.get_row().get_min_val().as_ref(),
+        ) != Ordering::Less;
+        let upper_ok = match (
+            child.get_row().get_max_val().as_ref(),
+            parent.get_row().get_max_val().as_ref(),
+        ) {
+            (_, None) => true,
+            (None, Some(_)) => false,
+            (Some(c), Some(p)) => cmp_min_rows(key_size, Some(c), Some(p)) != Ordering::Greater,
+        };
+        lower_ok && upper_ok
     }
 
     async fn download_chunk(
@@ -1701,6 +2027,341 @@ mod tests {
                 remaining.is_empty(),
                 "remaining chunks must drain with a large budget under prefetch"
             );
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path);
+        let _ = fs::remove_dir_all(chunk_remote_store_path);
+    }
+
+    #[tokio::test]
+    async fn repartition_merge_drains_and_yields() {
+        // Merge path with a group cap of 2: the parent's 3 persisted chunks are
+        // merged in groups and split into two children. A zero budget yields after
+        // the first group (anchor, processed last, stays active); a large budget
+        // drains the rest. Row counts must be conserved across the children.
+        let config = Config::test("repartition_merge_drains_and_yields").update_config(|mut c| {
+            c.repartition_merge_max_input_files = Some(2);
+            c
+        });
+        let path = "/tmp/test_repartition_merge";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
+                PathBuf::from(chunk_store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                Path::new(path),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+                10,
+            );
+
+            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    col.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
+            let partition = meta_store
+                .get_active_partitions_by_index_id(index.get_id())
+                .await
+                .unwrap()[0]
+                .clone();
+
+            let mut chunk_ids = Vec::new();
+            for range in [0..10i64, 10..20i64, 20..30i64] {
+                let rows = range
+                    .map(|i| Row::new(vec![TableValue::Int(i)]))
+                    .collect::<Vec<_>>();
+                let data = rows_to_columns(&col, &rows);
+                let (chunk, file_size) = chunk_store
+                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
+                    .await
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                meta_store
+                    .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
+                    .await
+                    .unwrap();
+                chunk_ids.push(chunk.get_id());
+            }
+
+            let dest1 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let dest2 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let mid = Row::new(vec![TableValue::Int(15)]);
+            meta_store
+                .swap_active_partitions(
+                    vec![(partition.clone(), vec![])],
+                    vec![(dest1.clone(), 1), (dest2.clone(), 1)],
+                    vec![
+                        (0, (None, Some(mid.clone())), (None, Some(mid.clone()))),
+                        (0, (Some(mid.clone()), None), (Some(mid.clone()), None)),
+                    ],
+                )
+                .await
+                .unwrap();
+
+            let anchor = *chunk_ids.iter().min().unwrap();
+
+            let child_rows = |dest_id: u64| {
+                let meta_store = meta_store.clone();
+                async move {
+                    meta_store
+                        .get_chunks_by_partition(dest_id, false)
+                        .await
+                        .unwrap()
+                        .iter()
+                        .filter(|c| c.get_row().active())
+                        .map(|c| c.get_row().get_row_count())
+                        .sum::<u64>()
+                }
+            };
+
+            // Zero budget: only the first group (the two non-anchor chunks) is
+            // processed; the anchor stays active on the parent.
+            chunk_store
+                .repartition_partition_chunks(
+                    partition.get_id(),
+                    anchor,
+                    std::time::Duration::from_secs(0),
+                    DataLoadedSize::new(),
+                )
+                .await
+                .unwrap();
+            let remaining = meta_store
+                .get_chunks_by_partition(partition.get_id(), false)
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|c| c.get_row().active())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                remaining.len(),
+                1,
+                "zero-budget merge run must yield after the first group"
+            );
+            assert_eq!(
+                remaining[0].get_id(),
+                anchor,
+                "anchor must be processed last and remain active after a yield"
+            );
+
+            // Large budget drains the rest; all 30 rows must land in the children.
+            chunk_store
+                .repartition_partition_chunks(
+                    partition.get_id(),
+                    anchor,
+                    std::time::Duration::from_secs(600),
+                    DataLoadedSize::new(),
+                )
+                .await
+                .unwrap();
+            let remaining = meta_store
+                .get_chunks_by_partition(partition.get_id(), false)
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|c| c.get_row().active())
+                .collect::<Vec<_>>();
+            assert!(remaining.is_empty(), "parent chunks must drain under merge");
+
+            let total = child_rows(dest1.get_id()).await + child_rows(dest2.get_id()).await;
+            assert_eq!(total, 30, "all rows must be conserved across children");
+            assert_eq!(
+                child_rows(dest1.get_id()).await,
+                15,
+                "rows below the split go to the first child"
+            );
+            assert_eq!(
+                child_rows(dest2.get_id()).await,
+                15,
+                "rows at/above the split go to the second child"
+            );
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path);
+        let _ = fs::remove_dir_all(chunk_remote_store_path);
+    }
+
+    #[tokio::test]
+    async fn repartition_merge_drains_empty_group() {
+        // A group whose chunks are all empty produces no new chunks; the merge path
+        // must deactivate the sources directly instead of failing on an empty swap.
+        let config = Config::test("repartition_merge_drains_empty_group").update_config(|mut c| {
+            c.repartition_merge_max_input_files = Some(4);
+            c
+        });
+        let path = "/tmp/test_repartition_merge_empty";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
+                PathBuf::from(chunk_store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                Path::new(path),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+                10,
+            );
+
+            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    col.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
+            let partition = meta_store
+                .get_active_partitions_by_index_id(index.get_id())
+                .await
+                .unwrap()[0]
+                .clone();
+
+            // Two empty persisted chunks on the parent.
+            for _ in 0..2 {
+                let data = rows_to_columns(&col, &[]);
+                let (chunk, file_size) = chunk_store
+                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
+                    .await
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                meta_store
+                    .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
+                    .await
+                    .unwrap();
+            }
+
+            let dest1 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let dest2 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let mid = Row::new(vec![TableValue::Int(15)]);
+            meta_store
+                .swap_active_partitions(
+                    vec![(partition.clone(), vec![])],
+                    vec![(dest1.clone(), 1), (dest2.clone(), 1)],
+                    vec![
+                        (0, (None, Some(mid.clone())), (None, Some(mid.clone()))),
+                        (0, (Some(mid.clone()), None), (Some(mid.clone()), None)),
+                    ],
+                )
+                .await
+                .unwrap();
+
+            let anchor = meta_store
+                .get_chunks_by_partition(partition.get_id(), false)
+                .await
+                .unwrap()
+                .iter()
+                .map(|c| c.get_id())
+                .min()
+                .unwrap();
+
+            chunk_store
+                .repartition_partition_chunks(
+                    partition.get_id(),
+                    anchor,
+                    std::time::Duration::from_secs(600),
+                    DataLoadedSize::new(),
+                )
+                .await
+                .unwrap();
+
+            let remaining = meta_store
+                .get_chunks_by_partition(partition.get_id(), false)
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|c| c.get_row().active())
+                .count();
+            assert_eq!(remaining, 0, "empty group must drain via deactivation");
         }
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(chunk_store_path);
