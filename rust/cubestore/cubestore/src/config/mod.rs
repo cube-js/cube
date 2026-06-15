@@ -536,6 +536,14 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
+    /// Byte budget for prefetching persisted chunk parquets ahead of a batch
+    /// repartition job. A sequential producer downloads upcoming chunks (anchor
+    /// last) while the job processes the current one, bounded so that no more
+    /// than this many bytes of fetched-but-unprocessed data sit on local disk.
+    /// The env value accepts size suffixes (e.g. `512MB`). `None` (env unset) or
+    /// `Some(0)` disables prefetching.
+    fn repartition_prefetch_budget_bytes(&self) -> Option<u64>;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -687,6 +695,7 @@ pub struct ConfigObjImpl {
     pub push_partial_aggregate_below_merge_enabled: bool,
     pub compaction_split_by_total_file_size_enabled: bool,
     pub prefilter_in_memory_chunks_enabled: bool,
+    pub repartition_prefetch_budget_bytes: Option<u64>,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1013,6 +1022,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn prefilter_in_memory_chunks_enabled(&self) -> bool {
         self.prefilter_in_memory_chunks_enabled
+    }
+    fn repartition_prefetch_budget_bytes(&self) -> Option<u64> {
+        self.repartition_prefetch_budget_bytes
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1669,6 +1681,12 @@ impl Config {
                     "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
                     false,
                 ),
+                repartition_prefetch_budget_bytes: env_parse_optional_size(
+                    "CUBESTORE_REPARTITION_PREFETCH_BUDGET",
+                    None,
+                    None,
+                )
+                .map(|n| n as u64),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -1914,6 +1932,7 @@ impl Config {
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
+                repartition_prefetch_budget_bytes: None,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,

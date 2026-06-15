@@ -3615,6 +3615,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn repartition_prefetch_keeps_data_consistent() -> Result<(), CubeError> {
+        // Batch repartition with chunk parquet prefetch enabled must drain and
+        // keep data consistent end-to-end (real downloads through the prefetch
+        // producer/consumer path).
+        Config::test("repartition_prefetch_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.batch_repartition_enabled = true;
+                c.repartition_prefetch_budget_bytes = Some(64 * 1024 * 1024);
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn repartition_small_time_budget_drains_via_cascade() -> Result<(), CubeError> {
         // A 1s budget forces most per-partition jobs to yield before draining all
         // chunks; the cascade must reschedule until the parent is empty.
