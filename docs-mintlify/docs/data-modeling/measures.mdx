@@ -307,8 +307,8 @@ periods.
 
 ### Percent of total (fixed dimension)
 
-Use the [`group_by`][ref-group-by] parameter to fix the inner aggregation to
-specific dimensions, enabling percent-of-total calculations:
+Use the [`grain`][ref-grain] parameter with `keep_only` to fix the inner
+aggregation to specific dimensions, enabling percent-of-total calculations:
 
 ```yaml
 measures:
@@ -320,8 +320,9 @@ measures:
     multi_stage: true
     sql: "{revenue}"
     type: sum
-    group_by:
-      - country
+    grain:
+      keep_only:
+        - country
 
   - name: country_revenue_percentage
     multi_stage: true
@@ -371,7 +372,7 @@ The `filter` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
 
 ### Nested aggregates
 
-Use the [`add_group_by`][ref-add-group-by] parameter to compute an aggregate
+Use the [`grain`][ref-grain] parameter with `include` to compute an aggregate
 of an aggregate, e.g., the average of per-customer averages:
 
 ```yaml
@@ -384,13 +385,15 @@ measures:
     multi_stage: true
     sql: "{avg_order_value}"
     type: avg
-    add_group_by:
-      - customer_id
+    grain:
+      include:
+        - customer_id
 ```
 
 ### Ranking
 
-Use the [`reduce_by`][ref-reduce-by] parameter to rank items within groups:
+Use the [`grain`][ref-grain] parameter with `exclude` to rank items within
+groups:
 
 ```yaml
 measures:
@@ -403,10 +406,19 @@ measures:
     order_by:
       - sql: "{revenue}"
         dir: asc
-    reduce_by:
-      - product
+    grain:
+      exclude:
+        - product
     type: rank
 ```
+
+<Note>
+
+`grain` replaces the standalone `group_by`, `reduce_by`, and `add_group_by`
+parameters, which remain supported. See the [`grain`][ref-grain] reference for
+the migration mapping.
+
+</Note>
 
 ### Conditional measures
 
@@ -463,9 +475,7 @@ measures:
 [ref-format]: /reference/data-modeling/measures#format
 [ref-rolling-window]: /reference/data-modeling/measures#rolling_window
 [ref-time-shift]: /reference/data-modeling/measures#time_shift
-[ref-group-by]: /reference/data-modeling/measures#group_by
-[ref-reduce-by]: /reference/data-modeling/measures#reduce_by
-[ref-add-group-by]: /reference/data-modeling/measures#add_group_by
+[ref-grain]: /reference/data-modeling/measures#grain
 [ref-filter]: /reference/data-modeling/measures#filter
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type

@@ -639,15 +639,21 @@ cube(`time_shift`, {
 
 </CodeGroup>
 
-### `group_by`
+### `grain`
 
-The `group_by` parameter is used with [multi-stage measures][ref-multi-stage] to specify
-dimensions that should be used for the `GROUP BY` of the inner aggregation stage,
-*ignoring* any dimensions present in the query.
+The `grain` parameter is used with [multi-stage measures][ref-multi-stage] to control the
+dimensions of the inner aggregation stage's `GROUP BY` — the *grain* at which the base
+measure is computed before the outer aggregation is applied. It accepts an object with
+three keys, each taking a list of dimension names from the same cube:
 
-This is commonly used for fixed dimension calculations — computing a measure at a fixed
-granularity regardless of the query's dimensions. For example, calculating percent of
-total or comparing individual items to a broader dataset.
+- `keep_only` — group the inner stage by *only* the listed dimensions, ignoring the
+  query's dimensions. Use it for fixed-grain calculations such as percent of total.
+- `exclude` — group the inner stage by the query's dimensions *minus* the listed
+  dimensions. Use it for ranking within groups.
+- `include` — group the inner stage by the query's dimensions *plus* the listed
+  dimensions. Use it for nested aggregates (an aggregate of an aggregate).
+
+`keep_only` and `exclude` are mutually exclusive.
 
 <CodeGroup>
 
@@ -657,8 +663,9 @@ measures:
     multi_stage: true
     sql: "{revenue}"
     type: sum
-    group_by:
-      - country
+    grain:
+      keep_only:
+        - country
 ```
 
 ```javascript title="JavaScript"
@@ -667,104 +674,44 @@ measures: {
     multi_stage: true,
     sql: `${revenue}`,
     type: `sum`,
-    group_by: [country]
+    grain: {
+      keep_only: [country]
+    }
   }
 }
 ```
 
 </CodeGroup>
 
-`group_by` accepts a list of dimension names from the same cube. The inner stage will
-group by *only* these dimensions, while the outer aggregation will group by the query's
-dimensions.
-
-| Parameter | Inner `GROUP BY` | Outer `GROUP BY` |
+| `grain` key | Inner `GROUP BY` | Outer `GROUP BY` |
 |---|---|---|
-| `group_by` | Only the listed dimensions | Query dimensions |
-| `reduce_by` | Query dimensions minus listed | Query dimensions |
-| `add_group_by` | Query dimensions plus listed | Query dimensions |
+| `keep_only` | Only the listed dimensions | Query dimensions |
+| `exclude` | Query dimensions minus listed | Query dimensions |
+| `include` | Query dimensions plus listed | Query dimensions |
 
-### `reduce_by`
+<Note>
 
-The `reduce_by` parameter is used with [multi-stage measures][ref-multi-stage] to specify
-dimensions that should be *removed* from the `GROUP BY` of the inner aggregation stage.
+`grain` replaces the standalone `group_by`, `reduce_by`, and `add_group_by` parameters,
+which remain supported. To migrate, use `grain.keep_only` instead of `group_by`,
+`grain.exclude` instead of `reduce_by`, and `grain.include` instead of `add_group_by`.
 
-This is commonly used for ranking calculations — computing a rank across a dimension
-while still allowing grouping by other dimensions in the query.
+</Note>
 
-<CodeGroup>
+### `group_by`, `reduce_by`, and `add_group_by` (legacy)
 
-```yaml title="YAML"
-measures:
-  - name: product_rank
-    multi_stage: true
-    order_by:
-      - sql: "{revenue}"
-        dir: asc
-    reduce_by:
-      - product
-    type: rank
-```
+These three parameters were the original way to control the inner aggregation stage's
+`GROUP BY` for [multi-stage measures][ref-multi-stage]. They are still supported, but
+[`grain`](#grain) now covers all three and is the recommended way to express the grain of
+a multi-stage measure.
 
-```javascript title="JavaScript"
-measures: {
-  product_rank: {
-    multi_stage: true,
-    order_by: [{
-      sql: `${revenue}`,
-      dir: `asc`
-    }],
-    reduce_by: [product],
-    type: `rank`
-  }
-}
-```
+| Legacy parameter | `grain` equivalent | Effect on the inner stage's `GROUP BY` |
+|---|---|---|
+| `group_by` | [`grain.keep_only`](#grain) | Only the listed dimensions, ignoring query dimensions |
+| `reduce_by` | [`grain.exclude`](#grain) | Query dimensions minus the listed dimensions |
+| `add_group_by` | [`grain.include`](#grain) | Query dimensions plus the listed dimensions |
 
-</CodeGroup>
-
-`reduce_by` accepts a list of dimension names. The inner stage will group by the query's
-dimensions *minus* the listed dimensions, while the outer aggregation will group by the
-query's dimensions.
-
-### `add_group_by`
-
-The `add_group_by` parameter is used with [multi-stage measures][ref-multi-stage] to
-specify dimensions that should be *added* to the `GROUP BY` of the inner aggregation
-stage, in addition to any dimensions present in the query.
-
-This is commonly used for [nested aggregate][ref-nested-aggregate] patterns — computing
-an aggregate of an aggregate. For example, averaging per-user metrics or counting how
-many groups exceed a threshold.
-
-<CodeGroup>
-
-```yaml title="YAML"
-measures:
-  - name: avg_user_score
-    multi_stage: true
-    sql: "{avg_score}"
-    type: avg
-    add_group_by:
-      - user_id
-```
-
-```javascript title="JavaScript"
-measures: {
-  avg_user_score: {
-    multi_stage: true,
-    sql: `${avg_score}`,
-    type: `avg`,
-    add_group_by: [user_id]
-  }
-}
-```
-
-</CodeGroup>
-
-`add_group_by` accepts a list of dimension names from the same cube. The listed
-dimensions will be included in the inner stage's `GROUP BY` but will *not* appear
-in the outer aggregation — they are used only to define the granularity at which
-the base measure is computed before the outer aggregation is applied.
+Each accepts a list of dimension names from the same cube. For new data models, use
+[`grain`](#grain) instead.
 
 ### `filter`
 
