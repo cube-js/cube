@@ -1301,7 +1301,9 @@ displayed to data consumers.
 
 You can use a named format or a custom [d3-format][link-d3-format]
 specifier string. Named formats accept an optional `_N` suffix (0–6)
-to set decimal precision; without a suffix, they default to 2 decimal places.
+to set the maximum decimal precision; insignificant trailing zeros are trimmed,
+so `N` is an upper bound rather than a fixed number of digits. Without a suffix,
+named formats default to a maximum of 2 decimal places.
 
 | Format | Description | Example | Output |
 |--------|-------------|---------|--------|
