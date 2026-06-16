@@ -859,8 +859,13 @@ impl ChunkDataStore for ChunkStore {
         partition: IdRow<Partition>,
         batch: RecordBatch,
     ) -> Result<(IdRow<Chunk>, Option<u64>), CubeError> {
+        let table = self
+            .meta_store
+            .get_table_by_id(index.get_row().table_id())
+            .await?;
         self.add_chunk_columns(
             index.clone(),
+            &table,
             partition.clone(),
             batch.columns().to_vec(),
             false,
@@ -1555,7 +1560,7 @@ mod tests {
 
             let data = rows_to_columns(&col, data_frame.get_rows().as_slice());
             let (chunk, file_size) = chunk_store
-                .add_chunk_columns(index, partition, data.clone(), false)
+                .add_chunk_columns(index, &table, partition, data.clone(), false)
                 .await
                 .unwrap()
                 .await
@@ -1783,7 +1788,7 @@ mod tests {
                     .collect::<Vec<_>>();
                 let data = rows_to_columns(&col, &rows);
                 let (chunk, file_size) = chunk_store
-                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
+                    .add_chunk_columns(index.clone(), &table, partition.clone(), data, false)
                     .await
                     .unwrap()
                     .await
@@ -1973,7 +1978,7 @@ mod tests {
                     .collect::<Vec<_>>();
                 let data = rows_to_columns(&col, &rows);
                 let (chunk, file_size) = chunk_store
-                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
+                    .add_chunk_columns(index.clone(), &table, partition.clone(), data, false)
                     .await
                     .unwrap()
                     .await
@@ -2142,7 +2147,7 @@ mod tests {
             for _ in 0..2 {
                 let data = rows_to_columns(&col, &[]);
                 let (chunk, file_size) = chunk_store
-                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
+                    .add_chunk_columns(index.clone(), &table, partition.clone(), data, false)
                     .await
                     .unwrap()
                     .await
@@ -2307,7 +2312,7 @@ mod tests {
                     .collect::<Vec<_>>();
                 let data = rows_to_columns(&col, &rows);
                 let (chunk, file_size) = chunk_store
-                    .add_chunk_columns(index.clone(), partition.clone(), data, false)
+                    .add_chunk_columns(index.clone(), &table, partition.clone(), data, false)
                     .await
                     .unwrap()
                     .await
@@ -2500,13 +2505,18 @@ impl ChunkStore {
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
         let index = self.meta_store.get_index(index_id).await?;
-        self.partition_rows_for_index(&index, columns, in_memory)
+        let table = self
+            .meta_store
+            .get_table_by_id(index.get_row().table_id())
+            .await?;
+        self.partition_rows_for_index(&index, &table, columns, in_memory)
             .await
     }
     #[tracing::instrument(level = "trace", skip(self, columns))]
     async fn partition_rows_for_index(
         &self,
         index: &IdRow<Index>,
+        table: &IdRow<Table>,
         mut columns: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
@@ -2591,10 +2601,13 @@ impl ChunkStore {
                     .iter()
                     .map(|c| datafusion::arrow::compute::take(c.as_ref(), &to_write, None))
                     .collect::<Result<Vec<_>, _>>()?;
-                let columns = self.post_process_columns(index.clone(), columns).await?;
+                let columns = self
+                    .post_process_columns(index.clone(), table, columns)
+                    .await?;
 
                 futures.push(self.add_chunk_columns(
                     index.clone(),
+                    table,
                     partition.clone(),
                     columns,
                     in_memory,
@@ -2651,15 +2664,12 @@ impl ChunkStore {
     async fn post_process_columns(
         &self,
         index: IdRow<Index>,
+        table: &IdRow<Table>,
         data: Vec<ArrayRef>,
     ) -> Result<Vec<ArrayRef>, CubeError> {
         match index.get_row().get_type() {
             IndexType::Regular => Ok(data),
             IndexType::Aggregate => {
-                let table = self
-                    .meta_store
-                    .get_table_by_id(index.get_row().table_id())
-                    .await?;
                 let schema = Arc::new(arrow_schema(&index.get_row()));
 
                 let batch = RecordBatch::try_new(schema.clone(), data)?;
@@ -2731,6 +2741,7 @@ impl ChunkStore {
     async fn add_chunk_columns(
         &self,
         index: IdRow<Index>,
+        table: &IdRow<Table>,
         partition: IdRow<Partition>,
         data: Vec<ArrayRef>,
         in_memory: bool,
@@ -2767,18 +2778,13 @@ impl ChunkStore {
             let metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory> =
                 self.metadata_cache_factory.clone();
 
-            let table = self
-                .meta_store
-                .get_table_by_id(index.get_row().table_id())
-                .await?;
-
             let parquet = ParquetTableStore::new(
                 index.get_row().clone(),
                 ROW_GROUP_SIZE,
                 metadata_cache_factory,
             );
 
-            let writer_props = parquet.writer_props(&table).await?;
+            let writer_props = parquet.writer_props(table).await?;
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
                 parquet.write_data_given_props(&local_file_copy, data, writer_props)
             })
@@ -2804,6 +2810,9 @@ impl ChunkStore {
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let mut rows = rows.0;
+        // The table is the same for every index/chunk produced by this call, so load it once
+        // here instead of re-fetching it per chunk over the metastore RPC downstream.
+        let table = self.meta_store.get_table_by_id(table_id).await?;
         let mut futures = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();
@@ -2816,7 +2825,7 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            futures.push(self.partition_rows_for_index(&index, remapped, in_memory));
+            futures.push(self.partition_rows_for_index(&index, &table, remapped, in_memory));
         }
 
         let new_chunks = join_all(futures)

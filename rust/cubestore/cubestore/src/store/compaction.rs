@@ -694,10 +694,8 @@ impl CompactionService for CompactionServiceImpl {
             None => Arc::new(EmptyExec::new(schema.clone())),
         };
 
-        let table = self
-            .meta_store
-            .get_table_by_id(index.get_row().table_id())
-            .await?;
+        // `table` is already loaded by get_partition_for_compaction above and is immutable for
+        // the duration of the job, so reuse it instead of re-fetching over the metastore RPC.
         let unique_key = table.get_row().unique_key_columns();
         let aggregate_columns = match index.get_row().get_type() {
             IndexType::Regular => None,
@@ -2361,7 +2359,13 @@ mod tests {
         ];
 
         let (chunk, _) = chunk_store
-            .add_chunk_columns(aggr_index.clone(), partition.clone(), data1.clone(), false)
+            .add_chunk_columns(
+                aggr_index.clone(),
+                &table,
+                partition.clone(),
+                data1.clone(),
+                false,
+            )
             .await
             .unwrap()
             .await
@@ -2370,7 +2374,13 @@ mod tests {
         metastore.chunk_uploaded(chunk.get_id()).await.unwrap();
 
         let (chunk, _) = chunk_store
-            .add_chunk_columns(aggr_index.clone(), partition.clone(), data2.clone(), false)
+            .add_chunk_columns(
+                aggr_index.clone(),
+                &table,
+                partition.clone(),
+                data2.clone(),
+                false,
+            )
             .await
             .unwrap()
             .await
