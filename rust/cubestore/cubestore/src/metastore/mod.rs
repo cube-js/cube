@@ -977,10 +977,13 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    /// Active partitions for each index id, positionally aligned with `index_ids`
+    /// (result[i] corresponds to index_ids[i]). Returns a Vec rather than a map because the
+    /// metastore RPC serializes with flexbuffers, which rejects non-string map keys.
     async fn get_active_partitions_for_indexes(
         &self,
         index_ids: Vec<u64>,
-    ) -> Result<HashMap<u64, Vec<IdRow<Partition>>>, CubeError>;
+    ) -> Result<Vec<Vec<IdRow<Partition>>>, CubeError>;
     async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError>;
 
     async fn get_index_with_active_partitions_out_of_queue(
@@ -3628,10 +3631,10 @@ impl MetaStore for RocksMetaStore {
     async fn get_active_partitions_for_indexes(
         &self,
         index_ids: Vec<u64>,
-    ) -> Result<HashMap<u64, Vec<IdRow<Partition>>>, CubeError> {
+    ) -> Result<Vec<Vec<IdRow<Partition>>>, CubeError> {
         self.read_operation_out_of_queue("get_active_partitions_for_indexes", move |db_ref| {
             let rocks_partition = PartitionRocksTable::new(db_ref);
-            let mut result = HashMap::with_capacity(index_ids.len());
+            let mut result = Vec::with_capacity(index_ids.len());
             for index_id in index_ids {
                 let partitions = rocks_partition
                     .get_rows_by_index(
@@ -3641,7 +3644,7 @@ impl MetaStore for RocksMetaStore {
                     .into_iter()
                     .filter(|r| r.get_row().active)
                     .collect::<Vec<_>>();
-                result.insert(index_id, partitions);
+                result.push(partitions);
             }
             Ok(result)
         })
@@ -5919,8 +5922,8 @@ mod tests {
             .get_active_partitions_by_index_id(index2.get_id())
             .await?;
 
-        // Batch over both indexes plus a non-existent one must match the per-index calls and
-        // return an empty vec (not an error) for the unknown index.
+        // Batch result is positionally aligned with the requested ids; it must match the
+        // per-index calls and return an empty vec (not an error) for the unknown index.
         let unknown_index_id = index2.get_id() + 1000;
         let batch = meta_store
             .get_active_partitions_for_indexes(vec![
@@ -5932,9 +5935,9 @@ mod tests {
 
         let ids = |ps: &Vec<IdRow<Partition>>| ps.iter().map(|p| p.get_id()).collect::<Vec<_>>();
         assert_eq!(batch.len(), 3);
-        assert_eq!(ids(&batch[&index1.get_id()]), ids(&single1));
-        assert_eq!(ids(&batch[&index2.get_id()]), ids(&single2));
-        assert!(batch[&unknown_index_id].is_empty());
+        assert_eq!(ids(&batch[0]), ids(&single1));
+        assert_eq!(ids(&batch[1]), ids(&single2));
+        assert!(batch[2].is_empty());
 
         Ok(())
     }

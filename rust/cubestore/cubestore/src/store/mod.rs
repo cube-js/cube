@@ -2977,18 +2977,27 @@ impl ChunkStore {
         let table = self.meta_store.get_table_by_id(table_id).await?;
         // When batching is enabled, fetch the active partitions of all indexes in one RPC
         // instead of one per index inside partition_rows_for_index.
+        // When batching is enabled the result is positionally aligned with `indexes`
+        // (result[i] holds index `indexes[i]`'s active partitions).
         let mut partitions_by_index = if self.config.metastore_batch_rpc() {
             let index_ids = indexes.iter().map(|i| i.get_id()).collect::<Vec<_>>();
-            Some(
-                self.meta_store
-                    .get_active_partitions_for_indexes(index_ids)
-                    .await?,
-            )
+            let fetched = self
+                .meta_store
+                .get_active_partitions_for_indexes(index_ids)
+                .await?;
+            if fetched.len() != indexes.len() {
+                return Err(CubeError::internal(format!(
+                    "Batched active-partition fetch returned {} entries for {} indexes",
+                    fetched.len(),
+                    indexes.len()
+                )));
+            }
+            Some(fetched)
         } else {
             None
         };
         let mut futures = Vec::new();
-        for index in indexes.iter() {
+        for (i, index) in indexes.iter().enumerate() {
             let index_columns = index.get_row().columns();
             let index_columns_copy = index_columns.clone();
             let columns = columns.to_vec();
@@ -2999,19 +3008,9 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            // In batch mode the map always has an entry per requested index id (the RPC inserts
-            // one for every id, empty vec included). A missing key means the requested ids and
-            // the indexes iterated here diverged — an internal bug we surface rather than
-            // silently passing an empty set, which would trip the corrupt-data path below.
-            let preset_partitions = match partitions_by_index.as_mut() {
-                Some(map) => Some(map.remove(&index.get_id()).ok_or_else(|| {
-                    CubeError::internal(format!(
-                        "Active partitions missing for index {} in batched fetch",
-                        index.get_id()
-                    ))
-                })?),
-                None => None,
-            };
+            let preset_partitions = partitions_by_index
+                .as_mut()
+                .map(|all| std::mem::take(&mut all[i]));
             futures.push(self.partition_rows_for_index(
                 &index,
                 &table,
