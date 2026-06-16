@@ -1576,6 +1576,63 @@ Required when using an AWS instance role.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid number in minutes | `180`                  | `180`                 |
 
+## `CUBESTORE_AZURE_ACCESS_KEY`
+
+The access key for the Azure Storage account. Optional when using Azure Blob
+Storage. If not set, falls back to SAS token authentication or
+federated token credentials.
+
+| Possible Values                   | Default in Development | Default in Production |
+| --------------------------------- | ---------------------- | --------------------- |
+| A valid Azure Storage account key | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_ACCOUNT`
+
+The name of the Azure Storage account. Required when
+`CUBESTORE_AZURE_CONTAINER` is set.
+
+| Possible Values                    | Default in Development | Default in Production |
+| ---------------------------------- | ---------------------- | --------------------- |
+| A valid Azure Storage account name | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_CONTAINER`
+
+The name of the Azure Blob Storage container. Required when using Azure Blob
+Storage.
+
+| Possible Values             | Default in Development | Default in Production |
+| --------------------------- | ---------------------- | --------------------- |
+| A valid blob container name | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_ENDPOINT`
+
+A custom endpoint URL for Azure Blob Storage. Optional. Use this for local
+development with [Azurite](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite)
+or for sovereign cloud endpoints.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid URL     | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_SAS_TOKEN`
+
+A shared access signature (SAS) token for Azure Blob Storage. Optional. Used
+when `CUBESTORE_AZURE_ACCESS_KEY` is not set. If neither the access key nor
+SAS token is set, federated token credentials are used.
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid SAS token | N/A                    | N/A                   |
+
+## `CUBESTORE_AZURE_SUB_PATH`
+
+The path prefix within the Azure Blob Storage container to store
+pre-aggregations. Optional.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A valid path prefix | N/A                    | N/A                   |
+
 ## `CUBESTORE_BIND_ADDR`
 
 The address/port pair for Cube Store's MySQL-compatible interface.
