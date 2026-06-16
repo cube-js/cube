@@ -7,7 +7,7 @@ description: In the Semantic Query tab, you can query the semantic layer. On the
   <img src="https://lgo0ecceic.ucarecd.net/935959a9-1ce5-430f-8af4-c6aea1a13289/" />
 </Frame>
 
-On the left side, you can select a semantic view you would like to query. Inside the semantic view, you can see the measures and dimensions grouped either by cubes or folders. You can search within your semantic view to find the relevant member.
+On the left side, you can select a semantic view you would like to query. Inside the semantic view, you can see the measures and dimensions grouped either by cubes or folders, along with any [hierarchies](#hierarchies) defined in the data model. You can search within your semantic view to find the relevant member.
 
 ## Running queries
 
@@ -56,6 +56,24 @@ change their values, switch operators, or remove them.
 Resetting the tab or going back to the view list clears default filters
 along with the rest of the query; they are seeded again the next time you
 select a view.
+
+## Hierarchies
+
+When a semantic view exposes [hierarchies][ref-hierarchies] from its data model,
+they appear in the members panel alongside measures and dimensions. A hierarchy
+groups related dimensions into ordered levels — for example, a `Location`
+hierarchy with `State` and `City` levels — so you can drill down or roll up
+during analysis.
+
+- **Expand a hierarchy** to reveal its levels. Each level is a dimension you can
+  add to the query like any other member.
+- **Levels keep their order** from the data model, from least to most granular.
+- When a hierarchy is part of a [folder][ref-folders], it appears nested under
+  that folder, and the same dimension can belong to more than one hierarchy.
+- **Searching** matches both hierarchy names and the dimensions within their
+  levels, expanding the matching hierarchies so you can reach the level you need.
+- Switching to the **used members** view shows only the levels added to the
+  current query.
 
 ## Pivoting
 
@@ -201,4 +219,6 @@ the model behaves as intended.
 [ref-access-control]: /docs/data-modeling/access-control
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 [ref-auto-run]: /reference/data-modeling/view#auto_run
+[ref-hierarchies]: /reference/data-modeling/hierarchies
+[ref-folders]: /reference/data-modeling/view#folders
 
