@@ -1187,25 +1187,56 @@ impl ChunkStore {
         .await?;
 
         let mut new_chunk_ids: Vec<(u64, Option<u64>)> = Vec::new();
-        for w in written {
-            if w.num_rows == 0 {
-                let _ = tokio::fs::remove_file(&w.file).await;
-                continue;
-            }
-            let child = &children[w.child_index];
-            let chunk = self
-                .meta_store
-                .create_chunk(
+        if self.config.metastore_batch_rpc() {
+            // Create all child chunks in one metastore write, then upload their files. The
+            // chunks are inactive until the swap below, so creating them before the uploads
+            // matches the per-item path's visibility.
+            let mut specs = Vec::new();
+            let mut spec_files = Vec::new();
+            for w in written {
+                if w.num_rows == 0 {
+                    let _ = tokio::fs::remove_file(&w.file).await;
+                    continue;
+                }
+                let child = &children[w.child_index];
+                specs.push(Chunk::new(
                     child.get_id(),
                     w.num_rows,
                     Some(Row::new(w.min)),
                     Some(Row::new(w.max)),
                     false,
-                )
-                .await?;
-            let remote = ChunkStore::chunk_file_name(chunk.clone());
-            let file_size = self.remote_fs.upload_file(w.file, remote).await?;
-            new_chunk_ids.push((chunk.get_id(), Some(file_size)));
+                ));
+                spec_files.push(w.file);
+            }
+            if !specs.is_empty() {
+                let chunks = self.meta_store.insert_chunks(specs).await?;
+                for (file, chunk) in spec_files.into_iter().zip(chunks) {
+                    let remote = ChunkStore::chunk_file_name(chunk.clone());
+                    let file_size = self.remote_fs.upload_file(file, remote).await?;
+                    new_chunk_ids.push((chunk.get_id(), Some(file_size)));
+                }
+            }
+        } else {
+            for w in written {
+                if w.num_rows == 0 {
+                    let _ = tokio::fs::remove_file(&w.file).await;
+                    continue;
+                }
+                let child = &children[w.child_index];
+                let chunk = self
+                    .meta_store
+                    .create_chunk(
+                        child.get_id(),
+                        w.num_rows,
+                        Some(Row::new(w.min)),
+                        Some(Row::new(w.max)),
+                        false,
+                    )
+                    .await?;
+                let remote = ChunkStore::chunk_file_name(chunk.clone());
+                let file_size = self.remote_fs.upload_file(w.file, remote).await?;
+                new_chunk_ids.push((chunk.get_id(), Some(file_size)));
+            }
         }
 
         let group_ids: Vec<u64> = group.iter().map(|c| c.get_id()).collect();
@@ -2021,7 +2052,14 @@ mod tests {
     async fn repartition_chunk_range_merges_only_range() {
         // repartition_chunk_range must merge only the active persisted chunks within
         // [start, end], leaving the rest active, and conserve rows into the children.
-        let config = Config::test("repartition_chunk_range_merges_only_range");
+        // Run with batched metastore RPC on so the batched insert_chunks path in
+        // merge_chunk_group_into_children is exercised (per-item path covered by the other
+        // repartition tests, which default the flag off).
+        let config =
+            Config::test("repartition_chunk_range_merges_only_range").update_config(|mut c| {
+                c.metastore_batch_rpc = true;
+                c
+            });
         let path = "/tmp/test_repartition_range";
         let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
         let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
