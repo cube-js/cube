@@ -173,6 +173,13 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn create_partitions(
+        &self,
+        _partitions: Vec<Partition>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_partition(&self, _partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
         panic!("MetaStore mock!")
     }

@@ -884,6 +884,10 @@ pub trait MetaStore: DIService + Send + Sync {
 
     fn partition_table(&self) -> PartitionMetaStoreTable;
     async fn create_partition(&self, partition: Partition) -> Result<IdRow<Partition>, CubeError>;
+    async fn create_partitions(
+        &self,
+        partitions: Vec<Partition>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn get_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition_out_of_queue(
         &self,
@@ -2760,6 +2764,21 @@ impl MetaStore for RocksMetaStore {
             let table = PartitionRocksTable::new(db_ref.clone());
             let row_id = table.insert(partition, batch_pipe)?;
             Ok(row_id)
+        })
+        .await
+    }
+
+    async fn create_partitions(
+        &self,
+        partitions: Vec<Partition>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        self.write_operation("create_partitions", move |db_ref, batch_pipe| {
+            let table = PartitionRocksTable::new(db_ref.clone());
+            let mut result = Vec::with_capacity(partitions.len());
+            for partition in partitions {
+                result.push(table.insert(partition, batch_pipe)?);
+            }
+            Ok(result)
         })
         .await
     }
@@ -5916,6 +5935,63 @@ mod tests {
         assert_eq!(ids(&batch[&index1.get_id()]), ids(&single1));
         assert_eq!(ids(&batch[&index2.get_id()]), ids(&single2));
         assert!(batch[&unknown_index_id].is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_partitions_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_remote_fs, meta_store) = RocksMetaStore::prepare_test_metastore("create_partitions");
+
+        meta_store.create_schema("foo".to_string(), false).await?;
+        let columns = vec![Column::new("col1".to_string(), ColumnType::Int, 0)];
+        let table = meta_store
+            .create_table(
+                "foo".to_string(),
+                "t1".to_string(),
+                columns,
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await?;
+        let index = meta_store.get_default_index(table.get_id()).await?;
+        let parent = meta_store
+            .get_active_partitions_by_index_id(index.get_id())
+            .await?[0]
+            .clone();
+
+        let created = meta_store
+            .create_partitions(vec![
+                Partition::new_child(&parent, None),
+                Partition::new_child(&parent, None),
+            ])
+            .await?;
+
+        assert_eq!(created.len(), 2);
+        assert_ne!(created[0].get_id(), created[1].get_id());
+        // Both rows must be persisted and point at the same parent partition.
+        for child in &created {
+            let fetched = meta_store.get_partition(child.get_id()).await?;
+            assert_eq!(
+                fetched.get_row().parent_partition_id(),
+                &Some(parent.get_id())
+            );
+        }
 
         Ok(())
     }
