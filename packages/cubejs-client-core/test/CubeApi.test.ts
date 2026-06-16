@@ -427,6 +427,21 @@ describe('CubeApi cubeSql', () => {
     JSON.stringify({ data: [['Active']] }),
   ].join('\n');
 
+  // The backend streams a schema chunk, then (on a post-processing failure) an error
+  // chunk. The error must surface as a rejection instead of being concatenated as an
+  // `undefined` phantom row.
+  const cubeSqlResponseBodyWithError = [
+    JSON.stringify({
+      schema: [
+        { name: 'created_date', column_type: 'String' },
+      ],
+    }),
+    JSON.stringify({
+      error: "Post-Processing Error: Cast error: Error parsing '2026-05-01' as timestamp",
+      requestId: '2fbe44e4-df6f-420d-ae39-376c802323b4-span-1',
+    }),
+  ].join('\n');
+
   test('should parse lastRefreshTime from response', async () => {
     vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
@@ -470,6 +485,24 @@ describe('CubeApi cubeSql', () => {
     expect(res.lastRefreshTime).toBeUndefined();
     expect(res.schema).toEqual([{ name: 'status', column_type: 'String' }]);
     expect(res.data).toEqual([['Active']]);
+  });
+
+  test('should surface an error chunk that follows the schema instead of swallowing it', async () => {
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyWithError })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await expect(
+      cubeApi.cubeSql('SELECT created_date FROM deals')
+    ).rejects.toThrow("Post-Processing Error: Cast error: Error parsing '2026-05-01' as timestamp");
   });
 });
 

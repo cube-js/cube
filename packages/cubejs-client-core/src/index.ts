@@ -786,19 +786,49 @@ class CubeApi {
 
         const [schema, ...data] = response.error.split('\n');
 
+        let parsedSchema: any;
         try {
-          const parsedSchema = JSON.parse(schema);
-          return {
-            schema: parsedSchema.schema,
-            data: data
-              .filter((d: string) => d.trim().length)
-              .map((d: string) => JSON.parse(d).data)
-              .reduce((a: any, b: any) => a.concat(b), []),
-            ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
-          };
+          parsedSchema = JSON.parse(schema);
         } catch (err) {
+          // Schema line isn't valid JSON — the whole `error` payload is a real error.
           throw new Error(response.error);
         }
+
+        const rows: any[] = [];
+
+        for (const line of data) {
+          if (!line.trim().length) {
+            continue;
+          }
+
+          let parsed: any;
+          try {
+            parsed = JSON.parse(line);
+          } catch (err) {
+            // A non-JSON line after a valid schema means a malformed payload — fall
+            // back to surfacing the raw response rather than dropping rows silently.
+            throw new Error(response.error);
+          }
+
+          // The stream can interleave an error chunk after the schema (e.g. a
+          // post-processing/cast error surfaced mid-result). Such a line has no
+          // `data`, so the previous `JSON.parse(d).data` concat pushed an `undefined`
+          // "phantom" row and silently swallowed the failure. Surface it instead —
+          // matching how `cubeSqlStream` classifies `error` chunks.
+          if (parsed.error) {
+            throw new Error(parsed.error);
+          }
+
+          if (parsed.data) {
+            rows.push(...parsed.data);
+          }
+        }
+
+        return {
+          schema: parsedSchema.schema,
+          data: rows,
+          ...(parsedSchema.lastRefreshTime ? { lastRefreshTime: parsedSchema.lastRefreshTime } : {}),
+        };
       },
       options,
       callback
