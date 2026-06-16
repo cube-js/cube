@@ -973,6 +973,10 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn get_active_partitions_for_indexes(
+        &self,
+        index_ids: Vec<u64>,
+    ) -> Result<HashMap<u64, Vec<IdRow<Partition>>>, CubeError>;
     async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError>;
 
     async fn get_index_with_active_partitions_out_of_queue(
@@ -3602,6 +3606,29 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn get_active_partitions_for_indexes(
+        &self,
+        index_ids: Vec<u64>,
+    ) -> Result<HashMap<u64, Vec<IdRow<Partition>>>, CubeError> {
+        self.read_operation_out_of_queue("get_active_partitions_for_indexes", move |db_ref| {
+            let rocks_partition = PartitionRocksTable::new(db_ref);
+            let mut result = HashMap::with_capacity(index_ids.len());
+            for index_id in index_ids {
+                let partitions = rocks_partition
+                    .get_rows_by_index(
+                        &PartitionIndexKey::ByIndexId(index_id),
+                        &PartitionRocksIndex::IndexId,
+                    )?
+                    .into_iter()
+                    .filter(|r| r.get_row().active)
+                    .collect::<Vec<_>>();
+                result.insert(index_id, partitions);
+            }
+            Ok(result)
+        })
+        .await
+    }
+
     #[tracing::instrument(level = "trace", skip(self))]
     async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError> {
         self.read_operation("get_index", move |db_ref| {
@@ -5802,6 +5829,94 @@ mod tests {
         }
         let _ = fs::remove_dir_all(store_path);
         let _ = fs::remove_dir_all(remote_store_path);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_active_partitions_for_indexes_test() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_remote_fs, meta_store) =
+            RocksMetaStore::prepare_test_metastore("get_active_partitions_for_indexes");
+
+        meta_store.create_schema("foo".to_string(), false).await?;
+        let columns = vec![
+            Column::new("col1".to_string(), ColumnType::Int, 0),
+            Column::new("col2".to_string(), ColumnType::String, 1),
+        ];
+        // Two tables → two default indexes, each with its own initial active partition.
+        let table1 = meta_store
+            .create_table(
+                "foo".to_string(),
+                "t1".to_string(),
+                columns.clone(),
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await?;
+        let table2 = meta_store
+            .create_table(
+                "foo".to_string(),
+                "t2".to_string(),
+                columns.clone(),
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await?;
+
+        let index1 = meta_store.get_default_index(table1.get_id()).await?;
+        let index2 = meta_store.get_default_index(table2.get_id()).await?;
+
+        let single1 = meta_store
+            .get_active_partitions_by_index_id(index1.get_id())
+            .await?;
+        let single2 = meta_store
+            .get_active_partitions_by_index_id(index2.get_id())
+            .await?;
+
+        // Batch over both indexes plus a non-existent one must match the per-index calls and
+        // return an empty vec (not an error) for the unknown index.
+        let unknown_index_id = index2.get_id() + 1000;
+        let batch = meta_store
+            .get_active_partitions_for_indexes(vec![
+                index1.get_id(),
+                index2.get_id(),
+                unknown_index_id,
+            ])
+            .await?;
+
+        let ids = |ps: &Vec<IdRow<Partition>>| ps.iter().map(|p| p.get_id()).collect::<Vec<_>>();
+        assert_eq!(batch.len(), 3);
+        assert_eq!(ids(&batch[&index1.get_id()]), ids(&single1));
+        assert_eq!(ids(&batch[&index2.get_id()]), ids(&single2));
+        assert!(batch[&unknown_index_id].is_empty());
+
         Ok(())
     }
 

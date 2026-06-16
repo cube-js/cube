@@ -1581,6 +1581,119 @@ mod tests {
         let _ = fs::remove_dir_all(chunk_store_path.clone());
         let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
     }
+
+    #[tokio::test]
+    async fn partition_data_with_batch_rpc() {
+        // Exercises the CUBESTORE_METASTORE_BATCH_RPC path: build_index_chunks fetches active
+        // partitions for all indexes in one get_active_partitions_for_indexes call and routes
+        // them per index. The produced chunks must still cover every input row.
+        let config = Config::test("partition_data_with_batch_rpc").update_config(|mut c| {
+            c.metastore_batch_rpc = true;
+            c
+        });
+        let path = "/tmp/test_partition_data_batch";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
+                PathBuf::from(chunk_store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                Path::new(path),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+                10,
+            );
+
+            let col = vec![
+                Column::new("foo_int".to_string(), ColumnType::Int, 0),
+                Column::new("foo".to_string(), ColumnType::String, 1),
+                Column::new("boo".to_string(), ColumnType::String, 2),
+            ];
+            let rows = (0..35)
+                .map(|i| {
+                    Row::new(vec![
+                        TableValue::Int(34 - i),
+                        TableValue::String(format!("Foo {}", 34 - i)),
+                        TableValue::String(format!("Boo {}", 34 - i)),
+                    ])
+                })
+                .collect::<Vec<_>>();
+            let data_frame = DataFrame::new(col.clone(), rows);
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            // A secondary regular index so build_index_chunks loops over >1 index on the batch
+            // path and must route each index its own partitions.
+            let secondary = IndexDef {
+                name: "by_foo".to_string(),
+                columns: vec!["foo".to_string(), "foo_int".to_string()],
+                multi_index: None,
+                index_type: IndexType::Regular,
+            };
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    col.clone(),
+                    None,
+                    None,
+                    vec![secondary],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            let index_count = meta_store
+                .get_table_indexes(table.get_id())
+                .await
+                .unwrap()
+                .len();
+            assert_eq!(index_count, 2, "default + secondary index expected");
+
+            let data = rows_to_columns(&col, data_frame.get_rows().as_slice());
+            let jobs = chunk_store
+                .partition_data(table.get_id(), data, &col, false)
+                .await
+                .unwrap();
+            assert!(!jobs.is_empty());
+            let mut total_rows = 0u64;
+            for job in jobs {
+                let (chunk, _file_size) = job.await.unwrap().unwrap();
+                total_rows += chunk.get_row().get_row_count();
+            }
+            // Each index receives all 35 rows, routed to its own partition.
+            assert_eq!(total_rows, 35 * index_count as u64);
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+    }
+
     #[tokio::test]
     async fn create_aggr_chunk_test() {
         let config = Config::test("create_aggr_chunk_test");
@@ -2509,7 +2622,7 @@ impl ChunkStore {
             .meta_store
             .get_table_by_id(index.get_row().table_id())
             .await?;
-        self.partition_rows_for_index(&index, &table, columns, in_memory)
+        self.partition_rows_for_index(&index, &table, None, columns, in_memory)
             .await
     }
     #[tracing::instrument(level = "trace", skip(self, columns))]
@@ -2517,14 +2630,19 @@ impl ChunkStore {
         &self,
         index: &IdRow<Index>,
         table: &IdRow<Table>,
+        preset_partitions: Option<Vec<IdRow<Partition>>>,
         mut columns: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
         let index_id = index.get_id();
-        let partitions = self
-            .meta_store
-            .get_active_partitions_by_index_id(index_id)
-            .await?;
+        let partitions = match preset_partitions {
+            Some(partitions) => partitions,
+            None => {
+                self.meta_store
+                    .get_active_partitions_by_index_id(index_id)
+                    .await?
+            }
+        };
         let sort_key_size = index.get_row().sort_key_size() as usize;
 
         let expected_columns = index.get_row().get_columns().len();
@@ -2819,6 +2937,18 @@ impl ChunkStore {
         // The table is the same for every index/chunk produced by this call, so load it once
         // here instead of re-fetching it per chunk over the metastore RPC downstream.
         let table = self.meta_store.get_table_by_id(table_id).await?;
+        // When batching is enabled, fetch the active partitions of all indexes in one RPC
+        // instead of one per index inside partition_rows_for_index.
+        let mut partitions_by_index = if self.config.metastore_batch_rpc() {
+            let index_ids = indexes.iter().map(|i| i.get_id()).collect::<Vec<_>>();
+            Some(
+                self.meta_store
+                    .get_active_partitions_for_indexes(index_ids)
+                    .await?,
+            )
+        } else {
+            None
+        };
         let mut futures = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();
@@ -2831,7 +2961,26 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            futures.push(self.partition_rows_for_index(&index, &table, remapped, in_memory));
+            // In batch mode the map always has an entry per requested index id (the RPC inserts
+            // one for every id, empty vec included). A missing key means the requested ids and
+            // the indexes iterated here diverged — an internal bug we surface rather than
+            // silently passing an empty set, which would trip the corrupt-data path below.
+            let preset_partitions = match partitions_by_index.as_mut() {
+                Some(map) => Some(map.remove(&index.get_id()).ok_or_else(|| {
+                    CubeError::internal(format!(
+                        "Active partitions missing for index {} in batched fetch",
+                        index.get_id()
+                    ))
+                })?),
+                None => None,
+            };
+            futures.push(self.partition_rows_for_index(
+                &index,
+                &table,
+                preset_partitions,
+                remapped,
+                in_memory,
+            ));
         }
 
         let new_chunks = join_all(futures)

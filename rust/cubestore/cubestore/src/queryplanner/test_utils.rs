@@ -330,6 +330,13 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn get_active_partitions_for_indexes(
+        &self,
+        _index_ids: Vec<u64>,
+    ) -> Result<HashMap<u64, Vec<IdRow<Partition>>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_index(&self, _index_id: u64) -> Result<IdRow<Index>, CubeError> {
         panic!("MetaStore mock!")
     }
