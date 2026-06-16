@@ -3583,6 +3583,155 @@ mod tests {
         Ok(())
     }
 
+    // Same drain-and-verify flow, but on an aggregate-index table whose chunks share
+    // dimension keys across inserts. The repartition merge groups those rows by the
+    // sort key and emits fewer rows than it consumed, so the swap activates fewer rows
+    // than it deactivates. This is the production scenario that failed with "Deactivated
+    // row count (..) doesn't match activated row count (..) during swap"; the merge path
+    // must commit with the unchecked swap. `sum(m)` is conserved by the aggregation, so it
+    // is the invariant we assert end-to-end.
+    async fn assert_repartition_drains_and_keeps_aggregate_data(
+        services: &CubeServices,
+    ) -> Result<(), CubeError> {
+        let service = &services.sql_service;
+
+        service
+            .exec_query("CREATE SCHEMA foo")
+            .await?
+            .collect()
+            .await?;
+
+        service
+            .exec_query(
+                "CREATE TABLE foo.aggr (g int, m int) \
+                 AGGREGATIONS (sum(m)) AGGREGATE INDEX byg (g)",
+            )
+            .await?
+            .collect()
+            .await?;
+
+        // 200 single-row inserts cycling g over 0..40, so every g is inserted 5 times
+        // across distinct chunks. Aggregated, the table holds 40 rows; sum(m) stays 200.
+        let n: i64 = 200;
+        let distinct: i64 = 40;
+        for i in 0..n {
+            service
+                .exec_query(&format!(
+                    "INSERT INTO foo.aggr (g, m) VALUES ({}, 1)",
+                    i % distinct
+                ))
+                .await?
+                .collect()
+                .await?;
+        }
+
+        let mut drained = false;
+        for _ in 0..300 {
+            let pending = services
+                .meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?;
+            if pending.is_empty() {
+                drained = true;
+                break;
+            }
+            Delay::new(Duration::from_millis(50)).await;
+        }
+        assert!(
+            drained,
+            "inactive partitions were not fully repartitioned in time"
+        );
+
+        // The aggregate index must have actually split into more than one partition.
+        let aggr_index = services
+            .meta_store
+            .get_table_indexes(1)
+            .await?
+            .into_iter()
+            .find(|i| i.get_row().get_name() == "byg")
+            .expect("aggregate index byg must exist");
+        let active = services
+            .meta_store
+            .get_active_partitions_by_index_id(aggr_index.get_id())
+            .await?;
+        assert!(
+            active.len() > 1,
+            "expected aggregate index to split, got {} active partitions",
+            active.len()
+        );
+
+        let result = service
+            .exec_query("SELECT sum(m) from foo.aggr")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(n)]));
+
+        let result = service
+            .exec_query("SELECT g, sum(m) from foo.aggr GROUP BY g ORDER BY g")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(
+            result.get_rows().len(),
+            distinct as usize,
+            "every distinct dimension value must survive the repartition"
+        );
+        for (g, row) in result.get_rows().iter().enumerate() {
+            assert_eq!(
+                row,
+                &Row::new(vec![
+                    TableValue::Int(g as i64),
+                    TableValue::Int(n / distinct)
+                ]),
+                "aggregated sum for g={} must be conserved",
+                g
+            );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_range_jobs_aggregate_index_keeps_data_consistent() -> Result<(), CubeError>
+    {
+        // Range strategy on an aggregate-index table: the repartition merge dedups rows by
+        // the sort key, so the commit must use the unchecked swap. Guards the production
+        // RepartitionRange row-count-mismatch regression end-to-end.
+        Config::test("repartition_range_jobs_aggregate_index_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::Range;
+                c.repartition_merge_max_rows = 40;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_aggregate_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_merge_aggregate_index_keeps_data_consistent() -> Result<(), CubeError> {
+        // PerPartition merge on an aggregate-index table; same dedup invariant as the range
+        // variant above.
+        Config::test("repartition_merge_aggregate_index_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 4;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_aggregate_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn repartition_keeps_data_consistent() -> Result<(), CubeError> {
         Config::test("repartition_keeps_data_consistent")
