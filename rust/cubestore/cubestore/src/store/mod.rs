@@ -2572,6 +2572,9 @@ impl ChunkStore {
         }
 
         let mut futures = Vec::new();
+        // The disk-space check resolves to a per-node total, so checking each distinct target
+        // node once is enough; this avoids one metastore RPC per partition written.
+        let mut checked_nodes: HashSet<String> = HashSet::new();
         for partition in partitions.into_iter() {
             let min = partition.get_row().get_min_val().as_ref();
             let max = partition.get_row().get_max_val().as_ref();
@@ -2593,7 +2596,10 @@ impl ChunkStore {
                         ) > Ordering::Equal)
             });
             if to_write.len() > 0 {
-                if !in_memory {
+                if !in_memory
+                    && checked_nodes
+                        .insert(node_name_by_partition(self.config.as_ref(), &partition))
+                {
                     self.check_node_disk_space(&partition).await?;
                 }
                 let to_write = UInt64Array::from(to_write);
