@@ -1082,6 +1082,10 @@ impl ChunkStore {
             IndexType::Regular => None,
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
         };
+        // merge_chunks collapses rows only for aggregate indexes (group-by) and unique-key
+        // tables (last-row dedup). For a plain regular index it is a pure sort-merge that
+        // conserves the row count, so we keep the checked swap there as an integrity guard.
+        let merge_collapses_rows = unique_key.is_some() || aggregate_columns.is_some();
         let schema = Arc::new(arrow_schema(index.get_row()));
 
         // Download the group's chunk parquets into the local cache concurrently before
@@ -1220,15 +1224,21 @@ impl ChunkStore {
 
         let replay_handle_id =
             merge_replay_handles(self.meta_store.clone(), &group.to_vec(), table.get_id()).await?;
-        // Commit with the unchecked swap (like compaction does): merge_chunks aggregates /
-        // last-row-dedups the group for aggregate indexes and unique-key tables, so the
-        // activated row count is legitimately smaller than the deactivated one. The checked
-        // swap_chunks would reject that as a row-count mismatch, failing the repartition job.
-        if let Err(e) = self
-            .meta_store
-            .swap_chunks_without_check(group_ids.clone(), new_chunk_ids, replay_handle_id)
-            .await
-        {
+        // For aggregate indexes and unique-key tables merge_chunks aggregates / last-row-dedups
+        // the group, so the activated row count is legitimately smaller than the deactivated one
+        // and the checked swap would reject it as a mismatch (like compaction commits its own
+        // dedup'd merges unchecked). A plain regular index keeps every row, so commit it through
+        // the checked swap to preserve the row-count integrity guard.
+        let swap_result = if merge_collapses_rows {
+            self.meta_store
+                .swap_chunks_without_check(group_ids.clone(), new_chunk_ids, replay_handle_id)
+                .await
+        } else {
+            self.meta_store
+                .swap_chunks(group_ids.clone(), new_chunk_ids, replay_handle_id)
+                .await
+        };
+        if let Err(e) = swap_result {
             let mut all_active = true;
             for id in &group_ids {
                 let active = self
