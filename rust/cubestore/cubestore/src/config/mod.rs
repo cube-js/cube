@@ -580,6 +580,12 @@ pub trait ConfigObj: DIService {
     /// Cap on the total rows merged together in one Merge group / RepartitionRange.
     fn repartition_merge_max_rows(&self) -> u64;
 
+    /// When enabled, the merge repartition path deactivates a table as corrupt if the
+    /// active children resolved for an inactive parent overlap. Off by default: the
+    /// streaming split never drops rows (the first child is the low catch-all, the last
+    /// the high one), and the legacy per-chunk path performed no such metadata check.
+    fn repartition_check_overlapping_children(&self) -> bool;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -734,6 +740,7 @@ pub struct ConfigObjImpl {
     pub repartition_strategy: RepartitionStrategy,
     pub repartition_merge_max_input_files: usize,
     pub repartition_merge_max_rows: u64,
+    pub repartition_check_overlapping_children: bool,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1069,6 +1076,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn repartition_merge_max_rows(&self) -> u64 {
         self.repartition_merge_max_rows
+    }
+    fn repartition_check_overlapping_children(&self) -> bool {
+        self.repartition_check_overlapping_children
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1755,6 +1765,10 @@ impl Config {
                     "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
                     4_000_000,
                 ),
+                repartition_check_overlapping_children: env_bool(
+                    "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
+                    false,
+                ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -2003,6 +2017,7 @@ impl Config {
                 repartition_strategy: RepartitionStrategy::PerChunk,
                 repartition_merge_max_input_files: 50,
                 repartition_merge_max_rows: 4_000_000,
+                repartition_check_overlapping_children: false,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,

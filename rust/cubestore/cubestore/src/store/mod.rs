@@ -972,9 +972,9 @@ impl ChunkStore {
 
     // Resolve the parent's children for repartition: active partitions of the index
     // within the parent's range, ordered by min bound (the bound the writer routes on,
-    // kept monotonic), plus the interior split boundaries. The children must tile the
-    // parent's range exactly (matching outer bounds, touching interior bounds) or the
-    // table is deactivated as corrupt, the same guard partition_rows applies.
+    // kept monotonic), plus the interior split boundaries. Children must be non-empty
+    // and non-overlapping; the merge stream-splits across them with the first child as
+    // the low catch-all and the last as the high catch-all, so no row is ever dropped.
     async fn compute_repartition_children(
         &self,
         partition: &IdRow<Partition>,
@@ -1007,40 +1007,43 @@ impl ChunkStore {
             )));
         }
 
-        // Children that are present but do not tile the parent's range exactly (gap or
-        // overlap) is genuine metadata corruption — rows could be routed into a child
-        // whose range does not contain them. Deactivate the table, the same response
-        // partition_rows gives when a row cannot be assigned to any partition.
-        let bounds_eq = |a: Option<&Row>, b: Option<&Row>| match (a, b) {
-            (None, None) => true,
-            (Some(x), Some(y)) => cmp_min_rows(key_size, Some(x), Some(y)) == Ordering::Equal,
-            _ => false,
-        };
-        let tiles_parent = bounds_eq(
-            children[0].get_row().get_min_val().as_ref(),
-            partition.get_row().get_min_val().as_ref(),
-        ) && bounds_eq(
-            children.last().unwrap().get_row().get_max_val().as_ref(),
-            partition.get_row().get_max_val().as_ref(),
-        ) && children.windows(2).all(|w| {
-            bounds_eq(
-                w[0].get_row().get_max_val().as_ref(),
-                w[1].get_row().get_min_val().as_ref(),
-            )
-        });
-        if !tiles_parent {
-            let message = format!(
-                "Repartition of {} found children that do not tile its range: {:?}",
-                partition.get_id(),
-                children.iter().map(|c| c.get_id()).collect::<Vec<_>>()
-            );
-            deactivate_table_due_to_corrupt_data(
-                self.meta_store.clone(),
-                index.get_row().table_id(),
-                message.clone(),
-            )
-            .await?;
-            return Err(CubeError::internal(message));
+        // Optional metadata sanity check (off by default): the active children must not
+        // overlap. Gaps between adjacent children are expected and benign — a partition's
+        // min/max are its data extent, and a split sets a child's lower bound to the first
+        // segment's data min rather than the parent's lower bound, so adjacent partitions
+        // legitimately leave empty key ranges between them. Only an overlap (a child whose
+        // range starts before the previous child's range ends) is genuine metadata
+        // corruption — a row could then belong to two children. The streaming split never
+        // drops rows regardless, so this is a defensive check, not a correctness
+        // requirement, and the legacy per-chunk path performed no such check.
+        if self.config.repartition_check_overlapping_children() {
+            let overlapping = children.windows(2).find(|w| {
+                match (
+                    w[0].get_row().get_max_val().as_ref(),
+                    w[1].get_row().get_min_val().as_ref(),
+                ) {
+                    // An interior child must be right-bounded and the next left-bounded;
+                    // an open bound in the middle of the ordering is itself corruption.
+                    (Some(prev_max), Some(next_min)) => {
+                        cmp_min_rows(key_size, Some(prev_max), Some(next_min)) == Ordering::Greater
+                    }
+                    _ => true,
+                }
+            });
+            if overlapping.is_some() {
+                let message = format!(
+                    "Repartition of {} found overlapping children: {:?}",
+                    partition.get_id(),
+                    children.iter().map(|c| c.get_id()).collect::<Vec<_>>()
+                );
+                deactivate_table_due_to_corrupt_data(
+                    self.meta_store.clone(),
+                    index.get_row().table_id(),
+                    message.clone(),
+                )
+                .await?;
+                return Err(CubeError::internal(message));
+            }
         }
 
         let boundaries: Vec<Row> = children
