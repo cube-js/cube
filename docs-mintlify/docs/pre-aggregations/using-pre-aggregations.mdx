@@ -874,6 +874,16 @@ used for query processing:
 +-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
 ```
 
+Unlike `EXPLAIN` and `EXPLAIN ANALYZE`, which only show the plan, `EXPLAIN ANALYZE
+DETAILED` actually executes the query under per-query tracing and renders a
+detailed execution trace as a tree with a per-category timing summary. Use it to
+diagnose where time is spent within a query:
+
+```sql
+EXPLAIN ANALYZE DETAILED SELECT orders__platform, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+GROUP BY orders__platform;
+```
+
 When you're debugging performance, one thing to keep in mind is that Cube Store, due to its design, will always use some index to query data, and usage of the index itself doesn't necessarily tell if the particular query is performing optimally or not.
 What's important to look at is aggregation and partition merge strategies.
 In most of the cases for aggregation, Cube Store will use `HashAggregate` or `InplaceAggregate` strategy as well as `Merge` and `MergeSort` operators to merge different partitions.
