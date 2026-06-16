@@ -2729,7 +2729,9 @@ impl ChunkStore {
 
         let mut futures = Vec::new();
         // The disk-space check resolves to a per-node total, so checking each distinct target
-        // node once is enough; this avoids one metastore RPC per partition written.
+        // node once is enough; this avoids one metastore RPC per partition written. When the
+        // limit is disabled (the common case) skip the node-name/dedup work entirely.
+        let disk_check_enabled = !in_memory && self.config.max_disk_space_per_worker() != 0;
         let mut checked_nodes: HashSet<String> = HashSet::new();
         for partition in partitions.into_iter() {
             let min = partition.get_row().get_min_val().as_ref();
@@ -2752,7 +2754,7 @@ impl ChunkStore {
                         ) > Ordering::Equal)
             });
             if to_write.len() > 0 {
-                if !in_memory
+                if disk_check_enabled
                     && checked_nodes
                         .insert(node_name_by_partition(self.config.as_ref(), &partition))
                 {
@@ -2976,9 +2978,8 @@ impl ChunkStore {
         // here instead of re-fetching it per chunk over the metastore RPC downstream.
         let table = self.meta_store.get_table_by_id(table_id).await?;
         // When batching is enabled, fetch the active partitions of all indexes in one RPC
-        // instead of one per index inside partition_rows_for_index.
-        // When batching is enabled the result is positionally aligned with `indexes`
-        // (result[i] holds index `indexes[i]`'s active partitions).
+        // instead of one per index inside partition_rows_for_index. The result is positionally
+        // aligned with `indexes` (result[i] holds index indexes[i]'s active partitions).
         let mut partitions_by_index = if self.config.metastore_batch_rpc() {
             let index_ids = indexes.iter().map(|i| i.get_id()).collect::<Vec<_>>();
             let fetched = self
@@ -2992,6 +2993,18 @@ impl ChunkStore {
                     indexes.len()
                 )));
             }
+            // Guard the positional pairing below: each entry's partitions must belong to the
+            // index at the same position. Cheap insurance against a future caller passing a
+            // reordered/sub-selected index slice.
+            debug_assert!(
+                fetched
+                    .iter()
+                    .zip(indexes.iter())
+                    .all(|(parts, index)| parts
+                        .iter()
+                        .all(|p| p.get_row().get_index_id() == index.get_id())),
+                "batched active-partition fetch is not aligned with the requested indexes"
+            );
             Some(fetched)
         } else {
             None
