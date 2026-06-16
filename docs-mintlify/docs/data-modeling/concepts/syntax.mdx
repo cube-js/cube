@@ -85,6 +85,10 @@ Common rules apply to names of entities within the data model. All names must:
 - Consist of letters, numbers, and underscore (`_`) symbols only.
 - Not be a [reserved keyword in Python][link-python-reserved-words], e.g., `from`, `return`, or `yield`.
 - When using the DAX API, not clash with the names of columns in [date hierarchies][ref-dax-api-date-hierarchies].
+- Be unique within their scope. Cube and view names must be unique across the data
+  model; members (measures, dimensions, segments, pre-aggregations, hierarchies) must
+  be unique within their cube; and folder names must be unique within their view. Cube
+  will report an error for duplicates.
 
 It is also recommended that names use [snake case][wiki-snake-case].
 
