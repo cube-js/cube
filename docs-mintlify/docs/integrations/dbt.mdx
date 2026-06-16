@@ -64,7 +64,7 @@ Expand the **dbt project (optional)** section.
 | **Repository URL** | The HTTPS clone URL of the repo that contains your dbt project, e.g. `https://github.com/your-org/your-repo.git`. |
 | **Access token (PAT)** | A personal access token with read access to the repository. Leave it unchanged to reuse the existing token. |
 | **Project path** | The path to the dbt project inside the repository (the folder containing `dbt_project.yml`). Use `.` if the project is at the repository root. |
-| **dbt target schema** | The schema your production dbt run builds models into (the `schema` of your production target in `profiles.yml`). Generated cubes will reference the tables in this schema. |
+| **dbt models schema** | The schema or dataset where your production dbt run builds its tables. Generated cubes will query the models in this schema. |
 
 </Step>
 
@@ -286,14 +286,14 @@ filters. Adjust the selector/marts folder and try again. Confirm the selector wi
 
 dbt Pull generates cube definitions that point at `schema.<model>`, but it doesn't
 build the tables. Make sure your production `dbt run` has materialized the models
-into the **dbt target schema** you configured, and that the schema matches.
+into the **dbt models schema** you configured, and that the schema matches.
 
 </Accordion>
 
 <Accordion title="A generated cube points at the wrong table or schema">
 
-The `sql_table` is derived from your dbt project and the **dbt target schema**
-setting. Verify that **dbt target schema** matches where your models actually land,
+The `sql_table` is derived from your dbt project and the **dbt models schema**
+setting. Verify that **dbt models schema** matches where your models actually land,
 and that any per-model schema/database overrides in dbt are what you expect.
 
 </Accordion>
