@@ -22,6 +22,16 @@ query {
 | `cubeQueryArgs` | [`CubeQueryArgs`](#cube-query-args) | Options that apply to the entire query     |
 | `cubeArgs`      | [`CubeArgs`](#cube-args)            | Options that apply only to a specific cube |
 
+## Response extensions
+
+In addition to the `data` field, the GraphQL response includes an `extensions`
+object with query metadata:
+
+- `annotation` — metadata for the query members (titles, types), the same as the
+  `annotation` field of the [REST API][ref-rest-api] response.
+- `lastRefreshTime` — an ISO 8601 timestamp indicating when the data was last
+  refreshed.
+
 ## `CubeQueryArgs`
 
 - **`where` ([`RootWhereInput`](#root-where-input)):** Represents a SQL `WHERE` clause.
@@ -110,6 +120,7 @@ format, e.g., `America/Los_Angeles`.
 `asc` | `desc`
 
 [ref-graphql-api]: /reference/graphql-api
-[ref-row-limit]: /reference/queries#row-limit
-[ref-time-zone]: /reference/queries#time-zone
-[ref-ungrouped-query]: /reference/queries#ungrouped-query
+[ref-rest-api]: /reference/core-data-apis/rest-api/reference
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
+[ref-ungrouped-query]: /reference/core-data-apis/queries#ungrouped-query
