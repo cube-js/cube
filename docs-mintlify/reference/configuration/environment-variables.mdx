@@ -1576,6 +1576,28 @@ Required when using an AWS instance role.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid number in minutes | `180`                  | `180`                 |
 
+## `CUBESTORE_AWS_WEB_IDENTITY_TOKEN_FILE`
+
+The path to an AWS web identity token file. When `CUBESTORE_AWS_ACCESS_KEY_ID` is
+not set and this variable is present, Cube Store authenticates to S3 using AWS Web
+Identity (for example, [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+on Amazon EKS): it exchanges the token for
+temporary credentials via STS `AssumeRoleWithWebIdentity` and re-exchanges them
+when the token file changes.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid file path | N/A                  | N/A                   |
+
+## `CUBESTORE_AWS_ROLE_ARN`
+
+The ARN of the AWS IAM role to assume when using
+[`CUBESTORE_AWS_WEB_IDENTITY_TOKEN_FILE`](#cubestore_aws_web_identity_token_file).
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid IAM role ARN | N/A                 | N/A                   |
+
 ## `CUBESTORE_BIND_ADDR`
 
 The address/port pair for Cube Store's MySQL-compatible interface.
