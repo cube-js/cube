@@ -4,10 +4,11 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        wrapper_replacer_context,
+        wrapper_replacer_context, BinaryExprOp,
     },
-    var,
+    var, var_iter,
 };
+use datafusion::logical_plan::Operator;
 use egg::Subst;
 
 impl WrapperRules {
@@ -70,9 +71,10 @@ impl WrapperRules {
 
     fn transform_binary_expr(
         &self,
-        _operator_var: &'static str,
+        operator_var: &'static str,
         input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let operator_var = var!(operator_var);
         let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
@@ -81,8 +83,27 @@ impl WrapperRules {
                 return false;
             };
 
-            // TODO check supported operators
-            Self::can_rewrite_template(&data_source, &meta, "expressions/binary")
+            if !Self::can_rewrite_template(&data_source, &meta, "expressions/binary") {
+                return false;
+            }
+
+            for op in var_iter!(egraph[subst[operator_var]], BinaryExprOp) {
+                match op {
+                    Operator::Like | Operator::NotLike => {
+                        if Self::can_rewrite_template(&data_source, &meta, "expressions/like") {
+                            return true;
+                        }
+                    }
+                    Operator::ILike | Operator::NotILike => {
+                        if Self::can_rewrite_template(&data_source, &meta, "expressions/ilike") {
+                            return true;
+                        }
+                    }
+                    _ => return true,
+                }
+            }
+
+            false
         }
     }
 }

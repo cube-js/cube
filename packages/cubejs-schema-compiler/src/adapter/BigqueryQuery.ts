@@ -354,7 +354,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';
-    delete templates.expressions.ilike;
+    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
