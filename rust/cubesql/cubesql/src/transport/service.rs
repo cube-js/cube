@@ -892,6 +892,22 @@ impl SqlTemplates {
         self.render_template("expressions/timestamp_literal", context! { value => value })
     }
 
+    pub fn timestamp_tz_named_timezone_cast_expr(
+        &self,
+        timestamp: String,
+        timezone: String,
+        value: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/timestamp_tz_named_timezone_cast",
+            context! {
+                timestamp => timestamp,
+                timezone => timezone,
+                value => value,
+            },
+        )
+    }
+
     pub fn like_expr(
         &self,
         like_type: LikeType,

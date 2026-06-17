@@ -1,5 +1,3 @@
-use chrono::{Duration, LocalResult, NaiveDateTime, Offset, SecondsFormat, TimeZone, Timelike};
-use chrono_tz::Tz;
 use itertools::Itertools;
 use log::trace;
 use pg_srv::{
@@ -13,7 +11,7 @@ use sqlparser::ast::{
 use std::{collections::HashMap, error::Error};
 
 use super::types::ColumnType;
-use crate::sql::postgres::ConnectionError;
+use crate::{sql::postgres::ConnectionError, utils::parse_named_timezone_timestamp};
 
 #[derive(Debug)]
 enum PlaceholderType {
@@ -859,9 +857,9 @@ impl CastReplacer {
 }
 
 #[derive(Debug)]
-pub struct TimestamptzLiteralReplacer {}
+pub struct PlainTimestampTimezoneSuffixReplacer {}
 
-impl TimestamptzLiteralReplacer {
+impl PlainTimestampTimezoneSuffixReplacer {
     pub fn new() -> Self {
         Self {}
     }
@@ -874,105 +872,42 @@ impl TimestamptzLiteralReplacer {
         result
     }
 
-    fn parse_value_to_str(value: &Value) -> Option<&str> {
-        match value {
-            Value::SingleQuotedString(str) | Value::DoubleQuotedString(str) => Some(&str),
-            _ => None,
-        }
-    }
-
-    fn named_timezone_timestamp_to_rfc3339(value: &str) -> Option<String> {
-        let value = value.trim();
-        let separator_index = value
-            .char_indices()
-            .rev()
-            .find(|(_, ch)| ch.is_whitespace())
-            .map(|(idx, _)| idx)?;
-        let (timestamp, timezone) = value.split_at(separator_index);
-        let timezone = timezone.trim().parse::<Tz>().ok()?;
-        let timestamp = timestamp.trim();
-        let datetime = [
-            "%Y-%m-%dT%H:%M:%S%.f",
-            "%Y-%m-%d %H:%M:%S%.f",
-            "%Y-%m-%dT%H:%M",
-            "%Y-%m-%d %H:%M",
-        ]
-        .iter()
-        .find_map(|format| NaiveDateTime::parse_from_str(timestamp, format).ok())?;
-
-        match timezone.from_local_datetime(&datetime) {
-            LocalResult::Single(datetime) => {
-                Some(datetime.to_rfc3339_opts(SecondsFormat::Millis, true))
-            }
-            // PostgreSQL resolves ambiguous local times to the standard-time occurrence. For
-            // fall-back transitions chrono_tz returns the earlier daylight occurrence first.
-            LocalResult::Ambiguous(_, datetime) => {
-                Some(datetime.to_rfc3339_opts(SecondsFormat::Millis, true))
-            }
-            LocalResult::None => {
-                let before = datetime.checked_sub_signed(Duration::days(1))?;
-                let before = timezone.from_local_datetime(&before).earliest()?;
-                Some(Self::format_naive_datetime_with_offset(
-                    datetime,
-                    before.offset().fix(),
-                ))
-            }
-        }
-    }
-
-    fn format_naive_datetime_with_offset(
-        datetime: NaiveDateTime,
-        offset: chrono::FixedOffset,
-    ) -> String {
-        format!(
-            "{}.{:03}{}",
-            datetime.format("%Y-%m-%dT%H:%M:%S"),
-            datetime.nanosecond() / 1_000_000,
-            offset
+    fn is_plain_timestamp_data_type(data_type: &ast::DataType) -> bool {
+        matches!(
+            data_type,
+            ast::DataType::Timestamp(
+                _,
+                ast::TimezoneInfo::None | ast::TimezoneInfo::WithoutTimeZone
+            )
         )
     }
 
-    fn is_timestamptz_data_type(data_type: &ast::DataType) -> bool {
-        match data_type {
-            ast::DataType::Timestamp(
-                _,
-                ast::TimezoneInfo::WithTimeZone | ast::TimezoneInfo::Tz,
-            ) => true,
-            ast::DataType::Custom(name, _) => name.to_string().eq_ignore_ascii_case("timestamptz"),
-            _ => false,
-        }
-    }
+    fn strip_plain_timestamp_timezone_suffix(value: &mut ast::Value) {
+        // Postgres ignores zones in timestamp without time zone literals.
+        let timestamp = match value {
+            Value::SingleQuotedString(str) | Value::DoubleQuotedString(str) => {
+                parse_named_timezone_timestamp(str).map(|(timestamp, _)| timestamp)
+            }
+            _ => None,
+        };
 
-    /// Rewrites a named-IANA-timezone timestamp value in place to an offset-bearing RFC3339
-    /// string. Returns `true` only when the value was a named-timezone literal that was
-    /// normalized, so callers can leave unrelated timestamptz values (and their type) untouched.
-    fn normalize_timestamptz_value(value: &mut ast::Value) -> bool {
-        if let Some(timestamp) =
-            Self::parse_value_to_str(value).and_then(Self::named_timezone_timestamp_to_rfc3339)
-        {
+        if let Some(timestamp) = timestamp {
             *value = Value::SingleQuotedString(timestamp);
-            true
-        } else {
-            false
         }
     }
 
-    fn normalize_timestamptz_literal(expr: &mut Expr) -> bool {
+    fn strip_plain_timestamp_timezone_literal(expr: &mut Expr) {
         if let Expr::Value(value) = expr {
-            Self::normalize_timestamptz_value(&mut value.value)
-        } else {
-            false
+            Self::strip_plain_timestamp_timezone_suffix(&mut value.value);
         }
     }
 }
 
-impl<'ast> Visitor<'ast, ConnectionError> for TimestamptzLiteralReplacer {
+impl<'ast> Visitor<'ast, ConnectionError> for PlainTimestampTimezoneSuffixReplacer {
     fn transform_expr(&mut self, expr: &mut Expr) -> Result<(), ConnectionError> {
         if let Expr::TypedString(typed_string) = expr {
-            if Self::is_timestamptz_data_type(&typed_string.data_type)
-                && Self::normalize_timestamptz_value(&mut typed_string.value.value)
-            {
-                typed_string.data_type = ast::DataType::Timestamp(None, ast::TimezoneInfo::None);
+            if Self::is_plain_timestamp_data_type(&typed_string.data_type) {
+                Self::strip_plain_timestamp_timezone_suffix(&mut typed_string.value.value);
             }
         }
 
@@ -987,10 +922,8 @@ impl<'ast> Visitor<'ast, ConnectionError> for TimestamptzLiteralReplacer {
         } = expr
         {
             self.visit_expr(&mut *cast_expr)?;
-            if Self::is_timestamptz_data_type(data_type)
-                && Self::normalize_timestamptz_literal(cast_expr)
-            {
-                *data_type = ast::DataType::Timestamp(None, ast::TimezoneInfo::None);
+            if Self::is_plain_timestamp_data_type(data_type) {
+                Self::strip_plain_timestamp_timezone_literal(cast_expr);
             }
         }
 
@@ -1515,13 +1448,16 @@ mod tests {
         Ok(())
     }
 
-    fn run_timestamptz_literal_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+    fn run_plain_timestamp_timezone_suffix_replacer(
+        input: &str,
+        output: &str,
+    ) -> Result<(), CubeError> {
         let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
             .unwrap()
             .pop()
             .expect("must contain at least one statement");
 
-        let replacer = TimestamptzLiteralReplacer::new();
+        let replacer = PlainTimestampTimezoneSuffixReplacer::new();
         let res = replacer.replace(stmt);
 
         assert_eq!(res.to_string(), output);
@@ -1529,16 +1465,16 @@ mod tests {
         Ok(())
     }
 
-    /// Asserts the replacer leaves the statement untouched. Compares against the canonical
-    /// round-trip of the same input so we don't have to hand-write the parser's rendering.
-    fn run_timestamptz_literal_replacer_unchanged(input: &str) -> Result<(), CubeError> {
+    fn run_plain_timestamp_timezone_suffix_replacer_unchanged(
+        input: &str,
+    ) -> Result<(), CubeError> {
         let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
             .unwrap()
             .pop()
             .expect("must contain at least one statement");
         let expected = stmt.to_string();
 
-        let replacer = TimestamptzLiteralReplacer::new();
+        let replacer = PlainTimestampTimezoneSuffixReplacer::new();
         let res = replacer.replace(stmt);
 
         assert_eq!(res.to_string(), expected);
@@ -1577,45 +1513,41 @@ mod tests {
     }
 
     #[test]
-    fn test_timestamptz_literal_replacer() -> Result<(), CubeError> {
-        run_timestamptz_literal_replacer(
-            "SELECT TIMESTAMP WITH TIME ZONE '2026-06-14T00:00:00 America/Los_Angeles'",
-            "SELECT TIMESTAMP '2026-06-14T00:00:00.000-07:00'",
-        )?;
-        run_timestamptz_literal_replacer(
-            "SELECT CAST('2026-06-14 00:00 America/Los_Angeles' AS TIMESTAMPTZ)",
-            "SELECT CAST('2026-06-14T00:00:00.000-07:00' AS TIMESTAMP)",
-        )?;
-        run_timestamptz_literal_replacer(
+    fn test_plain_timestamp_timezone_suffix_replacer() -> Result<(), CubeError> {
+        run_plain_timestamp_timezone_suffix_replacer(
             "SELECT TIMESTAMP '2026-06-14 00:00 America/Los_Angeles'",
-            "SELECT TIMESTAMP '2026-06-14 00:00 America/Los_Angeles'",
+            "SELECT TIMESTAMP '2026-06-14 00:00'",
         )?;
-        run_timestamptz_literal_replacer(
-            "SELECT TIMESTAMP WITH TIME ZONE '2026-11-01 01:30 America/Los_Angeles'",
-            "SELECT TIMESTAMP '2026-11-01T01:30:00.000-08:00'",
+        run_plain_timestamp_timezone_suffix_replacer(
+            "SELECT CAST('2026-06-14 00:00 America/Los_Angeles' AS TIMESTAMP)",
+            "SELECT CAST('2026-06-14 00:00' AS TIMESTAMP)",
         )?;
-        run_timestamptz_literal_replacer(
-            "SELECT TIMESTAMP WITH TIME ZONE '2026-03-08 02:30 America/Los_Angeles'",
-            "SELECT TIMESTAMP '2026-03-08T02:30:00.000-08:00'",
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT TIMESTAMP 'not a timestamp America/Los_Angeles'",
         )?;
 
         Ok(())
     }
 
     #[test]
-    fn test_timestamptz_literal_replacer_leaves_non_named_unchanged() -> Result<(), CubeError> {
-        // Casting a column to timestamptz must keep both the expression and the timezone-aware
-        // type; only named-IANA-timezone string literals should be rewritten.
-        run_timestamptz_literal_replacer_unchanged("SELECT CAST(order_date AS TIMESTAMPTZ)")?;
-        run_timestamptz_literal_replacer_unchanged(
+    fn test_plain_timestamp_timezone_suffix_replacer_leaves_timestamptz_unchanged(
+    ) -> Result<(), CubeError> {
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT TIMESTAMP WITH TIME ZONE '2026-06-14T00:00:00 America/Los_Angeles'",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT CAST('2026-06-14 00:00 America/Los_Angeles' AS TIMESTAMPTZ)",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT CAST(order_date AS TIMESTAMPTZ)",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
             "SELECT CAST(order_date AS TIMESTAMP WITH TIME ZONE)",
         )?;
-        // A timestamptz literal with a numeric offset is already unambiguous and must not be
-        // downgraded to a plain TIMESTAMP.
-        run_timestamptz_literal_replacer_unchanged(
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
             "SELECT TIMESTAMP WITH TIME ZONE '2026-06-14 00:00:00+02:00'",
         )?;
-        run_timestamptz_literal_replacer_unchanged(
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
             "SELECT CAST('2026-06-14 00:00:00+02:00' AS TIMESTAMPTZ)",
         )?;
 

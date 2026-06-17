@@ -1,4 +1,6 @@
 use crate::compile::rewrite::rewriter::CubeEGraph;
+use chrono::NaiveDateTime;
+use chrono_tz::Tz;
 use datafusion::scalar::ScalarValue;
 use sha2::{Digest, Sha256};
 use std::{
@@ -6,6 +8,27 @@ use std::{
     convert::TryInto,
     hash::{Hash, Hasher},
 };
+
+pub const TIMESTAMP_TZ_NAMED_TIMEZONE_CAST_TEMPLATE: &str =
+    "expressions/timestamp_tz_named_timezone_cast";
+
+pub fn parse_named_timezone_timestamp(value: &str) -> Option<(String, String)> {
+    let value = value.trim();
+    let (timestamp, timezone) = value.rsplit_once(char::is_whitespace)?;
+    let timestamp = timestamp.trim();
+    let timezone = timezone.trim();
+    [
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d %H:%M",
+    ]
+    .iter()
+    .find_map(|format| NaiveDateTime::parse_from_str(timestamp, format).ok())?;
+    timezone.parse::<Tz>().ok()?;
+
+    Some((timestamp.to_string(), timezone.to_string()))
+}
 
 pub struct ShaHasher {
     hasher: Sha256,
