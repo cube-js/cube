@@ -440,8 +440,11 @@ in the [synthetic dimension](#synthetic) name.
 A link must specify either a `url` or a `dashboard`:
 - `url` is a SQL expression that constructs the link URL. It can [reference][ref-references]
   column and dimension values, just like the [`sql` parameter](#sql) or [`mask` parameter](#mask).
-- `dashboard` is a dashboard identifier. When set, the link URL is generated as
-  `/dashboard/<dashboard_id>`. The `params` object is still appended as a query string.
+- `dashboard` is a target dashboard reference. When set, the link URL is generated as
+  `/dashboard/<dashboard>` and `params` are appended as a query string. In Cube Cloud
+  this is the target dashboard's **slug** (set in the dashboard's options and resolved
+  within the current deployment); choosing the link drills in-app to that dashboard with
+  `params` applied as equality filters. Links surface in the table **cell context menu**.
 
 Optionally, a link might use the `icon` parameter to reference an icon from a [supported
 icon set][link-tabler] to be displayed alongside the link label.
