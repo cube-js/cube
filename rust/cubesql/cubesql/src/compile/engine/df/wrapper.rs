@@ -21,7 +21,8 @@ use crate::{
     },
     CubeError,
 };
-use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
+use chrono::{Days, NaiveDate, NaiveDateTime, SecondsFormat, TimeZone, Utc};
+use chrono_tz::Tz;
 use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
 use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
 use datafusion::{
@@ -1826,6 +1827,56 @@ impl WrappedSelectNode {
             .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for type: {}", e)))
     }
 
+    fn parse_named_timezone_timestamp(value: &str) -> Option<String> {
+        let value = value.trim();
+        let separator_index = value
+            .char_indices()
+            .rev()
+            .find(|(_, ch)| ch.is_whitespace())
+            .map(|(idx, _)| idx)?;
+        let (timestamp, timezone) = value.split_at(separator_index);
+        let timezone = timezone.trim().parse::<Tz>().ok()?;
+        let timestamp = timestamp.trim();
+        let datetime = [
+            "%Y-%m-%dT%H:%M:%S%.f",
+            "%Y-%m-%d %H:%M:%S%.f",
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%d %H:%M",
+        ]
+        .iter()
+        .find_map(|format| NaiveDateTime::parse_from_str(timestamp, format).ok())?;
+        let datetime = timezone.from_local_datetime(&datetime).single()?;
+
+        Some(datetime.to_rfc3339_opts(SecondsFormat::Millis, true))
+    }
+
+    fn generate_sql_for_named_timezone_timestamp_cast(
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: &Expr,
+        data_type: &DataType,
+    ) -> result::Result<Option<String>, DataFusionError> {
+        if !matches!(data_type, DataType::Timestamp(_, _)) {
+            return Ok(None);
+        }
+
+        if let Expr::Literal(ScalarValue::Utf8(Some(value))) = expr {
+            if let Some(value) = Self::parse_named_timezone_timestamp(value) {
+                return sql_generator
+                    .get_sql_templates()
+                    .timestamp_literal_expr(value)
+                    .map(Some)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for timestamp: {}",
+                            e
+                        ))
+                    });
+            }
+        }
+
+        Ok(None)
+    }
+
     fn generate_typed_null(
         sql_generator: Arc<dyn SqlGenerator>,
         data_type: Option<DataType>,
@@ -2127,6 +2178,13 @@ impl WrappedSelectNode {
                 subqueries,
             ),
             Expr::Cast { expr, data_type } => {
+                if let Some(resulting_sql) = Self::generate_sql_for_named_timezone_timestamp_cast(
+                    sql_generator.clone(),
+                    expr.as_ref(),
+                    &data_type,
+                )? {
+                    return Ok((resulting_sql, sql_query));
+                }
                 let (expr, sql_query) = Self::generate_sql_for_expr(
                     sql_query,
                     sql_generator.clone(),
