@@ -383,20 +383,24 @@ See the following recipes:
 
 Dimensions can declare **links** — clickable navigation targets that supporting
 tools (such as [Cube Cloud Workbooks][ref-workbooks]) surface next to the
-dimension's values. A link points either to an **external URL** or to **another
-Cube Cloud dashboard** (a drill-in), and its URL is built per row from the
-dimension's data.
+dimension's values.
+
+`links` is a **list**, so a single dimension can declare **any number of
+links** — they all appear together in the cell menu. Each link points either to
+an **external URL** (`url`) or to **another Cube Cloud dashboard** (`dashboard`,
+a drill-in), and its URL is built per row from the dimension's data. The example
+below declares two links on one dimension (an external search and a drill-in).
 
 ### Parameters
 
-Each entry in `links` accepts:
+`links` is a list of link objects. Each link accepts:
 
 | Parameter | Required? | Description |
 | --- | --- | --- |
 | `name` | **Required** | Identifier, unique within the dimension. Also used in the synthetic dimension name (see [Behavior](#behavior)). |
 | `label` | **Required** | The text shown for the link in the UI. |
 | `url` | **Either `url` or `dashboard`** | SQL expression that builds an **external** URL per row. May [reference][ref-references] columns and other dimensions. |
-| `dashboard` | **Either `url` or `dashboard`** | The target Cube Cloud dashboard's **slug** (a **drill-in**). Provide exactly one of `url` or `dashboard` — never both. |
+| `dashboard` | **Either `url` or `dashboard`** | The target Cube Cloud dashboard's **slug** (a **drill-in**). Each link sets exactly one of `url` or `dashboard` — never both — but different links on the same dimension can mix the two. |
 | `icon` | Optional | A [Tabler icon][link-tabler] name (see [Icons](#icons)). Defaults to a generic link icon. |
 | `target` | Optional | Where to open the link: `blank` (default — new tab) or `self` (same tab). Applies to **external** links only — drill-ins always navigate in-app (see [Behavior](#behavior)). |
 | `params` | Optional | Extra per-row parameters. For `url:` they are appended as query parameters; for `dashboard:` they become filters on the target dashboard. |
