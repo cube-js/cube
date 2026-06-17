@@ -19,12 +19,22 @@ query {
 
 | Key             | Schema                              | Description                                |
 | --------------- | ----------------------------------- | ------------------------------------------ |
-| `cubeQueryArgs` | [`CubeQueryArgs`](#cube-query-args) | Options that apply to the entire query     |
-| `cubeArgs`      | [`CubeArgs`](#cube-args)            | Options that apply only to a specific cube |
+| `cubeQueryArgs` | [`CubeQueryArgs`](#cubequeryargs) | Options that apply to the entire query     |
+| `cubeArgs`      | [`CubeArgs`](#cubeargs)            | Options that apply only to a specific cube |
+
+## Response extensions
+
+In addition to the `data` field, the GraphQL response includes an `extensions`
+object with query metadata:
+
+- `annotation` — metadata for the query members (titles, types), the same as the
+  `annotation` field of the [REST API][ref-rest-api] response.
+- `lastRefreshTime` — an ISO 8601 timestamp indicating when the data was last
+  refreshed.
 
 ## `CubeQueryArgs`
 
-- **`where` ([`RootWhereInput`](#root-where-input)):** Represents a SQL `WHERE` clause.
+- **`where` ([`RootWhereInput`](#rootwhereinput)):** Represents a SQL `WHERE` clause.
 - **`limit` (`Int`):** A [row limit][ref-row-limit] for your query.
 - **`offset` (`Int`):** The number of initial rows to be skipped for your query. The default value is `0`.
 - **`timezone` (`String`):** The [time zone][ref-time-zone] for your query. You can set the
@@ -39,35 +49,35 @@ format, e.g., `America/Los_Angeles`.
 
 | Key          | Schema                                   | Description |
 | ------------ | ---------------------------------------- | ----------- |
-| `AND`        | [`[RootWhereInput!]`](#root-where-input) |             |
-| `OR`         | [`[RootWhereInput!]`](#root-where-input) |             |
-| `<cubeName>` | [`CubeWhereInput`](#cube-where-input)    |             |
+| `AND`        | [`[RootWhereInput!]`](#rootwhereinput) |             |
+| `OR`         | [`[RootWhereInput!]`](#rootwhereinput) |             |
+| `<cubeName>` | [`CubeWhereInput`](#cubewhereinput)    |             |
 
 ## `CubeArgs`
 
 | Key       | Schema                                | Description |
 | --------- | ------------------------------------- | ----------- |
-| `where`   | [`CubeWhereInput`](#cube-where-input) |             |
+| `where`   | [`CubeWhereInput`](#cubewhereinput) |             |
 | `orderBy` | `CubeOrderByInput`                    |             |
 
 ## `CubeWhereInput`
 
 | Key            | Schema                                   | Description |
 | -------------- | ---------------------------------------- | ----------- |
-| `AND`          | [`[RootWhereInput!]`](#root-where-input) |             |
-| `OR`           | [`[RootWhereInput!]`](#root-where-input) |             |
+| `AND`          | [`[RootWhereInput!]`](#rootwhereinput) |             |
+| `OR`           | [`[RootWhereInput!]`](#rootwhereinput) |             |
 | `<cubeMember>` | [`Filter`](#filter)                      |             |
 
 ## `CubeOrderByInput`
 
 | Key            | Schema                 | Description |
 | -------------- | ---------------------- | ----------- |
-| `<cubeMember>` | [`OrderBy`](#order-by) |             |
+| `<cubeMember>` | [`OrderBy`](#orderby) |             |
 
 ## `Filter`
 
-[`DateTimeFilter`](#date-time-filter) | [`FloatFilter`](#float-time-filter) |
-[`StringFilter`](#string-time-filter)
+[`DateTimeFilter`](#datetimefilter) | [`FloatFilter`](#floatfilter) |
+[`StringFilter`](#stringfilter)
 
 ## `DateTimeFilter`
 
@@ -109,7 +119,8 @@ format, e.g., `America/Los_Angeles`.
 
 `asc` | `desc`
 
-[ref-graphql-api]: /reference/graphql-api
-[ref-row-limit]: /reference/queries#row-limit
-[ref-time-zone]: /reference/queries#time-zone
-[ref-ungrouped-query]: /reference/queries#ungrouped-query
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
+[ref-rest-api]: /reference/core-data-apis/rest-api/reference
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
+[ref-ungrouped-query]: /reference/core-data-apis/queries#ungrouped-query

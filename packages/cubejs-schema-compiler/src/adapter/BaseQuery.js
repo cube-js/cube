@@ -1871,40 +1871,41 @@ export class BaseQuery {
       // Because of that it's not possible to correctly precalculate
       // granularities hierarchies on startup as they are specific for each timezone.
       ['granularityHierarchies', this.timezone],
-      () => R.reduce(
-        (hierarchies, cube) => R.reduce(
-          (acc, [tdName, td]) => {
+      () => {
+        // Mutating a single accumulator object instead of repeatedly spreading
+        // it keeps this O(n) in the number of dimensions/granularities. The
+        // previous `{ ...acc, ... }` approach copied the whole accumulator on
+        // every iteration, making it O(n^2) and extremely slow on large models.
+        const hierarchies = {};
+        const standardGranularityNames = R.keys(standardGranularitiesParents);
+
+        for (const cube of R.keys(this.cubeEvaluator.evaluatedCubes)) {
+          const timeDimensions = this.cubeEvaluator.timeDimensionsForCube(cube);
+
+          for (const tdName of Object.keys(timeDimensions)) {
+            const td = timeDimensions[tdName];
             const dimensionKey = `${cube}.${tdName}`;
 
             // constructing standard granularities for time dimension
-            const standardEntries = R.fromPairs(
-              R.keys(standardGranularitiesParents).map(gr => [
-                `${dimensionKey}.${gr}`,
-                standardGranularitiesParents[gr],
-              ]),
-            );
+            for (const gr of standardGranularityNames) {
+              hierarchies[`${dimensionKey}.${gr}`] = standardGranularitiesParents[gr];
+            }
 
             // If we have custom granularities in time dimension
-            const customEntries = td.granularities
-              ? R.fromPairs(
-                R.keys(td.granularities).map(granularityName => {
-                  const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
-                  return [
-                    `${dimensionKey}.${granularityName}`,
-                    [granularityName, ...standardGranularitiesParents[grObj.minGranularity()]],
-                  ];
-                }),
-              )
-              : {};
+            if (td.granularities) {
+              for (const granularityName of Object.keys(td.granularities)) {
+                const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
+                hierarchies[`${dimensionKey}.${granularityName}`] = [
+                  granularityName,
+                  ...standardGranularitiesParents[grObj.minGranularity()],
+                ];
+              }
+            }
+          }
+        }
 
-            return { ...acc, ...standardEntries, ...customEntries };
-          },
-          hierarchies,
-          R.toPairs(this.cubeEvaluator.timeDimensionsForCube(cube)),
-        ),
-        {},
-        R.keys(this.cubeEvaluator.evaluatedCubes),
-      ),
+        return hierarchies;
+      },
     );
   }
 
@@ -3317,6 +3318,19 @@ export class BaseQuery {
         if (!isMeasure || !isUngrouped || !hasSqlMask) {
           const maskFilter = this.memberMaskFilters && this.memberMaskFilters[memberPath];
           if (maskFilter) {
+            // Conditional masking renders:
+            //   CASE WHEN {rowFilter} THEN {value} ELSE {maskedValue} END
+            // For aggregate measures this produces invalid SQL on strict GROUP BY
+            // engines whenever the row filter references members that are not part
+            // of the GROUP BY: the predicate is evaluated at row grain while the
+            // measure is aggregated. The same row-level filter is already enforced
+            // in the query WHERE clause, so for such measures we render the masked
+            // value directly instead of a per-row CASE WHEN. In ungrouped queries
+            // the measure is rendered at row grain, so the CASE WHEN is valid and
+            // is kept.
+            if (isMeasure && !isUngrouped && !this.maskFilterReferencesOnlyGroupByMembers(maskFilter)) {
+              return this.memberMaskSql(cubeName, name, symbol);
+            }
             return this.conditionalMemberMaskSql(cubeName, name, symbol, maskFilter);
           }
           return this.memberMaskSql(cubeName, name, symbol);
@@ -3513,6 +3527,50 @@ export class BaseQuery {
       { skipMasking: true, currentMember: null }
     );
     return result;
+  }
+
+  // Collects all member paths (member/dimension/measure) referenced anywhere in a
+  // (possibly nested and/or) filter tree.
+  collectFilterMemberPaths(filter, acc = []) {
+    if (!filter) {
+      return acc;
+    }
+    if (Array.isArray(filter)) {
+      filter.forEach(f => this.collectFilterMemberPaths(f, acc));
+      return acc;
+    }
+    if (filter.and) {
+      this.collectFilterMemberPaths(filter.and, acc);
+    }
+    if (filter.or) {
+      this.collectFilterMemberPaths(filter.or, acc);
+    }
+    const member = filter.member || filter.dimension || filter.measure;
+    if (member) {
+      acc.push(member);
+    }
+    return acc;
+  }
+
+  // Returns true when every member referenced by the mask filter is part of the
+  // query GROUP BY (regular dimensions or time dimensions with a granularity).
+  // Conditional masking via CASE WHEN can only be applied to an aggregate measure
+  // when the filter predicate is evaluated against grouped columns; otherwise the
+  // generated SQL references ungrouped columns and fails on strict GROUP BY engines.
+  maskFilterReferencesOnlyGroupByMembers(maskFilter) {
+    const filterMembers = [...new Set(this.collectFilterMemberPaths(maskFilter))];
+    if (!filterMembers.length) {
+      return false;
+    }
+    const groupByMembers = new Set([
+      ...this.dimensions
+        .filter(d => !d.isMemberExpression && d.dimension)
+        .map(d => d.dimension),
+      ...this.timeDimensions
+        .filter(td => td.granularity && td.dimension)
+        .map(td => td.dimension),
+    ]);
+    return filterMembers.every(m => groupByMembers.has(m));
   }
 
   maskFilterToSql(filter) {
@@ -4574,6 +4632,10 @@ export class BaseQuery {
         series_bounds_cast: '{{ expr }}',
         bool_param_cast: '{{ expr }}',
         number_param_cast: '{{ expr }}',
+        // Tesseract uses its own join type templates, decoupled from `join_types`
+        // which are used by the SQL API push down. FULL is opt-in per dialect.
+        join_types_inner: 'INNER',
+        join_types_left: 'LEFT',
       },
       filters: {
         equals: '{{ column }} = {{ value }}{{ is_null_check }}',
@@ -4604,6 +4666,8 @@ export class BaseQuery {
       join_types: {
         inner: 'INNER',
         left: 'LEFT',
+        right: 'RIGHT',
+        full: 'FULL',
       },
       window_frame_types: {
         rows: 'ROWS',

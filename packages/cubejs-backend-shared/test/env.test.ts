@@ -143,3 +143,38 @@ describe('getEnv', () => {
     );
   });
 });
+
+describe('getEnv(apiSecret / apiSecrets)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_API_SECRET;
+    delete process.env.CUBEJS_API_SECRETS;
+  });
+
+  test('apiSecret', () => {
+    expect(getEnv('apiSecret')).toBeUndefined();
+
+    process.env.CUBEJS_API_SECRET = 'secret';
+    expect(getEnv('apiSecret')).toBe('secret');
+  });
+
+  test('apiSecrets - unset / empty / blanks resolve to undefined', () => {
+    expect(getEnv('apiSecrets')).toBeUndefined();
+
+    process.env.CUBEJS_API_SECRETS = '';
+    expect(getEnv('apiSecrets')).toBeUndefined();
+
+    process.env.CUBEJS_API_SECRETS = ',  ,,';
+    expect(getEnv('apiSecrets')).toBeUndefined();
+  });
+
+  test('apiSecrets - trims, drops empties, deduplicates, preserves order', () => {
+    process.env.CUBEJS_API_SECRETS = ' a , b , c ';
+    expect(getEnv('apiSecrets')).toEqual(['a', 'b', 'c']);
+
+    process.env.CUBEJS_API_SECRETS = 'a,b,a,c,b';
+    expect(getEnv('apiSecrets')).toEqual(['a', 'b', 'c']);
+
+    process.env.CUBEJS_API_SECRETS = 'only';
+    expect(getEnv('apiSecrets')).toEqual(['only']);
+  });
+});

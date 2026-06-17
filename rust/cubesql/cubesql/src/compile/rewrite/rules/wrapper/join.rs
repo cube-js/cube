@@ -13,6 +13,7 @@ use crate::{
         WrappedSelectJoinJoinType, WrappedSelectPushToCube, WrapperReplacerContextAliasToCube,
         WrapperReplacerContextGroupedSubqueries,
     },
+    transport::MetaContext,
     var, var_iter, var_list_iter,
 };
 
@@ -21,7 +22,7 @@ use datafusion::{
     logical_plan::Column,
     prelude::JoinType,
 };
-use egg::{Id, Subst};
+use egg::{Id, Subst, Var};
 use itertools::Itertools;
 
 impl WrapperRules {
@@ -263,6 +264,7 @@ impl WrapperRules {
                     "?left_on",
                     "?right_on",
                     "?in_join_type",
+                    "?input_data_source",
                     "?out_join_expr",
                     "?out_join_type",
                     "?out_grouped_subqueries",
@@ -481,6 +483,7 @@ impl WrapperRules {
                     "?left_push_to_cube",
                     "?right_on",
                     "?in_join_type",
+                    "?input_data_source",
                     "?out_join_expr",
                     "?out_join_type",
                     "?out_grouped_subqueries",
@@ -982,12 +985,42 @@ impl WrapperRules {
         result_expr
     }
 
+    /// Whether a join subquery with `join_type` can be pushed down to `data_source_var`.
+    ///
+    /// Inner/Left are always supported. Right/Full are only supported on the non-push-to-Cube
+    /// path (`push_to_cube == false`), i.e. when both sides become standalone subqueries joined
+    /// together — there the outer-join semantics map directly to SQL. On the push-to-Cube path
+    /// the join is folded inside the Cube query alongside its grouping/measures, where NULL-extended
+    /// outer rows are not validated, so Right/Full are refused there.
+    /// Other join types (semi/anti) are never supported as join subqueries.
+    fn is_subquery_join_type_supported(
+        egraph: &CubeEGraph,
+        subst: &mut Subst,
+        meta: &MetaContext,
+        data_source_var: Var,
+        join_type: &JoinType,
+        push_to_cube: bool,
+    ) -> bool {
+        let template = match join_type {
+            JoinType::Inner => "join_types/inner",
+            JoinType::Left => "join_types/left",
+            JoinType::Right if !push_to_cube => "join_types/right",
+            JoinType::Full if !push_to_cube => "join_types/full",
+            _ => return false,
+        };
+        let Ok(data_source) = Self::get_data_source(egraph, subst, data_source_var) else {
+            return false;
+        };
+        Self::can_rewrite_template(&data_source, meta, template)
+    }
+
     fn transform_ungrouped_join_grouped(
         &self,
         left_members_var: &'static str,
         left_on_var: &'static str,
         right_on_var: &'static str,
         in_join_type_var: &'static str,
+        input_data_source_var: &'static str,
         out_join_expr_var: &'static str,
         out_join_type_var: &'static str,
         out_grouped_subqueries_var: &'static str,
@@ -998,10 +1031,13 @@ impl WrapperRules {
         let right_on_var = var!(right_on_var);
 
         let in_join_type_var = var!(in_join_type_var);
+        let input_data_source_var = var!(input_data_source_var);
 
         let out_join_expr_var = var!(out_join_expr_var);
         let out_join_type_var = var!(out_join_type_var);
         let out_grouped_subqueries_var = var!(out_grouped_subqueries_var);
+
+        let meta = self.meta_context.clone();
 
         // Only left is allowed to be ungrouped query, so right would be a subquery join for left ungrouped CubeScan
         // It means we don't care about just a "single cube" in LHS, and there's essentially no cubes by this moment in RHS
@@ -1020,6 +1056,19 @@ impl WrapperRules {
                     for in_join_type in
                         var_list_iter!(egraph[subst[in_join_type_var]], JoinJoinType).cloned()
                     {
+                        // Left is an ungrouped CubeScan pushed to Cube, so this is always the
+                        // push-to-Cube path: Right/Full are not supported here.
+                        if !Self::is_subquery_join_type_supported(
+                            egraph,
+                            subst,
+                            &meta,
+                            input_data_source_var,
+                            &in_join_type.0,
+                            true,
+                        ) {
+                            return false;
+                        }
+
                         if !Self::are_join_members_supported(
                             egraph,
                             subst[left_members_var],
@@ -1217,6 +1266,7 @@ impl WrapperRules {
         left_push_to_cube_var: &'static str,
         right_on_var: &'static str,
         in_join_type_var: &'static str,
+        input_data_source_var: &'static str,
         out_join_expr_var: &'static str,
         out_join_type_var: &'static str,
         out_grouped_subqueries_var: &'static str,
@@ -1228,11 +1278,14 @@ impl WrapperRules {
         let right_on_var = var!(right_on_var);
 
         let in_join_type_var = var!(in_join_type_var);
+        let input_data_source_var = var!(input_data_source_var);
 
         let out_join_expr_var = var!(out_join_expr_var);
         let out_join_type_var = var!(out_join_type_var);
         let out_grouped_subqueries_var = var!(out_grouped_subqueries_var);
         let out_push_to_cube_var = var!(out_push_to_cube_var);
+
+        let meta = self.meta_context.clone();
 
         move |egraph, subst| {
             // We are going to generate join with grouped subquery
@@ -1254,6 +1307,20 @@ impl WrapperRules {
                         )
                         .cloned()
                         {
+                            // Right/Full are only supported on the non-push-to-Cube variant.
+                            // `continue` rather than `return false` so the non-push variant of
+                            // this eclass still gets a chance to match.
+                            if !Self::is_subquery_join_type_supported(
+                                egraph,
+                                subst,
+                                &meta,
+                                input_data_source_var,
+                                &in_join_type.0,
+                                left_push_to_cube.0,
+                            ) {
+                                continue;
+                            }
+
                             // TODO what's a proper way to find table expression alias?
                             let Some(right_join_alias) = right_join_on
                                 .iter()

@@ -85,6 +85,10 @@ Common rules apply to names of entities within the data model. All names must:
 - Consist of letters, numbers, and underscore (`_`) symbols only.
 - Not be a [reserved keyword in Python][link-python-reserved-words], e.g., `from`, `return`, or `yield`.
 - When using the DAX API, not clash with the names of columns in [date hierarchies][ref-dax-api-date-hierarchies].
+- Be unique within their scope. Cube and view names must be unique across the data
+  model; members (measures, dimensions, segments, pre-aggregations, hierarchies) must
+  be unique within their cube; and folder names must be unique within their view. Cube
+  will report an error for duplicates.
 
 It is also recommended that names use [snake case][wiki-snake-case].
 
@@ -277,6 +281,19 @@ cube(`users`, {
 ```
 
 </CodeGroup>
+
+<Note>
+
+You can safely reference a member whose `sql` is a compound expression, such as
+arithmetic (`{price} + {tax}`) or boolean logic (`{is_paid} OR {is_pending}`). When you
+reference such a member inside an arithmetic or logical expression, Cube wraps it in
+parentheses automatically, so operator precedence is preserved. For example, if
+`price_with_tax` is defined as `{price} + {tax}`, then referencing it as
+`{price_with_tax} * {quantity}` generates `(price + tax) * quantity`. Cube only adds these
+parentheses where they are needed — a reference that already sits in a safe position, such as
+a function argument (`ABS({price_with_tax})`) or a `CAST(...)`, is left unwrapped.
+
+</Note>
 
 This syntax works great for simple use cases. However, there are cases
 (like [subquery][ref-subquery]) when you'd like to reference members of

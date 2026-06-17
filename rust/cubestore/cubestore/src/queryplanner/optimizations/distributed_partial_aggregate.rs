@@ -1,23 +1,32 @@
 use crate::cluster::WorkerPlanningParams;
+use crate::queryplanner::check_memory::CheckMemoryExec;
+use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::AggregateTopKExec;
+use datafusion::arrow::compute::SortOptions;
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::common::{internal_datafusion_err, HashMap};
 use datafusion::config::ConfigOptions;
 use datafusion::error::DataFusionError;
-use datafusion::physical_expr::{LexOrdering, LexRequirement, PhysicalSortRequirement};
+use datafusion::physical_expr::{
+    LexOrdering, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
+};
 use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
 use datafusion::physical_optimizer::PhysicalOptimizerRule as _;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
-use datafusion::physical_plan::limit::GlobalLimitExec;
+use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::filter::FilterExec;
+use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
-use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanProperties, PhysicalExpr};
+use datafusion::physical_plan::{
+    ExecutionPlan, ExecutionPlanProperties, InputOrderMode, PhysicalExpr,
+};
 use itertools::Itertools as _;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -95,6 +104,7 @@ pub fn push_aggregate_to_workers(
                     .into_iter()
                     .next()
                     .unwrap(),
+                w.worker_sort_and_limit.clone(),
                 WorkerPlanningParams {
                     worker_partition_count: w.properties().output_partitioning().partition_count(),
                 },
@@ -118,6 +128,362 @@ pub fn push_aggregate_to_workers(
         p_final_input,
         p_final_input_schema,
     )?))
+}
+
+/// A global (no GROUP BY) aggregate doesn't use the input ordering, but the scan still merges
+/// its partitions with a SortPreservingMergeExec when the index has a sort key (e.g. picked
+/// from the filters for partition pruning). Replace such merges under the aggregate with plain
+/// partition coalescing: the per-row key comparisons are pure waste there, and particularly
+/// bad when the filters above make the merge keys constant, turning every comparison into a
+/// full-length tie.
+///
+/// Restricted to aggregates without group expressions: those hold a single accumulator set per
+/// partition even when later optimizations make them run per partition. A grouped hash
+/// aggregate over unmerged partitions could end up with a hash table per partition,
+/// multiplying its memory by the partition count.
+pub fn drop_sort_merge_under_global_aggregate(
+    p: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    let Some(agg) = p.as_any().downcast_ref::<AggregateExec>() else {
+        return Ok(p);
+    };
+    if !matches!(agg.input_order_mode(), InputOrderMode::Linear)
+        || !agg.group_expr().expr().is_empty()
+    {
+        return Ok(p);
+    }
+    // Order-sensitive aggregates (first_value, array_agg(ORDER BY), ...) stay Linear with an
+    // empty GROUP BY but still need their input ordered
+    if agg.required_input_ordering()[0].is_some() {
+        return Ok(p);
+    }
+    let new_input = replace_merges_with_coalesce(agg.input())?;
+    if Arc::ptr_eq(&new_input, agg.input()) {
+        return Ok(p);
+    }
+    p.with_new_children(vec![new_input])
+}
+
+/// Replaces sort preserving merges with plain partition coalescing, looking through the nodes
+/// that don't require an input ordering of their own.
+fn replace_merges_with_coalesce(
+    p: &Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    let p_any = p.as_any();
+    if let Some(merge) = p_any.downcast_ref::<SortPreservingMergeExec>() {
+        if merge.fetch().is_some() {
+            return Ok(p.clone());
+        }
+        let child = replace_merges_with_coalesce(merge.input())?;
+        return Ok(Arc::new(CoalescePartitionsExec::new(child)));
+    }
+    if p_any.is::<FilterExec>() || p_any.is::<ProjectionExec>() || p_any.is::<UnionExec>() {
+        let new_children = p
+            .children()
+            .into_iter()
+            .map(replace_merges_with_coalesce)
+            .collect::<Result<Vec<_>, _>>()?;
+        if p.children()
+            .into_iter()
+            .zip(new_children.iter())
+            .all(|(old, new)| Arc::ptr_eq(old, new))
+        {
+            return Ok(p.clone());
+        }
+        return p.clone().with_new_children(new_children);
+    }
+    Ok(p.clone())
+}
+
+/// Transforms from:
+///     AggregatePartial, Sorted
+///     `- SortPreservingMerge
+///        `- source(N partitions)
+/// to:
+///     SortPreservingMerge
+///     `- AggregatePartial, Sorted (executed per partition)
+///        `- source(N partitions)
+///
+/// The merge then carries one row per group per partition instead of all raw rows. Duplicate
+/// group keys from different partitions are adjacent in the merged stream and get combined by
+/// the Final aggregate, the same way partial states from different workers are.
+///
+/// Only sorted (streaming) partial aggregates are pushed: they hold O(1) accumulators per
+/// partition, while a hash aggregate holds O(num_groups) and would multiply its memory usage by
+/// the partition count.
+pub fn push_sorted_partial_aggregate_below_merge(
+    p: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    let Some(agg) = p.as_any().downcast_ref::<AggregateExec>() else {
+        return Ok(p);
+    };
+    if *agg.mode() != AggregateMode::Partial
+        || !matches!(agg.input_order_mode(), InputOrderMode::Sorted)
+        // Restrict to aggregates convertible to InlineAggregateExec (no grouping sets)
+        || !agg.group_expr().is_single()
+    {
+        return Ok(p);
+    }
+    let Some(merge) = agg
+        .input()
+        .as_any()
+        .downcast_ref::<SortPreservingMergeExec>()
+    else {
+        return Ok(p);
+    };
+    if merge.fetch().is_some() {
+        return Ok(p);
+    }
+    let merge_input = merge.input();
+    if merge_input.output_partitioning().partition_count() <= 1 {
+        return Ok(p);
+    }
+
+    let new_agg = AggregateExec::try_new(
+        AggregateMode::Partial,
+        agg.group_expr().clone(),
+        agg.aggr_expr().to_vec(),
+        agg.filter_expr().to_vec(),
+        merge_input.clone(),
+        agg.input_schema(),
+    )?;
+    // Per-partition input must still be sorted on the group keys, otherwise the aggregate
+    // becomes hash-based and must stay above the merge.
+    if !matches!(new_agg.input_order_mode(), InputOrderMode::Sorted) {
+        return Ok(p);
+    }
+    let Some(ordering) = new_agg.properties().output_ordering().cloned() else {
+        return Ok(p);
+    };
+    Ok(Arc::new(SortPreservingMergeExec::new(
+        ordering,
+        Arc::new(new_agg),
+    )))
+}
+
+/// Bounds worker memory for `GROUP BY ... ORDER BY <group cols> LIMIT n` when the ORDER BY is a
+/// subset of the group keys but not a prefix of the index sort key (so the cheaper
+/// `add_limit_to_workers` early-termination doesn't apply and the worker would otherwise emit every
+/// group). Driven by the `worker_sort_and_limit` descriptor computed in `ChooseIndex` and carried
+/// through `ClusterSendNode` serialization, since the worker's plan has no ORDER BY of its own.
+///
+/// On the worker (a `WorkerExec` carrying the descriptor), the worker subtree
+///     SortPreservingMerge(index) <- PartialAggregate
+/// becomes
+///     SortPreservingMerge(worker_order) <- Sort(worker_order, fetch=n, per partition) <- PartialAggregate
+///
+/// On the router (a final aggregate over a `ClusterSend` carrying the descriptor), the final
+/// aggregate is rebuilt over a `SortPreservingMerge(worker_order)`: the bounded worker streams are
+/// merged in `worker_order`, so equal group keys are adjacent and the (sorted) final aggregate
+/// combines them. Its output is `worker_order`-sorted, whose prefix is the query's ORDER BY, so the
+/// limit above it stays correct.
+///
+/// `worker_order` is the full group key reordered with the ORDER BY columns as its prefix. The
+/// per-partition `fetch=n` is sound only because the key is the full group key: a group in the
+/// global first `n` has fewer than `n` smaller-keyed groups, hence stays within every partition's
+/// first `n`, so all of its partial states survive the fetch and the final aggregate sums it
+/// correctly -- even when the same group spans partitions. Sorting by `order_by` alone (a partial
+/// key) would drop partial states of tied groups.
+pub fn push_worker_sort_and_limit(
+    p: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    // Worker side: wrap the partial aggregate with a per-partition bounded sort.
+    if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
+        let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
+            return Ok(p);
+        };
+        let Some(new_input) = resort_worker_subtree(&w.input, &cols, fetch) else {
+            return Ok(p);
+        };
+        return Ok(Arc::new(WorkerExec::new(
+            new_input,
+            w.max_batch_rows,
+            w.limit_and_reverse.clone(),
+            w.required_input_ordering.clone(),
+            w.worker_sort_and_limit.clone(),
+            WorkerPlanningParams {
+                worker_partition_count: w.properties().output_partitioning().partition_count(),
+            },
+        )));
+    }
+
+    // Router side: rebuild the final aggregate over a sort-preserving merge in `worker_order`, and
+    // reorder the (optimization-only) worker subtree to match. Same keys are adjacent in
+    // `worker_order`, so the sorted final combines them; its output is `worker_order`-sorted (whose
+    // prefix is the query's ORDER BY), so the limit above stays correct.
+    let Some(final_agg) = FinalAggregateInfo::extract(&p) else {
+        return Ok(p);
+    };
+    let Some(cs_plan) = find_cluster_send(&final_agg.input) else {
+        return Ok(p);
+    };
+    let cs = cs_plan
+        .as_any()
+        .downcast_ref::<ClusterSendExec>()
+        .expect("find_cluster_send returns a ClusterSendExec");
+    let Some((cols, fetch)) = cs.worker_sort_and_limit.clone() else {
+        return Ok(p);
+    };
+    let Some(new_worker_subtree) = resort_worker_subtree(&cs.input_for_optimizations, &cols, fetch)
+    else {
+        return Ok(p);
+    };
+    let new_cs: Arc<dyn ExecutionPlan> =
+        Arc::new(cs.with_changed_schema(new_worker_subtree, cs.required_input_ordering.clone()));
+    let worker_order = worker_ordering(&final_agg.group_expr, &cols)?;
+    let merged: Arc<dyn ExecutionPlan> =
+        Arc::new(SortPreservingMergeExec::new(worker_order, new_cs));
+    Ok(Arc::new(AggregateExec::try_new(
+        AggregateMode::Final,
+        final_agg.group_expr,
+        final_agg.aggr_expr,
+        final_agg.filter_expr,
+        merged,
+        final_agg.input_schema,
+    )?))
+}
+
+/// Builds the `worker_order` LexOrdering over an aggregate's group columns from the descriptor.
+fn worker_ordering(
+    group_expr: &datafusion::physical_plan::aggregates::PhysicalGroupBy,
+    cols: &[(usize, bool, bool)],
+) -> Result<LexOrdering, DataFusionError> {
+    let names = group_expr.expr();
+    let mut exprs = Vec::with_capacity(cols.len());
+    for (idx, asc, nulls_first) in cols {
+        let (_, name) = names.get(*idx).ok_or_else(|| {
+            DataFusionError::Internal("worker_sort_and_limit column out of range".to_string())
+        })?;
+        exprs.push(PhysicalSortExpr {
+            expr: Arc::new(Column::new(name, *idx)),
+            options: SortOptions {
+                descending: !asc,
+                nulls_first: *nulls_first,
+            },
+        });
+    }
+    Ok(LexOrdering::new(exprs))
+}
+
+/// Rebuilds a worker subtree as `SortPreservingMerge(worker_order) <- Sort(worker_order, fetch, per
+/// partition) <- partial`. Returns `None` for an unrecognized or already-rewritten subtree, which
+/// keeps [push_worker_sort_and_limit] idempotent.
+///
+/// The per-partition `Sort` does the bounding (a bounded heap, O(fetch) memory); the merge above it
+/// carries no fetch. Because this pass runs last, `replace_suboptimal_merge_sorts` has already run
+/// and won't push the query's row limit into the merge -- which would cut the merged stream of
+/// (still uncombined) partial rows by rows and undercount groups split across partitions.
+fn resort_worker_subtree(
+    worker_subtree: &Arc<dyn ExecutionPlan>,
+    cols: &[(usize, bool, bool)],
+    fetch: usize,
+) -> Option<Arc<dyn ExecutionPlan>> {
+    let partial = locate_partial_aggregate(worker_subtree)?;
+    let schema = partial.schema();
+    let mut exprs = Vec::with_capacity(cols.len());
+    for (idx, asc, nulls_first) in cols {
+        let field = schema.fields().get(*idx)?;
+        exprs.push(PhysicalSortExpr {
+            expr: Arc::new(Column::new(field.name(), *idx)),
+            options: SortOptions {
+                descending: !asc,
+                nulls_first: *nulls_first,
+            },
+        });
+    }
+    let worker_order = LexOrdering::new(exprs);
+    let per_partition_sort: Arc<dyn ExecutionPlan> = Arc::new(
+        SortExec::new(worker_order.clone(), partial)
+            .with_fetch(Some(fetch))
+            .with_preserve_partitioning(true),
+    );
+    Some(Arc::new(SortPreservingMergeExec::new(
+        worker_order,
+        per_partition_sort,
+    )))
+}
+
+/// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in
+/// Final mode.
+struct FinalAggregateInfo {
+    group_expr: datafusion::physical_plan::aggregates::PhysicalGroupBy,
+    aggr_expr: Vec<Arc<datafusion::physical_expr::aggregate::AggregateFunctionExpr>>,
+    filter_expr: Vec<Option<Arc<dyn PhysicalExpr>>>,
+    input_schema: datafusion::arrow::datatypes::SchemaRef,
+    input: Arc<dyn ExecutionPlan>,
+}
+
+impl FinalAggregateInfo {
+    fn extract(p: &Arc<dyn ExecutionPlan>) -> Option<Self> {
+        if let Some(a) = p.as_any().downcast_ref::<InlineAggregateExec>() {
+            if *a.mode() != InlineAggregateMode::Final {
+                return None;
+            }
+            Some(Self {
+                group_expr: a.group_expr().clone(),
+                aggr_expr: a.aggr_expr().to_vec(),
+                filter_expr: a.filter_expr().to_vec(),
+                input_schema: a.input_schema.clone(),
+                input: a.input().clone(),
+            })
+        } else if let Some(a) = p.as_any().downcast_ref::<AggregateExec>() {
+            if !matches!(
+                a.mode(),
+                AggregateMode::Final | AggregateMode::FinalPartitioned
+            ) {
+                return None;
+            }
+            Some(Self {
+                group_expr: a.group_expr().clone(),
+                aggr_expr: a.aggr_expr().to_vec(),
+                filter_expr: a.filter_expr().to_vec(),
+                input_schema: a.input_schema().clone(),
+                input: a.input().clone(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// Descends through merge/coalesce/check-memory wrappers to the ClusterSend feeding a final
+/// aggregate.
+fn find_cluster_send(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+    let any = p.as_any();
+    if any.is::<ClusterSendExec>() {
+        return Some(p.clone());
+    }
+    if any.is::<SortPreservingMergeExec>()
+        || any.is::<CoalescePartitionsExec>()
+        || any.is::<CheckMemoryExec>()
+    {
+        return find_cluster_send(p.children().into_iter().next()?);
+    }
+    None
+}
+
+/// The partial aggregate inside a worker subtree, reached through merge/coalesce wrappers. Returns
+/// `None` for any other shape (including an already-rewritten subtree, whose partial now sits under
+/// a `SortExec` -- not a wrapper we descend -- keeping the pass idempotent).
+fn locate_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> Option<Arc<dyn ExecutionPlan>> {
+    let mut candidate = p.clone();
+    loop {
+        let any = candidate.as_any();
+        if let Some(a) = any.downcast_ref::<InlineAggregateExec>() {
+            return (*a.mode() == InlineAggregateMode::Partial).then_some(candidate.clone());
+        }
+        if let Some(a) = any.downcast_ref::<AggregateExec>() {
+            return (*a.mode() == AggregateMode::Partial).then_some(candidate.clone());
+        }
+        if any.is::<SortPreservingMergeExec>()
+            || any.is::<CoalescePartitionsExec>()
+            || any.is::<CheckMemoryExec>()
+        {
+            candidate = candidate.children().into_iter().next()?.clone();
+            continue;
+        }
+        return None;
+    }
 }
 
 pub fn ensure_partition_merge_helper(
@@ -224,6 +590,29 @@ pub fn add_limit_to_workers(
     let Some((limit, reverse)) = limit_and_reverse else {
         return Ok(p);
     };
+
+    // A row limit must not be placed above a merge of per-partition aggregates: the merged
+    // stream carries duplicate group keys from different partitions, and cutting it by rows
+    // could cut off part of some group's partial states, silently corrupting that group's
+    // total. Instead the limit descends through the merges and lands directly above the first
+    // aggregate, where one row is one complete (within its partition) group: the union of
+    // per-partition first (last, for reverse) `limit` groups covers the global first (last)
+    // `limit` groups, and groups beyond that arrive complete or not at all -- the router
+    // orders by the group key, not by the totals, and its own limit drops them.
+    if first_aggregate_below_merges(input).is_some() {
+        let new_input = limit_above_first_aggregate(input, limit, reverse)?;
+        return p.with_new_children(vec![new_input]);
+    }
+
+    // Tripwire for shapes the descent doesn't recognize: a per-partition partial aggregate in
+    // the subtree means a duplicate-bearing merge somewhere above it, and the row limit below
+    // (LimitPushdown descends through projections into merges) could land on it. The worker
+    // limit is an optimization, skipping it is always correct.
+    if contains_multi_partition_partial_aggregate(input) {
+        return Ok(p);
+    }
+
+    // No aggregation: plain rows, each one self-contained, a row limit is exact anywhere.
     if reverse {
         let limit = Arc::new(TailLimitExec::new(input.clone(), limit));
         p.with_new_children(vec![limit])
@@ -232,6 +621,84 @@ pub fn add_limit_to_workers(
         let limit_optimized = LimitPushdown::new().optimize(limit, config)?;
         p.with_new_children(vec![limit_optimized])
     }
+}
+
+/// The first aggregate reachable from `p` looking only through sort preserving merges and
+/// projections.
+fn first_aggregate_below_merges(mut p: &Arc<dyn ExecutionPlan>) -> Option<&Arc<dyn ExecutionPlan>> {
+    loop {
+        if let Some(merge) = p.as_any().downcast_ref::<SortPreservingMergeExec>() {
+            p = merge.input();
+        } else if let Some(projection) = p.as_any().downcast_ref::<ProjectionExec>() {
+            p = projection.input();
+        } else if p.as_any().is::<InlineAggregateExec>() || p.as_any().is::<AggregateExec>() {
+            return Some(p);
+        } else {
+            return None;
+        }
+    }
+}
+
+/// Rebuilds the chain of merges and projections with a per-partition row limit placed directly
+/// above the first aggregate. Must only be called when [first_aggregate_below_merges] found one.
+fn limit_above_first_aggregate(
+    p: &Arc<dyn ExecutionPlan>,
+    limit: usize,
+    reverse: bool,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    if let Some(merge) = p.as_any().downcast_ref::<SortPreservingMergeExec>() {
+        let child = limit_above_first_aggregate(merge.input(), limit, reverse)?;
+        return Ok(Arc::new(
+            SortPreservingMergeExec::new(merge.expr().clone(), child).with_fetch(merge.fetch()),
+        ));
+    }
+    if let Some(projection) = p.as_any().downcast_ref::<ProjectionExec>() {
+        // The limit is a plain row count, it commutes with column renames
+        let child = limit_above_first_aggregate(projection.input(), limit, reverse)?;
+        return Ok(Arc::new(ProjectionExec::try_new(
+            projection.expr().to_vec(),
+            child,
+        )?));
+    }
+
+    // The sorted streaming aggregate can additionally stop reading its input early once it has
+    // emitted `limit` groups; for reverse the last groups are unknown until the input ends, so
+    // there is nothing to pass into the aggregate.
+    let mut node = p.clone();
+    if !reverse {
+        if let Some(agg) = p.as_any().downcast_ref::<InlineAggregateExec>() {
+            if *agg.mode() == InlineAggregateMode::Partial {
+                let agg_limit = agg.limit().map_or(limit, |l| l.min(limit));
+                node = Arc::new(agg.with_limit(Some(agg_limit)));
+            }
+        }
+    }
+
+    Ok(if reverse {
+        Arc::new(TailLimitExec::new(node, limit))
+    } else if node.output_partitioning().partition_count() == 1 {
+        Arc::new(GlobalLimitExec::new(node, 0, Some(limit)))
+    } else {
+        Arc::new(LocalLimitExec::new(node, limit))
+    })
+}
+
+/// True if the plan contains a partial aggregate executed per partition: its merged output
+/// carries duplicate group keys, so a row limit above such a merge is not group-aligned.
+fn contains_multi_partition_partial_aggregate(p: &Arc<dyn ExecutionPlan>) -> bool {
+    let is_one = if let Some(agg) = p.as_any().downcast_ref::<InlineAggregateExec>() {
+        *agg.mode() == InlineAggregateMode::Partial
+    } else if let Some(agg) = p.as_any().downcast_ref::<AggregateExec>() {
+        *agg.mode() == AggregateMode::Partial
+    } else {
+        false
+    };
+    if is_one && p.output_partitioning().partition_count() > 1 {
+        return true;
+    }
+    p.children()
+        .into_iter()
+        .any(contains_multi_partition_partial_aggregate)
 }
 
 /// Because we disable `EnforceDistribution`, and because we add `SortPreservingMergeExec` in
@@ -434,4 +901,659 @@ fn replace_columns(
         })?
         .data,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::arrow::array::{Int64Array, RecordBatch};
+    use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+    use datafusion::functions_aggregate::sum::sum_udaf;
+    use datafusion::physical_expr::aggregate::AggregateExprBuilder;
+    use datafusion::physical_expr::expressions::col;
+    use datafusion::physical_expr::PhysicalSortExpr;
+    use datafusion::physical_plan::aggregates::PhysicalGroupBy;
+    use datafusion::physical_plan::collect;
+    use datafusion::prelude::SessionContext;
+    use datafusion_datasource::memory::MemorySourceConfig;
+    use datafusion_datasource::source::DataSourceExec;
+    use std::collections::BTreeMap;
+
+    fn test_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, false),
+            Field::new("v", DataType::Int64, false),
+        ]))
+    }
+
+    fn make_batch(schema: &SchemaRef, rows: &[(i64, i64)]) -> RecordBatch {
+        RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from_iter_values(rows.iter().map(|r| r.0))),
+                Arc::new(Int64Array::from_iter_values(rows.iter().map(|r| r.1))),
+            ],
+        )
+        .unwrap()
+    }
+
+    /// Memory source with each partition sorted by `k`.
+    fn sorted_source(
+        schema: &SchemaRef,
+        partitions: Vec<Vec<RecordBatch>>,
+    ) -> Arc<dyn ExecutionPlan> {
+        let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
+            col("k", schema).unwrap(),
+        )]);
+        let source = MemorySourceConfig::try_new(&partitions, schema.clone(), None)
+            .unwrap()
+            .try_with_sort_information(vec![ordering])
+            .unwrap();
+        Arc::new(DataSourceExec::new(Arc::new(source)))
+    }
+
+    fn merge_by_k(input: Arc<dyn ExecutionPlan>) -> Arc<SortPreservingMergeExec> {
+        let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
+            col("k", &input.schema()).unwrap(),
+        )]);
+        Arc::new(SortPreservingMergeExec::new(ordering, input))
+    }
+
+    fn sum_aggregate(
+        mode: AggregateMode,
+        group_col: &str,
+        input: Arc<dyn ExecutionPlan>,
+    ) -> Arc<dyn ExecutionPlan> {
+        let schema = input.schema();
+        let group_by = PhysicalGroupBy::new_single(vec![(
+            col(group_col, &schema).unwrap(),
+            group_col.to_string(),
+        )]);
+        let sum = AggregateExprBuilder::new(sum_udaf(), vec![col("v", &schema).unwrap()])
+            .schema(schema.clone())
+            .alias("sum_v")
+            .build()
+            .unwrap();
+        Arc::new(
+            AggregateExec::try_new(
+                mode,
+                group_by,
+                vec![Arc::new(sum)],
+                vec![None],
+                input,
+                schema,
+            )
+            .unwrap(),
+        )
+    }
+
+    /// Collects plan output into per-key sums, combining duplicate keys the way a Final
+    /// aggregate would.
+    async fn collect_summed(plan: Arc<dyn ExecutionPlan>) -> BTreeMap<i64, i64> {
+        let session = SessionContext::new();
+        let batches = collect(plan, session.task_ctx()).await.unwrap();
+        let mut result = BTreeMap::new();
+        for batch in batches {
+            let keys = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            let sums = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            for (k, s) in keys.iter().zip(sums.iter()) {
+                *result.entry(k.unwrap()).or_insert(0) += s.unwrap();
+            }
+        }
+        result
+    }
+
+    fn two_partition_source(schema: &SchemaRef) -> Arc<dyn ExecutionPlan> {
+        // Duplicate keys 2 and 3 across partitions
+        sorted_source(
+            schema,
+            vec![
+                vec![make_batch(schema, &[(1, 10), (2, 20), (3, 30)])],
+                vec![make_batch(schema, &[(2, 21), (3, 31), (4, 40)])],
+            ],
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn pushes_sorted_partial_aggregate_below_merge() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let original = sum_aggregate(AggregateMode::Partial, "k", merge_by_k(source));
+
+        let rewritten = push_sorted_partial_aggregate_below_merge(original.clone()).unwrap();
+
+        let merge = rewritten
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .expect("merge must become the root");
+        let agg = merge
+            .input()
+            .as_any()
+            .downcast_ref::<AggregateExec>()
+            .expect("partial aggregate must move below the merge");
+        assert_eq!(*agg.mode(), AggregateMode::Partial);
+        assert!(matches!(agg.input_order_mode(), InputOrderMode::Sorted));
+        assert_eq!(
+            agg.properties().output_partitioning().partition_count(),
+            2,
+            "aggregate must run per partition"
+        );
+        assert_eq!(rewritten.schema(), original.schema());
+
+        // Cross-partition duplicate keys combine to the same totals as in the original plan
+        assert_eq!(
+            collect_summed(rewritten).await,
+            collect_summed(original).await
+        );
+    }
+
+    #[test]
+    fn does_not_push_hash_aggregate() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, false),
+            Field::new("g", DataType::Int64, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2])),
+                Arc::new(Int64Array::from(vec![5, 4])),
+                Arc::new(Int64Array::from(vec![10, 20])),
+            ],
+        )
+        .unwrap();
+        let source = sorted_source(&schema, vec![vec![batch.clone()], vec![batch]]);
+        // Grouping by `g` while the input is sorted by `k` makes the aggregate hash-based
+        let original = sum_aggregate(AggregateMode::Partial, "g", merge_by_k(source));
+        assert!(matches!(
+            original
+                .as_any()
+                .downcast_ref::<AggregateExec>()
+                .unwrap()
+                .input_order_mode(),
+            InputOrderMode::Linear
+        ));
+
+        let rewritten = push_sorted_partial_aggregate_below_merge(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    #[test]
+    fn does_not_push_non_partial_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let original = sum_aggregate(AggregateMode::Single, "k", merge_by_k(source));
+
+        let rewritten = push_sorted_partial_aggregate_below_merge(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    #[test]
+    fn does_not_push_below_merge_with_fetch() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let merge = Arc::new(merge_by_k(source).as_ref().clone().with_fetch(Some(3)));
+        let original = sum_aggregate(AggregateMode::Partial, "k", merge);
+
+        let rewritten = push_sorted_partial_aggregate_below_merge(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    #[test]
+    fn does_not_push_below_single_partition_merge() {
+        let schema = test_schema();
+        let source = sorted_source(
+            &schema,
+            vec![vec![make_batch(&schema, &[(1, 10), (2, 20)])]],
+        );
+        let original = sum_aggregate(AggregateMode::Partial, "k", merge_by_k(source));
+
+        let rewritten = push_sorted_partial_aggregate_below_merge(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    fn inline(plan: Arc<dyn ExecutionPlan>) -> Arc<InlineAggregateExec> {
+        let agg = plan.as_any().downcast_ref::<AggregateExec>().unwrap();
+        Arc::new(InlineAggregateExec::try_new_from_aggregate(agg).unwrap())
+    }
+
+    fn worker(
+        input: Arc<dyn ExecutionPlan>,
+        limit_and_reverse: Option<(usize, bool)>,
+    ) -> Arc<dyn ExecutionPlan> {
+        Arc::new(WorkerExec::new(
+            input,
+            4096,
+            limit_and_reverse,
+            None,
+            None,
+            WorkerPlanningParams {
+                worker_partition_count: 1,
+            },
+        ))
+    }
+
+    /// Worker plan with the partial aggregate below the merge: merge of per-partition partial
+    /// states can contain duplicate group keys, so the row limit must be limit * partitions
+    /// while the aggregates take the group limit.
+    #[test]
+    fn worker_limit_above_merged_partial_aggregate_limits_groups_per_partition() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
+        let merged = push_sorted_partial_aggregate_below_merge_shape(agg);
+        let p = worker(merged, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+
+        let worker = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let merge = worker
+            .input
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .expect("merge must stay on top of per-partition aggregates");
+        assert_eq!(merge.fetch(), None);
+        let local_limit = merge
+            .input()
+            .as_any()
+            .downcast_ref::<LocalLimitExec>()
+            .expect("the limit must become a per-partition row limit above the aggregate");
+        assert_eq!(local_limit.fetch(), 3);
+        let agg = local_limit
+            .input()
+            .as_any()
+            .downcast_ref::<InlineAggregateExec>()
+            .unwrap();
+        assert_eq!(agg.limit(), Some(3));
+    }
+
+    /// The limit descends below the merge even for an aggregate that is not an
+    /// InlineAggregateExec: only the early-stop absorption is specific to it, the row limit
+    /// placement is not.
+    #[test]
+    fn worker_limit_above_merged_raw_partial_aggregate_stays_below_merge() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = sum_aggregate(AggregateMode::Partial, "k", source);
+        let merged = merge_by_k(agg);
+        let p = worker(merged, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+
+        let worker_node = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let merge = worker_node
+            .input
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .unwrap();
+        assert_eq!(merge.fetch(), None);
+        let local_limit = merge
+            .input()
+            .as_any()
+            .downcast_ref::<LocalLimitExec>()
+            .expect("a row limit above the merge would truncate duplicate group keys");
+        assert_eq!(local_limit.fetch(), 3);
+        assert!(local_limit.input().as_any().is::<AggregateExec>());
+
+        let merged = merge_by_k(sum_aggregate(
+            AggregateMode::Partial,
+            "k",
+            two_partition_source(&schema),
+        ));
+        let p = worker(merged, Some((3, true)));
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+        let worker_node = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let merge = worker_node
+            .input
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .unwrap();
+        let tail = merge
+            .input()
+            .as_any()
+            .downcast_ref::<TailLimitExec>()
+            .unwrap();
+        assert_eq!(tail.limit, 3);
+        assert!(tail.input.as_any().is::<AggregateExec>());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn worker_reverse_limit_above_merged_partial_aggregate_tails_each_partition() {
+        let schema = test_schema();
+        // Keys 4..=6 are present in both partitions; per-partition tails of 3 groups are
+        // {4, 5, 6} and {7, 8, 9}.
+        let source = sorted_source(
+            &schema,
+            vec![
+                vec![make_batch(
+                    &schema,
+                    &(1..=6).map(|k| (k, k * 10)).collect::<Vec<_>>(),
+                )],
+                vec![make_batch(
+                    &schema,
+                    &(4..=9).map(|k| (k, k * 100 + 1)).collect::<Vec<_>>(),
+                )],
+            ],
+        );
+        let baseline = collect_summed(sum_aggregate(
+            AggregateMode::Partial,
+            "k",
+            merge_by_k(source.clone()),
+        ))
+        .await;
+
+        let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
+        let merged = push_sorted_partial_aggregate_below_merge_shape(agg);
+        let p = worker(merged, Some((3, true)));
+
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+
+        let worker = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let merge = worker
+            .input
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .expect("merge must stay on top of per-partition tails");
+        assert_eq!(merge.fetch(), None);
+        let tail = merge
+            .input()
+            .as_any()
+            .downcast_ref::<TailLimitExec>()
+            .expect("reverse limit must become a per-partition tail below the merge");
+        assert_eq!(tail.limit, 3);
+        let agg = tail
+            .input
+            .as_any()
+            .downcast_ref::<InlineAggregateExec>()
+            .unwrap();
+        assert_eq!(
+            agg.limit(),
+            None,
+            "tail limit can not stop the aggregate early"
+        );
+
+        // The merged stream must carry complete totals for the last 3 group keys; earlier keys
+        // may arrive partial and are dropped by the router's own limit.
+        let summed = collect_summed(worker.input.clone()).await;
+        for key in [7, 8, 9] {
+            assert_eq!(summed[&key], baseline[&key], "complete total for key {key}");
+        }
+    }
+
+    /// A global aggregate doesn't use the input order: the merge below it becomes a plain
+    /// coalesce, through the filter, with identical results.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn drops_sort_merge_under_global_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let filter: Arc<dyn ExecutionPlan> = Arc::new(
+            FilterExec::try_new(
+                Arc::new(datafusion::physical_plan::expressions::BinaryExpr::new(
+                    col("k", &schema).unwrap(),
+                    datafusion::logical_expr::Operator::Gt,
+                    Arc::new(datafusion::physical_plan::expressions::Literal::new(
+                        datafusion::scalar::ScalarValue::Int64(Some(1)),
+                    )),
+                )),
+                merge_by_k(source),
+            )
+            .unwrap(),
+        );
+        let original = global_sum_aggregate(filter);
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+
+        let agg = rewritten.as_any().downcast_ref::<AggregateExec>().unwrap();
+        let filter = agg
+            .input()
+            .as_any()
+            .downcast_ref::<FilterExec>()
+            .expect("filter must stay in place");
+        assert!(
+            filter.input().as_any().is::<CoalescePartitionsExec>(),
+            "the merge must become a plain coalesce"
+        );
+
+        assert_eq!(
+            collect_global_sum(rewritten).await,
+            collect_global_sum(original).await
+        );
+    }
+
+    /// An order-sensitive aggregate stays Linear with an empty GROUP BY but still needs its
+    /// input ordered, so its merge stays.
+    #[test]
+    fn keeps_sort_merge_under_order_sensitive_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let merged = merge_by_k(source);
+        let first = AggregateExprBuilder::new(
+            datafusion::functions_aggregate::array_agg::array_agg_udaf(),
+            vec![col("v", &schema).unwrap()],
+        )
+        .schema(schema.clone())
+        .alias("vals")
+        .order_by(LexOrdering::new(vec![PhysicalSortExpr::new_default(
+            col("k", &schema).unwrap(),
+        )]))
+        .build()
+        .unwrap();
+        let original: Arc<dyn ExecutionPlan> = Arc::new(
+            AggregateExec::try_new(
+                AggregateMode::Partial,
+                PhysicalGroupBy::new_single(Vec::new()),
+                vec![Arc::new(first)],
+                vec![None],
+                merged,
+                schema,
+            )
+            .unwrap(),
+        );
+        assert!(original
+            .as_any()
+            .downcast_ref::<AggregateExec>()
+            .unwrap()
+            .required_input_ordering()[0]
+            .is_some());
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    /// A grouped hash aggregate over unmerged partitions could build a hash table per
+    /// partition, so its merge stays.
+    #[test]
+    fn keeps_sort_merge_under_grouped_hash_aggregate() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, false),
+            Field::new("g", DataType::Int64, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2])),
+                Arc::new(Int64Array::from(vec![5, 4])),
+                Arc::new(Int64Array::from(vec![10, 20])),
+            ],
+        )
+        .unwrap();
+        let source = sorted_source(&schema, vec![vec![batch.clone()], vec![batch]]);
+        let original = sum_aggregate(AggregateMode::Partial, "g", merge_by_k(source));
+        assert!(matches!(
+            original
+                .as_any()
+                .downcast_ref::<AggregateExec>()
+                .unwrap()
+                .input_order_mode(),
+            InputOrderMode::Linear
+        ));
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    fn global_sum_aggregate(input: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+        let schema = input.schema();
+        let sum = AggregateExprBuilder::new(sum_udaf(), vec![col("v", &schema).unwrap()])
+            .schema(schema.clone())
+            .alias("sum_v")
+            .build()
+            .unwrap();
+        Arc::new(
+            AggregateExec::try_new(
+                AggregateMode::Partial,
+                PhysicalGroupBy::new_single(Vec::new()),
+                vec![Arc::new(sum)],
+                vec![None],
+                input,
+                schema,
+            )
+            .unwrap(),
+        )
+    }
+
+    /// Sums the partial states of a global aggregate across partitions.
+    async fn collect_global_sum(plan: Arc<dyn ExecutionPlan>) -> i64 {
+        let session = SessionContext::new();
+        let batches = collect(plan, session.task_ctx()).await.unwrap();
+        batches
+            .iter()
+            .flat_map(|b| {
+                b.column(0)
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+            })
+            .sum()
+    }
+
+    #[test]
+    fn keeps_sort_merge_under_sorted_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let original = sum_aggregate(AggregateMode::Partial, "k", merge_by_k(source));
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    /// The descent looks through projections: the row limit is a plain count and commutes with
+    /// column renames.
+    #[test]
+    fn worker_limit_descends_through_projection() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
+        let merged = push_sorted_partial_aggregate_below_merge_shape(agg);
+        let projection = Arc::new(
+            ProjectionExec::try_new(
+                merged
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| (col(f.name(), &merged.schema()).unwrap(), f.name().clone()))
+                    .collect(),
+                merged,
+            )
+            .unwrap(),
+        );
+        let p = worker(projection, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+
+        let worker_node = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let projection = worker_node
+            .input
+            .as_any()
+            .downcast_ref::<ProjectionExec>()
+            .expect("projection must stay on top");
+        let merge = projection
+            .input()
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .unwrap();
+        let local_limit = merge
+            .input()
+            .as_any()
+            .downcast_ref::<LocalLimitExec>()
+            .expect("the limit must descend through the projection to the aggregate");
+        assert_eq!(local_limit.fetch(), 3);
+        let agg = local_limit
+            .input()
+            .as_any()
+            .downcast_ref::<InlineAggregateExec>()
+            .unwrap();
+        assert_eq!(agg.limit(), Some(3));
+    }
+
+    /// A shape the descent doesn't recognize but containing per-partition partial aggregates
+    /// must not get a worker limit at all: a row limit could land above a duplicate-bearing
+    /// merge.
+    #[test]
+    fn worker_limit_skipped_for_unrecognized_shape_with_per_partition_aggregate() {
+        let schema = test_schema();
+        let source = two_partition_source(&schema);
+        let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
+        let coalesce: Arc<dyn ExecutionPlan> = Arc::new(CoalescePartitionsExec::new(agg));
+        let p = worker(coalesce, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p.clone(), &ConfigOptions::default()).unwrap();
+        assert!(
+            Arc::ptr_eq(&rewritten, &p),
+            "no limit must be added to an unrecognized shape with a per-partition aggregate"
+        );
+    }
+
+    /// Single partition partial aggregate emits unique group keys, the row limit stays exact
+    /// and also lets the aggregate stop early.
+    #[test]
+    fn worker_limit_above_single_partition_partial_aggregate_sets_aggregate_limit() {
+        let schema = test_schema();
+        let source = sorted_source(
+            &schema,
+            vec![vec![make_batch(&schema, &[(1, 10), (2, 20)])]],
+        );
+        let agg = inline(sum_aggregate(AggregateMode::Partial, "k", source));
+        let p = worker(agg, Some((3, false)));
+
+        let rewritten = add_limit_to_workers(p, &ConfigOptions::default()).unwrap();
+
+        let worker = rewritten.as_any().downcast_ref::<WorkerExec>().unwrap();
+        let limit = worker
+            .input
+            .as_any()
+            .downcast_ref::<GlobalLimitExec>()
+            .unwrap();
+        assert_eq!(limit.fetch(), Some(3));
+        let agg = limit
+            .input()
+            .as_any()
+            .downcast_ref::<InlineAggregateExec>()
+            .unwrap();
+        assert_eq!(agg.limit(), Some(3));
+    }
+
+    /// Builds the post-rewrite shape merge-above-aggregate for an already converted
+    /// InlineAggregateExec.
+    fn push_sorted_partial_aggregate_below_merge_shape(
+        agg: Arc<InlineAggregateExec>,
+    ) -> Arc<dyn ExecutionPlan> {
+        let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
+            col("k", &agg.schema()).unwrap(),
+        )]);
+        Arc::new(SortPreservingMergeExec::new(ordering, agg))
+    }
 }

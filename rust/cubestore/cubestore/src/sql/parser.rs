@@ -66,6 +66,7 @@ pub enum Statement {
     Queue(QueueCommand),
     System(SystemCommand),
     Dump(Box<Query>),
+    ExplainAnalyzeDetailed(Box<Query>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -301,10 +302,27 @@ impl<'a> CubeStoreParser<'a> {
                     };
                     Ok(Statement::Dump(q))
                 }
+                _ if self.is_explain_analyze_detailed() => {
+                    self.parser.next_token(); // EXPLAIN
+                    self.parser.next_token(); // ANALYZE
+                    self.parser.next_token(); // DETAILED
+                    Ok(Statement::ExplainAnalyzeDetailed(
+                        self.parser.parse_query()?,
+                    ))
+                }
                 _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
             },
             _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
         }
+    }
+
+    fn is_explain_analyze_detailed(&self) -> bool {
+        fn is_word(token: Token, value: &str) -> bool {
+            matches!(token, Token::Word(w) if w.value.eq_ignore_ascii_case(value))
+        }
+        is_word(self.parser.peek_token().token, "explain")
+            && is_word(self.parser.peek_nth_token(1).token, "analyze")
+            && is_word(self.parser.peek_nth_token(2).token, "detailed")
     }
 
     fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
@@ -1031,6 +1049,24 @@ mod tests {
     fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
         let mut parser = CubeStoreParser::new(query, None)?;
         Ok(parser.parse_statement()?)
+    }
+
+    #[test]
+    fn parse_explain_variants() -> Result<(), CubeError> {
+        match parse_stmt("EXPLAIN ANALYZE DETAILED SELECT 1")? {
+            Statement::ExplainAnalyzeDetailed(_) => {}
+            s => panic!("Expected ExplainAnalyzeDetailed, got {:?}", s),
+        }
+        // The DETAILED interception must not affect plain EXPLAIN / EXPLAIN ANALYZE.
+        match parse_stmt("EXPLAIN ANALYZE SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: true, .. }) => {}
+            s => panic!("Expected Explain with analyze, got {:?}", s),
+        }
+        match parse_stmt("EXPLAIN SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: false, .. }) => {}
+            s => panic!("Expected Explain without analyze, got {:?}", s),
+        }
+        Ok(())
     }
 
     #[test]

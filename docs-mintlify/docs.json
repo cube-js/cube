@@ -78,7 +78,7 @@
                     ]
                   },
                   "docs/explore-analyze/charts/custom",
-              {
+                  {
                     "group": "Configure charts",
                     "root": "docs/explore-analyze/charts/configuration/index",
                     "pages": [
@@ -92,7 +92,8 @@
                   }
                 ]
               },
-              "docs/explore-analyze/analytics-chat"
+              "docs/explore-analyze/analytics-chat",
+              "docs/explore-analyze/skills"
             ]
           },
           {
@@ -161,7 +162,6 @@
                   "docs/data-modeling/access-control/context"
                 ]
               },
-              
               {
                 "group": "Dynamic Data Models",
                 "root": "docs/data-modeling/dynamic/index",
@@ -179,7 +179,8 @@
                   "docs/data-modeling/visual-modeler",
                   "docs/data-modeling/data-model-ide",
                   "docs/data-modeling/dev-mode",
-                  "docs/data-modeling/access-policies-viewer"
+                  "docs/data-modeling/access-policies-viewer",
+                  "docs/data-modeling/content-validator"
                 ]
               }
             ]
@@ -211,6 +212,7 @@
               "docs/integrations/microsoft-excel",
               "docs/integrations/google-sheets",
               "docs/integrations/snowflake-semantic-views",
+              "docs/integrations/dbt",
               {
                 "group": "Semantic Layer Sync",
                 "root": "docs/integrations/semantic-layer-sync/index",
@@ -349,12 +351,22 @@
                   },
                   "admin/deployment/dedicated/pre-aggregation-storage"
                 ]
+              },
+              {
+                "group": "Cube OIDC",
+                "root": "admin/deployment/oidc/index",
+                "pages": [
+                  "admin/deployment/oidc/aws",
+                  "admin/deployment/oidc/gcp",
+                  "admin/deployment/oidc/azure"
+                ]
               }
             ]
           },
           {
             "group": "Monitoring",
             "pages": [
+              "admin/monitoring/usage-analytics",
               "admin/monitoring/query-history",
               "admin/monitoring/pre-aggregations",
               "admin/monitoring/performance",
@@ -380,9 +392,12 @@
               "admin/ai/index",
               "admin/ai/rules",
               "admin/ai/certified-queries",
+              "admin/ai/skills",
               "admin/ai/memory-isolation",
               "admin/ai/multi-agent",
-              "admin/ai/bring-your-own-model"
+              "admin/ai/bring-your-own-model",
+              "admin/ai/mcp-connectors",
+              "admin/ai/evals"
             ]
           },
           {
@@ -470,7 +485,7 @@
                   "reference/data-modeling/cube-package",
                   "reference/data-modeling/cube_dbt",
                   "reference/data-modeling/lkml2cube"
-                ] 
+                ]
               }
             ]
           },
@@ -665,6 +680,161 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "API",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication"
+            ]
+          },
+          {
+            "group": "Core Data Endpoints",
+            "openapi": "/api-reference/core-data.yaml",
+            "pages": [
+              "POST /v1/load",
+              "POST /v1/cubesql",
+              "GET /v1/meta"
+            ]
+          },
+          {
+            "group": "AI Endpoints",
+            "openapi": "/api-reference/chat.yaml",
+            "pages": [
+              "POST /chat/stream-chat-state"
+            ]
+          },
+          {
+            "group": "Platform Endpoints",
+            "pages": [
+              {
+                "group": "Deployments",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments",
+                  "GET /v1/deployments/{deploymentId}",
+                  "POST /v1/deployments/{deploymentId}/token"
+                ]
+              },
+              {
+                "group": "Environments",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/environments",
+                  "GET /v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
+                  "POST /v1/deployments/{deploymentId}/environments/{environmentId}/tokens",
+                  "POST /v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync"
+                ]
+              },
+              {
+                "group": "Folders",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/folders",
+                  "POST /v1/deployments/{deploymentId}/folders",
+                  "PUT /v1/deployments/{deploymentId}/folders/{folderId}",
+                  "DELETE /v1/deployments/{deploymentId}/folders/{folderId}",
+                  "GET /v1/deployments/{deploymentId}/folders/{folderId}/ancestors"
+                ]
+              },
+              {
+                "group": "Reports",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/reports",
+                  "POST /v1/deployments/{deploymentId}/reports",
+                  "GET /v1/deployments/{deploymentId}/reports/{reportId}",
+                  "PUT /v1/deployments/{deploymentId}/reports/{reportId}",
+                  "DELETE /v1/deployments/{deploymentId}/reports/{reportId}",
+                  "PUT /v1/deployments/{deploymentId}/reports/{reportId}/refresh"
+                ]
+              },
+              {
+                "group": "Workbooks",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/workbooks",
+                  "POST /v1/deployments/{deploymentId}/workbooks",
+                  "GET /v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "DELETE /v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
+                  "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
+                  "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
+                ]
+              },
+              {
+                "group": "Notifications",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/notifications",
+                  "POST /v1/deployments/{deploymentId}/notifications",
+                  "GET /v1/deployments/{deploymentId}/notifications/{id}",
+                  "PUT /v1/deployments/{deploymentId}/notifications/{id}",
+                  "DELETE /v1/deployments/{deploymentId}/notifications/{id}",
+                  "GET /v1/deployments/{deploymentId}/notifications/{id}/recipients",
+                  "POST /v1/deployments/{deploymentId}/notifications/{id}/recipients",
+                  "DELETE /v1/deployments/{deploymentId}/notifications/{id}/recipients"
+                ]
+              },
+              {
+                "group": "Workspace",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/shared-workspace",
+                  "GET /v1/deployments/{deploymentId}/workspace",
+                  "POST /v1/deployments/{deploymentId}/workspace/move"
+                ]
+              },
+              {
+                "group": "Embed",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/embed/dashboard/{publicId}",
+                  "POST /v1/embed/generate-session",
+                  "POST /v1/embed/session/token"
+                ]
+              },
+              {
+                "group": "Embed Tenants",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/embed-tenants/{embedTenantName}/groups",
+                  "DELETE /v1/embed-tenants/{embedTenantName}/groups/{id}",
+                  "GET /v1/embed-tenants/{embedTenantName}/user-attributes",
+                  "DELETE /v1/embed-tenants/{embedTenantName}/user-attributes/{id}"
+                ]
+              },
+              {
+                "group": "Users",
+                "openapi": "/api-reference/scim.yaml",
+                "pages": [
+                  "GET /scim/v2/Users",
+                  "POST /scim/v2/Users",
+                  "GET /scim/v2/Users/{id}",
+                  "PUT /scim/v2/Users/{id}",
+                  "PATCH /scim/v2/Users/{id}",
+                  "DELETE /scim/v2/Users/{id}"
+                ]
+              },
+              {
+                "group": "Groups",
+                "openapi": "/api-reference/scim.yaml",
+                "pages": [
+                  "GET /scim/v2/Groups",
+                  "POST /scim/v2/Groups",
+                  "GET /scim/v2/Groups/{id}",
+                  "PUT /scim/v2/Groups/{id}",
+                  "PATCH /scim/v2/Groups/{id}",
+                  "DELETE /scim/v2/Groups/{id}"
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },
@@ -682,6 +852,10 @@
   },
   "navbar": {
     "links": [
+      {
+        "label": "Demos",
+        "href": "https://cube.dev/demos"
+      },
       {
         "label": "Changelog",
         "href": "https://cube.dev/changelog"

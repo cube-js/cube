@@ -64,6 +64,7 @@ const schemaOptions = Joi.object().keys({
   basePath: Joi.string(),
   devServer: Joi.boolean(),
   apiSecret: Joi.string(),
+  apiSecrets: Joi.array().items(Joi.string()),
   logger: Joi.func(),
   // source
   dialectFactory: Joi.func(),

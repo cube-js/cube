@@ -269,6 +269,39 @@ fn masked_sum_measure_returns_mask_literal() {
 }
 
 #[test]
+fn masked_aggregate_measure_with_filter_not_in_group_by_renders_mask() {
+    use crate::cube_bridge::base_query_options::{FilterItem, MaskedMemberItem};
+
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
+    // sum_revenue is masked with a row-level filter on public_dim. The aggregate
+    // measure must not be wrapped in a per-row CASE WHEN when public_dim is not in
+    // the GROUP BY — that would reference an ungrouped column. It should fall back
+    // to the configured mask value instead.
+    let context = TestContext::new_with_masked_member_items(
+        schema,
+        vec![MaskedMemberItem {
+            member: "masking_cube.sum_revenue".to_string(),
+            filter: Some(FilterItem {
+                or: None,
+                and: None,
+                member: Some("masking_cube.public_dim".to_string()),
+                dimension: None,
+                operator: Some("equals".to_string()),
+                values: Some(vec![Some("active".to_string())]),
+            }),
+        }],
+    )
+    .unwrap();
+
+    let symbol = context.create_measure("masking_cube.sum_revenue").unwrap();
+    let sql = context
+        .evaluate_symbol_with_group_by(&symbol, vec!["masking_cube.id".to_string()])
+        .unwrap();
+    assert_eq!(sql, "(-1)");
+    assert!(!sql.to_uppercase().contains("CASE WHEN"));
+}
+
+#[test]
 fn unmasked_measure_returns_aggregated_sql() {
     let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
     // real_count has no mask and is NOT in the masked set

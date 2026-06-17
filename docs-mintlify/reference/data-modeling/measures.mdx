@@ -639,15 +639,21 @@ cube(`time_shift`, {
 
 </CodeGroup>
 
-### `group_by`
+### `grain`
 
-The `group_by` parameter is used with [multi-stage measures][ref-multi-stage] to specify
-dimensions that should be used for the `GROUP BY` of the inner aggregation stage,
-*ignoring* any dimensions present in the query.
+The `grain` parameter is used with [multi-stage measures][ref-multi-stage] to control the
+dimensions of the inner aggregation stage's `GROUP BY` — the *grain* at which the base
+measure is computed before the outer aggregation is applied. It accepts an object with
+three keys, each taking a list of dimension names from the same cube:
 
-This is commonly used for fixed dimension calculations — computing a measure at a fixed
-granularity regardless of the query's dimensions. For example, calculating percent of
-total or comparing individual items to a broader dataset.
+- `keep_only` — group the inner stage by *only* the listed dimensions, ignoring the
+  query's dimensions. Use it for fixed-grain calculations such as percent of total.
+- `exclude` — group the inner stage by the query's dimensions *minus* the listed
+  dimensions. Use it for ranking within groups.
+- `include` — group the inner stage by the query's dimensions *plus* the listed
+  dimensions. Use it for nested aggregates (an aggregate of an aggregate).
+
+`keep_only` and `exclude` are mutually exclusive.
 
 <CodeGroup>
 
@@ -657,8 +663,9 @@ measures:
     multi_stage: true
     sql: "{revenue}"
     type: sum
-    group_by:
-      - country
+    grain:
+      keep_only:
+        - country
 ```
 
 ```javascript title="JavaScript"
@@ -667,104 +674,161 @@ measures: {
     multi_stage: true,
     sql: `${revenue}`,
     type: `sum`,
-    group_by: [country]
+    grain: {
+      keep_only: [country]
+    }
   }
 }
 ```
 
 </CodeGroup>
 
-`group_by` accepts a list of dimension names from the same cube. The inner stage will
-group by *only* these dimensions, while the outer aggregation will group by the query's
-dimensions.
-
-| Parameter | Inner `GROUP BY` | Outer `GROUP BY` |
+| `grain` key | Inner `GROUP BY` | Outer `GROUP BY` |
 |---|---|---|
-| `group_by` | Only the listed dimensions | Query dimensions |
-| `reduce_by` | Query dimensions minus listed | Query dimensions |
-| `add_group_by` | Query dimensions plus listed | Query dimensions |
+| `keep_only` | Only the listed dimensions | Query dimensions |
+| `exclude` | Query dimensions minus listed | Query dimensions |
+| `include` | Query dimensions plus listed | Query dimensions |
 
-### `reduce_by`
+<Note>
 
-The `reduce_by` parameter is used with [multi-stage measures][ref-multi-stage] to specify
-dimensions that should be *removed* from the `GROUP BY` of the inner aggregation stage.
+`grain` replaces the standalone `group_by`, `reduce_by`, and `add_group_by` parameters,
+which remain supported. To migrate, use `grain.keep_only` instead of `group_by`,
+`grain.exclude` instead of `reduce_by`, and `grain.include` instead of `add_group_by`.
 
-This is commonly used for ranking calculations — computing a rank across a dimension
-while still allowing grouping by other dimensions in the query.
+</Note>
+
+### `group_by`, `reduce_by`, and `add_group_by` (legacy)
+
+These three parameters were the original way to control the inner aggregation stage's
+`GROUP BY` for [multi-stage measures][ref-multi-stage]. They are still supported, but
+[`grain`](#grain) now covers all three and is the recommended way to express the grain of
+a multi-stage measure.
+
+| Legacy parameter | `grain` equivalent | Effect on the inner stage's `GROUP BY` |
+|---|---|---|
+| `group_by` | [`grain.keep_only`](#grain) | Only the listed dimensions, ignoring query dimensions |
+| `reduce_by` | [`grain.exclude`](#grain) | Query dimensions minus the listed dimensions |
+| `add_group_by` | [`grain.include`](#grain) | Query dimensions plus the listed dimensions |
+
+Each accepts a list of dimension names from the same cube. For new data models, use
+[`grain`](#grain) instead.
+
+### `filter`
+
+The `filter` parameter is used with [multi-stage measures][ref-multi-stage] to
+override the filter context that the inner aggregation stage inherits from the
+query. By default, a multi-stage measure inherits all filters applied to the
+query; `filter` lets you drop, replace, or extend those filters at the inner
+stage.
+
+This is commonly used for "share of total" calculations where the denominator
+must ignore a filter applied by the query — for example, computing each status's
+share of the per-category total while the query is filtered to a single status.
+
+<Note>
+
+The `filter` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
+(`CUBEJS_TESSERACT_SQL_PLANNER=true`).
+
+</Note>
 
 <CodeGroup>
 
 ```yaml title="YAML"
 measures:
-  - name: product_rank
+  - name: amount_all_statuses
     multi_stage: true
-    order_by:
-      - sql: "{revenue}"
-        dir: asc
-    reduce_by:
-      - product
-    type: rank
+    sql: "{total_amount}"
+    type: number
+    filter:
+      exclude:
+        - status
 ```
 
 ```javascript title="JavaScript"
 measures: {
-  product_rank: {
+  amount_all_statuses: {
     multi_stage: true,
-    order_by: [{
-      sql: `${revenue}`,
-      dir: `asc`
-    }],
-    reduce_by: [product],
-    type: `rank`
+    sql: `${total_amount}`,
+    type: `number`,
+    filter: {
+      exclude: [status]
+    }
   }
 }
 ```
 
 </CodeGroup>
 
-`reduce_by` accepts a list of dimension names. The inner stage will group by the query's
-dimensions *minus* the listed dimensions, while the outer aggregation will group by the
-query's dimensions.
+`filter` accepts the following keys, which can be combined:
 
-### `add_group_by`
+| Key | Description |
+|---|---|
+| `exclude` | A list of members (dimensions or segments) whose query filters are *dropped* at the inner stage. |
+| `keep_only` | A list of members whose query filters are *kept*; all other inherited filters are dropped. |
+| `include` | A list of additional predicates injected at the inner stage, regardless of the query. Each entry is a query-style filter (`member`, `operator`, `values`) and entries may be nested into `and` / `or` groups. |
+| `mode` | How the override composes along a multi-stage chain: `relative` (default) or `fixed`. |
 
-The `add_group_by` parameter is used with [multi-stage measures][ref-multi-stage] to
-specify dimensions that should be *added* to the `GROUP BY` of the inner aggregation
-stage, in addition to any dimensions present in the query.
+The `mode` key controls how the override interacts with the filter context of
+an upstream multi-stage measure when measures are chained:
 
-This is commonly used for [nested aggregate][ref-nested-aggregate] patterns — computing
-an aggregate of an aggregate. For example, averaging per-user metrics or counting how
-many groups exceed a threshold.
+- `relative` (default): the override is applied *relative* to the filter context
+  inherited from the chain.
+- `fixed`: the override is applied as an *absolute* filter context, ignoring the
+  filters inherited from upstream multi-stage measures.
+
+At the top level (not inside a chain), `relative` and `fixed` are equivalent.
+
+An `include` entry uses the same shape as a [query filter][ref-filters-query],
+and `and` / `or` groups can be nested arbitrarily:
 
 <CodeGroup>
 
 ```yaml title="YAML"
 measures:
-  - name: avg_user_score
+  - name: high_value_west_coast
     multi_stage: true
-    sql: "{avg_score}"
-    type: avg
-    add_group_by:
-      - user_id
+    sql: "{total_amount}"
+    type: number
+    filter:
+      mode: relative
+      exclude:
+        - status
+      include:
+        - member: amount
+          operator: gt
+          values: ["0"]
+        - or:
+            - member: city
+              operator: equals
+              values: [NYC]
+            - member: city
+              operator: equals
+              values: [SF]
 ```
 
 ```javascript title="JavaScript"
 measures: {
-  avg_user_score: {
+  high_value_west_coast: {
     multi_stage: true,
-    sql: `${avg_score}`,
-    type: `avg`,
-    add_group_by: [user_id]
+    sql: `${total_amount}`,
+    type: `number`,
+    filter: {
+      mode: `relative`,
+      exclude: [status],
+      include: [
+        { member: amount, operator: `gt`, values: [`0`] },
+        { or: [
+          { member: city, operator: `equals`, values: [`NYC`] },
+          { member: city, operator: `equals`, values: [`SF`] }
+        ] }
+      ]
+    }
   }
 }
 ```
 
 </CodeGroup>
-
-`add_group_by` accepts a list of dimension names from the same cube. The listed
-dimensions will be included in the inner stage's `GROUP BY` but will *not* appear
-in the outer aggregation — they are used only to define the granularity at which
-the base measure is computed before the outer aggregation is applied.
 
 ### `time_shift`
 
@@ -1237,7 +1301,9 @@ displayed to data consumers.
 
 You can use a named format or a custom [d3-format][link-d3-format]
 specifier string. Named formats accept an optional `_N` suffix (0–6)
-to set decimal precision; without a suffix, they default to 2 decimal places.
+to set the maximum decimal precision; insignificant trailing zeros are trimmed,
+so `N` is an upper bound rather than a fixed number of digits. Without a suffix,
+named formats default to a maximum of 2 decimal places.
 
 | Format | Description | Example | Output |
 |--------|-------------|---------|--------|
@@ -1427,7 +1493,7 @@ cube(`orders`, {
 [ref-schema-ref-types-formats-measures-formats]: /reference/data-modeling/measures#format
 [ref-drilldowns]: /reference/recipes/drilldowns
 [ref-naming]: /docs/data-modeling/syntax#naming
-[ref-playground]: /docs/workspace/playground
+[ref-playground]: /docs/explore-analyze/playground
 [ref-apis]: /reference
 [ref-rolling-window]: /docs/data-modeling/measures#rolling-windows
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
@@ -1436,7 +1502,9 @@ cube(`orders`, {
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
-[ref-data-masking]: /docs/data-modeling/access-control/data-access-policies#data-masking
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-filters-query]: /reference/core-data-apis/rest-api/query-format#filters-format
+[ref-data-masking]: /docs/data-modeling/data-access-policies#data-masking
 [link-d3-format]: https://d3js.org/d3-format
 [link-iso-4217]: https://en.wikipedia.org/wiki/ISO_4217
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures

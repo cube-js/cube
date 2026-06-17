@@ -850,7 +850,12 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
 
         if o.show_metrics {
             if let Some(m) = p.metrics() {
-                *out += &format!(", metrics: {}", m);
+                *out += &format!(
+                    ", metrics: {}",
+                    m.aggregate_by_name()
+                        .sorted_for_display()
+                        .timestamps_removed()
+                );
             }
         }
     }

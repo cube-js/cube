@@ -137,6 +137,10 @@ pub static JOBS_REPARTITION_CHUNK_COMPLETED: Counter =
     metrics::counter("cs.jobs.repartition_chunk.completed");
 pub static JOBS_REPARTITION_CHUNK_FAILURES: Counter =
     metrics::counter("cs.jobs.repartition_chunk.failures");
+/// Jobs removed by the cleanup sweep because their type is unknown to this
+/// binary. Non-zero means a newer binary wrote a job type this one cannot run
+/// (version skew across `latest`/`release` channels).
+pub static JOBS_UNKNOWN_DELETED: Counter = metrics::counter("cs.jobs.unknown.deleted");
 
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");

@@ -108,6 +108,19 @@ Set the visibility from the **Visibility** dropdown when editing the control. **
 
 When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
 
+### Incompatible controls
+
+If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Controls of the other type still apply — for example, if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa.
+
+The chart displays a warning icon to indicate the problem:
+
+| Icon | Meaning |
+|---|---|
+| Crossed-out filter | Filters were skipped for this chart |
+| Crossed-out clock | Time granularity override was skipped for this chart |
+
+Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart.
+
 ### Controls mapping
 
 Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a dimension the chart doesn't have.

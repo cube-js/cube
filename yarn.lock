@@ -21528,7 +21528,7 @@ prelude-ls@~1.1.2:
   resolved "https://registry.yarnpkg.com/prelude-ls/-/prelude-ls-1.1.2.tgz#21932a549f5e52ffd9a827f570e04be62a97da54"
   integrity sha1-IZMqVJ9eUv/ZqCf1cOBL5iqX2lQ=
 
-presto-client@^1.2.0:
+presto-client@1.2.0, presto-client@^1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/presto-client/-/presto-client-1.2.0.tgz#7f6c4d78092298fa4b107775f8a2fabe008772e9"
   integrity sha512-mBwc6nZMGWbo9tRkDLxE6eZ4pyGlS08TeNJnF5zpRww02l6ASxQ14jdVNk+AcFrxNdI7yEDOBQXr+gK2KPiTOw==

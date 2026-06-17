@@ -7,6 +7,7 @@ use crate::planner::FiltersContext;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::any::Any;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Intercepts rendering for members masked by query-tools and
@@ -16,20 +17,25 @@ use std::rc::Rc;
 pub struct MaskedSqlNode {
     input: Rc<dyn SqlNode>,
     ungrouped: bool,
+    // Full names of the members present in the query GROUP BY. Used to decide
+    // whether conditional masking can be applied to an aggregate measure.
+    group_by_members: HashSet<String>,
 }
 
 impl MaskedSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, group_by_members: HashSet<String>) -> Rc<Self> {
         Rc::new(Self {
             input,
             ungrouped: false,
+            group_by_members,
         })
     }
 
-    pub fn new_ungrouped(input: Rc<dyn SqlNode>) -> Rc<Self> {
+    pub fn new_ungrouped(input: Rc<dyn SqlNode>, group_by_members: HashSet<String>) -> Rc<Self> {
         Rc::new(Self {
             input,
             ungrouped: true,
+            group_by_members,
         })
     }
 
@@ -69,6 +75,27 @@ impl MaskedSqlNode {
         let Some(filter_item) = mask_filter else {
             return Ok(Some(masked_sql));
         };
+
+        // Conditional masking renders `CASE WHEN filter THEN original ELSE mask END`.
+        // For an aggregate (grouped) measure this produces invalid SQL on strict
+        // GROUP BY engines when the filter references members that are not part of
+        // the GROUP BY: the predicate is evaluated at row grain while the measure is
+        // aggregated. The same row-level filter is already enforced in the query
+        // WHERE clause, so we render the mask value directly for such measures. In
+        // ungrouped queries the measure is rendered at row grain, so the CASE WHEN
+        // is valid and is kept.
+        if !self.ungrouped {
+            if let MemberSymbol::Measure(_) = node.as_ref() {
+                let filter_members = filter_item.all_member_evaluators();
+                let all_in_group_by = !filter_members.is_empty()
+                    && filter_members
+                        .iter()
+                        .all(|m| self.group_by_members.contains(&m.full_name()));
+                if !all_in_group_by {
+                    return Ok(Some(masked_sql));
+                }
+            }
+        }
 
         let original_sql = self.input.to_sql(
             visitor,

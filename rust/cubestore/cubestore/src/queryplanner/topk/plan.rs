@@ -643,6 +643,7 @@ pub fn plan_topk(
         /*use_streaming*/ true,
         /*max_batch_rows*/ max(2 * upper_node.limit, MIN_TOPK_STREAM_ROWS),
         None,
+        /*worker_sort_and_limit*/ None,
         None,
         Some(sort_requirement.clone()),
     )?;

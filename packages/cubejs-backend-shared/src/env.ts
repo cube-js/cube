@@ -711,6 +711,14 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Whether queries are executed automatically without requiring an
+   * explicit user confirmation. Only used in Cube Cloud.
+   */
+  autoRunMode: (): boolean => get('CUBEJS_AUTO_RUN_MODE')
+    .default('true')
+    .asBoolStrict(),
+
+  /**
    * Query stream `highWaterMark` value.
    */
   dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
@@ -1933,6 +1941,20 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   playgroundAuthSecret: () => get('CUBEJS_PLAYGROUND_AUTH_SECRET')
     .asString(),
+  apiSecret: () => get('CUBEJS_API_SECRET')
+    .asString(),
+  // Comma-separated rotation list. Trimmed, empties dropped, deduplicated.
+  // Takes precedence over the singular `apiSecret` when non-empty.
+  apiSecrets: (): string[] | undefined => {
+    const raw = get('CUBEJS_API_SECRETS').asString();
+    if (!raw) {
+      return undefined;
+    }
+    const unique = Array.from(
+      new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))
+    );
+    return unique.length > 0 ? unique : undefined;
+  },
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),

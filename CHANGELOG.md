@@ -3,6 +3,81 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.59](https://github.com/cube-js/cube/compare/v1.6.58...v1.6.59) (2026-06-17)
+
+### Performance Improvements
+
+- **schema-compiler:** optimize granularityHierarchies to avoid O(n^2) object spread ([#11098](https://github.com/cube-js/cube/issues/11098)) ([13f1c91](https://github.com/cube-js/cube/commit/13f1c91576b0205edb0def130e90dccf4a536fad))
+
+## [1.6.58](https://github.com/cube-js/cube/compare/v1.6.57...v1.6.58) (2026-06-17)
+
+### Bug Fixes
+
+- **cubesql:** Fix grouped join SQL push down regressions ([#11049](https://github.com/cube-js/cube/issues/11049)) ([c70e7ec](https://github.com/cube-js/cube/commit/c70e7ec1deffecbc58670e18905d3e81b1f8c9e5))
+- **cubestore:** stop main-node OOM from concurrent metastore scans ([#11082](https://github.com/cube-js/cube/issues/11082)) ([ee86b13](https://github.com/cube-js/cube/commit/ee86b13912246355d138ab9946125a4e5fda1d89))
+- **cubestore:** support Float32 in query result conversion ([#11078](https://github.com/cube-js/cube/issues/11078)) ([46a8454](https://github.com/cube-js/cube/commit/46a84541af3e7b512405204a9cc4f30a7e609ab8))
+- **tesseract:** Unexpected panic when pre-aggregation time_dimension are not resolved ([#11066](https://github.com/cube-js/cube/issues/11066)) ([fda5ab5](https://github.com/cube-js/cube/commit/fda5ab543b7360a1cdbcf5dbc64c8e096095e667))
+
+### Features
+
+- **backend-shared:** add CUBEJS_AUTO_RUN_MODE env variable ([#11062](https://github.com/cube-js/cube/issues/11062)) ([3278e4d](https://github.com/cube-js/cube/commit/3278e4d4ba7180c28eb558b296c2603c8c948bb6))
+- **cubesql:** Support FULL and RIGHT joins with non-push-to-Cube SQL push down ([#11008](https://github.com/cube-js/cube/issues/11008)) ([8ef4b54](https://github.com/cube-js/cube/commit/8ef4b54e825b2bb83743e10375694aa92f119ab9))
+- **cubestore:** batch persisted-chunk repartition per partition ([#11068](https://github.com/cube-js/cube/issues/11068)) ([b5dbdf5](https://github.com/cube-js/cube/commit/b5dbdf5cf7a4234c7df98dc3e1f6ee6effae80f7))
+- **cubestore:** dedicated reserve job pool for CSV imports ([#11069](https://github.com/cube-js/cube/issues/11069)) ([85bd67b](https://github.com/cube-js/cube/commit/85bd67bd0d0fd16e8307aa3e9b9646a5dd77801e))
+- **cubestore:** env-gate last week's planning/processing changes ([#11086](https://github.com/cube-js/cube/issues/11086)) ([689d842](https://github.com/cube-js/cube/commit/689d8428eb4ec2d0f2669debc903ca8a0b9099e7))
+- **cubestore:** execute sorted partial aggregate per partition below the merge, propagate LIMIT into it ([#10995](https://github.com/cube-js/cube/issues/10995)) ([d91df4b](https://github.com/cube-js/cube/commit/d91df4b826ef9423de5bff3152ae1c0bf576e8c1))
+- **cubestore:** pre-filter in-memory chunks on worker before IPC ([#11040](https://github.com/cube-js/cube/issues/11040)) ([2394513](https://github.com/cube-js/cube/commit/2394513eba55970cde80c2660f8e482cc0820821))
+- **cubestore:** tolerant job reads + cleanup of unknown job types ([#11087](https://github.com/cube-js/cube/issues/11087)) ([87ae095](https://github.com/cube-js/cube/commit/87ae095c69588a77d2711968a66e07c9764c2e6b))
+- **schema-compiler:** capitalize ID acronyms in default meta titles ([#11047](https://github.com/cube-js/cube/issues/11047)) ([094974b](https://github.com/cube-js/cube/commit/094974b20c1bd573ac57873bedd58a32f2bbc1d4))
+
+### Performance Improvements
+
+- **cubestore:** early compaction split ([#11079](https://github.com/cube-js/cube/issues/11079)) ([26eec6f](https://github.com/cube-js/cube/commit/26eec6f2546e89675bb7e8e6759550e328e3da20))
+- **cubestore:** load-aware placement of CSV import jobs ([#11084](https://github.com/cube-js/cube/issues/11084)) ([ddf77f2](https://github.com/cube-js/cube/commit/ddf77f2bcdc311ad936d6c8890a861c9e6854ea2))
+- **cubestore:** streaming k-way merge for compaction ([#11072](https://github.com/cube-js/cube/issues/11072)) ([b42b780](https://github.com/cube-js/cube/commit/b42b780352138fbf1a54427f03266623824c2a76))
+
+## [1.6.57](https://github.com/cube-js/cube/compare/v1.6.56...v1.6.57) (2026-06-09)
+
+### Features
+
+- **cubesql:** merge view joins on a shared cube member into a single CubeScan ([#10977](https://github.com/cube-js/cube/issues/10977)) ([281e920](https://github.com/cube-js/cube/commit/281e920948552524313a67697989caa1d746e1e1))
+
+## [1.6.56](https://github.com/cube-js/cube/compare/v1.6.55...v1.6.56) (2026-06-08)
+
+### Bug Fixes
+
+- **access-policies:** masked aggregate measures with row filters + multi-group member-level union ([#11026](https://github.com/cube-js/cube/issues/11026)) ([bf13b69](https://github.com/cube-js/cube/commit/bf13b69f87fe83e3ffe9ac779b91a5174d9b320a))
+- **native:** Don't fail deserializing JS numbers above u64/i64 range ([#11034](https://github.com/cube-js/cube/issues/11034)) ([44bd455](https://github.com/cube-js/cube/commit/44bd455bbaa4446088e9f20c2014d06c8da24031))
+- **prestodb-driver:** Send custom headers on nextUri poll requests ([#11037](https://github.com/cube-js/cube/issues/11037)) ([7583983](https://github.com/cube-js/cube/commit/758398358e9274cb8f8e126f5170b348c2f24ce6))
+
+### Features
+
+- **cubestore:** EXPLAIN ANALYZE DETAILED per-query trace ([#11016](https://github.com/cube-js/cube/issues/11016)) ([107e63f](https://github.com/cube-js/cube/commit/107e63f297e5ed03b235450d0cafa4edce2fd1b5))
+
+## [1.6.55](https://github.com/cube-js/cube/compare/v1.6.54...v1.6.55) (2026-06-05)
+
+### Features
+
+- **cubestore:** Introduce HttpQueryResultCompleted for zero-column r… ([#11019](https://github.com/cube-js/cube/issues/11019)) ([5a994ff](https://github.com/cube-js/cube/commit/5a994ffd0261b457aa65d77ab0125192e6187782))
+- **cubestore:** unique key filter pushdown below last-row dedup ([#11006](https://github.com/cube-js/cube/issues/11006)) ([adc8d26](https://github.com/cube-js/cube/commit/adc8d2601973635383c6b09eac46375f1586fcf6))
+
+### Performance Improvements
+
+- **snowflake-driver:** Combine session init into a single ALTER SESSION ([#11010](https://github.com/cube-js/cube/issues/11010)) ([e29e04c](https://github.com/cube-js/cube/commit/e29e04c3e253d756816fe23347f19933577229a5))
+
+## [1.6.54](https://github.com/cube-js/cube/compare/v1.6.53...v1.6.54) (2026-06-04)
+
+### Bug Fixes
+
+- **cubesql:** Don't mix filter params between subqueries in SQL push down ([#10996](https://github.com/cube-js/cube/issues/10996)) ([38b7d8c](https://github.com/cube-js/cube/commit/38b7d8c7f87e274816ce125bfcb8f94f05ebf8ea))
+- **tesseract:** make pre-aggregations tests work under native SQL planner ([#10992](https://github.com/cube-js/cube/issues/10992)) ([33ca484](https://github.com/cube-js/cube/commit/33ca484e15dedee2a7a27ba99f8d2204829926d0))
+- **tesseract:** nested CTE generation with duplicate names ([#11005](https://github.com/cube-js/cube/issues/11005)) ([a321af5](https://github.com/cube-js/cube/commit/a321af5bd635ef38cad1673902c62345b1e6c593))
+- **tesseract:** pre-aggregation table name corruption when one name is a prefix of another ([#11000](https://github.com/cube-js/cube/issues/11000)) ([f401118](https://github.com/cube-js/cube/commit/f401118db91b06fa740eb8a63bbe3755940da449))
+
+### Features
+
+- **api-gateway:** accept a list of API secrets for verification ([#10985](https://github.com/cube-js/cube/issues/10985)) ([d9a308f](https://github.com/cube-js/cube/commit/d9a308f0ef7d6cf11213bbc05858cb0cc1a55c36))
+
 ## [1.6.53](https://github.com/cube-js/cube/compare/v1.6.52...v1.6.53) (2026-06-02)
 
 ### Bug Fixes

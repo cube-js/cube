@@ -78,6 +78,7 @@ use deepsize::DeepSizeOf;
 
 pub mod cache;
 pub mod cachestore;
+mod explain_detailed;
 pub mod parser;
 mod table_creator;
 
@@ -544,6 +545,7 @@ impl SqlServiceImpl {
         )))
     }
 
+    /// `analyze` builds and shows the physical plans on the router and the workers.
     async fn explain(
         &self,
         statement: Statement,
@@ -822,6 +824,7 @@ impl SqlService for SqlServiceImpl {
                         PlanningMeta {
                             indices: Vec::new(),
                             multi_part_subtree: HashMap::new(),
+                            pushable_chunk_filters: Vec::new(),
                         },
                         None,
                     )
@@ -1386,6 +1389,10 @@ impl SqlService for SqlServiceImpl {
             },
 
             CubeStoreStatement::Dump(q) => Ok(self.dump_select_inputs(query, q).await?.into()),
+
+            CubeStoreStatement::ExplainAnalyzeDetailed(q) => {
+                Ok(self.explain_detailed(Statement::Query(q)).await?.into())
+            }
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
@@ -3308,7 +3315,9 @@ mod tests {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
             c.compaction_chunks_count_threshold = 50;
-            c.max_joined_partitions = 10;
+            // Eager split-by-file-size fragments the right table further; lift the join cap
+            // above the resulting partition count (this test asserts join correctness, not the cap).
+            c.max_joined_partitions = 50;
             c
         }).start_test(async move |services| {
             let service = services.sql_service;
@@ -3498,6 +3507,132 @@ mod tests {
         Ok(())
     }
 
+    async fn assert_repartition_drains_and_keeps_data(
+        services: &CubeServices,
+    ) -> Result<(), CubeError> {
+        let service = &services.sql_service;
+
+        service
+            .exec_query("CREATE SCHEMA foo")
+            .await?
+            .collect()
+            .await?;
+
+        service
+            .exec_query("CREATE TABLE foo.numbers (num int)")
+            .await?
+            .collect()
+            .await?;
+
+        let n: i64 = 200;
+        for i in 0..n {
+            service
+                .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                .await?
+                .collect()
+                .await?;
+        }
+
+        // Wait until repartition jobs have drained every inactive parent partition.
+        let mut drained = false;
+        for _ in 0..300 {
+            let pending = services
+                .meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?;
+            if pending.is_empty() {
+                drained = true;
+                break;
+            }
+            Delay::new(Duration::from_millis(50)).await;
+        }
+        assert!(
+            drained,
+            "inactive partitions were not fully repartitioned in time"
+        );
+
+        // The partition must have actually split.
+        let active = services
+            .meta_store
+            .get_active_partitions_by_index_id(1)
+            .await?;
+        assert!(
+            active.len() > 1,
+            "expected partition to split, got {} active partitions",
+            active.len()
+        );
+
+        // Data must be complete and correct after repartition.
+        let result = service
+            .exec_query("SELECT count(*) from foo.numbers")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(n)]));
+
+        let result = service
+            .exec_query("SELECT sum(num) from foo.numbers")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![TableValue::Int(n * (n - 1) / 2)])
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_keeps_data_consistent() -> Result<(), CubeError> {
+        Config::test("repartition_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_legacy_per_chunk_path() -> Result<(), CubeError> {
+        Config::test("repartition_legacy_per_chunk_path")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.batch_repartition_enabled = false;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_small_time_budget_drains_via_cascade() -> Result<(), CubeError> {
+        // A 1s budget forces most per-partition jobs to yield before draining all
+        // chunks; the cascade must reschedule until the parent is empty.
+        Config::test("repartition_small_time_budget_drains_via_cascade")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.batch_repartition_enabled = true;
+                c.repartition_chunks_time_budget_secs = 1;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn decimal_partition_pruning() -> Result<(), CubeError> {
         Config::test("decimal_partition_pruning")
@@ -3619,14 +3754,13 @@ mod tests {
                 \n      CoalescePartitions\
                 \n        LinearPartialAggregate\
                 \n          Filter\
-                \n            MergeSort\
-                \n              Scan, index: default:1:[1]:sort_on[num], fields: *\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan";
+                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan";
                 let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
                 let p = plan_regexp.replace_all(&plan, "ParquetScan");
                 println!("pp {}", p);
@@ -3916,6 +4050,8 @@ mod tests {
         Config::test("inactive_partitions_cleanup")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
+                // Keep a single active partition: this test covers inactive-file GC, not size split.
+                c.partition_size_split_threshold_bytes = 1024 * 1024;
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
                 c.meta_store_log_upload_interval = 1;
@@ -5160,6 +5296,8 @@ mod tests {
                             ).unwrap();
                             let matches = regex.captures_iter(&pp_plan).count();
                             assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
+                            // EXPLAIN ANALYZE only shows the plan, it doesn't execute it.
+                            assert!(!pp_plan.contains("metrics:"), "pp_plan = {}", pp_plan);
                         },
                         _ => {assert!(false);}
                     };
@@ -5170,6 +5308,71 @@ mod tests {
         }).await;
         Ok(())
     }
+
+    #[tokio::test]
+    async fn explain_analyze_detailed() -> Result<(), CubeError> {
+        Config::test("explain_detailed_router").update_config(|mut config| {
+            config.select_workers = vec!["127.0.0.1:14016".to_string()];
+            config.metastore_bind_address = Some("127.0.0.1:15016".to_string());
+            config.compaction_chunks_count_threshold = 0;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            Config::test("explain_detailed_worker_1").update_config(|mut config| {
+                config.worker_bind_address = Some("127.0.0.1:14016".to_string());
+                config.server_name = "127.0.0.1:14016".to_string();
+                config.metastore_remote_address = Some("127.0.0.1:15016".to_string());
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: Some(env::current_dir()
+                        .unwrap()
+                        .join("explain_detailed_router-upstream".to_string())),
+                };
+                config.compaction_chunks_count_threshold = 0;
+                config
+            }).start_test_worker(async move |_| {
+                service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await?.collect().await?;
+                service.exec_query(
+                    "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'ios', 17, 4), (3, 'ios', 20, 5)"
+                ).await?.collect().await?;
+
+                let result = service.exec_query(
+                    "EXPLAIN ANALYZE DETAILED SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
+                ).await?.collect().await?;
+
+                // Single "trace" cell holding the whole report.
+                assert_eq!(result.get_columns().len(), 1);
+                assert_eq!(result.get_rows().len(), 1);
+                let trace = match &result.get_rows()[0].values()[0] {
+                    TableValue::String(s) => s.clone(),
+                    v => panic!("expected string trace, got {:?}", v),
+                };
+
+                // Smoke check: the whole path produced the levels + the summary.
+                // (The test harness runs the worker in-process, without the select
+                // subprocess pool, so no `subprocess ·` section here.)
+                for marker in [
+                    "summary by category",
+                    "router",
+                    "Metastore",
+                    "main \u{b7}",
+                    "worker \u{b7}",
+                    "Planning",
+                    "Execution",
+                    "transport.",
+                    "plan:",
+                ] {
+                    assert!(trace.contains(marker), "trace missing '{}':\n{}", marker, trace);
+                }
+
+                Ok::<(), CubeError>(())
+            }).await;
+            Ok::<(), CubeError>(())
+        }).await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn create_aggr_index() -> Result<(), CubeError> {
         assert!(true);
@@ -5884,6 +6087,213 @@ mod tests {
                     })
                     .await;
             });
+    }
+
+    #[tokio::test]
+    async fn worker_sort_and_limit_cluster() -> Result<(), CubeError> {
+        Config::test("worker_sort_limit_router")
+            .update_config(|mut config| {
+                config.select_workers = vec![
+                    "127.0.0.1:24106".to_string(),
+                    "127.0.0.1:24107".to_string(),
+                ];
+                config.metastore_bind_address = Some("127.0.0.1:25106".to_string());
+                config.compaction_chunks_count_threshold = 0;
+                config
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                Config::test("worker_sort_limit_worker_1")
+                    .update_config(|mut config| {
+                        config.worker_bind_address = Some("127.0.0.1:24106".to_string());
+                        config.server_name = "127.0.0.1:24106".to_string();
+                        config.metastore_remote_address =
+                            Some("127.0.0.1:25106".to_string());
+                        config.store_provider = FileStoreProvider::Filesystem {
+                            remote_dir: Some(
+                                env::current_dir()
+                                    .unwrap()
+                                    .join("worker_sort_limit_router-upstream".to_string()),
+                            ),
+                        };
+                        config.compaction_chunks_count_threshold = 0;
+                        config
+                    })
+                    .start_test_worker(async move |_| {
+                        Config::test("worker_sort_limit_worker_2")
+                            .update_config(|mut config| {
+                                config.worker_bind_address =
+                                    Some("127.0.0.1:24107".to_string());
+                                config.server_name = "127.0.0.1:24107".to_string();
+                                config.metastore_remote_address =
+                                    Some("127.0.0.1:25106".to_string());
+                                config.store_provider = FileStoreProvider::Filesystem {
+                                    remote_dir: Some(
+                                        env::current_dir().unwrap().join(
+                                            "worker_sort_limit_router-upstream".to_string(),
+                                        ),
+                                    ),
+                                };
+                                config.compaction_chunks_count_threshold = 0;
+                                config
+                            })
+                            .start_test_worker(async move |_| {
+                                service
+                                    .exec_query("CREATE SCHEMA foo")
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                service
+                                    .exec_query(
+                                        "CREATE TABLE foo.data (category text, region text, amount int) \
+                                         INDEX idx1 (category, region)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                service
+                                    .exec_query(
+                                        "INSERT INTO foo.data (category, region, amount) VALUES \
+                                         ('A', 'East', 10), ('A', 'West', 20), ('B', 'East', 30), ('B', 'West', 40), \
+                                         ('C', 'East', 50), ('C', 'West', 60), ('D', 'East', 70), ('D', 'West', 80), \
+                                         ('A', 'North', 15), ('B', 'North', 25), ('C', 'North', 35), ('D', 'North', 45), \
+                                         ('A', 'South', 55), ('B', 'South', 65), ('C', 'South', 75), ('D', 'South', 85)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                // Test 1: ORDER BY group-by column (matches index prefix) with LIMIT
+                                // Should use limit_and_reverse on the worker
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT category, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        !worker_plan.contains("Sort"),
+                                        "When ORDER BY matches index prefix, worker should use \
+                                         limit scan instead of Sort. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 2: ORDER BY non-prefix group-by column with LIMIT
+                                // Should push Sort(fetch=N) to the worker
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT category, region, sum(amount) \
+                                             FROM foo.data GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        worker_plan.contains("Sort, fetch: 3"),
+                                        "Worker should have Sort with fetch=3. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 3: Verify correctness of ORDER BY 2 LIMIT 3
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "SELECT category, region, sum(amount) \
+                                             FROM foo.data GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    assert_eq!(result.len(), 3);
+                                    // ORDER BY region ASC: East comes first
+                                    for row in result.get_rows() {
+                                        match &row.values()[1] {
+                                            TableValue::String(region) => {
+                                                assert_eq!(region, "East");
+                                            }
+                                            _ => panic!("expected string"),
+                                        }
+                                    }
+                                }
+
+                                // Test 4: ORDER BY 1 DESC with LIMIT on non-prefix column
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT region, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 DESC LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        worker_plan.contains("Sort, fetch: 2"),
+                                        "Worker should have Sort with fetch=2 for DESC. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 5: Verify correctness of ORDER BY 1 DESC LIMIT 2
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "SELECT region, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 DESC LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    assert_eq!(result.len(), 2);
+                                    let regions: Vec<&str> = result
+                                        .get_rows()
+                                        .iter()
+                                        .map(|r| match &r.values()[0] {
+                                            TableValue::String(s) => s.as_str(),
+                                            _ => panic!("expected string"),
+                                        })
+                                        .collect();
+                                    assert_eq!(regions, vec!["West", "South"]);
+                                }
+
+                                Ok::<(), CubeError>(())
+                            })
+                            .await;
+                        Ok::<(), CubeError>(())
+                    })
+                    .await;
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
     }
 }
 

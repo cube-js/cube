@@ -98,5 +98,10 @@ CUBEJS_DS_ANALYTICS_DB_HOST=remotehost
 For the full list of variables that support decoration, see the
 [environment variables reference][ref-config-ref-env].
 
+Each source can also build and store its pre-aggregations on a dedicated connection
+using the `CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*` variables. See [pre-aggregation data
+source][ref-preagg-data-source] for details.
+
 [ref-config-ref-env]: /reference/configuration/environment-variables
+[ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-config-multitenancy]: /embedding/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources

@@ -19,6 +19,7 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
     BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
+    TracedMetaStore,
 };
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
@@ -392,6 +393,11 @@ pub trait ConfigObj: DIService {
 
     fn wal_split_threshold(&self) -> u64;
 
+    /// Optional in-flight WAL data frame byte size at which an import splits the frame, in
+    /// addition to the row count threshold. `None` (env unset or `0`) disables the size check,
+    /// leaving the row-count split as the only trigger.
+    fn wal_split_size_threshold_bytes(&self) -> Option<u64>;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn select_worker_idle_timeout(&self) -> u64;
@@ -399,6 +405,8 @@ pub trait ConfigObj: DIService {
     fn job_runners_count(&self) -> usize;
 
     fn long_term_job_runners_count(&self) -> usize;
+
+    fn csv_import_job_runners_count(&self) -> usize;
 
     fn bind_address(&self) -> &Option<String>;
 
@@ -496,6 +504,38 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    /// When enabled, a TableImportCSV job is placed on the worker with the fewest in-flight
+    /// CSV imports (load-aware), instead of by stateless hash of (table_id, location). Off by
+    /// default (hash placement); kept as a flag for rollout/rollback.
+    fn load_aware_import_placement_enabled(&self) -> bool;
+
+    /// When enabled, an inactive parent partition is repartitioned by a single
+    /// per-partition job that loops over its persisted chunks, instead of one
+    /// job per chunk. Kept as a flag for emergency rollback.
+    fn batch_repartition_enabled(&self) -> bool;
+
+    /// Time budget for a single batch repartition job. The job yields its runner
+    /// slot once the budget is exceeded (after the current chunk); the remainder
+    /// is drained by a follow-up job via the cascade. Kept separate from
+    /// import_job_timeout, which is the hard stuck-job kill, not a fairness knob.
+    fn repartition_chunks_time_budget_secs(&self) -> u64;
+
+    /// When enabled (default), the sorted partial aggregate is pushed below the partition merge
+    /// so the merge carries partial aggregate states instead of all raw rows. Kept as a flag for
+    /// emergency rollback to the pre-push plan shape.
+    fn push_partial_aggregate_below_merge_enabled(&self) -> bool;
+
+    /// When enabled, compaction sizes the partition split by the bytes actually being written
+    /// (existing main table plus the pending chunks merged in this pass) instead of the main
+    /// table alone, so a partition with large accumulated chunks splits in a single pass. Off
+    /// by default; kept as a flag for rollout/rollback.
+    fn compaction_split_by_total_file_size_enabled(&self) -> bool;
+
+    /// When enabled, the worker trims in-memory chunks by the dedup-safe pushable predicate
+    /// before they cross IPC to the select subprocess (which re-applies the same predicate).
+    /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
+    fn prefilter_in_memory_chunks_enabled(&self) -> bool;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -573,6 +613,7 @@ pub struct ConfigObjImpl {
     pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub compaction_chunks_threshold_multiplier: f64,
     pub compaction_chunks_in_memory_size_threshold: u64,
     pub compaction_chunks_max_lifetime_threshold: u64,
     pub compaction_in_memory_chunks_max_lifetime_threshold: u64,
@@ -583,6 +624,7 @@ pub struct ConfigObjImpl {
     pub compaction_in_memory_chunks_ratio_check_threshold: u64,
     pub compaction_in_memory_chunks_schedule_period_secs: u64,
     pub wal_split_threshold: u64,
+    pub wal_split_size_threshold_bytes: Option<u64>,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
@@ -590,6 +632,7 @@ pub struct ConfigObjImpl {
     pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
     pub long_term_job_runners_count: usize,
+    pub csv_import_job_runners_count: usize,
     pub bind_address: Option<String>,
     pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
@@ -638,6 +681,12 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub load_aware_import_placement_enabled: bool,
+    pub batch_repartition_enabled: bool,
+    pub repartition_chunks_time_budget_secs: u64,
+    pub push_partial_aggregate_below_merge_enabled: bool,
+    pub compaction_split_by_total_file_size_enabled: bool,
+    pub prefilter_in_memory_chunks_enabled: bool,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -692,11 +741,15 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn compaction_chunks_total_size_threshold(&self) -> u64 {
-        self.compaction_chunks_total_size_threshold
+        (self.compaction_chunks_total_size_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
-        self.compaction_chunks_count_threshold
+        (self.compaction_chunks_count_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
     fn compaction_chunks_in_memory_size_threshold(&self) -> u64 {
@@ -739,6 +792,10 @@ impl ConfigObj for ConfigObjImpl {
         self.wal_split_threshold
     }
 
+    fn wal_split_size_threshold_bytes(&self) -> Option<u64> {
+        self.wal_split_size_threshold_bytes
+    }
+
     fn select_worker_pool_size(&self) -> usize {
         self.select_worker_pool_size
     }
@@ -753,6 +810,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn long_term_job_runners_count(&self) -> usize {
         self.long_term_job_runners_count
+    }
+
+    fn csv_import_job_runners_count(&self) -> usize {
+        self.csv_import_job_runners_count
     }
 
     fn bind_address(&self) -> &Option<String> {
@@ -934,6 +995,24 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+    fn load_aware_import_placement_enabled(&self) -> bool {
+        self.load_aware_import_placement_enabled
+    }
+    fn batch_repartition_enabled(&self) -> bool {
+        self.batch_repartition_enabled
+    }
+    fn repartition_chunks_time_budget_secs(&self) -> u64 {
+        self.repartition_chunks_time_budget_secs
+    }
+    fn push_partial_aggregate_below_merge_enabled(&self) -> bool {
+        self.push_partial_aggregate_below_merge_enabled
+    }
+    fn compaction_split_by_total_file_size_enabled(&self) -> bool {
+        self.compaction_split_by_total_file_size_enabled
+    }
+    fn prefilter_in_memory_chunks_enabled(&self) -> bool {
+        self.prefilter_in_memory_chunks_enabled
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1209,6 +1288,50 @@ pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Optio
     n
 }
 
+/// Parses a human-readable byte size env var into `Some(bytes)`. Returns `None` when the var is
+/// unset or set to `0`, which callers treat as "disabled".
+pub fn env_parse_optional_size(
+    name: &str,
+    max: Option<usize>,
+    min: Option<usize>,
+) -> Option<usize> {
+    let v = env::var(name).ok()?;
+
+    let n = match parse_size::parse_size(&v) {
+        Ok(n) => n as usize,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if n == 0 {
+        return None;
+    }
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                humansize::format_size(max, humansize::DECIMAL)
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                humansize::format_size(min, humansize::DECIMAL)
+            )
+        }
+    };
+
+    Some(n)
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -1303,6 +1426,10 @@ impl Config {
                     1048576 * 8,
                 ),
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
+                compaction_chunks_threshold_multiplier: env_parse(
+                    "CUBESTORE_COMPACTION_CHUNKS_THRESHOLD_MULTIPLIER",
+                    1.0_f64,
+                ),
                 compaction_chunks_in_memory_size_threshold: env_parse_size(
                     "CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD",
                     1 * 1024 * 1024 * 1024,
@@ -1506,14 +1633,42 @@ impl Config {
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
+                wal_split_size_threshold_bytes: env_parse_optional_size(
+                    "CUBESTORE_WAL_SPLIT_SIZE_THRESHOLD",
+                    None,
+                    None,
+                )
+                .map(|v| v as u64),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
+                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 0),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                load_aware_import_placement_enabled: env_bool(
+                    "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
+                    false,
+                ),
+                batch_repartition_enabled: env_bool("CUBESTORE_BATCH_REPARTITION", false),
+                repartition_chunks_time_budget_secs: env_parse(
+                    "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
+                    60,
+                ),
+                push_partial_aggregate_below_merge_enabled: env_bool(
+                    "CUBESTORE_PUSH_PARTIAL_AGGREGATE_BELOW_MERGE",
+                    true,
+                ),
+                compaction_split_by_total_file_size_enabled: env_bool(
+                    "CUBESTORE_COMPACTION_SPLIT_BY_TOTAL_FILE_SIZE",
+                    false,
+                ),
+                prefilter_in_memory_chunks_enabled: env_bool(
+                    "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
+                    false,
+                ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -1687,6 +1842,7 @@ impl Config {
                 partition_size_split_threshold_bytes: 2 * 1024,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
+                compaction_chunks_threshold_multiplier: 1.0,
                 compaction_chunks_in_memory_size_threshold: 3 * 1024 * 1024 * 1024,
                 compaction_chunks_total_size_threshold: 10,
                 compaction_chunks_max_lifetime_threshold: 600,
@@ -1704,6 +1860,7 @@ impl Config {
                 select_worker_idle_timeout: 600,
                 job_runners_count: 4,
                 long_term_job_runners_count: 8,
+                csv_import_job_runners_count: 2,
                 bind_address: None,
                 status_bind_address: None,
                 http_bind_address: None,
@@ -1744,10 +1901,19 @@ impl Config {
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
                 wal_split_threshold: 262144,
+                wal_split_size_threshold_bytes: None,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                load_aware_import_placement_enabled: false,
+                batch_repartition_enabled: true,
+                repartition_chunks_time_budget_secs: 60,
+                push_partial_aggregate_below_merge_enabled: true,
+                compaction_split_by_total_file_size_enabled: false,
+                // Production default is off; kept on in tests so prefilter_chunks_shared_scan
+                // and the rest of the suite keep exercising the worker-side trim path.
+                prefilter_in_memory_chunks_enabled: true,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2155,7 +2321,10 @@ impl Config {
     }
 
     pub async fn configure_meta_store(&self) {
-        let (metastore_event_sender, _) = broadcast::channel(8192); // TODO config
+        // Bounded broadcast of metastore events; sized for bursts (e.g. orphaned-job cleanup
+        // emitting hundreds of UpdateJob events at once). Listeners that still lag past this fall
+        // back to authoritative metastore re-checks rather than failing.
+        let (metastore_event_sender, _) = broadcast::channel(32768);
         let metastore_event_sender_to_move = metastore_event_sender.clone();
 
         if let Some(_) = self.config_obj.metastore_remote_address() {
@@ -2170,7 +2339,7 @@ impl Config {
             self.injector
                 .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
                     let transport = ClusterMetaStoreClient::new(i.get_service_typed().await);
-                    Arc::new(MetaStoreRpcClient::new(transport))
+                    TracedMetaStore::new(Arc::new(MetaStoreRpcClient::new(transport)))
                 })
                 .await;
         } else {
@@ -2188,29 +2357,35 @@ impl Config {
                 })
                 .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
+            // Register the concrete RocksMetaStore (some code fetches it by type),
+            // then expose `dyn MetaStore` wrapped in TracedMetaStore so local calls
+            // are traced too.
             self.injector
-                .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
-                    async move |i| {
-                        let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        let metastore_fs = i.get_service("metastore_fs").await;
-                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksMetaStore::load_from_dump(
-                                &Path::new(&path),
-                                dump_dir,
-                                metastore_fs,
-                                config,
-                            )
+                .register_typed::<RocksMetaStore, RocksMetaStore, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
+                    let metastore_fs = i.get_service("metastore_fs").await;
+                    let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                        RocksMetaStore::load_from_dump(
+                            &Path::new(&path),
+                            dump_dir,
+                            metastore_fs,
+                            config,
+                        )
+                        .await
+                        .unwrap()
+                    } else {
+                        RocksMetaStore::load_from_remote(&path, metastore_fs, config)
                             .await
                             .unwrap()
-                        } else {
-                            RocksMetaStore::load_from_remote(&path, metastore_fs, config)
-                                .await
-                                .unwrap()
-                        };
-                        meta_store.add_listener(metastore_event_sender).await;
-                        meta_store
-                    },
-                )
+                    };
+                    meta_store.add_listener(metastore_event_sender).await;
+                    meta_store
+                })
+                .await;
+            self.injector
+                .register_typed::<dyn MetaStore, TracedMetaStore, _, _>(async move |i| {
+                    TracedMetaStore::new(i.get_service_typed::<RocksMetaStore>().await)
+                })
                 .await;
         };
 
@@ -2432,6 +2607,10 @@ impl Config {
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
+                let push_partial_aggregate_below_merge = i
+                    .get_service_typed::<dyn ConfigObj>()
+                    .await
+                    .push_partial_aggregate_below_merge_enabled();
                 QueryExecutorImpl::new(
                     i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
                         .await
@@ -2439,6 +2618,7 @@ impl Config {
                         .clone(),
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    push_partial_aggregate_below_merge,
                 )
             })
             .await;
@@ -2491,6 +2671,7 @@ impl Config {
         self.injector
             .register_typed::<dyn JobProcessor, _, _, _>(async move |i| {
                 JobProcessorImpl::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

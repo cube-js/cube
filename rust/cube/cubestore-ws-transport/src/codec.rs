@@ -5,7 +5,7 @@ use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
 use cubeshared::codegen::{
     root_as_http_message, HttpCommand, HttpMessage, HttpMessageArgs, HttpQuery, HttpQueryArgs,
-    QueryResultFormat,
+    HttpQueryResultData, QueryResultFormat,
 };
 use flatbuffers::FlatBufferBuilder;
 
@@ -105,20 +105,38 @@ pub fn decode_frame(bytes: &[u8]) -> Result<DecodedFrame, TransportError> {
             let qr = msg.command_as_http_query_result().ok_or_else(|| {
                 TransportError::Protocol("HttpQueryResult union variant missing".into())
             })?;
-            let arrow = qr.data_as_http_query_result_arrow().ok_or_else(|| {
-                TransportError::Protocol(
-                    "HttpQueryResult.data variant is not HttpQueryResultArrow".into(),
-                )
-            })?;
 
-            let result = decode_arrow_ipc(arrow.data().bytes())?;
-            log::debug!(
-                "decoded HttpQueryResult (Arrow IPC): {} columns, {} rows",
-                result.get_columns().len(),
-                result.row_count()
-            );
+            match qr.data_type() {
+                HttpQueryResultData::HttpQueryResultArrow => {
+                    let arrow = qr.data_as_http_query_result_arrow().ok_or_else(|| {
+                        TransportError::Protocol(
+                            "HttpQueryResult.data variant is not HttpQueryResultArrow".into(),
+                        )
+                    })?;
 
-            DecodedResponse::Ok(result)
+                    let result = decode_arrow_ipc(arrow.data().bytes())?;
+                    log::debug!(
+                        "decoded HttpQueryResult (Arrow IPC): {} columns, {} rows",
+                        result.get_columns().len(),
+                        result.row_count()
+                    );
+
+                    DecodedResponse::Ok(result)
+                }
+                HttpQueryResultData::HttpQueryResultCompleted => {
+                    // Command completed without a result set (zero columns).
+                    log::debug!("decoded HttpQueryResult (Completed): no result set");
+                    DecodedResponse::Ok(QueryResult {
+                        data: ResultData::Completed,
+                    })
+                }
+                other => {
+                    return Err(TransportError::Protocol(format!(
+                        "unsupported HttpQueryResult.data variant: {:?}",
+                        other.variant_name()
+                    )));
+                }
+            }
         }
         other => {
             return Err(TransportError::Protocol(format!(

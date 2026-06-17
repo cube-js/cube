@@ -1,6 +1,6 @@
 ---
 title: Dashboard Agent
-description: Ask questions about a dashboard and its charts using a conversational AI assistant docked alongside the dashboard.
+description: Ask questions about a dashboard and its charts — and change its filters and time granularity — using a conversational AI assistant docked alongside the dashboard.
 ---
 
 The Dashboard Agent is a conversational assistant docked as a panel on a
@@ -13,6 +13,12 @@ shows. It can drill into a single chart, re-aggregate a metric, break a number
 down by a dimension, pull a longer time range than the chart displays, and
 summarize trends across the dashboard.
 
+It can also **apply filters and change the time granularity** on the dashboard
+you're viewing — just ask in plain language (for example, _"filter to last 30
+days"_ or _"group by month"_). These changes affect only your own session and
+are never saved to the dashboard — see
+[Changing filters and time granularity](#changing-filters-and-time-granularity).
+
 <Frame>
   <img
     src="https://lgo0ecceic.ucarecd.net/a50f87dd-126d-44ad-87e9-6c9a0af81c1a/"
@@ -23,15 +29,16 @@ summarize trends across the dashboard.
 <Note>
   There are **two different agent surfaces** with different capabilities:
 
-  - **Dashboard Agent** (this page) — read-only Q&A for viewers of a published
-    or embedded dashboard.
+  - **Dashboard Agent** (this page) — for viewers of a published or embedded
+    dashboard: question-and-answer about what's on screen, plus changing your
+    own filters and time granularity.
   - **[Workbook Agent][ref-workbook-agent]** — full authoring inside a
     [workbook][ref-workbooks]: creating reports, building and editing
     dashboards, and running analysis.
 
-  Most of this page describes the read-only Dashboard Agent. Keep the
-  distinction in mind — the published agent intentionally cannot author or
-  change anything.
+  The published Dashboard Agent can adjust **your own view** — filters and time
+  granularity, for your session only — but intentionally cannot author or change
+  the **saved** dashboard.
 </Note>
 
 ## Opening the agent
@@ -61,31 +68,41 @@ them together.
 
 When a chart is attached, the agent receives a read-only snapshot of it — the
 underlying SQL, the data, and the chart spec — along with the dashboard's
-**current filter and time-granularity state**. It uses this as context; it does not
-modify any of it.
+**current filter and time-granularity state**. It uses this as context for
+answering and never edits the chart's definition. You can still ask it to change
+the dashboard's filters or time granularity — see
+[Changing filters and time granularity](#changing-filters-and-time-granularity).
 
-## What the Dashboard Agent can and can't do
+## Changing filters and time granularity
 
-The published Dashboard Agent is **read-only by design**.
+Ask the agent, in plain language, to filter the dashboard or change a time
+granularity, and it applies the change to the controls in front of you:
 
-**It can:**
+- _"Filter this dashboard to orders with status completed."_
+- _"Show only the Outerwear category."_
+- _"Filter to the last 30 days."_
+- _"Group by month."_
+- _"Reset the filters."_
 
-- Answer questions about what's on the dashboard from the dashboard's own data
-- Run **read-only queries** against the semantic model to go deeper — drill
-  down, break a metric down by a dimension, or pull a longer time range than a
-  chart shows
-- Explain how a metric or dimension is defined
-- Look up the values available for a dimension
-- Read the contents of [attachments](#attachments) you add to the chat
+How it works and what to expect:
 
-**It can't:**
+- **Only controls that exist on the dashboard can be changed.** The agent can
+  change a filter or time granularity only when the dashboard has a matching
+  [filter or time-granularity control widget][ref-controls] for that dimension.
+  If there's no control for what you asked about, the agent tells you so instead
+  of changing anything. A control whose [visibility][ref-control-visibility] is
+  **Disabled** also can't be changed.
+- **Time granularity stays within the control's allowed granularities.** If a
+  time-granularity control restricts which granularities viewers can pick, the
+  agent only chooses from that set.
+- **Changes apply to your session only.** They're applied the same way as
+  changing a control by hand: reflected in the dashboard's URL — so you can
+  share or bookmark the filtered view — but **not** saved to the dashboard. They
+  don't affect what other viewers see, and the author's saved defaults are left
+  untouched.
 
-- Edit the dashboard, or add/remove widgets
-- Change filters or the time granularity (see [Limitations](#limitations))
-- Create reports or workbooks
-- Change the data model
-
-If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
+This works the same way on both published dashboards and
+[embedded][ref-embedding] dashboards.
 
 ## Attachments
 
@@ -97,19 +114,52 @@ contents — text, PDF, ZIP, and image files are supported.
   supported. Confirm this in your deployment before relying on it.
 </Note>
 
+## What the Dashboard Agent can and can't do
+
+The published Dashboard Agent can answer questions and adjust your own view, but
+it never changes the **saved** dashboard.
+
+**It can:**
+
+- Answer questions about what's on the dashboard from the dashboard's own data
+- Run **read-only queries** against the semantic model to go deeper — drill
+  down, break a metric down by a dimension, or pull a longer time range than a
+  chart shows
+- Apply filters and change the time granularity on the dashboard you're
+  viewing, for dimensions that have a matching
+  [control widget][ref-controls] (your session only — see
+  [Changing filters and time granularity](#changing-filters-and-time-granularity))
+- Explain how a metric or dimension is defined
+- Look up the values available for a dimension
+- Read the contents of [attachments](#attachments) you add to the chat
+
+**It can't:**
+
+- Save its filter or time-granularity changes to the dashboard — they apply to
+  your session only and never change what other viewers see
+- Edit the dashboard, or add/remove widgets
+- Create reports or workbooks
+- Change the data model
+
+If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
+
 ## Limitations
 
-- **Filters are read-only.** The agent can tell you which filters and time granularity
-  are currently applied and reason about them, but it **cannot change them** for
-  you yet. This is the most common expectation gap — if you ask the agent to
-  "filter the dashboard to last quarter," it will explain the current state
-  rather than apply the change. This is actively being worked on.
+- **Filter and time-granularity changes need a matching control.** The agent can
+  change a filter or time granularity only for dimensions that have a
+  corresponding [control widget][ref-controls] on the dashboard, and the change
+  applies to your session only — it is never saved to the dashboard. If you ask
+  it to change something with no control on the dashboard, it explains the
+  current state instead of applying a change.
 - **No authoring on published dashboards.** The published Dashboard Agent
-  cannot create reports or build dashboards. Those live in the
-  [Workbook Agent][ref-workbook-agent].
+  cannot create reports or build dashboards, edit the saved dashboard, or change
+  the data model. Those live in the [Workbook Agent][ref-workbook-agent].
 - **Report search covers published reports only.** When the agent searches for
   existing reports, it sees published reports.
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
+[ref-embedding]: /embedding/iframe/dashboards

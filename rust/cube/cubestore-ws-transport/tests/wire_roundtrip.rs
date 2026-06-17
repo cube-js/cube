@@ -8,8 +8,8 @@ use arrow::ipc::writer::StreamWriter;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpCommand, HttpMessage,
     HttpMessageArgs, HttpQueryResult, HttpQueryResultArgs, HttpQueryResultArrow,
-    HttpQueryResultArrowArgs, HttpQueryResultData, HttpResultSet, HttpResultSetArgs, HttpRow,
-    HttpRowArgs, QueryResultFormat,
+    HttpQueryResultArrowArgs, HttpQueryResultCompleted, HttpQueryResultCompletedArgs,
+    HttpQueryResultData, HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs, QueryResultFormat,
 };
 use cubestore_ws_transport::codec::{decode_frame, encode_query, DecodedResponse};
 use cubestore_ws_transport::{ResponseFormat, ResultData, TransportError};
@@ -279,6 +279,49 @@ fn decode_arrow_ipc_result_with_nulls() -> Result<(), TransportError> {
     assert_eq!(name_col.value(0), "alice");
     assert!(name_col.is_null(1), "row 1 name should be NULL");
     assert_eq!(name_col.value(2), "carol");
+
+    Ok(())
+}
+
+#[test]
+fn decode_query_result_completed() -> Result<(), TransportError> {
+    // Commands that complete without a result set (CREATE TABLE/INSERT,
+    // queue/cache writes) come back as HttpQueryResult carrying the
+    // HttpQueryResultCompleted marker instead of an Arrow IPC payload.
+    let mut b = FlatBufferBuilder::with_capacity(1024);
+    let completed = HttpQueryResultCompleted::create(&mut b, &HttpQueryResultCompletedArgs {});
+    let qr = HttpQueryResult::create(
+        &mut b,
+        &HttpQueryResultArgs {
+            data_type: HttpQueryResultData::HttpQueryResultCompleted,
+            data: Some(completed.as_union_value()),
+        },
+    );
+    let conn = b.create_string("c");
+    let msg = HttpMessage::create(
+        &mut b,
+        &HttpMessageArgs {
+            message_id: 7,
+            command_type: HttpCommand::HttpQueryResult,
+            command: Some(qr.as_union_value()),
+            connection_id: Some(conn),
+        },
+    );
+    b.finish(msg, None);
+    let bytes = b.finished_data().to_vec();
+
+    let decoded = decode_frame(&bytes)?;
+    assert_eq!(decoded.message_id, 7);
+    let result = match decoded.response {
+        DecodedResponse::Ok(r) => r,
+        DecodedResponse::Error(e) => panic!("unexpected error: {e}"),
+    };
+
+    assert!(matches!(result.data, ResultData::Completed));
+    assert!(result.is_empty());
+    assert_eq!(result.row_count(), 0);
+    assert_eq!(result.get_columns(), Vec::<String>::new());
+    assert_eq!(result.get_format(), ResponseFormat::Completed);
 
     Ok(())
 }

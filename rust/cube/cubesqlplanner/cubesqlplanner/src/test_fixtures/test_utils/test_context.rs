@@ -100,6 +100,13 @@ impl TestContext {
         Self::new_with_options(schema, Tz::UTC, Some(items), None, false, false)
     }
 
+    pub fn new_with_masked_member_items(
+        schema: MockSchema,
+        masked_members: Vec<MaskedMemberItem>,
+    ) -> Result<Self, CubeError> {
+        Self::new_with_options(schema, Tz::UTC, Some(masked_members), None, false, false)
+    }
+
     fn for_options(&self, options: &dyn BaseQueryOptions) -> Result<Self, CubeError> {
         let static_data = options.static_data();
         let timezone = static_data
@@ -262,6 +269,28 @@ impl TestContext {
 
     pub fn evaluate_symbol(&self, symbol: &Rc<MemberSymbol>) -> Result<String, CubeError> {
         let nodes_factory = SqlNodesFactory::default();
+        let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
+        let visitor = SqlEvaluatorVisitor::new(self.query_tools.clone(), cube_ref_evaluator, None);
+        let base_tools = self.query_tools.base_tools();
+        let driver_tools = base_tools.driver_tools(false)?;
+        let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
+        let node_processor = nodes_factory.default_node_processor();
+
+        visitor.apply(symbol, node_processor, &templates)
+    }
+
+    /// Like `evaluate_symbol`, but configures the node factory with the given
+    /// GROUP BY members (grouped query). Used to exercise conditional masking of
+    /// aggregate measures, which depends on whether the mask filter references
+    /// grouped members.
+    pub fn evaluate_symbol_with_group_by(
+        &self,
+        symbol: &Rc<MemberSymbol>,
+        group_by_members: Vec<String>,
+    ) -> Result<String, CubeError> {
+        let mut nodes_factory = SqlNodesFactory::default();
+        nodes_factory.set_ungrouped(false);
+        nodes_factory.set_group_by_members(group_by_members.into_iter().collect());
         let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
         let visitor = SqlEvaluatorVisitor::new(self.query_tools.clone(), cube_ref_evaluator, None);
         let base_tools = self.query_tools.base_tools();

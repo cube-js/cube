@@ -22,7 +22,14 @@ fn main() {
             )).unwrap()
     };
 
-    run_sql_tests("migration", vec![], move |test_name, test_fn| {
+    // repartition_multi_node_consistency was added after the migration fixture
+    // tarball was recorded, so it has no pre-migration data directory to copy
+    // from. Skip it here; it still runs under in-process/cluster/multi-process.
+    let extra_args = vec![
+        "--skip".to_string(),
+        "repartition_multi_node_consistency".to_string(),
+    ];
+    run_sql_tests("migration", extra_args, move |test_name, test_fn| {
         let r = Builder::new_current_thread()
             .thread_stack_size(4 * 1024 * 1024)
             .enable_all()

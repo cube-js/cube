@@ -461,6 +461,12 @@ impl MockSqlTemplatesRender {
         // Join types - based on BaseQuery.js:4424-4427
         templates.insert("join_types/inner".to_string(), "INNER".to_string());
         templates.insert("join_types/left".to_string(), "LEFT".to_string());
+        // Tesseract join types (decoupled from SQL API push down join_types)
+        templates.insert(
+            "tesseract/join_types_inner".to_string(),
+            "INNER".to_string(),
+        );
+        templates.insert("tesseract/join_types_left".to_string(), "LEFT".to_string());
 
         // Window frame types - based on BaseQuery.js:4428-4431
         templates.insert("window_frame_types/rows".to_string(), "ROWS".to_string());

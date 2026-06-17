@@ -447,9 +447,9 @@ impl PlanSqlTemplates {
         join_type: &JoinType,
     ) -> Result<String, CubeError> {
         let join_type = match join_type {
-            JoinType::Full => self.render.get_template("join_types/full")?,
-            JoinType::Inner => self.render.get_template("join_types/inner")?,
-            JoinType::Left => self.render.get_template("join_types/left")?,
+            JoinType::Full => self.render.get_template("tesseract/join_types_full")?,
+            JoinType::Inner => self.render.get_template("tesseract/join_types_inner")?,
+            JoinType::Left => self.render.get_template("tesseract/join_types_left")?,
         };
         self.render.render_template(
             "statements/join",
@@ -500,7 +500,7 @@ impl PlanSqlTemplates {
     }
 
     pub fn supports_full_join(&self) -> bool {
-        self.render.contains_template("join_types/full")
+        self.render.contains_template("tesseract/join_types_full")
     }
 
     pub fn supports_is_not_distinct_from(&self) -> bool {

@@ -114,6 +114,8 @@ interface SnowflakeDriverOptions {
   exportBucketCsvEscapeSymbol?: string,
 }
 
+type SessionParameterValue = string | number | boolean | undefined;
+
 /**
  * Snowflake driver class.
  *
@@ -456,8 +458,22 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Initializes and resolves connection to the Snowflake.
+   * Values are interpolated rather than bound because Snowflake does not
+   * support bind variables in `ALTER SESSION SET` (it rejects `?` with
+   * "invalid value [?] for parameter"; see
+   * snowflakedb/snowflake-connector-nodejs#315).
+   *
+   * I've tested it on 04 jun 2026, and it still does not work.
    */
+  protected buildAlterSessionSql(params: Record<string, SessionParameterValue>): string {
+    const assignments = Object.entries(params)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `${key} = ${typeof value === 'string' ? `'${value}'` : value}`)
+      .join(', ');
+
+    return `ALTER SESSION SET ${assignments}`;
+  }
+
   protected async initConnection() {
     try {
       const connection = await this.createConnection();
@@ -466,9 +482,16 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
       );
 
-      await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
-      await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
-      await this.execute(connection, `ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = ${this.config.identIgnoreCase}`, [], false);
+      await this.execute(
+        connection,
+        this.buildAlterSessionSql({
+          TIMEZONE: 'UTC',
+          STATEMENT_TIMEOUT_IN_SECONDS: this.config.executionTimeout,
+          QUOTED_IDENTIFIERS_IGNORE_CASE: this.config.identIgnoreCase,
+        }),
+        [],
+        false,
+      );
       return connection;
     } catch (e) {
       this.connection = null;

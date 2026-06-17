@@ -36,6 +36,10 @@ pub struct SqlNodesFactory {
     dimensions_with_ignored_timezone: HashSet<String>,
     use_local_tz_in_date_range: bool,
     original_sql_pre_aggregations: HashMap<String, String>,
+    // Full names of the members present in the query GROUP BY. Used by
+    // MaskedSqlNode to decide whether conditional masking can be applied to an
+    // aggregate measure.
+    group_by_members: HashSet<String>,
 }
 
 impl SqlNodesFactory {
@@ -60,6 +64,10 @@ impl SqlNodesFactory {
 
     pub fn set_use_local_tz_in_date_range(&mut self, value: bool) {
         self.use_local_tz_in_date_range = value;
+    }
+
+    pub fn set_group_by_members(&mut self, value: HashSet<String>) {
+        self.group_by_members = value;
     }
 
     pub fn use_local_tz_in_date_range(&self) -> bool {
@@ -163,7 +171,8 @@ impl SqlNodesFactory {
     /// a top-level `RenderReferencesSqlNode` for query-wide reference
     /// substitution.
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
-        let evaluate_sql_processor = MaskedSqlNode::new(EvaluateSqlNode::new());
+        let evaluate_sql_processor =
+            MaskedSqlNode::new(EvaluateSqlNode::new(), self.group_by_members.clone());
         let auto_prefix_processor = AutoPrefixSqlNode::new(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
@@ -179,9 +188,9 @@ impl SqlNodesFactory {
         // Wrap the entire measure chain with MaskedSqlNode so masked measures
         // are intercepted before aggregation/ungrouped wrapping.
         let measure_processor = if self.ungrouped || self.ungrouped_measure {
-            MaskedSqlNode::new_ungrouped(measure_processor)
+            MaskedSqlNode::new_ungrouped(measure_processor, self.group_by_members.clone())
         } else {
-            MaskedSqlNode::new(measure_processor)
+            MaskedSqlNode::new(measure_processor, self.group_by_members.clone())
         };
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
