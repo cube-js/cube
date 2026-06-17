@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.58](https://github.com/cube-js/cube/compare/v1.6.57...v1.6.58) (2026-06-17)
+
+### Features
+
+- **cubesql:** Support FULL and RIGHT joins with non-push-to-Cube SQL push down ([#11008](https://github.com/cube-js/cube/issues/11008)) ([8ef4b54](https://github.com/cube-js/cube/commit/8ef4b54e825b2bb83743e10375694aa92f119ab9))
+- **schema-compiler:** capitalize ID acronyms in default meta titles ([#11047](https://github.com/cube-js/cube/issues/11047)) ([094974b](https://github.com/cube-js/cube/commit/094974b20c1bd573ac57873bedd58a32f2bbc1d4))
+
 ## [1.6.57](https://github.com/cube-js/cube/compare/v1.6.56...v1.6.57) (2026-06-09)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

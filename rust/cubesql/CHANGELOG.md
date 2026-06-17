@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.58](https://github.com/cube-js/cube/compare/v1.6.57...v1.6.58) (2026-06-17)
+
+### Bug Fixes
+
+- **cubesql:** Fix grouped join SQL push down regressions ([#11049](https://github.com/cube-js/cube/issues/11049)) ([c70e7ec](https://github.com/cube-js/cube/commit/c70e7ec1deffecbc58670e18905d3e81b1f8c9e5))
+
+### Features
+
+- **cubesql:** Support FULL and RIGHT joins with non-push-to-Cube SQL push down ([#11008](https://github.com/cube-js/cube/issues/11008)) ([8ef4b54](https://github.com/cube-js/cube/commit/8ef4b54e825b2bb83743e10375694aa92f119ab9))
+
 ## [1.6.57](https://github.com/cube-js/cube/compare/v1.6.56...v1.6.57) (2026-06-09)
 
 ### Features

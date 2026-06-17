@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.58](https://github.com/cube-js/cube/compare/v1.6.57...v1.6.58) (2026-06-17)
+
+### Features
+
+- **backend-shared:** add CUBEJS_AUTO_RUN_MODE env variable ([#11062](https://github.com/cube-js/cube/issues/11062)) ([3278e4d](https://github.com/cube-js/cube/commit/3278e4d4ba7180c28eb558b296c2603c8c948bb6))
+
 ## [1.6.57](https://github.com/cube-js/cube/compare/v1.6.56...v1.6.57) (2026-06-09)
 
 **Note:** Version bump only for package @cubejs-backend/shared
