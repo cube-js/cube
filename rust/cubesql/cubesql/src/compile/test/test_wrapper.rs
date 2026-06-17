@@ -1060,6 +1060,35 @@ async fn test_case_wrapper_escaping() {
         .contains("\\\\\\\\\\\\`"));
 }
 
+#[tokio::test]
+async fn test_wrapper_ilike_lowered_pushdown() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        "SELECT customer_gender ILIKE 'fem' AS g, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "expressions/ilike".to_string(),
+            "LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})".to_string(),
+        )],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains(") LIKE LOWER("),
+        "expected lowered ILIKE pushdown (LOWER(..) LIKE LOWER(..)), got: {}",
+        sql
+    );
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
 /// Test aliases for grouped CubeScan in wrapper
 /// qualifiers from join should get remapped to single from alias
 /// long generated aliases from Datafusion should get shortened
