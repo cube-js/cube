@@ -447,7 +447,10 @@ A link must specify either a `url` or a `dashboard`:
   `params` applied as equality filters. Links surface in the table **cell context menu**.
 
 Optionally, a link might use the `icon` parameter to reference an icon from a [supported
-icon set][link-tabler] to be displayed alongside the link label.
+icon set][link-tabler] to be displayed alongside the link label. Use the icon's kebab-case
+name without any prefix (e.g. `brand-google`, `external-link`, `layout-dashboard`, `send`);
+browse the available names at [tabler.io/icons][link-tabler]. When omitted, a default link
+icon is shown.
 
 Optionally, a link might use the `target` parameter to specify [where to open it][link-target]:
 `blank` (default) to open in a new tab/window or `self` to open in the same tab/window.
