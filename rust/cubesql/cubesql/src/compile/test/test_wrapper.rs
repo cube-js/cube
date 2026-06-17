@@ -532,6 +532,96 @@ GROUP BY
         ));
 }
 
+/// Using TIMESTAMP WITH TIME ZONE with an IANA timezone in wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz_named_timezone() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2026-06-14T00:00:00 America/Los_Angeles'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = &query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(wrapped_sql.contains(
+        "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2026-06-14T00:00:00.000-07:00'"
+    ));
+    assert!(!wrapped_sql.contains("America/Los_Angeles"));
+}
+
+/// A named timezone timestamp without a seconds component should still render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz_named_timezone_no_seconds() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2026-06-14 00:00 America/Los_Angeles'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = &query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(wrapped_sql.contains(
+        "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2026-06-14T00:00:00.000-07:00'"
+    ));
+    assert!(!wrapped_sql.contains("America/Los_Angeles"));
+}
+
 // TODO add more time zones
 // TODO add more TS syntax variants
 // TODO add TIMESTAMPTZ variant
