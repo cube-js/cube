@@ -26,7 +26,7 @@ Run the query to the REST (JSON) API and get the results.
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_pathv1running-queryrequestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
 
 Response
 
@@ -417,7 +417,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_pathv1running-queryrequestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, and optionally
@@ -472,7 +472,7 @@ queries matching the given request ID across all query queues.
 
 The request ID can be obtained from the `x-request-id` header sent with
 the original query request to endpoints like
-[`/v1/load`](#base_pathv1load) or [`/v1/cubesql`](#base_pathv1cubesql).
+[`/v1/load`](#base_path/v1/load) or [`/v1/cubesql`](#base_path/v1/cubesql).
 
 | Parameter | Description | Required |
 | --- | --- | --- |
@@ -1002,19 +1002,19 @@ Keep-Alive: timeout=5
 ```
 
 [ref-recipes-data-blending]: /docs/data-modeling/concepts/data-blending#data-blending
-[ref-rest-api]: /reference/rest-api
-[ref-basepath]: /reference/rest-api#base-path
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-basepath]: /reference/core-data-apis/rest-api#base-path
 [ref-datasources]: /admin/connect-to-data/multiple-data-sources
-[ref-sql-api]: /reference/sql-api
-[ref-rest-api]: /reference/rest-api
-[ref-regular-queries]: /reference/queries#regular-query
-[ref-query-wpp]: /reference/queries#query-with-post-processing
-[ref-query-wpd]: /reference/queries#query-with-pushdown
-[ref-sql-api]: /reference/sql-api
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-regular-queries]: /reference/core-data-apis/queries#regular-query
+[ref-query-wpp]: /reference/core-data-apis/queries#query-with-post-processing
+[ref-query-wpd]: /reference/core-data-apis/queries#query-with-pushdown
+[ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-orchestration-api]: /reference/orchestration-api
 [ref-folders]: /reference/data-modeling/view#folders
-[ref-cache-control]: /reference/rest-api#cache-control
-[ref-time-zone]: /reference/queries#time-zone
+[ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api

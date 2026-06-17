@@ -14,7 +14,7 @@ only partitions associated with this order.
 
 In the recipe below, we'll learn how to use the
 [`refresh_key`](/reference/data-modeling/pre-aggregations#sql) together
-with the [`FITER_PARAMS`](/reference/data-modeling/cube#filter-params)
+with the [`FITER_PARAMS`](/reference/data-modeling/context-variables#filter_params)
 for partition separately.
 
 ## Data modeling
@@ -105,7 +105,7 @@ Note that the query for two partitions is the same. It's the reason why **all
 partitions** will be updated.
 
 How do we fix this and update only the partition for August? We can use the
-[`FILTER_PARAMS`](/reference/data-modeling/cube#filter-params) for that!
+[`FILTER_PARAMS`](/reference/data-modeling/context-variables#filter_params) for that!
 
 Let's update our pre-aggregation definition:
 

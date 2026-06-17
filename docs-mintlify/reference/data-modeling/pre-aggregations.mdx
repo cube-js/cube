@@ -238,7 +238,7 @@ to them.
 
 `rollup_join` is an ephemeral pre-aggregation that relies on referenced rollups
 when queries are executed. Setting
-[`scheduled_refresh`](#parameters-scheduled-refresh) to `true` is unnecessary
+[`scheduled_refresh`](#scheduled_refresh) to `true` is unnecessary
 for `rollup_join` and will result in an error. Appropriate freshness controls
 should be set on referenced rollups instead.
 
@@ -999,7 +999,7 @@ existing tables.
 <Warning>
 
 Because incremental refreshes generate their own SQL, you **must not** use the
-[`sql`](#parameters-refresh-key-sql) property here.
+[`sql`](#refresh_key) property here.
 
 </Warning>
 
@@ -1063,7 +1063,7 @@ triggers a refresh for partitions where the end date lies within the
 <Warning>
 
 Because incremental refreshes generate their own SQL, you **must not** use the
-[`sql`](#parameters-refresh-key-sql) property here.
+[`sql`](#refresh_key) property here.
 
 </Warning>
 
@@ -1517,7 +1517,7 @@ cube(`orders`, {
 This option allows to define [indexes][ref-indexes]. Indexes are used to
 fine-tune pre-aggregation performance when pre-aggregations have significant
 cardinality. (For [aggregating indexes][ref-aggregating-indexes], see the
-[`type` option](#type-1) below.)
+[`type` option](#type-2) below.)
 
 Here's how you can define an index:
 
@@ -1733,7 +1733,7 @@ pre-aggregation definition.
 <Note>
 
 A query can only target an aggregating index when every measure it uses is
-[additive](/docs/pre-aggregations/getting-started-pre-aggregations#additivity)
+[additive](/docs/pre-aggregations/matching-pre-aggregations)
 (e.g. built on `sum`, `count`, `min`, `max`, or `countDistinctApprox`), and every
 dimension and filter in the query is one of the index's `columns`. Non-additive
 measures, such as `avg` or exact `countDistinct`, cannot use an aggregating index.
@@ -1810,10 +1810,10 @@ cube(`orders`, {
 
 [ref-caching-lambda-preaggs]: /docs/pre-aggregations/lambda-pre-aggregations
 [ref-caching-partitioning]: /docs/pre-aggregations/using-pre-aggregations#partitioning
-[ref-caching-preaggs-target]: /docs/pre-aggregations/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries
+[ref-caching-preaggs-target]: /docs/pre-aggregations/matching-pre-aggregations#matching-algorithm
 [ref-config-downstream-superset]: /admin/connect-to-data/visualization-tools/superset
 [ref-cube-refreshkey]: /reference/data-modeling/cube#refresh_key
-[ref-production-checklist-refresh]: /docs/deployment/production-checklist#set-up-refresh-worker
+[ref-production-checklist-refresh]: /cube-core/running-in-production#set-up-refresh-worker
 [ref-recipe-funnels]: /recipes/data-modeling/funnels
 [ref-schema-ref-cube-datasource]: /reference/data-modeling/cube#data_source
 [ref-schema-dimensions]: /reference/data-modeling/dimensions

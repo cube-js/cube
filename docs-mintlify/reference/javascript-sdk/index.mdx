@@ -9,9 +9,9 @@ Cube is visualization-agnostic, so you can build any user interface for your
 application.
 
 You can directly query Cube using the
-JSON [query format](/reference/rest-api/query-format) via the [REST (JSON) API](/reference/rest-api/reference)
+JSON [query format](/reference/core-data-apis/rest-api/query-format) via the [REST (JSON) API](/reference/core-data-apis/rest-api/reference)
 or
-[WebSockets](/reference/recipes/real-time-data-fetch#web-sockets)
+[WebSockets](/recipes/core-data-api/real-time-data-fetch)
 and visualize analytical data with tools of your choice. However, it's much
 easier to use the Cube JavaScript client and bindings for popular frameworks
 such as React, Angular, and Vue.
@@ -27,7 +27,7 @@ The client provides methods to solve common tasks:
 **Abstract from the transport and query data.** You can
 [fetch data](/reference/javascript-sdk/reference/cubejs-client-core#load) from Cube Backend or
 subscribe to
-[real-time updates](/reference/recipes/real-time-data-fetch)
+[real-time updates](/recipes/core-data-api/real-time-data-fetch)
 regardless of the protocol, be it HTTP or WebSockets.
 
 **Transform data for visualization.** You can
@@ -56,10 +56,10 @@ Here are the typical steps to query and visualize analytical data:
   with Cube API URL. In development mode, the default URL is
   [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1).
   The client is also initialized with an [API token](/docs/data-modeling/access-control), but it
-  takes effect only in [production](/docs/deployment/production-checklist).
+  takes effect only in [production](/cube-core/running-in-production).
 - **Query data from Cube Backend.** The client accepts a query, which is a plain
   JavaScript object. See
-  [Query Format](/reference/rest-api/query-format) for details.
+  [Query Format](/reference/core-data-apis/rest-api/query-format) for details.
 - **Transform data for visualization.** The result set has convenient methods,
   such as `series` and `chartPivot`, to prepare data for charting.
 - **Visualize the data.** Use tools of your choice to draw charts and create
@@ -125,8 +125,8 @@ console.log(resultSet.tablePivot())
 ```
 
 
-[ref-compare-date-range]: /reference/queries#compare-date-range-query
-[ref-rest-api]: /reference/rest-api
+[ref-compare-date-range]: /reference/core-data-apis/queries#compare-date-range-query
+[ref-rest-api]: /reference/core-data-apis/rest-api
 [link-max-safe-int]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER
 [ref-data-sources]: /admin/connect-to-data/data-sources
 [ref-ref-loadmethodoptions]: /reference/javascript-sdk/reference/cubejs-client-core#loadmethodoptions
