@@ -19,6 +19,7 @@ Run the query to the REST (JSON) API and get the results.
 | `query`     | Either a single URL encoded Cube [Query](/reference/core-data-apis/rest-api/query-format), or an array of queries    | ✅ Yes |
 | `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` | ❌ No |
 | `cache`     | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
+| `responseFormat` | Output format of the result `data` payload: `default` (row-oriented), `compact` (a `{ members, dataset }` object with rows of primitive arrays), or `columnar` (a `{ members, columns }` object with one primitive array per member). `default` by default | ❌ No |
 
 ### Headers
 
@@ -38,6 +39,8 @@ Response
   - `shortTitle` - Short title for visualization usage (ex. chart overlay)
   - `type` - Data type
 - `lastRefreshTime` - An ISO 8601 timestamp indicating when the data was last refreshed.
+- `external` - A boolean indicating whether the query was served from a
+  pre-aggregation in Cube Store. Present only when the query hit a pre-aggregation.
 - `total` - The total number of rows returned for the query. Useful for
   paginating results.
 
@@ -133,6 +136,7 @@ The response will contain a JSON object with the following properties under the 
 | `sql`, `array` | Two-element array (see below) |
 | `sql[0]`, `string` | Generated query with parameter placeholders |
 | `sql[1]`, <nobr>`array` or `object`</nobr> | Generated query parameters |
+| `dataSource`, `string` | The name of the [data source][ref-datasources] the generated query targets |
 
 For queries with the `sql` format, the response will also include the following additional
 properties under the `sql` key:

@@ -72,8 +72,9 @@ cubes:
         multi_stage: true
         sql: "XIRR({total_payments}, {date__day})"
         type: number_agg
-        add_group_by:
-          - date__day
+        grain:
+          include:
+            - date__day
 
     pre_aggregations:
       - name: main_xirr
@@ -122,9 +123,9 @@ cube(`payments`, {
       multi_stage: true,
       sql: `XIRR(${CUBE.total_payments}, ${CUBE.date__day})`,
       type: `number_agg`,
-      add_group_by: [
-        date__day
-      ]
+      grain: {
+        include: [date__day]
+      }
     }
   },
 

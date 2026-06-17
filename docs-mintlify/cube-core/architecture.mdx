@@ -235,10 +235,18 @@ services:
       - cubestore_router
 ```
 
+Instead of static access keys, Cube Store can authenticate to S3 using AWS Web
+Identity (for example, IRSA on Amazon EKS). Leave `CUBESTORE_AWS_ACCESS_KEY_ID`
+unset and provide
+[`CUBESTORE_AWS_WEB_IDENTITY_TOKEN_FILE`][ref-config-env-cubestore-web-identity]
+and [`CUBESTORE_AWS_ROLE_ARN`][ref-config-env]; Cube Store then assumes the role
+via STS and refreshes credentials automatically when the token file changes.
+
 
 [dh-cubejs]: https://hub.docker.com/r/cubejs/cube
 [dh-cubestore]: https://hub.docker.com/r/cubejs/cubestore
 [ref-config-env]: /reference/configuration/environment-variables
+[ref-config-env-cubestore-web-identity]: /reference/configuration/environment-variables#cubestore_aws_web_identity_token_file
 [ref-config-js]: /reference/configuration/config
 [ref-conf-ref-schemapath]: /reference/configuration/config#schema_path
 [gh-pavel]: https://github.com/paveltiunov

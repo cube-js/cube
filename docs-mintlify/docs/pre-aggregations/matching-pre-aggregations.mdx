@@ -103,6 +103,25 @@ cubes involved in the query.
 - If multiple cubes are referenced in the query, the pre-aggregation should
 include only members of these cubes.
 
+## Matching multi-fact and multi-stage queries
+
+A query can decompose into multiple subqueries — for example, a query over a
+[multi-fact view][ref-multi-fact-views] runs a subquery per fact, and a query
+with [multi-stage measures][ref-multi-stage] runs a subquery per stage. Cube
+matches a pre-aggregation to each subquery independently, so a single query can
+be served by several pre-aggregations at once — one per subquery — rather than
+requiring a single pre-aggregation that covers the whole query.
+
+<Warning>
+
+Matching separate pre-aggregations to multi-fact and multi-stage subqueries is
+powered by Tesseract, the [next-generation data modeling engine][link-tesseract].
+Tesseract is currently in preview. Use the
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
+enable it.
+
+</Warning>
+
 ## Troubleshooting
 
 If you're not sure why a query does not match a pre-aggregation, try to identify
@@ -141,3 +160,7 @@ configuration option.
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-views]: /docs/data-modeling/views
+[ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-multi-stage]: /docs/data-modeling/measures#multi_stage
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[link-tesseract]: https://cube.dev/blog/introducing-tesseract

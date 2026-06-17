@@ -3315,7 +3315,9 @@ mod tests {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
             c.compaction_chunks_count_threshold = 50;
-            c.max_joined_partitions = 10;
+            // Eager split-by-file-size fragments the right table further; lift the join cap
+            // above the resulting partition count (this test asserts join correctness, not the cap).
+            c.max_joined_partitions = 50;
             c
         }).start_test(async move |services| {
             let service = services.sql_service;
@@ -4048,6 +4050,8 @@ mod tests {
         Config::test("inactive_partitions_cleanup")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
+                // Keep a single active partition: this test covers inactive-file GC, not size split.
+                c.partition_size_split_threshold_bytes = 1024 * 1024;
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
                 c.meta_store_log_upload_interval = 1;

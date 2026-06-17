@@ -58,10 +58,10 @@ When the share measure needs to be part of the semantic model — so it is
 returned by the API, visible in Explore, or accessible to AI agents — define
 it using multi-stage measures powered by [Tesseract][link-tesseract].
 
-The key building block is the [`group_by`][ref-group-by] parameter: when set
-to an empty list, the inner aggregation stage groups by _nothing_, computing
-the grand total across all rows. The outer stage then joins that total back and
-groups by the query's dimensions as usual.
+The key building block is the [`grain`][ref-grain] parameter with `keep_only`:
+when set to an empty list, the inner aggregation stage groups by _nothing_,
+computing the grand total across all rows. The outer stage then joins that total
+back and groups by the query's dimensions as usual.
 
 <Warning>
 
@@ -76,15 +76,16 @@ Calculating share of total requires three measures:
 
 1. A **base measure** — the regular aggregate, e.g., `total_sale_price`.
 2. A **helper measure** — a multi-stage measure that re-aggregates the base
-   measure with `group_by: []`, fixing the inner `GROUP BY` to nothing (the
-   grand total). This measure is internal and should be hidden from views.
+   measure with `grain` set to `keep_only: []`, fixing the inner `GROUP BY` to
+   nothing (the grand total). This measure is internal and should be hidden from
+   views.
 3. A **ratio measure** — a multi-stage measure that divides the base by the
    helper total.
 
 The examples below extend the `order_items` cube from the
 [ecommerce demo model][link-ecommerce-demo]. The `brand` and `category`
 dimensions are proxied from the joined `products` cube so they can be
-referenced by `group_by`.
+referenced by `grain`.
 
 ### Share of grand total
 
@@ -122,7 +123,8 @@ cubes:
         multi_stage: true
         sql: "{total_sale_price}"
         type: sum
-        group_by: []
+        grain:
+          keep_only: []
 
       - name: revenue_share
         multi_stage: true
@@ -165,7 +167,9 @@ cube(`order_items`, {
       multi_stage: true,
       sql: `${total_sale_price}`,
       type: `sum`,
-      group_by: []
+      grain: {
+        keep_only: []
+      }
     },
 
     revenue_share: {
@@ -180,7 +184,7 @@ cube(`order_items`, {
 
 </CodeGroup>
 
-`group_by: []` tells Tesseract that the inner stage for `total_revenue_grand_total`
+`keep_only: []` tells Tesseract that the inner stage for `total_revenue_grand_total`
 should group by no dimensions, producing a single grand-total row. The outer stage
 joins it back and groups by whatever dimensions are in the query (e.g., `brand`),
 so every row receives the same total denominator.
@@ -216,9 +220,9 @@ Sometimes you want each row's share _within a category_ rather than the
 overall total — for example, each brand's share of its product category's
 revenue.
 
-Use `group_by` with the dimension you want to _fix_ as the subtotal boundary.
-The inner stage will group only by that dimension, and the outer stage will
-group by the full set of query dimensions:
+Use `grain` with `keep_only` set to the dimension you want to _fix_ as the
+subtotal boundary. The inner stage will group only by that dimension, and the
+outer stage will group by the full set of query dimensions:
 
 <CodeGroup>
 
@@ -256,8 +260,9 @@ cubes:
         multi_stage: true
         sql: "{total_sale_price}"
         type: sum
-        group_by:
-          - category
+        grain:
+          keep_only:
+            - category
 
       - name: revenue_share_of_category
         multi_stage: true
@@ -304,7 +309,9 @@ cube(`order_items`, {
       multi_stage: true,
       sql: `${total_sale_price}`,
       type: `sum`,
-      group_by: [`category`]
+      grain: {
+        keep_only: [`category`]
+      }
     },
 
     revenue_share_of_category: {
@@ -319,7 +326,7 @@ cube(`order_items`, {
 
 </CodeGroup>
 
-With `group_by: [category]`, the inner stage computes revenue per category.
+With `keep_only: [category]`, the inner stage computes revenue per category.
 The outer stage groups by both `category` and `brand`, so each brand row
 divides its revenue by the right category total. Exclude
 `category_revenue_grand_total` from the view the same way as shown above.
@@ -348,7 +355,7 @@ override)][ref-share-filter].
 
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [link-ecommerce-demo]: https://github.com/cubedevinc/ecommerce_demo
-[ref-group-by]: /reference/data-modeling/measures#group_by
+[ref-grain]: /reference/data-modeling/measures#grain
 [ref-filter]: /reference/data-modeling/measures#filter
 [ref-share-filter]: /docs/data-modeling/measures#share-of-total-filter-override
 [ref-dynamic-params]: /recipes/data-modeling/passing-dynamic-parameters-in-a-query

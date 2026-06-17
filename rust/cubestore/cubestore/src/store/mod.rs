@@ -1,7 +1,12 @@
 pub mod compaction;
 
 use async_trait::async_trait;
-use datafusion::arrow::compute::{concat_batches, lexsort_to_indices, SortColumn, SortOptions};
+use datafusion::arrow::compute::{concat_batches, SortOptions};
+use datafusion::config::TableParquetOptions;
+use datafusion::datasource::listing::PartitionedFile;
+use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
+use datafusion::datasource::physical_plan::{FileScanConfig, ParquetSource};
+use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::common::collect as common_collect;
@@ -268,15 +273,23 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         partition: IdRow<Partition>,
         index: IdRow<Index>,
     ) -> Result<Vec<RecordBatch>, CubeError>;
-    ///Return tuple with concated and sorted chunks data and vectore of non-empty chunks
-    ///Deactiveat empty chunks
-    async fn concat_and_sort_chunks_data(
+    /// Reads each chunk as a separate already-sorted run of record batches and returns them
+    /// together with the ids of the non-empty chunks. Empty chunks are deactivated.
+    async fn load_sorted_chunks_data(
         &self,
         chunks: &[IdRow<Chunk>],
         partition: IdRow<Partition>,
         index: IdRow<Index>,
-        sort_key_size: usize,
-    ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError>;
+    ) -> Result<(Vec<Vec<RecordBatch>>, Vec<u64>), CubeError>;
+    /// Returns a single-partition ExecutionPlan over one chunk's data, sorted by the index sort
+    /// key. Persisted chunks are scanned from parquet (streamed); in-memory chunks are served
+    /// from memory.
+    async fn chunk_exec(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+    ) -> Result<Arc<dyn ExecutionPlan>, CubeError>;
     async fn add_memory_chunk(
         &self,
         chunk_name: String,
@@ -452,8 +465,8 @@ impl ChunkDataStore for ChunkStore {
         };
 
         let unique_key = table.get_row().unique_key_columns();
-        let (in_memory_columns, old_chunk_ids) = self
-            .concat_and_sort_chunks_data(&chunks[..], partition.clone(), index.clone(), key_size)
+        let (chunk_runs, old_chunk_ids) = self
+            .load_sorted_chunks_data(&chunks[..], partition.clone(), index.clone())
             .await?;
 
         if old_chunk_ids.is_empty() {
@@ -466,10 +479,15 @@ impl ChunkDataStore for ChunkStore {
         )
         .task_ctx();
 
+        let chunk_inputs = chunk_runs
+            .into_iter()
+            .map(|run| try_make_memory_data_source(&[run], schema.clone(), None))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
-            in_memory_columns,
+            chunk_inputs,
             unique_key.clone(),
             aggregate_columns.clone(),
             task_context,
@@ -699,75 +717,78 @@ impl ChunkDataStore for ChunkStore {
         }
     }
 
-    async fn concat_and_sort_chunks_data(
+    async fn load_sorted_chunks_data(
         &self,
         chunks: &[IdRow<Chunk>],
         partition: IdRow<Partition>,
         index: IdRow<Index>,
-        sort_key_size: usize,
-    ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError> {
-        let mut data: Vec<RecordBatch> = Vec::new();
+    ) -> Result<(Vec<Vec<RecordBatch>>, Vec<u64>), CubeError> {
+        let mut runs: Vec<Vec<RecordBatch>> = Vec::new();
         let mut empty_chunk_ids = Vec::new();
         let mut non_empty_chunk_ids = Vec::new();
 
+        // Each chunk is written sorted by the index sort key, so its batches form a single
+        // sorted run that can be merged downstream without re-sorting.
         for chunk in chunks.iter() {
-            for b in self
+            let run = self
                 .get_chunk_columns_with_preloaded_meta(
                     chunk.clone(),
                     partition.clone(),
                     index.clone(),
                 )
                 .await?
-            {
-                if b.num_rows() == 0 {
-                    empty_chunk_ids.push(chunk.get_id());
-                } else {
-                    non_empty_chunk_ids.push(chunk.get_id());
-                    data.push(b)
-                }
+                .into_iter()
+                .filter(|b| b.num_rows() > 0)
+                .collect::<Vec<_>>();
+            if run.is_empty() {
+                empty_chunk_ids.push(chunk.get_id());
+            } else {
+                non_empty_chunk_ids.push(chunk.get_id());
+                runs.push(run);
             }
         }
         if !empty_chunk_ids.is_empty() {
             self.meta_store.deactivate_chunks(empty_chunk_ids).await?;
         }
-        if data.is_empty() {
-            return Ok((Vec::new(), Vec::new()));
-        }
-        let new = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-            // Concat rows from all chunks.
-            let num_columns = data[0].num_columns();
-            let mut columns = Vec::with_capacity(num_columns);
-            for i in 0..num_columns {
-                let v = datafusion::arrow::compute::concat(
-                    &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
-                )?;
-                columns.push(v);
-            }
-            // Sort rows from all chunks.
-            let mut sort_key = Vec::with_capacity(sort_key_size);
-            for i in 0..sort_key_size {
-                sort_key.push(SortColumn {
-                    values: columns[i].clone(),
-                    options: Some(SortOptions {
-                        descending: false,
-                        nulls_first: true,
-                    }),
-                });
-            }
-            let indices = lexsort_to_indices(&sort_key, None)?;
-            let mut new = Vec::with_capacity(num_columns);
-            for c in columns {
-                new.push(datafusion::arrow::compute::take(
-                    c.as_ref(),
-                    &indices,
-                    None,
-                )?)
-            }
-            Ok(new)
-        })
-        .await??;
 
-        Ok((new, non_empty_chunk_ids))
+        Ok((runs, non_empty_chunk_ids))
+    }
+
+    async fn chunk_exec(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+    ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        if chunk.get_row().in_memory() {
+            let batches = self
+                .get_chunk_columns_with_preloaded_meta(chunk, partition, index)
+                .await?;
+            Ok(try_make_memory_data_source(&[batches], schema, None)?)
+        } else {
+            let (local_file, _) = self.download_chunk(chunk, partition, index).await?;
+            let session_config = self
+                .metadata_cache_factory
+                .cache_factory()
+                .make_session_config();
+            let parquet_source = ParquetSource::new(
+                TableParquetOptions::default(),
+                get_reader_options_customizer(&session_config),
+            )
+            .with_parquet_file_reader_factory(
+                self.metadata_cache_factory
+                    .cache_factory()
+                    .make_noop_cache(),
+            );
+            let file_scan = FileScanConfig::new(
+                ObjectStoreUrl::local_filesystem(),
+                schema,
+                Arc::new(parquet_source),
+            )
+            .with_file(PartitionedFile::from_path(local_file)?);
+            Ok(Arc::new(DataSourceExec::new(Arc::new(file_scan))))
+        }
     }
 
     async fn has_in_memory_chunk(
@@ -1418,6 +1439,93 @@ mod tests {
         let _ = fs::remove_dir_all(chunk_store_path);
         let _ = fs::remove_dir_all(chunk_remote_store_path);
     }
+
+    #[tokio::test]
+    async fn partition_rows_deactivates_table_on_column_count_mismatch() {
+        let config = Config::test("partition_rows_column_count_mismatch");
+        let path = "/tmp/test_partition_rows_mismatch";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
+                PathBuf::from(chunk_store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                Path::new(path),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+                10,
+            );
+
+            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    col.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
+
+            // The index has 1 column; feed 2 columns to simulate a chunk written under a
+            // different (wider) schema. The mismatch must be treated as corrupt data, not
+            // retried forever via failing RepartitionChunk jobs.
+            let mismatched: Vec<ArrayRef> = vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3])),
+                Arc::new(Int64Array::from(vec![4, 5, 6])),
+            ];
+            let err = chunk_store
+                .partition_rows(index.get_id(), mismatched, false)
+                .await
+                .unwrap_err();
+            assert!(
+                err.message
+                    .contains("expects 1 columns but incoming chunk data has 2 columns"),
+                "unexpected error: {}",
+                err.message
+            );
+
+            // The table is deactivated (marked not ready) instead of looping.
+            let table = meta_store.get_table_by_id(table.get_id()).await.unwrap();
+            assert!(!table.get_row().is_ready());
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path);
+        let _ = fs::remove_dir_all(chunk_remote_store_path);
+    }
 }
 
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
@@ -1446,6 +1554,28 @@ impl ChunkStore {
             .get_active_partitions_by_index_id(index_id)
             .await?;
         let sort_key_size = index.get_row().sort_key_size() as usize;
+
+        let expected_columns = index.get_row().get_columns().len();
+        if columns.len() != expected_columns {
+            // The chunk data column count doesn't match the index schema (schema/version
+            // mismatch, e.g. an id collision after restoring a stale metastore copy). Treat as
+            // corrupt data and deactivate the table rather than panicking on the
+            // `columns[0..sort_key_size]` slice below or failing RecordBatch::try_new in
+            // post_process_columns.
+            let error_message = format!(
+                "Index {:?} expects {} columns but incoming chunk data has {} columns",
+                index,
+                expected_columns,
+                columns.len()
+            );
+            deactivate_table_due_to_corrupt_data(
+                self.meta_store.clone(),
+                index.get_row().table_id(),
+                error_message.clone(),
+            )
+            .await?;
+            return Err(CubeError::corrupt_data(error_message));
+        }
 
         let mut remaining_rows: Vec<u64> = (0..columns[0].len() as u64).collect_vec();
         {

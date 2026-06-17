@@ -596,6 +596,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn in_flight_import_jobs_by_node(&self) -> Result<HashMap<String, u64>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn add_job(&self, _job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -624,6 +628,10 @@ impl MetaStore for MetaStoreMock {
     }
 
     async fn delete_job(&self, _job_id: u64) -> Result<IdRow<Job>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn delete_unknown_jobs(&self) -> Result<u64, CubeError> {
         panic!("MetaStore mock!")
     }
 

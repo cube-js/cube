@@ -1871,40 +1871,41 @@ export class BaseQuery {
       // Because of that it's not possible to correctly precalculate
       // granularities hierarchies on startup as they are specific for each timezone.
       ['granularityHierarchies', this.timezone],
-      () => R.reduce(
-        (hierarchies, cube) => R.reduce(
-          (acc, [tdName, td]) => {
+      () => {
+        // Mutating a single accumulator object instead of repeatedly spreading
+        // it keeps this O(n) in the number of dimensions/granularities. The
+        // previous `{ ...acc, ... }` approach copied the whole accumulator on
+        // every iteration, making it O(n^2) and extremely slow on large models.
+        const hierarchies = {};
+        const standardGranularityNames = R.keys(standardGranularitiesParents);
+
+        for (const cube of R.keys(this.cubeEvaluator.evaluatedCubes)) {
+          const timeDimensions = this.cubeEvaluator.timeDimensionsForCube(cube);
+
+          for (const tdName of Object.keys(timeDimensions)) {
+            const td = timeDimensions[tdName];
             const dimensionKey = `${cube}.${tdName}`;
 
             // constructing standard granularities for time dimension
-            const standardEntries = R.fromPairs(
-              R.keys(standardGranularitiesParents).map(gr => [
-                `${dimensionKey}.${gr}`,
-                standardGranularitiesParents[gr],
-              ]),
-            );
+            for (const gr of standardGranularityNames) {
+              hierarchies[`${dimensionKey}.${gr}`] = standardGranularitiesParents[gr];
+            }
 
             // If we have custom granularities in time dimension
-            const customEntries = td.granularities
-              ? R.fromPairs(
-                R.keys(td.granularities).map(granularityName => {
-                  const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
-                  return [
-                    `${dimensionKey}.${granularityName}`,
-                    [granularityName, ...standardGranularitiesParents[grObj.minGranularity()]],
-                  ];
-                }),
-              )
-              : {};
+            if (td.granularities) {
+              for (const granularityName of Object.keys(td.granularities)) {
+                const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
+                hierarchies[`${dimensionKey}.${granularityName}`] = [
+                  granularityName,
+                  ...standardGranularitiesParents[grObj.minGranularity()],
+                ];
+              }
+            }
+          }
+        }
 
-            return { ...acc, ...standardEntries, ...customEntries };
-          },
-          hierarchies,
-          R.toPairs(this.cubeEvaluator.timeDimensionsForCube(cube)),
-        ),
-        {},
-        R.keys(this.cubeEvaluator.evaluatedCubes),
-      ),
+        return hierarchies;
+      },
     );
   }
 

@@ -856,6 +856,18 @@ to be [configured][mysql-server-tz-support] properly.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBEJS_DB_MSSQL_USE_NAMED_TIMEZONES`
+
+This flag controls how time zone conversion is done in the generated SQL for Microsoft
+SQL Server:
+- If it is set to `true`, time zone names are used, with DST-aware conversion via
+`AT TIME ZONE`.
+- If it is set to `false`, numeric offsets are used instead.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_REDSHIFT_CLUSTER_IDENTIFIER`
 
 The Redshift cluster identifier. Required for IAM authentication.
@@ -1277,6 +1289,14 @@ The logging level for Cube.
 | -------------------------------- | ---------------------- | --------------------- |
 | `error`, `info`, `trace`, `warn` | `warn`                 | `warn`                |
 
+<Note>
+
+In production, Cube emits logs as structured JSON — one JSON object per line,
+each including a `level` field with the log level. In development, logs are
+emitted as human-readable text.
+
+</Note>
+
 See also `CUBESTORE_LOG_LEVEL`.
 See also the [`logger` configuration option](/reference/configuration/config#logger).
 
@@ -1331,6 +1351,22 @@ In Cube Cloud, all [environments][ref-environments] share the same pre-aggregati
 This allows reusing pre-aggregations across environments, saving both time and cost.
 
 </Info>
+
+## `CUBEJS_PRE_AGGREGATIONS_DB_*`
+
+Connection variables for a dedicated data source used to build and store the default
+data source's pre-aggregations, instead of its own connection. They mirror the regular
+`CUBEJS_DB_*` connection variables — for example `CUBEJS_PRE_AGGREGATIONS_DB_TYPE`,
+`CUBEJS_PRE_AGGREGATIONS_DB_HOST`, `CUBEJS_PRE_AGGREGATIONS_DB_PORT`,
+`CUBEJS_PRE_AGGREGATIONS_DB_USER`, `CUBEJS_PRE_AGGREGATIONS_DB_PASS`, and
+`CUBEJS_PRE_AGGREGATIONS_DB_SSL`. For a [named data source][ref-config-multiple-ds-decorating-env],
+use the decorated form `CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*`.
+
+| Possible Values                              | Default in Development | Default in Production |
+| -------------------------------------------- | ---------------------- | --------------------- |
+| Same as the corresponding `CUBEJS_DB_*` variable | N/A                | N/A                   |
+
+See [pre-aggregation data source][ref-preagg-data-source] for details and examples.
 
 ## `CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`
 
@@ -1711,6 +1747,28 @@ Required when using an AWS instance role.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid number in minutes | `180`                  | `180`                 |
 
+## `CUBESTORE_AWS_WEB_IDENTITY_TOKEN_FILE`
+
+The path to an AWS web identity token file. When `CUBESTORE_AWS_ACCESS_KEY_ID` is
+not set and this variable is present, Cube Store authenticates to S3 using AWS Web
+Identity (for example, [IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+on Amazon EKS): it exchanges the token for
+temporary credentials via STS `AssumeRoleWithWebIdentity` and re-exchanges them
+when the token file changes.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid file path | N/A                  | N/A                   |
+
+## `CUBESTORE_AWS_ROLE_ARN`
+
+The ARN of the AWS IAM role to assume when using
+[`CUBESTORE_AWS_WEB_IDENTITY_TOKEN_FILE`](#cubestore_aws_web_identity_token_file).
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A valid IAM role ARN | N/A                 | N/A                   |
+
 ## `CUBESTORE_BIND_ADDR`
 
 The address/port pair for Cube Store's MySQL-compatible interface.
@@ -1900,6 +1958,17 @@ The timeout for SQL queries in seconds.
 | ------------------- | ---------------------- | --------------------- |
 | A number in seconds | `120`                  | `120`                 |
 
+## `CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE`
+
+Enables stale-while-revalidate behavior for Cube Store's SQL result cache. When set
+to a number of seconds, a cached result that has expired is still served for up to
+that many seconds while the cache is refreshed in the background. Set to `0` to
+disable.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A number in seconds | `0`                    | `0`                   |
+
 ## `CUBESTORE_REMOTE_DIR`
 
 A path on the local filesystem to store metadata and datasets from all nodes as
@@ -1969,6 +2038,27 @@ insertion.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `262144`               | `262144`              |
+
+## `CUBESTORE_CHUNKS_COUNT_THRESHOLD`
+
+The number of chunks a partition can accumulate before Cube Store compacts them into
+a single chunk.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `4`                    | `4`                   |
+
+## `CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD`
+
+The number of chunks at which a table's partitions are considered ready during table
+creation. When set, it must not be lower than
+[`CUBESTORE_CHUNKS_COUNT_THRESHOLD`](#cubestore_chunks_count_threshold), otherwise
+compaction would never reduce the number of chunks below this threshold. By default,
+it is not set.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | N/A                    | N/A                   |
 
 ## `CUBESTORE_WORKER_PORT`
 
@@ -2053,6 +2143,7 @@ The port for a Cube deployment to listen to API connections on.
 [ref-config-db]: /admin/connect-to-data/data-sources
 [ref-config-multiple-ds-cloud]: /admin/connect-to-data/multiple-data-sources
 [ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
+[ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-config-sched-refresh-timer]: /reference/configuration/config#scheduled_refresh_timer
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#configuration-api-scopes
 [snowflake-docs-account-id]:

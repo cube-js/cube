@@ -69,6 +69,47 @@ options | [CubeApiOptions](#cubeapioptions) | - |
 
 >  **movePivotItem**(**pivotConfig**: [PivotConfig](#pivotconfig), **sourceIndex**: number, **destinationIndex**: number, **sourceAxis**: TSourceAxis, **destinationAxis**: TSourceAxis): *[PivotConfig](#pivotconfig)*
 
+## Format API
+
+A set of helpers for formatting member values on the client, consistently with how
+Cube formats them. They are imported from the `@cubejs-client/core/format` subpath:
+
+```js
+import { formatValue, getFormat, formatDateByGranularity } from '@cubejs-client/core/format';
+```
+
+### `formatValue`
+
+>  **formatValue**(**value**: any, **options**: FormatValueOptions): *string*
+
+Formats a single value according to a member's `type` and `format`. `options` extends the
+member's metadata (`type`, `format`, `currency`, `granularity`) with an optional `locale`
+(e.g. `'en-US'`, `'de-DE'`) and an `emptyPlaceholder` for empty values. Numeric formats use
+[d3-format](https://d3js.org/d3-format) specifiers, and the precision of named formats (e.g.
+`currency_2`) is treated as an upper bound — insignificant trailing zeros are trimmed.
+
+```js
+import { formatValue } from '@cubejs-client/core/format';
+
+formatValue(1234.5, { type: 'number', format: 'currency_2', currency: 'EUR', locale: 'de-DE' });
+```
+
+### `getFormat`
+
+>  **getFormat**(**member**: FormatValueMember, **options?**: GetFormatOptions): *GetFormatResult*
+
+Returns a reusable formatter for a member. `options` accepts an optional `locale`. The result
+has two properties: `formatString` (the resolved format specifier, or `null` for non-numeric
+formats) and `formatFunc`, a function that formats a value. Use it when formatting many values
+for the same member.
+
+### `formatDateByGranularity`
+
+>  **formatDateByGranularity**(**value**: Date | string | number, **granularity?**: string): *string*
+
+Formats a date value for a given time dimension `granularity` (e.g. `'day'`, `'month'`,
+`'year'`).
+
 ## `CubeApi`
 
 Main class for accessing Cube API

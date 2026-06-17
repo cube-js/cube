@@ -21,6 +21,39 @@ behavior:
 - [`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`](/reference/configuration/environment-variables#cubejs_drop_pre_agg_without_touch)
 - [`CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME`](/reference/configuration/environment-variables#cubejs_pre_aggregations_backoff_max_time)
 
+## Pre-aggregation data source
+
+By default, each data source builds and stores its pre-aggregations using its own
+connection. You can instead point a data source's pre-aggregations at a dedicated
+connection by adding a `PRE_AGGREGATIONS` segment to its environment variables. When
+set, that source's pre-aggregations are built on and read from the dedicated
+connection rather than the source's own.
+
+Use the `CUBEJS_PRE_AGGREGATIONS_DB_*` variables for the default data source, and the
+`CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*` variables for a [named data
+source][ref-multiple-data-sources]:
+
+```dotenv
+# Default data source
+CUBEJS_DB_TYPE=postgres
+CUBEJS_DB_HOST=localhost
+
+# Dedicated pre-aggregation data source for the default data source
+CUBEJS_PRE_AGGREGATIONS_DB_TYPE=postgres
+CUBEJS_PRE_AGGREGATIONS_DB_HOST=preagg-host
+
+# A named data source and its dedicated pre-aggregation data source
+CUBEJS_DATASOURCES=default,analytics
+CUBEJS_DS_ANALYTICS_DB_TYPE=postgres
+CUBEJS_DS_ANALYTICS_DB_HOST=remotehost
+CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_TYPE=postgres
+CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST=analytics-preagg-host
+```
+
+The `PRE_AGGREGATIONS` variant supports the same connection variables as the regular
+`CUBEJS_DB_*` / `CUBEJS_DS_<NAME>_DB_*` data source variables (for example `_DB_TYPE`,
+`_DB_HOST`, `_DB_PORT`, `_DB_USER`, `_DB_PASS`, and `_DB_SSL`).
+
 ## Troubleshooting
 
 ### `Refresh scheduler interval error`
@@ -49,3 +82,4 @@ that would automatically do this for you.
 [ref-multitenancy]: /embedding/multitenancy
 [ref-preaggs]: /docs/pre-aggregations/using-pre-aggregations
 [ref-production-multi-cluster]: /admin/deployment/deployment-types#multi-cluster
+[ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources

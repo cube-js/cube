@@ -36,6 +36,7 @@ CUBEJS_DB_PASS=**********
 | [`CUBEJS_DB_DOMAIN`](/reference/configuration/environment-variables#cubejs_db_domain)   | A domain name within the database to connect to                                     | A valid domain name within a Microsoft SQL Server database |    ❌    |
 | [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl)      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                                            |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool) | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                             |    ❌    |
+| [`CUBEJS_DB_MSSQL_USE_NAMED_TIMEZONES`](/reference/configuration/environment-variables#cubejs_db_mssql_use_named_timezones) | The flag to use time zone names (with DST-aware conversion) or numeric offsets for time zone conversion. Default is `false` | `true`, `false` |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency

@@ -110,11 +110,15 @@ impl QueryPlanner for CubeQueryPlanner {
 }
 
 #[derive(Debug)]
-pub struct PreOptimizeRule {}
+pub struct PreOptimizeRule {
+    push_partial_aggregate_below_merge: bool,
+}
 
 impl PreOptimizeRule {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(push_partial_aggregate_below_merge: bool) -> Self {
+        Self {
+            push_partial_aggregate_below_merge,
+        }
     }
 }
 
@@ -124,7 +128,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
-        pre_optimize_physical_plan(plan)
+        pre_optimize_physical_plan(plan, self.push_partial_aggregate_below_merge)
     }
 
     fn name(&self) -> &str {
@@ -138,6 +142,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
 
 fn pre_optimize_physical_plan(
     p: Arc<dyn ExecutionPlan>,
+    push_partial_aggregate_below_merge: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))?;
 
@@ -147,7 +152,11 @@ fn pre_optimize_physical_plan(
     let p = ensure_partition_merge(p)?;
 
     // Make the merge carry partial aggregate states instead of all raw rows
-    let p = rewrite_physical_plan(p, &mut |p| push_sorted_partial_aggregate_below_merge(p))?;
+    let p = if push_partial_aggregate_below_merge {
+        rewrite_physical_plan(p, &mut |p| push_sorted_partial_aggregate_below_merge(p))?
+    } else {
+        p
+    };
 
     // Global (no GROUP BY) aggregates don't need their input merged in the sort order
     let p = rewrite_physical_plan(p, &mut |p| drop_sort_merge_under_global_aggregate(p))?;
