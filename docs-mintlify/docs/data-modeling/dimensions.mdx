@@ -481,9 +481,16 @@ environments**: it is resolved within the current deployment, so the same model
 works in development and production without hardcoding dashboard IDs.
 
 To set a slug in Cube Cloud, open the target dashboard, open its **options
-sidebar**, and fill the **Slug** field. Slugs are **unique per deployment**. The
-`dashboard:` value in your link must match this slug exactly. (Clearing a slug
-that links still reference warns you to update those links.)
+sidebar**, and fill the **Slug** field (see
+[Dashboards → Dashboard slug](/docs/explore-analyze/dashboards#dashboard-slug)).
+Slugs are **unique per deployment**, and the `dashboard:` value in your link must
+match the slug exactly.
+
+**There is no required order.** You can write the `dashboard:` slug in the model
+first (it won't break anything — a link whose slug doesn't yet resolve is simply
+skipped in the cell menu) and set the dashboard's slug later, or set the
+dashboard slug first and reference it from the model afterwards. The link starts
+working as soon as both sides use the same slug.
 
 ### Behavior
 
