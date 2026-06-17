@@ -62,6 +62,22 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   enum16: 'text',
 };
 
+/**
+ * TLS/SSL material used to connect to ClickHouse over HTTPS.
+ *
+ * Values are the certificate/key contents (PEM), either as a string or a
+ * Buffer. Supplying `cert` and `key` in addition to `ca` enables mutual TLS
+ * (client certificate authentication). Unlike the `CUBEJS_DB_SSL_*`
+ * environment variables, values passed here are treated as raw contents, not
+ * file paths — which makes it convenient to inject per-tenant certificates
+ * from a `driverFactory`.
+ */
+export interface ClickHouseDriverSslOptions {
+  ca?: string | Buffer,
+  cert?: string | Buffer,
+  key?: string | Buffer,
+}
+
 export interface ClickHouseDriverOptions {
   host?: string,
   port?: string,
@@ -70,6 +86,16 @@ export interface ClickHouseDriverOptions {
   protocol?: string,
   database?: string,
   readOnly?: boolean,
+
+  /**
+   * TLS/SSL options for connecting to ClickHouse over HTTPS.
+   *
+   * When provided (or when the standard `CUBEJS_DB_SSL_*` environment
+   * variables are set) the driver connects over HTTPS. Provide `cert` and
+   * `key` alongside `ca` to enable mutual TLS, i.e. authenticate as a
+   * ClickHouse user created with `IDENTIFIED WITH ssl_certificate`.
+   */
+  ssl?: ClickHouseDriverSslOptions,
   /**
    * Timeout in milliseconds for requests to ClickHouse.
    * Default is 10 minutes
@@ -112,6 +138,14 @@ interface ClickhouseDriverExportKeySecretAWS extends ClickhouseDriverExportRequi
 interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
 }
 
+/**
+ * TLS material in the shape expected by `@clickhouse/client`'s `createClient`.
+ * `ca_cert` alone enables basic TLS; adding `cert` and `key` enables mutual TLS.
+ */
+type ClickHouseTLSOptions =
+  | { ca_cert: Buffer }
+  | { ca_cert: Buffer, cert: Buffer, key: Buffer };
+
 type ClickHouseDriverConfig = {
   url: string,
   username: string,
@@ -122,6 +156,7 @@ type ClickHouseDriverConfig = {
   exportBucket: ClickhouseDriverExportAWS | null,
   compression: { response?: boolean; request?: boolean },
   clickhouseSettings: ClickHouseSettings,
+  tls?: ClickHouseTLSOptions,
 };
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
@@ -153,7 +188,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const preAggregations = config.preAggregations || false;
     const host = config.host ?? getEnv('dbHost', { dataSource, preAggregations });
     const port = config.port ?? getEnv('dbPort', { dataSource, preAggregations }) ?? 8123;
-    const protocol = config.protocol ?? (getEnv('dbSsl', { dataSource, preAggregations }) ? 'https:' : 'http:');
+    const tls = this.buildTls(config, dataSource, preAggregations);
+    const protocol = config.protocol ?? ((getEnv('dbSsl', { dataSource, preAggregations }) || tls) ? 'https:' : 'http:');
     const url = `${protocol}//${host}:${port}`;
 
     const username = config.username ?? getEnv('dbUser', { dataSource, preAggregations });
@@ -175,6 +211,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(dataSource, preAggregations),
       readOnly: !!config.readOnly,
       requestTimeout,
+      tls,
       compression: {
         // Response compression can't be enabled for a user with readonly=1, as ClickHouse will not allow settings modifications for such user.
         response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource, preAggregations }),
@@ -246,7 +283,49 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       clickhouse_settings: this.config.clickhouseSettings,
       request_timeout: this.config.requestTimeout,
       max_open_connections: maxPoolSize,
+      tls: this.config.tls,
     });
+  }
+
+  /**
+   * Resolves TLS material into the shape `@clickhouse/client` expects.
+   *
+   * Options passed directly via `config.ssl` take precedence; otherwise the
+   * standard `CUBEJS_DB_SSL_*` environment variables are used (via
+   * `getSslOptions`, which also supports file paths). Mutual TLS is enabled
+   * only when `ca`, `cert` and `key` are all present.
+   */
+  private buildTls(
+    config: ClickHouseDriverOptions,
+    dataSource: string,
+    preAggregations?: boolean,
+  ): ClickHouseTLSOptions | undefined {
+    const source = config.ssl ?? this.getSslOptions(dataSource, preAggregations);
+    if (!source) {
+      return undefined;
+    }
+
+    const caCert = ClickHouseDriver.toCertBuffer(source.ca as string | Buffer | undefined);
+    if (!caCert) {
+      // @clickhouse/client requires a CA certificate to enable TLS;
+      // plain HTTPS (system CAs) needs no `tls` object at all.
+      return undefined;
+    }
+
+    const cert = ClickHouseDriver.toCertBuffer(source.cert as string | Buffer | undefined);
+    const key = ClickHouseDriver.toCertBuffer(source.key as string | Buffer | undefined);
+    if (cert && key) {
+      return { ca_cert: caCert, cert, key };
+    }
+
+    return { ca_cert: caCert };
+  }
+
+  private static toCertBuffer(value: string | Buffer | undefined): Buffer | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    return Buffer.isBuffer(value) ? value : Buffer.from(value);
   }
 
   public async testConnection() {
