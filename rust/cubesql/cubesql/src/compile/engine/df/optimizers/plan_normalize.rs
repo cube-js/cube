@@ -36,6 +36,8 @@ use crate::compile::{engine::CubeContext, rewrite::rules::utils::DatePartToken};
 /// - binary operations between a timestamp and a date to a timestamp and timestamp operation
 /// - IN list expressions where expression being tested is `TIMESTAMP`
 ///   and values might be `DATE` to values casted to `TIMESTAMP`
+/// - BETWEEN expressions where expression being tested is `TIMESTAMP`
+///   and bounds are temporal to bounds casted to `TIMESTAMP`
 pub struct PlanNormalize<'a> {
     cube_ctx: &'a CubeContext,
 }
@@ -944,18 +946,16 @@ fn expr_normalize_cold_path(
             negated,
             low,
             high,
-        } => {
-            let expr = expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)?;
-            let negated = *negated;
-            let low = expr_normalize(optimizer, low, schema, remapped_columns, optimizer_config)?;
-            let high = expr_normalize(optimizer, high, schema, remapped_columns, optimizer_config)?;
-            Ok(Box::new(Expr::Between {
-                expr,
-                negated,
-                low,
-                high,
-            }))
-        }
+        } => between_expr_normalize(
+            optimizer,
+            expr,
+            *negated,
+            low,
+            high,
+            schema,
+            remapped_columns,
+            optimizer_config,
+        ),
 
         Expr::Case {
             expr,
@@ -1517,6 +1517,70 @@ fn in_list_expr_normalize(
         expr,
         list,
         negated,
+    }))
+}
+
+/// Recursively normalizes BETWEEN expressions.
+/// Currently this includes replacing:
+/// - BETWEEN expressions where the expression being tested is `TIMESTAMP` and the bounds are
+///   temporal to bounds casted to that `TIMESTAMP`, so all three operands share one type.
+///
+/// The bound is casted when its type differs from the tested expression (e.g. a `DATE` bound
+/// such as `CURRENT_DATE`), or when it is a computed expression. The latter is needed because
+/// some expressions are typed as `TIMESTAMP` by DataFusion yet rendered as `DATE`/`DATETIME`
+/// by strict dialects (e.g. `DATE - INTERVAL`, which DataFusion types as `TIMESTAMP`); an
+/// explicit cast keeps all three operands the same type in the generated SQL. Plain columns,
+/// literals and existing casts already carry the right type, so they are left untouched.
+#[inline(never)]
+fn between_expr_normalize(
+    optimizer: &PlanNormalize,
+    expr: &Expr,
+    negated: bool,
+    low: &Expr,
+    high: &Expr,
+    schema: &DFSchema,
+    remapped_columns: &HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<Box<Expr>> {
+    let expr = expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)?;
+    let expr_type = expr.get_type(schema)?;
+    let expr_is_timestamp = matches!(expr_type, DataType::Timestamp(_, _));
+
+    let normalize_bound = |bound: &Expr| -> Result<Box<Expr>> {
+        let bound =
+            expr_normalize_stacked(optimizer, bound, schema, remapped_columns, optimizer_config)?;
+        if !expr_is_timestamp {
+            return Ok(Box::new(bound));
+        }
+
+        let bound_type = bound.get_type(schema)?;
+        let bound_is_temporal = matches!(
+            bound_type,
+            DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _)
+        );
+        let bound_is_computed = !matches!(
+            bound,
+            Expr::Column(_) | Expr::Literal(_) | Expr::Cast { .. }
+        );
+        if !bound_is_temporal || (bound_type == expr_type && !bound_is_computed) {
+            return Ok(Box::new(bound));
+        }
+
+        let casted = Expr::Cast {
+            expr: Box::new(bound),
+            data_type: expr_type.clone(),
+        };
+        Ok(Box::new(evaluate_expr_stacked(optimizer, casted)?))
+    };
+
+    let low = normalize_bound(low)?;
+    let high = normalize_bound(high)?;
+
+    Ok(Box::new(Expr::Between {
+        expr,
+        negated,
+        low,
+        high,
     }))
 }
 
