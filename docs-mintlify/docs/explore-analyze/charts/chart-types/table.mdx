@@ -1,9 +1,9 @@
 ---
 title: Table
-description: Display query results as a configurable table with pivots, conditional formatting, and inline visualizations.
+description: Display query results as a configurable table with pivots, conditional formatting, and custom styling.
 ---
 
-The table visualization presents query results in a structured grid. Unlike the raw results table in the query panel, the table visualization is designed for sharing — it supports pivots, column display overrides, conditional formatting, custom styling, and inline bar/link/image column rendering.
+The table visualization presents query results in a structured grid. Unlike the raw results table in the query panel, the table visualization is designed for sharing — it supports pivots, conditional formatting, custom styling, and a per-cell menu for links, copy, and drill-down.
 
 {/* TODO screenshot: styled table with pivot and conditional formatting (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -49,30 +49,7 @@ Click the dropdown arrow on any field in the **Fields** section to configure it:
 | **Word wrap** | Allow cell content to wrap to multiple lines |
 | **Hide** | Show or hide the column |
 
-## Display tab — showing columns as links, images, or bars
-
-By default, columns display their raw value. The **Display** tab for each field lets you change this:
-
-### Links
-
-Display a field's value as a clickable hyperlink. To create dynamic per-row links:
-
-1. Add a [calculated field](/docs/explore-analyze/workbooks/calculated-fields) that produces a URL — for example:
-   ```
-   CONCAT("https://example.com/orders/", order_items.order_id)
-   ```
-2. In the table visualization, hide the calculated field column.
-3. In the **Display** tab for the field you want to link, set **Display as** to **Link** and select the hidden URL field as the source.
-
-{/* TODO screenshot: column display dropdown showing Link option selected (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
-
-### Images
-
-Display a field as an image by setting **Display as** to **Image**. Configure height and width. To make the image a link, check **Link image** and set the **Link URL**.
-
-The URL must be publicly accessible without authentication.
-
-### Inline bars
+## Inline bars
 
 Display a numeric column as a proportional in-cell bar. In the column's per-column section on the **Style** tab, use the **Display as** control to add a bar. Each bar's length reflects the value's magnitude within the column's range.
 
@@ -115,11 +92,9 @@ Other gestures:
   copies the value.
 - **Right-click** opens your **browser's native menu** (not the cell menu).
 
-This menu is distinct from the **Display → Link** column option above: that
-renders a column's value as a static hyperlink, whereas data-model links are
-declared once on the dimension and surface as per-row drill-in / external
-actions across every table. See
-[Dimensions → Links](/docs/data-modeling/dimensions#links) to define them.
+Links are declared once on the dimension in the data model, not configured
+per-table — see [Dimensions → Links](/docs/data-modeling/dimensions#links) to
+define them.
 
 ## Style options
 
