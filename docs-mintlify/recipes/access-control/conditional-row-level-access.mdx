@@ -1,0 +1,284 @@
+---
+title: Conditional row-level access
+description: Switch row-level filters based on the security context, and let an admin policy grant unrestricted row access on top of more restrictive policies.
+---
+
+## Use case
+
+You want different row-level filters to apply to the same group depending on
+who the user is. For example:
+
+- Users in different regional groups should see only rows for their region.
+- Admins should bypass row filters entirely, even when other policies restrict
+the same role.
+
+You can express both patterns with [`access_policy`][ref-ref-dap] by combining
+[`conditions`][ref-ref-dap-conditions], [`row_level.allow_all`][ref-ref-dap-row-level],
+and the [_OR_ semantics across policies][ref-dap-rls] that match the same group.
+
+## Data modeling
+
+### Region-based switching
+
+Define one policy per region, and gate each policy with a `conditions` entry
+that checks the user's [security context][ref-sec-ctx]. Only the policy whose
+condition evaluates to `true` contributes its `row_level` filter to the query —
+the others are skipped.
+
+In the following example, users in the `analyst` group see rows for their
+region: members of the `emea` group are restricted to EMEA orders, and members
+of the `amer` group are restricted to AMER orders.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: analyst
+        conditions:
+          - if: "{ security_context.groups and 'emea' in security_context.groups }"
+        row_level:
+          filters:
+            - member: region
+              operator: equals
+              values: ["EMEA"]
+
+      - group: analyst
+        conditions:
+          - if: "{ security_context.groups and 'amer' in security_context.groups }"
+        row_level:
+          filters:
+            - member: region
+              operator: equals
+              values: ["AMER"]
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `analyst`,
+      conditions: [
+        { if: securityContext.groups && securityContext.groups.includes(`emea`) }
+      ],
+      row_level: {
+        filters: [
+          {
+            member: `region`,
+            operator: `equals`,
+            values: [`EMEA`]
+          }
+        ]
+      }
+    },
+    {
+      group: `analyst`,
+      conditions: [
+        { if: securityContext.groups && securityContext.groups.includes(`amer`) }
+      ],
+      row_level: {
+        filters: [
+          {
+            member: `region`,
+            operator: `equals`,
+            values: [`AMER`]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+In JavaScript, you can also express the same pattern by making `row_level`
+itself a function of `securityContext` and returning different filters
+depending on the caller:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: analyst
+        conditions:
+          - if: "{ security_context.groups and ('emea' in security_context.groups or 'amer' in security_context.groups) }"
+        row_level:
+          filters:
+            - member: region
+              operator: equals
+              values:
+                - "{ 'EMEA' if 'emea' in security_context.groups else 'AMER' }"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `analyst`,
+      row_level: {
+        filters: [
+          {
+            member: `region`,
+            operator: `equals`,
+            values: [
+              securityContext.groups && securityContext.groups.includes(`emea`)
+                ? `EMEA`
+                : `AMER`
+            ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### Admin override with `allow_all`
+
+To let admins bypass row-level filters that apply to a role, add a second
+policy for the same group that grants [`row_level.allow_all`][ref-ref-dap-row-level]
+when `securityContext.is_admin` is true. Because policies that match the same
+group are combined with _OR_ semantics, the admin policy unlocks every row
+regardless of the more restrictive analyst policy:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      # Region-restricted access for regular analysts
+      - group: analyst
+        row_level:
+          filters:
+            - member: region
+              operator: equals
+              values: ["{ security_context.region }"]
+
+      # Admin override: full row access when the user is an admin
+      - group: analyst
+        conditions:
+          - if: "{ security_context.is_admin }"
+        row_level:
+          allow_all: true
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      // Region-restricted access for regular analysts
+      group: `analyst`,
+      row_level: {
+        filters: [
+          {
+            member: `region`,
+            operator: `equals`,
+            values: [securityContext.region]
+          }
+        ]
+      }
+    },
+    {
+      // Admin override: full row access when the user is an admin
+      group: `analyst`,
+      conditions: [
+        { if: securityContext.is_admin }
+      ],
+      row_level: {
+        allow_all: true
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### Composing boolean logic with `conditions`
+
+`conditions` accept full boolean logic, so you can switch which `row_level`
+applies based on combined checks against the security context and user
+attributes. In YAML, use `and`, `or`, `not`, and parentheses inside
+`{ ... }`. In JavaScript, use `&&`, `||`, and `!`. Multiple `conditions`
+entries on a single policy are combined with _AND_ semantics; multiple
+matching policies are combined with _OR_ semantics.
+
+In the following example, full-time analysts who are _either_ admins _or_
+owners and are _not_ contractors get unrestricted row access; everyone else
+in the `analyst` group falls back to the region-restricted policy above.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: analyst
+        conditions:
+          - if: "{ user_attributes.is_full_time_employee and user_attributes.tenure_years >= 2 }"
+          - if: "{ user_attributes.is_admin or user_attributes.is_owner }"
+          - if: "{ not (security_context.groups and 'contractors' in security_context.groups) }"
+        row_level:
+          allow_all: true
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `analyst`,
+      conditions: [
+        { if: userAttributes.is_full_time_employee && userAttributes.tenure_years >= 2 },
+        { if: userAttributes.is_admin || userAttributes.is_owner },
+        { if: !(securityContext.groups && securityContext.groups.includes(`contractors`)) }
+      ],
+      row_level: {
+        allow_all: true
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+## Result
+
+With these policies in place:
+
+- Regional analysts see only rows for the region attached to their security
+context, because only the policy whose `conditions` match contributes its
+`row_level` filter.
+- Admins see all rows, because the admin policy's `row_level.allow_all: true`
+combines with the regional policy via _OR_ semantics.
+- Users without any matching policy are denied access by default.
+
+
+[ref-ref-dap]: /reference/data-modeling/data-access-policies
+[ref-ref-dap-conditions]: /reference/data-modeling/data-access-policies#conditions
+[ref-ref-dap-row-level]: /reference/data-modeling/data-access-policies#row-level
+[ref-dap-rls]: /docs/data-modeling/access-control/data-access-policies#row-level-access
+[ref-sec-ctx]: /docs/data-modeling/access-control/context

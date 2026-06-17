@@ -647,6 +647,14 @@ view(`orders_view`, {
 
 </CodeGroup>
 
+### Conditional row-level filters
+
+You can switch which `row_level` filter applies based on the
+[security context][ref-sec-ctx] — for example, to scope a group to its region
+or to let admins bypass row filters with `row_level.allow_all: true`. See the
+[conditional row-level access recipe][ref-recipe-conditional-row-level] for
+worked examples in YAML and JavaScript.
+
 ### Mandatory filters
 
 You can apply mandatory row-level filters to specific groups to ensure they only see data matching certain criteria:
@@ -777,3 +785,4 @@ cube(`orders`, {
 [ref-ref-dap-masking]: /reference/data-modeling/data-access-policies#member-masking
 [ref-ref-mask-dim]: /reference/data-modeling/dimensions#mask
 [ref-core-data-apis]: /reference/core-data-apis
+[ref-recipe-conditional-row-level]: /recipes/access-control/conditional-row-level-access
