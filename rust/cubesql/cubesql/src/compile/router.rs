@@ -17,8 +17,8 @@ use crate::{
         dataframe,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
-            SensitiveDataSanitizer, SqlParser062Normalizer, ToTimestampReplacer,
-            UdfWildcardArgReplacer,
+            SensitiveDataSanitizer, SqlParser062Normalizer, TimestamptzLiteralReplacer,
+            ToTimestampReplacer, UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -744,6 +744,7 @@ impl QueryRouter {
 
 pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
     let stmt = SqlParser062Normalizer::new().replace(stmt);
+    let stmt = TimestamptzLiteralReplacer::new().replace(stmt);
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(stmt);

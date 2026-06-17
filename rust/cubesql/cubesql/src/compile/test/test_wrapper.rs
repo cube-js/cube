@@ -572,7 +572,7 @@ GROUP BY
         .wrapped_sql
         .sql;
     assert!(wrapped_sql.contains(
-        "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2026-06-14T00:00:00.000-07:00'"
+        "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2026-06-14T07:00:00.000Z'"
     ));
     assert!(!wrapped_sql.contains("America/Los_Angeles"));
 }
@@ -617,9 +617,52 @@ GROUP BY
         .wrapped_sql
         .sql;
     assert!(wrapped_sql.contains(
-        "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2026-06-14T00:00:00.000-07:00'"
+        "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2026-06-14T07:00:00.000Z'"
     ));
     assert!(!wrapped_sql.contains("America/Los_Angeles"));
+}
+
+/// Using plain TIMESTAMP with an IANA timezone-like suffix should not render as timestamptz
+#[tokio::test]
+async fn test_wrapper_timestamp_named_timezone_not_timestamptz() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP '2026-06-14 00:00 America/Los_Angeles'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = &query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(!wrapped_sql.contains("timestamptz '2026-06-14T00:00:00.000-07:00'"));
+    assert!(wrapped_sql.contains("CAST($1 AS TIMESTAMP)"));
 }
 
 // TODO add more time zones
