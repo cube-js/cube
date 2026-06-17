@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.59](https://github.com/cube-js/cube/compare/v1.6.58...v1.6.59) (2026-06-17)
+
+### Performance Improvements
+
+- **schema-compiler:** optimize granularityHierarchies to avoid O(n^2) object spread ([#11098](https://github.com/cube-js/cube/issues/11098)) ([13f1c91](https://github.com/cube-js/cube/commit/13f1c91576b0205edb0def130e90dccf4a536fad))
+
 ## [1.6.58](https://github.com/cube-js/cube/compare/v1.6.57...v1.6.58) (2026-06-17)
 
 ### Bug Fixes
