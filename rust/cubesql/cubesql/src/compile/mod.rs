@@ -16931,6 +16931,51 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_extract_epoch_diff_pushdown() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        // EXTRACT(EPOCH FROM (a - b)) — epoch of a timestamp difference.
+        let query = "
+            SELECT customer_gender,
+                   AVG(EXTRACT(EPOCH FROM (order_date - last_mod)) / 86400) AS avg_days
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ";
+
+        // Generic (no dedicated template) keeps EXTRACT(EPOCH FROM (a - b)).
+        let query_plan =
+            convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL).await;
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("EXTRACT(epoch"));
+
+        // Snowflake-style: epoch of a difference is rendered as a seconds diff.
+        let query_plan = convert_select_to_query_plan_customized(
+            query.to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                (
+                    "expressions/extract".to_string(),
+                    "EXTRACT({{ date_part }} FROM {{ expr }})".to_string(),
+                ),
+                (
+                    "expressions/extract_epoch_diff".to_string(),
+                    "TIMESTAMPDIFF(MICROSECOND, {{ right }}, {{ left }}) / 1000000".to_string(),
+                ),
+            ],
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(!sql.to_uppercase().contains("EXTRACT(EPOCH"));
+        assert!(sql.contains("TIMESTAMPDIFF(MICROSECOND,"));
+    }
+
+    #[tokio::test]
     async fn test_push_down_to_grouped_query_with_filters() {
         if !Rewriter::sql_push_down_enabled() {
             return;
