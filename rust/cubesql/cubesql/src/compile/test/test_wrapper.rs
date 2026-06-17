@@ -2316,6 +2316,61 @@ async fn test_wrapper_between() {
 }
 
 #[tokio::test]
+async fn test_wrapper_between_timestamp_date_bounds() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // `order_date` is a TIMESTAMP time dimension; the BETWEEN bounds are DATE-typed
+    // (`CURRENT_DATE` / `CURRENT_DATE - INTERVAL '52 weeks'`). PlanNormalize coerces the bounds
+    // to the tested TIMESTAMP so all three operands share one type; here they fold to TIMESTAMP
+    // literals. Without this, strict engines (e.g. BigQuery) reject the mixed-type BETWEEN.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM KibanaSampleDataEcommerce
+        WHERE
+            KibanaSampleDataEcommerce.customer_gender = customer_gender
+            AND order_date BETWEEN CURRENT_DATE - INTERVAL '52 weeks' AND CURRENT_DATE
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    // Both bounds must end up as the same TIMESTAMP type as `order_date`: `CURRENT_DATE` and
+    // `CURRENT_DATE - INTERVAL '52 weeks'` are coerced and fold to TIMESTAMP literals. Assert the
+    // structural shape (rather than concrete dates) to stay independent of the wall clock.
+    let between_re = Regex::new(
+        r"\$\{KibanaSampleDataEcommerce\.order_date\} BETWEEN timestamptz '[^']+' AND timestamptz '[^']+'",
+    )
+    .unwrap();
+    assert!(
+        between_re.is_match(&sql),
+        "expected both BETWEEN bounds coerced to TIMESTAMP literals, got: {}",
+        sql
+    );
+    // No DATE / INTERVAL operands should leak through to the generated SQL.
+    let upper = sql.to_uppercase();
+    assert!(
+        !upper.contains("CURRENT_DATE") && !upper.contains("INTERVAL"),
+        "DATE/INTERVAL bound should have been coerced away, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
 async fn test_wrapper_subqueries_filter_params_not_mixed() {
     if !Rewriter::sql_push_down_enabled() {
         return;
