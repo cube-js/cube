@@ -379,6 +379,88 @@ See the following recipes:
 
 </Note>
 
+## Links
+
+Dimensions can declare **links** — clickable navigation targets that supporting
+tools (such as Cube Cloud Workbooks) surface next to the dimension's values. A
+link points either to an external URL or to another Cube Cloud dashboard, and
+its URL is built per row from the dimension's data.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+        links:
+          # External link — opens a URL built from the row's value
+          - name: search
+            label: Search the web
+            url: "CONCAT('https://www.google.com/search?q=order+', {CUBE}.status)"
+            icon: brand-google
+            target: blank
+
+          # Drill-in link — opens another Cube Cloud dashboard, filtered by the row
+          - name: details
+            label: Open order details
+            dashboard: orders-detail   # the target dashboard's slug
+            params:
+              - key: orders_view.status
+                value: "{CUBE}.status"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+      links: [
+        {
+          name: `search`,
+          label: `Search the web`,
+          url: `CONCAT('https://www.google.com/search?q=order+', ${CUBE}.status)`,
+          icon: `brand-google`,
+          target: `blank`
+        },
+        {
+          name: `details`,
+          label: `Open order details`,
+          dashboard: `orders-detail`,
+          params: [{ key: `orders_view.status`, value: `${CUBE}.status` }]
+        }
+      ]
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+In Cube Cloud, links appear in the **cell context menu** on every results table
+(dashboard and workbook table charts, embedded dashboards, and Explore / SQL
+results): a left-click on a cell opens a menu listing the dimension's links,
+alongside **Copy value** and, on measures, **Drill down**. Choosing a
+`dashboard:` link drills in-app to that dashboard with the row's `params`
+applied as filters; choosing a `url:` link opens the external URL.
+
+<Note>
+
+The `dashboard` value is the target dashboard's **slug** (set in the dashboard's
+options sidebar) and is resolved within the current deployment, so the reference
+stays portable across environments. `params` produce equality filters on the
+target. See the [`links` reference][ref-dimensions-ref] for the full parameter
+list and the synthetic-dimension behavior.
+
+</Note>
+
 ## Hierarchies
 
 Dimensions can be organized into [hierarchies][ref-hierarchies] to define
