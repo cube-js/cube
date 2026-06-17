@@ -342,6 +342,14 @@ export class RefreshScheduler {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
 
+    // Bound the dispatch fan-out of refresh-key queries to the orchestrator's
+    // concurrency. Without this, every cube/timezone combination is enqueued
+    // at once, creating a large promise fan-out (memory / event-loop pressure)
+    // on deployments with many cubes or timezones. The limiter is shared per
+    // orchestrator id so concurrent refresh runs resolving to the same
+    // orchestrator respect a single cap.
+    const limit = await this.serverCore.getRefreshKeysLimiter(context, queryingOptions.concurrency);
+
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
@@ -349,7 +357,7 @@ export class RefreshScheduler {
       if (measuresCount === 0 && dimensionsCount === 0) {
         return;
       }
-      await Promise.all(queryingOptions.timezones.map(async timezone => {
+      await Promise.all(queryingOptions.timezones.map(timezone => limit(async () => {
         const query = {
           ...queryingOptions,
           ...(
@@ -373,7 +381,7 @@ export class RefreshScheduler {
           scheduledRefresh: true,
           loadRefreshKeysOnly: true,
         });
-      }));
+      })));
     }));
   }
 
