@@ -437,7 +437,7 @@ describe('CubeApi cubeSql', () => {
       ],
     }),
     JSON.stringify({
-      error: "Post-Processing Error: Cast error: Error parsing '2026-05-01' as timestamp",
+      error: 'Post-Processing Error: Cast error: Error parsing \'2026-05-01\' as timestamp',
       requestId: '2fbe44e4-df6f-420d-ae39-376c802323b4-span-1',
     }),
   ].join('\n');
@@ -502,7 +502,7 @@ describe('CubeApi cubeSql', () => {
 
     await expect(
       cubeApi.cubeSql('SELECT created_date FROM deals')
-    ).rejects.toThrow("Post-Processing Error: Cast error: Error parsing '2026-05-01' as timestamp");
+    ).rejects.toThrow('Post-Processing Error: Cast error: Error parsing \'2026-05-01\' as timestamp');
   });
 });
 

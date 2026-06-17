@@ -797,30 +797,28 @@ class CubeApi {
         const rows: any[] = [];
 
         for (const line of data) {
-          if (!line.trim().length) {
-            continue;
-          }
+          if (line.trim().length) {
+            let parsed: any;
+            try {
+              parsed = JSON.parse(line);
+            } catch (err) {
+              // A non-JSON line after a valid schema means a malformed payload — fall
+              // back to surfacing the raw response rather than dropping rows silently.
+              throw new Error(response.error);
+            }
 
-          let parsed: any;
-          try {
-            parsed = JSON.parse(line);
-          } catch (err) {
-            // A non-JSON line after a valid schema means a malformed payload — fall
-            // back to surfacing the raw response rather than dropping rows silently.
-            throw new Error(response.error);
-          }
+            // The stream can interleave an error chunk after the schema (e.g. a
+            // post-processing/cast error surfaced mid-result). Such a line has no
+            // `data`, so the previous `JSON.parse(d).data` concat pushed an `undefined`
+            // "phantom" row and silently swallowed the failure. Surface it instead —
+            // matching how `cubeSqlStream` classifies `error` chunks.
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
 
-          // The stream can interleave an error chunk after the schema (e.g. a
-          // post-processing/cast error surfaced mid-result). Such a line has no
-          // `data`, so the previous `JSON.parse(d).data` concat pushed an `undefined`
-          // "phantom" row and silently swallowed the failure. Surface it instead —
-          // matching how `cubeSqlStream` classifies `error` chunks.
-          if (parsed.error) {
-            throw new Error(parsed.error);
-          }
-
-          if (parsed.data) {
-            rows.push(...parsed.data);
+            if (parsed.data) {
+              rows.push(...parsed.data);
+            }
           }
         }
 
