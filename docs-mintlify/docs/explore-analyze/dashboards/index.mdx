@@ -18,6 +18,30 @@ Dashboards enable you to:
 
 In the dashboard builder inside your [workbook][ref-workbooks], select the reports you want to include and arrange them on the canvas alongside other [widgets][ref-widgets] to tell your data story, then publish the dashboard. This gives stakeholders direct access to the insights that matter most, without the complexity of the underlying analysis.
 
+## Dashboard slug
+
+A dashboard can have a **slug** — a short, stable, human-readable identifier
+(e.g. `orders-detail`) used to link to it from the data model. Data-model
+[dimension links][ref-dimension-links] with a `dashboard:` value reference a
+dashboard by its slug to drill into it.
+
+To set it, open the dashboard in the builder, open the **options sidebar**, and
+fill the **Slug** field. Slugs are **unique per deployment** and are resolved
+within the current deployment, so the same model works across environments. The
+dashboard's own URL is unaffected (it stays `publicId`-based).
+
+<Note>
+
+**There is no required order between the model and the dashboard.** You can
+reference a slug from a `dashboard:` link in the data model before any dashboard
+uses it, or set a dashboard's slug before any link references it — neither
+breaks. A link whose slug doesn't (yet) resolve is simply skipped in the cell
+menu, and starts working as soon as a dashboard in the deployment claims that
+slug. (If you later clear or change a slug that links still reference, the
+options sidebar warns you to update those links.)
+
+</Note>
+
 ## Download as PNG or PDF
 
 Open a published dashboard, click the **More actions** (`⋯`) button in the
@@ -37,5 +61,6 @@ refresh][ref-scheduled-refreshes].
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
+[ref-dimension-links]: /docs/data-modeling/dimensions#links
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
