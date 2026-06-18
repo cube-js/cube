@@ -32,27 +32,20 @@ pub struct QueryTools {
     convert_tz_for_raw_time_dimension: bool,
     masked_members: HashSet<String>,
     // Compiled mask filters keyed by member full path. Populated once by
-    // `State` after the Rc<QueryTools> exists (FilterCompiler requires it),
-    // then never mutated again — RefCell only carries the construction phase.
-    //
-    // KNOWN REMAINING CYCLE (only when masked members are present): the stored
-    // FilterItem -> BaseFilter -> TypedFilter holds a strong `Rc<QueryTools>`,
-    // so QueryTools -> member_mask_filters -> ... -> QueryTools never drops.
-    // This field still lives here only because moving it is deferred to a
-    // follow-up; relocating it into `State` (like the Compiler and join-tree
-    // cache) closes the cycle, since `State` is not pointed back to by any
-    // cached value. The leak regression test covers the join-cache cycle, not
-    // this one.
+    // `State` after the `Rc<QueryTools>` exists (the FilterCompiler needs it),
+    // then read-only — the `RefCell` only carries the construction phase.
+    // Nothing reachable from a stored `FilterItem` holds an `Rc<QueryTools>`,
+    // so this cache forms no reference cycle. It stays here only until the
+    // early-compilation refactor resolves mask filters up front.
     member_mask_filters: RefCell<HashMap<String, FilterItem>>,
 }
 
 impl QueryTools {
-    /// Builds the immutable, cache-free per-query leaf. The mutable
-    /// per-query state (the `Compiler`, the join-tree cache, the
-    /// compiled mask filters) lives in `State`, which owns this and
-    /// fills `member_mask_filters` once it has a `Compiler`. Keeping
-    /// `QueryTools` free of any cache that can hold an `Rc<QueryTools>`
-    /// is what prevents the planner's reference-cycle leaks.
+    /// Builds the per-query leaf. The mutable per-query state (the
+    /// `Compiler` and the join-tree cache) lives in `State`, which owns
+    /// this and fills `member_mask_filters` once it has a `Compiler`.
+    /// Keeping `QueryTools` free of any cache that can hold an
+    /// `Rc<QueryTools>` is what prevents the planner's reference-cycle leaks.
     pub fn try_new(
         cube_evaluator: Rc<dyn CubeEvaluator>,
         base_tools: Rc<dyn BaseTools>,
