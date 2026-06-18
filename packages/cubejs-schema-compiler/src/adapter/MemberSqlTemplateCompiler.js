@@ -234,6 +234,9 @@ function parseTemplateResult(result) {
   if (Array.isArray(result)) {
     return result.map(r => `${r}`);
   }
+  if (result === null || result === undefined) {
+    return '';
+  }
   return `${result}`;
 }
 
