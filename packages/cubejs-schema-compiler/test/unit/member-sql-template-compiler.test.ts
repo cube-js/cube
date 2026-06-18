@@ -57,7 +57,6 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
   });
 
   it('keeps the column callback as a function (deferred) and records {fp:N}', () => {
-    let captured;
     const res = compileMemberSql(
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.status.filter((c) => `${c} > 0`)}`,
       ['FILTER_PARAMS']
@@ -67,7 +66,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterParams[0].cube_name).toBe('orders');
     expect(res.filterParams[0].name).toBe('status');
     expect(typeof res.filterParams[0].column).toBe('function');
-    captured = res.filterParams[0].column;
+    const captured = res.filterParams[0].column;
     expect(captured('X')).toBe('X > 0');
   });
 
