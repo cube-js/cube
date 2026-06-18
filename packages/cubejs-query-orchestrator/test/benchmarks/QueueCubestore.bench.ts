@@ -25,12 +25,15 @@ const beforeAll = async () => {
   await (await cubeStoreDriverFactory()).query('QUEUE TRUNCATE');
 };
 
+const workers = parseInt(process.env.WORKERS || '2', 10);
+
 QueryQueueBenchmark(
-  'CubeStore Queue',
+  `CubeStore Queue (workers: ${workers})`,
   {
     cacheAndQueueDriver: 'cubestore',
     cubeStoreDriverFactory,
     beforeAll,
-    afterAll
+    afterAll,
+    workers,
   }
 );

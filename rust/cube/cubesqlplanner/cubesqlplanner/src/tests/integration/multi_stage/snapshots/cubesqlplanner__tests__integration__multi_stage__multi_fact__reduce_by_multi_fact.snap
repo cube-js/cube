@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/multi_fact.rs
+expression: result
+---
+orders__category | orders__total_amount | orders__amount_reduce_category | returns__total_refund
+-----------------+----------------------+--------------------------------+----------------------
+books            | 880.00               | 2250.00                        | 560.00               
+clothing         | 720.00               | 2250.00                        | 560.00               
+electronics      | 650.00               | 2250.00                        | 560.00

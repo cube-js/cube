@@ -1,0 +1,83 @@
+---
+title: Introduction
+description: Cube is the agentic analytics platform for business intelligence and embedded analytics, built on an open-source semantic layer.
+hideTableOfContents: true
+---
+
+Cube is the agentic analytics platform built on a semantic layer. One product, two primary use cases: internal business intelligence and embedded analytics.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/7ZQGGepDjUQ"
+  title="Cube: The Agentic Analytics Platform. Full Demo"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+For internal BI, data teams and business users explore data with workbooks, dashboards, and Analytics Chat — natural-language analysis grounded in a governed data model. For embedded analytics, software companies ship the same surfaces, and the underlying APIs, inside their own products to deliver customer-facing experiences.
+
+Cube is built for both humans and AI agents:
+
+- **Data engineers** build and maintain semantic models in code, with AI assistance.
+- **Data analysts** explore deeply and get trusted answers without writing ad-hoc SQL.
+- **Business users** ask questions in natural language and get answers grounded in the same data model the data team owns.
+- **AI agents** like Claude, ChatGPT, or your own connect through the MCP server or Chat API to get analytics answers grounded in the same governed data model.
+
+## How is Cube different?
+
+At the foundation of Cube is an [open-source semantic layer](https://github.com/cube-js/cube) — **Cube Core** — that provides the shared context every consumer works from. It centralizes metric definitions, joins, access rules, and caching upstream of every BI tool, application, and AI agent that queries the data. The same Cube Core that powers Cube is what we maintain as open-source; data models port unchanged between the two.
+
+The semantic layer is what makes AI useful. Without one, agents writing SQL against a warehouse end up with inconsistent metrics and ungoverned access — numbers that don't match how your business defines them. With one, agents get a stable, governed surface to reason over.
+
+### Semantic SQL
+
+Cube AI agents don't query the warehouse directly. They query the semantic layer using Semantic SQL — a Postgres-compatible interface that extends SQL with the `MEASURE` function. Every query passes through the semantic layer runtime, where it's validated against the data model and has access policies applied deterministically before reaching the warehouse.
+
+Semantic SQL gives agents the full expressiveness of SQL to build ad-hoc derived calculations on top of governed metrics — flexibility on a stable foundation, instead of one or the other.
+
+<Frame>
+  <img src="https://lgo0ecceic.ucarecd.net/97dd04e5-f534-424e-8d6b-e6e0c19fd95f/" />
+</Frame>
+
+### Semantic layer architecture
+
+The semantic layer is built on four pillars: data modeling, access control, caching, and APIs.
+
+#### Code-first
+
+Everything in Cube — data models, configurations, access control policies — is managed as code. That brings version control, code review, CI, and isolated environments to the semantic layer, the same way modern software teams already manage application code.
+
+Code-first also makes AI assistance practical: agents can read, propose, and edit the model through normal git workflows. Humans review the change before it lands.
+
+#### Data modeling
+
+The data model is the knowledge graph the platform — and any AI agent — uses to understand your business. It defines metrics, entities, joins, and how they relate, upstream of any consumer.
+
+Cube's model is **dataset-centric**, expanding on dimensional modeling. You work with two object types:
+
+- **Cubes** represent business entities — customers, orders, line items. They define measures, dimensions, and joins between entities.
+- **Views** sit on top of cubes and present curated, query-ready datasets. Views are what data consumers — humans and agents — interact with.
+
+Models are written in YAML or JavaScript and managed in version control.
+
+#### Access control
+
+Access control runs at the semantic layer, so the same policies apply to every consumer: AI agents, BI tools, embedded applications. Define the rule once; it's enforced everywhere.
+
+Policies are code (Python or JavaScript) and range from row-level rules to fully tenant-aware models backed by different data sources.
+
+#### Caching
+
+Cube's caching is built on **pre-aggregations** — rollup tables declared in the data model and refreshed in the background, stored in Cube Store (Cube's distributed caching engine).
+
+When a query comes in, Cube's aggregate awareness engine routes it to a matching pre-aggregation when one exists. This is what keeps interactive workflows fast and warehouse costs predictable.
+
+#### APIs
+
+The semantic layer exposes standard APIs so any consumer can plug in:
+
+- **SQL** — Postgres-compatible, with `MEASURE` and related extensions. Any tool that talks to Postgres or Redshift can talk to Cube.
+- **REST (JSON)** and **GraphQL** — for custom applications and programmatic access.
+- **Meta API** — model introspection. Lets AI agents discover what's queryable, and lets BI tools auto-map to the data model.

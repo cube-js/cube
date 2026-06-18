@@ -1,0 +1,49 @@
+---
+title: Analytics Chat
+description: Embed Cube Analytics Chat into your applications via iframe.
+---
+
+<Info>
+  Iframe embedding is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+</Info>
+
+Embed [Analytics Chat](/docs/explore-analyze/analytics-chat) into your application using an iframe. Let your users ask questions in plain language and get trusted answers powered by your semantic layer — without leaving your product.
+
+Analytics Chat can be embedded with either authentication mode:
+
+- **[Private embedding](/embedding/iframe/auth/private)** — for internal users with Cube accounts
+- **[Signed embedding](/embedding/iframe/auth/signed)** — for external/customer-facing applications using server-generated sessions
+
+## Embed with private embedding
+
+The embed URL for Analytics Chat is always the same:
+
+```html
+<iframe
+  title="Analytics Chat"
+  src="https://your-account.cubecloud.dev/embed/chat"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+Users will be prompted to sign in with their Cube credentials when accessing the embedded chat. See [Private embedding](/embedding/iframe/auth/private) for details on the auth model.
+
+## Embed with signed embedding
+
+To embed Analytics Chat for external/customer-facing applications, generate a session on your backend and pass the session ID into the iframe:
+
+```html
+<iframe
+  title="Analytics Chat"
+  src="https://your-tenant.cubecloud.dev/embed/chat?sessionId=YOUR_SESSION_ID"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
+
+## Personalize chat with user attributes
+
+When using signed embedding, you can pass [user attributes](/embedding/iframe/auth/signed#user-attributes) during session generation to personalize chat responses for each user — for example, scoping answers to a specific region, department, or tenant.

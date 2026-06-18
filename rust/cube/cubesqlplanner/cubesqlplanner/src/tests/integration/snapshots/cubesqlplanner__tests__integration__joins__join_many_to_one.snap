@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/joins.rs
+expression: result
+---
+customers__name | orders__count | orders__total_amount
+----------------+---------------+---------------------
+Alice           | 2             | 300.00              
+Bob             | 2             | 450.00              
+Charlie         | 1             | 80.00               
+NULL            | 1             | 50.00

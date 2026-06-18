@@ -1,0 +1,18 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: white;
+  background-color: var(--pink);
+  border-radius: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.button:hover {
+  background-color: var(--pink_bright);
+}

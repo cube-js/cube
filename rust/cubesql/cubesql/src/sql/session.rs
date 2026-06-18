@@ -92,6 +92,10 @@ pub struct SessionState {
     auth_context_expiration: Duration,
 
     pub cache_mode: RwLockSync<Option<CacheMode>>,
+
+    pub query_timezone: RwLockSync<Option<String>>,
+
+    pub throw_continue_wait: RwLockSync<bool>,
 }
 
 impl SessionState {
@@ -124,6 +128,8 @@ impl SessionState {
             statements: RWLockAsync::new(HashMap::new()),
             auth_context_expiration,
             cache_mode: RwLockSync::new(None),
+            query_timezone: RwLockSync::new(None),
+            throw_continue_wait: RwLockSync::new(false),
         }
     }
 

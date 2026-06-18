@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/pre_aggregations/multi_stage.rs
+expression: result
+---
+returns__created_at_month | customers__total_lifetime_value_prev_month_by_returns
+--------------------------+------------------------------------------------------
+2024-02-01 00:00:00       | 1000.00                                              
+2024-03-01 00:00:00       | 2000.00

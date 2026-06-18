@@ -1,0 +1,96 @@
+---
+title: Color & stacking
+description: Configure color palettes, stacking behavior, stacked segment sorting, and legend placement for charts.
+---
+
+The **Color** section in the Style tab controls two related things: how series are colored, and how they are stacked or grouped relative to each other. These settings apply across bar, line, area, scatter, and heatmap charts.
+
+{/* TODO screenshot: color and stacking section of the Style tab (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Color faceting
+
+Mapping a field to the **Color** channel in the Fields tab creates one series per unique value in that field, each assigned a color from the active palette. How this field is typed affects the available options:
+
+| Data type | Palette options |
+|---|---|
+| **String / nominal** | Discrete palettes (one color per category value) |
+| **Date / temporal** | Discrete (nominal) or continuous (temporal gradient) |
+| **Numeric / quantitative** | Discrete (nominal) or continuous (quantitative gradient) |
+
+For strings, only discrete bucketing is available. For dates and numbers, you can choose whether each value gets its own distinct color (discrete) or a gradient is applied across the range (continuous).
+
+If a date or numeric field only offers discrete options, try casting the field to the appropriate type.
+
+## Palettes
+
+### Discrete palettes
+
+For discrete data, colors from the palette are applied in palette order, matching the sort order of the query results. Change the palette order by adjusting the sort in your query.
+
+Enable **Reverse colors** to reverse the order colors are applied.
+
+### Continuous (gradient) palettes
+
+For continuous data, the gradient palette maps to the range of values in your results. Select a different gradient from the palette dropdown to change the color treatment.
+
+### Custom palettes
+
+If none of the provided palettes fit your needs, you can build a custom palette for an individual chart:
+
+1. Open the **Color** section of the Style tab.
+2. Select the last option in the palette menu: **Custom palette**.
+3. Click **Customize** to open the palette editor.
+4. Add, remove, and edit individual hex colors.
+5. Use **Open hex code editor** to toggle a bulk editor and paste a comma-separated list of hex values.
+
+{/* TODO screenshot: custom palette editor with hex editor open (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+To reuse a custom palette across charts, copy the hex codes and paste them into the custom palette editor of another chart.
+
+## Series color controls
+
+When no Color channel is assigned (single measure, no color-by), each series gets an individual color picker in the **Series** section of the Style tab. Click the color swatch next to a series to change its color.
+
+## Stacking options
+
+The stacking behavior controls how multiple series at the same X-axis value are positioned relative to each other. The available modes:
+
+| Option | Behavior |
+|---|---|
+| **Automatic** | Cube selects the best option based on chart type and data |
+| **Stack** | Series are stacked on top of each other |
+| **Group** | Series are placed side-by-side (bar charts only) |
+| **Overlay** | Series are drawn on top of each other from the same baseline |
+| **Stack %** | Series are stacked and normalized to 100% — tooltip shows raw value |
+
+{/* TODO screenshot: stacking option dropdown (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Per-axis stacking
+
+Stacking can also be set independently per Y-axis series in the Y-axis series configuration. This enables creating grouped clusters of stacked sub-groups — for example, two stacked grouplets placed side-by-side.
+
+## Stacked segment sorting
+
+When stacking is active, control how segments within each stack are ordered using **Sort stack by**:
+
+| Option | Description |
+|---|---|
+| **Label** | Alphabetical by dimension value (default) |
+| **Value** | By measure value within each individual stack (bar/column only) |
+| **Sum** | By total sum across all stacks — useful for ordering by overall contribution |
+| **Unsorted** | Preserves the original data order from the query results |
+
+<Note>
+The **Value** sorting option is only available for bar and column charts. For area and line charts, use **Sum** or **Label**.
+</Note>
+
+## Legend
+
+The legend appears when a Color channel is assigned. Configure it in the **Legend** section:
+
+| Option | Description |
+|---|---|
+| **Position** | Right, left, top, or bottom |
+| **Hidden** | Remove the legend entirely |
+
+{/* TODO screenshot: legend position options (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}

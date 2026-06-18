@@ -14,12 +14,19 @@ import {
   QueryOptions,
   ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
-import { AsyncDebounce, getEnv } from '@cubejs-backend/shared';
+import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+
+const CubeStoreCapabilityMinVersion = {
+  queueExclusive: '1.6.22',
+  queueExternalId: '1.6.26',
+  sendableParameters: '1.6.38',
+} satisfies Record<string, string>;
+type CubeStoreCapability = keyof typeof CubeStoreCapabilityMinVersion;
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
@@ -52,6 +59,10 @@ type CreateTableOptions = {
   disableQuoting?: boolean
 };
 
+type CubeStoreQueryOptions = QueryOptions & {
+  sendParameters?: boolean,
+};
+
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   protected readonly config: any;
 
@@ -76,14 +87,26 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
   }
 
+  public async hasCapability(capability: CubeStoreCapability): Promise<boolean> {
+    const minVersion = CubeStoreCapabilityMinVersion[capability];
+
+    return isVersionGte(await this.connection.getCubeStoreVersion(), minVersion);
+  }
+
   public async testConnection() {
     await this.query('SELECT 1', []);
   }
 
-  public async query<R = any>(query: string, values: any[], options?: QueryOptions): Promise<R[]> {
-    const { inlineTables, ...queryTracingObj } = options ?? {};
-    const sql = formatSql(query, values || []);
-    return this.connection.query(sql, inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
+  public async query<R = any>(query: string, values: any[], options?: CubeStoreQueryOptions): Promise<R[]> {
+    const { inlineTables, sendParameters, ...queryTracingObj } = options ?? {};
+
+    if (!sendParameters) {
+      query = formatSql(query, values || []);
+    }
+
+    const tracingObj = { ...queryTracingObj, instance: getEnv('instanceId') };
+
+    return this.connection.query(query, inlineTables ?? [], tracingObj, sendParameters ? values : undefined);
   }
 
   public async release() {
@@ -112,7 +135,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`delimiter = '${options.delimiter}'`);
     }
     if (options.disableQuoting) {
-      withEntries.push(`disable_quoting = true`);
+      withEntries.push('disable_quoting = true');
     }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);

@@ -1,8 +1,5 @@
-#![feature(test)]
 #![feature(box_patterns)]
-#![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
-// #![feature(trace_macros)]
 
 // trace_macros!(true);
 #[macro_use]
@@ -35,6 +32,7 @@ pub mod app_metrics;
 pub mod cachestore;
 pub mod cluster;
 pub mod config;
+pub mod cube_ext;
 pub mod http;
 pub mod import;
 pub mod metastore;
@@ -49,6 +47,7 @@ pub mod streaming;
 pub mod sys;
 pub mod table;
 pub mod telemetry;
+pub mod trace;
 pub mod util;
 
 pub use datafusion::cube_ext::spawn;
@@ -198,8 +197,8 @@ impl From<cuberockstore::rocksdb::Error> for CubeError {
     }
 }
 
-impl From<flatbuffers::InvalidFlatbuffer> for CubeError {
-    fn from(v: flatbuffers::InvalidFlatbuffer) -> Self {
+impl From<cubeshared::flatbuffers::InvalidFlatbuffer> for CubeError {
+    fn from(v: cubeshared::flatbuffers::InvalidFlatbuffer) -> Self {
         CubeError::from_debug_error(v)
     }
 }
@@ -213,6 +212,12 @@ impl From<std::io::Error> for CubeError {
 impl From<ParserError> for CubeError {
     fn from(v: ParserError) -> Self {
         CubeError::from_error(format!("{:?}", v))
+    }
+}
+
+impl From<regex::Error> for CubeError {
+    fn from(v: regex::Error) -> Self {
+        CubeError::from_error(v)
     }
 }
 
@@ -262,7 +267,12 @@ impl From<Elapsed> for CubeError {
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
         match v {
-            datafusion::error::DataFusionError::Panic(msg) => CubeError::panic(msg),
+            datafusion::error::DataFusionError::ExecutionJoin(join_error)
+                if join_error.is_panic() =>
+            {
+                let payload = join_error.into_panic();
+                CubeError::from_panic_payload(payload)
+            }
             v => CubeError::from_error(v),
         }
     }

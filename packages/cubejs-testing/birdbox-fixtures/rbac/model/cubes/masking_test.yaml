@@ -1,0 +1,346 @@
+cubes:
+  - name: masking_test
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: secret_string
+        sql: product_id
+        mask:
+          sql: "CONCAT('***', RIGHT(CAST({CUBE}.product_id AS TEXT), 2))"
+        type: string
+
+      - name: secret_number
+        sql: price
+        mask: -1
+        type: number
+
+      - name: secret_boolean
+        sql: "CASE WHEN {CUBE}.quantity > 3 THEN TRUE ELSE FALSE END"
+        mask: FALSE
+        type: boolean
+
+      - name: public_dim
+        sql: order_id
+        type: number
+
+    measures:
+      - name: count
+        mask: 12345
+        type: count
+
+      - name: count_d
+        sql: product_id
+        mask: 34567
+        type: count_distinct
+
+      - name: total_quantity
+        sql: quantity
+        type: sum
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+      - role: "masking_full_access"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+      - role: "masking_partial"
+        member_level:
+          includes:
+            - id
+            - public_dim
+            - total_quantity
+        member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  # Cube where all members are hidden by policy.
+  # Members carry mask definitions so a view can apply masking on top.
+  - name: masking_hidden_cube
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: secret_string
+        sql: product_id
+        mask:
+          sql: "CONCAT('***', RIGHT(CAST({CUBE}.product_id AS TEXT), 2))"
+        type: string
+
+      - name: secret_number
+        sql: price
+        mask: -1
+        type: number
+
+      - name: public_dim
+        sql: order_id
+        type: number
+
+    measures:
+      - name: count
+        mask: 12345
+        type: count
+
+      - name: total_quantity
+        sql: quantity
+        type: sum
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+
+  - name: yaml_ua_mask_test
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: masked_status
+        sql: product_id
+        type: number
+        mask:
+          sql: "CASE WHEN { userAttributes.tenantId } = '1' THEN {CUBE}.product_id ELSE -1 END"
+
+    measures:
+      - name: count
+        type: count
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+  # Cube exercising different reference forms inside a mask.sql on a member
+  # that is re-exposed via a prefixed view. Each masked dimension encodes its
+  # reference style; the view tests exercise routing them through the view
+  # alias (e.g. `view_mask_test.base_pid_full`). Mask compiles in the owning
+  # cube's context so CUBE / cross-cube references resolve the same way as
+  # on the underlying cube. Names are kept short to stay under Postgres's
+  # 63-char identifier limit once the view prefix is added.
+  - name: view_mask_base
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: number
+
+      # Reference form: {cube.member}
+      - name: pid_full
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {view_mask_base.product_id}
+              ELSE -1
+            END
+
+      # Reference form: {CUBE.member}
+      - name: pid_cube_ref
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {CUBE.product_id}
+              ELSE -1
+            END
+
+      # Reference form: {CUBE}.column
+      - name: pid_cube_col
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {CUBE}.product_id
+              ELSE -1
+            END
+
+      # Reference form: {cube}.column (literal cube name)
+      - name: pid_cube_name
+        sql: product_id
+        type: number
+        mask:
+          sql: |
+            CASE
+              WHEN { groups.filter("'sensitive_data_access'") }
+              THEN {view_mask_base}.product_id
+              ELSE -1
+            END
+
+    measures:
+      - name: count
+        type: count
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes:
+            - id
+            - product_id
+            - count
+        member_masking:
+          includes:
+            - pid_full
+            - pid_cube_ref
+            - pid_cube_col
+            - pid_cube_name
+
+views:
+  # View with full access at view level - but cube masking still applies (RLS pattern)
+  # Excludes members with {CUBE} references in SQL (secret_string, secret_boolean)
+  - name: masking_view
+    cubes:
+      - join_path: masking_test
+        includes:
+          - secret_number
+          - public_dim
+          - count
+          - count_d
+          - total_quantity
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  # View with its own masking policy: all members masked for "*", full access for masking_full_access
+  # Excludes secret_string (SQL mask with {CUBE} references causes FROM-clause issues in SQL API)
+  - name: masking_view_masked
+    cubes:
+      - join_path: masking_test
+        includes:
+          - secret_number
+          - public_dim
+          - count
+          - count_d
+          - total_quantity
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+      - role: "masking_full_access"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  # View with partial masking: public_dim and total_quantity unmasked, rest masked
+  # Excludes members with {CUBE} references in SQL (secret_string, secret_boolean)
+  - name: masking_view_partial
+    cubes:
+      - join_path: masking_test
+        includes:
+          - secret_number
+          - public_dim
+          - count
+          - count_d
+          - total_quantity
+    access_policy:
+      - role: "*"
+        member_level:
+          includes:
+            - public_dim
+            - total_quantity
+        member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  # View re-exposing masks from view_mask_base through a prefixed join-path.
+  # Mirrors the user-reported scenario of a view that carries masks written
+  # with different cube reference styles; the mask must still compile and
+  # resolve against the underlying cube.
+  - name: view_mask_test
+    public: true
+
+    cubes:
+      - join_path: view_mask_base
+        prefix: true
+        includes:
+          - id
+          - product_id
+          - pid_full
+          - pid_cube_ref
+          - pid_cube_col
+          - pid_cube_name
+          - count
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes:
+            - view_mask_base_id
+            - view_mask_base_product_id
+            - view_mask_base_count
+        member_masking:
+          includes:
+            - view_mask_base_pid_full
+            - view_mask_base_pid_cube_ref
+            - view_mask_base_pid_cube_col
+            - view_mask_base_pid_cube_name
+
+  # View over a cube where all members are hidden.
+  # The view adds its own masking policy — members that are invisible at
+  # the cube level become accessible (some masked, some real) through the view.
+  # Excludes secret_string (SQL mask with {CUBE} references causes FROM-clause issues in SQL API)
+  - name: masking_view_over_hidden_cube
+    cubes:
+      - join_path: masking_hidden_cube
+        includes:
+          - secret_number
+          - public_dim
+          - count
+          - total_quantity
+    access_policy:
+      - role: "*"
+        member_level:
+          includes:
+            - public_dim
+            - total_quantity
+        member_masking:
+          includes: "*"
+        row_level:
+          allow_all: true
+      - role: "masking_full_access"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true

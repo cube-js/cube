@@ -18,8 +18,8 @@ describe('Switch Dimension', () => {
     const statusDim = cube.config.dimensions.find((d) => d.name === 'orders.status');
     const currencyDim = cube.config.dimensions.find((d) => d.name === 'orders.currency');
 
-    expect(numberDim.type).toBe('number');
-    expect(statusDim.type).toBe('string');
-    expect(currencyDim.type).toBe('string');
+    expect(numberDim?.type).toBe('number');
+    expect(statusDim?.type).toBe('string');
+    expect(currencyDim?.type).toBe('string');
   });
 });

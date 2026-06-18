@@ -4,10 +4,12 @@ import {
   shutdownInterface,
   execSql,
   sql4sql,
+  rest4sql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
   Sql4SqlResponse,
+  QueryConvertResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
@@ -47,7 +49,8 @@ export class SQLServer {
   ) {
     setupLogger(
       ({ event }) => apiGateway.log(event),
-      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
+      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn',
+      process.env.NODE_ENV === 'production'
     );
 
     // Actually, proxy is enabled in gateway
@@ -65,12 +68,24 @@ export class SQLServer {
     throw new Error('Native api gateway is not enabled');
   }
 
-  public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode) {
-    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext, cacheMode);
+  private getSqlInterfaceInstance(): SqlInterfaceInstance {
+    if (!this.sqlInterfaceInstance) {
+      throw new Error('SQL interface is not initialized. Please enable the SQL interface in your settings.');
+    }
+
+    return this.sqlInterfaceInstance;
+  }
+
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode, timezone?: string, throwContinueWait?: boolean, requestId?: string) {
+    await execSql(this.getSqlInterfaceInstance(), sqlQuery, stream, securityContext, cacheMode, timezone, throwContinueWait, requestId);
   }
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {
-    return sql4sql(this.sqlInterfaceInstance!, sqlQuery, disablePostProcessing, securityContext);
+    return sql4sql(this.getSqlInterfaceInstance(), sqlQuery, disablePostProcessing, securityContext);
+  }
+
+  public async rest4sql(sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> {
+    return rest4sql(this.getSqlInterfaceInstance(), sqlQuery, securityContext);
   }
 
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
@@ -173,34 +188,6 @@ export class SQLServer {
               },
               includeCompilerId: true,
               onlyCompilerId
-            });
-          } catch (e) {
-            reject(e);
-          }
-        });
-      },
-      load: async ({ request, session, query }) => {
-        const context = await contextByRequest(request, session);
-
-        // eslint-disable-next-line no-async-promise-executor
-        return new Promise(async (resolve, reject) => {
-          try {
-            await this.apiGateway.load({
-              query,
-              queryType: 'multi',
-              context,
-              res: (response) => {
-                if ('error' in response) {
-                  reject({
-                    message: response.error
-                  });
-
-                  return;
-                }
-
-                resolve(response);
-              },
-              apiType: 'sql',
             });
           } catch (e) {
             reject(e);

@@ -1,0 +1,16 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/edge_cases.rs
+expression: result
+---
+orders__created_at_day | orders__rolling_sum_trailing_7d
+-----------------------+--------------------------------
+2024-06-01 00:00:00    | NULL                           
+2024-06-02 00:00:00    | NULL                           
+2024-06-03 00:00:00    | NULL                           
+2024-06-04 00:00:00    | NULL                           
+2024-06-05 00:00:00    | NULL                           
+2024-06-06 00:00:00    | NULL                           
+2024-06-07 00:00:00    | NULL                           
+2024-06-08 00:00:00    | NULL                           
+2024-06-09 00:00:00    | NULL                           
+2024-06-10 00:00:00    | NULL

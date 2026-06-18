@@ -1,79 +1,38 @@
-use super::udf_xirr::XirrAccumulator;
-use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::{Hll, HllUnion};
-use crate::queryplanner::udf_xirr::create_xirr_udaf;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
+use crate::queryplanner::udf_xirr::{XirrUDF, XIRR_UDAF_NAME};
 use crate::CubeError;
-use chrono::{Datelike, Duration, Months, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, Months, NaiveDateTime};
 use datafusion::arrow::array::{
-    Array, ArrayRef, BinaryArray, TimestampNanosecondArray, UInt64Builder,
+    Array, ArrayRef, BinaryArray, StringArray, TimestampNanosecondArray, UInt64Builder,
 };
+use datafusion::arrow::buffer::ScalarBuffer;
 use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
-use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
 use datafusion::error::DataFusionError;
-use datafusion::physical_plan::functions::Signature;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::{type_coercion, Accumulator, ColumnarValue};
+use datafusion::logical_expr::function::AccumulatorArgs;
+use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyInfo};
+use datafusion::logical_expr::{
+    AggregateUDF, AggregateUDFImpl, Expr, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature,
+    Volatility, TIMEZONE_WILDCARD,
+};
+use datafusion::physical_plan::{Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
-use smallvec::smallvec;
-use smallvec::SmallVec;
+use std::any::Any;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum CubeScalarUDFKind {
-    HllCardinality, // cardinality(), accepting the HyperLogLog sketches.
-    Coalesce,
-    Now,
-    UnixTimestamp,
-    DateAdd,
-    DateSub,
-    DateBin,
-}
-
-pub trait CubeScalarUDF {
-    fn kind(&self) -> CubeScalarUDFKind;
-    fn name(&self) -> &str;
-    fn descriptor(&self) -> ScalarUDF;
-}
-
-pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Box<dyn CubeScalarUDF> {
-    match k {
-        CubeScalarUDFKind::HllCardinality => Box::new(HllCardinality {}),
-        CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
-        CubeScalarUDFKind::Now => Box::new(Now {}),
-        CubeScalarUDFKind::UnixTimestamp => Box::new(UnixTimestamp {}),
-        CubeScalarUDFKind::DateAdd => Box::new(DateAddSub { is_add: true }),
-        CubeScalarUDFKind::DateSub => Box::new(DateAddSub { is_add: false }),
-        CubeScalarUDFKind::DateBin => Box::new(DateBin {}),
-    }
-}
-
-/// Note that only full match counts. Pass capitalized names.
-pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
-    if n == "CARDINALITY" {
-        return Some(CubeScalarUDFKind::HllCardinality);
-    }
-    if n == "COALESCE" {
-        return Some(CubeScalarUDFKind::Coalesce);
-    }
-    if n == "NOW" {
-        return Some(CubeScalarUDFKind::Now);
-    }
-    if n == "UNIX_TIMESTAMP" {
-        return Some(CubeScalarUDFKind::UnixTimestamp);
-    }
-    if n == "DATE_ADD" {
-        return Some(CubeScalarUDFKind::DateAdd);
-    }
-    if n == "DATE_SUB" {
-        return Some(CubeScalarUDFKind::DateSub);
-    }
-    if n == "DATE_BIN" {
-        return Some(CubeScalarUDFKind::DateBin);
-    }
-    return None;
+pub fn registerable_scalar_udfs_iter() -> impl Iterator<Item = ScalarUDF> {
+    [
+        ScalarUDF::new_from_impl(HllCardinality::new()),
+        ScalarUDF::new_from_impl(DateBin::new()),
+        ScalarUDF::new_from_impl(DateAddSub::new_add()),
+        ScalarUDF::new_from_impl(DateAddSub::new_sub()),
+        ScalarUDF::new_from_impl(UnixTimestamp::new()),
+        ScalarUDF::new_from_impl(ConvertTz::new()),
+        ScalarUDF::new_from_impl(Now::new()),
+    ]
+    .into_iter()
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -82,26 +41,27 @@ pub enum CubeAggregateUDFKind {
     Xirr,
 }
 
-pub trait CubeAggregateUDF {
-    fn kind(&self) -> CubeAggregateUDFKind;
-    fn name(&self) -> &str;
-    fn descriptor(&self) -> AggregateUDF;
-    fn accumulator(&self) -> Box<dyn Accumulator>;
+pub fn registerable_aggregate_udfs_iter() -> impl Iterator<Item = AggregateUDF> {
+    [
+        AggregateUDF::new_from_impl(HllMergeUDF::new()),
+        AggregateUDF::new_from_impl(XirrUDF::new()),
+    ]
+    .into_iter()
 }
 
-pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> Box<dyn CubeAggregateUDF> {
+pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> AggregateUDF {
     match k {
-        CubeAggregateUDFKind::MergeHll => Box::new(HllMergeUDF {}),
-        CubeAggregateUDFKind::Xirr => Box::new(XirrUDF {}),
+        CubeAggregateUDFKind::MergeHll => AggregateUDF::new_from_impl(HllMergeUDF::new()),
+        CubeAggregateUDFKind::Xirr => AggregateUDF::new_from_impl(XirrUDF::new()),
     }
 }
 
-/// Note that only full match counts. Pass capitalized names.
+/// Note that only full match counts. Pass lowercase names.
 pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
-    if n == "MERGE" {
+    if n == "merge" {
         return Some(CubeAggregateUDFKind::MergeHll);
     }
-    if n == "XIRR" {
+    if n == XIRR_UDAF_NAME {
         return Some(CubeAggregateUDFKind::Xirr);
     }
     return None;
@@ -110,147 +70,148 @@ pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
 // The rest of the file are implementations of the various functions that we have.
 // TODO: add custom type and use it instead of `Binary` for HLL columns.
 
-struct Coalesce {}
-impl Coalesce {
-    fn signature() -> Signature {
-        Signature::Variadic(SUPPORTED_COALESCE_TYPES.to_vec())
-    }
-}
-impl CubeScalarUDF for Coalesce {
-    fn kind(&self) -> CubeScalarUDFKind {
-        CubeScalarUDFKind::Coalesce
-    }
-
-    fn name(&self) -> &str {
-        "COALESCE"
-    }
-
-    fn descriptor(&self) -> ScalarUDF {
-        return ScalarUDF {
-            name: self.name().to_string(),
-            signature: Self::signature(),
-            return_type: Arc::new(|inputs| {
-                if inputs.is_empty() {
-                    return Err(DataFusionError::Plan(
-                        "COALESCE requires at least 1 argument".to_string(),
-                    ));
-                }
-                let ts = type_coercion::data_types(inputs, &Self::signature())?;
-                Ok(Arc::new(ts[0].clone()))
-            }),
-            fun: Arc::new(coalesce),
-        };
-    }
+#[derive(Debug)]
+struct Now {
+    signature: Signature,
 }
 
-struct Now {}
 impl Now {
-    fn signature() -> Signature {
-        Signature::Exact(Vec::new())
-    }
-}
-impl CubeScalarUDF for Now {
-    fn kind(&self) -> CubeScalarUDFKind {
-        CubeScalarUDFKind::Now
+    fn new() -> Self {
+        Now {
+            signature: Self::signature(),
+        }
     }
 
+    fn signature() -> Signature {
+        Signature::exact(Vec::new(), Volatility::Stable)
+    }
+}
+
+impl ScalarUDFImpl for Now {
     fn name(&self) -> &str {
         "NOW"
     }
 
-    fn descriptor(&self) -> ScalarUDF {
-        ScalarUDF {
-            name: self.name().to_string(),
-            signature: Self::signature(),
-            return_type: Arc::new(|inputs| {
-                assert!(inputs.is_empty());
-                Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-            }),
-            fun: Arc::new(|_| {
-                let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to get current timestamp: {}",
-                            e
-                        )))
-                    }
-                };
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
-                let nanos = match i64::try_from(t.as_nanos()) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to convert timestamp to i64: {}",
-                            e
-                        )))
-                    }
-                };
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
 
-                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                    Some(nanos),
+    fn return_type(&self, _arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    }
+
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::error::Result<ColumnarValue> {
+        let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to get current timestamp: {}",
+                    e
                 )))
-            }),
-        }
+            }
+        };
+
+        let nanos = match i64::try_from(t.as_nanos()) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to convert timestamp to i64: {}",
+                    e
+                )))
+            }
+        };
+
+        Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+            Some(nanos),
+            None,
+        )))
     }
 }
 
-struct UnixTimestamp {}
+#[derive(Debug)]
+struct UnixTimestamp {
+    signature: Signature,
+}
+
 impl UnixTimestamp {
-    fn signature() -> Signature {
-        Signature::Exact(Vec::new())
-    }
-}
-impl CubeScalarUDF for UnixTimestamp {
-    fn kind(&self) -> CubeScalarUDFKind {
-        CubeScalarUDFKind::UnixTimestamp
-    }
-
-    fn name(&self) -> &str {
-        "UNIX_TIMESTAMP"
-    }
-
-    fn descriptor(&self) -> ScalarUDF {
-        ScalarUDF {
-            name: self.name().to_string(),
+    pub fn new() -> Self {
+        UnixTimestamp {
             signature: Self::signature(),
-            return_type: Arc::new(|inputs| {
-                assert!(inputs.is_empty());
-                Ok(Arc::new(DataType::Int64))
-            }),
-            fun: Arc::new(|_| {
-                let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to get current timestamp: {}",
-                            e
-                        )))
-                    }
-                };
-
-                let seconds = match i64::try_from(t.as_secs()) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to convert timestamp to i64: {}",
-                            e
-                        )))
-                    }
-                };
-
-                Ok(ColumnarValue::Scalar(ScalarValue::Int64(Some(seconds))))
-            }),
         }
     }
+    fn signature() -> Signature {
+        Signature::exact(Vec::new(), Volatility::Stable)
+    }
 }
 
-fn interval_dt_duration(i: &i64) -> Duration {
-    let days: i64 = i.signum() * (i.abs() >> 32);
-    let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-    let duration = Duration::days(days) + Duration::milliseconds(millis);
+impl ScalarUDFImpl for UnixTimestamp {
+    fn name(&self) -> &str {
+        "unix_timestamp"
+    }
 
-    duration
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Int64)
+    }
+
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::error::Result<ColumnarValue> {
+        let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to get current timestamp: {}",
+                    e
+                )))
+            }
+        };
+
+        let seconds = match i64::try_from(t.as_secs()) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to convert timestamp to i64: {}",
+                    e
+                )))
+            }
+        };
+
+        Ok(ColumnarValue::Scalar(ScalarValue::Int64(Some(seconds))))
+    }
+
+    fn simplify(
+        &self,
+        _args: Vec<Expr>,
+        info: &dyn SimplifyInfo,
+    ) -> datafusion::common::Result<ExprSimplifyResult> {
+        let unix_time = info
+            .execution_props()
+            .query_execution_start_time
+            .timestamp();
+        Ok(ExprSimplifyResult::Simplified(Expr::Literal(
+            ScalarValue::Int64(Some(unix_time)),
+        )))
+    }
+}
+
+fn interval_dt_duration(interval_days: i32, interval_nanos: i64) -> Duration {
+    Duration::days(interval_days as i64) + Duration::nanoseconds(interval_nanos)
 }
 
 fn calc_intervals(start: NaiveDateTime, end: NaiveDateTime, interval: i32) -> i32 {
@@ -274,8 +235,10 @@ fn calc_intervals(start: NaiveDateTime, end: NaiveDateTime, interval: i32) -> i3
 
 /// Calculate date_bin timestamp for source date for year-month interval
 fn calc_bin_timestamp_ym(origin: NaiveDateTime, source: &i64, interval: i32) -> NaiveDateTime {
-    let timestamp =
-        NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
+    let timestamp = naive_datetime_from_timestamp_or_panic(
+        *source / 1_000_000_000,
+        (*source % 1_000_000_000) as u32,
+    );
     let num_intervals = calc_intervals(origin, timestamp, interval);
     let nearest_date = if num_intervals >= 0 {
         origin
@@ -292,12 +255,26 @@ fn calc_bin_timestamp_ym(origin: NaiveDateTime, source: &i64, interval: i32) -> 
     NaiveDateTime::new(nearest_date, origin.time())
 }
 
+// TODO upgrade DF: Pass up error, don't panic (even if the panic should be super rare)
+pub fn naive_datetime_from_timestamp_or_panic(secs: i64, nsecs: u32) -> NaiveDateTime {
+    DateTime::from_timestamp(secs, nsecs)
+        .expect("invalid or out-of-range datetime")
+        .naive_utc()
+}
+
 /// Calculate date_bin timestamp for source date for date-time interval
-fn calc_bin_timestamp_dt(origin: NaiveDateTime, source: &i64, interval: &i64) -> NaiveDateTime {
-    let timestamp =
-        NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
+fn calc_bin_timestamp_dt(
+    origin: NaiveDateTime,
+    source: &i64,
+    interval_days: i32,
+    interval_nanos: i64,
+) -> NaiveDateTime {
+    let timestamp = naive_datetime_from_timestamp_or_panic(
+        *source / 1_000_000_000,
+        (*source % 1_000_000_000) as u32,
+    );
     let diff = timestamp - origin;
-    let interval_duration = interval_dt_duration(&interval);
+    let interval_duration = interval_dt_duration(interval_days, interval_nanos);
     let num_intervals =
         diff.num_nanoseconds().unwrap_or(0) / interval_duration.num_nanoseconds().unwrap_or(1);
     let mut nearest_timestamp = origin
@@ -313,335 +290,436 @@ fn calc_bin_timestamp_dt(origin: NaiveDateTime, source: &i64, interval: &i64) ->
     nearest_timestamp
 }
 
-struct DateBin {}
+#[derive(Debug)]
+struct DateBin {
+    signature: Signature,
+}
 impl DateBin {
-    fn signature() -> Signature {
-        Signature::OneOf(vec![
-            Signature::Exact(vec![
-                DataType::Interval(IntervalUnit::YearMonth),
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-            ]),
-            Signature::Exact(vec![
-                DataType::Interval(IntervalUnit::DayTime),
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-            ]),
-        ])
+    fn new() -> DateBin {
+        DateBin {
+            signature: Signature {
+                type_signature: TypeSignature::OneOf(vec![
+                    TypeSignature::Exact(vec![
+                        DataType::Interval(IntervalUnit::YearMonth),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Interval(IntervalUnit::DayTime),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Interval(IntervalUnit::MonthDayNano),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    ]),
+                ]),
+                volatility: Volatility::Immutable,
+            },
+        }
     }
 }
-impl CubeScalarUDF for DateBin {
-    fn kind(&self) -> CubeScalarUDFKind {
-        CubeScalarUDFKind::DateBin
-    }
 
+impl ScalarUDFImpl for DateBin {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
     fn name(&self) -> &str {
-        "DATE_BIN"
+        "date_bin"
     }
-
-    fn descriptor(&self) -> ScalarUDF {
-        return ScalarUDF {
-            name: self.name().to_string(),
-            signature: Self::signature(),
-            return_type: Arc::new(|_| {
-                Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-            }),
-            fun: Arc::new(move |inputs| {
-                assert_eq!(inputs.len(), 3);
-                let interval = match &inputs[0] {
-                    ColumnarValue::Scalar(i) => i.clone(),
-                    _ => {
-                        // We leave this case out for simplicity.
-                        // CubeStore does not allow intervals inside tables, so this is super rare.
-                        return Err(DataFusionError::Execution(format!(
-                            "Only scalar intervals are supported in DATE_BIN"
-                        )));
-                    }
-                };
-
-                let origin = match &inputs[2] {
-                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(o))) => {
-                        NaiveDateTime::from_timestamp(
-                            *o / 1_000_000_000,
-                            (*o % 1_000_000_000) as u32,
-                        )
-                    }
-                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => {
-                        return Err(DataFusionError::Execution(format!(
-                            "Third argument (origin) of DATE_BIN must be a non-null timestamp"
-                        )));
-                    }
-                    _ => {
-                        // Leaving out other rare cases.
-                        // The initial need for the date_bin comes from custom granularities support
-                        // and there will always be a scalar origin point
-                        return Err(DataFusionError::Execution(format!(
-                            "Only scalar origins are supported in DATE_BIN"
-                        )));
-                    }
-                };
-
-                match interval {
-                    ScalarValue::IntervalYearMonth(Some(interval)) => match &inputs[1] {
-                        ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
-                            ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
-                        ),
-                        ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
-                            let nearest_timestamp = calc_bin_timestamp_ym(origin, t, interval);
-
-                            Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                                Some(nearest_timestamp.timestamp_nanos()),
-                            )))
-                        }
-                        ColumnarValue::Array(arr)
-                            if arr.as_any().is::<TimestampNanosecondArray>() =>
-                        {
-                            let ts_array = arr
-                                .as_any()
-                                .downcast_ref::<TimestampNanosecondArray>()
-                                .unwrap();
-
-                            let mut builder = TimestampNanosecondArray::builder(ts_array.len());
-
-                            for i in 0..ts_array.len() {
-                                if ts_array.is_null(i) {
-                                    builder.append_null()?;
-                                } else {
-                                    let ts = ts_array.value(i);
-                                    let nearest_timestamp =
-                                        calc_bin_timestamp_ym(origin, &ts, interval);
-                                    builder.append_value(nearest_timestamp.timestamp_nanos())?;
-                                }
-                            }
-
-                            Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
-                        }
-                        _ => {
-                            return Err(DataFusionError::Execution(format!(
-                                "Second argument of DATE_BIN must be a non-null timestamp"
-                            )));
-                        }
-                    },
-                    ScalarValue::IntervalDayTime(Some(interval)) => match &inputs[1] {
-                        ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
-                            ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
-                        ),
-                        ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
-                            let nearest_timestamp = calc_bin_timestamp_dt(origin, t, &interval);
-
-                            Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                                Some(nearest_timestamp.timestamp_nanos()),
-                            )))
-                        }
-                        ColumnarValue::Array(arr)
-                            if arr.as_any().is::<TimestampNanosecondArray>() =>
-                        {
-                            let ts_array = arr
-                                .as_any()
-                                .downcast_ref::<TimestampNanosecondArray>()
-                                .unwrap();
-
-                            let mut builder = TimestampNanosecondArray::builder(ts_array.len());
-
-                            for i in 0..ts_array.len() {
-                                if ts_array.is_null(i) {
-                                    builder.append_null()?;
-                                } else {
-                                    let ts = ts_array.value(i);
-                                    let nearest_timestamp =
-                                        calc_bin_timestamp_dt(origin, &ts, &interval);
-                                    builder.append_value(nearest_timestamp.timestamp_nanos())?;
-                                }
-                            }
-
-                            Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
-                        }
-                        _ => {
-                            return Err(DataFusionError::Execution(format!(
-                                "Second argument of DATE_BIN must be a non-null timestamp"
-                            )));
-                        }
-                    },
-                    _ => Err(DataFusionError::Execution(format!(
-                        "Unsupported interval type: {:?}",
-                        interval
-                    ))),
-                }
-            }),
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    }
+    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        assert_eq!(inputs.len(), 3);
+        let interval = match &inputs[0] {
+            ColumnarValue::Scalar(i) => i.clone(),
+            _ => {
+                // We leave this case out for simplicity.
+                // CubeStore does not allow intervals inside tables, so this is super rare.
+                return Err(DataFusionError::Execution(format!(
+                    "Only scalar intervals are supported in DATE_BIN"
+                )));
+            }
         };
+
+        let origin = match &inputs[2] {
+            ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(o), _tz)) => {
+                // The DF 42.2.0 upgrade added timezone values.  A comment about this in
+                // handle_year_month.
+                naive_datetime_from_timestamp_or_panic(
+                    *o / 1_000_000_000,
+                    (*o % 1_000_000_000) as u32,
+                )
+            }
+            ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => {
+                return Err(DataFusionError::Execution(format!(
+                    "Third argument (origin) of DATE_BIN must be a non-null timestamp"
+                )));
+            }
+            _ => {
+                // Leaving out other rare cases.
+                // The initial need for the date_bin comes from custom granularities support
+                // and there will always be a scalar origin point
+                return Err(DataFusionError::Execution(format!(
+                    "Only scalar origins are supported in DATE_BIN"
+                )));
+            }
+        };
+
+        fn handle_year_month(
+            inputs: &[ColumnarValue],
+            origin: NaiveDateTime,
+            interval: i32,
+        ) -> Result<ColumnarValue, DataFusionError> {
+            match &inputs[1] {
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => Ok(
+                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, None)),
+                ),
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t), _tz)) => {
+                    let nearest_timestamp = calc_bin_timestamp_ym(origin, t, interval);
+
+                    // The DF 42.2.0 upgrade added timezone values.  DF's date_bin drops this time zone
+                    // information.  For now we just ignore time zone if present and in that case
+                    // use UTC time zone for all calculations, and remove the time zone from the
+                    // return value.
+                    Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                        Some(timestamp_nanos_or_panic(&nearest_timestamp.and_utc())),
+                        None,
+                    )))
+                }
+                ColumnarValue::Array(arr) if arr.as_any().is::<TimestampNanosecondArray>() => {
+                    let ts_array = arr
+                        .as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .unwrap();
+
+                    // Replicating the time zone decision in the scalar case (by not using
+                    // `.with_time_zone(ts_array.timezone())`).
+                    let mut builder = TimestampNanosecondArray::builder(ts_array.len());
+
+                    for i in 0..ts_array.len() {
+                        if ts_array.is_null(i) {
+                            builder.append_null();
+                        } else {
+                            let ts = ts_array.value(i);
+                            let nearest_timestamp = calc_bin_timestamp_ym(origin, &ts, interval);
+                            builder.append_value(timestamp_nanos_or_panic(
+                                &nearest_timestamp.and_utc(),
+                            ));
+                        }
+                    }
+
+                    Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
+                }
+                _ => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Second argument of DATE_BIN must be a non-null timestamp"
+                    )));
+                }
+            }
+        }
+
+        fn handle_day_time(
+            inputs: &[ColumnarValue],
+            origin: NaiveDateTime,
+            interval_days: i32,
+            interval_nanos: i64,
+        ) -> Result<ColumnarValue, DataFusionError> {
+            match &inputs[1] {
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => Ok(
+                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, None)),
+                ),
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t), _tz)) => {
+                    // As with handle_year_month, no use of the time zone.
+                    let nearest_timestamp =
+                        calc_bin_timestamp_dt(origin, t, interval_days, interval_nanos);
+
+                    Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                        Some(timestamp_nanos_or_panic(&nearest_timestamp.and_utc())),
+                        None,
+                    )))
+                }
+                ColumnarValue::Array(arr) if arr.as_any().is::<TimestampNanosecondArray>() => {
+                    let ts_array = arr
+                        .as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .unwrap();
+
+                    // As with handle_year_month (and the scalar case above), no use of `ts_array.timezone()`.
+                    let mut builder = TimestampNanosecondArray::builder(ts_array.len());
+
+                    for i in 0..ts_array.len() {
+                        if ts_array.is_null(i) {
+                            builder.append_null();
+                        } else {
+                            let ts = ts_array.value(i);
+                            let nearest_timestamp =
+                                calc_bin_timestamp_dt(origin, &ts, interval_days, interval_nanos);
+                            builder.append_value(timestamp_nanos_or_panic(
+                                &nearest_timestamp.and_utc(),
+                            ));
+                        }
+                    }
+
+                    Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
+                }
+                _ => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Second argument of DATE_BIN must be a non-null timestamp"
+                    )));
+                }
+            }
+        }
+
+        match interval {
+            ScalarValue::IntervalYearMonth(Some(interval)) => {
+                handle_year_month(inputs, origin, interval)
+            }
+            ScalarValue::IntervalDayTime(Some(interval)) => handle_day_time(
+                inputs,
+                origin,
+                interval.days,
+                (interval.milliseconds as i64) * 1_000_000,
+            ),
+            ScalarValue::IntervalMonthDayNano(Some(month_day_nano)) => {
+                // We handle months or day/time but not combinations of month with day/time.
+                // Potential reasons:  Before the upgrade to DF 42.2.0, there was no
+                // IntervalMonthDayNano.  Also, custom granularities support doesn't need it.
+                // (Also, how would it behave?)
+                if month_day_nano.months != 0 {
+                    if month_day_nano.days == 0 && month_day_nano.nanoseconds == 0 {
+                        handle_year_month(inputs, origin, month_day_nano.months)
+                    } else {
+                        Err(DataFusionError::Execution(format!(
+                            "Unsupported interval type (mixed month with day/time interval): {:?}",
+                            interval
+                        )))
+                    }
+                } else {
+                    handle_day_time(
+                        inputs,
+                        origin,
+                        month_day_nano.days,
+                        month_day_nano.nanoseconds,
+                    )
+                }
+            }
+            _ => Err(DataFusionError::Execution(format!(
+                "Unsupported interval type: {:?}",
+                interval
+            ))),
+        }
     }
 }
 
+#[derive(Debug)]
 struct DateAddSub {
     is_add: bool,
+    signature: Signature,
 }
 
 impl DateAddSub {
-    fn signature() -> Signature {
-        Signature::OneOf(vec![
-            Signature::Exact(vec![
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Interval(IntervalUnit::YearMonth),
-            ]),
-            Signature::Exact(vec![
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Interval(IntervalUnit::DayTime),
-            ]),
-        ])
+    pub fn new(is_add: bool) -> DateAddSub {
+        let tz_wildcard: Arc<str> = Arc::from(TIMEZONE_WILDCARD);
+        DateAddSub {
+            is_add,
+            signature: Signature {
+                type_signature: TypeSignature::OneOf(vec![
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Interval(IntervalUnit::YearMonth),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Interval(IntervalUnit::DayTime),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Interval(IntervalUnit::MonthDayNano),
+                    ]),
+                    // We wanted this for NOW(), which has "+00:00" time zone.  Using
+                    // TIMEZONE_WILDCARD to favor DST-related questions over "UTC" == "+00:00"
+                    // questions.  MySQL doesn't have a timezone as this function is applied, and we
+                    // simply invoke DF's date + interval behavior.
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some(tz_wildcard.clone())),
+                        DataType::Interval(IntervalUnit::YearMonth),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some(tz_wildcard.clone())),
+                        DataType::Interval(IntervalUnit::DayTime),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some(tz_wildcard)),
+                        DataType::Interval(IntervalUnit::MonthDayNano),
+                    ]),
+                ]),
+                volatility: Volatility::Immutable,
+            },
+        }
+    }
+    pub fn new_add() -> DateAddSub {
+        Self::new(true)
+    }
+    pub fn new_sub() -> DateAddSub {
+        Self::new(false)
     }
 }
 
 impl DateAddSub {
     fn name_static(&self) -> &'static str {
         match self.is_add {
-            true => "DATE_ADD",
-            false => "DATE_SUB",
+            true => "date_add",
+            false => "date_sub",
         }
     }
 }
 
-impl CubeScalarUDF for DateAddSub {
-    fn kind(&self) -> CubeScalarUDFKind {
-        match self.is_add {
-            true => CubeScalarUDFKind::DateAdd,
-            false => CubeScalarUDFKind::DateSub,
-        }
+impl ScalarUDFImpl for DateAddSub {
+    fn as_any(&self) -> &dyn Any {
+        self
     }
-
     fn name(&self) -> &str {
         self.name_static()
     }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        if arg_types.len() != 2 {
+            return Err(DataFusionError::Internal(format!(
+                "DateAddSub return_type expects 2 arguments, got {:?}",
+                arg_types
+            )));
+        }
+        match (&arg_types[0], &arg_types[1]) {
+            (ts @ DataType::Timestamp(_, _), DataType::Interval(_)) => Ok(ts.clone()),
+            _ => Err(DataFusionError::Internal(format!(
+                "DateAddSub return_type expects Timestamp and Interval arguments, got {:?}",
+                arg_types
+            ))),
+        }
+    }
+    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        use datafusion::arrow::compute::kernels::numeric::add;
+        use datafusion::arrow::compute::kernels::numeric::sub;
+        assert_eq!(inputs.len(), 2);
+        // DF 42.2.0 already has date + interval or date - interval.  Note that `add` and `sub` are
+        // public (defined in arrow_arith), while timestamp-specific functions they invoke,
+        // Arrow's `arithmetic_op` and then `timestamp_op::<TimestampNanosecondType>`, are not.
+        datafusion::physical_expr_common::datum::apply(
+            &inputs[0],
+            &inputs[1],
+            if self.is_add { add } else { sub },
+        )
+    }
+}
 
-    fn descriptor(&self) -> ScalarUDF {
-        let name = self.name_static();
-        let is_add = self.is_add;
-        return ScalarUDF {
-            name: self.name().to_string(),
-            signature: Self::signature(),
-            return_type: Arc::new(|_| {
-                Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-            }),
-            fun: Arc::new(move |inputs| {
-                assert_eq!(inputs.len(), 2);
-                let interval = match &inputs[1] {
-                    ColumnarValue::Scalar(i) => i.clone(),
-                    _ => {
-                        // We leave this case out for simplicity.
-                        // CubeStore does not allow intervals inside tables, so this is super rare.
-                        return Err(DataFusionError::Execution(format!(
-                            "Only scalar intervals are supported in `{}`",
-                            name
-                        )));
-                    }
-                };
-                match &inputs[0] {
-                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
-                        ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
-                    ),
-                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
-                        let r = date_addsub_scalar(Utc.timestamp_nanos(*t), interval, is_add)?;
-                        Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                            Some(r.timestamp_nanos()),
-                        )))
-                    }
-                    ColumnarValue::Array(t) if t.as_any().is::<TimestampNanosecondArray>() => {
-                        let t = t
-                            .as_any()
-                            .downcast_ref::<TimestampNanosecondArray>()
-                            .unwrap();
-                        Ok(ColumnarValue::Array(Arc::new(date_addsub_array(
-                            &t, interval, is_add,
-                        )?)))
-                    }
-                    _ => {
-                        return Err(DataFusionError::Execution(format!(
-                            "First argument of `{}` must be a non-null timestamp",
-                            name
-                        )))
+#[derive(Debug)]
+pub(crate) struct HllCardinality {
+    signature: Signature,
+}
+impl HllCardinality {
+    pub fn new() -> HllCardinality {
+        let signature = Signature::new(
+            TypeSignature::Exact(vec![DataType::Binary]),
+            Volatility::Immutable,
+        );
+
+        HllCardinality { signature }
+    }
+
+    /// Lets us call [`ScalarFunctionExpr::new`] in some cases without elaborately computing return
+    /// type or using [`ScalarFunctionExpr::try_new`].
+    pub fn static_return_type() -> DataType {
+        DataType::UInt64
+    }
+
+    pub fn static_name() -> &'static str {
+        "cardinality"
+    }
+}
+
+impl ScalarUDFImpl for HllCardinality {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn name(&self) -> &str {
+        Self::static_name()
+    }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        Ok(Self::static_return_type())
+    }
+    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        assert_eq!(args.len(), 1);
+        let sketches = args[0].clone().into_array(1)?;
+        let sketches = sketches
+            .as_any()
+            .downcast_ref::<BinaryArray>()
+            .expect("expected binary data");
+
+        let mut r = UInt64Builder::with_capacity(sketches.len());
+        for s in sketches {
+            match s {
+                None => r.append_null(),
+                Some(d) => {
+                    if d.len() == 0 {
+                        r.append_value(0)
+                    } else {
+                        r.append_value(read_sketch(d)?.cardinality())
                     }
                 }
-            }),
-        };
+            }
+        }
+        return Ok(ColumnarValue::Array(Arc::new(r.finish())));
+    }
+    fn aliases(&self) -> &[String] {
+        &[]
     }
 }
 
-struct HllCardinality {}
-impl CubeScalarUDF for HllCardinality {
-    fn kind(&self) -> CubeScalarUDFKind {
-        return CubeScalarUDFKind::HllCardinality;
-    }
-
-    fn name(&self) -> &str {
-        return "CARDINALITY";
-    }
-
-    fn descriptor(&self) -> ScalarUDF {
-        return ScalarUDF {
-            name: self.name().to_string(),
-            signature: Signature::Exact(vec![DataType::Binary]),
-            return_type: Arc::new(|_| Ok(Arc::new(DataType::UInt64))),
-            fun: Arc::new(|a| {
-                assert_eq!(a.len(), 1);
-                let sketches = a[0].clone().into_array(1);
-                let sketches = sketches
-                    .as_any()
-                    .downcast_ref::<BinaryArray>()
-                    .expect("expected binary data");
-
-                let mut r = UInt64Builder::new(sketches.len());
-                for s in sketches {
-                    match s {
-                        None => r.append_null()?,
-                        Some(d) => {
-                            if d.len() == 0 {
-                                r.append_value(0)?
-                            } else {
-                                r.append_value(read_sketch(d)?.cardinality())?
-                            }
-                        }
-                    }
-                }
-                return Ok(ColumnarValue::Array(Arc::new(r.finish())));
-            }),
-        };
+#[derive(Debug)]
+pub(crate) struct HllMergeUDF {
+    signature: Signature,
+}
+impl HllMergeUDF {
+    fn new() -> HllMergeUDF {
+        HllMergeUDF {
+            signature: Signature::exact(vec![DataType::Binary], Volatility::Stable),
+        }
     }
 }
 
-struct HllMergeUDF {}
-impl CubeAggregateUDF for HllMergeUDF {
-    fn kind(&self) -> CubeAggregateUDFKind {
-        return CubeAggregateUDFKind::MergeHll;
-    }
+impl AggregateUDFImpl for HllMergeUDF {
     fn name(&self) -> &str {
-        return "MERGE";
+        return "merge";
     }
-    fn descriptor(&self) -> AggregateUDF {
-        return AggregateUDF {
-            name: self.name().to_string(),
-            signature: Signature::Exact(vec![DataType::Binary]),
-            return_type: Arc::new(|_| Ok(Arc::new(DataType::Binary))),
-            accumulator: Arc::new(|| Ok(Box::new(HllMergeAccumulator { acc: None }))),
-            state_type: Arc::new(|_| Ok(Arc::new(vec![DataType::Binary]))),
-        };
-    }
-    fn accumulator(&self) -> Box<dyn Accumulator> {
-        return Box::new(HllMergeAccumulator { acc: None });
-    }
-}
 
-struct XirrUDF {}
-impl CubeAggregateUDF for XirrUDF {
-    fn kind(&self) -> CubeAggregateUDFKind {
-        CubeAggregateUDFKind::Xirr
+    fn as_any(&self) -> &dyn Any {
+        self
     }
-    fn name(&self) -> &str {
-        "XIRR"
+
+    fn signature(&self) -> &Signature {
+        &self.signature
     }
-    fn descriptor(&self) -> AggregateUDF {
-        create_xirr_udaf()
+
+    fn return_type(&self, _arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Binary)
     }
-    fn accumulator(&self) -> Box<dyn Accumulator> {
-        return Box::new(XirrAccumulator::new());
+
+    fn accumulator(
+        &self,
+        _acc_args: AccumulatorArgs,
+    ) -> datafusion::common::Result<Box<dyn Accumulator>> {
+        Ok(Box::new(HllMergeAccumulator { acc: None }))
     }
 }
 
@@ -653,64 +731,87 @@ struct HllMergeAccumulator {
 }
 
 impl Accumulator for HllMergeAccumulator {
-    fn reset(&mut self) {
-        self.acc = None;
-    }
+    fn update_batch(&mut self, values: &[ArrayRef]) -> Result<(), DataFusionError> {
+        assert_eq!(values.len(), 1);
 
-    fn state(&self) -> Result<SmallVec<[ScalarValue; 2]>, DataFusionError> {
-        return Ok(smallvec![self.evaluate()?]);
-    }
-
-    fn update(&mut self, row: &[ScalarValue]) -> Result<(), DataFusionError> {
-        assert_eq!(row.len(), 1);
-        let data;
-        if let ScalarValue::Binary(v) = &row[0] {
-            if let Some(d) = v {
-                data = d
-            } else {
-                return Ok(()); // ignore NULL.
+        if let Some(value_rows) = values[0].as_any().downcast_ref::<BinaryArray>() {
+            for opt_datum in value_rows {
+                if let Some(data) = opt_datum {
+                    if data.len() != 0 {
+                        self.merge_sketch(read_sketch(&data)?)?;
+                    } else {
+                        // empty state is ok, this means an empty sketch.
+                    }
+                } else {
+                    // ignore NULL.
+                }
             }
+            return Ok(());
         } else {
             return Err(CubeError::internal(
-                "invalid scalar value passed to MERGE, expecting HLL sketch".to_string(),
+                "invalid array type passed to update_batch, expecting HLL sketches".to_string(),
             )
             .into());
         }
-
-        // empty state is ok, this means an empty sketch.
-        if data.len() == 0 {
-            return Ok(());
-        }
-        return self.merge_sketch(read_sketch(&data)?);
     }
 
-    fn merge(&mut self, states: &[ScalarValue]) -> Result<(), DataFusionError> {
-        assert_eq!(states.len(), 1);
-
-        let data;
-        if let ScalarValue::Binary(v) = &states[0] {
-            if let Some(d) = v {
-                data = d
-            } else {
-                return Ok(()); // ignore NULL.
-            }
-        } else {
-            return Err(CubeError::internal("invalid state in MERGE".to_string()).into());
-        }
-        // empty state is ok, this means an empty sketch.
-        if data.len() == 0 {
-            return Ok(());
-        }
-        return self.merge_sketch(read_sketch(&data)?);
+    fn evaluate(&mut self) -> Result<ScalarValue, DataFusionError> {
+        self.peek_evaluate()
     }
 
-    fn evaluate(&self) -> Result<ScalarValue, DataFusionError> {
+    // Cube ext:
+    fn peek_evaluate(&self) -> Result<ScalarValue, DataFusionError> {
         let v;
         match &self.acc {
             None => v = Vec::new(),
             Some(s) => v = s.write(),
         }
         return Ok(ScalarValue::Binary(Some(v)));
+    }
+
+    fn size(&self) -> usize {
+        let hllu_allocated_size = if let Some(hllu) = &self.acc {
+            hllu.allocated_size()
+        } else {
+            0
+        };
+        size_of::<Self>() + hllu_allocated_size
+    }
+
+    fn state(&mut self) -> Result<Vec<ScalarValue>, DataFusionError> {
+        return Ok(vec![self.evaluate()?]);
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<(), DataFusionError> {
+        assert_eq!(states.len(), 1);
+
+        if let Some(value_rows) = states[0].as_any().downcast_ref::<BinaryArray>() {
+            for opt_datum in value_rows {
+                if let Some(data) = opt_datum {
+                    if data.len() != 0 {
+                        self.merge_sketch(read_sketch(&data)?)?;
+                    } else {
+                        // empty state is ok, this means an empty sketch.
+                    }
+                } else {
+                    // ignore NULL.
+                }
+            }
+            return Ok(());
+        } else {
+            return Err(CubeError::internal("invalid state in MERGE".to_string()).into());
+        }
+    }
+
+    fn reset(&mut self) -> Result<(), DataFusionError> {
+        self.acc = None;
+        Ok(())
+    }
+    fn peek_state(&self) -> Result<Vec<ScalarValue>, DataFusionError> {
+        Ok(vec![self.peek_evaluate()?])
+    }
+    fn supports_cube_ext(&self) -> bool {
+        true
     }
 }
 
@@ -736,4 +837,178 @@ impl HllMergeAccumulator {
 
 pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
     return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
+}
+
+#[derive(Debug)]
+struct ConvertTz {
+    signature: Signature,
+}
+
+impl ConvertTz {
+    fn new() -> ConvertTz {
+        ConvertTz {
+            signature: Signature {
+                type_signature: TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Utf8,
+                ]),
+                volatility: Volatility::Immutable,
+            },
+        }
+    }
+}
+
+impl ScalarUDFImpl for ConvertTz {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn name(&self) -> &str {
+        "convert_tz"
+    }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    }
+    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        match (&inputs[0], &inputs[1]) {
+            (
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(t, _)),
+                ColumnarValue::Scalar(ScalarValue::Utf8(shift)),
+            ) => {
+                let t: Arc<TimestampNanosecondArray> =
+                    Arc::new(std::iter::repeat(t).take(1).collect());
+                let shift: Arc<StringArray> = Arc::new(std::iter::repeat(shift).take(1).collect());
+                let t: ArrayRef = t;
+                let shift: ArrayRef = shift;
+                let result = convert_tz(&t, &shift)?;
+                let ts_array = result
+                    .as_any()
+                    .downcast_ref::<TimestampNanosecondArray>()
+                    .ok_or_else(|| {
+                        DataFusionError::Internal("Wrong type returned in convert_tz".to_string())
+                    })?;
+                let ts_native = ts_array.value(0);
+                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                    Some(ts_native),
+                    None,
+                )))
+            }
+            (ColumnarValue::Array(t), ColumnarValue::Scalar(ScalarValue::Utf8(shift))) => {
+                let shift =
+                    convert_tz_compute_shift_nanos(shift.as_ref().map_or("", |s| s.as_str()))?;
+
+                convert_tz_precomputed_shift(t, shift).map(|arr| ColumnarValue::Array(arr))
+            }
+            (
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(t, _)),
+                ColumnarValue::Array(shift),
+            ) => {
+                let t: Arc<TimestampNanosecondArray> =
+                    Arc::new(std::iter::repeat(t).take(shift.len()).collect());
+                let t: ArrayRef = t;
+                convert_tz(&t, shift).map(|arr| ColumnarValue::Array(arr))
+            }
+            (ColumnarValue::Array(t), ColumnarValue::Array(shift)) => {
+                convert_tz(t, shift).map(|arr| ColumnarValue::Array(arr))
+            }
+            _ => Err(DataFusionError::Internal(
+                "Unsupported input type in convert_tz".to_string(),
+            )),
+        }
+    }
+}
+
+fn convert_tz_compute_shift_nanos(shift: &str) -> Result<i64, DataFusionError> {
+    let hour_min = shift.split(':').collect::<Vec<_>>();
+    if hour_min.len() != 2 {
+        return Err(DataFusionError::Execution(format!(
+            "Can't parse timezone shift '{}'",
+            shift
+        )));
+    }
+    let hour = hour_min[0].parse::<i64>().map_err(|e| {
+        DataFusionError::Execution(format!(
+            "Can't parse hours of timezone shift '{}': {}",
+            hour_min[0], e
+        ))
+    })?;
+    let minute = hour_min[1].parse::<i64>().map_err(|e| {
+        DataFusionError::Execution(format!(
+            "Can't parse minutes of timezone shift '{}': {}",
+            hour_min[1], e
+        ))
+    })?;
+    let shift = (hour * 60 + hour.signum() * minute) * 60 * 1_000_000_000;
+    Ok(shift)
+}
+
+/// convert_tz SQL function
+pub fn convert_tz(args_0: &ArrayRef, args_1: &ArrayRef) -> Result<ArrayRef, DataFusionError> {
+    let timestamps = args_0
+        .as_any()
+        .downcast_ref::<TimestampNanosecondArray>()
+        .ok_or_else(|| {
+            DataFusionError::Execution(
+                "Could not cast convert_tz timestamp input to TimestampNanosecondArray".to_string(),
+            )
+        })?;
+
+    let shift = args_1
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| {
+            DataFusionError::Execution(
+                "Could not cast convert_tz shift input to StringArray".to_string(),
+            )
+        })?;
+
+    let range = 0..timestamps.len();
+    let result = range
+        .map(|i| {
+            if timestamps.is_null(i) {
+                Ok(0_i64)
+            } else {
+                let shift: i64 = convert_tz_compute_shift_nanos(shift.value(i))?;
+                Ok(timestamps.value(i) + shift)
+            }
+        })
+        .collect::<Result<Vec<_>, DataFusionError>>()?;
+
+    Ok(Arc::new(TimestampNanosecondArray::new(
+        ScalarBuffer::<i64>::from(result),
+        timestamps.nulls().map(|null_buffer| null_buffer.clone()),
+    )))
+}
+
+pub fn convert_tz_precomputed_shift(
+    args_0: &ArrayRef,
+    shift: i64,
+) -> Result<ArrayRef, DataFusionError> {
+    let timestamps = args_0
+        .as_any()
+        .downcast_ref::<TimestampNanosecondArray>()
+        .ok_or_else(|| {
+            DataFusionError::Execution(
+                "Could not cast convert_tz timestamp input to TimestampNanosecondArray".to_string(),
+            )
+        })?;
+
+    // TODO: This could be faster.
+    let range = 0..timestamps.len();
+    let result = range
+        .map(|i| {
+            if timestamps.is_null(i) {
+                Ok(0_i64)
+            } else {
+                Ok(timestamps.value(i) + shift)
+            }
+        })
+        .collect::<Result<Vec<_>, DataFusionError>>()?;
+
+    Ok(Arc::new(TimestampNanosecondArray::new(
+        ScalarBuffer::<i64>::from(result),
+        timestamps.nulls().map(|null_buffer| null_buffer.clone()),
+    )))
 }

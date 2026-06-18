@@ -3,7 +3,7 @@ const { CubejsServerCore } = require('./dist/src/core/server');
 
 /**
  * After 5 years working with TypeScript, now I know
- * that commonjs and nodejs require is not compatibility with using export default
+ * that commonjs and Node.js require is not compatible with using export default
  */
 const toExport = CubejsServerCore;
 

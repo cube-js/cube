@@ -1,0 +1,432 @@
+---
+title: Dimensions
+description: Dimensions are attributes that describe individual rows of data — the fields you group by and filter on, such as status, city, or created_at.
+---
+
+Dimensions represent attributes of individual rows in your data. They are
+the fields you group by and filter on — things like `status`, `city`,
+`product_name`, or `created_at`. Each dimension maps to a column or SQL
+expression in your data source.
+
+<Note>
+
+See the [dimensions reference][ref-dimensions-ref] for the full list of
+parameters and configuration options.
+
+</Note>
+
+## Defining dimensions
+
+A dimension specifies the SQL expression and its type:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true },
+    status: { sql: `status`, type: `string` },
+    created_at: { sql: `created_at`, type: `time` }
+  }
+})
+```
+
+</CodeGroup>
+
+### Dimension types
+
+| Data type in SQL | Dimension type in Cube |
+| --- | --- |
+| `timestamp`, `date`, `time` | [`time`][ref-type] |
+| `text`, `varchar` | [`string`][ref-type] |
+| `integer`, `bigint`, `decimal` | [`number`][ref-type] |
+| `boolean` | [`boolean`][ref-type] |
+
+### Primary keys
+
+Every cube that participates in [joins][ref-joins] should define a
+[`primary_key`][ref-primary-key] dimension. Cube uses primary keys to avoid
+fanouts — when rows get duplicated during joins and aggregates are
+over-counted. Composite primary keys can be created by concatenating columns:
+
+```yaml
+dimensions:
+  - name: composite_key
+    sql: "CONCAT({CUBE}.order_id, '-', {CUBE}.product_id)"
+    type: string
+    primary_key: true
+```
+
+## Time dimensions
+
+Time dimensions are dimensions of the [`time` type][ref-type]. They enable
+grouping by time granularity (year, quarter, month, week, day, hour, minute,
+second) and are essential for time-series analysis.
+
+```yaml
+dimensions:
+  - name: created_at
+    sql: created_at
+    type: time
+```
+
+When queried, you can group by any built-in granularity without defining
+additional dimensions.
+
+### Custom granularities
+
+You can define [custom granularities][ref-granularities] for time dimensions
+when the built-in ones don't fit — for example, weeks starting on Sunday
+or fiscal years:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        granularities:
+          - name: sunday_week
+            interval: 1 week
+            offset: -1 day
+
+          - name: fiscal_year
+            interval: 1 year
+            offset: 1 month
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+      granularities: {
+        sunday_week: { interval: `1 week`, offset: `-1 day` },
+        fiscal_year: { interval: `1 year`, offset: `1 month` }
+      }
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+Time dimensions are essential for performance features like
+[partitioned pre-aggregations][ref-partition-preaggs] and
+[incremental refreshes][ref-incremental-preaggs].
+
+<Note>
+
+See the following recipes:
+- For a [custom granularity][ref-custom-granularity-recipe] example.
+- For a [custom calendar][ref-custom-calendar-recipe] example.
+
+</Note>
+
+## Proxy dimensions
+
+Proxy dimensions reference dimensions from the same cube or other cubes,
+providing a way to reuse existing definitions and reduce code duplication.
+
+### Within the same cube
+
+Reference existing dimensions to build derived ones without duplicating SQL:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: initials
+        sql: "SUBSTR(first_name, 1, 1)"
+        type: string
+
+      - name: last_name
+        sql: "UPPER(last_name)"
+        type: string
+
+      - name: full_name
+        sql: "{initials} || '. ' || {last_name}"
+        type: string
+```
+
+```javascript title="JavaScript"
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    initials: { sql: `SUBSTR(first_name, 1, 1)`, type: `string` },
+    last_name: { sql: `UPPER(last_name)`, type: `string` },
+    full_name: { sql: `${initials} || '. ' || ${last_name}`, type: `string` }
+  }
+})
+```
+
+</CodeGroup>
+
+### From other cubes
+
+If cubes are [joined][ref-joins], you can bring a dimension from one cube
+into another. Cube generates the necessary joins automatically:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: user_name
+        sql: "{users.name}"
+        type: string
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  joins: {
+    users: {
+      sql: `${CUBE}.user_id = ${users.id}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true },
+    user_name: { sql: `${users.name}`, type: `string` }
+  }
+})
+```
+
+</CodeGroup>
+
+### Time dimension granularity references
+
+When referencing a time dimension, you can specify a granularity to create
+a proxy dimension at that specific granularity — including
+[custom granularities](#custom-granularities):
+
+```yaml
+dimensions:
+  - name: created_at
+    sql: created_at
+    type: time
+    granularities:
+      - name: sunday_week
+        interval: 1 week
+        offset: -1 day
+
+  - name: created_at_year
+    sql: "{created_at.year}"
+    type: time
+
+  - name: created_at_sunday_week
+    sql: "{created_at.sunday_week}"
+    type: time
+```
+
+## Subquery dimensions
+
+Subquery dimensions reference [measures][ref-measures-page] from other cubes,
+effectively turning an aggregate into a per-row value. This enables nested
+aggregations — for example, calculating the average of per-customer order counts.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: users
+        sql: "{users}.id = {CUBE}.user_id"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string
+
+      - name: order_count
+        sql: "{orders.count}"
+        type: number
+        sub_query: true
+
+    measures:
+      - name: avg_order_count
+        sql: "{order_count}"
+        type: avg
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  joins: {
+    users: {
+      sql: `${users}.id = ${CUBE}.user_id`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true }
+  },
+
+  measures: {
+    count: { type: `count` }
+  }
+})
+
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    id: { sql: `id`, type: `number`, primary_key: true },
+    name: { sql: `name`, type: `string` },
+
+    order_count: {
+      sql: `${orders.count}`,
+      type: `number`,
+      sub_query: true
+    }
+  },
+
+  measures: {
+    avg_order_count: {
+      sql: `${order_count}`,
+      type: `avg`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+The `order_count` subquery dimension computes the order count per user.
+The `avg_order_count` measure then averages those per-user values. Cube
+implements this as a correlated subquery via joins for optimal performance.
+
+<Note>
+
+See the following recipes:
+- How to calculate [nested aggregates][ref-nested-aggregates-recipe].
+- How to calculate [filtered aggregates][ref-filtered-aggregates-recipe].
+
+</Note>
+
+## Hierarchies
+
+Dimensions can be organized into [hierarchies][ref-hierarchies] to define
+drill-down paths (e.g., Country → State → City):
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    dimensions:
+      - name: country
+        sql: country
+        type: string
+
+      - name: state
+        sql: state
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+    hierarchies:
+      - name: location
+        levels:
+          - country
+          - state
+          - city
+```
+
+## Next steps
+
+- See the [dimensions reference][ref-dimensions-ref] for all parameters
+- Learn about [measures][ref-measures-page] for aggregated calculations
+- Explore [custom granularities][ref-granularities] for fiscal calendars
+  and non-standard time periods
+
+[ref-dimensions-ref]: /reference/data-modeling/dimensions
+[ref-measures-page]: /docs/data-modeling/measures
+[ref-joins]: /docs/data-modeling/joins
+[ref-type]: /reference/data-modeling/dimensions#type
+[ref-primary-key]: /reference/data-modeling/dimensions#primary_key
+[ref-granularities]: /reference/data-modeling/dimensions#granularities
+[ref-hierarchies]: /reference/data-modeling/hierarchies
+[ref-partition-preaggs]: /docs/pre-aggregations/matching-pre-aggregations#partitioning
+[ref-incremental-preaggs]: /reference/data-modeling/pre-aggregations#incremental
+[ref-custom-granularity-recipe]: /recipes/data-modeling/custom-granularity
+[ref-custom-calendar-recipe]: /recipes/data-modeling/custom-calendar
+[ref-nested-aggregates-recipe]: /recipes/data-modeling/nested-aggregates
+[ref-filtered-aggregates-recipe]: /recipes/data-modeling/filtered-aggregates

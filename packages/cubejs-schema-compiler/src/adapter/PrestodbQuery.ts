@@ -49,7 +49,7 @@ export class PrestodbQuery extends BaseQuery {
     return `from_iso8601_timestamp(${value})`;
   }
 
-  public convertTz(field) {
+  public override convertTz(field) {
     const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
     return this.timezone ?
       `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
@@ -59,7 +59,10 @@ export class PrestodbQuery extends BaseQuery {
   /**
    * Returns sql for source expression floored to timestamps aligned with
    * intervals relative to origin timestamp point.
-   * Athena doesn't support INTERVALs directly — using date_diff/date_add
+   * Athena doesn't support INTERVALs directly — using date_diff/date_add.
+   * Origin is wrapped in `CAST(... AS TIMESTAMP)` so that `date_add` returns
+   * a plain TIMESTAMP rather than `timestamp with time zone` — Hive cannot
+   * write the TZ-aware type into an export bucket.
    */
   public dateBin(interval: string, source: string, origin: string): string {
     const intervalParsed = parseSqlInterval(interval);
@@ -70,7 +73,7 @@ export class PrestodbQuery extends BaseQuery {
     }
 
     const [unit, count] = intervalParts[0];
-    const originExpr = this.timeStampCast(`'${origin}'`);
+    const originExpr = `CAST(${this.timeStampCast(`'${origin}'`)} AS TIMESTAMP)`;
 
     return `date_add('${unit}',
       floor(
@@ -139,6 +142,7 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';
+    templates.functions.STRING_AGG = 'ARRAY_JOIN(ARRAY_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}), COALESCE({{ args[1] }}, \'\'))';
     delete templates.functions.PERCENTILECONT;
     templates.statements.select = '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +
@@ -147,6 +151,7 @@ export class PrestodbQuery extends BaseQuery {
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} {% elif from_prepared %}\n' +
       'FROM {{ from_prepared }}' +
       '{% endif %}' +
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
@@ -160,6 +165,7 @@ export class PrestodbQuery extends BaseQuery {
     templates.expressions.binary = '{% if op == \'||\' %}' +
       '(CAST({{ left }} AS VARCHAR) || CAST({{ right }} AS VARCHAR))' +
       '{% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.float = 'REAL';
@@ -192,5 +198,9 @@ export class PrestodbQuery extends BaseQuery {
 
   public castToString(sql: any): string {
     return `CAST(${sql} as VARCHAR)`;
+  }
+
+  public urlEncode(sql: string): string {
+    return `url_encode(CAST(${sql} as VARCHAR))`;
   }
 }

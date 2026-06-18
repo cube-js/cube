@@ -59,7 +59,7 @@ cubes:
           - sql: "{CUBE}.status = 'completed'"
 
       - name: completed_percentage
-        sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+        sql: "1.0 * {completed_count} / NULLIF({count}, 0)"
         type: number
         format: percent
 

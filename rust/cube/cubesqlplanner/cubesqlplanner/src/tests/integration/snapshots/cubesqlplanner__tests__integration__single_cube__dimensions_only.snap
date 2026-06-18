@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/single_cube.rs
+expression: result
+---
+orders__status
+--------------
+cancelled     
+completed     
+pending

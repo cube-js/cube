@@ -5,7 +5,7 @@ describe('ErrorReporter', () => {
   it('should group and format errors and warnings from different files', () => {
     const logs: string[] = [];
     const reporter = new ErrorReporter(null, [], {
-      logger: (msg) => logs.push(msg)
+      logger: (msg, _params) => logs.push(msg)
     });
 
     // Test inFile and exitFile
@@ -106,7 +106,7 @@ describe('ErrorReporter', () => {
 
   it('should handle inContext correctly', () => {
     const reporter = new ErrorReporter(null, [], {
-      logger: () => { /* empty */ }
+      logger: (_msg, _params) => { /* empty */ }
     });
 
     const contextReporter = reporter.inContext('Processing Users cube');
@@ -117,7 +117,7 @@ describe('ErrorReporter', () => {
 
   it('should deduplicate identical errors and warnings', () => {
     const reporter = new ErrorReporter(null, [], {
-      logger: () => { /* empty */ }
+      logger: (_msg, _params) => { /* empty */ }
     });
 
     reporter.inFile({
@@ -159,7 +159,7 @@ describe('ErrorReporter', () => {
 
   it('should handle addErrors and addWarnings', () => {
     const reporter = new ErrorReporter(null, [], {
-      logger: () => { /* empty */ }
+      logger: (_msg, _params) => { /* empty */ }
     });
 
     // Test addErrors with fileName
@@ -183,7 +183,7 @@ describe('ErrorReporter', () => {
 
   it('should not throw if no errors', () => {
     const reporter = new ErrorReporter(null, [], {
-      logger: () => { /* empty */ }
+      logger: (_msg, _params) => { /* empty */ }
     });
 
     reporter.warning({ message: 'Just a warning' });
@@ -193,7 +193,7 @@ describe('ErrorReporter', () => {
 
   it('should handle errors without fileName at the end', () => {
     const reporter = new ErrorReporter(null, [], {
-      logger: () => { /* empty */ }
+      logger: (_msg, _params) => { /* empty */ }
     });
 
     reporter.error({ message: 'Error in file A' }, 'fileA.js');

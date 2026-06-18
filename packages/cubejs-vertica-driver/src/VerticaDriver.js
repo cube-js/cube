@@ -1,5 +1,6 @@
 const { Pool } = require('vertica-nodejs');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { getEnv } = require('@cubejs-backend/shared');
 const VerticaQuery = require('./VerticaQuery');
 
 const defaultGenericType = 'text';
@@ -61,7 +62,7 @@ class VerticaDriver extends BaseDriver {
     return `
       SELECT
         column_name,
-        table_name, 
+        table_name,
         table_schema,
         data_type
       FROM v_catalog.columns;
@@ -85,19 +86,27 @@ class VerticaDriver extends BaseDriver {
     const columns = await this.query(
       `SELECT
         column_name,
-        data_type
+        data_type,
+        numeric_precision,
+        numeric_scale
       FROM v_catalog.columns
       WHERE table_name = ${this.param(0)}
         AND table_schema = ${this.param(1)}`,
       [name, schema]
     );
 
-    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type, c.numeric_precision, c.numeric_scale) }));
   }
 
-  toGenericType(columnType) {
+  toGenericType(columnType, precision, scale) {
     const type = columnType.toLowerCase().replace(/\([0-9,]+\)/, '');
-    return VerticaTypeToGenericType[type] || defaultGenericType;
+    const genericType = VerticaTypeToGenericType[type] || defaultGenericType;
+
+    if (genericType === 'decimal' && precision && scale && getEnv('preciseDecimalInCubestore')) {
+      return `decimal(${precision}, ${scale})`;
+    }
+
+    return genericType;
   }
 }
 

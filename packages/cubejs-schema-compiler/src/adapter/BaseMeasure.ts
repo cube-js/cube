@@ -18,10 +18,11 @@ export class BaseMeasure {
 
   protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{sql: Function}>): MeasureDefinition {
     const source = this.query.cubeEvaluator.measureByPath(sourceMeasure);
+    const aggType = source.aggType ?? source.type;
 
-    let resultMeasureType = source.type;
+    let resultMeasureType = aggType;
     if (newMeasureType !== null) {
-      switch (source.type) {
+      switch (aggType) {
         case 'sum':
         case 'avg':
         case 'min':
@@ -32,29 +33,35 @@ export class BaseMeasure {
             case 'min':
             case 'max':
             case 'count_distinct':
+            case 'countDistinct':
             case 'count_distinct_approx':
+            case 'countDistinctApprox':
               // Can change from avg/... to count_distinct
               // Latter does not care what input value is
               // ok, do nothing
               break;
             default:
               throw new UserError(
-                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+                `Unsupported measure type replacement for ${sourceMeasure}: ${aggType} => ${newMeasureType}`
               );
           }
           break;
         case 'count_distinct':
+        case 'countDistinct':
         case 'count_distinct_approx':
+        case 'countDistinctApprox':
           switch (newMeasureType) {
             case 'count_distinct':
+            case 'countDistinct':
             case 'count_distinct_approx':
+            case 'countDistinctApprox':
               // ok, do nothing
               break;
             default:
               // Can not change from count_distinct to avg/...
               // Latter do care what input value is, and original measure can be defined on strings
               throw new UserError(
-                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+                `Unsupported measure type replacement for ${sourceMeasure}: ${aggType} => ${newMeasureType}`
               );
           }
           break;
@@ -64,7 +71,7 @@ export class BaseMeasure {
           // Can not change from count
           // There's no SQL at all
           throw new UserError(
-            `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+            `Unsupported measure type replacement for ${sourceMeasure}: ${aggType} => ${newMeasureType}`
           );
       }
 
@@ -81,14 +88,16 @@ export class BaseMeasure {
         case 'max':
         case 'count':
         case 'count_distinct':
+        case 'countDistinct':
         case 'count_distinct_approx':
+        case 'countDistinctApprox':
           // ok, do nothing
           break;
         default:
           // Can not add filters to string, time, boolean, number
           // Aggregation is already included in SQL, it's hard to patch that
           throw new UserError(
-            `Unsupported additional filters for measure ${sourceMeasure} type ${source.type}`
+            `Unsupported additional filters for measure ${sourceMeasure} type ${aggType}`
           );
       }
 
@@ -97,9 +106,16 @@ export class BaseMeasure {
 
     const patchedFrom = this.query.cubeEvaluator.parsePath('measures', sourceMeasure);
 
+    // For view measures, `type` is `number` (aggregation is embedded in SQL)
+    // while `aggType` carries the real aggregation kind. We must preserve that
+    // distinction to avoid double-wrapping (e.g. SUM(SUM(...))).
+    const typeFields = source.aggType != null
+      ? { type: source.type, aggType: resultMeasureType }
+      : { type: resultMeasureType };
+
     return {
       ...source,
-      type: resultMeasureType,
+      ...typeFields,
       filters: resultFilters,
       patchedFrom: {
         cubeName: patchedFrom[0],

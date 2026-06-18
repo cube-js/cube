@@ -146,11 +146,10 @@ interface Query {
   cache?: CacheMode; // Used in public interface
   ungrouped?: boolean;
   responseFormat?: ResultType;
-
   // TODO incoming query, query with parsed exprs and query with evaluated exprs are all different types
-  subqueryJoins?: Array<SubqueryJoins>,
-
-  joinHints?: Array<JoinHint>
+  subqueryJoins?: Array<SubqueryJoins>;
+  joinHints?: Array<JoinHint>;
+  requestId?: string;
 }
 
 /**
@@ -167,6 +166,7 @@ interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: null | number;
   order?: { id: string; desc: boolean }[];
+  maskedMembers?: { member: string; filter?: any }[];
 }
 
 export {

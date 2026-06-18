@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:22.20.0-bookworm-slim AS base
+FROM node:22.22.0-bookworm-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -76,7 +76,6 @@ COPY packages/cubejs-vertica-driver/package.json packages/cubejs-vertica-driver/
 #COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 #COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
 #COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
-#COPY packages/cubejs-client-vue/package.json packages/cubejs-client-vue/package.json
 #COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/package.json
 #COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.json
 #COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
@@ -153,7 +152,6 @@ COPY packages/cubejs-vertica-driver/ packages/cubejs-vertica-driver/
 #COPY packages/cubejs-templates/ packages/cubejs-templates/
 #COPY packages/cubejs-client-core/ packages/cubejs-client-core/
 #COPY packages/cubejs-client-react/ packages/cubejs-client-react/
-#COPY packages/cubejs-client-vue/ packages/cubejs-client-vue/
 #COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
 #COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
 #COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
@@ -181,6 +179,9 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV PYTHONUNBUFFERED=1
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 

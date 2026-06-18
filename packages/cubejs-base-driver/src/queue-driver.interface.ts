@@ -44,6 +44,7 @@ export interface AddToQueueOptions {
   requestId: string,
   spanId?: string,
   orphanedTimeout?: number,
+  externalId?: string,
 }
 
 export interface QueueDriverOptions {
@@ -58,7 +59,7 @@ export interface QueueDriverOptions {
 export interface QueueDriverConnectionInterface {
   redisHash(queryKey: QueryKey): QueryKeyHash;
   getResultBlocking(queryKey: QueryKeyHash, queueId: QueueId): Promise<unknown>;
-  getResult(queryKey: QueryKey): Promise<any>;
+  getResult(queryKey: QueryKey, externalId?: string): Promise<any>;
   /**
    * Adds specified by the queryKey query to the queue, returns tuple
    * with the operation result.

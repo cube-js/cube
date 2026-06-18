@@ -1,6 +1,6 @@
 import { loadNative, setupLogger } from '../js';
 
-setupLogger(({ event }) => console.log(event), 'trace');
+setupLogger(({ event }) => console.log(event), 'trace', false);
 
 describe('Cross language representation (CLR)', () => {
   it('all types', async () => {

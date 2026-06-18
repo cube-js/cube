@@ -1,0 +1,42 @@
+---
+title: Line
+description: Track how a measure changes over time or across an ordered dimension.
+---
+
+Line charts connect data points with a continuous line. Use them when the direction and rate of change matter — trends over time, trajectories of multiple series, or any ordered dimension where continuity is meaningful.
+
+## Variants
+
+### Single series
+
+One measure plotted against a time or ordered dimension. The simplest and most common use case.
+
+{/* Screenshot: single-series line chart — total revenue by month over 12 months. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Multi-series
+
+Multiple lines plotted on the same axes. Map a second dimension to the **Color** channel to split one measure into one line per dimension value, or add multiple measures to the Y axis to plot them as separate series.
+
+{/* Screenshot: multi-series line chart — order count by week, split by order status (3–4 colored lines). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### With reference line
+
+A horizontal reference line marks a target, threshold, or benchmark. Added via the **Axes** section of the Style tab.
+
+{/* Screenshot: line chart with a dashed reference line at a target value, label visible on the right side of the line. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Reference lines
+
+Add a horizontal reference line in the **Y axis** section of the Style tab. Set the value, label, color, and line style (solid, dashed, or dotted). Multiple reference lines are supported.
+
+{/* Screenshot: reference line configuration panel open — value field, label field, style dropdown. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+See [Axes](/docs/explore-analyze/charts/configuration/axes) for the full configuration reference.
+
+## Axis behavior
+
+Line charts use a temporal X axis for time dimensions — continuous, time-aware, and not constrained to the result set. For non-time dimensions, the axis is ordinal and follows the result set sort order. Gaps in the line indicate missing data points.
+
+## Combining with bars
+
+To layer a line on top of a bar chart, add a second series to the Y axis, set its mark type to **Line** in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration), and assign it to the right Y axis for a dual-axis layout.

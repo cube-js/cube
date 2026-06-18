@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:22.20.0-bookworm-slim AS builder
+FROM node:22.22.0-bookworm-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -22,7 +22,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:22.20.0-bookworm-slim
+FROM node:22.22.0-bookworm-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -49,6 +49,8 @@ COPY --chown=cube:cube --from=builder /cube .
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 ENV PYTHONUNBUFFERED=1
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
 RUN ln -s /cube/node_modules/.bin/cubestore-dev /usr/local/bin/cubestore-dev
 

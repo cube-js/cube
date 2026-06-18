@@ -1,32 +1,27 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
-use chrono::Datelike as _;
 use datafusion::{
     arrow::{
-        array::{ArrayRef, Date32Array, Float64Array, Int32Array, ListArray},
+        array::{ArrayRef, ArrowPrimitiveType, Date32Array, Float64Array, ListArray},
         compute::cast,
-        datatypes::{DataType, Field, TimeUnit},
+        datatypes::{DataType, Date32Type, Field, Float64Type, TimeUnit},
     },
+    common::utils::proxy::VecAllocExt,
     error::{DataFusionError, Result},
-    physical_plan::{
-        aggregates::{AccumulatorFunctionImplementation, StateTypeFunction},
-        functions::{ReturnTypeFunction, Signature},
-        udaf::AggregateUDF,
-        Accumulator,
+    logical_expr::{
+        function::{AccumulatorArgs, StateFieldsArgs},
+        utils::format_state_name,
+        AggregateUDFImpl, Signature, TypeSignature, Volatility,
     },
+    physical_plan::Accumulator,
     scalar::ScalarValue,
 };
-use smallvec::SmallVec;
 
 // This is copy/pasted and edited from cubesql in a file xirr.rs -- you might need to update both.
-//
-// Some differences here:
-// - the Accumulator trait has reset, merge, and update functions that operate on ScalarValues.
-// - List of Date32 isn't allowed, so we use List of Int32 in state values.
 
 pub const XIRR_UDAF_NAME: &str = "xirr";
 
-/// Creates a XIRR Aggregate UDF.
+/// An XIRR Aggregate UDF.
 ///
 /// Syntax:
 /// ```sql
@@ -55,57 +50,104 @@ pub const XIRR_UDAF_NAME: &str = "xirr";
 /// The function returns `on_error` value (or yields an error if omitted) if:
 /// - The function cannot find a solution after a set number of iterations.
 /// - The calculation failed due to internal division by 0.
-pub fn create_xirr_udaf() -> AggregateUDF {
-    let name = XIRR_UDAF_NAME;
-    let type_signatures = {
-        // Only types actually used by cubesql are included
-        const NUMERIC_TYPES: &[DataType] = &[DataType::Float64, DataType::Int64, DataType::Int32];
-        const DATETIME_TYPES: &[DataType] = &[
-            DataType::Date32,
-            DataType::Timestamp(TimeUnit::Nanosecond, None),
-            DataType::Timestamp(TimeUnit::Millisecond, None),
-        ];
-        let mut type_signatures = Vec::with_capacity(45);
-        for payment_type in NUMERIC_TYPES {
-            for date_type in DATETIME_TYPES {
-                // Base signatures without `initial_guess` and `on_error` arguments
-                type_signatures.push(Signature::Exact(vec![
-                    payment_type.clone(),
-                    date_type.clone(),
-                ]));
-                // Signatures with `initial_guess` argument; only [`DataType::Float64`] is accepted
-                const INITIAL_GUESS_TYPE: DataType = DataType::Float64;
-                type_signatures.push(Signature::Exact(vec![
-                    payment_type.clone(),
-                    date_type.clone(),
-                    INITIAL_GUESS_TYPE,
-                ]));
-                // Signatures with `initial_guess` and `on_error` arguments
-                for on_error_type in NUMERIC_TYPES {
-                    type_signatures.push(Signature::Exact(vec![
+
+#[derive(Debug)]
+pub(crate) struct XirrUDF {
+    signature: Signature,
+}
+
+impl XirrUDF {
+    pub fn new() -> XirrUDF {
+        let type_signatures = {
+            // Only types actually used by cubesql are included
+            const NUMERIC_TYPES: &[DataType] =
+                &[DataType::Float64, DataType::Int64, DataType::Int32];
+            const DATETIME_TYPES: &[DataType] = &[
+                DataType::Date32,
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+            ];
+            let mut type_signatures = Vec::with_capacity(45);
+            for payment_type in NUMERIC_TYPES {
+                for date_type in DATETIME_TYPES {
+                    // Base signatures without `initial_guess` and `on_error` arguments
+                    type_signatures.push(TypeSignature::Exact(vec![
+                        payment_type.clone(),
+                        date_type.clone(),
+                    ]));
+                    // Signatures with `initial_guess` argument; only [`DataType::Float64`] is accepted
+                    const INITIAL_GUESS_TYPE: DataType = DataType::Float64;
+                    type_signatures.push(TypeSignature::Exact(vec![
                         payment_type.clone(),
                         date_type.clone(),
                         INITIAL_GUESS_TYPE,
-                        on_error_type.clone(),
                     ]));
+                    // Signatures with `initial_guess` and `on_error` arguments
+                    for on_error_type in NUMERIC_TYPES {
+                        type_signatures.push(TypeSignature::Exact(vec![
+                            payment_type.clone(),
+                            date_type.clone(),
+                            INITIAL_GUESS_TYPE,
+                            on_error_type.clone(),
+                        ]));
+                    }
                 }
             }
+            type_signatures
+        };
+        let type_signature = TypeSignature::OneOf(type_signatures);
+        XirrUDF {
+            signature: Signature {
+                type_signature,
+                volatility: Volatility::Immutable,
+            },
         }
-        type_signatures
-    };
-    let signature = Signature::OneOf(type_signatures);
-    let return_type: ReturnTypeFunction = Arc::new(|_| Ok(Arc::new(DataType::Float64)));
-    let accumulator: AccumulatorFunctionImplementation =
-        Arc::new(|| Ok(Box::new(XirrAccumulator::new())));
-    let state_type: StateTypeFunction = Arc::new(|_| {
-        Ok(Arc::new(vec![
-            DataType::List(Box::new(Field::new("item", DataType::Float64, true))),
-            DataType::List(Box::new(Field::new("item", DataType::Int32, true))), // Date32
-            DataType::List(Box::new(Field::new("item", DataType::Float64, true))),
-            DataType::List(Box::new(Field::new("item", DataType::Float64, true))),
-        ]))
-    });
-    AggregateUDF::new(name, &signature, &return_type, &accumulator, &state_type)
+    }
+}
+
+impl AggregateUDFImpl for XirrUDF {
+    fn name(&self) -> &str {
+        XIRR_UDAF_NAME
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, _arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Float64)
+    }
+    fn accumulator(
+        &self,
+        _acc_args: AccumulatorArgs,
+    ) -> datafusion::common::Result<Box<dyn Accumulator>> {
+        Ok(Box::new(XirrAccumulator::new()))
+    }
+    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
+        Ok(vec![
+            Field::new(
+                format_state_name(args.name, "payments"),
+                DataType::List(Arc::new(Field::new_list_field(DataType::Float64, true))),
+                false,
+            ),
+            Field::new(
+                format_state_name(args.name, "dates"),
+                DataType::List(Arc::new(Field::new_list_field(DataType::Date32, true))),
+                false,
+            ),
+            Field::new(
+                format_state_name(args.name, "initial_guess"),
+                DataType::List(Arc::new(Field::new_list_field(DataType::Float64, true))),
+                false,
+            ),
+            Field::new(
+                format_state_name(args.name, "on_error"),
+                DataType::List(Arc::new(Field::new_list_field(DataType::Float64, true))),
+                false,
+            ),
+        ])
+    }
 }
 
 #[derive(Debug)]
@@ -171,275 +213,216 @@ impl XirrAccumulator {
             ValueState::Set(on_error) => Ok(ScalarValue::Float64(on_error)),
         }
     }
-}
 
-fn cast_scalar_to_float64(scalar: &ScalarValue) -> Result<Option<f64>> {
-    fn err(from_type: &str) -> Result<Option<f64>> {
-        Err(DataFusionError::Internal(format!(
-            "cannot cast {} to Float64",
-            from_type
-        )))
-    }
-    match scalar {
-        ScalarValue::Boolean(_) => err("Boolean"),
-        ScalarValue::Float32(o) => Ok(o.map(f64::from)),
-        ScalarValue::Float64(o) => Ok(*o),
-        ScalarValue::Int8(o) => Ok(o.map(f64::from)),
-        ScalarValue::Int16(o) => Ok(o.map(f64::from)),
-        ScalarValue::Int32(o) => Ok(o.map(f64::from)),
-        ScalarValue::Int64(o) => Ok(o.map(|x| x as f64)),
-        ScalarValue::Int96(o) => Ok(o.map(|x| x as f64)),
-        ScalarValue::Int64Decimal(o, scale) => {
-            Ok(o.map(|x| (x as f64) / 10f64.powi(*scale as i32)))
-        }
-        ScalarValue::Int96Decimal(o, scale) => {
-            Ok(o.map(|x| (x as f64) / 10f64.powi(*scale as i32)))
-        }
-        ScalarValue::UInt8(o) => Ok(o.map(f64::from)),
-        ScalarValue::UInt16(o) => Ok(o.map(f64::from)),
-        ScalarValue::UInt32(o) => Ok(o.map(f64::from)),
-        ScalarValue::UInt64(o) => Ok(o.map(|x| x as f64)),
-        ScalarValue::Utf8(_) => err("Utf8"),
-        ScalarValue::LargeUtf8(_) => err("LargeUtf8"),
-        ScalarValue::Binary(_) => err("Binary"),
-        ScalarValue::LargeBinary(_) => err("LargeBinary"),
-        ScalarValue::List(_, _dt) => err("List"),
-        ScalarValue::Date32(_) => err("Date32"),
-        ScalarValue::Date64(_) => err("Date64"),
-        ScalarValue::TimestampSecond(_) => err("TimestampSecond"),
-        ScalarValue::TimestampMillisecond(_) => err("TimestampMillisecond"),
-        ScalarValue::TimestampMicrosecond(_) => err("TimestampMicrosecond"),
-        ScalarValue::TimestampNanosecond(_) => err("TimestampNanosecond"),
-        ScalarValue::IntervalYearMonth(_) => err("IntervalYearMonth"),
-        ScalarValue::IntervalDayTime(_) => err("IntervalDayTime"),
+    fn allocated_size(&self) -> usize {
+        let XirrAccumulator {
+            pairs,
+            initial_guess,
+            on_error,
+        } = self;
+        pairs.allocated_size() + initial_guess.allocated_size() + on_error.allocated_size()
     }
 }
 
-fn cast_scalar_to_date32(scalar: &ScalarValue) -> Result<Option<i32>> {
-    fn err(from_type: &str) -> Result<Option<i32>> {
-        Err(DataFusionError::Internal(format!(
-            "cannot cast {} to Date32",
-            from_type
-        )))
-    }
-    fn string_to_date32(o: &Option<String>) -> Result<Option<i32>> {
-        if let Some(x) = o {
-            // Consistent with cast() in update_batch being configured with the "safe" option true, so we return None (null value) if there is a cast error.
-            Ok(x.parse::<chrono::NaiveDate>()
-                .map(|date| date.num_days_from_ce() - EPOCH_DAYS_FROM_CE)
-                .ok())
-        } else {
-            Ok(None)
-        }
-    }
+// TODO upgrade DF: Remove these, say, once we've confirmed we are not porting Cube's inplace
+// aggregate implementation.  These would be used by update or merge functions in the Accumulator
+// trait -- functions which no longer exist.
 
-    // Number of days between 0001-01-01 and 1970-01-01
-    const EPOCH_DAYS_FROM_CE: i32 = 719_163;
+// fn cast_scalar_to_float64(scalar: &ScalarValue) -> Result<Option<f64>> {
+//     fn err(from_type: &str) -> Result<Option<f64>> {
+//         Err(DataFusionError::Internal(format!(
+//             "cannot cast {} to Float64",
+//             from_type
+//         )))
+//     }
+//     match scalar {
+//         ScalarValue::Null => err("Null"),
+//         ScalarValue::Boolean(_) => err("Boolean"),
+//         ScalarValue::Float16(o) => Ok(o.map(f64::from)),
+//         ScalarValue::Float32(o) => Ok(o.map(f64::from)),
+//         ScalarValue::Float64(o) => Ok(*o),
+//         ScalarValue::Int8(o) => Ok(o.map(f64::from)),
+//         ScalarValue::Int16(o) => Ok(o.map(f64::from)),
+//         ScalarValue::Int32(o) => Ok(o.map(f64::from)),
+//         ScalarValue::Int64(o) => Ok(o.map(|x| x as f64)),
+//         ScalarValue::Decimal128(o, precision, scale) => {
+//             Ok(o.map(|x| (x as f64) / 10f64.powi(*scale as i32)))
+//         }
+//         ScalarValue::Decimal256(o, precision, scale) => err("Decimal256"),  // TODO?
+//         ScalarValue::UInt8(o) => Ok(o.map(f64::from)),
+//         ScalarValue::UInt16(o) => Ok(o.map(f64::from)),
+//         ScalarValue::UInt32(o) => Ok(o.map(f64::from)),
+//         ScalarValue::UInt64(o) => Ok(o.map(|x| x as f64)),
+//         ScalarValue::Utf8(_) => err("Utf8"),
+//         ScalarValue::Utf8View(_) => err("Utf8View"),
+//         ScalarValue::LargeUtf8(_) => err("LargeUtf8"),
+//         ScalarValue::Binary(_) => err("Binary"),
+//         ScalarValue::BinaryView(_) => err("BinaryView"),
+//         ScalarValue::FixedSizeBinary(_, _) => err("FixedSizeBinary"),
+//         ScalarValue::LargeBinary(_) => err("LargeBinary"),
+//         ScalarValue::FixedSizeList(_) => err("FixedSizeList"),
+//         ScalarValue::List(_) => err("List"),
+//         ScalarValue::LargeList(_) => err("LargeList"),
+//         ScalarValue::Struct(_) => err("Struct"),
+//         ScalarValue::Map(_) => err("Map"),
+//         ScalarValue::Date32(_) => err("Date32"),
+//         ScalarValue::Date64(_) => err("Date64"),
+//         ScalarValue::Time32Second(_) => err("Time32Second"),
+//         ScalarValue::Time32Millisecond(_) => err("Time32Millisecond"),
+//         ScalarValue::Time64Microsecond(_) => err("Time64Microsecond"),
+//         ScalarValue::Time64Nanosecond(_) => err("Time64Nanosecond"),
+//         ScalarValue::TimestampSecond(_, _) => err("TimestampSecond"),
+//         ScalarValue::TimestampMillisecond(_, _) => err("TimestampMillisecond"),
+//         ScalarValue::TimestampMicrosecond(_, _) => err("TimestampMicrosecond"),
+//         ScalarValue::TimestampNanosecond(_, _) => err("TimestampNanosecond"),
+//         ScalarValue::IntervalYearMonth(_) => err("IntervalYearMonth"),
+//         ScalarValue::IntervalDayTime(_) => err("IntervalDayTime"),
+//         ScalarValue::IntervalMonthDayNano(_) => err("IntervalMonthDayNano"),
+//         ScalarValue::DurationSecond(_) => err("DurationSecond"),
+//         ScalarValue::DurationMillisecond(_) => err("DurationMillisecond"),
+//         ScalarValue::DurationMicrosecond(_) => err("DurationMicrosecond"),
+//         ScalarValue::DurationNanosecond(_) => err("DurationNanosecond"),
+//         ScalarValue::Union(_, _, _) => err("Union"),
+//         ScalarValue::Dictionary(_, _) => err("Dictionary"),
+//     }
+// }
 
-    const SECONDS_IN_DAY: i64 = 86_400;
-    const MILLISECONDS_IN_DAY: i64 = SECONDS_IN_DAY * 1_000;
+// fn cast_scalar_to_date32(scalar: &ScalarValue) -> Result<Option<i32>> {
+//     fn err(from_type: &str) -> Result<Option<i32>> {
+//         Err(DataFusionError::Internal(format!(
+//             "cannot cast {} to Date32",
+//             from_type
+//         )))
+//     }
+//     fn string_to_date32(o: &Option<String>) -> Result<Option<i32>> {
+//         if let Some(x) = o {
+//             // Consistent with cast() in update_batch being configured with the "safe" option true, so we return None (null value) if there is a cast error.
+//             Ok(x.parse::<chrono::NaiveDate>()
+//                 .map(|date| date.num_days_from_ce() - EPOCH_DAYS_FROM_CE)
+//                 .ok())
+//         } else {
+//             Ok(None)
+//         }
+//     }
 
-    match scalar {
-        ScalarValue::Boolean(_) => err("Boolean"),
-        ScalarValue::Float32(_) => err("Float32"),
-        ScalarValue::Float64(_) => err("Float64"),
-        ScalarValue::Int8(_) => err("Int8"),
-        ScalarValue::Int16(_) => err("Int16"),
-        ScalarValue::Int32(o) => Ok(*o),
-        ScalarValue::Int64(o) => Ok(o.and_then(|x| num::NumCast::from(x))),
-        ScalarValue::Int96(_) => err("Int96"),
-        ScalarValue::Int64Decimal(_, _scale) => err("Int64Decimal"),
-        ScalarValue::Int96Decimal(_, _scale) => err("Int96Decimal"),
-        ScalarValue::UInt8(_) => err("UInt8"),
-        ScalarValue::UInt16(_) => err("UInt16"),
-        ScalarValue::UInt32(_) => err("UInt32"),
-        ScalarValue::UInt64(_) => err("UInt64"),
-        ScalarValue::Utf8(o) => string_to_date32(o),
-        ScalarValue::LargeUtf8(o) => string_to_date32(o),
-        ScalarValue::Binary(_) => err("Binary"),
-        ScalarValue::LargeBinary(_) => err("LargeBinary"),
-        ScalarValue::List(_, _dt) => err("List"),
-        ScalarValue::Date32(o) => Ok(*o),
-        ScalarValue::Date64(o) => Ok(o.map(|x| (x / MILLISECONDS_IN_DAY) as i32)),
-        ScalarValue::TimestampSecond(o) => Ok(o.map(|x| (x / SECONDS_IN_DAY) as i32)),
-        ScalarValue::TimestampMillisecond(o) => Ok(o.map(|x| (x / MILLISECONDS_IN_DAY) as i32)),
-        ScalarValue::TimestampMicrosecond(o) => {
-            Ok(o.map(|x| (x / (1_000_000 * SECONDS_IN_DAY)) as i32))
-        }
-        ScalarValue::TimestampNanosecond(o) => {
-            Ok(o.map(|x| (x / (1_000_000_000 * SECONDS_IN_DAY)) as i32))
-        }
-        ScalarValue::IntervalYearMonth(_) => err("IntervalYearMonth"),
-        ScalarValue::IntervalDayTime(_) => err("IntervalDayTime"),
-    }
+//     // Number of days between 0001-01-01 and 1970-01-01
+//     const EPOCH_DAYS_FROM_CE: i32 = 719_163;
+
+//     const SECONDS_IN_DAY: i64 = 86_400;
+//     const MILLISECONDS_IN_DAY: i64 = SECONDS_IN_DAY * 1_000;
+
+//     match scalar {
+//         ScalarValue::Null => err("Null"),
+//         ScalarValue::Boolean(_) => err("Boolean"),
+//         ScalarValue::Float16(_) => err("Float16"),
+//         ScalarValue::Float32(_) => err("Float32"),
+//         ScalarValue::Float64(_) => err("Float64"),
+//         ScalarValue::Int8(_) => err("Int8"),
+//         ScalarValue::Int16(_) => err("Int16"),
+//         ScalarValue::Int32(o) => Ok(*o),
+//         ScalarValue::Int64(o) => Ok(o.and_then(|x| num::NumCast::from(x))),
+//         ScalarValue::Decimal128(_, _, _) => err("Decimal128"),
+//         ScalarValue::Decimal256(_, _, _) => err("Decimal256"),
+//         ScalarValue::UInt8(_) => err("UInt8"),
+//         ScalarValue::UInt16(_) => err("UInt16"),
+//         ScalarValue::UInt32(_) => err("UInt32"),
+//         ScalarValue::UInt64(_) => err("UInt64"),
+//         ScalarValue::Utf8(o) => string_to_date32(o),
+//         ScalarValue::Utf8View(o) => string_to_date32(o),
+//         ScalarValue::LargeUtf8(o) => string_to_date32(o),
+//         ScalarValue::Binary(_) => err("Binary"),
+//         ScalarValue::BinaryView(_) => err("BinaryView"),
+//         ScalarValue::FixedSizeBinary(_, _) => err("FixedSizeBinary"),
+//         ScalarValue::LargeBinary(_) => err("LargeBinary"),
+//         ScalarValue::FixedSizeList(_) => err("FixedSizeList"),
+//         ScalarValue::List(_) => err("List"),
+//         ScalarValue::LargeList(_) => err("LargeList"),
+//         ScalarValue::Struct(_) => err("Struct"),
+//         ScalarValue::Map(_) => err("Map"),
+//         ScalarValue::Date32(o) => Ok(*o),
+//         ScalarValue::Date64(o) => Ok(o.map(|x| (x / MILLISECONDS_IN_DAY) as i32)),
+//         ScalarValue::Time32Second(_) => err("Time32Second"),
+//         ScalarValue::Time32Millisecond(_) => err("Time32Millisecond"),
+//         ScalarValue::Time64Microsecond(_) => err("Time64Microsecond"),
+//         ScalarValue::Time64Nanosecond(_) => err("Time64Nanosecond"),
+
+//         ScalarValue::TimestampSecond(o, _tz) => Ok(o.map(|x| (x / SECONDS_IN_DAY) as i32)),
+//         ScalarValue::TimestampMillisecond(o, _tz) => Ok(o.map(|x| (x / MILLISECONDS_IN_DAY) as i32)),
+//         ScalarValue::TimestampMicrosecond(o, _tz) => {
+//             Ok(o.map(|x| (x / (1_000_000 * SECONDS_IN_DAY)) as i32))
+//         }
+//         ScalarValue::TimestampNanosecond(o, _tz) => {
+//             Ok(o.map(|x| (x / (1_000_000_000 * SECONDS_IN_DAY)) as i32))
+//         }
+//         ScalarValue::IntervalYearMonth(_) => err("IntervalYearMonth"),
+//         ScalarValue::IntervalDayTime(_) => err("IntervalDayTime"),
+//         ScalarValue::IntervalMonthDayNano(_) => err("IntervalMonthDayNano"),
+//         ScalarValue::DurationSecond(_) => err("DurationSecond"),
+//         ScalarValue::DurationMillisecond(_) => err("DurationMillisecond"),
+//         ScalarValue::DurationMicrosecond(_) => err("DurationMicrosecond"),
+//         ScalarValue::DurationNanosecond(_) => err("DurationNanosecond"),
+//         ScalarValue::Union(_, _, _) => err("Union"),
+//         ScalarValue::Dictionary(_, _) => err("Dictionary"),
+//     }
+// }
+
+fn single_element_listarray<T, P>(iter: P) -> ListArray
+where
+    T: ArrowPrimitiveType,
+    P: IntoIterator<Item = Option<<T as ArrowPrimitiveType>::Native>>,
+{
+    ListArray::from_iter_primitive::<T, P, _>(vec![Some(iter)])
 }
 
 impl Accumulator for XirrAccumulator {
-    fn reset(&mut self) {
+    // Note that we don't have a GroupsAccumulator implementation for Xirr.
+
+    // We keep implementations of the Cube extension functions (reset and peek_... patched into DF)
+    // because our state and evaluate implementations would be immutable anyway, to avoid
+    // differences between branches before and after the upgrade to DF >= 42.
+
+    fn reset(&mut self) -> Result<()> {
         self.pairs.clear();
         self.initial_guess = ValueState::Unset;
         self.on_error = ValueState::Unset;
-    }
-
-    fn update(&mut self, values: &[ScalarValue]) -> Result<()> {
-        let payment = cast_scalar_to_float64(&values[0])?;
-        let date = cast_scalar_to_date32(&values[1])?;
-        self.add_pair(payment, date)?;
-        let values_len = values.len();
-        if values_len < 3 {
-            return Ok(());
-        }
-        let ScalarValue::Float64(initial_guess) = values[2] else {
-            return Err(DataFusionError::Internal(format!(
-                "XIRR initial guess should be a Float64 but it was of type {}",
-                values[2].get_datatype()
-            )));
-        };
-        self.set_initial_guess(initial_guess)?;
-        if values_len < 4 {
-            return Ok(());
-        }
-        let on_error = cast_scalar_to_float64(&values[3])?;
-        self.set_on_error(on_error)?;
         Ok(())
     }
 
-    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
-        if states.len() != 4 {
-            return Err(DataFusionError::Internal(format!(
-                "Merging XIRR states list with {} columns instead of 4",
-                states.len()
-            )));
-        }
-        // payments and dates
-        {
-            let ScalarValue::List(payments, payments_datatype) = &states[0] else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR payments state must be a List but it was of type {}",
-                    states[0].get_datatype()
-                )));
-            };
-            if payments_datatype.as_ref() != &DataType::Float64 {
-                return Err(DataFusionError::Internal(format!("XIRR payments state must be a List of Float64 but it was a List with element type {}", payments_datatype)));
-            }
-            let ScalarValue::List(dates, dates_datatype) = &states[1] else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR dates state must be a List but it was of type {}",
-                    states[1].get_datatype()
-                )));
-            };
-            if dates_datatype.as_ref() != &DataType::Int32 {
-                return Err(DataFusionError::Internal(format!("XIRR dates state must be a List of Int32 but it was a List with element type {}", dates_datatype)));
-            }
-            let Some(payments) = payments else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR payments state is null in merge"
-                )));
-            };
-            let Some(dates) = dates else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR dates state is null, payments not null in merge"
-                )));
-            };
+    fn peek_state(&self) -> Result<Vec<ScalarValue>> {
+        let (payments_vec, dates_vec): (Vec<_>, Vec<_>) =
+            self.pairs.iter().copied::<(f64, i32)>().unzip();
 
-            for (payment, date) in payments.iter().zip(dates.iter()) {
-                let ScalarValue::Float64(payment) = payment else {
-                    return Err(DataFusionError::Internal(format!(
-                        "XIRR payment in List is not a Float64"
-                    )));
-                };
-                let ScalarValue::Int32(date) = date else {
-                    // Date32
-                    return Err(DataFusionError::Internal(format!(
-                        "XIRR date in List is not an Int32"
-                    )));
-                };
-                self.add_pair(*payment, *date)?;
-            }
-        }
-        // initial_guess
-        {
-            let ScalarValue::List(initial_guess_list, initial_guess_dt) = &states[2] else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR initial guess state is not a List in merge"
-                )));
-            };
-            if initial_guess_dt.as_ref() != &DataType::Float64 {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR initial guess state is not a List of Float64 in merge"
-                )));
-            }
-            let Some(initial_guess_list) = initial_guess_list else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR initial guess state is a null list in merge"
-                )));
-            };
-            // To be clear this list has 0 or 1 elements which may be null.
-            for initial_guess in initial_guess_list.iter() {
-                let ScalarValue::Float64(guess) = initial_guess else {
-                    return Err(DataFusionError::Internal(format!(
-                        "XIRR initial guess in List is not a Float64"
-                    )));
-                };
-                self.set_initial_guess(*guess)?;
-            }
-        }
-        // on_error
-        {
-            let ScalarValue::List(on_error_list, on_error_dt) = &states[3] else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR on_error state is not a List in merge"
-                )));
-            };
-            if on_error_dt.as_ref() != &DataType::Float64 {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR on_error state is not a List of Float64 in merge"
-                )));
-            }
+        let payments_list =
+            single_element_listarray::<Float64Type, _>(payments_vec.into_iter().map(|p| Some(p)));
+        let dates_list =
+            single_element_listarray::<Date32Type, _>(dates_vec.into_iter().map(|p| Some(p)));
 
-            let Some(on_error_list) = on_error_list else {
-                return Err(DataFusionError::Internal(format!(
-                    "XIRR on_error state is a null list in merge"
-                )));
-            };
-            // To be clear this list has 0 or 1 elements which may be null.
-            for on_error in on_error_list.iter() {
-                let ScalarValue::Float64(on_error) = on_error else {
-                    return Err(DataFusionError::Internal(format!(
-                        "XIRR on_error in List is not a Float64"
-                    )));
-                };
-                self.set_on_error(*on_error)?;
+        let initial_guess_list = match self.initial_guess {
+            ValueState::Unset => {
+                single_element_listarray::<Float64Type, _>(([] as [Option<f64>; 0]).into_iter())
             }
-        }
-
-        Ok(())
-    }
-
-    fn state(&self) -> Result<SmallVec<[ScalarValue; 2]>> {
-        let (payments, dates): (Vec<_>, Vec<_>) = self
-            .pairs
-            .iter()
-            .map(|(payment, date)| {
-                let payment = ScalarValue::Float64(Some(*payment));
-                let date = ScalarValue::Int32(Some(*date)); // Date32
-                (payment, date)
-            })
-            .unzip();
-        let initial_guess = match self.initial_guess {
-            ValueState::Unset => vec![],
-            ValueState::Set(initial_guess) => vec![ScalarValue::Float64(initial_guess)],
+            ValueState::Set(initial_guess) => single_element_listarray::<Float64Type, _>(
+                ([initial_guess] as [Option<f64>; 1]).into_iter(),
+            ),
         };
-        let on_error = match self.on_error {
-            ValueState::Unset => vec![],
-            ValueState::Set(on_error) => vec![ScalarValue::Float64(on_error)],
+        let on_error_list = match self.on_error {
+            ValueState::Unset => {
+                single_element_listarray::<Float64Type, _>(([] as [Option<f64>; 0]).into_iter())
+            }
+            ValueState::Set(on_error) => single_element_listarray::<Float64Type, _>(
+                ([on_error] as [Option<f64>; 1]).into_iter(),
+            ),
         };
-        Ok(smallvec::smallvec![
-            ScalarValue::List(Some(Box::new(payments)), Box::new(DataType::Float64)),
-            ScalarValue::List(Some(Box::new(dates)), Box::new(DataType::Int32)), // Date32
-            ScalarValue::List(Some(Box::new(initial_guess)), Box::new(DataType::Float64)),
-            ScalarValue::List(Some(Box::new(on_error)), Box::new(DataType::Float64)),
+        Ok(vec![
+            ScalarValue::List(Arc::new(payments_list)),
+            ScalarValue::List(Arc::new(dates_list)),
+            ScalarValue::List(Arc::new(initial_guess_list)),
+            ScalarValue::List(Arc::new(on_error_list)),
         ])
+    }
+
+    fn state(&mut self) -> Result<Vec<ScalarValue>> {
+        self.peek_state()
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
@@ -487,7 +470,7 @@ impl Accumulator for XirrAccumulator {
             .downcast_ref::<ListArray>()
             .unwrap()
             .values();
-        let dates = dates.as_any().downcast_ref::<Int32Array>().unwrap(); // Date32Array
+        let dates = dates.as_any().downcast_ref::<Date32Array>().unwrap();
         for (payment, date) in payments.into_iter().zip(dates) {
             self.add_pair(payment, date)?;
         }
@@ -517,7 +500,7 @@ impl Accumulator for XirrAccumulator {
         Ok(())
     }
 
-    fn evaluate(&self) -> Result<ScalarValue> {
+    fn peek_evaluate(&self) -> Result<ScalarValue> {
         const MAX_ITERATIONS: usize = 100;
         const TOLERANCE: f64 = 1e-6;
         const DEFAULT_INITIAL_GUESS: f64 = 0.1;
@@ -568,6 +551,14 @@ impl Accumulator for XirrAccumulator {
         }
         self.yield_no_solution()
     }
+
+    fn evaluate(&mut self) -> Result<ScalarValue> {
+        self.peek_evaluate()
+    }
+
+    fn size(&self) -> usize {
+        size_of::<Self>() + self.allocated_size()
+    }
 }
 
 #[derive(Debug)]
@@ -582,5 +573,11 @@ impl<T: Copy> ValueState<T> {
             ValueState::Unset => None,
             ValueState::Set(value) => *value,
         }
+    }
+
+    #[inline(always)]
+    /// Zero.  Note that T: Copy.
+    fn allocated_size(&self) -> usize {
+        0
     }
 }

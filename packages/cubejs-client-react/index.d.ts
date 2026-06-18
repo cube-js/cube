@@ -32,6 +32,7 @@ declare module '@cubejs-client/react' {
     BinaryOperator,
     DeeplyReadonly,
     QueryRecordType,
+    CacheMode,
   } from '@cubejs-client/core';
 
   type CubeProviderOptions = {
@@ -139,6 +140,10 @@ declare module '@cubejs-client/react' {
      * `CubeApi` instance to use
      */
     cubeApi?: CubeApi;
+    /**
+     * Server-side cache policy for query execution. Does not control client-side caching.
+     */
+    cache?: CacheMode;
     /**
      * Output of this function will be rendered by the `QueryRenderer`
      */
@@ -477,6 +482,10 @@ declare module '@cubejs-client/react' {
      * If enabled, all members of the 'number' type will be automatically converted to numerical values on the client side
      */
     castNumerics?: boolean;
+    /**
+     * Server-side cache policy for query execution. Does not control client-side caching.
+     */
+    cache?: CacheMode;
   };
 
   type UseCubeQueryResult<TQuery, TData> = {

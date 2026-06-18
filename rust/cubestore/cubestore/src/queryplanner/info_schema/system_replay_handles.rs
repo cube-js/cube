@@ -1,10 +1,11 @@
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointerForLocation};
 use crate::metastore::IdRow;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array,
+    ArrayRef, BooleanBuilder, StringBuilder, TimestampNanosecondBuilder, UInt64Builder,
 };
 use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
@@ -19,8 +20,8 @@ impl InfoSchemaTableDef for SystemReplayHandlesTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         _limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.meta_store.all_replay_handles().await?))
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.meta_store.all_replay_handles().await?)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -37,37 +38,29 @@ impl InfoSchemaTableDef for SystemReplayHandlesTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut table_id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut failed_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut seq_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut created_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+
+        for row in rows.into_iter() {
+            id_builder.append_value(row.get_id());
+            let handle = row.get_row();
+            table_id_builder.append_value(handle.table_id());
+            failed_builder.append_value(handle.has_failed_to_persist_chunks());
+            seq_builder.append_value(format!("{:?}", handle.seq_pointers_by_location()));
+            created_builder.append_value(timestamp_nanos_or_panic(handle.created_at()));
+        }
+
         vec![
-            Box::new(|handles| {
-                Arc::new(UInt64Array::from_iter_values(
-                    handles.iter().map(|row| row.get_id()),
-                ))
-            }),
-            Box::new(|handles| {
-                Arc::new(UInt64Array::from_iter_values(
-                    handles.iter().map(|row| row.get_row().table_id()),
-                ))
-            }),
-            Box::new(|handles| {
-                Arc::new(BooleanArray::from_iter(
-                    handles
-                        .iter()
-                        .map(|row| Some(row.get_row().has_failed_to_persist_chunks())),
-                ))
-            }),
-            Box::new(|jobs| {
-                Arc::new(StringArray::from_iter_values(jobs.iter().map(|row| {
-                    format!("{:?}", row.get_row().seq_pointers_by_location())
-                })))
-            }),
-            Box::new(|handles| {
-                Arc::new(TimestampNanosecondArray::from_iter_values(
-                    handles
-                        .iter()
-                        .map(|row| row.get_row().created_at().timestamp_nanos()),
-                ))
-            }),
+            Arc::new(id_builder.finish()),
+            Arc::new(table_id_builder.finish()),
+            Arc::new(failed_builder.finish()),
+            Arc::new(seq_builder.finish()),
+            Arc::new(created_builder.finish()),
         ]
     }
 }

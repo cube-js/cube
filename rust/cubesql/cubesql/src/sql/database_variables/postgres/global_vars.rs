@@ -34,6 +34,11 @@ pub fn defaults() -> DatabaseVariables {
             ScalarValue::Utf8(Some("en_US.utf8".to_string())),
             None,
         ),
+        DatabaseVariable::system(
+            "server_version_num".to_string(),
+            ScalarValue::Utf8(Some("140002".to_string())),
+            None,
+        ),
     ];
 
     let variables = IntoIterator::into_iter(variables)

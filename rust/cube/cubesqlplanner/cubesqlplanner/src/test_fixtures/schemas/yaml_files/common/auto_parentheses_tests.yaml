@@ -1,0 +1,131 @@
+cubes:
+    - name: expr_cube
+      sql: "SELECT * FROM expr_cube_table"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+          # Atomic single-column dimensions.
+          - name: atomic
+            type: number
+            sql: "{CUBE}.col"
+
+          - name: a
+            type: number
+            sql: "{CUBE}.a"
+
+          - name: b
+            type: number
+            sql: "{CUBE}.b"
+
+          # Compound: top-level arithmetic.
+          - name: compound_arith
+            type: number
+            sql: "{CUBE}.a + {CUBE}.b"
+
+          # Compound: top-level logical / comparison.
+          - name: compound_or
+            type: boolean
+            sql: "{CUBE}.a > 0 OR {CUBE}.b > 0"
+
+          # Consumer 1: compound in arithmetic context → should WRAP.
+          - name: arith_over_compound
+            type: number
+            sql: "{compound_arith} * 2"
+
+          # Consumer 2: compound in logical context → should WRAP.
+          - name: and_over_compound
+            type: boolean
+            sql: "{compound_or} AND {CUBE}.a > 10"
+
+          # Consumer 3: compound as function argument → NO wrap.
+          - name: abs_of_compound
+            type: number
+            sql: "ABS({compound_arith})"
+
+          # Consumer 4: compound inside CAST → NO wrap.
+          - name: cast_of_compound
+            type: number
+            sql: "CAST({compound_arith} AS INT)"
+
+          # Consumer 5: compound in CASE THEN branch — NO wrap.
+          - name: case_with_compound
+            type: number
+            sql: "CASE WHEN {CUBE}.a > 0 THEN {compound_arith} ELSE 0 END"
+
+          # Consumer 6: direct reference, single placeholder template — NO wrap.
+          - name: direct_compound
+            type: number
+            sql: "{compound_arith}"
+
+          # Consumer 7: atomic dep in arithmetic — NO wrap (dep output is atomic).
+          - name: arith_over_atomic
+            type: number
+            sql: "{atomic} * 2"
+
+      measures:
+          - name: cnt
+            type: count
+
+          # Atomic sum of a simple column.
+          - name: sum_a
+            type: sum
+            sql: "{CUBE}.a"
+
+          - name: sum_b
+            type: sum
+            sql: "{CUBE}.b"
+
+          # SUM(compound) — aggregate wrap is safe, so the inner chain should
+          # render without adding parens around the compound expression.
+          - name: sum_compound
+            type: sum
+            sql: "{compound_arith}"
+
+          # SUM with a compound template itself.
+          - name: sum_of_sum_template
+            type: sum
+            sql: "{CUBE}.a + {CUBE}.b"
+
+          # `type: number` — calculated measure, PassThrough aggregate wrap.
+          # Compound template at top level: no outer context, renders as-is.
+          - name: calc_number_compound
+            type: number
+            sql: "{sum_a} + {sum_b}"
+
+          # Calculated `number` with arithmetic over a compound calc measure —
+          # the dep's rendered SQL is `sum(a) + sum(b)` which is compound, so
+          # the outer `* 100` context must wrap it.
+          - name: calc_number_over_compound
+            type: number
+            sql: "{calc_number_compound} * 100"
+
+          # Calculated `number` with a logical expression at top level.
+          - name: calc_boolean_compound
+            type: boolean
+            sql: "{sum_a} > 0 OR {sum_b} > 0"
+
+          # Calculated `number` in AND context — compound dep must wrap.
+          - name: calc_boolean_combined
+            type: boolean
+            sql: "{calc_boolean_compound} AND {sum_a} > 100"
+
+          # Measure with a `case:` definition over compound branches.
+          # CASE wrap is safe, so the compound THEN branch does not need parens.
+          - name: measure_case
+            type: number
+            case:
+                when:
+                    - sql: "{CUBE}.a > 0"
+                      label: positive
+                else:
+                    label: other
+
+          # SUM over an arithmetic template that references a compound number
+          # measure — the outer SUM is a safe wrap, so no parens are needed
+          # around the compound child despite the enclosing `+ 1`.
+          - name: sum_over_calc_number_plus_one
+            type: sum
+            sql: "{calc_number_compound} + 1"

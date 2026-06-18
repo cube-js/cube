@@ -1,0 +1,135 @@
+---
+title: Skills
+description: Package reusable, named agent workflows in your data model repository that users can run on demand from chat.
+---
+
+Skills are reusable, named instruction packages for the agent — saved workflows a user
+can run on demand wherever they work with the agent, including
+[Analytics Chat](/docs/explore-analyze/analytics-chat), Workbooks, dashboards, and the
+IDE. Instead of re-typing the same multi-step request ("produce a weekly revenue report,
+broken down by region, with week-over-week trends…"), a user picks a skill and the agent
+follows the workflow you've defined.
+
+Skills are configured as code in your [data model repository](/admin/ai#agent-configuration),
+alongside your cubes and views, so they're versioned, reviewed, and deployed like the rest
+of your Cube project.
+
+<Note>
+A skill guides what the agent does using the same data access the agent already has. The
+first version of skills is instructions-only — `title`, `description`, and instructions.
+There is no per-skill data scoping or external actions yet.
+</Note>
+
+## Defining skills
+
+Skills are defined as Markdown files under `agents/skills/`. Each skill lives in its own
+file: the YAML frontmatter holds metadata, and the Markdown body is the instructions the
+agent follows.
+
+```markdown
+<!-- agents/skills/weekly-revenue-report.md -->
+---
+title: "Weekly revenue report"
+description: "Use when the user asks for a weekly revenue summary, a weekly revenue report, or week-over-week revenue trends."
+---
+Produce a weekly revenue report:
+
+1. Report total revenue for the requested week, alongside the prior week and the
+   week-over-week percentage change.
+2. Break revenue down by region, sorted from highest to lowest.
+3. Highlight any region whose revenue changed by more than 10% week over week.
+4. If the user names a region or a time range, scope the report accordingly.
+```
+
+Files placed under a `skills/` directory are treated as skills automatically — no `kind`
+property is required. The `name` is inferred from the file name (e.g.,
+`weekly-revenue-report.md` → `weekly-revenue-report`). Nested folders are allowed for
+organization but do not namespace the skill — skill names must be unique across the
+entire `skills/` directory.
+
+### Frontmatter properties
+
+| Property        | Type   | Required | Description                                                                       |
+|-----------------|--------|:--------:|-----------------------------------------------------------------------------------|
+| `title`         | string | Yes      | User-facing label shown on the skill button and in the `/` menu.                  |
+| `description`   | string | Yes      | What the agent matches free-text requests against to auto-select the skill.       |
+| `name`          | string | No       | Unique identifier. Inferred from the file name if omitted.                        |
+
+The Markdown body is the skill's instructions.
+
+### Inlining skills in YAML
+
+You can also inline skills directly in `agents/config.yml` under a `skills` key:
+
+```yaml
+# agents/config.yml
+skills:
+  - name: weekly-revenue-report
+    title: "Weekly revenue report"
+    description: "Use when the user asks for a weekly revenue summary or week-over-week trends."
+    instructions: |
+      Produce a weekly revenue report:
+      1. Total revenue for the requested week, with the week-over-week change.
+      2. A breakdown by region, sorted by revenue descending.
+      3. Highlight any region that moved more than 10% week over week.
+```
+
+Inline skills use the same `name`, `title` (required), and `description` (required) as
+Markdown skills. Since there is no Markdown body in YAML, provide the instructions inline
+via the `instructions` key.
+
+<Note>
+Skills inlined at the root of `agents/config.yml` are attached to the implicit `auto`
+space and applied to the default agent in a [single-agent setup](/admin/ai). In a
+[multi-agent setup](/admin/ai/multi-agent), attach skills to a specific space by inlining
+them under that space's `skills` key (or by placing Markdown files under
+`agents/skills/<space-name>/`).
+</Note>
+
+## How skills are surfaced
+
+Skills use **progressive disclosure**. The agent is given a compact catalog of every
+available skill — just the `name`, `title`, and `description` — so it knows what each
+skill is for without carrying the full instructions. When a skill is run, the agent loads
+its complete instructions on demand.
+
+- The chat UI only ever receives a skill's `name`, `title`, and `description`. The full
+  instruction body stays server-side and is never sent to the browser.
+- Skills are surfaced through a viewer-accessible deployment endpoint, so they work for
+  any configured agent as well as the default `auto` agent.
+- Because the agent matches against `description`, a well-written description makes
+  automatic matching more reliable.
+
+For how skills appear and run in chat — buttons, the `/` menu, and automatic matching —
+see [Agent skills](/docs/explore-analyze/skills).
+
+## Deploying and testing
+
+Skills ship through the normal Cube development flow: author the skill on a development
+branch, commit, and merge to your production branch. Because skills live on the branch, a
+skill on a development branch is testable before it reaches production — open chat against
+the dev branch and run the skill to confirm it behaves as intended.
+
+## Permissions
+
+Authoring skills requires data-model edit access — the same access needed to define
+[rules](/admin/ai/rules) and [certified queries](/admin/ai/certified-queries). In Cube
+Cloud's built-in roles, that means the **Admin** or **Developer**
+[roles](/admin/users-and-permissions/roles-and-permissions), or a custom role with
+semantic-model edit access.
+
+Running skills is available to anyone with chat access, including **Explorer** and
+**Viewer** roles. In-product tips that promote authoring skills, rules, and certified
+queries are role-aware and shown only to developers.
+
+## Writing effective skills
+
+- **Phrase `description` as a "use when…" statement.** This is what the agent matches
+  against incoming requests, so describe the situations the skill applies to.
+- **Write instructions as an explicit workflow.** Number the steps and state the output
+  you expect, the same way you'd brief an analyst.
+- **Account for added context.** Users can add specifics after selecting a skill (e.g.,
+  `/weekly-revenue-report for EMEA, last 6 weeks`), so instruct the agent to honor a
+  named region or time range when provided.
+- **Keep each skill focused.** One skill should cover one well-defined workflow; create
+  separate skills for distinct tasks.

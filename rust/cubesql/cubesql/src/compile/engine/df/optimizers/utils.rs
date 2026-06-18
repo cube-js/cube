@@ -302,13 +302,18 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
                     window_frame: *window_frame,
                 })
         }
-        Expr::AggregateUDF { fun, args } => args
+        Expr::AggregateUDF {
+            fun,
+            args,
+            distinct,
+        } => args
             .iter()
             .map(|arg| rewrite(arg, map))
             .collect::<Result<Option<Vec<_>>>>()?
             .map(|args| Expr::AggregateUDF {
                 fun: fun.clone(),
                 args,
+                distinct: *distinct,
             }),
         Expr::InList {
             expr,

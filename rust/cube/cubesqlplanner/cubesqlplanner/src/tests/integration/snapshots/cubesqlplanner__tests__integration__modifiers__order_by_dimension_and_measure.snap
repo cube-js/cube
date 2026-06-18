@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/modifiers.rs
+expression: result
+---
+customers__city | orders__count | orders__total_amount
+----------------+---------------+---------------------
+Boston          | 1             | 500.00              
+New York        | 4             | 525.00              
+San Francisco   | 2             | 350.00              
+NULL            | 2             | 65.00

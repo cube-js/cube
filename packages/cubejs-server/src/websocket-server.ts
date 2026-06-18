@@ -1,10 +1,12 @@
 import WebSocket from 'ws';
 import crypto from 'crypto';
 import util from 'util';
-import { CancelableInterval, createCancelableInterval } from '@cubejs-backend/shared';
+import { CancelableInterval, createCancelableInterval, getEnv } from '@cubejs-backend/shared';
+
 import type { CubejsServerCore } from '@cubejs-backend/server-core';
 import type http from 'http';
 import type https from 'https';
+import type { SubscriptionServer } from '@cubejs-backend/api-gateway';
 
 export interface WebSocketServerOptions {
   processSubscriptionsInterval?: number,
@@ -16,7 +18,7 @@ export class WebSocketServer {
 
   protected wsServer: WebSocket.Server | null = null;
 
-  protected subscriptionServer: any = null;
+  protected subscriptionServer: SubscriptionServer | null = null;
 
   public constructor(
     protected readonly serverCore: CubejsServerCore,
@@ -27,6 +29,7 @@ export class WebSocketServer {
     this.wsServer = new WebSocket.Server({
       server,
       path: this.options.webSocketsBasePath,
+      maxPayload: getEnv('maxRequestSize'),
     });
 
     const connectionIdToSocket: Record<string, any> = {};
@@ -63,15 +66,15 @@ export class WebSocketServer {
       connectionIdToSocket[connectionId] = ws;
 
       ws.on('message', async (message) => {
-        await this.subscriptionServer.processMessage(connectionId, message, true);
+        await this.subscriptionServer!.processMessage(connectionId, message as string);
       });
 
       ws.on('close', async () => {
-        await this.subscriptionServer.disconnect(connectionId);
+        await this.subscriptionServer!.disconnect(connectionId);
       });
 
       ws.on('error', async () => {
-        await this.subscriptionServer.disconnect(connectionId);
+        await this.subscriptionServer!.disconnect(connectionId);
       });
     });
 
@@ -79,7 +82,7 @@ export class WebSocketServer {
 
     this.subscriptionsTimer = createCancelableInterval(
       async () => {
-        await this.subscriptionServer.processSubscriptions();
+        await this.subscriptionServer!.processSubscriptions();
       },
       {
         interval: processSubscriptionsInterval,
@@ -100,6 +103,8 @@ export class WebSocketServer {
       await close();
     }
 
-    this.subscriptionServer.clear();
+    if (this.subscriptionServer) {
+      this.subscriptionServer.clear();
+    }
   }
 }

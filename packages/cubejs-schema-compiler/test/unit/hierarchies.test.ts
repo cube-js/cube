@@ -17,8 +17,8 @@ describe('Cube hierarchies', () => {
       (it) => it.config.name === 'orders_users_view'
     );
 
-    expect(ordersView.config.hierarchies.length).toBe(2);
-    expect(ordersView.config.hierarchies).toEqual([
+    expect(ordersView?.config.hierarchies.length).toBe(2);
+    expect(ordersView?.config.hierarchies).toEqual([
       {
         name: 'orders_users_view.orders_hierarchy',
         title: 'Hello Hierarchy',
@@ -42,19 +42,19 @@ describe('Cube hierarchies', () => {
     const ordersIncludesExcludesView = metaTransformer.cubes.find(
       (it) => it.config.name === 'orders_includes_excludes_view'
     );
-    expect(ordersIncludesExcludesView.config.hierarchies.length).toBe(1);
+    expect(ordersIncludesExcludesView?.config.hierarchies.length).toBe(1);
 
     const emptyView = metaTransformer.cubes.find(
       (it) => it.config.name === 'empty_view'
     );
-    expect(emptyView.config.hierarchies.length).toBe(0);
+    expect(emptyView?.config.hierarchies.length).toBe(0);
 
     const allHierarchyView = metaTransformer.cubes.find(
       (it) => it.config.name === 'all_hierarchy_view'
     );
-    expect(allHierarchyView.config.hierarchies.length).toBe(3);
+    expect(allHierarchyView?.config.hierarchies.length).toBe(3);
 
-    const prefixedHierarchy = allHierarchyView.config.hierarchies.find((it) => it.name === 'all_hierarchy_view.users_users_hierarchy');
+    const prefixedHierarchy = allHierarchyView?.config.hierarchies.find((it) => it.name === 'all_hierarchy_view.users_users_hierarchy');
     expect(prefixedHierarchy).toBeTruthy();
     expect(prefixedHierarchy?.aliasMember).toEqual('users.users_hierarchy');
     expect(prefixedHierarchy?.levels).toEqual(['all_hierarchy_view.users_age', 'all_hierarchy_view.users_city']);
@@ -73,7 +73,7 @@ describe('Cube hierarchies', () => {
       (it) => it.config.name === 'only_hierarchy_included_view'
     );
 
-    expect(view1.config.dimensions).toEqual(
+    expect(view1?.config.dimensions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'only_hierarchy_included_view.status' }),
         expect.objectContaining({ name: 'only_hierarchy_included_view.number' }),
@@ -85,8 +85,8 @@ describe('Cube hierarchies', () => {
     const view2 = metaTransformer.cubes.find(
       (it) => it.config.name === 'auto_include_view'
     );
-    expect(view2.config.dimensions.length).toEqual(2);
-    expect(view2.config.dimensions).toEqual(
+    expect(view2?.config.dimensions.length).toEqual(2);
+    expect(view2?.config.dimensions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'auto_include_view.status' }),
         expect.objectContaining({ name: 'auto_include_view.number' }),
@@ -177,7 +177,7 @@ describe('Cube hierarchies', () => {
       (it) => it.config.name === 'orders'
     );
 
-    expect(ordersCube.config.hierarchies).toEqual([
+    expect(ordersCube?.config.hierarchies).toEqual([
       {
         aliasMember: undefined,
         name: 'orders.hello',

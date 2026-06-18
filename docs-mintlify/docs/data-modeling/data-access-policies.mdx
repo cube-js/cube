@@ -1,0 +1,779 @@
+---
+title: Access policies
+description: Declares group-scoped policies that combine member access, row filters, and masking rules directly in the data model.
+---
+
+Access policies provide a holistic mechanism to manage [member-level](#member-level-access),
+[row-level](#row-level-access) security, and [data masking](#data-masking) for
+different user groups. You can define access control rules in data model files,
+allowing for an organized and maintainable approach to security.
+
+## Policies
+
+You can define policies that target specific groups and contain member-level and (or)
+row-level security rules:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+        #   For the `manager` group,
+        #   allow access to all members
+        #   but filter rows by the user's country
+      - group: manager
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: [ "{ userAttributes.country }" ]
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      // For all groups, restrict access entirely
+      group: `*`,
+      member_level: {
+        includes: []
+      }
+    },
+    {
+      // For the `manager` group,
+      //   allow access to all members
+      //   but filter rows by the user's country
+      group: `manager`,
+      member_level: {
+        includes: `*`
+      },
+      row_level: {
+        filters: [
+          {
+            member: `country`,
+            operator: `equals`,
+            values: [ userAttributes.country ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+While you can define access policies on both cubes and views, it is more common to define them on views.
+
+For more details on available parameters, check out the [access policies reference][ref-ref-dap].
+
+## Policy evaluation
+
+When processing a request, Cube will evaluate the access policies and combine them
+with relevant custom security rules, e.g., [`public` parameters][ref-mls-public] for member-level security
+and `query_rewrite` filters for row-level security.
+
+### The permission space
+
+It helps to think of access control as a **two-dimensional permission space** —
+a grid of **members** (the columns a user may query: dimensions and measures)
+and **rows** (the records a user may see):
+
+- one axis is **members** — _what_ a user can look at;
+- the other axis is **rows** — _which_ records they can look at.
+
+Each access policy grants visibility over a rectangular region of this space:
+its `member_level` chooses the members (the horizontal extent) and its
+`row_level` chooses the rows (the vertical extent). Defaults _widen_ the region —
+a policy with no `row_level` (or with `row_level: { allow_all: true }`) spans
+**every row**, and a policy with no `member_level` spans **every member**.
+`member_masking` marks part of a region as **visible but masked** rather than
+fully readable.
+
+A user usually matches more than one policy (for example, through multiple
+[groups](#custom-mapping)), so their effective access is the combination of
+every region granted by every matching policy:
+
+- **Members are unioned.** A member is accessible if **any** matching policy
+  grants it. A user who matches several policies sees every member those
+  policies expose, even when no single policy exposes all of them.
+- **Rows are intersected across the queried members.** For each queried member,
+  the visible rows are the **union** of the row filters of the policies that
+  grant that member (a policy with no row filter adds no restriction). A row is
+  returned only when it is visible for **every** queried member.
+- **A member is masked** when no granting policy gives it unconditional full
+  access through `member_level`, but some matching policy lists it under
+  `member_masking`.
+- **Access is denied** (an empty result) only when a queried member is granted
+  by **no** matching policy at all.
+
+#### Diagram and behavior
+
+Consider an `orders_view` matched by two of a user's groups:
+
+- the `support` group — `member_level: [status, count]`, `row_level` restricted
+  to `region = 'US'`;
+- the `finance` group — `member_level: [count, revenue]`, `row_level` restricted
+  to `region = 'EU'`.
+
+The two policies cover overlapping regions of the permission space. `count` sits
+in the overlap (both policies grant it); `status` and `revenue` are each granted
+by only one policy:
+
+```text
+  members
+         ▲
+         │          ┌───────────────────────────────────────┐
+ revenue │          │            finance policy             │
+         │ ┌────────┼──────────────┐                        │
+   count │ │        │   overlap    │                        │
+         │ │        └──────────────┼────────────────────────┘
+  status │ │    support policy     │
+         │ └───────────────────────┘
+         └───────────────────────────────────────────────────▶ rows
+                   US region                EU region
+```
+
+For a user in **both** groups, the readable cells (✓) of the permission space are:
+
+| | `US` rows | `EU` rows |
+| --- | :---: | :---: |
+| `status` | ✓ (support) | — |
+| `count` | ✓ (support) | ✓ (finance) |
+| `revenue` | — | ✓ (finance) |
+
+Because rows are intersected across the queried members, the visible rows depend
+on _which_ members the query selects:
+
+| Queried members | How rows resolve | Visible rows |
+| --- | --- | --- |
+| `status`, `count` | `US` ∩ (`US` ∪ `EU`) | `US` rows |
+| `count`, `revenue` | (`US` ∪ `EU`) ∩ `EU` | `EU` rows |
+| `count` | `US` ∪ `EU` | all rows |
+| `status`, `count`, `revenue` | `US` ∩ `EU` | none (empty result) |
+
+- Querying `status` and `count` returns only `US` rows: `status` is granted only
+  by the `support` policy, so records outside the US can never satisfy the query.
+- Querying `count` alone returns all rows: both policies grant `count`, so its
+  visible rows are the union of the two regions.
+- Querying `status`, `count`, and `revenue` returns nothing: `status` is visible
+  only on `US` rows and `revenue` only on `EU` rows, and no record is in both.
+  The result is empty rather than leaking US-only members onto EU rows.
+
+<Info>
+
+A policy without a `row_level` filter defaults to **all rows** (allow-all). So
+when every policy that grants the queried members is filter-less, there is no
+row restriction at all — the members are simply unioned and all rows are
+returned. Row filters only narrow the result when a granting policy defines them.
+
+</Info>
+
+### Member-level access
+
+Member-level security rules in access policies are _combined together_
+with `public` parameters of cube and view members using the _AND_ semantics.
+Both will apply to the request.
+
+_When querying a view,_ member-level security rules defined in the view are _**not** combined together_
+with member-level security rules defined in relevant cubes.
+**Only the ones from the view will apply to the request.**
+
+<Info>
+
+This is consistent with how column-level security works in SQL databases. If you have
+a view that exposes a subset of columns from a table, it doesnt matter if the
+columns in the table are public or not, the view will expose them anyway.
+
+</Info>
+
+### Row-level access
+
+Row-level filters in access policies are _combined together_ with filters defined
+using the `query_rewrite` configuration option.
+Both will apply to the request.
+
+_When querying a view,_ row-level filters defined in the view are _combined together_
+with row-level filters defined in relevant cubes. Both will apply to the request.
+
+<Info>
+
+This is consistent with how row-level security works in SQL databases. If you have
+a view that exposes a subset of rows from another view, the result set will be
+filtered by the row-level security rules of both views.
+
+</Info>
+
+### Data masking
+
+With data masking, you can return masked values for restricted members instead
+of denying access entirely. Users who don't have full access to a member will
+see a transformed value (e.g., `***`, `-1`, `NULL`) rather than receiving an error.
+
+To use data masking, define a [`mask` parameter][ref-ref-mask-dim] on dimensions
+or measures, and add `member_masking` to your access policy alongside `member_level`.
+Members in `member_level` get real values; members not in `member_level` but in
+`member_masking` get masked values; members in neither are denied.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: secret_code
+        sql: secret_code
+        type: string
+        mask:
+          sql: "CONCAT('***', RIGHT({CUBE}.secret_code, 3))"
+
+      - name: revenue
+        sql: revenue
+        type: number
+        mask: -1
+
+    measures:
+      - name: count
+        type: count
+        mask: 0
+
+    access_policy:
+      - group: manager
+        member_level:
+          includes:
+            - status
+            - count
+        member_masking:
+          includes: "*"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    secret_code: {
+      sql: `secret_code`,
+      type: `string`,
+      mask: {
+        sql: `CONCAT('***', RIGHT(${CUBE}.secret_code, 3))`
+      }
+    },
+
+    revenue: {
+      sql: `revenue`,
+      type: `number`,
+      mask: -1
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`,
+      mask: 0
+    }
+  },
+
+  access_policy: [
+    {
+      group: `manager`,
+      member_level: {
+        includes: [`status`, `count`]
+      },
+      member_masking: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+With this policy, users in the `manager` group will see:
+
+| Member | Value |
+| --- | --- |
+| `status` | Real value (full access via `member_level`) |
+| `count` | Real value (full access via `member_level`) |
+| `secret_code` | Masked via SQL: `***xyz` |
+| `revenue` | Masked: `-1` |
+
+If no `mask` is defined on a member, the default mask value is `NULL`. You can
+customize defaults with the `CUBEJS_ACCESS_POLICY_MASK_STRING`,
+`CUBEJS_ACCESS_POLICY_MASK_NUMBER`, `CUBEJS_ACCESS_POLICY_MASK_BOOLEAN`, and
+`CUBEJS_ACCESS_POLICY_MASK_TIME` environment variables.
+
+<Warning>
+
+SQL masks (`mask: { sql: "..." }`) on measures are not applied in ungrouped
+queries (e.g., `SELECT *` via the SQL API), because SQL mask expressions
+typically reference columns that are not meaningful in a per-row context.
+Static masks (`mask: -1`, `mask: 0`) are applied in all cases.
+
+If you need to mask a measure in ungrouped queries with a dynamic expression,
+define it as a dimension with an SQL mask instead, and reference that masked
+dimension in your query.
+
+</Warning>
+
+#### Masking across multiple policies
+
+Because member access is [unioned](#the-permission-space), **full access wins
+over masking**. If any matching policy grants a member unconditional full access
+through `member_level` (with no `row_level` filter), the user sees the **real**
+value — even if another matching policy lists that member under `member_masking`.
+
+Masking only takes effect when **no** matching policy grants unconditional full
+access. There are two sub-cases:
+
+- **Masked only.** The member is exposed solely through `member_masking` (or any
+  full-access policy is itself row-restricted). The member is masked for **all**
+  rows.
+- **Conditionally unmasked.** Another policy grants full access _and_ defines a
+  `row_level` filter — full access is conditional on that filter. Masking then
+  becomes **conditional on the row filter**: rows matching the filter show the
+  real value, while the rest show the masked value. The generated SQL is roughly
+  `CASE WHEN {rowFilter} THEN {value} ELSE {mask} END`.
+
+<Info>
+
+This lets you combine a broad masking policy (e.g. the `*` group sees masked
+values) with a narrower policy that reveals real values only for the rows a
+group is entitled to (its `row_level` range).
+
+</Info>
+
+If the query itself already constrains rows to a subset of the conditional
+mask's row filter — an equally or more restrictive filter on the same member
+(for example, the query filters `country = 'US'` and the mask filter is
+`country = 'US'`) — then every returned row would show the real value anyway.
+In that case the `CASE WHEN` is unnecessary and the member is **unmasked**. This
+also lets a conditionally-masked _aggregate measure_ render its real value
+instead of being masked, even without grouping by the filter's member.
+
+#### Conditional masking on measures
+
+Conditional masking is evaluated **per row**, which works naturally for
+dimensions (the `CASE WHEN` expression is part of the `GROUP BY`). For an
+**aggregate measure** (e.g. `sum`, `count`), that per-row expression can only be
+applied when the members referenced by the row filter are part of the query's
+`GROUP BY`.
+
+When a query selects a conditionally-masked measure but **does not group by the
+members referenced in the row filter**, Cube cannot decide the condition per
+aggregated group. Rather than emit invalid SQL (where the filter column is
+neither grouped nor aggregated — which fails on strict engines like BigQuery),
+it renders the **mask value for the entire measure** (`NULL` by default) instead
+of the conditional expression.
+
+| Query groups by the row filter's members? | Result for the measure |
+| --- | --- |
+| Yes | Conditional: real value for matching rows, masked otherwise |
+| No | Fully masked (the mask value, e.g. `NULL`) |
+
+<Tip>
+
+If you need a row-aware value for a measure regardless of grouping, add the row
+filter's member (the dimension it filters on) to your query's dimensions so it
+becomes part of the `GROUP BY`.
+
+</Tip>
+
+_When querying a view,_ data masking follows the same pattern as row-level
+security: masking rules from both the view and relevant cubes are applied.
+
+For more details on available parameters, check out the
+[`member_masking` reference][ref-ref-dap-masking].
+
+## Common patterns
+
+### Restrict access to specific groups
+
+To restrict access to a view to only specific groups, define access policies for those groups. Access is automatically denied to all other groups:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: sensitive_data_view
+    # ...
+    
+    access_policy:
+      # Allow access only to the `analysts` group
+      - group: analysts
+        member_level:
+          includes: "*"
+```
+
+```javascript title="JavaScript"
+view(`sensitive_data_view`, {
+  // ...
+  
+  access_policy: [
+    {
+      // Allow access only to the `analysts` group
+      group: `analysts`,
+      member_level: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+You can also use the `groups` parameter (plural) to apply the same policy to multiple groups at once:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: sensitive_data_view
+    # ...
+    
+    access_policy:
+      # Allow access to multiple groups using groups array
+      - groups: [analysts, managers]
+        member_level:
+          includes: "*"
+```
+
+```javascript title="JavaScript"
+view(`sensitive_data_view`, {
+  // ...
+  
+  access_policy: [
+    {
+      // Allow access to multiple groups using groups array
+      groups: [`analysts`, `managers`],
+      member_level: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### Filter by user attribute
+
+You can filter data based on user attributes to ensure users only see data they're authorized to access. For example, sales people can see only their own deals, while sales managers can see all deals:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: deals_view
+    # ...
+    
+    access_policy:
+      # Sales people can only see their own deals
+      - group: sales
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: sales_person_id
+              operator: equals
+              values: [ "{ userAttributes.userId }" ]
+      
+      # Sales managers can see all deals
+      - group: sales_manager
+        member_level:
+          includes: "*"
+        # No row-level filters - full access to all rows
+```
+
+```javascript title="JavaScript"
+view(`deals_view`, {
+  // ...
+  
+  access_policy: [
+    {
+      // Sales people can only see their own deals
+      group: `sales`,
+      member_level: {
+        includes: `*`
+      },
+      row_level: {
+        filters: [
+          {
+            member: `sales_person_id`,
+            operator: `equals`,
+            values: [ userAttributes.userId ]
+          }
+        ]
+      }
+    },
+    {
+      // Sales managers can see all deals
+      group: `sales_manager`,
+      member_level: {
+        includes: `*`
+      }
+      // No row-level filters - full access to all rows
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### Filter by multiple user attributes
+
+You can pass multiple values in the `values` array to match a dimension against
+more than one user attribute. This is useful when users may have access based on
+multiple properties, such as a country and a custom country property:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: deals_view
+    # ...
+    
+    access_policy:
+      - group: sales
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: users_country
+              operator: equals
+              values: [ "{ userAttributes.country }", "{ userAttributes.customCountryProperty }" ]
+```
+
+```javascript title="JavaScript"
+view(`deals_view`, {
+  // ...
+  
+  access_policy: [
+    {
+      group: `sales`,
+      member_level: {
+        includes: `*`
+      },
+      row_level: {
+        filters: [
+          {
+            member: `users_country`,
+            operator: `equals`,
+            values: [
+              userAttributes.country,
+              userAttributes.customCountryProperty
+            ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### Mask sensitive members
+
+You can mask sensitive members for most users while granting full access to
+privileged groups:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+    # ...
+
+    access_policy:
+      # Default: all members masked
+      - group: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+      # Admins: full access
+      - group: admin
+        member_level:
+          includes: "*"
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  // ...
+
+  access_policy: [
+    {
+      // Default: all members masked
+      group: `*`,
+      member_level: {
+        includes: []
+      },
+      member_masking: {
+        includes: `*`
+      }
+    },
+    {
+      // Admins: full access
+      group: `admin`,
+      member_level: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+### Mandatory filters
+
+You can apply mandatory row-level filters to specific groups to ensure they only see data matching certain criteria:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: country_data_view
+    # ...
+    
+    access_policy:
+      # Allow access only to the `sales` and `marketing` groups with country filtering
+      - groups: [sales, marketing]
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: users_country
+              operator: equals
+              values: ["Brasil"]
+```
+
+```javascript title="JavaScript"
+view(`country_data_view`, {
+  // ...
+  
+  access_policy: [
+    {
+      // Allow access only to the `sales` and `marketing` groups with country filtering
+      groups: [`sales`, `marketing`],
+      member_level: {
+        includes: `*`
+      },
+      row_level: {
+        filters: [
+          {
+            member: `users_country`,
+            operator: `equals`,
+            values: [`Brasil`]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+## Custom mapping
+
+Cube cloud platform automatically maps authenticated users to groups for access policies.
+If you are using Cube Core or authenticating against [Core Data APIs][ref-core-data-apis] directly, you might need to map the security context to groups manually.
+
+<CodeGroup>
+
+```python title="Python"
+# cube.py
+from cube import config
+
+@config('context_to_groups')
+def context_to_groups(ctx: dict) -> list[str]:
+  return ctx['securityContext'].get('groups', ['default'])
+```
+
+```javascript title="JavaScript"
+// cube.js
+module.exports = {
+  contextToGroups: ({ securityContext }) => {
+    return securityContext.groups || ['default']
+  }
+}
+```
+
+</CodeGroup>
+
+A user can have more than one group.
+
+## Using securityContext
+
+The [`userAttributes`][ref-sec-ctx] object is only available in Cube Cloud platform. If you are using Cube Core or authenticating against [Core Data APIs][ref-core-data-apis] directly, you won't have access to `userAttributes`. Instead, you need to use `securityContext` directly when referencing user attributes in access policies (e.g., in `row_level` filters or `conditions`). For example, use `securityContext.userId` instead of `userAttributes.userId`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - group: manager
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: [ "{ securityContext.country }" ]
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `manager`,
+      row_level: {
+        filters: [
+          {
+            member: `country`,
+            operator: `equals`,
+            values: [ securityContext.country ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+
+[ref-mls-public]: /docs/data-modeling/access-control/member-level-security#managing-member-level-access
+[ref-sec-ctx]: /docs/data-modeling/access-control/context
+[ref-ref-dap]: /reference/data-modeling/data-access-policies
+[ref-ref-dap-role]: /reference/data-modeling/data-access-policies#role
+[ref-ref-dap-masking]: /reference/data-modeling/data-access-policies#member-masking
+[ref-ref-mask-dim]: /reference/data-modeling/dimensions#mask
+[ref-core-data-apis]: /reference/core-data-apis

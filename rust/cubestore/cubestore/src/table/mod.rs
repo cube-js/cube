@@ -1,17 +1,15 @@
+use crate::metastore::ColumnType;
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
 
 use datafusion::arrow::array::{
-    Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
-    Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
-    Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array, Int96Decimal10Array,
-    Int96Decimal1Array, Int96Decimal2Array, Int96Decimal3Array, Int96Decimal4Array,
-    Int96Decimal5Array, StringArray, TimestampMicrosecondArray,
+    Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array, Int64Array,
+    StringArray, TimestampMicrosecondArray,
 };
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 
+use crate::cube_ext::ordfloat::OrdF64;
 use chrono::{SecondsFormat, TimeZone, Utc};
-use datafusion::cube_ext::ordfloat::OrdF64;
 use deepsize::{Context, DeepSizeOf};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -23,7 +21,7 @@ pub mod data;
 pub mod parquet;
 pub mod redistribute;
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, Hash)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, Hash, PartialOrd)]
 pub enum TableValue {
     Null,
     String(String),
@@ -69,9 +67,9 @@ impl TableValue {
             DataType::Int64 => {
                 TableValue::Int(a.as_any().downcast_ref::<Int64Array>().unwrap().value(row))
             }
-            DataType::Int96 => TableValue::Int96(Int96::new(
-                a.as_any().downcast_ref::<Int96Array>().unwrap().value(row),
-            )),
+            // DataType::Int96 => TableValue::Int96(Int96::new(
+            //     a.as_any().downcast_ref::<Int96Array>().unwrap().value(row),
+            // )),
             DataType::Utf8 => TableValue::String(
                 a.as_any()
                     .downcast_ref::<StringArray>()
@@ -86,87 +84,9 @@ impl TableValue {
                     .value(row)
                     .to_vec(),
             ),
-            DataType::Int64Decimal(0) => TableValue::Decimal(Decimal::new(
+            DataType::Decimal128(_, _) => TableValue::Decimal(Decimal::new(
                 a.as_any()
-                    .downcast_ref::<Int64Decimal0Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int64Decimal(1) => TableValue::Decimal(Decimal::new(
-                a.as_any()
-                    .downcast_ref::<Int64Decimal1Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int64Decimal(2) => TableValue::Decimal(Decimal::new(
-                a.as_any()
-                    .downcast_ref::<Int64Decimal2Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int64Decimal(3) => TableValue::Decimal(Decimal::new(
-                a.as_any()
-                    .downcast_ref::<Int64Decimal3Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int64Decimal(4) => TableValue::Decimal(Decimal::new(
-                a.as_any()
-                    .downcast_ref::<Int64Decimal4Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int64Decimal(5) => TableValue::Decimal(Decimal::new(
-                a.as_any()
-                    .downcast_ref::<Int64Decimal5Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int64Decimal(10) => TableValue::Decimal(Decimal::new(
-                a.as_any()
-                    .downcast_ref::<Int64Decimal10Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int96Decimal(0) => TableValue::Decimal96(Decimal96::new(
-                a.as_any()
-                    .downcast_ref::<Int96Decimal0Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int96Decimal(1) => TableValue::Decimal96(Decimal96::new(
-                a.as_any()
-                    .downcast_ref::<Int96Decimal1Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int96Decimal(2) => TableValue::Decimal96(Decimal96::new(
-                a.as_any()
-                    .downcast_ref::<Int96Decimal2Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int96Decimal(3) => TableValue::Decimal96(Decimal96::new(
-                a.as_any()
-                    .downcast_ref::<Int96Decimal3Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int96Decimal(4) => TableValue::Decimal96(Decimal96::new(
-                a.as_any()
-                    .downcast_ref::<Int96Decimal4Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int96Decimal(5) => TableValue::Decimal96(Decimal96::new(
-                a.as_any()
-                    .downcast_ref::<Int96Decimal5Array>()
-                    .unwrap()
-                    .value(row),
-            )),
-            DataType::Int96Decimal(10) => TableValue::Decimal96(Decimal96::new(
-                a.as_any()
-                    .downcast_ref::<Int96Decimal10Array>()
+                    .downcast_ref::<Decimal128Array>()
                     .unwrap()
                     .value(row),
             )),
@@ -196,6 +116,45 @@ impl TableValue {
                 "unexpected array type when converting to TableValue: {:?}",
                 other
             ),
+        }
+    }
+
+    /// Render the value as a string, using `column_type` for context-dependent
+    /// variants (currently `Decimal` / `Decimal96`, where scale lives on the
+    /// column rather than on the value). Falls back to `Display` otherwise.
+    pub fn format_with(&self, column_type: &ColumnType) -> String {
+        match (self, column_type) {
+            (TableValue::Decimal(v), ColumnType::Decimal { scale, .. }) => {
+                v.to_string(*scale as u8)
+            }
+            (TableValue::Decimal96(v), ColumnType::Decimal96 { scale, .. }) => {
+                v.to_string(*scale as u8)
+            }
+            (v, _) => v.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for TableValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            TableValue::Null => f.write_str("NULL"),
+            TableValue::String(v) => f.write_str(v),
+            TableValue::Int(v) => write!(f, "{}", v),
+            TableValue::Int96(v) => f.write_str(&v.to_string()),
+            // Scale-unaware fallbacks; `format_with` produces the proper form.
+            TableValue::Decimal(v) => write!(f, "{}", v.raw_value()),
+            TableValue::Decimal96(v) => write!(f, "{}", v.raw_value()),
+            TableValue::Float(v) => write!(f, "{}", v.0),
+            TableValue::Bytes(v) => {
+                f.write_str("0x")?;
+                for b in v {
+                    write!(f, "{:02x}", b)?;
+                }
+                Ok(())
+            }
+            TableValue::Timestamp(v) => f.write_str(&v.to_string()),
+            TableValue::Boolean(v) => write!(f, "{}", v),
         }
     }
 }
@@ -234,7 +193,7 @@ impl ToString for TimestampValue {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf, PartialOrd)]
 pub struct Row {
     values: Vec<TableValue>,
 }

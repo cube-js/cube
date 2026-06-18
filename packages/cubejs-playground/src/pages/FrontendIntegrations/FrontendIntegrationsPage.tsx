@@ -17,19 +17,19 @@ export function FrontendIntegrationsPage() {
       key: '1',
       name: 'REST API Endpoint',
       url: restUrl,
-      docsUrl: 'https://cube.dev/docs/rest-api',
+      docsUrl: 'https://cube.dev/reference/core-data-apis/rest-api',
     },
     {
       key: '2',
       name: 'Websockets Endpoint',
       url: wsUrl,
-      docsUrl: 'https://cube.dev/docs/real-time-data-fetch',
+      docsUrl: 'https://cube.dev/recipes/core-data-api/real-time-data-fetch',
     },
     {
       key: '2',
       name: 'GraphQL Endpoint',
       url: graphqlUrl,
-      docsUrl: 'https://cube.dev/docs/backend/graphql',
+      docsUrl: 'https://cube.dev/reference/core-data-apis/graphql-api',
     },
   ];
   
@@ -64,16 +64,16 @@ export function FrontendIntegrationsPage() {
             <Col span={12}>
               <Paragraph>
                 You can refer to Cube docs to learn more about{' '}
-                <Link href="https://cube.dev/docs/rest-api" target="_blank">
+                <Link href="https://cube.dev/reference/core-data-apis/rest-api" target="_blank">
                   REST
                 </Link>
                 ,{' '}
-                <Link href="https://cube.dev/docs/backend/graphql" target="_blank">
+                <Link href="https://cube.dev/reference/core-data-apis/graphql-api" target="_blank">
                   GraphQL
                 </Link>{' '}
                 APIs and{' '}
                 <Link
-                  href="https://cube.dev/docs/frontend-introduction"
+                  href="https://cube.dev/reference/javascript-sdk"
                   target="_blank"
                 >
                   integration with frontend frameworks
@@ -206,7 +206,7 @@ const { resultSet, isLoading, error, progress } = useCubeQuery({
                 <Paragraph>
                   You can find full Angular tutorial and examples in{' '}
                   <Link
-                    href="https://cube.dev/docs/@cubejs-client-ngx/"
+                    href="https://cube.dev/reference/javascript-sdk/angular"
                     target="_blank"
                   >
                     this documentation guide
@@ -234,7 +234,7 @@ const cubeApi = cube(
                 <Paragraph>
                   You can find full Angular tutorial and examples in{' '}
                   <Link
-                    href="https://cube.dev/docs/@cubejs-client-ngx/"
+                    href="https://cube.dev/reference/javascript-sdk/angular"
                     target="_blank"
                   >
                     this documentation guide

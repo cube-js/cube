@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/with_dimensions.rs
+expression: result
+---
+orders__category | orders__rolling_sum_trailing
+-----------------+-----------------------------
+books            | 135.00                      
+clothing         | 345.00                      
+electronics      | 1070.00

@@ -1,0 +1,69 @@
+# Test case for overlapping access policies with member-level and row-level filters.
+#
+# This tests the scenario where:
+# - Policy 1: group "*" with memberLevel.includes: [] (no members)
+# - Policy 2: group "developer" with memberLevel.includes: "*" and row_level filters
+# - Policy 3: group "admin" with memberLevel.includes: "*" and allowAll
+#
+# The row-level filter from the developer policy SHOULD be applied when a developer
+# queries for members, because:
+#
+#   Members
+#     ^
+#     |   ┌─────────────────┐
+#     |   │    Policy 1     │  (no members, no row filter)
+#     |   │   ┌─────────────┼───────────────┐
+#     |   │   │             │               │
+#     |   └───┼─────────────┘   Policy 2    │  (all members, with row filter)
+#     |       │                             │
+#     |       └─────────────────────────────┘
+#     └──────────────────────────────────────────> Rows
+#
+# Policy 1 covers no members (empty includes), so it should not affect row filtering.
+# Policy 2 covers all members with a row filter, so the filter MUST be applied.
+
+cubes:
+  - name: customers
+    sql_table: users
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_count
+        sql: "1"
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: city
+        sql: city
+        type: string
+
+    access_policy:
+      # Policy 1: All groups, but grants access to NO members
+      - group: "*"
+        member_level:
+          includes: []
+
+      # Policy 2: Developers get all members, but with row-level filter on city
+      - group: developer
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: city
+              operator: equals
+              values: security_context.auth.userAttributes.allowedCities
+
+      # Policy 3: Admins get all members with no row restrictions
+      - group: leadership
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+

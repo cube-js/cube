@@ -15,14 +15,14 @@ use tracking_allocator::TrackingAllocator;
 static ALLOCATOR: TrackingAllocator = TrackingAllocator::new();
 
 fn prepare_cachestore(name: &str) -> Result<Arc<RocksCacheStore>, CubeError> {
-    let config = Config::test(&name).update_config(|mut config| {
+    let config = Config::test(name).update_config(|mut config| {
         // disable periodic eviction
         config.cachestore_cache_eviction_loop_interval = 100000;
 
         config
     });
 
-    let (_, cachestore) = RocksCacheStore::prepare_bench_cachestore(&name, config);
+    let (_, cachestore) = RocksCacheStore::prepare_bench_cachestore(name, config);
 
     let cachestore_to_move = cachestore.clone();
 
@@ -61,6 +61,9 @@ async fn do_insert(
             value: "a".repeat(size_kb * 1024), // size in bytes
             priority: 0,
             orphaned: None,
+            process_id: None,
+            exclusive: false,
+            external_id: None,
         });
 
         let res = fut.await;
@@ -81,7 +84,7 @@ fn do_insert_bench(c: &mut Criterion, runtime: &Runtime, total: usize, size_kb: 
             let mut insert_id_padding = 0;
 
             b.to_async(runtime).iter(|| {
-                let prev_value = insert_id_padding.clone();
+                let prev_value = insert_id_padding;
                 insert_id_padding += total;
 
                 do_insert(
@@ -89,7 +92,7 @@ fn do_insert_bench(c: &mut Criterion, runtime: &Runtime, total: usize, size_kb: 
                     &cachestore,
                     *total,
                     *size_kb,
-                    &"STANDALONE#queue",
+                    "STANDALONE#queue",
                     prev_value,
                 )
             });
@@ -108,6 +111,7 @@ async fn do_list(
             status_filter.clone(),
             true,
             false,
+            None,
         );
 
         let res = fut.await;

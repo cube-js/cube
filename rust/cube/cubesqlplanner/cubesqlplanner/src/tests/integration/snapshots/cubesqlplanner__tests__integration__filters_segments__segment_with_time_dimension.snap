@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/filters_segments.rs
+expression: result
+---
+orders__created_at_month | orders__count | orders__total_amount
+-------------------------+---------------+---------------------
+2024-01-01 00:00:00      | 2             | 300.00              
+2024-02-01 00:00:00      | 1             | 300.00              
+2024-03-01 00:00:00      | 1             | 150.00

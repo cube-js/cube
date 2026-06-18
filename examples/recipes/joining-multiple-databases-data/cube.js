@@ -1,21 +1,3 @@
-const BigQueryDriver = require('@cubejs-backend/bigquery-driver');
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
-function bigquery() {
-  // CUBEJS_DB_BQ_PROJECT_ID
-  // CUBEJS_DB_EXPORT_BUCKET
-  // CUBEJS_DB_BQ_CREDENTIALS
-  return new BigQueryDriver({})
-}
-
-function postgres() {
-  // CUBEJS_DB_HOST
-  // CUBEJS_DB_NAME
-  // CUBEJS_DB_USER
-  // CUBEJS_DB_PASS
-  return new PostgresDriver({})
-}
-
 module.exports = {
   dbType: ({ dataSource }) => {
     switch (dataSource) {
@@ -26,10 +8,23 @@ module.exports = {
   },
 
   driverFactory: ({ dataSource }) => {
-    switch (dataSource) {
-      case 'suppliers': return postgres();
-      case 'products': return bigquery();
-      default: throw new Error(`driverFactory: Invalid dataSource '${dataSource}'`);
+    if (dataSource === 'suppliers') {
+      return {
+        type: 'postgres',
+        host: process.env.CUBEJS_DS_SUPPLIERS_DB_HOST,
+        database: process.env.CUBEJS_DS_SUPPLIERS_DB_NAME,
+        user: process.env.CUBEJS_DS_SUPPLIERS_DB_USER,
+        password: process.env.CUBEJS_DS_SUPPLIERS_DB_PASS,
+      };
     }
+    if (dataSource === 'products') {
+      return {
+        type: 'bigquery',
+        projectId: process.env.CUBEJS_DS_PRODUCTS_BQ_PROJECT_ID,
+        credentials: process.env.CUBEJS_DS_PRODUCTS_BQ_CREDENTIALS,
+        exportBucket: process.env.CUBEJS_DS_PRODUCTS_EXPORT_BUCKET,
+      };
+    }
+    throw new Error(`driverFactory: Invalid dataSource '${dataSource}'`);
   },
 };

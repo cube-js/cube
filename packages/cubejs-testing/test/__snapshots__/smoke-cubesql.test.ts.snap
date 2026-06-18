@@ -1,5 +1,89 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`SQL API Cube SQL over HTTP Query convert API regular query 1`] = `
+Object {
+  "body": Object {
+    "query": Object {
+      "dimensions": Array [],
+      "measures": Array [
+        "Orders.totalAmount",
+      ],
+      "order": Array [],
+      "segments": Array [],
+    },
+    "status": "ok",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP Query convert API regular query with filter 1`] = `
+Object {
+  "body": Object {
+    "query": Object {
+      "dimensions": Array [],
+      "filters": Array [
+        Object {
+          "member": "Orders.status",
+          "operator": "equals",
+          "values": Array [
+            "foo",
+          ],
+        },
+      ],
+      "measures": Array [
+        "Orders.totalAmount",
+      ],
+      "order": Array [],
+      "segments": Array [],
+    },
+    "status": "ok",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP Query convert API regular query with time dimension filter 1`] = `
+Object {
+  "body": Object {
+    "query": Object {
+      "dimensions": Array [
+        "Orders.status",
+      ],
+      "measures": Array [],
+      "order": Array [],
+      "segments": Array [],
+      "timeDimensions": Array [
+        Object {
+          "dateRange": Array [
+            "2024-01-01T00:00:00.001Z",
+            "2025-12-31T23:59:59.999Z",
+          ],
+          "dimension": "Orders.createdAt",
+        },
+      ],
+      "ungrouped": true,
+    },
+    "status": "ok",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP Query convert API wrapper with parameters 1`] = `
+Object {
+  "body": Object {
+    "error": "Provided sql query can not be converted to rest query.",
+    "status": "error",
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
 exports[`SQL API Cube SQL over HTTP sql4sql double aggregation post-processing 1`] = `
 Object {
   "body": Object {
@@ -149,8 +233,8 @@ Object {
 exports[`SQL API Cube SQL over HTTP sql4sql regular query with missing column 1`] = `
 Object {
   "body": Object {
-    "error": "Error: SQLCompilationError: Internal: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
-    "stack": "Error: SQLCompilationError: Internal: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
+    "error": "Error: Planning Error: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.approxOrderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.avgAmount, Orders.minAmount, Orders.maxAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
+    "stack": "Error: Planning Error: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.approxOrderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.avgAmount, Orders.minAmount, Orders.maxAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.updatedAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
   },
   "headers": Headers {
     Symbol(map): Object {
@@ -161,7 +245,7 @@ Object {
         "keep-alive",
       ],
       "content-length": Array [
-        "1431",
+        "1559",
       ],
       "content-type": Array [
         "application/json; charset=utf-8",
@@ -236,8 +320,8 @@ Object {
 exports[`SQL API Cube SQL over HTTP sql4sql set variable 1`] = `
 Object {
   "body": Object {
-    "error": "Error: This query doesnt have a plan, because it already has values for response",
-    "stack": "Error: This query doesnt have a plan, because it already has values for response",
+    "error": "Error: Internal Error: This query doesnt have a plan, because it already has values for response",
+    "stack": "Error: Internal Error: This query doesnt have a plan, because it already has values for response",
   },
   "headers": Headers {
     Symbol(map): Object {
@@ -248,7 +332,7 @@ Object {
         "keep-alive",
       ],
       "content-length": Array [
-        "241",
+        "273",
       ],
       "content-type": Array [
         "application/json; charset=utf-8",
@@ -553,6 +637,18 @@ Array [
   Object {
     "count": "1",
     "status": "shipped",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) measure in view with ad-hoc filter: measure-in-view-with-ad-hoc-filters 1`] = `
+Array [
+  Object {
+    "new_amount": 800,
+    "new_avg_amount": 400,
+    "new_count_distinct": "1",
+    "new_max_amount": 500,
+    "new_min_amount": 300,
   },
 ]
 `;

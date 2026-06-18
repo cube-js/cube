@@ -1,0 +1,9 @@
+.SocialIcon {
+  display: block;
+  transition: opacity 300ms;
+}
+
+.SocialIcon:hover {
+  cursor: pointer;
+  opacity: 0.7;
+}

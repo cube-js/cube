@@ -1,0 +1,89 @@
+---
+title: Calculated fields
+description: Create ad-hoc custom dimensions and measures with Semantic SQL in workbooks, with help from AI or the field picker.
+---
+
+Calculated fields are ad-hoc dimensions and measures you add only to the current
+workbook report. They do not change the shared data model.
+
+As described in [Semantic SQL](/docs/introduction#semantic-sql), Cube routes
+analysis through the semantic layer instead of sending arbitrary SQL straight to
+the warehouse. The runtime validates every request and applies your security
+policies. Semantic SQL builds on Postgres-compatible SQL—including the
+`MEASURE()` function—so you can express derived logic on top of existing
+semantic definitions with both flexibility and governance.
+
+Calculated fields are expressed as Semantic SQL and pushed down to the Cube
+backend for evaluation. The semantic layer compiles them with the rest of the
+query—rather than applying them only in the browser—so the same validation,
+governance, and warehouse execution path apply as for any other Semantic SQL
+analysis.
+
+## Using AI to create calculated fields
+
+You can ask the Cube AI agent to create custom calculations in natural language.
+The agent can add or refine calculated fields from different parts of the
+product—for example while exploring in **Analytics chat** or working in
+**Workbooks**—so you are not limited to a single entry point when you want a new
+metric or dimension for the analysis in front of you.
+
+## Creating calculated fields in UI
+
+You can also build and edit calculated fields directly in the workbook. New
+fields appear in the **Calculated fields** section of the field picker sidebar.
+
+### Aggregations from existing dimensions
+
+Right-click a dimension column header and choose an aggregation to create a
+calculated field automatically. Available aggregations depend on the column type:
+
+| Column type | Available aggregations |
+| --- | --- |
+| Number | Count Distinct, Sum, Average, Min, Max |
+| Time | Count Distinct, Min, Max |
+| String, Boolean | Count Distinct |
+
+### Calculations from existing measures
+
+Open the menu on a measure column header and use the **Calculations** submenu
+for derived calculations:
+
+| Calculation | Description |
+| --- | --- |
+| % of total | Ratio of the measure value to the total across all rows |
+| % of previous | Ratio of the measure value to the previous row's value |
+| % change from previous | Percentage change compared to the previous row |
+| Running total | Cumulative sum of the measure across rows |
+
+<Info>
+
+**% of previous**, **% change from previous**, and **Running total** require at
+least one dimension in the query.
+
+</Info>
+
+Which calculations are offered depends on the measure’s aggregation type:
+
+| Aggregation type | Available calculations |
+| --- | --- |
+| Count, Sum | All calculations |
+| Min, Max | Running total |
+| Average, Count Distinct | None |
+
+### Filtered measures
+
+When working with query **Results**, pivot so at least one dimension is on
+columns, then open the header menu on a **pivoted measure column** and choose
+**Create filtered measure**. Cube adds a calculated measure that applies the
+column’s slice—for example, from **Count** broken down by **Status**, you get a
+measure that only aggregates rows matching that status (such as completed
+orders only).
+
+The option appears only for **native** measures on pivoted columns, not for
+calculated fields. The same flow works in **Explore** when results are pivoted
+the same way.
+
+### Editing a calculated field
+
+Select a calculated field in the sidebar to open the editor. You can change its
+**name** and **SQL expression**, then choose **Update** to apply.

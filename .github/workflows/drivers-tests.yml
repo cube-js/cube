@@ -29,7 +29,7 @@ on:
 
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -56,7 +56,7 @@ on:
 
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
   workflow_dispatch:
     inputs:
       use_tesseract_sql_planner:
@@ -266,6 +266,7 @@ jobs:
           - mssql
           - mysql
           - postgres
+          - postgres-pre-agg-credentials
           - redshift
           - redshift-export-bucket-s3
           - snowflake
@@ -293,6 +294,10 @@ jobs:
           - database: databricks-jdbc
             use_tesseract_sql_planner: true
           - database: mysql
+            use_tesseract_sql_planner: true
+          - database: clickhouse
+            use_tesseract_sql_planner: true
+          - database: mssql
             use_tesseract_sql_planner: true
       fail-fast: false
 
@@ -369,7 +374,6 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
-          DRIVERS_TESTS_CUBEJS_TRANSPILATION_WORKER_THREADS: true
           DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE: false
           DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.use_tesseract_sql_planner) || matrix.use_tesseract_sql_planner }}
 

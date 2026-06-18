@@ -7,9 +7,9 @@
 import {
   getEnv,
   assertDataSource,
+  Pool,
 } from '@cubejs-backend/shared';
 import mysql, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from 'mysql';
-import genericPool from 'generic-pool';
 import { promisify } from 'util';
 import {
   BaseDriver,
@@ -23,6 +23,7 @@ import {
   DownloadTableMemoryData,
   DriverCapabilities,
   TableColumn,
+  createPoolName,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -92,7 +93,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: MySqlDriverConfiguration;
 
-  protected readonly pool: genericPool.Pool<MySQLConnection>;
+  protected readonly pool: Pool<MySQLConnection>;
 
   /**
    * Class constructor.
@@ -103,6 +104,11 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
        * Data source name.
        */
       dataSource?: string,
+
+      /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
 
       /**
        * Max pool size value for the [cube]<-->[db] pool.
@@ -123,22 +129,25 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     const { pool, ...restConfig } = config;
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      socketPath: getEnv('dbSocketPath', { dataSource }),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      socketPath: getEnv('dbSocketPath', { dataSource, preAggregations }),
       timezone: 'Z',
-      ssl: this.getSslOptions(dataSource),
+      ssl: this.getSslOptions(dataSource, preAggregations),
       dateStrings: true,
       readOnly: true,
       ...restConfig,
     };
-    this.pool = genericPool.createPool({
+
+    const poolName = createPoolName('mysql', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         const conn: any = mysql.createConnection(this.config);
         const connect = promisify(conn.connect.bind(conn));
@@ -168,7 +177,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       min: 0,
       max:
         config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
@@ -447,10 +456,14 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public toGenericType(columnType: string) {
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    return this.tableColumnTypesWithPrecision(table);
+  }
+
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     return MySqlToGenericType[columnType.toLowerCase()] ||
       MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
-      super.toGenericType(columnType);
+      super.toGenericType(columnType, precision, scale);
   }
 
   public capabilities(): DriverCapabilities {

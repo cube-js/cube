@@ -248,6 +248,12 @@ class MockDriver extends BaseDriver {
 
   private schema: any;
 
+  public shouldFailQuery: boolean = false;
+
+  public failQueryPattern: RegExp | null = null;
+
+  public queryAttempts: number = 0;
+
   public constructor() {
     super();
   }
@@ -257,8 +263,21 @@ class MockDriver extends BaseDriver {
 
   public query(query) {
     this.executedQueries.push(query);
+
+    // Track query attempts for backoff testing
+    if (this.failQueryPattern && query.match(this.failQueryPattern)) {
+      this.queryAttempts++;
+    }
+
     let promise: any = Promise.resolve([query]);
     promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
+
+    // Simulate query failure for backoff testing
+    if (this.shouldFailQuery && this.failQueryPattern && query.match(this.failQueryPattern)) {
+      promise = promise.then(() => {
+        throw new Error('Simulated datasource error');
+      });
+    }
 
     if (query.match(/min\(.*timestamp.*foo/)) {
       promise = promise.then(() => [{ min: '2020-12-27T00:00:00.000' }]);
@@ -331,7 +350,11 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
-const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext }: { repository: SchemaFileRepository, useOriginalSqlPreAggregations?: boolean, skipAssertSecurityContext?: true }) => {
+const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext }: {
+  repository: SchemaFileRepository,
+  useOriginalSqlPreAggregations?: boolean,
+  skipAssertSecurityContext?: true
+}) => {
   const mockDriver = new MockDriver();
   const externalDriver = new MockDriver();
 
@@ -362,7 +385,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
       return externalDriver;
     },
     orchestratorOptions: () => ({
-      continueWaitTimeout: 0.1,
+      continueWaitTimeout: 1,
       queryCacheOptions: {
         queueOptions: () => ({
           concurrency: 2,
@@ -1111,5 +1134,102 @@ describe('Refresh Scheduler', () => {
         }
       }
     }
+  });
+
+  test('Exponential backoff', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME = '10'; // 10 seconds max backoff
+
+    const {
+      refreshScheduler, mockDriver, serverCore
+    } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+
+    const orchestratorApi = await serverCore.getOrchestratorApi(ctx);
+    const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+
+    // Target specific pre-aggregation: foo_first (all partitions)
+    // Scheduler processes multiple partitions: foo_first20201231, foo_first20201230, etc.
+    // Configure driver to fail only for foo_first table creation
+    mockDriver.shouldFailQuery = true;
+    mockDriver.failQueryPattern = /foo_first/;
+
+    // Run refresh until it tries to create foo_first table and fails
+    const queryIteratorState = {};
+    const maxIterations = 100;
+    for (let i = 0; i < maxIterations; i++) {
+      try {
+        await refreshScheduler.runScheduledRefresh(ctx, {
+          concurrency: 1,
+          workerIndices: [0],
+          timezones: ['UTC'],
+          queryIteratorState,
+        });
+      } catch (e) {
+        // Expected to fail when hitting foo_first
+      }
+
+      // Check if we started attempting to create foo_first table
+      if (mockDriver.queryAttempts > 0) {
+        break;
+      }
+    }
+
+    const initialAttempts = mockDriver.queryAttempts;
+    expect(initialAttempts).toBeGreaterThan(0);
+
+    // Wait for backoff to be set in storage (increased delay for async Redis writes)
+    await mockDriver.delay(1000);
+
+    // Find which foo_first partition has backoff set
+    // Scheduler may process different partitions (20201231, 20201230, etc.)
+    const possiblePartitions = ['20201231', '20201230', '20201229', '20201228', '20201227'];
+    let backoffData: { backoffMultiplier: number, nextTimestamp: Date } | null = null;
+    let targetTableName: string | null = null;
+
+    for (const partition of possiblePartitions) {
+      const tableName = `stb_pre_aggregations.foo_first${partition}`;
+      const data = await preAggsInstance.getPreAggBackoff(tableName);
+      if (data) {
+        backoffData = data;
+        targetTableName = tableName;
+        break;
+      }
+    }
+
+    // Verify backoff was set for at least one foo_first table
+    expect(backoffData).not.toBeNull();
+    expect(targetTableName).not.toBeNull();
+    // Initial backoff multiplier is 1 second
+    expect(backoffData!.backoffMultiplier).toBeGreaterThanOrEqual(1);
+
+    // Step 1: Immediate retry - should skip due to backoff (10-second window)
+    const beforeSkipAttempts = mockDriver.queryAttempts;
+    const immediateRetryCount = 5;
+    for (let i = 0; i < immediateRetryCount; i++) {
+      try {
+        await refreshScheduler.runScheduledRefresh(ctx, {
+          concurrency: 1,
+          workerIndices: [0],
+          timezones: ['UTC'],
+          queryIteratorState,
+        });
+      } catch (e) {
+        // Expected to skip due to backoff
+      }
+    }
+
+    // Query attempts should not increase significantly (skipped due to backoff)
+    // Allow some margin for other pre-aggregations processed by scheduler
+    expect(mockDriver.queryAttempts).toBeLessThanOrEqual(beforeSkipAttempts + 2);
+
+    // Step 2: Verify backoff persists - pre-aggregation is still in backoff after 500ms
+    await mockDriver.delay(500);
+    const backoffDataStillActive = await preAggsInstance.getPreAggBackoff(targetTableName!);
+    expect(backoffDataStillActive).not.toBeNull();
+    // backoffDataStillActive exists, which means backoff is still in place
+    // (nextTimestamp may be close to current time due to test execution delays)
   });
 });

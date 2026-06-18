@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/advanced_filters.rs
+expression: result
+---
+customers__city
+---------------
+New York

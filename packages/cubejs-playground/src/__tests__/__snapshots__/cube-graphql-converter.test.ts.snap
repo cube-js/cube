@@ -57,7 +57,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Orders.amount","operator":"equals","values":["5","10"]},{"or":[{"member":"Users.country","operator":"equals","values":["US"]},{"and":[{"member":"Orders.status","operator":"equals","values":["canceled","active"]},{"member":"Users.country","operator":"equals","values":["US"]}]}]}]} 1`] = `
 "query CubeQuery {
   cube(
-    where: {orders: {amount: {in: [5, 10]}}, OR: [{users: {country: {equals: \\"US\\"}}}, {AND: [{orders: {status: {in: [\\"canceled\\", \\"active\\"]}}}, {users: {country: {equals: \\"US\\"}}}]}]}
+    where: {orders: {amount: {in: [5, 10]}}, OR: [{users: {country: {equals: "US"}}}, {AND: [{orders: {status: {in: ["canceled", "active"]}}}, {users: {country: {equals: "US"}}}]}]}
   ) {
     orders {
       count
@@ -74,7 +74,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Users.country","operator":"equals","values":["US"]},{"member":"Orders.status","operator":"equals","values":["canceled","active"]}]} 1`] = `
 "query CubeQuery {
   cube(
-    where: {users: {country: {equals: \\"US\\"}}, orders: {status: {in: [\\"canceled\\", \\"active\\"]}}}
+    where: {users: {country: {equals: "US"}}, orders: {status: {in: ["canceled", "active"]}}}
   ) {
     orders {
       count
@@ -91,7 +91,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status","Users.country"],"filters":[{"member":"Users.country","operator":"equals","values":["US"]},{"member":"Users.country","operator":"equals","values":["Canada"]}]} 1`] = `
 "query CubeQuery {
   cube(
-    where: {users: {AND: [{country: {equals: \\"US\\"}}, {country: {equals: \\"Canada\\"}}]}}
+    where: {users: {AND: [{country: {equals: "US"}}, {country: {equals: "Canada"}}]}}
   ) {
     orders {
       count
@@ -108,7 +108,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status"],"filters":[{"member":"Orders.status","operator":"equals","values":["canceled","active"]},{"or":[{"member":"Users.country","operator":"notSet"},{"member":"Users.country","operator":"equals","values":["US"]}]}]} 1`] = `
 "query CubeQuery {
   cube(
-    where: {orders: {status: {in: [\\"canceled\\", \\"active\\"]}}, OR: [users: {OR: [{country: {set: false}}, {country: {equals: \\"US\\"}}]}]}
+    where: {orders: {status: {in: ["canceled", "active"]}}, OR: [users: {OR: [{country: {set: false}}, {country: {equals: "US"}}]}]}
   ) {
     orders {
       count
@@ -121,7 +121,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status"],"timeDimensions":[{"dimension":"Orders.createdAt","granularity":"day","dateRange":["2020-01-01","2021-01-01"]}]} 1`] = `
 "query CubeQuery {
-  cube(where: {orders: {createdAt: {inDateRange: [\\"2020-01-01\\", \\"2021-01-01\\"]}}}) {
+  cube(where: {orders: {createdAt: {inDateRange: ["2020-01-01", "2021-01-01"]}}}) {
     orders {
       count
       status
@@ -136,7 +136,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 1`] = `
 "query CubeQuery {
-  cube(timezone: \\"America/Los_Angeles\\", limit: 100) {
+  cube(timezone: "America/Los_Angeles", limit: 100) {
     orders {
       count
       status
@@ -148,7 +148,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 2`] = `
 "query CubeQuery {
-  cube(timezone: \\"America/Los_Angeles\\", limit: 100) {
+  cube(timezone: "America/Los_Angeles", limit: 100) {
     orders {
       count
       status

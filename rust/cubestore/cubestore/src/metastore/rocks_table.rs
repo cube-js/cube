@@ -1,3 +1,4 @@
+use crate::cachestore::LFU_INIT_VAL;
 use crate::metastore::rocks_store::TableId;
 use crate::metastore::{
     get_fixed_prefix, BatchPipe, DbTableRef, IdRow, IndexId, KeyVal, MemorySequence,
@@ -149,6 +150,13 @@ pub trait BaseRocksSecondaryIndex<T>: Debug {
     fn version(&self) -> u32;
 
     fn value_version(&self) -> RocksSecondaryIndexValueVersion;
+
+    /// Returns whether this index should store an entry for the given row.
+    /// Default is true. Override to skip indexing rows (e.g. when the indexed
+    /// field is None).
+    fn should_index_row(&self, _row: &T) -> bool {
+        true
+    }
 }
 
 pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
@@ -176,7 +184,7 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
                     &hash,
                     expire,
                     RocksSecondaryIndexValueTTLExtended {
-                        lfu: 0,
+                        lfu: LFU_INIT_VAL,
                         // Specify the current time as protection from LRU eviction
                         lru: Some(Utc::now()),
                         raw_size: self.raw_value_size(row),
@@ -225,6 +233,10 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
     fn get_expire(&self, _row: &T) -> Option<DateTime<Utc>> {
         None
     }
+
+    fn should_index_row(&self, _row: &T) -> bool {
+        true
+    }
 }
 
 impl<T, I> BaseRocksSecondaryIndex<T> for I
@@ -265,6 +277,10 @@ where
 
     fn value_version(&self) -> RocksSecondaryIndexValueVersion {
         RocksSecondaryIndex::value_version(self)
+    }
+
+    fn should_index_row(&self, row: &T) -> bool {
+        RocksSecondaryIndex::should_index_row(self, row)
     }
 }
 
@@ -482,18 +498,18 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     }
 
     /// @internal Do not use this method directly, please use insert or insert_with_pk
-    fn do_insert(
+    fn do_insert<S>(
         &self,
         row_id: Option<u64>,
         row: Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         row.serialize(&mut ser).unwrap();
         let serialized_row = ser.take_buffer();
 
         for index in Self::indexes().iter() {
-            if index.is_unique() {
+            if index.is_unique() && index.should_index_row(&row) {
                 let hash = index.key_hash(&row);
                 let index_val = index.index_key_by(&row);
                 let existing_keys =
@@ -534,19 +550,19 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(IdRow::new(row_id, row))
     }
 
-    fn insert_with_pk(
+    fn insert_with_pk<S>(
         &self,
         row_id: u64,
         row: Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         self.do_insert(Some(row_id), row, batch_pipe)
     }
 
-    fn insert(
+    fn insert<S>(
         &self,
         row: Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         self.do_insert(None, row, batch_pipe)
     }
@@ -717,9 +733,12 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 log_shown = true;
             }
             let row = row?;
-            let index_row = self.index_key_val(row.get_row(), row.get_id(), index);
-            batch.put(index_row.key, index_row.val);
+            if index.should_index_row(row.get_row()) {
+                let index_row = self.index_key_val(row.get_row(), row.get_id(), index);
+                batch.put(index_row.key, index_row.val);
+            }
         }
+
         batch.put(
             &RowKey::SecondaryIndexInfo {
                 index_id: Self::index_id(index.get_id()),
@@ -732,6 +751,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             .as_slice(),
         );
         self.db().write(batch)?;
+
         if log_shown {
             log::info!(
                 "Rebuilding metastore index {:?} for table {:?} complete ({:?})",
@@ -740,6 +760,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 time.elapsed()?
             );
         }
+
         Ok(())
     }
 
@@ -797,17 +818,16 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             )));
         }
 
-        let id = if let Some(id) = if reverse {
+        let to_fetch = if reverse {
             row_ids.last()
         } else {
             row_ids.first()
-        } {
-            id.clone()
-        } else {
+        };
+        let Some(id) = to_fetch else {
             return Ok(None);
         };
 
-        if let Some(row) = self.get_row(id)? {
+        if let Some(row) = self.get_row(*id)? {
             Ok(Some(row))
         } else {
             let index = self.get_index_by_id(BaseRocksSecondaryIndex::get_id(secondary_index));
@@ -891,34 +911,34 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         self.get_row_by_index_opt(row_key, secondary_index, true)
     }
 
-    fn update_with_fn(
+    fn update_with_fn<S>(
         &self,
         row_id: u64,
         update_fn: impl FnOnce(&Self::T) -> Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
         let new_row = update_fn(&row.get_row());
         self.update(row_id, new_row, &row.get_row(), batch_pipe)
     }
 
-    fn update_with_res_fn(
+    fn update_with_res_fn<S>(
         &self,
         row_id: u64,
         update_fn: impl FnOnce(&Self::T) -> Result<Self::T, CubeError>,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
         let new_row = update_fn(&row.get_row())?;
         self.update(row_id, new_row, &row.get_row(), batch_pipe)
     }
 
-    fn update(
+    fn update<S>(
         &self,
         row_id: u64,
         new_row: Self::T,
         old_row: &Self::T,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let deleted_row = self.delete_index_row(&old_row, row_id)?;
         for row in deleted_row {
@@ -949,7 +969,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(IdRow::new(row_id, new_row))
     }
 
-    fn truncate(&self, batch_pipe: &mut BatchPipe) -> Result<(), CubeError> {
+    fn truncate<S>(&self, batch_pipe: &mut BatchPipe<'_, S>) -> Result<(), CubeError> {
         let iter = self.table_scan(self.snapshot())?;
 
         for item in iter {
@@ -961,13 +981,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(())
     }
 
-    fn update_extended_ttl_secondary_index<'a, K: Debug>(
+    fn update_extended_ttl_secondary_index<'a, K: Debug, S>(
         &self,
         row_id: u64,
         secondary_index: &'a impl RocksSecondaryIndex<Self::T, K>,
         secondary_key_hash: SecondaryKeyHash,
         extended: RocksSecondaryIndexValueTTLExtended,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<bool, CubeError>
     where
         K: Hash,
@@ -1005,15 +1025,19 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         }
     }
 
-    fn delete(&self, row_id: u64, batch_pipe: &mut BatchPipe) -> Result<IdRow<Self::T>, CubeError> {
+    fn delete<S>(
+        &self,
+        row_id: u64,
+        batch_pipe: &mut BatchPipe<'_, S>,
+    ) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
         self.delete_row(row, batch_pipe)
     }
 
-    fn try_delete(
+    fn try_delete<S>(
         &self,
         row_id: u64,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<Option<IdRow<Self::T>>, CubeError> {
         if let Some(row) = self.get_row(row_id)? {
             Ok(Some(self.delete_row(row, batch_pipe)?))
@@ -1022,10 +1046,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         }
     }
 
-    fn delete_row(
+    fn delete_row<S>(
         &self,
         row: IdRow<Self::T>,
-        batch_pipe: &mut BatchPipe,
+        batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let deleted_row = self.delete_index_row(row.get_row(), row.get_id())?;
         batch_pipe.add_event(MetaStoreEvent::Delete(Self::table_id(), row.get_id()));
@@ -1128,7 +1152,9 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let mut res = Vec::with_capacity(indexes.len());
 
         for index in indexes.iter() {
-            res.push(self.index_key_val(row, row_id, index));
+            if index.should_index_row(row) {
+                res.push(self.index_key_val(row, row_id, index));
+            }
         }
 
         Ok(res)
@@ -1154,13 +1180,18 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn delete_index_row(&self, row: &Self::T, row_id: u64) -> Result<Vec<KeyVal>, CubeError> {
         let mut res = Vec::new();
         for index in Self::indexes().iter() {
-            let hash = index.key_hash(&row);
-            let key =
-                RowKey::SecondaryIndex(Self::index_id(index.get_id()), hash.to_be_bytes(), row_id);
-            res.push(KeyVal {
-                key: key.to_bytes(),
-                val: vec![],
-            });
+            if index.should_index_row(row) {
+                let hash = index.key_hash(&row);
+                let key = RowKey::SecondaryIndex(
+                    Self::index_id(index.get_id()),
+                    hash.to_be_bytes(),
+                    row_id,
+                );
+                res.push(KeyVal {
+                    key: key.to_bytes(),
+                    val: vec![],
+                });
+            }
         }
 
         Ok(res)

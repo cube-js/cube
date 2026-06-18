@@ -1,0 +1,5 @@
+---
+source: cubesqlplanner/src/tests/integration/combinations.rs
+expression: result
+---
+(empty result)

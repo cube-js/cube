@@ -1,0 +1,73 @@
+---
+title: Dashboards
+description: Embed Cube dashboards into your applications via iframe.
+---
+
+<Info>
+  Iframe embedding is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+</Info>
+
+Embed any [dashboard](/docs/explore-analyze/dashboards) into your application using an iframe. Dashboards can be embedded with either authentication mode:
+
+- **[Private embedding](/embedding/iframe/auth/private)** — for internal users with Cube accounts (e.g., embedding in Notion, Salesforce, internal tools)
+- **[Signed embedding](/embedding/iframe/auth/signed)** — for external/customer-facing applications using server-generated sessions
+
+## Embed with private embedding
+
+To embed a dashboard for internal users:
+
+1. Open your dashboard in Cube
+2. Click **Share** → **Embed**
+3. Copy the generated iframe code
+
+<img src="https://lgo0ecceic.ucarecd.net/24999bd4-1a7a-4c15-999a-848e6ec3fbe4/" alt="Share embed dialog" />
+
+Then paste the iframe code into your application:
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-account.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+Users will be prompted to sign in with their Cube credentials when accessing the embedded dashboard. See [Private embedding](/embedding/iframe/auth/private) for details on the auth model and integration examples (Notion, Salesforce).
+
+## Embed with signed embedding
+
+To embed a dashboard for external/customer-facing applications, generate a session on your backend and pass the session ID into the iframe:
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
+
+## Pre-set dashboard filters via URL
+
+You can pre-set dashboard filter values by adding URL parameters in the format
+`?f_<semantic_view>.<dimension>=<JSON>`. The `<semantic_view>` and `<dimension>`
+must match the internal names (not display titles) of the semantic view and
+dimension configured on the filter widget. If the filter type is omitted, it
+defaults to `equals`.
+
+Example:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}
+```
+
+This works on both regular and published (embedded) dashboards. The filter is
+only applied if a matching filter widget for that dimension already exists on the
+dashboard.
+
+## Customize appearance
+
+You can style an embedded dashboard — background, padding, widget borders, titles, and fonts — from the **Styling** panel in the Dashboard Builder. See [Dashboards → Styling](/docs/explore-analyze/dashboards/styling) for the full list of options.

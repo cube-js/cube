@@ -1,4 +1,5 @@
-use crate::{to_rows, SqlClient};
+use crate::files::download_and_unzip;
+use crate::to_rows;
 use async_trait::async_trait;
 use cubestore::cluster::Cluster;
 use cubestore::config::{env_parse, Config, CubeServices};
@@ -6,23 +7,19 @@ use cubestore::metastore::{Column, ColumnType};
 use cubestore::table::TableValue;
 use cubestore::util::strings::path_to_string;
 use cubestore::CubeError;
-use flate2::read::GzDecoder;
 use std::any::Any;
-use std::io::Cursor;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use tar::Archive;
 use tokio::time::timeout;
 
 pub type BenchState = dyn Any + Send + Sync;
 
 #[async_trait]
 pub trait Bench: Send + Sync {
-    fn config(self: &Self, prefix: &str) -> (String, Config);
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError>;
+    fn config(&self, prefix: &str) -> (String, Config);
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError>;
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         state: Arc<BenchState>,
     ) -> Result<(), CubeError>;
@@ -33,12 +30,12 @@ fn config_name(prefix: &str, name: &str) -> String {
 }
 
 pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
-    return vec![
+    vec![
         Arc::new(SimpleBench {}),
         Arc::new(ParquetMetadataCacheBench {}),
         Arc::new(CacheSetGetBench {}),
         Arc::new(QueueListBench::new(16 * 1024)),
-    ];
+    ]
 }
 
 pub struct SimpleBenchState {
@@ -47,20 +44,20 @@ pub struct SimpleBenchState {
 pub struct SimpleBench;
 #[async_trait]
 impl Bench for SimpleBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "simple");
         let config = Config::test(name.as_str());
         (name, config)
     }
 
-    async fn setup(self: &Self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         Ok(Arc::new(SimpleBenchState {
             query: "SELECT 23".to_string(),
         }))
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
@@ -70,6 +67,8 @@ impl Bench for SimpleBench {
         let r = services
             .sql_service
             .exec_query(state.query.as_str())
+            .await?
+            .collect()
             .await?;
         let rows = to_rows(&r);
         assert_eq!(rows, vec![vec![TableValue::Int(23)]]);
@@ -83,7 +82,7 @@ impl Bench for SimpleBench {
 pub struct ParquetMetadataCacheBench;
 #[async_trait]
 impl Bench for ParquetMetadataCacheBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "parquet_metadata_cache");
         let config = Config::test(name.as_str()).update_config(|mut c| {
             c.partition_split_threshold = 10_000_000;
@@ -97,7 +96,7 @@ impl Bench for ParquetMetadataCacheBench {
         (name, config)
     }
 
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         let dataset_path = download_and_unzip(
             "https://github.com/cube-js/testing-fixtures/raw/master/github-commits.tar.gz",
             "github-commits",
@@ -108,14 +107,16 @@ impl Bench for ParquetMetadataCacheBench {
         let _ = services
             .sql_service
             .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+            .await?
+            .collect()
             .await?;
 
         let _ = services.sql_service
             .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path_to_string(path)?).as_str())
-            .await?;
+            .await?.collect().await?;
 
         // Wait for all pending (compaction) jobs to finish.
-        wait_for_all_jobs(&services).await?;
+        wait_for_all_jobs(services).await?;
 
         let state = Arc::new(());
 
@@ -126,7 +127,7 @@ impl Bench for ParquetMetadataCacheBench {
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         _state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
@@ -140,6 +141,8 @@ impl Bench for ParquetMetadataCacheBench {
                 )
                 .as_str(),
             )
+            .await?
+            .collect()
             .await?;
         let rows = to_rows(&r);
         assert_eq!(rows, vec![vec![TableValue::Int(6)]]);
@@ -150,16 +153,18 @@ impl Bench for ParquetMetadataCacheBench {
 pub struct CacheSetGetBench;
 #[async_trait]
 impl Bench for CacheSetGetBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "cache_set_get");
         let config = Config::test(name.as_str()).update_config(|c| c);
         (name, config)
     }
 
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         services
             .sql_service
             .exec_query("CACHE SET TTL 600 'my_key' 'my_value'")
+            .await?
+            .collect()
             .await?;
 
         let state = Arc::new(());
@@ -167,13 +172,15 @@ impl Bench for CacheSetGetBench {
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         _state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
         let r = services
             .sql_service
             .exec_query("CACHE GET 'my_key'")
+            .await?
+            .collect()
             .await?;
 
         let rows = to_rows(&r);
@@ -195,13 +202,13 @@ impl QueueListBench {
 
 #[async_trait]
 impl Bench for crate::benches::QueueListBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "queue_list_bench");
         let config = Config::test(name.as_str()).update_config(|c| c);
         (name, config)
     }
 
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         for i in 1..5_001 {
             services
                 .sql_service
@@ -211,6 +218,8 @@ impl Bench for crate::benches::QueueListBench {
                     i,
                     "a".repeat(self.payload_size)
                 ))
+                .await?
+                .collect()
                 .await?;
         }
 
@@ -219,13 +228,15 @@ impl Bench for crate::benches::QueueListBench {
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         _state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
         let r = services
             .sql_service
             .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?
+            .collect()
             .await?;
 
         assert_eq!(
@@ -241,21 +252,6 @@ impl Bench for crate::benches::QueueListBench {
 
         Ok(())
     }
-}
-
-async fn download_and_unzip(url: &str, dataset: &str) -> Result<Box<Path>, CubeError> {
-    let root = std::env::current_dir()?.join("data");
-    let dataset_path = root.join(dataset);
-    if !dataset_path.exists() {
-        println!("Downloading {}", dataset);
-        let response = reqwest::get(url).await?;
-        let content = Cursor::new(response.bytes().await?);
-        let tarfile = GzDecoder::new(content);
-        let mut archive = Archive::new(tarfile);
-        archive.unpack(root)?;
-    }
-    assert!(dataset_path.exists());
-    Ok(dataset_path.into_boxed_path())
 }
 
 async fn wait_for_all_jobs(services: &CubeServices) -> Result<(), CubeError> {

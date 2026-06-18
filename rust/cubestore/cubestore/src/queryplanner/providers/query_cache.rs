@@ -1,19 +1,21 @@
-use crate::queryplanner::project_schema;
+use crate::queryplanner::{project_schema, try_make_memory_data_source};
 use crate::sql::cache::{sql_result_cache_sizeof, SqlResultCache};
 use async_trait::async_trait;
 use datafusion::arrow::array::{Array, Int64Builder, StringBuilder};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::datasource::datasource::Statistics;
-use datafusion::datasource::TableProvider;
+use datafusion::catalog::Session;
+use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::Expr;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::Partitioning;
+use datafusion::execution::TaskContext;
+use datafusion::logical_expr::Expr;
+use datafusion::physical_expr::EquivalenceProperties;
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion::physical_plan::{DisplayAs, DisplayFormatType, Partitioning, PlanProperties};
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use std::any::Any;
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 pub struct InfoSchemaQueryCacheTableProvider {
@@ -33,6 +35,13 @@ fn get_schema() -> SchemaRef {
     ]))
 }
 
+impl Debug for InfoSchemaQueryCacheTableProvider {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "InfoSchemaQueryCacheTableProvider")
+    }
+}
+
+#[async_trait]
 impl TableProvider for InfoSchemaQueryCacheTableProvider {
     fn as_any(&self) -> &dyn Any {
         self
@@ -42,28 +51,31 @@ impl TableProvider for InfoSchemaQueryCacheTableProvider {
         get_schema()
     }
 
-    fn scan(
+    fn table_type(&self) -> TableType {
+        TableType::Base
+    }
+
+    async fn scan(
         &self,
-        projection: &Option<Vec<usize>>,
-        _batch_size: usize,
+        _state: &dyn Session,
+        projection: Option<&Vec<usize>>,
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        let schema = project_schema(&self.schema(), projection.cloned().as_deref());
         let exec = InfoSchemaQueryCacheTableExec {
             cache: self.cache.clone(),
-            projection: projection.clone(),
-            projected_schema: project_schema(&self.schema(), projection.as_deref()),
+            projection: projection.cloned(),
+            projected_schema: schema.clone(),
+            properties: PlanProperties::new(
+                EquivalenceProperties::new(schema),
+                Partitioning::UnknownPartitioning(1),
+                EmissionType::Final,
+                Boundedness::Bounded,
+            ),
         };
 
         Ok(Arc::new(exec))
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-        }
     }
 }
 
@@ -75,14 +87,14 @@ struct InfoSchemaQueryCacheBuilder {
 impl InfoSchemaQueryCacheBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            sql: StringBuilder::new(capacity),
-            size: Int64Builder::new(capacity),
+            sql: StringBuilder::with_capacity(capacity, 0),
+            size: Int64Builder::with_capacity(capacity),
         }
     }
 
     fn add_row(&mut self, sql: impl AsRef<str> + Clone, size: i64) {
-        self.sql.append_value(sql).unwrap();
-        self.size.append_value(size).unwrap();
+        self.sql.append_value(sql);
+        self.size.append_value(size);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -99,6 +111,7 @@ pub struct InfoSchemaQueryCacheTableExec {
     cache: Arc<SqlResultCache>,
     projection: Option<Vec<usize>>,
     projected_schema: SchemaRef,
+    properties: PlanProperties,
 }
 
 impl std::fmt::Debug for InfoSchemaQueryCacheTableExec {
@@ -110,8 +123,18 @@ impl std::fmt::Debug for InfoSchemaQueryCacheTableExec {
     }
 }
 
+impl DisplayAs for InfoSchemaQueryCacheTableExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> fmt::Result {
+        write!(f, "InfoSchemaQueryCacheTableExec")
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for InfoSchemaQueryCacheTableExec {
+    fn name(&self) -> &str {
+        "InfoSchemaQueryCacheTableExec"
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -120,24 +143,25 @@ impl ExecutionPlan for InfoSchemaQueryCacheTableExec {
         self.projected_schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         _children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        Ok(Arc::new(self.clone()))
+        Ok(self)
     }
 
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let mut builder = InfoSchemaQueryCacheBuilder::new(self.cache.entry_count() as usize);
 
@@ -154,8 +178,11 @@ impl ExecutionPlan for InfoSchemaQueryCacheTableExec {
         let batch = RecordBatch::try_new(get_schema(), data.to_vec())?;
 
         // TODO: Please migrate to real streaming, if we are going to expose query results
-        let mem_exec =
-            MemoryExec::try_new(&vec![vec![batch]], self.schema(), self.projection.clone())?;
-        mem_exec.execute(partition).await
+        let mem_exec = try_make_memory_data_source(
+            &vec![vec![batch]],
+            self.schema(),
+            self.projection.clone(),
+        )?;
+        mem_exec.execute(partition, context)
     }
 }

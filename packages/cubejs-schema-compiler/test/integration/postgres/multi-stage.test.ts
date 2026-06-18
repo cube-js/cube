@@ -232,8 +232,135 @@ views:
       },
     ],
     { joinGraph, cubeEvaluator, compiler }));
+    it('multi stage measure filter', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.status'],
+      timeDimensions: [
+        {
+          dimension: 'orders.date',
+          granularity: 'year'
+        }
+      ],
+      filters: [
+        { member: 'orders.cagr_1_y', operator: 'gt', values: ['1.5'] }
+      ],
+      timezone: 'UTC'
+    }, [
+      {
+        orders__date_year: '2023-01-01T00:00:00.000Z',
+        orders__status: 'completed',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
   } else {
     // This test is working only in tesseract
     test.skip('multi stage over sub query', () => { expect(1).toBe(1); });
+  }
+});
+
+describe('Multi-Stage Rolling Window with multiplied leaf', () => {
+  jest.setTimeout(200000);
+
+  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: rw_orders
+    sql: >
+      SELECT 1 as ID, 100 as AMOUNT, '2024-01-10T00:00:00.000Z'::timestamptz as CREATED_AT
+      union all
+      SELECT 2 as ID, 200 as AMOUNT, '2024-01-20T00:00:00.000Z'::timestamptz as CREATED_AT
+      union all
+      SELECT 3 as ID, 300 as AMOUNT, '2024-02-15T00:00:00.000Z'::timestamptz as CREATED_AT
+      union all
+      SELECT 4 as ID, 400 as AMOUNT, '2024-03-05T00:00:00.000Z'::timestamptz as CREATED_AT
+    joins:
+      - name: rw_order_items
+        sql: "{CUBE}.ID = {rw_order_items}.ORDER_ID"
+        relationship: one_to_many
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
+
+    measures:
+      - name: amount_ytd
+        sql: AMOUNT
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+
+  - name: rw_order_items
+    sql: >
+      SELECT 1 as ID, 1 as ORDER_ID, 'brand_a' as BRAND
+      union all
+      SELECT 2 as ID, 1 as ORDER_ID, 'brand_b' as BRAND
+      union all
+      SELECT 3 as ID, 2 as ORDER_ID, 'brand_a' as BRAND
+      union all
+      SELECT 4 as ID, 3 as ORDER_ID, 'brand_b' as BRAND
+      union all
+      SELECT 5 as ID, 4 as ORDER_ID, 'brand_a' as BRAND
+    public: false
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: order_id
+        sql: ORDER_ID
+        type: number
+
+      - name: brand
+        sql: BRAND
+        type: string
+    `);
+
+  if (getEnv('nativeSqlPlanner')) {
+    // The filter on rw_order_items joins it through a one_to_many
+    // relationship, so sum(AMOUNT) becomes a multiplied measure and the
+    // rolling window leaf query plans its own CTEs. CTE names must stay
+    // unique: nested WITH with a shadowed name is invalid on some dialects.
+    it('rolling window with multiplied leaf measure', async () => {
+      const [sql] = await dbRunner.runQueryTest({
+        measures: ['rw_orders.amount_ytd'],
+        timeDimensions: [
+          {
+            dimension: 'rw_orders.created_at',
+            granularity: 'month',
+            dateRange: ['2024-01-01', '2024-03-31'],
+          }
+        ],
+        filters: [
+          { member: 'rw_order_items.brand', operator: 'set' }
+        ],
+        timezone: 'UTC'
+      }, [
+        {
+          rw_orders__created_at_month: '2024-01-01T00:00:00.000Z',
+          rw_orders__amount_ytd: '300',
+        },
+        {
+          rw_orders__created_at_month: '2024-02-01T00:00:00.000Z',
+          rw_orders__amount_ytd: '600',
+        },
+        {
+          rw_orders__created_at_month: '2024-03-01T00:00:00.000Z',
+          rw_orders__amount_ytd: '1000',
+        },
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+
+      const cteNames = [...sql.matchAll(/(\w+) AS \(/g)].map(m => m[1]);
+      expect(new Set(cteNames).size).toBe(cteNames.length);
+    });
+  } else {
+    test.skip('rolling window with multiplied leaf measure', () => { expect(1).toBe(1); });
   }
 });

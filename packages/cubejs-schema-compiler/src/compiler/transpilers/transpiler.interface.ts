@@ -8,12 +8,12 @@ export interface TranspilerInterface {
 }
 
 export interface TranspilerSymbolResolver {
-  resolveSymbol(cubeName, name): any;
-  isCurrentCube(name): boolean;
+  resolveSymbol(cubeName: string | null | undefined, name: string): any;
+  isCurrentCube(name: string): boolean;
 }
 
 export interface TranspilerCubeResolver {
-  resolveCube(name): boolean;
+  resolveCube(name: string): any;
 }
 
 export type SymbolResolver = (name: string) => any;

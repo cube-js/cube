@@ -2,11 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "include": [
     "src",
-    "test"
+    "test",
+    "package.json"
   ],
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",
+    "resolveJsonModule": true
   }
 }

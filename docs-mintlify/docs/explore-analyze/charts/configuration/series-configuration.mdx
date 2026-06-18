@@ -1,0 +1,48 @@
+---
+title: Series configuration
+description: Configure individual series — mark type, color, and display options — independently from the global chart settings.
+---
+
+Series configuration lets you override chart settings on a per-series basis. Access it from the **Fields** tab by expanding an individual series in the Y-axis section.
+
+{/* TODO screenshot: series configuration panel expanded for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Mark type override
+
+Each series can use a different mark type, independent of the global chart mark. This enables composite charts — for example, plotting one measure as a bar and another as a line on the same chart.
+
+Available mark types per series:
+- **Bar**
+- **Line**
+- **Area**
+- **Scatter** (point)
+
+To create a bar + line chart:
+1. Add two measures to the Y axis.
+2. Expand the second series in the Fields tab.
+3. Set its mark type to **Line**.
+4. Optionally assign it to the **Right Y axis** in the same panel (see [Axes](/docs/explore-analyze/charts/configuration/axes)).
+
+{/* TODO screenshot: second series with mark type set to Line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Series color
+
+When no **Color** channel is assigned (single-color charts with no color-by dimension), each series has an individual color picker. Click the color swatch to open the picker and set a custom color for that series.
+
+This setting has no effect when a Color channel is active — in that case, colors are managed by the palette in [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
+
+## Y axis assignment
+
+For charts with a dual Y axis, assign each series to either the **Left** or **Right** Y axis. This controls which axis scale the series uses.
+
+See [Axes](/docs/explore-analyze/charts/configuration/axes) for configuring the right axis title, labels, and scale.
+
+## Data labels per series
+
+Enable data labels for an individual series without enabling them globally. Configure label position, font, and format independently for each series.
+
+See [Data labels](/docs/explore-analyze/charts/configuration/data-labels) for the full configuration reference.
+
+## Stacking override
+
+On charts with multiple Y-axis series, you can set stacking behavior per-axis rather than globally. This lets you create grouped clusters where each cluster is internally stacked — expand the Y-axis settings for a specific series to access this option.

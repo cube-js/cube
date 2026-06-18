@@ -37,7 +37,8 @@ export function useCubeQuery(query, options = {}) {
         mutexObj: mutexRef.current,
         mutexKey: 'query',
         progressCallback,
-        castNumerics: Boolean(typeof options.castNumerics === 'boolean' ? options.castNumerics : context?.options?.castNumerics)
+        castNumerics: Boolean(typeof options.castNumerics === 'boolean' ? options.castNumerics : context?.options?.castNumerics),
+        ...(options.cache ? { cache: options.cache } : {}),
       });
 
       setResultSet(response);
@@ -85,6 +86,7 @@ export function useCubeQuery(query, options = {}) {
                 mutexObj: mutexRef.current,
                 mutexKey: 'query',
                 progressCallback,
+                ...(options.cache ? { cache: options.cache } : {}),
               },
               (e, result) => {
                 if (e) {

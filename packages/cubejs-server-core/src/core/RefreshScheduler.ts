@@ -615,7 +615,49 @@ export class RefreshScheduler {
           const currentQuery = await queryIterator.current();
           if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
             const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
-            await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
+            const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+            const now = new Date();
+
+            const backoffChecks = await Promise.all(
+              currentQuery.preAggregations.map(p => preAggsInstance.getPreAggBackoff(p.tableName))
+            );
+
+            // Skip execution if any pre-aggregation is still in backoff window
+            const shouldSkip = backoffChecks.some(backoffData => backoffData && now < backoffData.nextTimestamp);
+
+            if (!shouldSkip) {
+              try {
+                await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
+              } catch (e: any) {
+                // Check if this is a "Continue wait" error - these are normal queue signals
+                // For Continue wait errors, re-throw to handle them in the normal flow
+                if (e.error === 'Continue wait') {
+                  throw e;
+                }
+
+                // Real datasource error - apply exponential backoff
+                for (const p of currentQuery.preAggregations) {
+                  let backoffData = await preAggsInstance.getPreAggBackoff(p.tableName);
+
+                  if (backoffData && backoffData.backoffMultiplier > 0) {
+                    const newMultiplier = backoffData.backoffMultiplier * 2;
+                    const delaySeconds = Math.min(newMultiplier, preAggsInstance.getPreAggBackoffMaxTime());
+
+                    backoffData = {
+                      backoffMultiplier: newMultiplier,
+                      nextTimestamp: new Date(now.valueOf() + delaySeconds * 1000),
+                    };
+                  } else {
+                    backoffData = {
+                      backoffMultiplier: 1,
+                      nextTimestamp: new Date(now.valueOf() + 1000),
+                    };
+                  }
+
+                  await preAggsInstance.updatePreAggBackoff(p.tableName, backoffData);
+                }
+              }
+            }
           }
           const hasNext = await queryIterator.advance();
           if (!hasNext) {

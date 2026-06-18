@@ -1,0 +1,10 @@
+.productVideo {
+  text-align: center;
+  margin: var(--space-m) 0;
+}
+
+.video {
+  width: 100%;
+  height: 525px;
+  object-fit: contain;
+}

@@ -1,0 +1,134 @@
+---
+title: Table
+description: Display query results as a configurable table with pivots, conditional formatting, and inline visualizations.
+---
+
+The table visualization presents query results in a structured grid. Unlike the raw results table in the query panel, the table visualization is designed for sharing — it supports pivots, column display overrides, conditional formatting, custom styling, and inline bar/link/image column rendering.
+
+{/* TODO screenshot: styled table with pivot and conditional formatting (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Showing and hiding columns
+
+Right-click a column header in the table visualization to hide it. Hidden columns can be restored from the **Fields** section of the configuration panel. You can also hide columns from the column options menu (the three-dot menu on each column header).
+
+## Reordering columns
+
+Drag a column header to reorder columns. Dimensions and measures can be interspersed freely when no pivot is active.
+
+## Pivots
+
+Pivoting a dimension turns its unique values into columns, creating a cross-tab view. Drag a dimension to the **Pivot columns** drop zone in the **Fields** section to pivot it.
+
+{/* TODO screenshot: table with pivot active — dimension values as column headers (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+Pivot behavior:
+- Pivot columns can be sorted by clicking the column header, including the totals column.
+- Pivot columns can also be sorted by row values — click a row number to sort by that row, including the totals row.
+- Pivoted columns can be hidden, but hiding is indexed to the specific value (e.g. hiding `status: returned`), not position.
+
+## Table options
+
+The **Table** tab in the configuration panel controls layout and display settings:
+
+| Option | Description |
+|---|---|
+| **Column width** | **Stretch** fills the full table width; **Fixed** keeps column widths constant regardless of tile size |
+| **Header text** | Controls whether long column headers **truncate** or **wrap** to the next line |
+| **View names** | When enabled, the view/cube name is shown in the column header |
+| **Row numbers** | Adds a row number column on the left |
+| **Group dimensions** | Groups multiple dimensions per row into a collapsible section for subtotaling |
+
+## Column field options
+
+Click the dropdown arrow on any field in the **Fields** section to configure it:
+
+| Option | Description |
+|---|---|
+| **Label** | Override the column header text |
+| **Alignment** | Left, center, or right |
+| **Word wrap** | Allow cell content to wrap to multiple lines |
+| **Hide** | Show or hide the column |
+
+## Display tab — showing columns as links, images, or bars
+
+By default, columns display their raw value. The **Display** tab for each field lets you change this:
+
+### Links
+
+Display a field's value as a clickable hyperlink. To create dynamic per-row links:
+
+1. Add a [calculated field](/docs/explore-analyze/workbooks/calculated-fields) that produces a URL — for example:
+   ```
+   CONCAT("https://example.com/orders/", order_items.order_id)
+   ```
+2. In the table visualization, hide the calculated field column.
+3. In the **Display** tab for the field you want to link, set **Display as** to **Link** and select the hidden URL field as the source.
+
+{/* TODO screenshot: column display dropdown showing Link option selected (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Images
+
+Display a field as an image by setting **Display as** to **Image**. Configure height and width. To make the image a link, check **Link image** and set the **Link URL**.
+
+The URL must be publicly accessible without authentication.
+
+### Inline bars
+
+Display a numeric column as a proportional bar by setting **Display as** to **Bar**. Bars scale relative to the max value in the column. Columns with negative values will split the bar in both directions.
+
+{/* TODO screenshot: table with inline bar column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Style options
+
+The **Style** tab controls the visual appearance of the table:
+
+| Option | Description |
+|---|---|
+| **Row numbers** | Show or hide the row number column |
+| **Row banding** | Alternates row background between white and a secondary color |
+| **Font size** | Adjust size independently for Headers, Values, and Totals |
+| **Description** | Show a description below the table title |
+
+### Colors
+
+Set background and text colors for table elements:
+
+- Table headers (background + text)
+- Values (background + text)
+- Banding (background)
+- Hover state
+- Totals row
+
+Use the three-dot menu in the Colors section to **reset to defaults** or **copy the color palette** as a JSON string for reuse:
+
+```json
+{"header":{"fontColor":"#fefefe","backgroundColor":"#5339CF"},"banding":{"backgroundColor":"#f5f3ff"}}
+```
+
+## Conditional formatting
+
+The **Conditional formatting** tab applies cell or row styling based on conditions you define. Configure:
+
+1. The field to evaluate
+2. The condition (e.g. greater than, contains, is null)
+3. The styling to apply when the condition is met (background color, text color)
+
+To make a background transparent, open the color picker and clear the hex value.
+
+{/* TODO screenshot: conditional formatting panel with a condition configured (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Gradient color scale
+
+The **Color scale** tab applies a gradient across a column based on value ranges. Configure a minimum color, a midpoint color (optional), and a maximum color. The gradient is applied across all visible rows.
+
+<Warning>
+If you don't set a mapping value for the scale, the gradient applies across visible rows only. This can produce unexpected results when row limits or pagination are active.
+</Warning>
+
+Use the **Treat as zero** toggle to handle null values in the gradient calculation.
+
+{/* TODO screenshot: table with gradient color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Totals
+
+Enable column totals and row totals from the **Table** configuration tab. Totals rows and columns are styled separately from body cells.

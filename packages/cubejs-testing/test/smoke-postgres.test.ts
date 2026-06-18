@@ -72,6 +72,75 @@ describe('postgres pa', () => {
     ]);
   });
 
+  test('query pre-aggregation with granularity-based index', async () => {
+    const query: Query = {
+      measures: ['OrdersPAIndexGranularity.count', 'OrdersPAIndexGranularity.totalAmount'],
+      dimensions: ['OrdersPAIndexGranularity.status'],
+      timeDimensions: [{
+        dimension: 'OrdersPAIndexGranularity.createdAt',
+        granularity: 'day',
+        dateRange: ['2024-01-01', '2024-01-03'],
+      }],
+      order: {
+        'OrdersPAIndexGranularity.createdAt': 'asc',
+        'OrdersPAIndexGranularity.status': 'asc',
+      },
+    };
+    const result = await client.load(query);
+    expect(result.rawData()).toEqual([
+      {
+        'OrdersPAIndexGranularity.count': '2',
+        'OrdersPAIndexGranularity.createdAt': '2024-01-01T00:00:00.000',
+        'OrdersPAIndexGranularity.createdAt.day': '2024-01-01T00:00:00.000',
+        'OrdersPAIndexGranularity.status': 'new',
+        'OrdersPAIndexGranularity.totalAmount': '300',
+      },
+      {
+        'OrdersPAIndexGranularity.count': '2',
+        'OrdersPAIndexGranularity.createdAt': '2024-01-02T00:00:00.000',
+        'OrdersPAIndexGranularity.createdAt.day': '2024-01-02T00:00:00.000',
+        'OrdersPAIndexGranularity.status': 'processed',
+        'OrdersPAIndexGranularity.totalAmount': '800',
+      },
+      {
+        'OrdersPAIndexGranularity.count': '1',
+        'OrdersPAIndexGranularity.createdAt': '2024-01-03T00:00:00.000',
+        'OrdersPAIndexGranularity.createdAt.day': '2024-01-03T00:00:00.000',
+        'OrdersPAIndexGranularity.status': 'shipped',
+        'OrdersPAIndexGranularity.totalAmount': '600',
+      },
+    ]);
+  });
+
+  test('pre-aggregation index with granularity has correct SQL', async () => {
+    const id = 'OrdersPAIndexGranularity.ordersByDay';
+
+    const partitionsResponse = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/partitions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          preAggregations: [{ id }]
+        }
+      }),
+    })).json();
+
+    const partitions = partitionsResponse.preAggregationPartitions;
+    expect(partitions.length).toEqual(1);
+    expect(partitions[0].partitions.length).toBeGreaterThan(0);
+
+    const partition = partitions[0].partitions[0];
+    expect(partition.indexesSql.length).toEqual(2);
+
+    const [timeIndexSql] = partition.indexesSql[0].sql;
+    expect(timeIndexSql).toContain('orders_p_a_index_granularity__created_at_day');
+    expect(timeIndexSql).not.toContain('orders_p_a_index_granularity__created_at__day');
+
+    const [timeAndStatusIndexSql] = partition.indexesSql[1].sql;
+    expect(timeAndStatusIndexSql).toContain('orders_p_a_index_granularity__created_at_day');
+    expect(timeAndStatusIndexSql).toContain('orders_p_a_index_granularity__status');
+  });
+
   test('preview', async () => {
     const id = 'OrdersPA.ordersByStatus';
 

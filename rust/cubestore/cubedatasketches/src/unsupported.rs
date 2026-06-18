@@ -65,4 +65,8 @@ impl HLLUnionDataSketch {
     pub fn merge_with(&mut self, _other: HLLDataSketch) -> Result<()> {
         unimplemented!();
     }
+
+    pub fn allocated_size(&self) -> usize {
+        unimplemented!();
+    }
 }

@@ -1,5 +1,5 @@
 use crate::config::injection::DIService;
-use crate::config::Config;
+use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::table::Table;
@@ -7,10 +7,11 @@ use crate::metastore::{MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct JobProcessResult {
@@ -52,6 +53,7 @@ impl JobProcessorImpl {
         chunk_store: Arc<dyn ChunkDataStore>,
         compaction_service: Arc<dyn CompactionService>,
         import_service: Arc<dyn ImportService>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(Self {
             processor: JobIsolatedProcessor::new(
@@ -59,6 +61,7 @@ impl JobProcessorImpl {
                 chunk_store,
                 compaction_service,
                 import_service,
+                config_obj,
             ),
         })
     }
@@ -84,6 +87,7 @@ pub struct JobIsolatedProcessor {
     chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
     import_service: Arc<dyn ImportService>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 impl JobIsolatedProcessor {
@@ -92,17 +96,20 @@ impl JobIsolatedProcessor {
         chunk_store: Arc<dyn ChunkDataStore>,
         compaction_service: Arc<dyn CompactionService>,
         import_service: Arc<dyn ImportService>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(Self {
             meta_store,
             chunk_store,
             compaction_service,
             import_service,
+            config_obj,
         })
     }
 
     pub async fn new_from_config(config: &Config) -> Arc<Self> {
         Self::new(
+            config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
@@ -117,10 +124,16 @@ impl JobIsolatedProcessor {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
                     let data_loaded_size = DataLoadedSize::new();
+                    app_metrics::JOBS_PARTITION_COMPACTION.add(1);
                     let r = compaction_service
                         .compact(partition_id, data_loaded_size.clone())
                         .await;
-                    r?;
+                    if let Err(e) = r {
+                        app_metrics::JOBS_PARTITION_COMPACTION_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_PARTITION_COMPACTION_COMPLETED.add(1);
+
                     Ok(JobProcessResult::new(data_loaded_size.get()))
                 } else {
                     Self::fail_job_row_key(job)
@@ -130,7 +143,13 @@ impl JobIsolatedProcessor {
                 if let RowKey::Table(TableId::MultiPartitions, id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let id = *id;
-                    compaction_service.split_multi_partition(id).await?;
+                    app_metrics::JOBS_MULTI_PARTITION_SPLIT.add(1);
+                    let r = compaction_service.split_multi_partition(id).await;
+                    if let Err(e) = r {
+                        app_metrics::JOBS_MULTI_PARTITION_SPLIT_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_MULTI_PARTITION_SPLIT_COMPLETED.add(1);
                     Ok(JobProcessResult::default())
                 } else {
                     Self::fail_job_row_key(job)
@@ -143,9 +162,15 @@ impl JobIsolatedProcessor {
                     let compaction_service = self.compaction_service.clone();
                     let multi_part_id = *multi_part_id;
                     for p in meta_store.find_unsplit_partitions(multi_part_id).await? {
-                        compaction_service
+                        app_metrics::JOBS_FINISH_MULTI_SPLIT.add(1);
+                        let r = compaction_service
                             .finish_multi_split(multi_part_id, p)
-                            .await?
+                            .await;
+                        if let Err(e) = r {
+                            app_metrics::JOBS_FINISH_MULTI_SPLIT_FAILURES.add(1);
+                            return Err(e);
+                        }
+                        app_metrics::JOBS_FINISH_MULTI_SPLIT_COMPLETED.add(1);
                     }
 
                     Ok(JobProcessResult::default())
@@ -196,9 +221,40 @@ impl JobIsolatedProcessor {
                         ));
                     }
                     let data_loaded_size = DataLoadedSize::new();
-                    self.chunk_store
-                        .repartition_chunk(chunk_id, data_loaded_size.clone())
-                        .await?;
+                    app_metrics::JOBS_REPARTITION_CHUNK.add(1);
+                    // FIXME: a RepartitionChunk job whose chunk_id is used as an
+                    // anchor for the whole partition (batch_repartition_enabled).
+                    // We deliberately overload the existing RepartitionChunk type
+                    // instead of introducing a dedicated per-partition JobType:
+                    // a new JobType variant cannot be deserialized by an older
+                    // binary, which would make the whole job shard unreadable when
+                    // a deployment switches between the `latest` and `release`
+                    // channels (version can move both ways at any time). Reusing a
+                    // known type keeps both directions safe — an old binary just
+                    // repartitions the single anchor chunk. See repartition_partition_chunks.
+                    let r = if self.config_obj.batch_repartition_enabled() {
+                        let partition_id = chunk.get_row().get_partition_id();
+                        let time_budget = Duration::from_secs(
+                            self.config_obj.repartition_chunks_time_budget_secs(),
+                        );
+                        self.chunk_store
+                            .repartition_partition_chunks(
+                                partition_id,
+                                chunk_id,
+                                time_budget,
+                                data_loaded_size.clone(),
+                            )
+                            .await
+                    } else {
+                        self.chunk_store
+                            .repartition_chunk(chunk_id, data_loaded_size.clone())
+                            .await
+                    };
+                    if let Err(e) = r {
+                        app_metrics::JOBS_REPARTITION_CHUNK_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_REPARTITION_CHUNK_COMPLETED.add(1);
                     Ok(JobProcessResult::new(data_loaded_size.get()))
                 } else {
                     Self::fail_job_row_key(job)

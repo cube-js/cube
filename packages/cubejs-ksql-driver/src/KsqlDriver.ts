@@ -98,6 +98,11 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -116,15 +121,16 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
-      url: getEnv('dbUrl', { dataSource }),
-      username: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      kafkaHost: getEnv('dbKafkaHost', { dataSource }),
-      kafkaUser: getEnv('dbKafkaUser', { dataSource }),
-      kafkaPassword: getEnv('dbKafkaPass', { dataSource }),
-      kafkaUseSsl: getEnv('dbKafkaUseSsl', { dataSource }),
+      url: getEnv('dbUrl', { dataSource, preAggregations }),
+      username: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      kafkaHost: getEnv('dbKafkaHost', { dataSource, preAggregations }),
+      kafkaUser: getEnv('dbKafkaUser', { dataSource, preAggregations }),
+      kafkaPassword: getEnv('dbKafkaPass', { dataSource, preAggregations }),
+      kafkaUseSsl: getEnv('dbKafkaUseSsl', { dataSource, preAggregations }),
       ...config,
     };
 

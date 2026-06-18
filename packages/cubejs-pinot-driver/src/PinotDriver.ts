@@ -34,6 +34,7 @@ export type PinotDriverConfiguration = {
   dataSource?: string;
   queryTimeout?: number;
   nullHandling?: boolean;
+  preAggregations?: boolean;
 };
 
 type AuthorizationHeaders = {
@@ -95,22 +96,23 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      basicAuth: getEnv('dbPass', { dataSource })
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      basicAuth: getEnv('dbPass', { dataSource, preAggregations })
         ? {
-          user: getEnv('dbUser', { dataSource }),
-          password: getEnv('dbPass', { dataSource }),
+          user: getEnv('dbUser', { dataSource, preAggregations }),
+          password: getEnv('dbPass', { dataSource, preAggregations }),
         }
         : undefined,
-      authToken: getEnv('pinotAuthToken', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
-      nullHandling: getEnv('pinotNullHandling', { dataSource }),
-      queryTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      authToken: getEnv('pinotAuthToken', { dataSource, preAggregations }),
+      ssl: this.getSslOptions(dataSource, preAggregations),
+      nullHandling: getEnv('pinotNullHandling', { dataSource, preAggregations }),
+      queryTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
       ...config
     };
 

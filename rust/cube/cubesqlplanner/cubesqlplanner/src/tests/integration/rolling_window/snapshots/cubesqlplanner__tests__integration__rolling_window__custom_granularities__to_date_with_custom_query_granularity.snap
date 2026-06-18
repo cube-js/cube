@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/custom_granularities.rs
+expression: result
+---
+orders__created_at_half_year | orders__rolling_sum_to_date_month
+-----------------------------+----------------------------------
+2024-01-01 00:00:00          | 150.00                           
+2024-07-01 00:00:00          | 400.00                           
+2025-01-01 00:00:00          | 230.00                           
+2025-07-01 00:00:00          | 420.00

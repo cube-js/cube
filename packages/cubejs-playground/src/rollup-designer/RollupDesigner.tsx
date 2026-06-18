@@ -603,7 +603,7 @@ export function RollupDesigner({
                         rollup is configured with the additive measures that
                         calculate this non-additive measure. See more info in{' '}
                         <Typography.Link
-                          href="https://cube.dev/docs/recipes/non-additivity#data-schema-decomposing-into-a-formula-with-additive-measures"
+                          href="https://cube.dev/recipes/pre-aggregations/non-additivity"
                           target="_blank"
                         >
                           our docs

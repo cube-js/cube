@@ -3,8 +3,8 @@ import moment from 'moment';
 import Joi from 'joi';
 import { getEnv } from '@cubejs-backend/shared';
 
-import { UserError } from './UserError';
-import { dateParser } from './dateParser';
+import { UserError } from './user-error';
+import { dateParser } from './date-parser';
 import { QueryType } from './types/enums';
 
 const getQueryGranularity = (queries) => R.pipe(
@@ -192,9 +192,13 @@ const querySchema = Joi.object().keys({
   cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   cache: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   ungrouped: Joi.boolean(),
-  responseFormat: Joi.valid('default', 'compact'),
+  responseFormat: Joi.valid('default', 'compact', 'columnar'),
   subqueryJoins: Joi.array().items(subqueryJoin),
   joinHints: Joi.array().items(joinHint),
+  maskedMembers: Joi.array().items(Joi.object().keys({
+    member: Joi.string().required(),
+    filter: Joi.object(),
+  })),
 });
 
 const normalizeQueryOrder = order => {
@@ -327,11 +331,13 @@ function normalizeQueryCacheMode(query, cacheMode) {
  * @returns {import('./types/query').NormalizedQuery}
  */
 const normalizeQuery = (query, persistent, cacheMode) => {
-  query = normalizeQueryCacheMode(query);
+  query = normalizeQueryCacheMode(query, cacheMode);
+  query.timezone = query.timezone || getEnv('defaultTimezone');
   const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
+
   const validQuery = query.measures?.length ||
     query.dimensions?.length ||
     query.timeDimensions?.filter(td => !!td.granularity).length;

@@ -1,0 +1,42 @@
+---
+title: Dedicated Infrastructure on Azure
+sidebarTitle: Azure
+description: Connect Cube's Dedicated Infrastructure on Azure to your VNets and corporate networks, or deploy the entire data plane inside your own Azure subscription via BYOC.
+---
+
+On Azure, Cube offers single-tenant Dedicated Infrastructure operated by Cube,
+and Bring Your Own Cloud (BYOC) operated inside your own Azure subscription.
+Both options support private network connectivity to your data sources.
+
+## Backend connectivity (Cube → your network)
+
+Use these options to give Cube private access to your data sources, auth
+providers, BI APIs targeted by Semantic Layer Sync, and anything else Cube
+needs to query. See [Backend and frontend connectivity][backend-frontend] for
+the full picture.
+
+- [**Azure Private Link**][azure-private-link] — connect to data sources
+  exposed through Azure Private Link Services without routing traffic over
+  the public internet.
+- [**VNet Peering**][azure-vnet-peering] — establish a VNet peering connection
+  between the Cube VNet and your own VNet.
+
+## Frontend connectivity (your clients → Cube)
+
+Expose Cube's APIs to your applications, browsers, BI tools, embedded
+analytics clients, and Semantic Layer Sync-generated configs over a private
+network. The pattern mirrors the AWS implementation documented in
+[Private API Connectivity on AWS][aws-private-api-connectivity];
+[contact us](https://cube.dev/contact) to enable the equivalent on Azure for
+your tenant.
+
+## Bring Your Own Cloud
+
+If you'd like the entire Cube data plane to live inside your own Azure
+subscription, see [Bring Your Own Cloud on Azure][azure-byoc].
+
+[azure-private-link]: /admin/deployment/dedicated/azure/private-link
+[azure-vnet-peering]: /admin/deployment/dedicated/azure/vpc-peering
+[azure-byoc]: /admin/deployment/dedicated/azure/byoc
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

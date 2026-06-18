@@ -16,9 +16,11 @@ import {
   DownloadQueryResultsOptions,
   TableStructure,
   DriverCapabilities,
-  DownloadQueryResultsResult, TableColumnQueryResult,
+  DownloadQueryResultsResult,
+  TableColumnQueryResult,
+  GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
-import { QueryStream } from './QueryStream';
+import { QueryStream, transformRow } from './QueryStream';
 
 // ********* Value converters ***************** //
 const numericTypes = [
@@ -61,7 +63,7 @@ const MSSqlToGenericType: Record<string, string> = {
  * MS SQL driver class.
  */
 export class MSSqlDriver extends BaseDriver implements DriverInterface {
-  private readonly connectionPool: ConnectionPool;
+  private readonly pool: ConnectionPool;
 
   private readonly initialConnectPromise: Promise<ConnectionPool>;
 
@@ -84,9 +86,19 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Min pool size value for the [cube]<-->[db] pool.
+       */
+      minPoolSize?: number,
 
       /**
        * Time to wait for a response from a connection after validation
@@ -102,37 +114,39 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    /**
-     * @type {import('mssql').config}
-     */
     this.config = {
       readOnly: true,
-      server: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      domain: getEnv('dbDomain', { dataSource }),
+      server: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      domain: getEnv('dbDomain', { dataSource, preAggregations }),
       requestTimeout: getEnv('dbQueryTimeout') * 1000,
       options: {
-        encrypt: getEnv('dbSsl', { dataSource }),
-        useUTC: false
+        encrypt: getEnv('dbSsl', { dataSource, preAggregations }),
+        useUTC: true
       },
       pool: {
         max:
           config.maxPoolSize ||
-          getEnv('dbMaxPoolSize', { dataSource }) ||
+          getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
           8,
-        min: 0,
+        min: config.minPoolSize ||
+          getEnv('dbMinPoolSize', { dataSource, preAggregations }) ||
+          0,
         idleTimeoutMillis: 30 * 1000,
         acquireTimeoutMillis: 20 * 1000
       },
       ...config
     };
-    const { readOnly, ...poolConfig } = this.config;
-    this.connectionPool = new ConnectionPool(poolConfig as MsSQLConfig);
-    this.initialConnectPromise = this.connectionPool.connect();
+
+    const { readOnly: _, ...poolConfig } = this.config;
+
+    this.pool = new ConnectionPool(poolConfig as MsSQLConfig);
+    this.initialConnectPromise = this.pool.connect();
   }
 
   /**
@@ -290,7 +304,10 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       // TODO time zone UTC set in driver ?
 
       cancelFn = () => request.cancel();
-      return request.query(query).then(res => res.recordset);
+      return request.query(query).then(res => {
+        res.recordset?.forEach(transformRow);
+        return res.recordset;
+      });
     });
     promise.cancel = () => cancelFn && cancelFn();
     return promise;
@@ -300,20 +317,22 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     return `@_${paramIndex + 1}`;
   }
 
-  public async tableColumnTypes(table: string): Promise<TableStructure> {
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
     const [schema, name] = table.split('.');
 
     const columns: TableColumnQueryResult[] = await this.query(
       `SELECT column_name as ${this.quoteIdentifier('column_name')},
              table_name as ${this.quoteIdentifier('table_name')},
              table_schema as ${this.quoteIdentifier('table_schema')},
-             data_type  as ${this.quoteIdentifier('data_type')}
+             data_type  as ${this.quoteIdentifier('data_type')},
+             numeric_precision AS ${this.quoteIdentifier('numeric_precision')},
+             numeric_scale AS ${this.quoteIdentifier('numeric_scale')}
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name, schema]
     );
 
-    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type, c.numeric_precision, c.numeric_scale) }));
   }
 
   public getTablesQuery(schemaName: string) {
@@ -368,8 +387,8 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
   }
 
-  protected toGenericType(columnType: string): string {
-    return MSSqlToGenericType[columnType] || super.toGenericType(columnType);
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
+    return MSSqlToGenericType[columnType] || super.toGenericType(columnType, precision, scale);
   }
 
   public readOnly(): boolean {
@@ -378,6 +397,10 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
+  }
+
+  public override async release(): Promise<void> {
+    await this.pool.close();
   }
 
   public capabilities(): DriverCapabilities {

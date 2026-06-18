@@ -1,0 +1,73 @@
+cubes:
+  - name: coach
+    sql: "SELECT * FROM coach"
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+        public: false
+
+    measures:
+      - name: count_distinct
+        sql: id
+        type: count_distinct
+        public: false
+
+      - name: count_distinct__sum_by_quarter_aux
+        multi_stage: true
+        sql: "{CUBE.count_distinct}"
+        type: sum
+        add_group_by:
+          - coach.time.month
+        group_by:
+          - coach.time.quarter
+        public: false
+
+      - name: count_distinct__sum_by_quarter
+        multi_stage: true
+        sql: "{CUBE.count_distinct__sum_by_quarter_aux}"
+        type: sum
+        add_group_by:
+          - coach.time.quarter
+
+      - name: count_distinct_approx
+        sql: id
+        type: count_distinct_approx
+        public: false
+
+      - name: approx__sum_by_quarter_aux
+        multi_stage: true
+        sql: "{CUBE.count_distinct_approx}"
+        type: sum
+        add_group_by:
+          - coach.time.month
+        group_by:
+          - coach.time.quarter
+        public: false
+
+      - name: approx__sum_by_quarter
+        multi_stage: true
+        sql: "{CUBE.approx__sum_by_quarter_aux}"
+        type: sum
+        add_group_by:
+          - coach.time.quarter
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - count_distinct
+        time_dimensions:
+          - dimension: time
+            granularity: month
+          - dimension: time
+            granularity: quarter
+
+      - name: main_approx
+        measures:
+          - count_distinct_approx
+        time_dimensions:
+          - dimension: time
+            granularity: month
+          - dimension: time
+            granularity: quarter

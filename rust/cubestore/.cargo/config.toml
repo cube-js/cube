@@ -1,11 +1,15 @@
-[target."x86_64-unknown-linux-gnu"]
-# todo, move to rust-lld, when it will be in the stable or after (nightly-2024-05-18)
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
-[target."aarch64-unknown-linux-gnu"]
-# todo, move to rust-lld, when it will be in the stable or after (nightly-2024-05-18)
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+#[target."x86_64-unknown-linux-gnu"]
+## todo, move to rust-lld, when it will be in the stable or after (nightly-2024-05-18)
+#rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+#
+#[target."aarch64-unknown-linux-gnu"]
+## todo, move to rust-lld, when it will be in the stable or after (nightly-2024-05-18)
+#rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 # If you are going to use local fork, feel free to uncomment
 #paths = ["../../../sqlparser-rs", "../../../arrow-datafusion/datafusion"]
-#paths = ["../../../arrow-datafusion/datafusion"]
+#paths = [
+#    "../../../arrow-datafusion/datafusion/common",
+#    "../../../arrow-datafusion/datafusion/physical-plan",
+#    "../../../arrow-datafusion/datafusion/core"
+#]

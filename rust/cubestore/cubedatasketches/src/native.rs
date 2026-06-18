@@ -37,22 +37,22 @@ impl Debug for HLLDataSketch {
 
 impl HLLDataSketch {
     pub fn read(data: &[u8]) -> Result<Self> {
-        return Ok(Self {
+        Ok(Self {
             instance: HLLSketch::deserialize(data)?,
-        });
+        })
     }
 
     pub fn cardinality(&self) -> u64 {
-        return self.instance.estimate().round() as u64;
+        self.instance.estimate().round() as u64
     }
 
     pub fn get_lg_config_k(&self) -> u8 {
-        return self.instance.get_lg_config_k();
+        self.instance.get_lg_config_k()
     }
 
     pub fn write(&self) -> Vec<u8> {
         // TODO(ovr): Better way?
-        self.instance.serialize().as_ref().iter().copied().collect()
+        self.instance.serialize().as_ref().to_vec()
     }
 }
 
@@ -80,18 +80,33 @@ impl HLLUnionDataSketch {
     }
 
     pub fn get_lg_config_k(&self) -> u8 {
-        return self.instance.get_lg_config_k();
+        self.instance.get_lg_config_k()
     }
 
     pub fn write(&self) -> Vec<u8> {
         let sketch = self.instance.sketch(HLLType::HLL_4);
         // TODO(ovr): Better way?
-        sketch.serialize().as_ref().iter().copied().collect()
+        sketch.serialize().as_ref().to_vec()
     }
 
     pub fn merge_with(&mut self, other: HLLDataSketch) -> Result<()> {
         self.instance.merge(other.instance);
 
         Ok(())
+    }
+
+    /// Allocated size, not including size_of::<Self>().  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        let lg_k = self.get_lg_config_k();
+        let k = 1 << lg_k;
+
+        // HLL union starts with an hll sketch with HLL_8, and the storage footprint according to
+        // hll.hpp (in datasketches-rs) is k bytes.  We are assuming we're using maximum memory
+        // usage, even though the HLL implementation internally starts out with smaller buffers
+        // (until you add enough rows).  Also, we're eyeballing the C++ struct overhead as 32 bytes.
+        //
+        // This function is supposed to be exact, but it is not exact.
+
+        32 + k
     }
 }

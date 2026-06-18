@@ -8,6 +8,7 @@ import {
   MaybeCancelablePromise,
   streamToArray,
   CacheMode,
+  LoggerFn,
 } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
@@ -23,7 +24,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash } from './utils';
+import { getCacheHash, extractRequestUUID } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -127,6 +128,7 @@ type CacheEntry = {
   time: number;
   result: any;
   renewalKey: string;
+  requestId?: string;
 };
 
 export interface QueryCacheOptions {
@@ -160,7 +162,7 @@ export class QueryCache {
   public constructor(
     protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
-    protected readonly logger: any,
+    protected readonly logger: LoggerFn,
     public readonly options: QueryCacheOptions
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
@@ -251,17 +253,21 @@ export class QueryCache {
     ) {
       if (queryBody.persistent) {
         // stream will be returned here
-        return this.queryWithRetryAndRelease(query, values, {
-          cacheKey,
-          priority: queuePriority,
-          external: queryBody.external,
-          requestId: queryBody.requestId,
-          persistent: queryBody.persistent,
-          dataSource: queryBody.dataSource,
-          useCsvQuery: queryBody.useCsvQuery,
-          lambdaTypes: queryBody.lambdaTypes,
-          aliasNameToMember: queryBody.aliasNameToMember,
-        });
+        return this.queryWithRetryAndRelease(
+          query,
+          values,
+          {
+            cacheKey,
+            priority: queuePriority,
+            external: queryBody.external,
+            requestId: queryBody.requestId,
+            persistent: queryBody.persistent,
+            dataSource: queryBody.dataSource,
+            useCsvQuery: queryBody.useCsvQuery,
+            lambdaTypes: queryBody.lambdaTypes,
+            aliasNameToMember: queryBody.aliasNameToMember,
+          }
+        );
       } else {
         return {
           data: await this.queryWithRetryAndRelease(
@@ -291,10 +297,12 @@ export class QueryCache {
         cacheKey,
         renewalThreshold,
         {
+          forceNoCache,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
+          skipRefreshKeyWaitForRenew: true,
         }
       );
     }
@@ -308,6 +316,7 @@ export class QueryCache {
         cacheKey,
         renewalThreshold,
         {
+          forceNoCache,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -398,6 +407,10 @@ export class QueryCache {
     return key;
   }
 
+  public static extractRequestUUID(requestId: string): string {
+    return extractRequestUUID(requestId);
+  }
+
   protected static replaceAll(replaceThis, withThis, inThis) {
     withThis = withThis.replace(/\$/g, '$$$$');
     return inThis.replace(
@@ -413,12 +426,24 @@ export class QueryCache {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
       : [queryAndParams, []];
-    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName }]) => (
-        QueryCache.replaceAll(tableName, targetTableName, query)
-      ),
-      keyQuery
+    // Single-pass replacement with longest-first alternation: sequential
+    // per-name replacement would corrupt names that are prefixes of other
+    // names (e.g. `name1` vs `name10`) and rescan already inserted target
+    // names, which contain the source name as a prefix
+    const sorted = [...preAggregationsTablesToTempTables]
+      .sort(([a], [b]) => b.length - a.length);
+    const replacements = new Map(
+      sorted.map(([tableName, { targetTableName }]) => [tableName, targetTableName])
     );
+    const replaceRegex = new RegExp(
+      sorted
+        .map(([tableName]) => tableName.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'))
+        .join('|'),
+      'g'
+    );
+    const replacedKeyQuery: string = sorted.length
+      ? keyQuery.replace(replaceRegex, (match) => replacements.get(match) as string)
+      : keyQuery;
     return Array.isArray(queryAndParams)
       ? [replacedKeyQuery, params, queryOptions]
       : replacedKeyQuery;
@@ -770,6 +795,7 @@ export class QueryCache {
       requestId?: string,
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
+      forceNoCache?: boolean,
       dataSource: string,
       useCsvQuery?: boolean,
       lambdaTypes?: TableStructure,
@@ -803,6 +829,7 @@ export class QueryCache {
                 this.queryRedisKey([query, values]),
               ],
               waitForRenew: true,
+              forceNoCache: options.forceNoCache,
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
@@ -894,7 +921,8 @@ export class QueryCache {
         const result = {
           time: (new Date()).getTime(),
           result: res,
-          renewalKey
+          renewalKey,
+          requestId: options.requestId,
         };
         return this
           .cacheDriver
@@ -994,14 +1022,24 @@ export class QueryCache {
         primaryQuery,
         renewCycle
       });
-      if (
-        renewalKey && (
-          !renewalThreshold ||
-          !parsedResult.time ||
-          renewedAgo > renewalThreshold * 1000 ||
-          parsedResult.renewalKey !== renewalKey
-        )
-      ) {
+
+      const isExpired = !renewalThreshold || !parsedResult.time || renewedAgo > renewalThreshold * 1000;
+      const isKeyMismatch = renewalKey && parsedResult.renewalKey !== renewalKey;
+      const isSameRequest = options.requestId && parsedResult.requestId &&
+        QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId);
+
+      // Continue-wait cycle: result was produced by our request,
+      // refreshKey changed during execution — return cached, refresh in background.
+      // Skip for renewCycle — it must always fetch fresh data to keep cache up-to-date.
+      if (isSameRequest && !renewCycle && (isExpired || isKeyMismatch)) {
+        this.logger('Same request cache hit (background refresh)', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+        fetchNew().catch(e => {
+          if (!(e instanceof ContinueWaitError)) {
+            this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+          }
+        });
+      } else if (renewalKey && (isExpired || isKeyMismatch)) {
+        // Cache expired or refreshKey changed — need to refresh
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           return fetchNew();
@@ -1014,6 +1052,7 @@ export class QueryCache {
           });
         }
       }
+
       this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
         this.memoryCache.set(redisKey, parsedResult);

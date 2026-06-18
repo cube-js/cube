@@ -5,11 +5,16 @@ import {
   AccessPolicyDefinition,
   CubeDefinitionExtended,
   CubeSymbols,
+  Folder,
+  FolderInclude,
+  FolderMember,
   HierarchyDefinition,
   JoinDefinition,
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
-  type ToString
+  type ToString,
+  ViewDefaultValueFilter,
+  ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
@@ -27,6 +32,49 @@ export type SegmentDefinition = {
   multiStage?: boolean;
 };
 
+export type MultiStageFilterIncludeMember = {
+  member: string;
+  operator: string;
+  values?: string[];
+};
+
+export type MultiStageFilterIncludeItem =
+  | MultiStageFilterIncludeMember
+  | { and: MultiStageFilterIncludeItem[] }
+  | { or: MultiStageFilterIncludeItem[] };
+
+export type MultiStageFilterDirective = {
+  mode?: 'relative' | 'fixed';
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: MultiStageFilterIncludeItem[];
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  // The native bridge reads these (not the function forms above).
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+};
+
+export type MultiStageGrainDirective = {
+  exclude?: (...args: Array<unknown>) => Array<ToString>;
+  keepOnly?: (...args: Array<unknown>) => Array<ToString>;
+  include?: (...args: Array<unknown>) => Array<ToString>;
+  // Resolved sibling fields populated by `evaluateMultiStageReferences`.
+  excludeReferences?: string[];
+  keepOnlyReferences?: string[];
+  includeReferences?: string[];
+};
+
+export type LinkDefinition = {
+  name: string;
+  label: string;
+  url?: (...args: any[]) => string;
+  dashboard?: string;
+  icon?: string;
+  target?: 'blank' | 'self';
+  primary?: boolean;
+  params?: Array<{ key: string; value: (...args: any[]) => string }>;
+};
+
 export type DimensionDefinition = {
   type: string;
   sql(): string;
@@ -35,6 +83,13 @@ export type DimensionDefinition = {
   fieldType?: string;
   multiStage?: boolean;
   shiftInterval?: string;
+  order?: 'asc' | 'desc';
+  key?: (...args: any[]) => ToString;
+  keyReference?: string;
+  addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  addGroupByReferences?: string[];
+  filter?: MultiStageFilterDirective;
+  links?: LinkDefinition[];
 };
 
 export type TimeShiftDefinition = {
@@ -53,16 +108,19 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string;
+  aggType?: string,
   sql(): string;
   ownedByCube: boolean;
   rollingWindow?: any
   filters?: any
+  filter?: MultiStageFilterDirective;
   primaryKey?: true;
   drillFilters?: any;
   multiStage?: boolean;
   groupBy?: (...args: Array<unknown>) => Array<ToString>;
   reduceBy?: (...args: Array<unknown>) => Array<ToString>;
   addGroupBy?: (...args: Array<unknown>) => Array<ToString>;
+  grain?: MultiStageGrainDirective;
   timeShift?: TimeShiftDefinition[];
   groupByReferences?: string[];
   reduceByReferences?: string[];
@@ -100,7 +158,7 @@ export type PreAggregationReferences = {
 export type PreAggregationInfo = {
   id: string,
   preAggregationName: string,
-  preAggregation: unknown,
+  preAggregation: any,
   cube: string,
   references: PreAggregationReferences,
   refreshKey: unknown,
@@ -118,12 +176,13 @@ export type EvaluatedHierarchy = {
 
 export type EvaluatedFolder = {
   name: string;
-  includes: (EvaluatedFolder | DimensionDefinition | MeasureDefinition)[];
+  includes: (EvaluatedFolder | ViewIncludedMember)[];
   type: 'folder';
   [key: string]: any;
 };
 
 export type EvaluatedCube = {
+  name: string;
   measures: Record<string, MeasureDefinition>;
   dimensions: Record<string, DimensionDefinition>;
   segments: Record<string, SegmentDefinition>;
@@ -136,6 +195,9 @@ export type EvaluatedCube = {
   sql?: (...args: any[]) => string;
   sqlTable?: (...args: any[]) => string;
   accessPolicy?: AccessPolicyDefinition[];
+  isView?: boolean;
+  includedMembers?: ViewIncludedMember[];
+  defaultFilters?: ViewDefaultValueFilter[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -196,8 +258,85 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareFolders(cube, errorReporter);
 
     this.prepareAccessPolicy(cube, errorReporter);
+    this.prepareViewFilters(cube, errorReporter);
 
     return cube;
+  }
+
+  private prepareViewFilters(cube: any, errorReporter: ErrorReporter) {
+    if (!cube.defaultFilters) {
+      return;
+    }
+
+    const included = (cube.includedMembers as ViewIncludedMember[] | undefined) || [];
+
+    // Always returns view-scoped path `<view>.<member>` to match
+    // MemberSymbol::full_name on the Rust side, which is what `unless` and
+    // filter dispatch compare against.
+    const resolveViewMember = (memberType: string, reference: string): string | null => {
+      let lookupName = reference;
+      let lookupPath: string | null = null;
+
+      if (reference.indexOf('.') !== -1) {
+        const parts = reference.split('.');
+        if (parts[0] === cube.name) {
+          lookupName = parts.slice(1).join('.');
+        } else {
+          lookupPath = reference;
+        }
+      }
+
+      const match = lookupPath
+        ? included.find((m) => m.memberPath === lookupPath)
+        : included.find((m) => m.name === lookupName);
+
+      if (!match) {
+        errorReporter.error(
+          `Member '${reference}' used as ${memberType} in default value filter is not included in view '${cube.name}'`
+        );
+        return null;
+      }
+      return `${cube.name}.${match.name}`;
+    };
+
+    for (const filter of cube.defaultFilters as ViewDefaultValueFilter[]) {
+      const rawMember = this.evaluateReferences(cube.name, filter.member);
+      const resolved = resolveViewMember('member', rawMember);
+      if (resolved !== null) {
+        filter.memberReference = resolved;
+      }
+
+      if (filter.values) {
+        const evaluated = filter.values();
+        if (!Array.isArray(evaluated)) {
+          errorReporter.error(
+            `'values' in default value filter for view '${cube.name}' must evaluate to an array, got: ${typeof evaluated}`
+          );
+        } else {
+          // Coerce to strings to match the FilterItem.values contract used by
+          // regular query filters (Option<Vec<Option<String>>> on the Rust side).
+          filter.valuesReferences = evaluated.map(
+            (v) => (v === null || v === undefined ? null : String(v))
+          );
+        }
+      }
+
+      if (filter.unless) {
+        const rawUnless = this.evaluateReferences(
+          cube.name,
+          filter.unless,
+          { originalSorting: true }
+        );
+        const resolvedUnless: string[] = [];
+        for (const ref of rawUnless) {
+          const r = resolveViewMember('unless', ref);
+          if (r !== null) {
+            resolvedUnless.push(r);
+          }
+        }
+        filter.unlessReferences = resolvedUnless;
+      }
+    }
   }
 
   private allMembersOrList(cube: any, specifier: string | string[]): string[] {
@@ -257,21 +396,95 @@ export class CubeEvaluator extends CubeSymbols {
           policy.memberLevel.excludes || []
         ).map(memberMapper('an excludes member'));
       }
+
+      if (policy.memberMasking) {
+        if (!policy.memberLevel) {
+          errorReporter.error(
+            `accessPolicy for ${cube.name} defines memberMasking without memberLevel. memberLevel is required when memberMasking is used`
+          );
+        }
+        policy.memberMasking.includesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.includes || '*'
+        ).map(memberMapper('a masking includes member'));
+        policy.memberMasking.excludesMembers = this.allMembersOrList(
+          cube,
+          policy.memberMasking.excludes || []
+        ).map(memberMapper('a masking excludes member'));
+      }
     }
   }
 
-  private prepareFolders(cube: any, errorReporter: ErrorReporter) {
+  private getFolderMembersFromJoinPath(cube: CubeDefinitionExtended, joinPath: () => ToString, folderName: string, errorReporter: ErrorReporter): ViewIncludedMember[] {
+    const fullPath = this.evaluateReferences(null, joinPath, { collectJoinHints: true });
+
+    const pathParts = fullPath.split('.');
+    const pathCubeName = pathParts[pathParts.length - 1];
+
+    if (!this.evaluatedCubes[pathCubeName]) {
+      errorReporter.error(
+        `Cube '${pathCubeName}' not found for join path '${fullPath}' in folder '${folderName}'`
+      );
+      return [];
+    }
+
+    if (this.evaluatedCubes[pathCubeName].isView) {
+      errorReporter.error(
+        `Cannot use view '${pathCubeName}' in join_path '${fullPath}' (folder '${folderName}' of '${cube.name}'). Only cubes are allowed`
+      );
+      return [];
+    }
+
+    const matchingCubeInclude = cube.rawCubes()?.find((c) => {
+      const cubePath = this.evaluateReferences(null, c.joinPath, { collectJoinHints: true });
+      return cubePath === fullPath;
+    });
+
+    if (!matchingCubeInclude) {
+      errorReporter.error(
+        `Join path '${fullPath}' included in folder '${folderName}' not found in view '${cube.name}' cubes definition`
+      );
+      return [];
+    }
+
+    if (cube.includedMembers) {
+      return cube.includedMembers.filter((m: ViewIncludedMember) => {
+        const memberPathParts = m.memberPath.split('.');
+        const memberCubeName = memberPathParts[0];
+
+        return memberCubeName === pathCubeName;
+      });
+    }
+
+    return [];
+  }
+
+  private prepareFolders(cube: CubeDefinitionExtended, errorReporter: ErrorReporter): void {
     const folders = cube.rawFolders();
     if (!folders.length) return;
 
-    const checkMember = (memberName: string, folderName: string) => {
+    const seen = new Set<string>();
+
+    for (const folder of folders) {
+      if (folder.name && seen.has(folder.name)) {
+        errorReporter.error(
+          `Folder names must be unique within a view. Found duplicate folder '${folder.name}' in view '${cube.name}'.`
+        );
+      }
+
+      if (folder.name) {
+        seen.add(folder.name);
+      }
+    }
+
+    const checkMember = (memberName: string, folderName: string): ViewIncludedMember | null => {
       if (memberName.includes('.')) {
         errorReporter.error(
           `Paths aren't allowed in the 'folders' but '${memberName}' has been provided for ${cube.name}`
         );
       }
 
-      const member = cube.includedMembers.find(m => m.name === memberName);
+      const member = cube.includedMembers?.find((m: ViewIncludedMember) => m.name === memberName);
       if (!member) {
         errorReporter.error(
           `Member '${memberName}' included in folder '${folderName}' not found`
@@ -282,31 +495,38 @@ export class CubeEvaluator extends CubeSymbols {
       return member;
     };
 
-    const processFolder = (folder: any): any => {
+    const processFolder = (folder: Folder | FolderMember): EvaluatedFolder => {
       let includedMembers: string[];
-      let includes: any[] = [];
+      let includes: (ViewIncludedMember | EvaluatedFolder | null)[] = [];
 
       if (folder.includes === '*') {
         includedMembers = this.allMembersOrList(cube, folder.includes);
         includes = includedMembers.map(m => checkMember(m, folder.name)).filter(Boolean);
       } else if (Array.isArray(folder.includes)) {
-        includes = folder.includes.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            return processFolder(item);
+        includes = folder.includes.flatMap((item: FolderInclude | FolderMember): (ViewIncludedMember | EvaluatedFolder | null)[] => {
+          // Handle joinPath syntax
+          if (typeof item === 'object' && item !== null && 'joinPath' in item) {
+            return this.getFolderMembersFromJoinPath(cube, item.joinPath, folder.name, errorReporter);
           }
 
-          return checkMember(item, folder.name);
+          // Handle nested folders
+          if (typeof item === 'object' && item !== null && 'name' in item) {
+            return [processFolder(item as FolderMember)];
+          }
+
+          // Handle regular string member names
+          return [checkMember(item as string, folder.name)];
         });
       }
 
       return {
         ...folder,
-        type: 'folder',
-        includes: includes.filter(Boolean)
+        type: 'folder' as const,
+        includes: includes.filter((item): item is ViewIncludedMember | EvaluatedFolder => item !== null)
       };
     };
 
-    cube.folders = folders.map(processFolder);
+    (cube as unknown as EvaluatedCube).folders = folders.map(processFolder);
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
@@ -420,6 +640,25 @@ export class CubeEvaluator extends CubeSymbols {
               ? { timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }
               : {}),
           }));
+        }
+        if (member.filter) {
+          if (typeof member.filter.exclude === 'function') {
+            member.filter.excludeReferences = this.evaluateReferences(cubeName, member.filter.exclude);
+          }
+          if (typeof member.filter.keepOnly === 'function') {
+            member.filter.keepOnlyReferences = this.evaluateReferences(cubeName, member.filter.keepOnly);
+          }
+        }
+        if (member.grain) {
+          if (typeof member.grain.exclude === 'function') {
+            member.grain.excludeReferences = this.evaluateReferences(cubeName, member.grain.exclude);
+          }
+          if (typeof member.grain.keepOnly === 'function') {
+            member.grain.keepOnlyReferences = this.evaluateReferences(cubeName, member.grain.keepOnly);
+          }
+          if (typeof member.grain.include === 'function') {
+            member.grain.includeReferences = this.evaluateReferences(cubeName, member.grain.include);
+          }
         }
       }
     }
@@ -576,6 +815,34 @@ export class CubeEvaluator extends CubeSymbols {
       if (aliasMember) {
         members[memberName].aliasMember = aliasMember;
       }
+
+      // Expose maskSql getter for the Tesseract bridge. It normalizes both
+      // SQL masks (mask.sql) and static masks into a callable function.
+      // Non-enumerable so it doesn't pollute serialization.
+      const memberMask = members[memberName].mask;
+      if (memberMask !== undefined && memberMask !== null) {
+        if (typeof memberMask === 'object' && memberMask.sql) {
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => memberMask.sql,
+            enumerable: false,
+          });
+        } else {
+          let maskLiteral: string;
+          if (typeof memberMask === 'number') {
+            maskLiteral = `(${memberMask})`;
+          } else if (typeof memberMask === 'boolean') {
+            maskLiteral = memberMask ? '(TRUE)' : '(FALSE)';
+          } else {
+            maskLiteral = `'${String(memberMask).replace(/'/g, "''")}'`;
+          }
+          // eslint-disable-next-line no-new-func
+          const maskFn = new Function(`return \`${maskLiteral}\`;`);
+          Object.defineProperty(members[memberName], 'maskSql', {
+            get: () => maskFn,
+            enumerable: false,
+          });
+        }
+      }
     }
   }
 
@@ -712,15 +979,15 @@ export class CubeEvaluator extends CubeSymbols {
     return this.isInstanceOfType('segments', path);
   }
 
-  public measureByPath(measurePath: string): MeasureDefinition {
+  public measureByPath(measurePath: string | string[]): MeasureDefinition {
     return this.byPath('measures', measurePath) as MeasureDefinition;
   }
 
-  public dimensionByPath(dimensionPath: string): DimensionDefinition {
+  public dimensionByPath(dimensionPath: string | string[]): DimensionDefinition {
     return this.byPath('dimensions', dimensionPath) as DimensionDefinition;
   }
 
-  public segmentByPath(segmentPath: string): SegmentDefinition {
+  public segmentByPath(segmentPath: string | string[]): SegmentDefinition {
     return this.byPath('segments', segmentPath) as SegmentDefinition;
   }
 

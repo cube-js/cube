@@ -1,7 +1,7 @@
 import { clone, equals, fromPairs, indexBy, prop, toPairs } from 'ramda';
-import { DeeplyReadonly } from './index';
-import { DEFAULT_GRANULARITY } from './time';
+import { DEFAULT_GRANULARITY } from './time.js';
 import {
+  DeeplyReadonly,
   Filter,
   PivotConfig,
   Query,
@@ -14,7 +14,7 @@ import {
   TQueryOrderArray,
   TQueryOrderObject,
   TSourceAxis
-} from './types';
+} from './types.js';
 
 export function removeEmptyQueryFields(_query: DeeplyReadonly<Query>) {
   const query = _query || {};

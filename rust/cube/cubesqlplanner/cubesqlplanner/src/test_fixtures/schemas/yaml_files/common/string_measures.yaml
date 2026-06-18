@@ -1,0 +1,30 @@
+cubes:
+  - name: visitors_str
+    sql: "SELECT * FROM visitors"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: number
+        sql: status
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+      - name: sources_list
+        type: string
+        sql: "STRING_AGG({CUBE}.source, ', ' ORDER BY {CUBE}.source)"
+    pre_aggregations:
+      - name: string_measure_rollup
+        type: rollup
+        measures:
+          - sources_list
+          - count
+        dimensions:
+          - status

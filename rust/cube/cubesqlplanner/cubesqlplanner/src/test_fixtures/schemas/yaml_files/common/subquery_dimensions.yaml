@@ -1,0 +1,48 @@
+cubes:
+  - name: Sales
+    sql: "SELECT * FROM sales"
+    joins:
+      - name: Customers
+        relationship: many_to_one
+        sql: "{CUBE}.customer_id = {Customers.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: totalAmount
+        type: sum
+        sql: amount
+
+  - name: Customers
+    sql: "SELECT * FROM customers"
+    joins:
+      - name: CustomerOrders
+        relationship: one_to_many
+        sql: "{CUBE}.id = {CustomerOrders.customerId}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: totalSpend
+        type: number
+        sql: "{CustomerOrders.orderTotal}"
+        sub_query: true
+    measures: []
+
+  - name: CustomerOrders
+    sql: "SELECT * FROM customer_orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: customerId
+        type: number
+        sql: "{CUBE}.customer_id"
+    measures:
+      - name: orderTotal
+        type: sum
+        sql: amount

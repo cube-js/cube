@@ -21,6 +21,7 @@ import {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
+  MemberExpression,
 } from './types/query';
 
 import {
@@ -52,7 +53,7 @@ import {
 import {
   ConfigItem,
   GranularityMeta
-} from './helpers/prepareAnnotation';
+} from './helpers/prepare-annotation';
 
 export {
   AliasToMemberMap,
@@ -69,6 +70,7 @@ export {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
+  MemberExpression,
   JWTOptions,
   CheckAuthFn,
   CheckSQLAuthSuccessResponse,

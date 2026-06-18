@@ -1,0 +1,78 @@
+cubes:
+    - name: periods
+      sql: "SELECT * FROM periods"
+      dimensions:
+          - name: date_id
+            type: number
+            sql: date_id
+            primary_key: true
+          - name: month_name
+            type: string
+            sql: month_name
+
+    - name: sales
+      sql: "SELECT * FROM sales"
+      joins:
+          - name: periods
+            relationship: many_to_one
+            sql: "{sales}.date_id = {periods.date_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: date_id
+            type: number
+            sql: date_id
+          - name: category
+            type: string
+            sql: category
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+
+    - name: impressions
+      sql: "SELECT * FROM impressions"
+      joins:
+          - name: periods
+            relationship: many_to_one
+            sql: "{impressions}.date_id = {periods.date_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: date_id
+            type: number
+            sql: date_id
+          - name: channel
+            type: string
+            sql: channel
+      measures:
+          - name: count
+            type: count
+          - name: total_clicks
+            type: sum
+            sql: clicks
+
+views:
+    - name: activity
+      cubes:
+          - join_path: periods
+            includes:
+                - date_id
+                - month_name
+          - join_path: sales
+            includes:
+                - category
+                - count
+                - total_amount
+          - join_path: impressions
+            includes:
+                - channel
+                - count
+                - total_clicks
+            prefix: true

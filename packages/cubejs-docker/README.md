@@ -63,7 +63,7 @@ The Cube.js Developer Playground will be available at `http://localhost:4000`.
 For more information about supported environment variables, please consult the
 documentation for [Environment Variables][link-cubejs-env-vars].
 
-[link-cubejs-env-vars]: https://cube.dev/docs/reference/environment-variables
+[link-cubejs-env-vars]: https://cube.dev/reference/configuration/environment-variables
 
 ### Using Docker Compose
 

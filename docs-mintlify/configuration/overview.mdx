@@ -1,0 +1,59 @@
+---
+title: Configuration Overview
+description: Learn how to configure Cube for your data sources and use cases.
+---
+
+ Configuration
+
+Cube is configured using a combination of environment variables and configuration files.
+
+## Configuration file
+
+The main configuration file is `cube.py` (or `cube.js`):
+
+<CodeGroup>
+```python title="Python" cube.py
+from cube import config
+
+@config('context_to_app_id')
+def context_to_app_id(ctx: dict) -> str:
+    return ctx['securityContext'].get('team', 'default')
+
+@config('scheduled_refresh_contexts')
+def scheduled_refresh_contexts() -> list:
+    return [{'securityContext': {'team': 'default'}}]
+```
+
+```javascript title="JavaScript" cube.js
+module.exports = {
+  contextToAppId: ({ securityContext }) => {
+    return securityContext.team || 'default';
+  },
+  scheduledRefreshContexts: () => {
+    return [{ securityContext: { team: 'default' } }];
+  },
+};
+```
+</CodeGroup>
+
+## Environment variables
+
+All Cube environment variables start with `CUBEJS_`:
+
+<Warning>
+Never commit environment variables containing credentials to version control.
+</Warning>
+
+```bash
+CUBEJS_DB_TYPE=postgres
+CUBEJS_DB_HOST=localhost
+CUBEJS_DB_PORT=5432
+CUBEJS_DB_NAME=my_database
+CUBEJS_DB_USER=cube
+CUBEJS_DB_PASS=secret
+CUBEJS_API_SECRET=your-api-secret
+```
+
+## Data sources
+
+Cube supports 30+ data sources. See the [data sources](/configuration/data-sources) page for the full list and connection details.

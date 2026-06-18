@@ -1,0 +1,140 @@
+---
+title: Setting up AWS PrivateLink
+sidebarTitle: PrivateLink
+description: How to expose an AWS endpoint service and coordinate PrivateLink so Cube's Dedicated Infrastructure reaches your VPC privately.
+---
+
+<Note>
+
+This page covers **backend connectivity** — Cube reaching into your network to
+query data sources, auth providers, BI APIs targeted by Semantic Layer Sync,
+and other upstream services. See
+[Backend and frontend connectivity][backend-frontend] for the full picture.
+For **frontend connectivity** (exposing Cube's APIs to your applications,
+browsers, BI tools, and embedded analytics clients), see
+[Private API Connectivity on AWS][aws-private-api-connectivity].
+
+</Note>
+
+[AWS PrivateLink][aws-docs-private-link] provides private connectivity between
+virtual private clouds (VPCs), supported services and resources, and your
+on-premises networks, without exposing your traffic to the public internet.
+To set up a PrivateLink connection between Cube's Dedicated Infrastructure
+and your own VPC, you'll need to prepare an Endpoint Service, share service
+details with the Cube team, and accept the incoming connection request.
+
+<Note>
+
+**Dedicated Infrastructure vs. Bring Your Own Cloud.** The flow described on
+this page — sharing service details with the Cube team and letting Cube create
+the VPC endpoint and DNS overrides — applies to
+[Dedicated Infrastructure][cube-region] operated by Cube.
+
+In a [Bring Your Own Cloud (BYOC)][aws-byoc] deployment, the Cube VPC lives in
+**your own AWS account**, so you own the networking. The IAM role granted to
+the Cube Operator intentionally does not include `route53:*` permissions,
+which means Cube cannot create the VPC interface endpoint or the Route 53
+private hosted zone needed for the DNS override on your behalf.
+
+For BYOC, set up PrivateLink yourself inside the Cube VPC:
+
+1. Create the VPC interface endpoint in the Cube VPC against the provider's
+   Endpoint Service Name.
+2. Create a Route 53 private hosted zone for the TLS hostname and associate
+   it with the Cube VPC, with an `A` ALIAS record pointing at the interface
+   endpoint.
+3. Confirm the security groups on both ends allow the required ports.
+
+If you'd prefer Cube to do this for you in BYOC, you can grant the Cube
+Operator role `route53:*` (and the matching `ec2:*VpcEndpoint*` permissions)
+on the BYOC role — but most customers keep this networking in their own
+hands.
+
+</Note>
+
+## Preparing the Endpoint Service
+
+There are two common scenarios for preparing the Endpoint Service:
+- Connecting to a service in your AWS infrastructure
+- Connecting to a service provided by a third party such as Snowflake,
+  Databricks, Altinity Cloud, etc.
+
+In the case of your own infrastructure, please follow the
+[official AWS documentation][aws-docs-endpoint-service] to configure the
+Endpoint Service pointing at your data source.
+
+If your data source is hosted in a third-party infrastructure, please follow
+the vendor's documentation for creating and managing an Endpoint Service.
+
+## Allowing the Cube principal
+
+Cube needs to be added to the list of principals allowed to discover your
+Endpoint Service. To do so, please go to **AWS Console** → **VPC** →
+**Endpoint Services** → **Your service** → **Allow principals** and add
+`arn:aws:iam::331376342520:root` to the list.
+
+<Info>
+
+`331376342520` is the AWS account ID of Cube's PrivateLink consumer account.
+Adding its root principal authorizes Cube to discover your endpoint service
+and create a private endpoint against it; nothing else in Cube's AWS estate
+gains access to your network.
+
+</Info>
+
+## Gathering required information
+
+To request establishing a PrivateLink connection, please share the following
+information with the Cube team:
+
+- **Service Name** (such as `com.amazonaws.vpce.us-west-2.vpce-svc-abcde`)
+- **Reference Name** for the record (such as "Snowflake-prod" or
+  "clickhouse-dev")
+- **Ports**: a list of ports that will be accessed through this connection
+- **DNS Name(s)**: see [DNS and TLS](#dns-and-tls) below
+- **Cube Region:** PrivateLink requires Cube to be hosted on
+  [Dedicated Infrastructure][cube-region]. Specify which Cube Region should
+  host your Dedicated Infrastructure.
+
+## DNS and TLS
+
+How your data source is addressed inside Cube depends on whether it speaks
+TLS:
+
+- **If the service uses TLS** (HTTPS, JDBC `sslmode=require`, etc.), share
+  the **DNS name(s)** the certificate is issued for — typically the same
+  hostname your in-network clients already use to reach it. Cube creates
+  internal DNS overrides inside the Dedicated Infrastructure so that the same
+  hostname resolves to the PrivateLink endpoint. Keeping the original
+  hostname is what preserves TLS validity: the certificate's CN/SAN keeps
+  matching what Cube dials.
+- **If the service does not use TLS** and you don't supply a DNS name, the
+  Cube team will share back an internal endpoint hostname (e.g. an
+  AWS-assigned interface-endpoint DNS name) that you can configure as the
+  upstream when you wire the connection into Cube.
+
+## Accepting the connection
+
+The Cube team will notify you once the connection request is sent. You can
+accept it by going to **AWS Console** → **VPC** → **Endpoint Services** →
+**Your Service** → **Endpoint Connections** and clicking
+**Accept Connection Request**.
+
+## Using the connection
+
+Once the connection is established, you can access your data source by
+addressing it via the DNS name(s) you supplied (TLS case) or the internal
+endpoint hostname returned to you by the Cube team (non-TLS case).
+
+## Supported Regions
+
+AWS PrivateLink is available in all AWS commercial regions where Dedicated
+Infrastructure can be provisioned. AWS China (`cn-north-1`, `cn-northwest-1`)
+and AWS GovCloud (`us-gov-east-1`, `us-gov-west-1`) are not supported.
+
+[aws-docs-private-link]: https://aws.amazon.com/privatelink/
+[aws-docs-endpoint-service]: https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html
+[cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[aws-byoc]: /admin/deployment/dedicated/aws/byoc
+[backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

@@ -18,6 +18,8 @@ export * from './PostgresQuery';
 export * from './MssqlQuery';
 export * from './PrestodbQuery';
 
+export { PreAggregationReferences } from '../compiler/CubeEvaluator';
+
 // Candidates to move from this package to drivers packages
 // export * from './RedshiftQuery';
 // export * from './SnowflakeQuery';

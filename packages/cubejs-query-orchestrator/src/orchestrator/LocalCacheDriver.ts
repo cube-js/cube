@@ -47,6 +47,12 @@ export class LocalCacheDriver implements CacheDriverInterface {
     // Nothing to do
   }
 
+  public reset(): void {
+    for (const key of Object.keys(this.store)) {
+      delete this.store[key];
+    }
+  }
+
   public async testConnection(): Promise<void> {
     // Nothing to do
   }

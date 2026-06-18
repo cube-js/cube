@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/combinations.rs
+expression: result
+---
+orders__id | orders__status | customers__name | orders__count
+-----------+----------------+-----------------+--------------
+1          | completed      | Alice Johnson   | 1            
+2          | completed      | Alice Johnson   | 1            
+6          | completed      | Alice Cooper    | 1            
+7          | pending        | Alice Cooper    | 1

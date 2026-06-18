@@ -1,5 +1,7 @@
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 import crypto from 'crypto';
+import path from 'path';
+import { ChildProcess, fork } from 'child_process';
 import { createPromiseLock, MethodName, pausePromise } from '@cubejs-backend/shared';
 import { QueueDriverConnectionInterface, QueueDriverInterface, } from '@cubejs-backend/base-driver';
 import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
@@ -7,6 +9,7 @@ import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
   beforeAll?: () => Promise<void>,
   afterAll?: () => Promise<void>,
+  workers?: number,
 };
 
 function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInterface, counters: any): QueueDriverConnectionInterface {
@@ -138,10 +141,61 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
           } else {
             counters.events[event] = 1;
           }
+
+          if (event.includes('error')) {
+            console.log(event, _params);
+          }
         },
         queueDriverFactory,
         ...options
       });
+
+      // Spawn worker processes for multi-process simulation (CubeStore only)
+      type WorkerCounters = { handlersStarted: number; handlersFinished: number; events: Record<string, number> };
+      type WorkerState = { worker: ChildProcess; counters: WorkerCounters; prevFinished: number };
+      const workerStates: WorkerState[] = [];
+      const numWorkers = options.workers || 0;
+
+      if (numWorkers > 0) {
+        const workerPath = path.resolve(__dirname, 'QueueBenchWorker.js');
+
+        for (let i = 0; i < numWorkers; i++) {
+          const w = fork(workerPath, [], {
+            execArgv: process.execArgv,
+            stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+          });
+
+          const state: WorkerState = {
+            worker: w,
+            counters: { handlersStarted: 0, handlersFinished: 0, events: {} },
+            prevFinished: 0,
+          };
+
+          w.on('message', (msg: { type: string; data?: WorkerCounters }) => {
+            if (msg.type === 'counters' && msg.data) {
+              state.counters = msg.data;
+            }
+          });
+
+          w.on('error', (err) => {
+            console.error(`[Worker ${i}] error:`, err);
+          });
+
+          w.send({
+            type: 'start',
+            tenantPrefix,
+            benchSettings: {
+              queueResponseSize: benchSettings.queueResponseSize,
+              currency: benchSettings.currency,
+            },
+            reconcileInterval: 50,
+          });
+
+          workerStates.push(state);
+        }
+
+        console.log(`Spawned ${numWorkers} worker processes`);
+      }
 
       const processingPromisses = [];
 
@@ -154,12 +208,44 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
           });
           await Promise.all(processingPromisses.splice(0));
         }
+
+        // Shutdown worker processes
+        if (workerStates.length > 0) {
+          await Promise.all(workerStates.map((ws) => new Promise<void>((resolve) => {
+            const onMessage = (msg: { type: string; data?: WorkerCounters }) => {
+              if (msg.type === 'counters' && msg.data) {
+                ws.counters = msg.data;
+              }
+              if (msg.type === 'done') {
+                ws.worker.removeListener('message', onMessage);
+                resolve();
+              }
+            };
+
+            ws.worker.on('message', onMessage);
+            ws.worker.send({ type: 'shutdown' });
+          })));
+        }
       }
 
       const progressIntervalId = setInterval(() => {
         console.log('running', {
           ...counters,
-          processingPromisses: processingPromisses.length
+          processingPromisses: processingPromisses.length,
+          benchSettings,
+          ...(workerStates.length > 0 ? {
+            workers: workerStates.map((ws, i) => {
+              const finishedSinceLastTick = ws.counters.handlersFinished - ws.prevFinished;
+              ws.prevFinished = ws.counters.handlersFinished;
+              return {
+                id: i,
+                handlersStarted: ws.counters.handlersStarted,
+                handlersFinished: ws.counters.handlersFinished,
+                processing: ws.counters.handlersStarted - ws.counters.handlersFinished,
+                processedFromLastEvent: finishedSinceLastTick,
+              };
+            }),
+          } : {}),
         });
       }, 1000);
 
@@ -177,18 +263,25 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
 
         const queueId = crypto.randomBytes(12).toString('hex');
         const running = (async () => {
-          await queue.executeInQueue('query', queueId, {
-            // eslint-disable-next-line no-bitwise
-            payload: 'a'.repeat(benchSettings.queuePayloadSize)
-          }, 1, {
-            stageQueryKey: 1,
-            requestId: 'request-id',
-            spanId: 'span-id'
-          });
+          try {
+            await queue.executeInQueue('query', queueId, {
+              // eslint-disable-next-line no-bitwise
+              payload: {
+                large_str: 'a'.repeat(benchSettings.queuePayloadSize)
+              },
+              orphanedTimeout: 120
+            }, 1, {
+              stageQueryKey: 1,
+              requestId: 'request-id',
+              spanId: 'span-id'
+            });
+          } catch (e) {
+            console.error(e);
+          }
 
           counters.queueResolved++;
 
-          // loosing memory for result
+          // losing memory for a result
           return null;
         })();
 
@@ -200,10 +293,28 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       await awaitProcessing();
       clearInterval(progressIntervalId);
 
-      console.log('Result', {
+      const workerAgg = workerStates.reduce(
+        (acc, ws) => ({
+          handlersStarted: acc.handlersStarted + ws.counters.handlersStarted,
+          handlersFinished: acc.handlersFinished + ws.counters.handlersFinished,
+        }),
+        { handlersStarted: 0, handlersFinished: 0 }
+      );
+
+      console.dir({
+        message: 'Result',
         benchSettings,
         ...counters,
-      });
+        ...(workerStates.length > 0 ? {
+          workers: workerStates.map((ws, i) => ({
+            id: i,
+            ...ws.counters,
+            processing: ws.counters.handlersStarted - ws.counters.handlersFinished,
+          })),
+          totalHandlersStarted: counters.handlersStarted + workerAgg.handlersStarted,
+          totalHandlersFinished: counters.handlersFinished + workerAgg.handlersFinished,
+        } : {}),
+      }, { depth: null });
     };
 
     await createBenchmark({
@@ -217,5 +328,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
     if (options.afterAll) {
       await options.afterAll();
     }
+
+    process.exit(0);
   })();
 }

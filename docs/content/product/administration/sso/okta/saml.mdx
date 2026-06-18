@@ -1,0 +1,94 @@
+# SAML authentication with Okta
+
+With SAML (Security Assertion Markup Language) enabled, you can authenticate
+users in Cube Cloud through Okta, allowing your team to access Cube Cloud
+using single sign-on.
+
+<InfoBox>
+
+Available on [Enterprise and above plans](https://cube.dev/pricing).
+
+</InfoBox>
+
+## Prerequisites
+
+Before proceeding, ensure you have the following:
+
+- Admin permissions in Cube Cloud.
+- Account administrator permissions in your Okta organization to access
+  the Admin Console and create SAML integrations.
+
+## Enable SAML in Cube Cloud
+
+First, enable SAML authentication in Cube Cloud:
+
+1. In Cube Cloud, navigate to <Btn>Admin → Settings</Btn>.
+2. On the <Btn>Authentication & SSO</Btn> tab, enable the <Btn>SAML</Btn>
+   toggle.
+3. Take note of the <Btn>Single Sign-On URL</Btn> and <Btn>Audience</Btn>
+   values — you'll need them when configuring the SAML integration in Okta.
+
+## Create a SAML integration in Okta
+
+1. Log in to your Okta organization as an administrator, then navigate to
+   the Admin Console by clicking <Btn>Admin</Btn> in the top-right corner.
+2. Click <Btn>Applications → Applications</Btn> from the navigation on the
+   left, then click <Btn>Create App Integration</Btn>.
+3. Select <Btn>SAML 2.0</Btn> and click <Btn>Next</Btn>.
+4. Enter a name for your application and click <Btn>Next</Btn>.
+5. Enter the following values in the <Btn>SAML Settings</Btn> section:
+   - **Single sign on URL** — Use the <Btn>Single Sign-On URL</Btn>
+     value from Cube Cloud.
+   - **Audience URI (SP Entity ID)** — Use the <Btn>Audience</Btn>
+     value from Cube Cloud.
+6. Click <Btn>Next</Btn> to go to the <Btn>Feedback</Btn> screen, fill in
+   any necessary details and click <Btn>Finish</Btn>.
+
+## Configure attribute statements in Okta
+
+After the application is created, configure attribute statements to map
+user attributes from Okta to Cube Cloud:
+
+1. In your SAML app integration, go to the <Btn>Sign On</Btn> tab.
+2. Scroll down to the <Btn>Attribute statements</Btn> section.
+3. Click <Btn>Add expression</Btn> and create the following entries:
+
+| Name    | Expression                |
+| ------- | ------------------------- |
+| `email` | `user.profile.email`      |
+| `name`  | `user.profile.firstName`  |
+
+## Retrieve SAML details from Okta
+
+Next, retrieve the values you'll need to complete the configuration
+in Cube Cloud:
+
+1. In your SAML app integration, go to the <Btn>Sign On</Btn> tab.
+2. In the sidebar, click <Btn>View SAML setup instructions</Btn>.
+3. Take note of the following values from the setup instructions page:
+   - **Identity Provider Single Sign-On URL**
+   - **Identity Provider Issuer**
+   - **X.509 Certificate**
+
+## Complete configuration in Cube Cloud
+
+Return to the SAML configuration page in Cube Cloud and provide the
+identity provider details:
+
+- **Entity ID / Issuer** — Use the <Btn>Identity Provider Issuer</Btn>
+  value from Okta.
+- **SSO (Sign on) URL** — Use the <Btn>Identity Provider Single
+  Sign-On URL</Btn> value from Okta.
+- **Certificate** — Paste the <Btn>X.509 Certificate</Btn> from Okta.
+
+## Test SAML authentication
+
+1. Copy the <Btn>Single Sign-On URL</Btn> from the SAML configuration page
+   in Cube Cloud.
+2. Open a new browser tab and paste the URL into the address bar, then
+   press <Btn>Enter</Btn>.
+3. You should be redirected to Okta to log in. After a successful login,
+   you should be redirected back to Cube Cloud.
+
+[okta-docs-create-saml-app]:
+  https://help.okta.com/en-us/Content/Topics/Apps/Apps_App_Integration_Wizard_SAML.htm

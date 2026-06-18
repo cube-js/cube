@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/subquery_dimensions.rs
+expression: result
+---
+customers__total_spend | sales__total_amount | refunds__total_refund
+-----------------------+---------------------+----------------------
+200.00                 | 500.00              | NULL                 
+130.00                 | 500.00              | 50.00                
+40.00                  | 150.00              | 30.00                
+NULL                   | 100.00              | 20.00
