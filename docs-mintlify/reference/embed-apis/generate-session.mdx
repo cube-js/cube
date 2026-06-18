@@ -15,6 +15,8 @@ The Generate Session API is available on [Premium and Enterprise plans](https://
 
 The Generate Session API requires your [Cube Cloud API key][ref-api-keys] for authentication.
 
+If the API key is [scoped to specific deployments][ref-api-keys], the `deploymentId` in the request body must be within the key's scope; otherwise the request is rejected with `403 Forbidden`. Unscoped keys can mint sessions for any deployment.
+
 ## Endpoint
 
 ```text

@@ -156,25 +156,48 @@ Currently, advanced semantic queries can be placed on dashboards, but dashboard 
 
 ## Applying a security context
 
-When you run a query in a workbook—or open a dashboard—Cube generates a token to
-execute it against the semantic layer. If you have developer access, you can
-attach a [security context][ref-security-context] to that token directly from
-the workbook or dashboard page. The values you provide are used when the token
-is generated, overriding the claims that would otherwise come from your session.
+When you run a query—in a workbook, on a dashboard, or in [Explore][ref-explore]—Cube
+generates a token to execute it against the semantic layer. If you have developer or
+admin access, you can attach a [security context][ref-security-context] to that token
+directly from the page you're working on. The values you provide are used when the
+token is generated, overriding the claims that would otherwise come from your session.
+
+The security context you set is also respected by [AI agents][ref-analytics-chat]:
+any query an agent runs on your behalf—whether in the workbook or in the IDE—executes
+under the same context. This lets you confirm an agent sees exactly the data a given
+end user would.
+
+### What you can override
+
+- **Groups** — choose **Inherit** to keep the Cube Cloud groups resolved from your
+  session, **Custom** to query as a specific set of groups, or **None** to query with
+  no groups at all.
+- **User attributes** — keep the attributes resolved from your session, or override
+  them with your own values.
 
 <Note>
 
-The security context control is only visible to developers. Other users always
-query with the security context derived from their own session.
+Setting a security context requires developer or admin access (deployment edit
+access). Overriding the Cube Cloud **groups** and **user attributes** specifically
+requires the admin role. Users without edit access always query with the security
+context derived from their own session.
 
 </Note>
 
-This is primarily a testing tool. It lets developers reproduce what a specific
-end user would see and verify [access control][ref-access-control] and
-multitenancy behavior without leaving Cube Cloud. It's especially useful when a
-query fails or returns no data because the data model expects security context
-values that aren't present in your session—you can supply them here and confirm
-the model behaves as intended.
+<Warning>
+
+You can't use a security context to impersonate another user. The `email` claim is
+never overridable—it's always taken from your own session—so you can't run queries on
+behalf of someone else.
+
+</Warning>
+
+This is primarily a testing tool. It lets you reproduce what a specific end user would
+see and verify [access control][ref-access-control] and multitenancy behavior without
+leaving Cube Cloud. It's especially useful when a query fails or returns no data
+because the data model expects security context values that aren't present in your
+session—you can supply them here and confirm the model (and any agent that queries it)
+behaves as intended.
 
 <video
   autoPlay
@@ -182,7 +205,7 @@ the model behaves as intended.
   loop
   playsInline
   className="w-full h-auto rounded-xl block dark:hidden"
-  src="https://lgo0ecceic.ucarecd.net/add0e872-e951-4d13-850b-991bf0e34c41/"
+  src="https://ucarecdn.com/0b8ed4a8-9072-4db6-95bb-8f4a40ebeff9/c67da299-light.mp4"
 ></video>
 <video
   autoPlay
@@ -190,7 +213,7 @@ the model behaves as intended.
   loop
   playsInline
   className="w-full h-auto rounded-xl hidden dark:block"
-  src="https://lgo0ecceic.ucarecd.net/d61efb90-809c-4247-aa00-efe3d0af2f6f/"
+  src="https://ucarecdn.com/172af2cd-920d-4443-aa17-41ff3f15bffb/103430ef-dark.mp4"
 ></video>
 
 [ref-core-data-apis]: /reference/core-data-apis
@@ -199,6 +222,8 @@ the model behaves as intended.
 [ref-configuration]: /docs/data-modeling/configuration
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
+[ref-explore]: /docs/explore-analyze/explore
+[ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 

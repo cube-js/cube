@@ -19,6 +19,11 @@ Authorization: Bearer <YOUR_TOKEN>
 The token can be an API key generated in your Cube Cloud account settings, or an
 OAuth access token from Cube Cloud's OAuth flow — both are sent the same way.
 
+If the API key is [scoped to specific deployments](/admin/account-billing/api-keys#deployment-scope),
+it only authorizes requests for those deployments. A request targeting a
+deployment outside the key's scope returns `403 Forbidden`. Unscoped keys
+(**All deployments**) authorize requests for every deployment.
+
 ```bash
 curl --request GET \
   --url 'https://<tenant>.cubecloud.dev/api/v1/deployments' \
@@ -51,10 +56,12 @@ curl --request GET \
 
 <Warning>
 
-Treat API keys and SCIM tokens like passwords — they grant full access to your
-account's resources. Store them securely and rotate them if they are exposed.
+Treat API keys and SCIM tokens like passwords — unless an API key is scoped to
+specific deployments, they grant full access to your account's resources. Store
+them securely and rotate them if they are exposed.
 
 </Warning>
 
 A `401 Unauthorized` response means the credential is missing, malformed, or
-expired.
+expired. A `403 Forbidden` response means the credential is valid but not
+authorized for the target — for example, an API key scoped to other deployments.

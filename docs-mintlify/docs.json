@@ -790,6 +790,13 @@
                 ]
               },
               {
+                "group": "App Theme",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/app-config"
+                ]
+              },
+              {
                 "group": "Embed",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
