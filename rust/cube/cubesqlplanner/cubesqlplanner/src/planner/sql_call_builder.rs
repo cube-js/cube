@@ -41,8 +41,12 @@ impl<'a> SqlCallBuilder<'a> {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<SqlCall, CubeError> {
-        let (template, template_args) = member_sql
-            .compile_template_sql(self.base_tools.clone(), self.security_context.clone())?;
+        let compiled = self.base_tools.compile_member_sql(
+            member_sql.clone(),
+            self.security_context.clone(),
+            member_sql.args_names().clone(),
+        )?;
+        let (template, template_args) = (compiled.template, compiled.args);
 
         let deps = template_args
             .symbol_paths

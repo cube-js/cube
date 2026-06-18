@@ -2,12 +2,14 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::cube_bridge::member_sql::{CompiledMemberTemplate, MemberSql};
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
+use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
+    MockDriverTools, MockJoinGraph, MockMemberSql, MockSqlTemplatesRender, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -103,5 +105,18 @@ impl BaseTools for MockBaseTools {
     ) -> Result<Rc<dyn JoinDefinition>, CubeError> {
         let result = self.join_graph.build_join(hints)?;
         Ok(result as Rc<dyn JoinDefinition>)
+    }
+
+    fn compile_member_sql(
+        &self,
+        member_sql: Rc<dyn MemberSql>,
+        _security_context: Rc<dyn SecurityContext>,
+        _arg_names: Vec<String>,
+    ) -> Result<CompiledMemberTemplate, CubeError> {
+        let mock = member_sql
+            .as_any()
+            .downcast::<MockMemberSql>()
+            .map_err(|_| CubeError::internal("MockBaseTools expects MockMemberSql".to_string()))?;
+        Ok(mock.compiled())
     }
 }

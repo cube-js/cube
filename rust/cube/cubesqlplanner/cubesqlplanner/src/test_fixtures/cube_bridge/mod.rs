@@ -62,7 +62,7 @@ pub use mock_join_item_definition::MockJoinItemDefinition;
 pub use mock_measure_definition::MockMeasureDefinition;
 pub use mock_member_expression_definition::MockMemberExpressionDefinition;
 pub use mock_member_order_by::MockMemberOrderBy;
-pub use mock_member_sql::MockMemberSql;
+pub use mock_member_sql::{mock_compiled, MockMemberSql};
 pub use mock_multi_stage_filter::MockMultiStageFilterReferences;
 pub use mock_multi_stage_grain::MockMultiStageGrainReferences;
 pub use mock_pre_aggregation_description::MockPreAggregationDescription;

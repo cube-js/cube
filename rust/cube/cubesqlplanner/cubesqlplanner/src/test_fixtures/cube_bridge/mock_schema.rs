@@ -664,7 +664,8 @@ mod tests {
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
-    use crate::test_fixtures::cube_bridge::MockBaseTools;
+
+    use crate::test_fixtures::cube_bridge::mock_compiled;
 
     #[test]
     fn test_basic_schema() {
@@ -1201,9 +1202,6 @@ mod tests {
 
     #[test]
     fn test_view_with_multiple_long_join_paths() {
-        use crate::test_fixtures::cube_bridge::MockSecurityContext;
-        use std::rc::Rc;
-
         let schema = MockSchemaBuilder::new()
             .add_cube("visitors")
             .add_dimension(
@@ -1260,12 +1258,7 @@ mod tests {
         let checkin_id_sql = checkin_id_dim.sql().unwrap().unwrap();
 
         // Compile template and check symbol_paths structure
-        let (_template, args) = checkin_id_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(checkin_id_sql);
 
         // Should have exactly one symbol path
         assert_eq!(
@@ -1286,12 +1279,7 @@ mod tests {
             .unwrap();
         let checkin_count_sql = checkin_count_measure.sql().unwrap().unwrap();
 
-        let (_template, args) = checkin_count_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(checkin_count_sql);
 
         assert_eq!(
             args.symbol_paths.len(),
@@ -1309,12 +1297,7 @@ mod tests {
         let id_dim = schema.get_dimension("multi_path_view", "id").unwrap();
         let id_sql = id_dim.sql().unwrap().unwrap();
 
-        let (_template, args) = id_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(id_sql);
 
         assert_eq!(
             args.symbol_paths.len(),
@@ -1330,12 +1313,7 @@ mod tests {
         let count_measure = schema.get_measure("multi_path_view", "count").unwrap();
         let count_sql = count_measure.sql().unwrap().unwrap();
 
-        let (_template, args) = count_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(count_sql);
 
         assert_eq!(
             args.symbol_paths.len(),
