@@ -2,7 +2,7 @@ use super::{DimensionSubqueryPlanner, JoinPlanner};
 use crate::logical_plan::*;
 use crate::planner::collectors::collect_sub_query_dimensions_from_symbols;
 use crate::planner::planners::multi_stage::PlanningScope;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -11,12 +11,12 @@ use std::rc::Rc;
 /// source, no multi-stage or multiplied CTEs. Sub-query dimensions
 /// are still woven into the join.
 pub struct SimpleQueryPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
     join_planner: JoinPlanner,
 }
 impl SimpleQueryPlanner {
-    pub fn new(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
+    pub fn new(query_tools: Rc<State>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
             join_planner: JoinPlanner::new(query_tools.clone()),
             query_properties,

@@ -6,7 +6,7 @@
 //! For inputs that originate from `BaseQueryOptions`, see
 //! [`QueryPropertiesCompiler`](super::query_properties_compiler).
 
-use super::query_tools::QueryTools;
+use super::state::State;
 use super::MemberSymbol;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::tree_ops;
@@ -134,7 +134,7 @@ impl FullKeyAggregateMeasures {
 #[derive(Clone, TypedBuilder)]
 #[builder(build_method(into = Result<Rc<QueryProperties>, CubeError>))]
 pub struct QueryProperties {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     #[builder(default)]
     measures: Vec<Rc<MemberSymbol>>,
     #[builder(default)]
@@ -913,6 +913,7 @@ impl QueryProperties {
                             FilterOperator::BeforeOrOnDate,
                             to_value,
                             itm.use_raw_values(),
+                            None,
                         )?));
                     }
                     other => new_filters.push(other.clone()),
@@ -938,6 +939,7 @@ impl QueryProperties {
                             FilterOperator::AfterOrOnDate,
                             from_value,
                             itm.use_raw_values(),
+                            None,
                         )?));
                     }
                     other => new_filters.push(other.clone()),
@@ -1067,7 +1069,14 @@ impl QueryProperties {
                         };
                         values.extend(additional_values.iter().cloned());
                         let use_raw_values = use_raw_values.unwrap_or(itm.use_raw_values());
-                        itm.change_operator(operator.clone(), values, use_raw_values)?
+                        itm.change_operator(
+                            operator.clone(),
+                            values,
+                            use_raw_values,
+                            // FIXME: late compilation — only needed to recompile a
+                            // to_date rolling-window granularity here.
+                            Some(&mut self.query_tools.compiler().borrow_mut()),
+                        )?
                     } else {
                         itm.clone()
                     };

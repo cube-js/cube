@@ -5,7 +5,7 @@ use crate::planner::filter::FilterItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::JoinTreeBuilder;
 use crate::planner::query_tools::JoinKey;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -149,7 +149,7 @@ impl MeasuresJoinHints {
 /// are cheap lookups at render time.
 #[derive(Clone)]
 pub struct MultiFactJoinGroups {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     measures_join_hints: MeasuresJoinHints,
     groups: Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>,
     /// cube_name → join path from root, computed from the first group (shared for dimensions).
@@ -162,7 +162,7 @@ impl MultiFactJoinGroups {
     /// Builds the join trees from `measures_join_hints` and groups
     /// measures by the resulting `JoinKey`.
     pub fn try_new(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
         let groups = Self::build_groups(&query_tools, &measures_join_hints)?;
@@ -184,7 +184,7 @@ impl MultiFactJoinGroups {
     }
 
     fn build_groups(
-        query_tools: &Rc<QueryTools>,
+        query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
     ) -> Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());

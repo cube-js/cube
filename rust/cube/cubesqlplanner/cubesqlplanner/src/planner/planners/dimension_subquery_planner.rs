@@ -4,7 +4,7 @@ use crate::physical_plan::QualifiedColumnName;
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::PlanningScope;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::QueryProperties;
 use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
@@ -18,7 +18,7 @@ use std::rc::Rc;
 /// gets joined back into the host query on those keys.
 pub struct DimensionSubqueryPlanner {
     utils: CommonUtils,
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
     sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>>,
     dimensions_refs: RefCell<HashMap<String, QualifiedColumnName>>,
@@ -27,7 +27,7 @@ pub struct DimensionSubqueryPlanner {
 impl DimensionSubqueryPlanner {
     /// Planner with no sub-query dimensions — used when the host
     /// query has none.
-    pub fn empty(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
+    pub fn empty(query_tools: Rc<State>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
             sub_query_dims: HashMap::new(),
             utils: CommonUtils::new(query_tools.clone()),
@@ -40,7 +40,7 @@ impl DimensionSubqueryPlanner {
     /// by owning cube.
     pub fn try_new(
         dimensions: &Vec<Rc<MemberSymbol>>,
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         query_properties: Rc<QueryProperties>,
     ) -> Result<Self, CubeError> {
         let mut sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>> = HashMap::new();
@@ -99,7 +99,7 @@ impl DimensionSubqueryPlanner {
 
         let cube_symbol = self
             .query_tools
-            .evaluator_compiler()
+            .compiler()
             .borrow_mut()
             .add_cube_table_evaluator(cube_name.clone(), vec![])?;
         let member_expression_symbol = MemberExpressionSymbol::try_new(

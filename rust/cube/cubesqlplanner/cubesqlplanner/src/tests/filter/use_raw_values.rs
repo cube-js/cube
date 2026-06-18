@@ -23,7 +23,7 @@ fn test_in_date_range_use_raw_values() {
     let symbol = ctx.create_symbol("visitors.created_at").unwrap();
 
     let filter = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         symbol,
         FilterType::Dimension,
         FilterOperator::InDateRange,
@@ -31,6 +31,7 @@ fn test_in_date_range_use_raw_values() {
             Some("2024-01-01".to_string()),
             Some("2024-12-31".to_string()),
         ]),
+        None,
     )
     .unwrap();
 
@@ -42,6 +43,7 @@ fn test_in_date_range_use_raw_values() {
                 Some("(SELECT max(dt) FROM cte)".to_string()),
             ],
             true,
+            None,
         )
         .unwrap();
 
@@ -58,7 +60,7 @@ fn test_not_in_date_range_use_raw_values() {
     let symbol = ctx.create_symbol("visitors.created_at").unwrap();
 
     let filter = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         symbol,
         FilterType::Dimension,
         FilterOperator::NotInDateRange,
@@ -66,6 +68,7 @@ fn test_not_in_date_range_use_raw_values() {
             Some("2024-01-01".to_string()),
             Some("2024-12-31".to_string()),
         ]),
+        None,
     )
     .unwrap();
 
@@ -77,6 +80,7 @@ fn test_not_in_date_range_use_raw_values() {
                 Some("(SELECT max(dt) FROM cte)".to_string()),
             ],
             true,
+            None,
         )
         .unwrap();
 
@@ -93,7 +97,7 @@ fn test_before_or_on_date_use_raw_values() {
     let symbol = ctx.create_symbol("visitors.created_at").unwrap();
 
     let filter = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         symbol,
         FilterType::Dimension,
         FilterOperator::InDateRange,
@@ -101,6 +105,7 @@ fn test_before_or_on_date_use_raw_values() {
             Some("2024-01-01".to_string()),
             Some("2024-12-31".to_string()),
         ]),
+        None,
     )
     .unwrap();
 
@@ -109,6 +114,7 @@ fn test_before_or_on_date_use_raw_values() {
             FilterOperator::BeforeOrOnDate,
             vec![Some("(SELECT max(dt) FROM cte)".to_string())],
             true,
+            None,
         )
         .unwrap();
 
@@ -125,7 +131,7 @@ fn test_after_or_on_date_use_raw_values() {
     let symbol = ctx.create_symbol("visitors.created_at").unwrap();
 
     let filter = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         symbol,
         FilterType::Dimension,
         FilterOperator::InDateRange,
@@ -133,6 +139,7 @@ fn test_after_or_on_date_use_raw_values() {
             Some("2024-01-01".to_string()),
             Some("2024-12-31".to_string()),
         ]),
+        None,
     )
     .unwrap();
 
@@ -141,6 +148,7 @@ fn test_after_or_on_date_use_raw_values() {
             FilterOperator::AfterOrOnDate,
             vec![Some("(SELECT min(df) FROM cte)".to_string())],
             true,
+            None,
         )
         .unwrap();
 

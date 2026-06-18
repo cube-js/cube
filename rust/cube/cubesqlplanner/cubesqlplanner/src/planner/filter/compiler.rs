@@ -59,6 +59,7 @@ impl<'a> FilterCompiler<'a> {
                     FilterType::Dimension,
                     FilterOperator::InDateRange,
                     Some(date_range.into_iter().map(|v| Some(v)).collect()),
+                    None,
                 )?;
                 self.time_dimension_filters.push(FilterItem::Item(filter));
             }
@@ -120,6 +121,7 @@ impl<'a> FilterCompiler<'a> {
                     item_type.clone(),
                     FilterOperator::from_str(&operator)?,
                     item.values.clone(),
+                    Some(&mut *self.evaluator_compiler),
                 )?))
             } else {
                 Err(CubeError::user(format!(

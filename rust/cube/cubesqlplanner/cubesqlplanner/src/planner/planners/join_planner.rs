@@ -3,7 +3,7 @@ use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_item::JoinItem;
 use crate::logical_plan::*;
 use crate::planner::join_hints::JoinHints;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
@@ -39,11 +39,11 @@ impl ResolvedJoinItem {
 /// helpers for resolving the members each ON clause references.
 pub struct JoinPlanner {
     utils: CommonUtils,
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
 }
 
 impl JoinPlanner {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(query_tools: Rc<State>) -> Self {
         Self {
             utils: CommonUtils::new(query_tools.clone()),
             query_tools,

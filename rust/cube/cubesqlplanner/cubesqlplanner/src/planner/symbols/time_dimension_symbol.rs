@@ -1,6 +1,7 @@
 use super::common::CompiledMemberPath;
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::time_dimension::Granularity;
 use crate::planner::CubeRef;
 use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
@@ -83,14 +84,18 @@ impl TimeDimensionSymbol {
     /// the base symbol and date range are preserved.
     pub fn change_granularity(
         &self,
-        query_tools: Rc<QueryTools>,
+        // FIXME: late compilation. `State` is threaded here only to reach the
+        // `Compiler` and (re)compile a granularity during planning. Once
+        // compilation happens in an early phase, this should take the
+        // already-resolved granularity and drop the `State`/`Compiler` dependency.
+        state: Rc<State>,
         new_granularity: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
-        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = state.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
-            query_tools.cube_evaluator().clone(),
+            state.cube_evaluator().clone(),
             &mut evaluator_compiler,
             &&self.base_symbol.cube_name(),
             &self.base_symbol.name(),

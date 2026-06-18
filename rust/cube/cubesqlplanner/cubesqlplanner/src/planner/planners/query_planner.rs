@@ -4,7 +4,7 @@ use super::{
 };
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::PlanningScope;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -16,12 +16,12 @@ use std::rc::Rc;
 /// `MultipliedMeasuresQueryPlanner`) and stitched together by
 /// `FullKeyAggregateQueryPlanner`.
 pub struct QueryPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     request: Rc<QueryProperties>,
 }
 
 impl QueryPlanner {
-    pub fn new(request: Rc<QueryProperties>, query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(request: Rc<QueryProperties>, query_tools: Rc<State>) -> Self {
         Self {
             request,
             query_tools,

@@ -4,7 +4,7 @@ use super::{
 };
 use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageGrain;
@@ -21,14 +21,14 @@ use std::vec;
 /// dimension / measure inode, or a leaf (base measure /
 /// time-series / time-series-get-range).
 pub struct MultiStageMemberQueryPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
     description: Rc<MultiStageQueryDescription>,
 }
 
 impl MultiStageMemberQueryPlanner {
     pub fn new(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         query_properties: Rc<QueryProperties>,
         description: Rc<MultiStageQueryDescription>,
     ) -> Self {
@@ -146,7 +146,7 @@ impl MultiStageMemberQueryPlanner {
                 let time_dimension = &rolling_window_desc.time_dimension;
                 let query_granularity = to_date_rolling_window.granularity.clone();
 
-                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let evaluator_compiler_cell = self.query_tools.compiler().clone();
                 let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
                 let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
