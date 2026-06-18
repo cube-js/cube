@@ -72,10 +72,10 @@ Cube Store is the purpose-built pre-aggregations storage for Cube.
 Cube Store uses a distributed query engine architecture. In every Cube Store
 cluster:
 
-- a one or many [router nodes](#cube-store-cube-store-router) handle incoming
+- a one or many [router nodes](#cube-store-router) handle incoming
   connections, manages database metadata, builds query plans, and orchestrates
   their execution
-- multiple [worker nodes](#cube-store-cube-store-worker) ingest warmed up data
+- multiple [worker nodes](#cube-store-worker) ingest warmed up data
   and execute queries in parallel
 - a local or cloud-based blob storage keeps pre-aggregated data in columnar
   format
