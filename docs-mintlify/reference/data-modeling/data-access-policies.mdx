@@ -208,6 +208,72 @@ cube(`orders`, {
 
 </CodeGroup>
 
+#### Supported operators
+
+The `if` expression must evaluate to a boolean. The syntax you can use inside it
+depends on the data model format:
+
+- In **YAML** data models, the expression inside `{ }` is evaluated as a Python
+expression. Only logical operators, member access, and method calls are supported.
+- In **JavaScript** data models, the expression is evaluated as a JavaScript
+expression, so a broader set of operators is available.
+
+The following operators and constructs are supported:
+
+| Operator | Python (YAML) | JavaScript |
+| --- | --- | --- |
+| Logical AND | `and` | `&&` |
+| Logical OR | `or` | <code>&#124;&#124;</code> |
+| Logical NOT | `not` | `!` |
+| Member access | `.` | `.` |
+| Method call (e.g., `includes`) | `.includes(…)` | `.includes(…)` |
+| Equality and inequality | — | `===`, `!==`, `==`, `!=` |
+| Comparison | — | `<`, `>`, `<=`, `>=` |
+| Arithmetic | — | `+`, `-`, `*`, `/`, `%`, `**` |
+| Ternary | — | `? :` |
+| Optional chaining | — | `?.` |
+
+For example, the following policy applies to users who are not blocked, are either
+administrators or based in the EMEA region, and belong to the `admins` group. Each
+requirement is expressed as a separate condition, and all conditions must be `true`
+for the policy to take effect:
+
+<CodeGroup>
+
+```yaml title="YAML"
+conditions:
+  - if: "{ not securityContext.is_blocked }"
+  - if: "{ securityContext.is_admin or securityContext.is_EMEA_based }"
+  - if: "{ securityContext.groups.includes('admins') }"
+```
+
+```javascript title="JavaScript"
+conditions: [
+  { if: !securityContext.is_blocked },
+  { if: securityContext.is_admin || securityContext.is_EMEA_based },
+  { if: securityContext.groups.includes(`admins`) }
+]
+```
+
+</CodeGroup>
+
+<Tip>
+
+Prefer decomposing a condition chained with logical AND into separate
+conditions. Since conditions are combined with AND, the result is equivalent
+but easier to read and maintain.
+
+</Tip>
+
+<Note>
+
+The set of operators supported in JavaScript data models is currently broader than
+in YAML data models. If you'd like to use additional operators in YAML, please
+request support by opening an issue on
+[GitHub](https://github.com/cube-js/cube/issues?q=is%3Aissue+label%3A%22data+modeling%3Aaccess+policies%22).
+
+</Note>
+
 ### `member_level`
 
 The optional `member_level` parameter, when present, configures [member-level
