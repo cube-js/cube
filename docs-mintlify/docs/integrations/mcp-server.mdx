@@ -5,11 +5,11 @@ description: Connect MCP-aware assistants to Cube through a hosted HTTPS endpoin
 
 Cube MCP (Model Context Protocol) lets MCP-compatible AI clients connect to Cube over HTTPS using OAuth.
 
-<Info>
+<Note>
 
 The MCP server is available on [Premium and Enterprise plans](https://cube.dev/pricing). <br />Users need the [Viewer][ref-roles] role or higher to interact with the MCP server.
 
-</Info>
+</Note>
 
 
 ## What is MCP?
@@ -23,7 +23,7 @@ Cube hosts an MCP server endpoint for your tenant. MCP clients connect over HTTP
 - **Endpoint:** `https://<cube-mcp-server-host>/api/mcp`
 - **OAuth discovery:** `https://<cube-mcp-server-host>/.well-known/oauth`
 - **OAuth flow:** Authorization Code + PKCE, `client_id` = `cube-mcp-client`, scope = `mcp-agent-access`
-- **Agent selection:** Uses the **MCP Defaults** (default deployment + agent) set by your admin
+- **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
 
 ## Admin setup
 
@@ -39,17 +39,29 @@ Before enabling MCP, make sure you have:
 
 MCP uses your Cube MCP server host. If the URL isn’t configured, the MCP page will show “MCP configuration is unavailable.”
 
-### 2) Set MCP Defaults
+### 2) Configure deployment access
 
-Go to **Admin → MCP** and select:
+Go to **Admin → MCP Server** and use the **Deployment Access** section to control which
+deployments MCP clients can reach and where they connect by default:
 
-- **Default Deployment**
-- **Default Agent**
+- **Default deployment** — the deployment MCP clients connect to unless they explicitly
+  request another one. Choose **Automatic (first available)** to land each user on the
+  first deployment they can access.
+- **Limit available deployments** — when off (the default), MCP clients can access **all**
+  deployments the user is permitted to see. Turn it on to restrict MCP to a chosen subset.
+- **Available deployments** — when the limit is on, pick the deployments MCP clients may
+  access. Selecting none disables MCP access for the account.
 
-These defaults are required for the OAuth token exchange.
+<Note>
+
+Deployment access is always intersected with the user's
+[role-based permissions][ref-roles] — clients can only reach deployments the
+authenticated user is allowed to see.
+
+</Note>
 
 <Frame>
-  <img src="https://lgo0ecceic.ucarecd.net/284e72c6-c536-4a24-b5ae-9c0a9bf0e8b7/" />
+  <img src="/images/docs/integrations/mcp-deployment-access.png" alt="Admin MCP Server page showing the Deployment Access section with the default deployment dropdown, the Limit available deployments switch, and the available deployments picker" />
 </Frame>
 
 ## Connect to Claude
@@ -62,7 +74,7 @@ claude mcp add --transport http cube-mcp-server https://<cube-mcp-server-host>/a
 
 #### Authentication and usage flow:
 
-1. Run the command copied from **Admin → MCP → Claude → Claude Code**.
+1. Run the command copied from **Admin → MCP Server → AI Clients → Claude Code**.
 2. Then run Claude and use `/mcp` to list available servers.
 3. Select `cube-mcp-server` and choose `Authenticate`.
 2. A browser window opens for authentication.
@@ -152,9 +164,54 @@ For any MCP-compatible client:
 2. The client will auto-discover OAuth and prompt for authentication.
 3. Complete the OAuth flow to grant access to your Cube deployment.
 
+## Select a deployment and agent
+
+An MCP client is not locked to a single deployment for the whole session. After
+connecting, it can discover the deployments and agents you can access and target a
+specific one on each request.
+
+Three tools work together:
+
+- **`listDeployments`** — discovery. Returns every deployment you can access via MCP
+  (already filtered by the admin's deployment-access settings and your permissions) and
+  each deployment's agents. Use it to find valid `deploymentId` and `agentId` values
+  before calling `chat`. Every deployment offers an **Auto** agent (`agentId: null`) in
+  addition to any configured agents.
+- **`chat`** — accepts two optional selection parameters:
+  - **`deploymentId`** — the deployment to use for this request. When omitted, the chat
+    uses the deployment from the current session (the default resolved at connect time).
+  - **`agentId`** — the agent to use for this request. When omitted or `null`, the
+    deployment's **Auto** agent is used. Pass a specific `agentId` to route to a
+    configured agent.
+- **`loadQueryResults`** — paginates through the results of a previous query on the same
+  deployment context.
+
+A typical client workflow:
+
+<Steps>
+  <Step title="Connect">
+    Complete the OAuth flow. The session is scoped to the tenant default deployment (or
+    the first one you can access).
+  </Step>
+  <Step title="Discover">
+    Call `listDeployments` to see the available `deploymentId` / `agentId` values.
+  </Step>
+  <Step title="Chat">
+    Call `chat` with your `input`, optionally passing `deploymentId` and/or `agentId` to
+    target a specific deployment or agent. Omit both to use the session default deployment
+    with its Auto agent.
+  </Step>
+</Steps>
+
+Requests are always validated against the admin's deployment-access settings. A deployment
+that is outside the allow-list — or that you don't have permission to see — is rejected
+with a **403 Forbidden** (`Deployment <id> is not available via MCP for this account`), so
+neither `listDeployments` nor the `chat` selection can reach an excluded deployment.
+
 ## Available actions
 
-- Chat with your Cube AI agent over MCP
+- Discover accessible deployments and agents with `listDeployments`
+- Chat with a Cube AI agent over MCP, optionally targeting a specific deployment and agent
 - Query data and request analysis
 - Receive responses directly in your MCP client
 
@@ -172,6 +229,7 @@ For any MCP-compatible client:
 
 - **MCP configuration is unavailable**: Configure the MCP server URL.
 - **MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
-- **MCP defaults are not configured**: Set defaults in **Admin → MCP** under **MCP Defaults**.
+- **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment Access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
+- **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment Access**.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
