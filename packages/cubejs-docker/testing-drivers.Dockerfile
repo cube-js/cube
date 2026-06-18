@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:24.18.0-bookworm-slim AS base
+FROM node:24.18.0-trixie-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -12,7 +12,7 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends libssl3 curl \
+    && apt-get install -y --no-install-recommends libssl3t64 curl \
        cmake python3 gcc g++ make cmake openjdk-21-jdk-headless unzip \
     && rm -rf /var/lib/apt/lists/*
 

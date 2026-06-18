@@ -1,4 +1,4 @@
-FROM node:24.18.0-bookworm-slim AS builder
+FROM node:24.18.0-trixie-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -21,7 +21,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:24.18.0-bookworm-slim
+FROM node:24.18.0-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -30,7 +30,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends libssl3 python3.13 libpython3.13-dev \
+    && apt-get install -y --no-install-recommends libssl3t64 python3.13 libpython3.13-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN yarn policies set-version v1.22.22
