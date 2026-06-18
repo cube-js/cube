@@ -116,6 +116,7 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
+    templates.expressions.timestamp_tz_named_timezone_cast = 'CONVERT_TIMEZONE(\'{{ timezone }}\', \'UTC\', \'{{ timestamp }}\'::timestamp_ntz)';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
     templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
