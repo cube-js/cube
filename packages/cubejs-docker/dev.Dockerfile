@@ -10,7 +10,7 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     # python3 package is necessary to install `python3` executable for node-gyp
     && apt-get install -y --no-install-recommends libssl3 curl \
-       cmake python3 python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
+       cmake python3 python3.13 libpython3.13-dev gcc g++ make cmake openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -171,7 +171,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
+    && apt-get install -y ca-certificates python3.13 libpython3.13-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .
