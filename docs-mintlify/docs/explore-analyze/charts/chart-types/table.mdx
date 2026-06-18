@@ -121,9 +121,13 @@ To make a background transparent, open the color picker and clear the hex value.
 
 A **color scale** (heat map) tints each cell of a numeric column with a gradient based on where its value falls in the column's range. It is a rule type in the **Formatting** tab, alongside conditional formatting — switch a rule between **Conditional formatting** and **Color scale** with the **Type** selector inside the rule.
 
-To add one quickly, open the menu next to **Add rule** and pick a color-scale preset (for example, *White → green* or *Green · white · red*).
+To add one quickly, open the menu next to **Add rule** and pick a color-scale preset:
 
-A color scale requires a **numeric source column**. For non-numeric columns (strings, dates, booleans), the **Color scale** type is disabled — use conditional formatting instead.
+- **Outstanding values** — a two-color scale that highlights the highest values.
+- **Divergent values** — a three-color scale that distinguishes low, middle, and high values.
+- **Traffic light gradient** — a red–yellow–green three-color scale.
+
+A color scale requires a **numeric source column**. For non-numeric columns (strings, dates, booleans), the **Scale** type is disabled — use conditional formatting instead.
 
 Configure the gradient with three stops, laid out top-to-bottom to mirror the column:
 
@@ -131,7 +135,16 @@ Configure the gradient with three stops, laid out top-to-bottom to mirror the co
 - **Center** (optional middle) — **Disabled** by default, which produces a two-color gradient. Enable it for a three-color gradient anchored at the **Midpoint**, **Average**, **Median**, or a custom **Number** / **Percentile**.
 - **End** (high end) — anchored at the column **Maximum** by default, or a custom **Number** or **Percentile**.
 
-Each stop has its own color. Computed anchor modes (Minimum, Maximum, Midpoint, Average, Median) preview the resolved value from your data in the dropdown.
+Each stop has its own color. The anchor determines *which value* in the column the stop's color is pinned to:
+
+- **Minimum** / **Maximum** — the lowest / highest value in the column.
+- **Midpoint** — the halfway point of the range, i.e. `(minimum + maximum) / 2`. Independent of how the values are distributed.
+- **Average** — the mean of all values (sensitive to outliers).
+- **Median** — the middle value when sorted (robust to outliers).
+- **Number** — a fixed value you enter.
+- **Percentile** — a value at the given percentile (e.g. `90` = the 90th percentile).
+
+For the computed anchors (Minimum, Maximum, Midpoint, Average, Median), the dropdown previews the resolved value from your data.
 
 Use **Reverse color scale** to swap the Start and End colors. **Treat nulls as zero** is on by default, coloring null/blank cells as zero; turn it off to leave them uncolored.
 
