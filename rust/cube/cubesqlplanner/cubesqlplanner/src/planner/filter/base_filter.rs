@@ -60,11 +60,13 @@ impl BaseFilter {
         filter_operator: FilterOperator,
         values: Vec<Option<String>>,
         use_raw_values: bool,
+        query_tools: Rc<crate::planner::query_tools::QueryTools>,
         compiler: Option<&mut Compiler>,
     ) -> Result<Rc<Self>, CubeError> {
         let typed_filter = self
             .typed_filter
             .to_builder()
+            .query_tools(query_tools)
             .operator(filter_operator)
             .values(Some(values))
             .use_raw_values(use_raw_values)

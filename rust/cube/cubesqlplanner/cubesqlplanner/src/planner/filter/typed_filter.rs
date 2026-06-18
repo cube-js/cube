@@ -51,7 +51,6 @@ pub enum FilterOp {
 /// whichever view they need.
 #[derive(Clone)]
 pub struct TypedFilter {
-    query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
     filter_type: FilterType,
     operator: FilterOperator,
@@ -67,16 +66,11 @@ impl TypedFilter {
 
     pub fn to_builder(&self) -> TypedFilterBuilder {
         TypedFilter::builder()
-            .query_tools(self.query_tools.clone())
             .member_evaluator(self.member_evaluator.clone())
             .filter_type(self.filter_type.clone())
             .operator(self.operator.clone())
             .values(Some(self.values.clone()))
             .use_raw_values(self.use_raw_values)
-    }
-
-    pub fn query_tools(&self) -> &Rc<QueryTools> {
-        &self.query_tools
     }
 
     pub fn member_evaluator(&self) -> &Rc<MemberSymbol> {
@@ -174,15 +168,13 @@ impl TypedFilterBuilder {
             .ok_or_else(|| CubeError::user("Expected one parameter but nothing found".to_string()))
     }
 
-    // FIXME: late compilation. `compiler` is threaded in only to (re)compile a
-    // custom rolling-window granularity during planning (the
-    // ToDateRollingWindowDateRange branch below). Once granularities are
-    // resolved in an early compile phase, this parameter — and the whole
-    // QueryTools→Compiler dependency in filter building — should go away.
+    // FIXME: late compilation. `compiler` and the builder's `query_tools` are
+    // consumed only to (re)compile a custom rolling-window granularity during
+    // planning (the ToDateRollingWindowDateRange branch below); neither is
+    // stored on the built filter. Once granularities are resolved in an early
+    // compile phase, both inputs should go away.
     pub fn build(self, compiler: Option<&mut Compiler>) -> Result<TypedFilter, CubeError> {
-        let query_tools = self
-            .query_tools
-            .ok_or_else(|| CubeError::internal("query_tools is required".to_string()))?;
+        let query_tools = self.query_tools;
         let member_evaluator = self
             .member_evaluator
             .ok_or_else(|| CubeError::internal("member_evaluator is required".to_string()))?;
@@ -288,6 +280,12 @@ impl TypedFilterBuilder {
                                 .to_string(),
                         )
                     })?;
+                    let query_tools = query_tools.as_ref().ok_or_else(|| {
+                        CubeError::internal(
+                            "query_tools is required to resolve a to_date rolling-window granularity"
+                                .to_string(),
+                        )
+                    })?;
 
                     let granularity_obj = GranularityHelper::make_granularity_obj(
                         query_tools.cube_evaluator().clone(),
@@ -338,7 +336,6 @@ impl TypedFilterBuilder {
         };
 
         Ok(TypedFilter {
-            query_tools,
             member_evaluator,
             filter_type,
             operator,

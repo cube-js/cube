@@ -34,7 +34,7 @@ impl ToSql for TypedFilter {
 
         let ctx = FilterSqlContext {
             member_sql: &member_sql,
-            query_tools: self.query_tools(),
+            query_tools: &query_tools,
             plan_templates: templates,
             use_db_time_zone: !filters_ctx.use_local_tz,
             use_raw_values: self.use_raw_values(),
@@ -48,6 +48,7 @@ impl TypedFilter {
     pub fn to_sql_for_filter_params(
         &self,
         column: &FilterParamsColumn,
+        query_tools: &Rc<QueryTools>,
         plan_templates: &PlanSqlTemplates,
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
@@ -57,7 +58,7 @@ impl TypedFilter {
             FilterParamsColumn::String(column_sql) => {
                 let ctx = FilterSqlContext {
                     member_sql: column_sql,
-                    query_tools: self.query_tools(),
+                    query_tools,
                     plan_templates,
                     use_db_time_zone,
                     use_raw_values: self.use_raw_values(),
@@ -69,7 +70,7 @@ impl TypedFilter {
                     FilterOp::DateRange(_) | FilterOp::DateSingle(_) => {
                         let ctx = FilterSqlContext {
                             member_sql: "",
-                            query_tools: self.query_tools(),
+                            query_tools,
                             plan_templates,
                             use_db_time_zone,
                             use_raw_values: self.use_raw_values(),
@@ -91,7 +92,7 @@ impl TypedFilter {
                     _ => self
                         .values()
                         .iter()
-                        .filter_map(|v| v.as_ref().map(|v| self.query_tools().allocate_param(v)))
+                        .filter_map(|v| v.as_ref().map(|v| query_tools.allocate_param(v)))
                         .collect::<Vec<_>>(),
                 };
                 callback.call(&args)

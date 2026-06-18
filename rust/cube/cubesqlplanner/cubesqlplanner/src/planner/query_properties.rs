@@ -913,6 +913,7 @@ impl QueryProperties {
                             FilterOperator::BeforeOrOnDate,
                             to_value,
                             itm.use_raw_values(),
+                            self.query_tools.query_tools().clone(),
                             None,
                         )?));
                     }
@@ -939,6 +940,7 @@ impl QueryProperties {
                             FilterOperator::AfterOrOnDate,
                             from_value,
                             itm.use_raw_values(),
+                            self.query_tools.query_tools().clone(),
                             None,
                         )?));
                     }
@@ -1073,6 +1075,7 @@ impl QueryProperties {
                             operator.clone(),
                             values,
                             use_raw_values,
+                            self.query_tools.query_tools().clone(),
                             // FIXME: late compilation — only needed to recompile a
                             // to_date rolling-window granularity here.
                             Some(&mut self.query_tools.compiler().borrow_mut()),
