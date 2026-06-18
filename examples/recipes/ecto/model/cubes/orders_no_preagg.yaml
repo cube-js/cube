@@ -1,0 +1,54 @@
+---
+cubes:
+  - name: orders_no_preagg
+    description: Orders cube WITHOUT pre-aggregations for performance comparison
+    title: Orders (No Pre-Aggregation)
+    sql_table: public.order
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+
+      - name: market_code
+        type: string
+        sql: market_code
+
+      - name: brand_code
+        type: string
+        sql: brand_code
+
+      - name: updated_at
+        type: time
+        sql: updated_at
+
+      - name: inserted_at
+        type: time
+        sql: inserted_at
+
+    measures:
+      - name: count
+        type: count
+        description: Total number of orders
+
+      - name: total_amount_sum
+        type: sum
+        sql: total_amount
+        description: Sum of total amounts
+
+      - name: tax_amount_sum
+        type: sum
+        sql: tax_amount
+        description: Sum of tax amounts
+
+      - name: subtotal_amount_sum
+        type: sum
+        sql: subtotal_amount
+        description: Sum of subtotal amounts
+
+      - name: customer_id_distinct
+        type: count_distinct
+        sql: customer_id
+        description: Distinct customer count

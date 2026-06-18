@@ -40,10 +40,8 @@ struct PgCatalogTypeBuilder {
     typelem: UInt32Builder,
     typarray: UInt32Builder,
     typinput: StringBuilder,
-    // TODO: Check
     typoutput: StringBuilder,
-    // In real tables, it's an additional type, but in pg_proc it's an oid
-    typreceive: UInt32Builder,
+    typreceive: StringBuilder,
     typsend: StringBuilder,
     typmodin: StringBuilder,
     typmodout: StringBuilder,
@@ -82,10 +80,8 @@ impl PgCatalogTypeBuilder {
             typsubscript: StringBuilder::new(capacity),
             typelem: UInt32Builder::new(capacity),
             typarray: UInt32Builder::new(capacity),
-            // In real tables, it's an additional type, but in pg_proc it's an oid
-            typreceive: UInt32Builder::new(capacity),
+            typreceive: StringBuilder::new(capacity),
             typinput: StringBuilder::new(capacity),
-            // TODO: Check
             typoutput: StringBuilder::new(capacity),
             typsend: StringBuilder::new(capacity),
             typmodin: StringBuilder::new(capacity),
@@ -121,11 +117,10 @@ impl PgCatalogTypeBuilder {
         self.typsubscript.append_value(typ.typsubscript).unwrap();
         self.typelem.append_value(typ.typelem).unwrap();
         self.typarray.append_value(typ.typarray).unwrap();
-        self.typreceive.append_value(typ.typreceive_oid).unwrap();
+        self.typreceive.append_value(typ.typreceive).unwrap();
         self.typinput.append_value(typ.get_typinput()).unwrap();
-        // TODO: Check
-        self.typoutput.append_null().unwrap();
-        self.typsend.append_null().unwrap();
+        self.typoutput.append_value(typ.get_typoutput()).unwrap();
+        self.typsend.append_value(typ.get_typsend()).unwrap();
         self.typmodin.append_null().unwrap();
         self.typmodout.append_null().unwrap();
         self.typanalyze.append_null().unwrap();
@@ -212,14 +207,13 @@ impl PgCatalogTypeProvider {
                 typsubscript: "-",
                 typelem: 0,
                 typarray: table.array_handler_oid,
-                // TODO Verify
                 typalign: "i",
                 typstorage: "x",
                 typbasetype: 0,
-                // TODO Verify
-                typreceive: "",
-                // TODO: Get from pg_proc
+                typreceive: "record_recv",
                 typreceive_oid: 0,
+                typsend: "record_send",
+                typoutput: "record_out",
             });
 
             builder.add_type(&PgType {
@@ -238,14 +232,13 @@ impl PgCatalogTypeProvider {
                 typsubscript: "array_subscript_handler",
                 typelem: table.record_oid,
                 typarray: 0,
-                // TODO Verify
                 typalign: "d",
                 typstorage: "x",
                 typbasetype: 0,
-                // TODO Verify
-                typreceive: "",
-                // TODO: Get from pg_proc
+                typreceive: "array_recv",
                 typreceive_oid: 0,
+                typsend: "array_send",
+                typoutput: "array_out",
             });
         }
 
@@ -283,11 +276,9 @@ impl TableProvider for PgCatalogTypeProvider {
             Field::new("typelem", DataType::UInt32, true),
             Field::new("typarray", DataType::UInt32, true),
             Field::new("typinput", DataType::Utf8, false),
-            // TODO: Check
-            Field::new("typoutput", DataType::Utf8, true),
-            // In real tables, it's an additional type, but in pg_proc it's an oid
-            Field::new("typreceive", DataType::UInt32, true),
-            Field::new("typsend", DataType::Utf8, true),
+            Field::new("typoutput", DataType::Utf8, false),
+            Field::new("typreceive", DataType::Utf8, false),
+            Field::new("typsend", DataType::Utf8, false),
             Field::new("typmodin", DataType::Utf8, true),
             Field::new("typmodout", DataType::Utf8, true),
             Field::new("typanalyze", DataType::Utf8, true),

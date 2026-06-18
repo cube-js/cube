@@ -1,0 +1,109 @@
+cubes:
+  - name: datatypes_test
+    sql_table: public.datatypes_test_table
+
+    title: Data Types Test Cube
+    description: Cube for testing all supported Arrow data types
+
+    dimensions:
+      - name: an_id
+        type: number
+        primary_key: true
+        sql: id
+      # Integer types
+      - name: int8_col
+        sql: int8_val
+        type: number
+        meta:
+          arrow_type: int8
+
+      - name: int16_col
+        sql: int16_val
+        type: number
+        meta:
+          arrow_type: int16
+
+      - name: int32_col
+        sql: int32_val
+        type: number
+        meta:
+          arrow_type: int32
+
+      - name: int64_col
+        sql: int64_val
+        type: number
+        meta:
+          arrow_type: int64
+
+      # Unsigned integer types
+      - name: uint8_col
+        sql: uint8_val
+        type: number
+        meta:
+          arrow_type: uint8
+
+      - name: uint16_col
+        sql: uint16_val
+        type: number
+        meta:
+          arrow_type: uint16
+
+      - name: uint32_col
+        sql: uint32_val
+        type: number
+        meta:
+          arrow_type: uint32
+
+      - name: uint64_col
+        sql: uint64_val
+        type: number
+        meta:
+          arrow_type: uint64
+
+      # Float types
+      - name: float32_col
+        sql: float32_val
+        type: number
+        meta:
+          arrow_type: float32
+
+      - name: float64_col
+        sql: float64_val
+        type: number
+        meta:
+          arrow_type: float64
+
+      # Boolean
+      - name: bool_col
+        sql: bool_val
+        type: boolean
+
+      # String
+      - name: string_col
+        sql: string_val
+        type: string
+
+      # Date/Time types
+      - name: date_col
+        sql: date_val
+        type: time
+        meta:
+          arrow_type: date32
+
+      - name: timestamp_col
+        sql: timestamp_val
+        type: time
+        meta:
+          arrow_type: timestamp
+
+    measures:
+      - name: count
+        type: count
+
+      - name: int32_sum
+        type: sum
+        sql: int32_val
+
+      - name: float64_avg
+        type: avg
+        sql: float64_val

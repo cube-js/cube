@@ -5,7 +5,8 @@ use crate::{
         engine::{
             df::{
                 optimizers::{
-                    FilterPushDown, FilterSplitMeta, LimitPushDown, PlanNormalize, SortPushDown,
+                    CrossJoinToLeftJoin, FilterPushDown, FilterSplitMeta, LimitPushDown,
+                    PlanNormalize, SortPushDown,
                 },
                 planner::CubeQueryPlanner,
                 scan::CubeScanNode,
@@ -143,6 +144,8 @@ pub trait QueryEngine {
 
         let optimizer_config = OptimizerConfig::new();
         let optimizers: Vec<Arc<dyn OptimizerRule + Sync + Send>> = vec![
+            // Convert Filter(CrossJoin) back to LEFT JOIN for pg_catalog queries
+            Arc::new(CrossJoinToLeftJoin::new()),
             Arc::new(PlanNormalize::new(&cube_ctx)),
             Arc::new(ProjectionDropOut::new()),
             Arc::new(FilterPushDown::new()),

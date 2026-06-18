@@ -1,0 +1,16 @@
+services:
+  postgresql:
+    container_name: cube_postgresql
+    image: docker.io/postgres:alpine
+    restart: always
+    command: -c 'max_connections=1024' -c 'shared_buffers=32GB'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - 8432:5432
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+
+volumes:
+  postgresql:
