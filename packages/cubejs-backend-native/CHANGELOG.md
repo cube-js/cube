@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.60](https://github.com/cube-js/cube/compare/v1.6.59...v1.6.60) (2026-06-18)
+
+### Bug Fixes
+
+- **tesseract:** memory leaks in the native planner ([#11120](https://github.com/cube-js/cube/issues/11120)) ([6eb7afa](https://github.com/cube-js/cube/commit/6eb7afab5ad8f5e62a22a78b7097e23a8531c7d5))
+
 ## [1.6.59](https://github.com/cube-js/cube/compare/v1.6.58...v1.6.59) (2026-06-17)
 
 **Note:** Version bump only for package @cubejs-backend/native

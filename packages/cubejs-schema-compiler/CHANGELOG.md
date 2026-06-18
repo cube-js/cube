@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.60](https://github.com/cube-js/cube/compare/v1.6.59...v1.6.60) (2026-06-18)
+
+### Bug Fixes
+
+- **tesseract:** memory leaks in the native planner ([#11120](https://github.com/cube-js/cube/issues/11120)) ([6eb7afa](https://github.com/cube-js/cube/commit/6eb7afab5ad8f5e62a22a78b7097e23a8531c7d5))
+
+### Features
+
+- **cubesql:** Support `ILIKE` SQL push down for BigQuery ([#11112](https://github.com/cube-js/cube/issues/11112)) ([73b7805](https://github.com/cube-js/cube/commit/73b78050395b58e706e344974671f3622b35ad0c))
+
 ## [1.6.59](https://github.com/cube-js/cube/compare/v1.6.58...v1.6.59) (2026-06-17)
 
 ### Performance Improvements

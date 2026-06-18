@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.60](https://github.com/cube-js/cube/compare/v1.6.59...v1.6.60) (2026-06-18)
+
+### Bug Fixes
+
+- **cubesql:** Normalize BETWEEN timestamp/date bounds ([#11104](https://github.com/cube-js/cube/issues/11104)) ([455de8f](https://github.com/cube-js/cube/commit/455de8fe3656b42c3080cf5452b4d33c4c7c9eeb))
+
+### Features
+
+- **cubesql:** Support `ILIKE` SQL push down for BigQuery ([#11112](https://github.com/cube-js/cube/issues/11112)) ([73b7805](https://github.com/cube-js/cube/commit/73b78050395b58e706e344974671f3622b35ad0c))
+
 ## [1.6.59](https://github.com/cube-js/cube/compare/v1.6.58...v1.6.59) (2026-06-17)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
