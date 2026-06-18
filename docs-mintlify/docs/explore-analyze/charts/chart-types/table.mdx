@@ -74,7 +74,17 @@ The URL must be publicly accessible without authentication.
 
 ### Inline bars
 
-Display a numeric column as a proportional bar by setting **Display as** to **Bar**. Bars scale relative to the max value in the column. Columns with negative values will split the bar in both directions.
+Display a numeric column as a proportional in-cell bar. In the column's per-column section on the **Style** tab, use the **Render as** control to add a bar. Each bar's length reflects the value's magnitude within the column's range.
+
+| Option | Description |
+|---|---|
+| **Render as** | Choose **Value**, **Bar**, or both. Checking **Bar** reveals the bar options below; keeping **Value** checked shows the number alongside the bar (uncheck it for a bar-only cell). |
+| **Positive bar color** | Fill color for non-negative bars |
+| **Negative bar color** | Fill color for negative bars (used when the column contains both positive and negative values) |
+| **Bar scale** | **Auto** anchors each bar at zero and scales to the column's largest value, so even the smallest value still shows a bar; **Manual** scales against the bounds you set |
+| **Lower / Higher bound** | The minimum and maximum (in the column's raw units) used when **Bar scale** is **Manual**. Pre-filled to match the Auto range, so switching modes doesn't shift the bars. |
+
+When a column contains both positive and negative values, bars are drawn in both directions from a centered zero baseline — positive values to the right, negative to the left — using the positive and negative bar colors. Values outside the scale are clamped to a full or empty bar, but the displayed number is always the true value.
 
 {/* TODO screenshot: table with inline bar column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
