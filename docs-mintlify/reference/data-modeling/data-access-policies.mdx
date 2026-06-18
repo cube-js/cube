@@ -242,16 +242,16 @@ for the policy to take effect:
 
 ```yaml title="YAML"
 conditions:
-  - if: "{ not securityContext.is_blocked }"
-  - if: "{ securityContext.is_admin or securityContext.is_EMEA_based }"
-  - if: "{ securityContext.groups.includes('admins') }"
+  - if: "{ not userAttributes.is_blocked }"
+  - if: "{ userAttributes.is_admin or userAttributes.is_EMEA_based }"
+  - if: "{ userAttributes.groups.includes('admins') }"
 ```
 
 ```javascript title="JavaScript"
 conditions: [
-  { if: !securityContext.is_blocked },
-  { if: securityContext.is_admin || securityContext.is_EMEA_based },
-  { if: securityContext.groups.includes(`admins`) }
+  { if: !userAttributes.is_blocked },
+  { if: userAttributes.is_admin || userAttributes.is_EMEA_based },
+  { if: userAttributes.groups.includes(`admins`) }
 ]
 ```
 
