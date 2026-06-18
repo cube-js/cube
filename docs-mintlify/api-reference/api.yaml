@@ -23,9 +23,23 @@ tags:
   - name: Workbooks
   - name: Notifications
   - name: Workspace
+  - name: App Theme
   - name: Embed
   - name: Embed Tenants
 paths:
+  /v1/app-config:
+    get:
+      operationId: getAppConfig
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppConfigResponse'
+          description: ''
+      summary: Get app config
+      tags:
+        - App Theme
   /v1/deployments:
     get:
       operationId: getDeployments
@@ -503,10 +517,87 @@ paths:
             oneOf:
               - minimum: 1
                 type: integer
+                description: >-
+                  Optional filter: only return notifications for this numeric dashboard id. Provide
+                  this OR dashboardPublicId, not both.
               - type: 'null'
             type: integer
             minimum: 1
-          description: 'Optional filter: only return notifications for this dashboard id.'
+          description: >-
+            Optional filter: only return notifications for this numeric dashboard id. Provide this
+            OR `dashboardPublicId`, not both.
+        - in: query
+          name: dashboardPublicId
+          required: false
+          schema:
+            oneOf:
+              - type: string
+                description: >-
+                  Optional filter: only return notifications for this dashboard public id. Provide
+                  this OR dashboardId, not both.
+              - type: 'null'
+            type: string
+          description: >-
+            Optional filter: only return notifications for this dashboard public id. Provide this OR
+            `dashboardId`, not both.
+        - in: query
+          name: recipientUserId
+          required: false
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+                description: >-
+                  Optional filter: only return notifications received by this user, by user id.
+                  Mutually exclusive with recipientEmail and the embed-user filter.
+              - type: 'null'
+            type: integer
+            minimum: 1
+          description: >-
+            Optional filter: only return notifications received by this user, by user id. Mutually
+            exclusive with `recipientEmail` and the embed-user filter.
+        - in: query
+          name: recipientEmail
+          required: false
+          schema:
+            oneOf:
+              - type: string
+                description: >-
+                  Optional filter: only return notifications received by this user, by email.
+                  Mutually exclusive with recipientUserId and the embed-user filter.
+              - type: 'null'
+            type: string
+          description: >-
+            Optional filter: only return notifications received by this user, by email. Mutually
+            exclusive with `recipientUserId` and the embed-user filter.
+        - in: query
+          name: recipientEmbedTenantName
+          required: false
+          schema:
+            oneOf:
+              - type: string
+                description: >-
+                  Optional filter: only return notifications received by this embed user. Required
+                  together with recipientExternalId; mutually exclusive with the user filters.
+              - type: 'null'
+            type: string
+          description: >-
+            Optional filter: only return notifications received by this embed user. Required
+            together with `recipientExternalId`; mutually exclusive with the user filters.
+        - in: query
+          name: recipientExternalId
+          required: false
+          schema:
+            oneOf:
+              - type: string
+                description: >-
+                  Optional filter: only return notifications received by this embed user. Required
+                  together with recipientEmbedTenantName; mutually exclusive with the user filters.
+              - type: 'null'
+            type: string
+          description: >-
+            Optional filter: only return notifications received by this embed user. Required
+            together with `recipientEmbedTenantName`; mutually exclusive with the user filters.
         - in: query
           name: first
           required: false
@@ -540,8 +631,11 @@ paths:
 
           Returns the deployment’s scheduled notifications (recurring dashboard runs), ordered by
           creation time (newest first) and cursor-paginated. Optionally filter to a single dashboard
-          with `dashboardId`. Each item describes the schedule only; recipients are managed through
-          the `/recipients` sub-resource.
+          with either `dashboardId` (numeric) or `dashboardPublicId` (string), and/or to the
+          notifications a single recipient receives — a user (`recipientUserId` or `recipientEmail`)
+          or an embed user (`recipientEmbedTenantName` + `recipientExternalId`). At most one
+          identifier per dashboard/recipient dimension. Each item describes the schedule only;
+          recipients are managed through the `/recipients` sub-resource.
     post:
       operationId: createNotification
       parameters:
@@ -577,9 +671,10 @@ paths:
           Creates a scheduled notification — a recurring run of a dashboard whose rendered result is
           delivered to its recipients. The cadence is set by `scheduleType` plus the relevant time
           fields (`minute`, `hour`, `dayOfWeek`, `dayOfMonth`) or a raw `customCron` expression when
-          `scheduleType` is `CUSTOM`; `timezone` defaults to UTC. The target `dashboardId` must
-          belong to this deployment, otherwise `404` is returned. The created notification has no
-          recipients — add them via `POST /notifications/{id}/recipients`.
+          `scheduleType` is `CUSTOM`; `timezone` defaults to UTC. Identify the target dashboard with
+          either `dashboardId` (numeric) or `dashboardPublicId` (string) — supply exactly one; it
+          must belong to this deployment, otherwise `404` is returned. The created notification has
+          no recipients — add them via `POST /notifications/{id}/recipients`.
   /v1/deployments/{deploymentId}/notifications/{id}:
     delete:
       operationId: deleteNotification
@@ -1104,11 +1199,12 @@ paths:
       x-mint:
         content: >-
           List the workspace items (folders, workbooks, reports) that have been shared with embed
-          users via the built-in `all_embed_users` group.
+          users via the built-in "All embed users" group or the caller's per-embed-tenant
+          `system:tenant:{embedTenantName}` group.
 
 
-          Unlike `GET /workspace`, this feed is not per-user: every valid embed caller for the
-          deployment sees the same set, scoped to what the built-in group has been granted. Owner
+          Unlike `GET /workspace`, this feed is not per-user: every valid embed caller from the same
+          embed tenant sees the same set, scoped to what those groups have been granted. Owner
           identities are blanked out so they are not exposed to embed users.
 
 
@@ -1334,6 +1430,13 @@ paths:
           required: true
           schema:
             type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DuplicateWorkbookInput'
+        description: DuplicateWorkbookInput
+        required: false
       responses:
         '200':
           content:
@@ -1358,6 +1461,16 @@ paths:
 
           Requires **read** access to the source workbook and the **AI BI User** role (or higher).
           The new workbook is owned by the calling user.
+
+
+          Creator-mode embed sessions can also clone a workbook from the **shared workspace** (the
+          items listed by `GET /shared-workspace`) by passing `{ "shared": true }` in the request
+          body — `workbookId` is then resolved against the shared workspace instead of the caller's
+          own. Such a clone is built from the workbook's **published dashboard**: a fresh report is
+          created per report snapshot, the dashboard is re-published onto the new workbook, and the
+          same config seeds the workbook's draft — the source's live reports and unpublished draft
+          are not copied. The clone is placed at the workspace root. Requires the workbook to have a
+          published dashboard (`400` otherwise); `403` for non-creator-mode callers.
 
 
           If the deployment's plan enforces a workbook limit and it has been reached, the request is
@@ -1777,6 +1890,79 @@ components:
       required:
         - recipients
       type: object
+    AppConfigResponse:
+      properties:
+        appTheme:
+          oneOf:
+            - $ref: '#/components/schemas/AppTheme'
+            - type: 'null'
+        applyThemeGlobally:
+          type: boolean
+        creatorMode:
+          oneOf:
+            - $ref: '#/components/schemas/CreatorMode'
+            - type: 'null'
+      required:
+        - applyThemeGlobally
+      type: object
+    AppTheme:
+      properties:
+        dark:
+          $ref: '#/components/schemas/AppThemeScheme'
+        light:
+          $ref: '#/components/schemas/AppThemeScheme'
+        typography:
+          oneOf:
+            - $ref: '#/components/schemas/AppThemeTypography'
+            - type: 'null'
+      required:
+        - light
+        - dark
+      type: object
+    AppThemeFontRef:
+      properties:
+        fontRef:
+          type: string
+        fontWeight:
+          type: number
+      required:
+        - fontRef
+        - fontWeight
+      type: object
+    AppThemeScheme:
+      properties:
+        accentColor:
+          type: string
+        backgroundColor:
+          type: string
+        contrast:
+          type: number
+        foregroundColor:
+          type: string
+        logoUrl:
+          type: string
+      required:
+        - accentColor
+        - backgroundColor
+        - foregroundColor
+        - contrast
+        - logoUrl
+      type: object
+    AppThemeTypography:
+      properties:
+        body:
+          $ref: '#/components/schemas/AppThemeFontRef'
+        fonts:
+          items:
+            $ref: '#/components/schemas/ThemeFont'
+          type: array
+        heading:
+          $ref: '#/components/schemas/AppThemeFontRef'
+      required:
+        - fonts
+        - body
+        - heading
+      type: object
     ColumnFormatOverride:
       properties:
         decimalPlaces:
@@ -1897,8 +2083,19 @@ components:
               description: Custom cron expression (required if scheduleType is CUSTOM)
             - type: 'null'
         dashboardId:
-          description: Dashboard to run on the schedule
-          type: integer
+          oneOf:
+            - type: integer
+              description: >-
+                Numeric id of the dashboard to run on the schedule. Provide this OR
+                dashboardPublicId (exactly one).
+            - type: 'null'
+        dashboardPublicId:
+          oneOf:
+            - type: string
+              description: >-
+                Public id of the dashboard to run on the schedule. Provide this OR dashboardId
+                (exactly one).
+            - type: 'null'
         dayOfMonth:
           oneOf:
             - type: integer
@@ -1908,6 +2105,15 @@ components:
           oneOf:
             - type: integer
               description: Day of week (0-6, Sunday=0)
+            - type: 'null'
+        filters:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardFilterInput'
+              type: array
+              description: >-
+                Dimension filters applied to the dashboard when the notification is rendered
+                (substituted into the screenshot/PDF for every recipient).
             - type: 'null'
         hour:
           oneOf:
@@ -1929,13 +2135,19 @@ components:
             - type: 'null'
         scheduleType:
           $ref: '#/components/schemas/CreateNotificationInputScheduleType'
+        timeGrains:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardTimeGrainInput'
+              type: array
+              description: Time-grain overrides applied to the dashboard when the notification is rendered.
+            - type: 'null'
         timezone:
           oneOf:
             - type: string
               description: Timezone for the schedule (e.g. "America/New_York")
             - type: 'null'
       required:
-        - dashboardId
         - scheduleType
       type: object
     CreateNotificationInputNotificationFormat:
@@ -2044,6 +2256,17 @@ components:
         - ready
         - demo
       type: string
+    CreatorMode:
+      properties:
+        showWorkspaceTitle:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        workspaceTitle:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
     Dashboard:
       properties:
         allowEmbed:
@@ -2059,6 +2282,10 @@ components:
         description:
           oneOf:
             - type: string
+            - type: 'null'
+        fromSharedWorkspace:
+          oneOf:
+            - type: boolean
             - type: 'null'
         id:
           type: integer
@@ -2255,6 +2482,113 @@ components:
         - published
         - archived
       type: string
+    DashboardFilter:
+      properties:
+        caseSensitive:
+          oneOf:
+            - {}
+            - type: 'null'
+        endInclusive:
+          oneOf:
+            - {}
+            - type: 'null'
+        member:
+          type: string
+        operator:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardFilterOperator'
+            - type: 'null'
+        startInclusive:
+          oneOf:
+            - {}
+            - type: 'null'
+        value:
+          oneOf:
+            - oneOf:
+                - type: string
+                - type: number
+                - type: boolean
+                - type: array
+                  items: {}
+            - type: 'null'
+      required:
+        - member
+      type: object
+    DashboardFilterInput:
+      properties:
+        caseSensitive:
+          oneOf:
+            - description: 'For string filters: whether matching is case-sensitive'
+            - type: 'null'
+        endInclusive:
+          oneOf:
+            - description: 'For between filters: whether the end bound is inclusive'
+            - type: 'null'
+        member:
+          description: Dimension path, e.g. "Orders.status"
+          pattern: .+\..+
+          type: string
+        operator:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardFilterInputOperator'
+            - type: 'null'
+        startInclusive:
+          oneOf:
+            - description: 'For between filters: whether the start bound is inclusive'
+            - type: 'null'
+        value:
+          oneOf:
+            - description: >-
+                Filter value. Omit for is_null / is_not_null; provide a 2-element [start, end] array
+                for between.
+              oneOf:
+                - type: string
+                - type: number
+                - type: boolean
+                - type: array
+                  items: {}
+            - type: 'null'
+      required:
+        - member
+      type: object
+    DashboardFilterInputOperator:
+      enum:
+        - equals
+        - not_equals
+        - greater_than
+        - greater_than_or_equal
+        - less_than
+        - less_than_or_equal
+        - contains
+        - not_contains
+        - starts_with
+        - not_starts_with
+        - ends_with
+        - not_ends_with
+        - is_null
+        - is_not_null
+        - between
+        - custom
+      type: string
+    DashboardFilterOperator:
+      enum:
+        - equals
+        - not_equals
+        - greater_than
+        - greater_than_or_equal
+        - less_than
+        - less_than_or_equal
+        - contains
+        - not_contains
+        - starts_with
+        - not_starts_with
+        - ends_with
+        - not_ends_with
+        - is_null
+        - is_not_null
+        - between
+        - custom
+      type: string
     DashboardLayout:
       properties:
         breakpoints:
@@ -2396,6 +2730,29 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    DashboardTimeGrain:
+      properties:
+        grain:
+          type: string
+        member:
+          type: string
+      required:
+        - member
+        - grain
+      type: object
+    DashboardTimeGrainInput:
+      properties:
+        grain:
+          description: Granularity, e.g. "day", "week", "month"
+          type: string
+        member:
+          description: Time dimension path, e.g. "Orders.created_at"
+          pattern: .+\..+
+          type: string
+      required:
+        - member
+        - grain
       type: object
     DashboardWidget:
       properties:
@@ -2681,6 +3038,13 @@ components:
         - offset
         - limit
       type: object
+    DuplicateWorkbookInput:
+      properties:
+        shared:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
     EmbedTheme:
       properties:
         analyticsChat:
@@ -2843,7 +3207,7 @@ components:
             - type: 'null'
         embedTenantName:
           oneOf:
-            - pattern: ^[a-z][a-z0-9-]{3,34}[a-z0-9]$
+            - pattern: ^[a-z][a-z0-9-]{0,34}[a-z0-9]$
               type: string
             - type: 'null'
         embedTheme:
@@ -2990,6 +3354,13 @@ components:
           type: integer
         deploymentId:
           type: integer
+        filters:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardFilter'
+              type: array
+              description: Dimension filters applied when the notification is rendered.
+            - type: 'null'
         humanReadableSchedule:
           description: Human-readable description of the cron schedule
           type: string
@@ -3001,6 +3372,13 @@ components:
           type: boolean
         notificationFormat:
           type: string
+        timeGrains:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardTimeGrain'
+              type: array
+              description: Time-grain overrides applied when the notification is rendered.
+            - type: 'null'
         timezone:
           type: string
       required:
@@ -3615,6 +3993,27 @@ components:
         - name
         - actions
       type: object
+    ThemeFont:
+      properties:
+        family:
+          oneOf:
+            - type: string
+            - type: 'null'
+        format:
+          type: string
+        id:
+          type: string
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        url:
+          type: string
+      required:
+        - id
+        - url
+        - format
+      type: object
     UpdateFolderInput:
       properties:
         name:
@@ -3641,6 +4040,15 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        filters:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardFilterInput'
+              type: array
+              description: >-
+                Dimension filters applied to the dashboard when the notification is rendered.
+                Replaces the existing set when provided.
+            - type: 'null'
         hour:
           oneOf:
             - type: integer
@@ -3665,6 +4073,15 @@ components:
         scheduleType:
           oneOf:
             - $ref: '#/components/schemas/UpdateNotificationInputScheduleType'
+            - type: 'null'
+        timeGrains:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardTimeGrainInput'
+              type: array
+              description: >-
+                Time-grain overrides applied to the dashboard when the notification is rendered.
+                Replaces the existing set when provided.
             - type: 'null'
         timezone:
           oneOf:
@@ -4003,6 +4420,10 @@ components:
               type: string
             - format: date-time
               type: string
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/ResourceOwner'
+            - type: 'null'
         userId:
           oneOf:
             - type: number
