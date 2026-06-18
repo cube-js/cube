@@ -28,7 +28,7 @@ jobs:
       matrix:
         rust: [nightly-2025-08-01]
     container:
-      image: cubejs/rust-builder:bookworm-llvm-18
+      image: cubejs/rust-builder:trixie-llvm-22
     env:
       RUST: ${{ matrix.rust }}
     steps:
@@ -150,7 +150,7 @@ jobs:
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
-        run: choco install -y --force llvm --version 18.1.6
+        run: choco install -y --force llvm --version 22.1.0
       - name: Set Env Variables for Windows
         uses: allenevans/set-env@v4.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
