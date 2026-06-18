@@ -67,6 +67,7 @@ const BRIDGES: BridgeSpec[] = [
     name: 'baseTools',
     expected: [
       'all_cube_members',
+      'compile_member_sql',
       'driver_tools',
       'get_allocated_params',
       'get_pre_aggregation_by_name',
