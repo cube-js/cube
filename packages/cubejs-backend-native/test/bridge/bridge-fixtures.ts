@@ -248,6 +248,13 @@ export const baseToolsFixture = (): unknown => ({
   getPreAggregationByName: () => preAggregationObjFixture(),
   preAggregationTableName: () => 'pre_aggr_table',
   joinTreeForHints: () => joinDefinitionFixture(),
+  compileMemberSql: () => ({
+    template: '',
+    symbolPaths: [],
+    filterParams: [],
+    filterGroups: [],
+    securityContextValues: [],
+  }),
 });
 
 export const baseQueryOptionsFixture = (): unknown => ({

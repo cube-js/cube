@@ -27,6 +27,7 @@ impl ToSql for BaseFilter {
             {
                 return self.typed_filter().to_sql_for_filter_params(
                     filter_params_column,
+                    &query_tools,
                     templates,
                     filters_ctx,
                 );

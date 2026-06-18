@@ -1,4 +1,4 @@
-use super::query_tools::QueryTools;
+use super::state::State;
 use super::top_level_planner::TopLevelPlanner;
 use super::{QueryProperties, QueryPropertiesCompiler};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
@@ -32,7 +32,7 @@ struct GroupedPreAggregationInfo {
 
 pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     request: Rc<QueryProperties>,
     cubestore_support_multistage: bool,
 }
@@ -46,7 +46,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             .static_data()
             .cubestore_support_multistage
             .unwrap_or(false);
-        let query_tools = QueryTools::try_new(
+        let query_tools = State::try_new(
             options.cube_evaluator()?,
             options.security_context()?,
             options.base_tools()?,

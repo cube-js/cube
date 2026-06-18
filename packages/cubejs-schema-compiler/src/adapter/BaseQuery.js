@@ -5119,6 +5119,16 @@ export class BaseQuery {
     };
   }
 
+  // Invoked from the native planner to compile a member's `sql` function: runs
+  // it under recording proxies and returns the produced template plus the
+  // dependencies it touched. The recording logic is a standalone, stateless
+  // module so it can be unit-tested in isolation.
+  compileMemberSql(sqlFn, securityContext, argNames) {
+    // eslint-disable-next-line global-require
+    const { compileMemberSql } = require('./MemberSqlTemplateCompiler');
+    return compileMemberSql(sqlFn, argNames, securityContext, this.sqlUtilsForRust());
+  }
+
   contextSymbolsProxy(symbols) {
     return CubeSymbols.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
   }

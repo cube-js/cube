@@ -135,11 +135,12 @@ fn test_filter_simple_collapsed() {
     let symbol = ctx.create_symbol("visitors.source").unwrap();
 
     let filter = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Equal,
         Some(vec![Some("google".to_string())]),
+        None,
     )
     .unwrap();
 
@@ -154,11 +155,12 @@ fn test_filter_simple_expanded() {
     let symbol = ctx.create_symbol("visitors.source").unwrap();
 
     let filter = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Equal,
         Some(vec![Some("google".to_string())]),
+        None,
     )
     .unwrap();
 
@@ -174,20 +176,22 @@ fn test_filter_group_and_collapsed() {
     let id_symbol = ctx.create_symbol("visitors.id").unwrap();
 
     let filter1 = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         source_symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Equal,
         Some(vec![Some("google".to_string())]),
+        None,
     )
     .unwrap();
 
     let filter2 = BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         id_symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Gt,
         Some(vec![Some("100".to_string())]),
+        None,
     )
     .unwrap();
 

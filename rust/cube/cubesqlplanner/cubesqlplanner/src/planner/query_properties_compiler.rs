@@ -19,7 +19,7 @@ use super::filter::compiler::FilterCompiler;
 use super::filter::{BaseSegment, FilterItem};
 use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
-use super::query_tools::QueryTools;
+use super::state::State;
 use super::{
     Compiler, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
     TimeDimensionSymbol,
@@ -28,11 +28,11 @@ use super::{
 /// One-shot translator from [`BaseQueryOptions`] into a finalized
 /// [`QueryProperties`].
 pub struct QueryPropertiesCompiler {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
 }
 
 impl QueryPropertiesCompiler {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(query_tools: Rc<State>) -> Self {
         Self { query_tools }
     }
 
@@ -41,7 +41,7 @@ impl QueryPropertiesCompiler {
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Rc<QueryProperties>, CubeError> {
         let options = options.as_ref();
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
         let dimensions = self.compile_dimensions(&mut evaluator_compiler, options)?;
@@ -391,7 +391,8 @@ impl QueryPropertiesCompiler {
         time_dimensions: &[Rc<MemberSymbol>],
         measures: &[Rc<MemberSymbol>],
     ) -> Result<(Vec<FilterItem>, Vec<FilterItem>, Vec<FilterItem>), CubeError> {
-        let mut filter_compiler = FilterCompiler::new(evaluator_compiler, self.query_tools.clone());
+        let mut filter_compiler =
+            FilterCompiler::new(evaluator_compiler, self.query_tools.query_tools().clone());
         if let Some(filters) = &options.static_data().filters {
             for filter in filters {
                 filter_compiler.add_item(filter)?;

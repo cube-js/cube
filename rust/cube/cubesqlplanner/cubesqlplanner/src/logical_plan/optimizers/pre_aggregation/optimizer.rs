@@ -7,7 +7,7 @@ use crate::planner::filter::FilterOp;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::time_dimension::QueryDateTime;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -35,14 +35,14 @@ impl PreAggregationUsage {
 }
 
 pub struct PreAggregationOptimizer {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     allow_multi_stage: bool,
     usages: Vec<PreAggregationUsage>,
     usage_counter: usize,
 }
 
 impl PreAggregationOptimizer {
-    pub fn new(query_tools: Rc<QueryTools>, allow_multi_stage: bool) -> Self {
+    pub fn new(query_tools: Rc<State>, allow_multi_stage: bool) -> Self {
         Self {
             query_tools,
             allow_multi_stage,
@@ -431,7 +431,7 @@ impl PreAggregationOptimizer {
 
     fn extract_date_range(
         filter: &LogicalFilter,
-        query_tools: &Rc<QueryTools>,
+        query_tools: &Rc<State>,
         time_shifts: &TimeShiftState,
         external: bool,
     ) -> Option<(String, String)> {
@@ -590,7 +590,8 @@ impl PreAggregationOptimizer {
         segments: &Vec<FilterItem>,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<MatchState, CubeError> {
-        let mut matcher = DimensionMatcher::new(self.query_tools.clone(), pre_aggregation);
+        let mut matcher =
+            DimensionMatcher::new(self.query_tools.query_tools().clone(), pre_aggregation);
         matcher.try_match(
             dimensions,
             time_dimensions,

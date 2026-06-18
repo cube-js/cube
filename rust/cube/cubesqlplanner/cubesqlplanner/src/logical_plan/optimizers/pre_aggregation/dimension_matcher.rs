@@ -359,7 +359,7 @@ mod tests {
         let pre_agg = compiler.compile_pre_aggregation(&name).unwrap();
 
         let qp = ctx.create_query_properties(query_yaml).unwrap();
-        let mut matcher = DimensionMatcher::new(ctx.query_tools().clone(), &pre_agg);
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().query_tools().clone(), &pre_agg);
         matcher
             .try_match(
                 qp.dimensions(),

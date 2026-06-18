@@ -1,9 +1,19 @@
-use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::member_sql::{MemberSql, SqlTemplate, SqlTemplateArgs};
-use crate::cube_bridge::security_context::SecurityContext;
+use crate::cube_bridge::member_sql::{
+    CompiledMemberTemplate, MemberSql, SqlTemplate, SqlTemplateArgs,
+};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
+
+/// Test helper: extract the compiled `(template, args)` from a mock member sql.
+pub fn mock_compiled(sql: Rc<dyn MemberSql>) -> (SqlTemplate, SqlTemplateArgs) {
+    let c = sql
+        .as_any()
+        .downcast::<MockMemberSql>()
+        .expect("expected MockMemberSql")
+        .compiled();
+    (c.template, c.args)
+}
 
 /// Mock implementation of MemberSql for testing
 /// Parses template strings like "{CUBE.field} / {other_cube.field} + {revenue}"
@@ -164,6 +174,15 @@ impl MockMemberSql {
     }
 }
 
+impl MockMemberSql {
+    pub fn compiled(&self) -> CompiledMemberTemplate {
+        CompiledMemberTemplate {
+            template: self.template.clone(),
+            args: self.args.clone(),
+        }
+    }
+}
+
 impl MemberSql for MockMemberSql {
     fn args_names(&self) -> &Vec<String> {
         &self.args_names
@@ -171,14 +190,6 @@ impl MemberSql for MockMemberSql {
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
         self
-    }
-
-    fn compile_template_sql(
-        &self,
-        _base_tools: Rc<dyn BaseTools>,
-        _security_context: Rc<dyn SecurityContext>,
-    ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError> {
-        Ok((self.template.clone(), self.args.clone()))
     }
 }
 
@@ -314,12 +325,7 @@ mod tests {
     #[test]
     fn test_compile_template_sql() {
         let mock = Rc::new(MockMemberSql::new("{CUBE.field} / {other.field}").unwrap());
-        let (template, args) = mock
-            .compile_template_sql(
-                Rc::new(crate::test_fixtures::cube_bridge::MockBaseTools::default()),
-                Rc::new(crate::test_fixtures::cube_bridge::MockSecurityContext),
-            )
-            .unwrap();
+        let (template, args) = mock_compiled(mock);
 
         match template {
             SqlTemplate::String(s) => {
@@ -425,12 +431,7 @@ mod tests {
             MockMemberSql::pre_agg_array_refs(vec!["orders.status", "line_items.product_id"])
                 .unwrap();
 
-        let (template, args) = mock
-            .compile_template_sql(
-                Rc::new(crate::test_fixtures::cube_bridge::MockBaseTools::default()),
-                Rc::new(crate::test_fixtures::cube_bridge::MockSecurityContext),
-            )
-            .unwrap();
+        let (template, args) = mock_compiled(mock);
 
         match template {
             SqlTemplate::StringVec(vec) => {

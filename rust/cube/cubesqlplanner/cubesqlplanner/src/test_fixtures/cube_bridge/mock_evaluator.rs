@@ -8,7 +8,7 @@ use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::cube_bridge::segment_definition::SegmentDefinition;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::mock_schema::MockSchema;
-use crate::test_fixtures::cube_bridge::{MockBaseTools, MockJoinGraph, MockSecurityContext};
+use crate::test_fixtures::cube_bridge::{mock_compiled, MockJoinGraph};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -297,10 +297,7 @@ impl CubeEvaluator for MockCubeEvaluator {
         // Simple implementation for mock: extract symbol paths from compiled template
         // For YAML schemas, rollups are already provided as strings like "visitors.for_join"
         // which MockMemberSql parses into symbol_paths like [["visitors", "for_join"]]
-        let (_template, args) = sql.compile_template_sql(
-            Rc::new(MockBaseTools::default()),
-            Rc::new(MockSecurityContext),
-        )?;
+        let (_template, args) = mock_compiled(sql);
 
         // Convert symbol paths back to dot-separated strings
         Ok(args

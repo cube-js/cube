@@ -8,8 +8,8 @@ use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::filter::Filter;
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
 use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
 use crate::planner::{MemberSymbol, TimeDimensionSymbol};
@@ -24,7 +24,7 @@ use std::rc::Rc;
 /// Test context providing query tools and symbol creation helpers
 pub struct TestContext {
     schema: MockSchema,
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext>,
     /// Custom SQL templates carried over through `for_options` so that
     /// timezone-driven `MockBaseTools` rebuilds (e.g. when the caller
@@ -50,7 +50,7 @@ impl TestContext {
         let security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext> =
             Rc::new(MockSecurityContext);
 
-        let query_tools = QueryTools::try_new(
+        let query_tools = State::try_new(
             evaluator,
             security_context.clone(),
             Rc::new(base_tools),
@@ -170,7 +170,7 @@ impl TestContext {
         let security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext> =
             Rc::new(MockSecurityContext);
 
-        let query_tools = QueryTools::try_new(
+        let query_tools = State::try_new(
             evaluator,
             security_context.clone(),
             Rc::new(base_tools),
@@ -191,7 +191,7 @@ impl TestContext {
     }
 
     #[allow(dead_code)]
-    pub fn query_tools(&self) -> &Rc<QueryTools> {
+    pub fn query_tools(&self) -> &Rc<State> {
         &self.query_tools
     }
 
@@ -205,21 +205,21 @@ impl TestContext {
     #[allow(dead_code)]
     pub fn create_symbol(&self, member_path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
-            .evaluator_compiler()
+            .compiler()
             .borrow_mut()
             .add_auto_resolved_member_evaluator(member_path.to_string())
     }
 
     pub fn create_dimension(&self, path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
-            .evaluator_compiler()
+            .compiler()
             .borrow_mut()
             .add_dimension_evaluator(path.to_string())
     }
 
     pub fn create_measure(&self, path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
-            .evaluator_compiler()
+            .compiler()
             .borrow_mut()
             .add_measure_evaluator(path.to_string())
     }
@@ -236,7 +236,7 @@ impl TestContext {
             .query_tools
             .cube_evaluator()
             .segment_by_path(path.to_string())?;
-        let mut compiler = self.query_tools.evaluator_compiler().borrow_mut();
+        let mut compiler = self.query_tools.compiler().borrow_mut();
         let expression = compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = compiler.add_cube_table_evaluator(cube_name.clone(), vec![])?;
         drop(compiler);
@@ -249,7 +249,7 @@ impl TestContext {
         path: &str,
         granularity: Option<&str>,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut compiler = self.query_tools.evaluator_compiler().borrow_mut();
+        let mut compiler = self.query_tools.compiler().borrow_mut();
         let base_symbol = compiler.add_dimension_evaluator(path.to_string())?;
         let granularity = granularity.map(|g| g.to_string());
         let granularity_obj = GranularityHelper::make_granularity_obj(
@@ -270,7 +270,11 @@ impl TestContext {
     pub fn evaluate_symbol(&self, symbol: &Rc<MemberSymbol>) -> Result<String, CubeError> {
         let nodes_factory = SqlNodesFactory::default();
         let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
-        let visitor = SqlEvaluatorVisitor::new(self.query_tools.clone(), cube_ref_evaluator, None);
+        let visitor = SqlEvaluatorVisitor::new(
+            self.query_tools.query_tools().clone(),
+            cube_ref_evaluator,
+            None,
+        );
         let base_tools = self.query_tools.base_tools();
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
@@ -292,7 +296,11 @@ impl TestContext {
         nodes_factory.set_ungrouped(false);
         nodes_factory.set_group_by_members(group_by_members.into_iter().collect());
         let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
-        let visitor = SqlEvaluatorVisitor::new(self.query_tools.clone(), cube_ref_evaluator, None);
+        let visitor = SqlEvaluatorVisitor::new(
+            self.query_tools.query_tools().clone(),
+            cube_ref_evaluator,
+            None,
+        );
         let base_tools = self.query_tools.base_tools();
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
@@ -713,7 +721,7 @@ impl TestContext {
 
         let nodes_factory = SqlNodesFactory::default();
         let context = Rc::new(VisitorContext::new(
-            self.query_tools.clone(),
+            self.query_tools.query_tools().clone(),
             &nodes_factory,
             None,
         ));
@@ -732,7 +740,7 @@ impl TestContext {
     ) -> Result<(String, Vec<String>), CubeError> {
         let nodes_factory = SqlNodesFactory::default();
         let context = Rc::new(VisitorContext::new(
-            self.query_tools.clone(),
+            self.query_tools.query_tools().clone(),
             &nodes_factory,
             None,
         ));
@@ -740,11 +748,11 @@ impl TestContext {
         let driver_tools = base_tools.driver_tools(false)?;
         let templates = PlanSqlTemplates::try_new(driver_tools, false)?;
 
-        let visitor = context.make_visitor(self.query_tools.clone());
+        let visitor = context.make_visitor(self.query_tools.query_tools().clone());
         let sql = base_filter.to_sql(
             &visitor,
             context.node_processor(),
-            self.query_tools.clone(),
+            self.query_tools.query_tools().clone(),
             &templates,
             context.filters_context(),
         )?;

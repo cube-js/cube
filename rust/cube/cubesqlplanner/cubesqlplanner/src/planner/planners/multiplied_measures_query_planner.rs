@@ -5,7 +5,7 @@ use crate::planner::collectors::{
     collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
 use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
@@ -19,7 +19,7 @@ use std::rc::Rc;
 /// `AggregateMultipliedSubquery` CTEs (one per owning cube). Both
 /// kinds are registered into the shared `PlanningScope`.
 pub struct MultipliedMeasuresQueryPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
     join_planner: JoinPlanner,
     common_utils: CommonUtils,
@@ -31,7 +31,7 @@ impl MultipliedMeasuresQueryPlanner {
     /// `full_key_aggregate_measures` for later use in
     /// `plan_queries`.
     pub fn try_new(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         query_properties: Rc<QueryProperties>,
     ) -> Result<Self, CubeError> {
         let full_key_aggregate_measures = query_properties.full_key_aggregate_measures()?;

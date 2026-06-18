@@ -11,7 +11,7 @@ use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::TimeDimensionSymbol;
@@ -50,16 +50,13 @@ impl PreAggregationFullName {
 }
 
 pub struct PreAggregationsCompiler {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     descriptions: Rc<Vec<(PreAggregationFullName, Rc<dyn PreAggregationDescription>)>>,
     compiled_cache: HashMap<PreAggregationFullName, Rc<CompiledPreAggregation>>,
 }
 
 impl PreAggregationsCompiler {
-    pub fn try_new(
-        query_tools: Rc<QueryTools>,
-        cube_names: &Vec<String>,
-    ) -> Result<Self, CubeError> {
+    pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<String>) -> Result<Self, CubeError> {
         let mut descriptions = Vec::new();
         for cube_name in cube_names.iter() {
             let pre_aggregations = query_tools
@@ -144,7 +141,7 @@ impl PreAggregationsCompiler {
                 resolved.push((base_symbol, td_ref.static_data().granularity.clone()));
             }
 
-            let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+            let evaluator_compiler_cell = self.query_tools.compiler().clone();
             let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
             let mut result = Vec::new();
             for (base_symbol, granularity) in resolved {
@@ -169,7 +166,7 @@ impl PreAggregationsCompiler {
                 Self::time_dimension_symbol_from_ref(self.query_tools.clone(), name, refs)?;
 
             if static_data.granularity.is_some() {
-                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let evaluator_compiler_cell = self.query_tools.compiler().clone();
                 let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
                 let granularity_obj = GranularityHelper::make_granularity_obj(
@@ -545,12 +542,12 @@ impl PreAggregationsCompiler {
     }
 
     fn symbols_from_ref<F: Fn(&MemberSymbol) -> Result<(), CubeError>>(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         cube_name: &String,
         ref_func: Rc<dyn MemberSql>,
         check_type_fn: F,
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         let sql_call = evaluator_compiler.compile_sql_call(cube_name, ref_func)?;
         let mut res = Vec::new();
@@ -562,11 +559,11 @@ impl PreAggregationsCompiler {
     }
 
     fn time_dimension_symbol_from_ref(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         name: &PreAggregationFullName,
         ref_func: Rc<dyn MemberSql>,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
 
