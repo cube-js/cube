@@ -16,6 +16,9 @@
     "@cubejs-backend/base-driver": "1.6.64",
     "ramda": "^0.27.0"
   },
+  "devDependencies": {
+    "@types/oracledb": "^6.2.3"
+  },
   "optionalDependencies": {
     "oracledb": "^6.2.0"
   },

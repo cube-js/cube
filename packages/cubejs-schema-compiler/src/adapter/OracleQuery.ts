@@ -179,6 +179,58 @@ export class OracleQuery extends BaseQuery {
     return res;
   }
 
+  /**
+   * Dialect templates for the Tesseract (native) planner. The legacy-planner
+   * overrides above (`asSyntaxTable`, `groupByDimensionLimit`, `groupByClause`)
+   * don't apply to the native planner, which renders SQL purely from these
+   * templates. Oracle needs three deviations from the defaults:
+   *   - no `AS` keyword before table / subquery aliases,
+   *   - `OFFSET ... ROWS FETCH NEXT ... ROWS ONLY` instead of `LIMIT`/`OFFSET`,
+   *   - expression-based `GROUP BY` (Oracle has no positional GROUP BY).
+   */
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // Oracle forbids `AS` before a table/subquery alias.
+    templates.expressions.query_aliased = '{{ query }} {{ quoted_alias }}';
+    // Oracle does not support positional GROUP BY — group by expressions.
+    templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
+    // No `AS` before the FROM subquery alias, and Oracle row-limiting syntax.
+    templates.statements.select = '{% if ctes %} WITH \n' +
+      '{{ ctes | join(\',\n\') }}\n' +
+      '{% endif %}' +
+      'SELECT {% if distinct %}DISTINCT {% endif %}' +
+      '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
+      'FROM (\n' +
+      '{{ from | indent(2, true) }}\n' +
+      ') {{ from_alias }}{% elif from_prepared %}\n' +
+      'FROM {{ from_prepared }}' +
+      '{% endif %}' +
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
+      '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+      '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+      '{% if having %}\nHAVING {{ having }}{% endif %}' +
+      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
+      '{% if offset is not none %}\nOFFSET {{ offset }} ROWS{% endif %}' +
+      '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
+    // Oracle has no `::` cast and no `VALUES` row-constructor table source. Build the
+    // series with TO_TIMESTAMP + UNION ALL SELECT ... FROM DUAL, and no `AS` before
+    // the derived-table alias (Oracle forbids it). `seria` items are [from, to] pairs.
+    templates.statements.time_series_select = 'SELECT TO_TIMESTAMP(dates.f, \'YYYY-MM-DD"T"HH24:MI:SS.FF3\') AS "date_from",\n' +
+      'TO_TIMESTAMP(dates.t, \'YYYY-MM-DD"T"HH24:MI:SS.FF3\') AS "date_to" \n' +
+      'FROM (\n' +
+      '{% for time_item in seria %}' +
+      'SELECT \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t FROM DUAL' +
+      '{% if not loop.last %} UNION ALL\n{% endif %}' +
+      '{% endfor %}' +
+      ') dates';
+
+    delete templates.expressions.ilike;
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    templates.filters.like_pattern = '{% if start_wild %}\'%\' || {% endif %}LOWER({{ value }}){% if end_wild %} || \'%\'{% endif %}';
+
+    return templates;
+  }
+
   public newFilter(filter) {
     return new OracleFilter(this, filter);
   }

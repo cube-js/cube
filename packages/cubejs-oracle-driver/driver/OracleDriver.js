@@ -12,6 +12,21 @@ const { BaseDriver, TableColumn } = require('@cubejs-backend/base-driver');
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 
+// Maps Oracle `metaData.dbTypeName` strings to Cube generic types. NUMBER and the
+// TIMESTAMP* family are handled separately (scale-based / prefix match) below.
+const OracleTypeToGenericType = {
+  varchar2: 'text',
+  nvarchar2: 'text',
+  char: 'text',
+  nchar: 'text',
+  clob: 'text',
+  nclob: 'text',
+  long: 'text',
+  binary_float: 'float',
+  binary_double: 'double',
+  date: 'timestamp',
+};
+
 const sortByKeys = (unordered) => {
   const ordered = {};
 
@@ -43,20 +58,11 @@ const reduceCb = (result, i) => {
   return sortByKeys(result);
 };
 
-/**
- * Oracle driver class.
- */
 class OracleDriver extends BaseDriver {
-  /**
-   * Returns default concurrency value.
-   */
   static getDefaultConcurrency() {
     return 2;
   }
 
-  /**
-   * Class constructor.
-   */
   constructor(config = {}) {
     super({
       testConnectionTimeout: config.testConnectionTimeout,
@@ -127,17 +133,78 @@ class OracleDriver extends BaseDriver {
       throw new Error('Oracle can not work with table names longer than 128 symbols. ' +
         `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
     }
+
     return super.createTable(quotedTableName, columns);
+  }
+
+  static normalizeParams(query, values) {
+    if (!values || values.length === 0) {
+      return { sql: query, binds: {} };
+    }
+
+    const binds = {};
+    let idx = 0;
+
+    // `:"?"` must be matched as a whole before a lone `?`, so it appears first
+    // in the alternation; since it starts with `:`, its inner `?` is consumed
+    // as part of the match and never matched again on its own.
+    const sql = query.replace(/:"\?"|\?/g, () => {
+      const name = `cb_param_${idx}`;
+      binds[name] = values[idx];
+      idx += 1;
+      return `:${name}`;
+    });
+
+    return { sql, binds };
   }
 
   async query(query, values) {
     const conn = await this.getConnectionFromPool();
 
     try {
-      const res = await conn.execute(query, values || {});
+      const { sql, binds } = OracleDriver.normalizeParams(query, values);
+      const res = await conn.execute(sql, binds);
       return res && res.rows;
     } catch (e) {
       throw (e);
+    } finally {
+      try {
+        await conn.close();
+      } catch (e) {
+        throw e;
+      }
+    }
+  }
+
+  static metaDataToColumnTypes(metaData) {
+    return (metaData || []).map((column) => {
+      const dbTypeName = (column.dbTypeName || '').toLowerCase();
+      let type = 'text';
+
+      if (dbTypeName === 'number') {
+        // scale === 0 → integer family; otherwise (decimals, or float NUMBER
+        // with undefined/negative scale from aggregations) → decimal.
+        type = column.scale === 0 ? 'bigint' : 'decimal';
+      } else if (dbTypeName.startsWith('timestamp')) {
+        type = 'timestamp';
+      } else {
+        type = OracleTypeToGenericType[dbTypeName] || 'text';
+      }
+
+      return { name: column.name, type };
+    });
+  }
+
+  async downloadQueryResults(query, values, _options) {
+    const conn = await this.getConnectionFromPool();
+
+    try {
+      const { sql, binds } = OracleDriver.normalizeParams(query, values);
+      const res = await conn.execute(sql, binds);
+      return {
+        rows: (res && res.rows) || [],
+        types: OracleDriver.metaDataToColumnTypes(res && res.metaData),
+      };
     } finally {
       try {
         await conn.close();
@@ -156,7 +223,8 @@ class OracleDriver extends BaseDriver {
   }
 
   wrapQueryWithLimit(query) {
-    query.query = `SELECT * FROM (${query.query}) AS t WHERE ROWNUM <= ${query.limit}`;
+    // Oracle forbids the `AS` keyword for table/subquery aliases.
+    query.query = `SELECT * FROM (${query.query}) t WHERE ROWNUM <= ${query.limit}`;
   }
 }
 
