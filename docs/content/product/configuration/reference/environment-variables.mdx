@@ -1474,18 +1474,18 @@ If `true`, then use WebSocket for data fetching.
 
 ## `CUBEJS_TESSERACT_SQL_PLANNER`
 
-If `true`, enables Tesseract, the [next-generation data modeling engine][link-tesseract].
-Tesseract powers [multi-stage calculations][ref-multi-stage-calculations].
+Enables Tesseract, the [next-generation data modeling engine][link-tesseract],
+which is the default SQL planner and powers
+[multi-stage calculations][ref-multi-stage-calculations]. In versions before v1.7.0,
+Tesseract was not enabled by default. Set to `false` to fall back to the legacy
+planner, which is deprecated and will be removed in the near future.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                 | `false`                |
+| `true`, `false` | `true`                 | `true`                |
 
-<WarningBox>
-
-Tesseract is currently in preview.
-
-</WarningBox>
+Tesseract-based pre-aggregation matching and planning follows this flag and cannot be
+toggled independently.
 
 ## `CUBESTORE_AWS_ACCESS_KEY_ID`
 

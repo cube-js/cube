@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
-import { displayCLIWarning } from './cli';
+import { displayCLIWarning, displayCLIWarningOnce } from './cli';
 import { isNativeSupported } from './platform';
 
 export class InvalidConfiguration extends Error {
@@ -299,8 +299,19 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
-  nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
-  nativeSqlPlannerPreAggregations: () => get('CUBEJS_TESSERACT_PRE_AGGREGATIONS').default('false').asBool(),
+  nativeSqlPlanner: () => {
+    const explicitlySet = process.env.CUBEJS_TESSERACT_SQL_PLANNER !== undefined;
+    const enabled = get('CUBEJS_TESSERACT_SQL_PLANNER').default('true').asBool();
+
+    if (explicitlySet && !enabled) {
+      displayCLIWarningOnce(
+        'CUBEJS_TESSERACT_SQL_PLANNER',
+        'Tesseract planner is a default one, but you are trying to use a legacy planner which will be removed in the near future.'
+      );
+    }
+
+    return enabled;
+  },
   transpilationWorkerThreads: () => {
     const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
       .default('true')
