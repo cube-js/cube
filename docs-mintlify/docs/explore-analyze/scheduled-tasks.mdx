@@ -1,0 +1,98 @@
+---
+title: Scheduled Tasks
+description: Save a natural-language agent prompt and have Cube run it automatically on a schedule, producing an Analytics Chat thread for each run.
+---
+
+<Warning>
+
+Scheduled Tasks are currently in preview, and the user experience may still
+change. Reach out to the [Cube support team](/admin/account-billing/support)
+to activate this feature for your account.
+
+</Warning>
+
+Scheduled Tasks let you save a natural-language prompt for the
+[agent](/docs/explore-analyze/analytics-chat) and have Cube run it
+automatically on a schedule — or on demand. Each run produces an
+[Analytics Chat](/docs/explore-analyze/analytics-chat) thread you can open
+later to read the agent's answer.
+
+For example, you might schedule a task to *"every weekday at 9am, summarize
+yesterday's signups and flag anything anomalous"* and review the resulting
+chat each morning.
+
+Scheduled Tasks are **scoped to a deployment** — each task belongs to the
+deployment it was created in.
+
+## Where to find it
+
+In the deployment sidebar, open **Scheduled** (the clock icon, below
+**Explore**). The page lists the deployment's tasks with their name,
+schedule, status, and description, and is searchable.
+
+{/* TODO: screenshot — Scheduled Tasks list page in the deployment sidebar */}
+
+## Anatomy of a task
+
+A task has:
+
+- **Name** (required) — how the task appears in the list.
+- **Description** (optional) — a short summary shown in the list.
+- **Instructions** (required) — the natural-language prompt the agent runs on
+  each execution.
+- **Schedule** — how often the task runs (see below).
+- **Enabled** — a toggle to activate or pause a scheduled task.
+
+## Schedule options
+
+Scheduled Tasks use the same schedule editor as
+[dashboard scheduled refresh](/docs/explore-analyze/scheduled-refreshes),
+offering these frequencies:
+
+- **Manual** — no schedule; the task runs only when you trigger it with
+  **Run now**.
+- **Hourly**, **Daily**, **Weekly** (with a day of the week), and **Monthly**
+  (with a day of the month) — each with a time picker.
+- **Custom** — a raw cron expression for full control.
+
+A **timezone** selector (defaulting to your browser's timezone) controls when
+the schedule fires; it is stored per task.
+
+## Managing tasks
+
+From the list, you can:
+
+- **Create** a new task.
+- **Edit** an existing task's instructions, schedule, or details.
+- **Enable / Pause** a scheduled task to control whether it runs on schedule.
+- **Run now** — trigger a one-off run immediately. This works for both manual
+  and scheduled tasks.
+- **Delete** a task. Deleting removes its schedule and stops all future runs.
+
+## Reading the output
+
+Each run creates an [Analytics Chat](/docs/explore-analyze/analytics-chat)
+thread containing the agent's response. Open the thread from the chat UI to
+read the full answer, ask follow-up questions, or
+[save results to a Workbook](/docs/explore-analyze/workbooks).
+
+The task runs headlessly under the security context of the user who created
+it, so it sees exactly the data that user can access.
+
+## Managing tasks from chat
+
+You can also create and manage Scheduled Tasks conversationally in
+[Analytics Chat](/docs/explore-analyze/analytics-chat). Ask the agent to
+schedule, update, list, or delete tasks in plain language — for example,
+*"schedule a daily summary of yesterday's signups at 9am"* or *"list my
+scheduled tasks."*
+
+## Preview limitations
+
+- Scheduled Tasks must be activated for your account by the
+  [Cube support team](/admin/account-billing/support).
+- Results are delivered only as Analytics Chat threads — there is no email or
+  Slack delivery.
+- Missed runs (for example, while a deployment is unavailable) are not caught
+  up automatically.
+- There is no in-app run-history view yet.
