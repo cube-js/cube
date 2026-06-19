@@ -85,7 +85,7 @@ pub async fn choose_index(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
-    choose_index_ext(p, metastore, true).await
+    choose_index_ext(p, metastore, true, false).await
 }
 
 /// Information required to distribute the logical plan into multiple workers.
@@ -123,6 +123,7 @@ pub async fn choose_index_ext(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
+    dictionary_encoding: bool,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -238,6 +239,7 @@ pub async fn choose_index_ext(
         chosen_indices: &indices,
         next_index: 0,
         enable_topk,
+        dictionary_encoding,
         can_pushdown_limit: true,
         cluster_send_next_id: 1,
     };
@@ -831,6 +833,7 @@ struct ChooseIndex<'a> {
     next_index: usize,
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
+    dictionary_encoding: bool,
     can_pushdown_limit: bool,
     cluster_send_next_id: usize,
 }
@@ -1057,6 +1060,7 @@ impl ChooseIndex<'_> {
                             HashMap::new(),
                             Vec::new(),
                             NoopParquetMetadataCache::new(),
+                            self.dictionary_encoding,
                         )?)));
 
                         let index_schema = source.schema();

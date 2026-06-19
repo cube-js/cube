@@ -679,6 +679,7 @@ impl CubeTable {
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: Vec<(u64, RowFilter)>,
         parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
+        dictionary_encoding: bool,
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             // Tables are always exposed only using table columns order instead of index one because
@@ -690,7 +691,7 @@ impl CubeTable {
                 .get_row()
                 .get_columns()
                 .iter()
-                .map(|c| c.clone().into())
+                .map(|c| c.as_arrow_field(dictionary_encoding))
                 .collect::<Vec<Field>>(),
         ));
         Ok(Self {

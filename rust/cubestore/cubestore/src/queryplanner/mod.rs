@@ -161,6 +161,7 @@ impl QueryPlanner for QueryPlannerImpl {
             inline_tables,
             self.cache.clone(),
             state.clone(),
+            self.config.dictionary_encoding_enabled(),
         );
 
         let query_planner = SqlToRel::new_with_options(&schema_provider, sql_to_rel_options());
@@ -231,6 +232,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
+                self.config.dictionary_encoding_enabled(),
             )
             .await?;
             let workers = compute_workers(
@@ -372,6 +374,7 @@ struct MetaStoreSchemaProvider {
     inline_tables: InlineTables,
     cache: Arc<SqlResultCache>,
     config_options: ConfigOptions,
+    dictionary_encoding: bool,
     expr_planners: Vec<Arc<dyn ExprPlanner>>, // session_state.expr_planners clone
     session_state: Arc<SessionState>,
 }
@@ -408,6 +411,7 @@ impl MetaStoreSchemaProvider {
         inline_tables: &InlineTables,
         cache: Arc<SqlResultCache>,
         session_state: Arc<SessionState>,
+        dictionary_encoding: bool,
     ) -> Self {
         let by_name = tables.iter().map(|t| TableKey(t)).collect();
         Self {
@@ -418,6 +422,7 @@ impl MetaStoreSchemaProvider {
             cache,
             inline_tables: (*inline_tables).clone(),
             config_options: ConfigOptions::new(),
+            dictionary_encoding,
             expr_planners: datafusion::execution::FunctionRegistry::expr_planners(
                 session_state.as_ref(),
             ),
@@ -486,13 +491,14 @@ impl ContextProvider for MetaStoreSchemaProvider {
             .get(&TableKey(&table_path))
             .map(|table| -> Arc<dyn TableProvider> {
                 let table = unsafe { &*table.0 };
+                let dictionary_encoding = self.dictionary_encoding;
                 let schema = Arc::new(Schema::new(
                     table
                         .table
                         .get_row()
                         .get_columns()
                         .iter()
-                        .map(|c| c.clone().into())
+                        .map(|c| c.as_arrow_field(dictionary_encoding))
                         .collect::<Vec<Field>>(),
                 ));
                 Arc::new(CubeTableLogical {
@@ -1095,6 +1101,7 @@ pub mod tests {
             &vec![],
             Arc::new(SqlResultCache::new(1 << 20, None, 10000, None)),
             Arc::new(SessionContext::new().state()),
+            false,
         )
     }
 

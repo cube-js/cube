@@ -585,6 +585,10 @@ pub trait ConfigObj: DIService {
     /// streaming split never drops rows (the first child is the low catch-all, the last
     /// the high one), and the legacy per-chunk path performed no such metadata check.
     fn repartition_check_overlapping_children(&self) -> bool;
+    /// Master gate for string dictionary-encoding work: reading string columns as
+    /// `DictionaryArray` and the dictionary-aware inline aggregate paths. Off by default while
+    /// the feature is built up incrementally behind this flag.
+    fn dictionary_encoding_enabled(&self) -> bool;
 
     fn allow_decimal128(&self) -> bool;
 
@@ -745,6 +749,7 @@ pub struct ConfigObjImpl {
     pub repartition_merge_max_input_files: usize,
     pub repartition_merge_max_rows: u64,
     pub repartition_check_overlapping_children: bool,
+    pub dictionary_encoding_enabled: bool,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1085,6 +1090,8 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn repartition_check_overlapping_children(&self) -> bool {
         self.repartition_check_overlapping_children
+    fn dictionary_encoding_enabled(&self) -> bool {
+        self.dictionary_encoding_enabled
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1783,6 +1790,8 @@ impl Config {
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
+                // TODO: dev default; flip back to false before merge.
+                dictionary_encoding_enabled: env_bool("CUBESTORE_DICTIONARY_ENCODING", true),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -2039,6 +2048,7 @@ impl Config {
                 repartition_merge_max_input_files: 50,
                 repartition_merge_max_rows: 4_000_000,
                 repartition_check_overlapping_children: false,
+                dictionary_encoding_enabled: false,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,

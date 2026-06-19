@@ -1,5 +1,7 @@
 use datafusion::arrow::array::*;
+use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::*;
+use std::cmp::Ordering;
 use std::marker::PhantomData;
 
 /// Trait for comparing adjacent rows in an array to detect group boundaries.
@@ -193,6 +195,82 @@ where
     }
 }
 
+/// Comparator for dictionary-encoded columns (e.g. `Dictionary(Int32, Utf8)`).
+///
+/// The hot path compares dictionary keys (small integers) instead of the underlying
+/// values. Within a single batch all rows share one dictionary, so key equality implies
+/// value equality. The reverse does not hold when a dictionary carries duplicate values
+/// (e.g. after a merge unions several local dictionaries), so when adjacent keys differ we
+/// fall back to comparing the actual values to avoid splitting a group incorrectly. That
+/// fallback only fires on group boundaries, which are rare in a sorted stream.
+pub struct DictionaryComparator<K: ArrowDictionaryKeyType, const NULLABLE: bool> {
+    _phantom: PhantomData<fn() -> K>,
+}
+
+impl<K: ArrowDictionaryKeyType, const NULLABLE: bool> DictionaryComparator<K, NULLABLE> {
+    pub fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<K: ArrowDictionaryKeyType, const NULLABLE: bool> ColumnComparator
+    for DictionaryComparator<K, NULLABLE>
+{
+    #[inline]
+    fn compare_adjacent(&self, col: &ArrayRef, equal_results: &mut [bool]) {
+        let array = col
+            .as_any()
+            .downcast_ref::<DictionaryArray<K>>()
+            .expect("DictionaryComparator got non-dictionary array");
+        let keys = array.keys();
+        let values = array.values();
+
+        if !NULLABLE {
+            // A non-nullable field must not carry null keys; the loop below skips null checks.
+            debug_assert_eq!(
+                keys.null_count(),
+                0,
+                "DictionaryComparator<_, false> received null keys"
+            );
+        }
+
+        // Built lazily, only when adjacent keys actually differ. The values array is always one
+        // of the types accepted by `new_dictionary_group_column`, all of which `make_comparator`
+        // supports.
+        let mut value_cmp: Option<DynComparator> = None;
+
+        for i in 0..equal_results.len() {
+            if !equal_results[i] {
+                continue;
+            }
+
+            if NULLABLE {
+                let null1 = keys.is_null(i);
+                let null2 = keys.is_null(i + 1);
+                if null1 || null2 {
+                    // Both null => same group; one null => boundary.
+                    equal_results[i] = null1 && null2;
+                    continue;
+                }
+            }
+
+            let k1 = keys.value(i).as_usize();
+            let k2 = keys.value(i + 1).as_usize();
+            if k1 == k2 {
+                continue;
+            }
+
+            let cmp = value_cmp.get_or_insert_with(|| {
+                make_comparator(values.as_ref(), values.as_ref(), SortOptions::default())
+                    .expect("make_comparator for dictionary values")
+            });
+            equal_results[i] = cmp(k1, k2) == Ordering::Equal;
+        }
+    }
+}
+
 /// Instantiate a primitive comparator and push it into the vector.
 ///
 /// Handles const generic NULLABLE parameter based on field nullability.
@@ -259,4 +337,85 @@ macro_rules! instantiate_byte_view_comparator {
             ) as _)
         }
     };
+}
+
+/// Instantiate a dictionary comparator and push it into the vector.
+#[macro_export]
+macro_rules! instantiate_dictionary_comparator {
+    ($v:expr, $nullable:expr, $k:ty) => {
+        if $nullable {
+            $v.push(Box::new(
+                $crate::queryplanner::inline_aggregate::column_comparator::DictionaryComparator::<
+                    $k,
+                    true,
+                >::new(),
+            ) as _)
+        } else {
+            $v.push(Box::new(
+                $crate::queryplanner::inline_aggregate::column_comparator::DictionaryComparator::<
+                    $k,
+                    false,
+                >::new(),
+            ) as _)
+        }
+    };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    fn run(comparator: &dyn ColumnComparator, col: &ArrayRef) -> Vec<bool> {
+        let n = col.len();
+        let mut eq = vec![true; n - 1];
+        comparator.compare_adjacent(col, &mut eq);
+        eq
+    }
+
+    #[test]
+    fn dict_compare_same_dictionary_sorted() {
+        // values [a,b,c], keys [0,0,1,1,2] => rows a,a,b,b,c
+        let dict: DictionaryArray<Int32Type> = vec!["a", "a", "b", "b", "c"].into_iter().collect();
+        let col: ArrayRef = Arc::new(dict);
+        let cmp = DictionaryComparator::<Int32Type, false>::new();
+        assert_eq!(run(&cmp, &col), vec![true, false, true, false]);
+    }
+
+    #[test]
+    fn dict_compare_duplicate_values_fallback() {
+        // Dictionary with duplicate values: keys 0 and 1 both map to "a".
+        // Adjacent keys differ but values are equal -> must NOT be a boundary.
+        let keys = Int32Array::from(vec![0, 1, 2]);
+        let values = Arc::new(StringArray::from(vec!["a", "a", "b"]));
+        let dict = DictionaryArray::<Int32Type>::new(keys, values);
+        let col: ArrayRef = Arc::new(dict);
+        let cmp = DictionaryComparator::<Int32Type, false>::new();
+        // rows: a, a, b => (a,a) equal via fallback, (a,b) boundary
+        assert_eq!(run(&cmp, &col), vec![true, false]);
+    }
+
+    #[test]
+    fn dict_compare_nulls() {
+        // rows: null, null, "a", "a", null
+        let dict: DictionaryArray<Int32Type> = vec![None, None, Some("a"), Some("a"), None]
+            .into_iter()
+            .collect();
+        let col: ArrayRef = Arc::new(dict);
+        let cmp = DictionaryComparator::<Int32Type, true>::new();
+        // (null,null) equal, (null,a) boundary, (a,a) equal, (a,null) boundary
+        assert_eq!(run(&cmp, &col), vec![true, false, true, false]);
+    }
+
+    #[test]
+    fn dict_compare_respects_short_circuit() {
+        // values [a,b], keys [0,0,1]; pre-mark first pair as already-false.
+        let dict: DictionaryArray<Int32Type> = vec!["a", "a", "b"].into_iter().collect();
+        let col: ArrayRef = Arc::new(dict);
+        let cmp = DictionaryComparator::<Int32Type, false>::new();
+        let mut eq = vec![false, true];
+        cmp.compare_adjacent(&col, &mut eq);
+        // first stays false (short-circuit), second is a real boundary a->b
+        assert_eq!(eq, vec![false, false]);
+    }
 }

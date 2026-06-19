@@ -558,28 +558,40 @@ impl Into<Field> for Column {
     }
 }
 
+impl Column {
+    /// Arrow field for this column. When `dictionary_encoding` is set, `String` columns are
+    /// exposed as `Dictionary(Int32, Utf8)` so they flow dictionary-encoded through the plan;
+    /// otherwise they are plain `Utf8`. All other types are unaffected.
+    pub fn as_arrow_field(&self, dictionary_encoding: bool) -> Field {
+        let data_type = match self.column_type {
+            ColumnType::String => {
+                if dictionary_encoding {
+                    DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8))
+                } else {
+                    DataType::Utf8
+                }
+            }
+            ColumnType::Int => DataType::Int64,
+            ColumnType::Int96 => DataType::Decimal128(38, 0),
+            ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
+            ColumnType::Boolean => DataType::Boolean,
+            ColumnType::Decimal { scale, precision } => {
+                DataType::Decimal128(precision as u8, scale as i8)
+            }
+            ColumnType::Decimal96 { scale, precision } => {
+                DataType::Decimal128(precision as u8, scale as i8)
+            }
+            ColumnType::Bytes => DataType::Binary,
+            ColumnType::HyperLogLog(_) => DataType::Binary,
+            ColumnType::Float => DataType::Float64,
+        };
+        Field::new(self.name.as_str(), data_type, true)
+    }
+}
+
 impl<'a> Into<Field> for &'a Column {
     fn into(self) -> Field {
-        Field::new(
-            self.name.as_str(),
-            match self.column_type {
-                ColumnType::String => DataType::Utf8,
-                ColumnType::Int => DataType::Int64,
-                ColumnType::Int96 => DataType::Decimal128(38, 0),
-                ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
-                ColumnType::Boolean => DataType::Boolean,
-                ColumnType::Decimal { scale, precision } => {
-                    DataType::Decimal128(precision as u8, scale as i8)
-                }
-                ColumnType::Decimal96 { scale, precision } => {
-                    DataType::Decimal128(precision as u8, scale as i8)
-                }
-                ColumnType::Bytes => DataType::Binary,
-                ColumnType::HyperLogLog(_) => DataType::Binary,
-                ColumnType::Float => DataType::Float64,
-            },
-            true,
-        )
+        self.as_arrow_field(false)
     }
 }
 
