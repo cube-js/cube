@@ -409,6 +409,22 @@ fn resort_worker_subtree(
 ) -> Option<Arc<dyn ExecutionPlan>> {
     let partial = locate_partial_aggregate(worker_subtree)?;
 
+    // N-way experiment: drop the per-partition merge below the aggregate so it runs per partition;
+    // the hash-final CoalescePartitions then parallelizes all partitions. Only with hash-final (the
+    // sorted path's SortPreservingMerge would not parallelize the extra partitions anyway).
+    let partial = if group_by_limit_factor > 0 && hash_final_enabled() && per_partition_enabled() {
+        partial
+            .as_any()
+            .downcast_ref::<AggregateExec>()
+            .and_then(|agg| {
+                let new_input = strip_coalesce_partitions(agg.input()).ok()?;
+                partial.clone().with_new_children(vec![new_input]).ok()
+            })
+            .unwrap_or(partial)
+    } else {
+        partial
+    };
+
     // Trim during aggregation: replace the partial hash aggregate with a GroupByLimitAggregateExec
     // so it keeps only the top-k groups by `cols` instead of materializing every group and letting
     // the Sort below trim afterwards. `group_by_limit_factor == 0` disables this.
@@ -491,6 +507,39 @@ fn hash_final_enabled() -> bool {
     std::env::var("CUBESTORE_GROUP_BY_LIMIT_HASH_FINAL")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false)
+}
+
+/// Experiment toggle (only meaningful with [hash_final_enabled]): drop the per-partition merge
+/// below the trimmed aggregate so it runs per partition (N-way) instead of per union branch. The
+/// hash-final `CoalescePartitions` then parallelizes all partitions.
+///
+/// Trades memory for parallelism: one group table per DF partition (= per parquet file and chunk),
+/// so peak memory is bounded by the partition count, not by k. It stays low only while partitions
+/// are key-local (group keys do not span partitions) -- true for index-sorted pre-aggregations. On
+/// a group key spread across many partitions each table approaches full cardinality (~N x memory).
+fn per_partition_enabled() -> bool {
+    std::env::var("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false)
+}
+
+/// Recursively drop `CoalescePartitionsExec` nodes, exposing the underlying multi-partition streams
+/// to the parent.
+fn strip_coalesce_partitions(
+    p: &Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    if p.as_any().is::<CoalescePartitionsExec>() {
+        return strip_coalesce_partitions(&p.children()[0].clone());
+    }
+    let children = p.children();
+    if children.is_empty() {
+        return Ok(p.clone());
+    }
+    let new_children = children
+        .iter()
+        .map(|c| strip_coalesce_partitions(c))
+        .collect::<Result<Vec<_>, _>>()?;
+    p.clone().with_new_children(new_children)
 }
 
 /// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in
