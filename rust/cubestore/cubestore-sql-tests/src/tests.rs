@@ -429,6 +429,7 @@ lazy_static::lazy_static! {
         "limit_pushdown_group_nonprefix_order",
         "prefilter_chunks_shared_scan",
         "planning_topk_hash_aggregate",
+        "topk_hash_aggregate_trim",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -3328,6 +3329,37 @@ async fn planning_topk_hash_aggregate(service: Box<dyn SqlClient>) -> Result<(),
         router_pp
     );
 
+    // Bare LIMIT (no ORDER BY) on a non-indexed group column: the limit can't ride the index, so the
+    // worker still trims to the smallest groups by the full group key -- "any k" made deterministic.
+    let p = service
+        .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 LIMIT 10")
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        pp.contains("GroupByLimitAggregate, k: 10, factor: 2,")
+            && pp.contains("(0, SortOptions { descending: false, nulls_first: false })"),
+        "expected GroupByLimitAggregate on a bare LIMIT, got:\n{}",
+        pp
+    );
+
+    // UNION ALL + bare LIMIT: the per-branch trim descriptor must survive the cluster-send pull-up
+    // over the union so the worker still trims above the union.
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, day int, hits int)")
+        .await?;
+    let p = service
+        .plan_query(
+            "SELECT day, SUM(hits) FROM \
+             (SELECT * FROM s.Data UNION ALL SELECT * FROM s.Data2) u GROUP BY 1 LIMIT 10",
+        )
+        .await?;
+    let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
+    assert!(
+        pp.contains("GroupByLimitAggregate, k: 10, factor: 2,") && pp.contains("Union"),
+        "expected GroupByLimitAggregate over the Union, got:\n{}",
+        pp
+    );
+
     Ok(())
 }
 
@@ -3376,6 +3408,23 @@ async fn topk_hash_aggregate_trim(service: Box<dyn SqlClient>) -> Result<(), Cub
     let got = to_rows(&r);
     assert_eq!(got.len(), 2, "expected 2 rows, got: {:?}", got);
     for expected in rows(&[(1, 1, 15), (1, 2, 3)]) {
+        assert!(
+            got.contains(&expected),
+            "missing {:?} in {:?}",
+            expected,
+            got
+        );
+    }
+
+    // Bare LIMIT 3 (no ORDER BY): the trim orders by the full group key, so "any 3" resolves to the
+    // 3 smallest by (a, b). The result order is unspecified, but the group SET and each group's full
+    // sum must be exact -- the latter guards against undercounting a group split across workers.
+    let r = service
+        .exec_query("SELECT a, b, SUM(hits) FROM s.Data GROUP BY 1, 2 LIMIT 3")
+        .await?;
+    let got = to_rows(&r);
+    assert_eq!(got.len(), 3, "expected 3 rows, got: {:?}", got);
+    for expected in rows(&[(1, 1, 15), (1, 2, 3), (2, 1, 10)]) {
         assert!(
             got.contains(&expected),
             "missing {:?} in {:?}",
