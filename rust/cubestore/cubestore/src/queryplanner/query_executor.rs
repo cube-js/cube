@@ -29,7 +29,7 @@ use datafusion::arrow::array::{
     Float64Array, Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
-use datafusion::arrow::compute::{filter_record_batch, SortOptions};
+use datafusion::arrow::compute::{cast, filter_record_batch, SortOptions};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::ipc::reader::StreamReader;
 use datafusion::arrow::ipc::writer::StreamWriter;
@@ -39,7 +39,9 @@ use datafusion::common::ToDFSchema;
 use datafusion::config::TableParquetOptions;
 use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
+use datafusion::datasource::physical_plan::parquet::{
+    get_reader_options_customizer, ReaderOptionsCustomizer,
+};
 use datafusion::datasource::physical_plan::{
     FileScanConfig, ParquetFileReaderFactory, ParquetSource,
 };
@@ -50,6 +52,7 @@ use datafusion::execution::memory_pool::{MemoryPool, MemoryReservation};
 use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
+use datafusion::parquet::arrow::arrow_reader::ArrowReaderOptions;
 use datafusion::physical_expr;
 use datafusion::physical_expr::LexOrdering;
 use datafusion::physical_expr::{
@@ -653,6 +656,26 @@ impl QueryExecutorImpl {
     }
 }
 
+/// Forces the parquet reader to produce arrays of the supplied schema directly, so
+/// `Dictionary(Int32, Utf8)` string columns are read natively from the on-disk dictionary pages
+/// instead of being materialized as `Utf8` and cast to dictionary by the schema adapter.
+#[derive(Debug)]
+struct SuppliedSchemaReaderCustomizer {
+    schema: SchemaRef,
+    inner: Arc<dyn ReaderOptionsCustomizer>,
+}
+
+impl ReaderOptionsCustomizer for SuppliedSchemaReaderCustomizer {
+    fn adjust_reader_options(
+        &self,
+        options: ArrowReaderOptions,
+    ) -> Result<ArrowReaderOptions, DataFusionError> {
+        // Compose with the configured customizer so its adjustments are kept, then pin the schema.
+        let options = self.inner.adjust_reader_options(options)?;
+        Ok(options.with_schema(Arc::clone(&self.schema)))
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CubeTable {
     index_snapshot: IndexSnapshot,
@@ -834,6 +857,22 @@ impl CubeTable {
             None
         };
 
+        // With dictionary encoding the index schema carries `Dictionary` string columns; supply it to
+        // the parquet reader so they are read natively from the dictionary pages instead of being
+        // materialized as `Utf8` and cast to dictionary per batch.
+        let reader_options_customizer: Arc<dyn ReaderOptionsCustomizer> = if index_schema
+            .fields()
+            .iter()
+            .any(|f| matches!(f.data_type(), DataType::Dictionary(_, _)))
+        {
+            Arc::new(SuppliedSchemaReaderCustomizer {
+                schema: index_schema.clone(),
+                inner: get_reader_options_customizer(state.config()),
+            })
+        } else {
+            get_reader_options_customizer(state.config())
+        };
+
         let unique_key_columns = self
             .index_snapshot
             .table_path
@@ -883,9 +922,8 @@ impl CubeTable {
                 let mut options = TableParquetOptions::new();
                 options.global = state.config_options().execution.parquet.clone();
 
-                let parquet_source =
-                    ParquetSource::new(options, get_reader_options_customizer(state.config()))
-                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                let parquet_source = ParquetSource::new(options, reader_options_customizer.clone())
+                    .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
                 let parquet_source = if let Some(phys_pred) = &physical_predicate {
                     parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
                 } else {
@@ -964,7 +1002,7 @@ impl CubeTable {
                     let mut options = TableParquetOptions::new();
                     options.global = state.config_options().execution.parquet.clone();
                     let parquet_source =
-                        ParquetSource::new(options, get_reader_options_customizer(state.config()))
+                        ParquetSource::new(options, reader_options_customizer.clone())
                             .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
                     let parquet_source = if let Some(phys_pred) = &physical_predicate {
                         parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
@@ -2152,11 +2190,48 @@ macro_rules! convert_array {
     }};
 }
 
+/// Cast any `Dictionary` columns of a batch to their value type, leaving other columns untouched.
+fn decode_dictionary_columns(batch: RecordBatch) -> Result<RecordBatch, CubeError> {
+    let schema = batch.schema();
+    if !schema
+        .fields()
+        .iter()
+        .any(|f| matches!(f.data_type(), DataType::Dictionary(_, _)))
+    {
+        return Ok(batch);
+    }
+    let mut fields = Vec::with_capacity(schema.fields().len());
+    let mut columns = Vec::with_capacity(batch.num_columns());
+    for (field, column) in schema.fields().iter().zip(batch.columns()) {
+        match field.data_type() {
+            DataType::Dictionary(_, value_type) => {
+                columns.push(cast(column, value_type)?);
+                fields.push(Arc::new(Field::new(
+                    field.name(),
+                    value_type.as_ref().clone(),
+                    field.is_nullable(),
+                )));
+            }
+            _ => {
+                columns.push(column.clone());
+                fields.push(field.clone());
+            }
+        }
+    }
+    Ok(RecordBatch::try_new(
+        Arc::new(Schema::new(fields)),
+        columns,
+    )?)
+}
+
 pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
     let mut cols = vec![];
     let mut all_rows = vec![];
 
     for batch in batches.into_iter() {
+        // Dictionary-encoded columns (string group keys) reach the result as `Dictionary(_, _)`;
+        // decode them to their value type for the row conversion below.
+        let batch = decode_dictionary_columns(batch)?;
         if cols.len() == 0 {
             for (i, field) in batch.schema().fields().iter().enumerate() {
                 cols.push(Column::new(

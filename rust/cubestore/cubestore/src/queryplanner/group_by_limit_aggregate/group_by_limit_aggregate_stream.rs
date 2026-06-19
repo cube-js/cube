@@ -1,6 +1,6 @@
 use datafusion::arrow::array::{ArrayRef, AsArray, RecordBatch};
 use datafusion::arrow::compute::{lexsort_to_indices, take, SortColumn, SortOptions};
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::dfschema::internal_err;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::{RecordBatchStream, TaskContext};
@@ -16,6 +16,7 @@ use futures::stream::{Stream, StreamExt};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use super::dict_remap::{is_int32_utf8_dict, GlobalDict};
 use super::GroupByLimitAggregateExec;
 
 enum ExecutionState {
@@ -35,6 +36,9 @@ pub(crate) struct GroupByLimitAggregateStream {
     input_done: bool,
     accumulators: Vec<Box<dyn GroupsAccumulator>>,
     group_values: Box<dyn GroupValues>,
+    /// One slot per group column: `Some` for a `Dictionary(Int32, Utf8)` key grouped as Int32
+    /// global ids, `None` for a column passed through to `group_values` unchanged.
+    dict_remaps: Vec<Option<GlobalDict>>,
     current_group_indices: Vec<usize>,
     k: usize,
     factor: usize,
@@ -64,7 +68,21 @@ impl GroupByLimitAggregateStream {
             .collect::<DFResult<_>>()?;
 
         let group_schema = agg_group_by.group_schema(&agg.input().schema())?;
-        let group_values = new_group_values(group_schema, &GroupOrdering::None)?;
+        // Expose `Dictionary(Int32, Utf8)` group keys to `group_values` as plain `Int32` global ids
+        // (df's fast primitive path); other columns are passed through unchanged.
+        let mut int_fields = Vec::with_capacity(group_schema.fields().len());
+        let mut dict_remaps = Vec::with_capacity(group_schema.fields().len());
+        for field in group_schema.fields() {
+            if is_int32_utf8_dict(field.data_type()) {
+                int_fields.push(Arc::new(Field::new(field.name(), DataType::Int32, true)));
+                dict_remaps.push(Some(GlobalDict::new()));
+            } else {
+                int_fields.push(field.clone());
+                dict_remaps.push(None);
+            }
+        }
+        let int_group_schema = Arc::new(Schema::new(int_fields));
+        let group_values = new_group_values(int_group_schema, &GroupOrdering::None)?;
 
         Ok(GroupByLimitAggregateStream {
             schema: agg_schema,
@@ -77,6 +95,7 @@ impl GroupByLimitAggregateStream {
             input_done: false,
             accumulators,
             group_values,
+            dict_remaps,
             current_group_indices: Vec::with_capacity(batch_size),
             k: agg.k(),
             factor: agg.factor(),
@@ -141,14 +160,27 @@ impl RecordBatchStream for GroupByLimitAggregateStream {
 }
 
 impl GroupByLimitAggregateStream {
+    /// Remap dictionary group columns to `Int32` global ids; pass other columns through unchanged.
+    fn remap_group_cols(&mut self, cols: &[ArrayRef]) -> DFResult<Vec<ArrayRef>> {
+        let mut out = Vec::with_capacity(cols.len());
+        for (i, col) in cols.iter().enumerate() {
+            match &mut self.dict_remaps[i] {
+                Some(gd) => out.push(gd.remap(col)?),
+                None => out.push(Arc::clone(col)),
+            }
+        }
+        Ok(out)
+    }
+
     fn group_aggregate_batch(&mut self, batch: RecordBatch) -> DFResult<()> {
         let group_by_values = evaluate_group_by(&self.group_by, &batch)?;
         let input_values = evaluate_many(&self.aggregate_arguments, &batch)?;
         let filter_values = evaluate_optional(&self.filter_expressions, &batch)?;
 
         assert_eq!(group_by_values.len(), 1, "Exactly 1 group value required");
+        let group_cols = self.remap_group_cols(&group_by_values[0])?;
         self.group_values
-            .intern(&group_by_values[0], &mut self.current_group_indices)?;
+            .intern(&group_cols, &mut self.current_group_indices)?;
         let group_indices = &self.current_group_indices;
         let total_num_groups = self.group_values.len();
 
@@ -171,6 +203,13 @@ impl GroupByLimitAggregateStream {
             return Ok(None);
         }
         let mut columns = self.group_values.emit(EmitTo::All)?;
+        // Convert the Int32 global ids of dictionary keys back to `Dictionary(Int32, Utf8)` so the
+        // emitted columns match the partial-aggregate output schema.
+        for (i, remap) in self.dict_remaps.iter().enumerate() {
+            if let Some(gd) = remap {
+                columns[i] = gd.rebuild(&columns[i])?;
+            }
+        }
         for acc in &mut self.accumulators {
             columns.extend(acc.state(EmitTo::All)?);
         }

@@ -1,0 +1,90 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use datafusion::arrow::array::{Array, ArrayRef, DictionaryArray, Int32Array, StringArray};
+use datafusion::arrow::datatypes::{DataType, Int32Type};
+use datafusion::error::{DataFusionError, Result as DFResult};
+
+/// True for the only dictionary layout CubeStore produces for string group keys.
+pub(crate) fn is_int32_utf8_dict(dt: &DataType) -> bool {
+    matches!(dt, DataType::Dictionary(k, v)
+        if k.as_ref() == &DataType::Int32 && v.as_ref() == &DataType::Utf8)
+}
+
+/// Accumulates a global `String -> id` mapping across batches so a dictionary-encoded group column
+/// can be grouped as `Int32` global ids on DataFusion's fast primitive path, instead of
+/// materializing the string on every row. The per-batch string work is proportional to the batch's
+/// distinct dictionary values, not its row count. Null dictionary entries and null keys stay null.
+pub(crate) struct GlobalDict {
+    value_to_id: HashMap<String, i32>,
+    values: Vec<String>,
+}
+
+impl GlobalDict {
+    pub fn new() -> Self {
+        Self {
+            value_to_id: HashMap::new(),
+            values: Vec::new(),
+        }
+    }
+
+    fn intern_value(&mut self, v: &str) -> i32 {
+        if let Some(id) = self.value_to_id.get(v) {
+            return *id;
+        }
+        let id = self.values.len() as i32;
+        self.values.push(v.to_string());
+        self.value_to_id.insert(v.to_string(), id);
+        id
+    }
+
+    /// Remap a `Dictionary(Int32, Utf8)` array to an `Int32Array` of global ids.
+    pub fn remap(&mut self, array: &ArrayRef) -> DFResult<ArrayRef> {
+        let dict = array
+            .as_any()
+            .downcast_ref::<DictionaryArray<Int32Type>>()
+            .ok_or_else(|| {
+                DataFusionError::Internal(
+                    "GlobalDict::remap expected Dictionary(Int32)".to_string(),
+                )
+            })?;
+        let local_values = dict
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| {
+                DataFusionError::Internal("GlobalDict::remap expected Utf8 values".to_string())
+            })?;
+
+        // Intern each distinct dictionary value once; `None` marks a null entry.
+        let mut local_to_global: Vec<Option<i32>> = Vec::with_capacity(local_values.len());
+        for i in 0..local_values.len() {
+            if local_values.is_null(i) {
+                local_to_global.push(None);
+            } else {
+                local_to_global.push(Some(self.intern_value(local_values.value(i))));
+            }
+        }
+
+        let ids: Int32Array = dict
+            .keys()
+            .iter()
+            .map(|k| match k {
+                Some(local) => local_to_global[local as usize],
+                None => None,
+            })
+            .collect();
+        Ok(Arc::new(ids))
+    }
+
+    /// Rebuild a `Dictionary(Int32, Utf8)` array from an `Int32Array` of global ids emitted by the
+    /// group table; the values are the full accumulated global dictionary.
+    pub fn rebuild(&self, ids: &ArrayRef) -> DFResult<ArrayRef> {
+        let ids = ids.as_any().downcast_ref::<Int32Array>().ok_or_else(|| {
+            DataFusionError::Internal("GlobalDict::rebuild expected Int32 ids".to_string())
+        })?;
+        let values = StringArray::from_iter_values(self.values.iter());
+        let dict = DictionaryArray::<Int32Type>::try_new(ids.clone(), Arc::new(values))?;
+        Ok(Arc::new(dict))
+    }
+}

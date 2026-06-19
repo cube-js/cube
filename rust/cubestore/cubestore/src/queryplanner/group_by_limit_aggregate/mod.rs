@@ -1,3 +1,4 @@
+mod dict_remap;
 mod group_by_limit_aggregate_stream;
 
 use datafusion::arrow::compute::SortOptions;
