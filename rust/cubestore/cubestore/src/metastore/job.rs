@@ -21,6 +21,12 @@ pub enum JobType {
     RepartitionChunk,
     InMemoryChunksCompaction,
     NodeInMemoryChunksCompaction(/*node*/ String),
+    // Repartition an inclusive [start, end] chunk-id range of an inactive parent in
+    // one merge+swap. row_reference carries the start chunk; the end is data only and
+    // is deliberately excluded from the job index key (see key_to_bytes) so a tail
+    // that extends the trailing range dedups on the start instead of spawning a
+    // second job for the same start.
+    RepartitionRange(/*end_chunk_id*/ u64),
     /// Fallback for job types written by a newer binary that this binary does
     /// not know about. Lets the read path decode such rows instead of failing
     /// the whole job scan; the worker ignores `Unknown` jobs.
@@ -41,6 +47,7 @@ fn get_job_type_index(j: &JobType) -> u32 {
         JobType::InMemoryChunksCompaction => 9,
         JobType::NodeInMemoryChunksCompaction(_) => 10,
         JobType::Unknown => 11,
+        JobType::RepartitionRange(_) => 12,
     }
 }
 
@@ -55,6 +62,7 @@ fn get_job_type_priority(j: &JobType) -> u32 {
         JobType::MultiPartitionSplit => 1000,
         JobType::FinishMultiSplit => 1000,
         JobType::RepartitionChunk => 1000,
+        JobType::RepartitionRange(_) => 1000,
         JobType::InMemoryChunksCompaction => 10000,
         JobType::NodeInMemoryChunksCompaction(_) => 10000,
         JobType::Unknown => 0,

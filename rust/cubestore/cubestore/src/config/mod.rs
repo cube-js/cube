@@ -361,6 +361,37 @@ pub struct Config {
     injector: Arc<Injector>,
 }
 
+/// How an inactive parent's persisted chunks are repartitioned into its children.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepartitionStrategy {
+    /// One chunk at a time, each split independently into the children.
+    PerChunk,
+    /// One job per partition that k-way merges all its chunks in groups and splits the
+    /// merged stream into the children at the wal-split limit.
+    PerPartition,
+    /// Many jobs sliced at schedule time, each merging an inclusive chunk-id range;
+    /// spreads across workers by the hash of the range bounds.
+    Range,
+}
+
+impl FromStr for RepartitionStrategy {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "per_chunk" | "perchunk" | "per-chunk" => Ok(RepartitionStrategy::PerChunk),
+            "per_partition" | "perpartition" | "per-partition" => {
+                Ok(RepartitionStrategy::PerPartition)
+            }
+            "range" => Ok(RepartitionStrategy::Range),
+            _ => Err(format!(
+                "unknown repartition strategy '{}' (expected per_chunk, per_partition or range)",
+                s
+            )),
+        }
+    }
+}
+
 #[automock]
 pub trait ConfigObj: DIService {
     fn partition_split_threshold(&self) -> u64;
@@ -509,11 +540,6 @@ pub trait ConfigObj: DIService {
     /// default (hash placement); kept as a flag for rollout/rollback.
     fn load_aware_import_placement_enabled(&self) -> bool;
 
-    /// When enabled, an inactive parent partition is repartitioned by a single
-    /// per-partition job that loops over its persisted chunks, instead of one
-    /// job per chunk. Kept as a flag for emergency rollback.
-    fn batch_repartition_enabled(&self) -> bool;
-
     /// Time budget for a single batch repartition job. The job yields its runner
     /// slot once the budget is exceeded (after the current chunk); the remainder
     /// is drained by a follow-up job via the cascade. Kept separate from
@@ -535,6 +561,30 @@ pub trait ConfigObj: DIService {
     /// before they cross IPC to the select subprocess (which re-applies the same predicate).
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
+
+    /// When enabled, a merge group's chunk parquets (PerPartition / Range strategies) are
+    /// downloaded concurrently before building the merge inputs, instead of one at a time.
+    /// The group is already bounded by repartition_merge_max_input_files and the download
+    /// pool by download_concurrency, so no extra budget is needed. Off by default.
+    fn repartition_concurrent_download(&self) -> bool;
+
+    /// Which repartition strategy to use for an inactive parent's persisted chunks.
+    /// Defaults to PerChunk.
+    fn repartition_strategy(&self) -> RepartitionStrategy;
+
+    /// Cap on the number of chunks merged together in one Merge group / RepartitionRange.
+    /// Bounds the concurrent parquet readers, the k-way merge width, the swap size and
+    /// (since a range downloads its chunks sequentially) the per-job download time.
+    fn repartition_merge_max_input_files(&self) -> usize;
+
+    /// Cap on the total rows merged together in one Merge group / RepartitionRange.
+    fn repartition_merge_max_rows(&self) -> u64;
+
+    /// When enabled, the merge repartition path deactivates a table as corrupt if the
+    /// active children resolved for an inactive parent overlap. Off by default: the
+    /// streaming split never drops rows (the first child is the low catch-all, the last
+    /// the high one), and the legacy per-chunk path performed no such metadata check.
+    fn repartition_check_overlapping_children(&self) -> bool;
 
     fn allow_decimal128(&self) -> bool;
 
@@ -682,11 +732,15 @@ pub struct ConfigObjImpl {
     pub upload_to_remote: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
-    pub batch_repartition_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
     pub push_partial_aggregate_below_merge_enabled: bool,
     pub compaction_split_by_total_file_size_enabled: bool,
     pub prefilter_in_memory_chunks_enabled: bool,
+    pub repartition_concurrent_download: bool,
+    pub repartition_strategy: RepartitionStrategy,
+    pub repartition_merge_max_input_files: usize,
+    pub repartition_merge_max_rows: u64,
+    pub repartition_check_overlapping_children: bool,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -999,9 +1053,6 @@ impl ConfigObj for ConfigObjImpl {
     fn load_aware_import_placement_enabled(&self) -> bool {
         self.load_aware_import_placement_enabled
     }
-    fn batch_repartition_enabled(&self) -> bool {
-        self.batch_repartition_enabled
-    }
     fn repartition_chunks_time_budget_secs(&self) -> u64 {
         self.repartition_chunks_time_budget_secs
     }
@@ -1013,6 +1064,21 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn prefilter_in_memory_chunks_enabled(&self) -> bool {
         self.prefilter_in_memory_chunks_enabled
+    }
+    fn repartition_concurrent_download(&self) -> bool {
+        self.repartition_concurrent_download
+    }
+    fn repartition_strategy(&self) -> RepartitionStrategy {
+        self.repartition_strategy
+    }
+    fn repartition_merge_max_input_files(&self) -> usize {
+        self.repartition_merge_max_input_files
+    }
+    fn repartition_merge_max_rows(&self) -> u64 {
+        self.repartition_merge_max_rows
+    }
+    fn repartition_check_overlapping_children(&self) -> bool {
+        self.repartition_check_overlapping_children
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1346,6 +1412,24 @@ where
     })
 }
 
+// Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
+// back to per_chunk, so a typo in the strategy env never takes the process down.
+fn env_repartition_strategy() -> RepartitionStrategy {
+    match env::var("CUBESTORE_REPARTITION_STRATEGY") {
+        Ok(v) => match v.parse::<RepartitionStrategy>() {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using per_chunk",
+                    e
+                );
+                RepartitionStrategy::PerChunk
+            }
+        },
+        Err(_) => RepartitionStrategy::PerChunk,
+    }
+}
+
 impl Config {
     fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
         let trigger_size = match cache_max_size >> 20 {
@@ -1652,7 +1736,6 @@ impl Config {
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
                     false,
                 ),
-                batch_repartition_enabled: env_bool("CUBESTORE_BATCH_REPARTITION", false),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
                     60,
@@ -1667,6 +1750,23 @@ impl Config {
                 ),
                 prefilter_in_memory_chunks_enabled: env_bool(
                     "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
+                    false,
+                ),
+                repartition_concurrent_download: env_bool(
+                    "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
+                    false,
+                ),
+                repartition_strategy: env_repartition_strategy(),
+                repartition_merge_max_input_files: env_parse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_INPUT_FILES",
+                    50,
+                ),
+                repartition_merge_max_rows: env_parse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
+                    4_000_000,
+                ),
+                repartition_check_overlapping_children: env_bool(
+                    "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
@@ -1907,13 +2007,17 @@ impl Config {
                 upload_to_remote: true,
                 enable_topk: true,
                 load_aware_import_placement_enabled: false,
-                batch_repartition_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
                 push_partial_aggregate_below_merge_enabled: true,
                 compaction_split_by_total_file_size_enabled: false,
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
+                repartition_concurrent_download: false,
+                repartition_strategy: RepartitionStrategy::PerChunk,
+                repartition_merge_max_input_files: 50,
+                repartition_merge_max_rows: 4_000_000,
+                repartition_check_overlapping_children: false,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2779,4 +2883,26 @@ pub async fn uses_remote_metastore(i: &Injector) -> bool {
 
 pub fn is_router(c: &dyn ConfigObj) -> bool {
     !c.worker_bind_address().is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repartition_strategy_from_str() {
+        assert_eq!(
+            "per_chunk".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerChunk
+        );
+        assert_eq!(
+            "per_partition".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerPartition
+        );
+        assert_eq!(
+            "RANGE".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::Range
+        );
+        assert!("nonsense".parse::<RepartitionStrategy>().is_err());
+    }
 }

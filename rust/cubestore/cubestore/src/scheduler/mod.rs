@@ -1,5 +1,5 @@
 use crate::cluster::{pick_import_worker, pick_worker_by_ids, Cluster};
-use crate::config::ConfigObj;
+use crate::config::{ConfigObj, RepartitionStrategy};
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
@@ -51,6 +51,9 @@ pub struct SchedulerImpl {
     // Serializes load-aware import placement so concurrent CREATE TABLE events don't read
     // the same in-flight counts and pile onto the same worker before either job is scheduled.
     import_placement_lock: Mutex<()>,
+    // Short-TTL memo of the inactive parents still draining (range repartition), so the GC
+    // loop doesn't re-scan the whole chunk table on every cycle just to gate their deletion.
+    repartition_parents_cache: Mutex<Option<(Instant, Arc<HashSet<u64>>)>>,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -107,7 +110,35 @@ impl SchedulerImpl {
             node_last_actions: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
             import_placement_lock: Mutex::new(()),
+            repartition_parents_cache: Mutex::new(None),
         }
+    }
+
+    // Inactive parents that still have active chunks (range repartition in progress),
+    // memoized with a short TTL. The GC loop consults this to keep such parents' inactive
+    // chunks until they fully drain; the underlying query scans the chunk table, so caching
+    // avoids re-scanning it on every GC cycle. Staleness up to the TTL is harmless: the
+    // actual chunk deletion is already delayed by not_used_timeout.
+    async fn draining_repartition_parents(&self) -> Result<Arc<HashSet<u64>>, CubeError> {
+        const TTL: Duration = Duration::from_secs(5);
+        {
+            let guard = self.repartition_parents_cache.lock().await;
+            if let Some((at, set)) = guard.as_ref() {
+                if at.elapsed() < TTL {
+                    return Ok(set.clone());
+                }
+            }
+        }
+        let set = Arc::new(
+            self.meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?
+                .into_iter()
+                .map(|p| p.get_id())
+                .collect::<HashSet<u64>>(),
+        );
+        *self.repartition_parents_cache.lock().await = Some((Instant::now(), set.clone()));
+        Ok(set)
     }
 
     pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
@@ -633,8 +664,20 @@ impl SchedulerImpl {
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
+            // Range-based repartition slices an inactive parent over ALL its chunks
+            // (active and inactive) so the [start, end] ranges stay pinned to chunk ids.
+            // While such a parent is still draining, keep its inactive chunks: deleting
+            // them would shift the slicing boundaries on the next re-slice. Once the
+            // parent has no active chunks it is no longer in this set and its inactive
+            // chunks are collected normally.
+            let keep_parents = if self.config.repartition_strategy() == RepartitionStrategy::Range {
+                self.draining_repartition_parents().await?
+            } else {
+                Arc::new(HashSet::new())
+            };
             let ids = persistent_inactive
                 .iter()
+                .filter(|c| !keep_parents.contains(&c.get_row().get_partition_id()))
                 .map(|c| c.get_id())
                 .collect::<Vec<_>>();
             for part in ids.as_slice().chunks(10000) {
@@ -859,20 +902,25 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::DeleteJob(job) = event {
             match job.get_row().job_type() {
-                JobType::RepartitionChunk => match job.get_row().row_reference() {
-                    RowKey::Table(TableId::Chunks, c) => {
-                        let c = self.meta_store.get_chunk(*c).await?;
-                        let p = self
-                            .meta_store
-                            .get_partition(c.get_row().get_partition_id())
-                            .await?;
-                        self.schedule_repartition_if_needed(&p).await?
+                JobType::RepartitionChunk | JobType::RepartitionRange(_) => {
+                    match job.get_row().row_reference() {
+                        RowKey::Table(TableId::Chunks, c) => {
+                            let c = self.meta_store.get_chunk(*c).await?;
+                            let p = self
+                                .meta_store
+                                .get_partition(c.get_row().get_partition_id())
+                                .await?;
+                            // Re-slice the parent: drains any range whose job has not run
+                            // yet and picks up a tail chunk that landed after the previous
+                            // slicing (re-slicing is id-pinned, so existing ranges dedup).
+                            self.schedule_repartition_if_needed(&p).await?
+                        }
+                        _ => panic!(
+                            "Unexpected row reference: {:?}",
+                            job.get_row().row_reference()
+                        ),
                     }
-                    _ => panic!(
-                        "Unexpected row reference: {:?}",
-                        job.get_row().row_reference()
-                    ),
-                },
+                }
                 JobType::MultiPartitionSplit => match job.get_row().row_reference() {
                     RowKey::Table(TableId::MultiPartitions, m) => {
                         self.schedule_finish_multi_split_if_needed(*m).await?
