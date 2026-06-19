@@ -8,7 +8,9 @@ use std::rc::Rc;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::cube_bridge::base_query_options::{BaseQueryOptions, FilterItem as NativeFilterItem};
+use crate::cube_bridge::base_query_options::{
+    BaseQueryOptions, FilterItem as NativeFilterItem, FilterValue,
+};
 use crate::cube_bridge::member_expression::{
     MemberExpressionDefinition, MemberExpressionExpressionDef,
 };
@@ -471,7 +473,12 @@ impl QueryPropertiesCompiler {
                 member: Some(s.member_reference.clone()),
                 dimension: None,
                 operator: Some(s.operator.clone()),
-                values: s.values_references.clone(),
+                // `values_references` are SQL/member references resolved as
+                // plain strings; lift each into a typed `FilterValue`.
+                values: s
+                    .values_references
+                    .as_ref()
+                    .map(|vals| vals.iter().cloned().map(FilterValue::from).collect()),
             };
             filter_compiler.add_item(&native_filter)?;
         }

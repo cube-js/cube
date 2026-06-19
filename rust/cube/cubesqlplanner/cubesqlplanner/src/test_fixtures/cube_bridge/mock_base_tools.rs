@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::join_definition::JoinDefinition;
@@ -66,7 +67,7 @@ impl BaseTools for MockBaseTools {
         Ok(self.sql_utils.clone())
     }
 
-    fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
+    fn get_allocated_params(&self) -> Result<Vec<FilterValue>, CubeError> {
         Ok(vec![])
     }
 

@@ -1,5 +1,6 @@
 use super::filter_operator::FilterOperator;
 use super::typed_filter::{resolve_base_symbol, TypedFilter};
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::Compiler;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
@@ -39,7 +40,7 @@ impl BaseFilter {
         member_evaluator: Rc<MemberSymbol>,
         filter_type: FilterType,
         filter_operator: FilterOperator,
-        values: Option<Vec<Option<String>>>,
+        values: Option<Vec<FilterValue>>,
         compiler: Option<&mut Compiler>,
     ) -> Result<Rc<Self>, CubeError> {
         let typed_filter = TypedFilter::builder()
@@ -58,7 +59,7 @@ impl BaseFilter {
     pub fn change_operator(
         &self,
         filter_operator: FilterOperator,
-        values: Vec<Option<String>>,
+        values: Vec<FilterValue>,
         use_raw_values: bool,
         query_tools: Rc<crate::planner::query_tools::QueryTools>,
         compiler: Option<&mut Compiler>,
@@ -129,7 +130,7 @@ impl BaseFilter {
         }
     }
 
-    pub fn values(&self) -> &Vec<Option<String>> {
+    pub fn values(&self) -> &Vec<FilterValue> {
         self.typed_filter.values()
     }
 
@@ -175,8 +176,7 @@ impl BaseFilter {
                 self.typed_filter
                     .values()
                     .iter()
-                    .cloned()
-                    .filter_map(|v| v)
+                    .filter_map(|v| v.to_param_string())
                     .collect_vec(),
             )
         } else {

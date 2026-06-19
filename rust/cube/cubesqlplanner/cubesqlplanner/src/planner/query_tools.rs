@@ -191,7 +191,15 @@ impl QueryTools {
         should_reuse_params: bool,
         templates: &PlanSqlTemplates,
     ) -> Result<(String, Vec<String>), CubeError> {
-        let native_allocated_params = self.base_tools.get_allocated_params()?;
+        // Normalize allocated params to their canonical string form (a param can
+        // be a boolean/number scalar — e.g. a `securityContext` value), keeping
+        // the param channel as `Vec<String>`.
+        let native_allocated_params = self
+            .base_tools
+            .get_allocated_params()?
+            .into_iter()
+            .map(|p| p.to_param_string().unwrap_or_default())
+            .collect::<Vec<_>>();
         self.params_allocator.borrow().build_sql_and_params(
             sql,
             native_allocated_params,

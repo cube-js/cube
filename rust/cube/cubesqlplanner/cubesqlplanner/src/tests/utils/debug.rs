@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::filter::{
     BaseFilter, FilterGroup, FilterGroupOperator, FilterItem, FilterOperator,
 };
@@ -139,7 +140,7 @@ fn test_filter_simple_collapsed() {
         symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Equal,
-        Some(vec![Some("google".to_string())]),
+        Some(vec![FilterValue::Str("google".to_string())]),
         None,
     )
     .unwrap();
@@ -159,7 +160,7 @@ fn test_filter_simple_expanded() {
         symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Equal,
-        Some(vec![Some("google".to_string())]),
+        Some(vec![FilterValue::Str("google".to_string())]),
         None,
     )
     .unwrap();
@@ -180,7 +181,7 @@ fn test_filter_group_and_collapsed() {
         source_symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Equal,
-        Some(vec![Some("google".to_string())]),
+        Some(vec![FilterValue::Str("google".to_string())]),
         None,
     )
     .unwrap();
@@ -190,7 +191,7 @@ fn test_filter_group_and_collapsed() {
         id_symbol,
         crate::planner::filter::base_filter::FilterType::Dimension,
         FilterOperator::Gt,
-        Some(vec![Some("100".to_string())]),
+        Some(vec![FilterValue::Str("100".to_string())]),
         None,
     )
     .unwrap();

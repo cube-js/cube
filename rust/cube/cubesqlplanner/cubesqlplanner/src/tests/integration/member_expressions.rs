@@ -96,7 +96,9 @@ async fn test_expr_with_filter() {
         member: None,
         dimension: Some("orders.status".to_string()),
         operator: Some("equals".to_string()),
-        values: Some(vec![Some("completed".to_string())]),
+        values: Some(vec![
+            crate::cube_bridge::base_query_options::FilterValue::Str("completed".to_string()),
+        ]),
         or: None,
         and: None,
     };

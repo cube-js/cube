@@ -1,6 +1,6 @@
 use super::base_filter::{BaseFilter, FilterType};
 use super::FilterOperator;
-use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
+use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::{Compiler, MemberSymbol};
@@ -58,7 +58,7 @@ impl<'a> FilterCompiler<'a> {
                     item.clone(),
                     FilterType::Dimension,
                     FilterOperator::InDateRange,
-                    Some(date_range.into_iter().map(|v| Some(v)).collect()),
+                    Some(date_range.into_iter().map(FilterValue::Str).collect()),
                     None,
                 )?;
                 self.time_dimension_filters.push(FilterItem::Item(filter));

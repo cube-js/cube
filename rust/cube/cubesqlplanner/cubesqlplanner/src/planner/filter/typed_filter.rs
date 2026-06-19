@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::Compiler;
 use crate::planner::MemberSymbol;
@@ -54,7 +55,7 @@ pub struct TypedFilter {
     member_evaluator: Rc<MemberSymbol>,
     filter_type: FilterType,
     operator: FilterOperator,
-    values: Vec<Option<String>>,
+    values: Vec<FilterValue>,
     use_raw_values: bool,
     op: FilterOp,
 }
@@ -85,7 +86,7 @@ impl TypedFilter {
         &self.operator
     }
 
-    pub fn values(&self) -> &Vec<Option<String>> {
+    pub fn values(&self) -> &Vec<FilterValue> {
         &self.values
     }
 
@@ -104,7 +105,7 @@ pub struct TypedFilterBuilder {
     member_evaluator: Option<Rc<MemberSymbol>>,
     filter_type: Option<FilterType>,
     operator: Option<FilterOperator>,
-    values: Option<Vec<Option<String>>>,
+    values: Option<Vec<FilterValue>>,
     use_raw_values: bool,
     /// Pre-computed operation carried over from an existing filter. When set,
     /// `build` reuses it instead of recomputing from operator/values — which is
@@ -147,7 +148,7 @@ impl TypedFilterBuilder {
         self
     }
 
-    pub fn values(mut self, v: Option<Vec<Option<String>>>) -> Self {
+    pub fn values(mut self, v: Option<Vec<FilterValue>>) -> Self {
         self.values = v;
         self
     }
@@ -161,10 +162,19 @@ impl TypedFilterBuilder {
         }
     }
 
-    fn first_non_null_value(values: &[Option<String>]) -> Result<String, CubeError> {
+    fn first_non_null_value(values: &[FilterValue]) -> Result<FilterValue, CubeError> {
         values
             .iter()
-            .find_map(|v| v.as_ref().cloned())
+            .find(|v| !v.is_null())
+            .cloned()
+            .ok_or_else(|| CubeError::user("Expected one parameter but nothing found".to_string()))
+    }
+
+    /// First non-null value rendered as its parameter string. Used by the
+    /// date/interval operators, which operate on the string form.
+    fn first_non_null_string(values: &[FilterValue]) -> Result<String, CubeError> {
+        Self::first_non_null_value(values)?
+            .to_param_string()
             .ok_or_else(|| CubeError::user("Expected one parameter but nothing found".to_string()))
     }
 
@@ -194,13 +204,13 @@ impl TypedFilterBuilder {
             match operator {
                 FilterOperator::Equal | FilterOperator::NotEqual => {
                     let negated = matches!(operator, FilterOperator::NotEqual);
-                    let has_null = values.iter().any(|v| v.is_none());
+                    let has_null = values.iter().any(|v| v.is_null());
                     if values.len() > 1 {
                         FilterOp::InList(InListOp::new(negated, values, member_type))
                     } else if has_null {
                         // equals null → IS NULL, notEquals null → IS NOT NULL
                         FilterOp::Nullability(NullabilityOp::new(!negated))
-                    } else if let Some(Some(value)) = values.into_iter().next() {
+                    } else if let Some(value) = values.into_iter().next() {
                         FilterOp::Equality(EqualityOp::new(negated, value, member_type))
                     } else {
                         return Err(CubeError::user(
@@ -227,10 +237,10 @@ impl TypedFilterBuilder {
                 FilterOperator::Set => FilterOp::Nullability(NullabilityOp::new(false)),
                 FilterOperator::NotSet => FilterOp::Nullability(NullabilityOp::new(true)),
                 FilterOperator::InDateRange | FilterOperator::NotInDateRange => {
-                    let from = Self::first_non_null_value(&values)?;
+                    let from = Self::first_non_null_string(&values)?;
                     let to = values
                         .get(1)
-                        .and_then(|v| v.as_ref().cloned())
+                        .and_then(|v| v.to_param_string())
                         .ok_or_else(|| {
                             CubeError::user("2 arguments expected for date range".to_string())
                         })?;
@@ -242,36 +252,35 @@ impl TypedFilterBuilder {
                     FilterOp::DateRange(DateRangeOp::new(kind, from, to))
                 }
                 FilterOperator::BeforeDate => {
-                    let value = Self::first_non_null_value(&values)?;
+                    let value = Self::first_non_null_string(&values)?;
                     FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::Before, value))
                 }
                 FilterOperator::BeforeOrOnDate => {
-                    let value = Self::first_non_null_value(&values)?;
+                    let value = Self::first_non_null_string(&values)?;
                     FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::BeforeOrOn, value))
                 }
                 FilterOperator::AfterDate => {
-                    let value = Self::first_non_null_value(&values)?;
+                    let value = Self::first_non_null_string(&values)?;
                     FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::After, value))
                 }
                 FilterOperator::AfterOrOnDate => {
-                    let value = Self::first_non_null_value(&values)?;
+                    let value = Self::first_non_null_string(&values)?;
                     FilterOp::DateSingle(DateSingleOp::new(DateSingleKind::AfterOrOn, value))
                 }
                 FilterOperator::RegularRollingWindowDateRange => {
-                    let trailing = values.get(2).and_then(|v| v.clone());
-                    let leading = values.get(3).and_then(|v| v.clone());
+                    let trailing = values.get(2).and_then(|v| v.to_param_string());
+                    let leading = values.get(3).and_then(|v| v.to_param_string());
                     FilterOp::RegularRollingWindow(RegularRollingWindowOp::new(trailing, leading))
                 }
                 FilterOperator::ToDateRollingWindowDateRange => {
                     let granularity_name = values
                         .get(2)
-                        .and_then(|v| v.as_ref())
+                        .and_then(|v| v.to_param_string())
                         .ok_or_else(|| {
                             CubeError::user(
                                 "Granularity required for to_date rolling window".to_string(),
                             )
-                        })?
-                        .clone();
+                        })?;
 
                     let resolved = resolve_base_symbol(&member_evaluator);
                     let evaluator_compiler = compiler.ok_or_else(|| {
@@ -310,9 +319,9 @@ impl TypedFilterBuilder {
                 | FilterOperator::NotStartsWith
                 | FilterOperator::EndsWith
                 | FilterOperator::NotEndsWith => {
-                    let has_null = values.iter().any(|v| v.is_none());
+                    let has_null = values.iter().any(|v| v.is_null());
                     let non_null_values: Vec<String> =
-                        values.iter().filter_map(|v| v.clone()).collect();
+                        values.iter().filter_map(|v| v.to_param_string()).collect();
                     let (negated, start_wild, end_wild) = match operator {
                         FilterOperator::Contains => (false, true, true),
                         FilterOperator::NotContains => (true, true, true),

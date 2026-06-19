@@ -9,10 +9,141 @@ use cubenativeutils::wrappers::serializer::{
 };
 use cubenativeutils::wrappers::{NativeArray, NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
-use serde::{Deserialize, Serialize};
+use serde::de::Visitor;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::any::Any;
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
+
+/// A single value of a filter (`equals`, `in`, `gt`, …).
+#[derive(Debug, Clone, PartialEq)]
+pub enum FilterValue {
+    Str(String),
+    Bool(bool),
+    Num(f64),
+    Null,
+}
+
+impl FilterValue {
+    pub fn is_null(&self) -> bool {
+        matches!(self, FilterValue::Null)
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            FilterValue::Str(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Canonical string representation bound as a SQL parameter. `Null` yields
+    /// `None` (the value is dropped / handled as `IS NULL`). Whole numbers are
+    /// rendered without a trailing `.0` (`42.0` → `"42"`).
+    pub fn to_param_string(&self) -> Option<String> {
+        match self {
+            FilterValue::Str(s) => Some(s.clone()),
+            FilterValue::Bool(b) => Some(b.to_string()),
+            FilterValue::Num(n) => Some(Self::format_number(*n)),
+            FilterValue::Null => None,
+        }
+    }
+
+    fn format_number(n: f64) -> String {
+        if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 {
+            format!("{}", n as i64)
+        } else {
+            format!("{}", n)
+        }
+    }
+}
+
+impl From<Option<String>> for FilterValue {
+    fn from(value: Option<String>) -> Self {
+        match value {
+            Some(s) => FilterValue::Str(s),
+            None => FilterValue::Null,
+        }
+    }
+}
+
+impl From<String> for FilterValue {
+    fn from(value: String) -> Self {
+        FilterValue::Str(value)
+    }
+}
+
+impl Serialize for FilterValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            FilterValue::Str(s) => serializer.serialize_str(s),
+            FilterValue::Bool(b) => serializer.serialize_bool(*b),
+            FilterValue::Num(n) => serializer.serialize_f64(*n),
+            FilterValue::Null => serializer.serialize_none(),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FilterValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct FilterValueVisitor;
+
+        impl<'de> Visitor<'de> for FilterValueVisitor {
+            type Value = FilterValue;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string, boolean, number, or null")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
+                Ok(FilterValue::Bool(v))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> {
+                Ok(FilterValue::Num(v as f64))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {
+                Ok(FilterValue::Num(v as f64))
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {
+                Ok(FilterValue::Num(v))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(FilterValue::Str(v.to_string()))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E> {
+                Ok(FilterValue::Str(v))
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+                Ok(FilterValue::Null)
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E> {
+                Ok(FilterValue::Null)
+            }
+
+            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                deserializer.deserialize_any(self)
+            }
+        }
+
+        deserializer.deserialize_any(FilterValueVisitor)
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MaskedMemberItem {
@@ -35,7 +166,7 @@ pub struct FilterItem {
     pub member: Option<String>,
     pub dimension: Option<String>,
     pub operator: Option<String>,
-    pub values: Option<Vec<Option<String>>>,
+    pub values: Option<Vec<FilterValue>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

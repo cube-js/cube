@@ -1,4 +1,5 @@
 use super::{FilterOperationSql, FilterSqlContext};
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::filter::operators::like::LikeOp;
 use cubenativeutils::CubeError;
 
@@ -8,7 +9,7 @@ impl FilterOperationSql for LikeOp {
             &self
                 .values
                 .iter()
-                .map(|v| Some(v.clone()))
+                .map(|v| FilterValue::Str(v.clone()))
                 .collect::<Vec<_>>(),
             &self.member_type,
         )?;
