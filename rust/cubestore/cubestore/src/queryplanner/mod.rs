@@ -10,6 +10,7 @@ use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
 pub use planning::PlanningMeta;
 mod check_memory;
+mod group_by_limit_aggregate;
 pub mod physical_plan_flags;
 pub mod pretty_printers;
 mod projection_above_limit;
