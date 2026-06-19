@@ -3,9 +3,15 @@
 //! These tests verify that queries correctly match and use pre-aggregations,
 //! checking that the generated SQL contains references to pre-aggregation tables.
 
-use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::options_member::OptionsMember;
+use crate::test_fixtures::cube_bridge::{
+    MockMemberExpressionDefinition, MockMemberSql, MockSchema,
+};
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
+use std::rc::Rc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_basic_pre_agg_sql() {
@@ -494,6 +500,46 @@ async fn test_base_and_calculated_measure_parital_match() {
 }
 
 // --- Segment matching tests ---
+
+// When a cube's access policy denies the queried members, RBAC
+// (CompilerApi.applyRowLevelSecurity) appends a member-expression segment
+// `{ expression: () => '1 = 0', cubeName, name: 'rlsAccessDenied' }`. It
+// references no members (empty dependencies), so it's a constant filter on top
+// of the rollup and must not disqualify pre-aggregation matching.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_constant_member_expression_segment_keeps_pre_aggregation() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["main_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+    "};
+
+    let access_denied_segment = {
+        let sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new("1 = 0").unwrap());
+        let expr = MockMemberExpressionDefinition::builder()
+            .expression_name(Some("rlsAccessDenied".to_string()))
+            .cube_name(Some("orders".to_string()))
+            .expression(MemberExpressionExpressionDef::Sql(sql))
+            .build();
+        OptionsMember::MemberExpression(Rc::new(expr))
+    };
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations_with_segments(query_yaml, vec![access_denied_segment])
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "main_rollup");
+    assert!(
+        sql.contains("1 = 0"),
+        "expected the constant access-denied segment in SQL, got:\n{sql}"
+    );
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_segment_full_match() {

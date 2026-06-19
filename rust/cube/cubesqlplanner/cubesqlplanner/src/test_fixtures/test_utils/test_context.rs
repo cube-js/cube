@@ -1,5 +1,6 @@
 use crate::cube_bridge::base_query_options::{BaseQueryOptions, MaskedMemberItem};
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::cube_bridge::options_member::OptionsMember;
 use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
 use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
@@ -347,6 +348,17 @@ impl TestContext {
     ///
     /// Panics if YAML cannot be parsed.
     pub fn create_query_options_from_yaml(&self, yaml: &str) -> Rc<dyn BaseQueryOptions> {
+        self.create_query_options_from_yaml_with_segments(yaml, vec![])
+    }
+
+    /// Like `create_query_options_from_yaml`, but appends extra (typically
+    /// member-expression) segments that can't be expressed as YAML member
+    /// names — e.g. the constant `1 = 0` `rlsAccessDenied` segment RBAC injects.
+    pub fn create_query_options_from_yaml_with_segments(
+        &self,
+        yaml: &str,
+        extra_segments: Vec<OptionsMember>,
+    ) -> Rc<dyn BaseQueryOptions> {
         let yaml_options: YamlBaseQueryOptions = serde_yaml::from_str(yaml)
             .unwrap_or_else(|e| panic!("Failed to parse YAML query options: {}", e));
 
@@ -360,10 +372,14 @@ impl TestContext {
             .map(|d| members_from_strings(d))
             .filter(|d| !d.is_empty());
 
-        let segments = yaml_options
-            .segments
-            .map(|s| members_from_strings(s))
-            .filter(|s| !s.is_empty());
+        let segments = {
+            let mut segments = yaml_options
+                .segments
+                .map(|s| members_from_strings(s))
+                .unwrap_or_default();
+            segments.extend(extra_segments);
+            Some(segments).filter(|s| !s.is_empty())
+        };
 
         let order = yaml_options
             .order
@@ -444,7 +460,15 @@ impl TestContext {
     }
 
     pub fn create_query_properties(&self, yaml: &str) -> Result<Rc<QueryProperties>, CubeError> {
-        let options = self.create_query_options_from_yaml(yaml);
+        self.create_query_properties_with_segments(yaml, vec![])
+    }
+
+    pub fn create_query_properties_with_segments(
+        &self,
+        yaml: &str,
+        extra_segments: Vec<OptionsMember>,
+    ) -> Result<Rc<QueryProperties>, CubeError> {
+        let options = self.create_query_options_from_yaml_with_segments(yaml, extra_segments);
         QueryPropertiesCompiler::new(self.query_tools.clone()).build(options)
     }
 
@@ -469,7 +493,15 @@ impl TestContext {
         &self,
         query: &str,
     ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
-        let options = self.create_query_options_from_yaml(query);
+        self.build_sql_with_used_pre_aggregations_with_segments(query, vec![])
+    }
+
+    pub fn build_sql_with_used_pre_aggregations_with_segments(
+        &self,
+        query: &str,
+        extra_segments: Vec<OptionsMember>,
+    ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
+        let options = self.create_query_options_from_yaml_with_segments(query, extra_segments);
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
