@@ -315,7 +315,16 @@ impl<'a> DimensionMatcher<'a> {
                 Ok(result)
             }
             FilterItem::Segment(segment) => {
-                self.try_match_symbol(&segment.member_evaluator(), add_to_matched_dimension)
+                let symbol = segment.member_evaluator();
+                // An ad-hoc member-expression segment that references no members
+                // (a constant like the `1 = 0` rlsAccessDenied segment RBAC injects
+                // on access denial) is a filter pushable on top of any rollup, so it
+                // doesn't need pre-aggregation coverage. Named segments still must be
+                // covered and fall through to the regular matcher.
+                if segment.is_member_expression() && symbol.get_dependencies().is_empty() {
+                    return Ok(MatchState::Full);
+                }
+                self.try_match_symbol(&symbol, add_to_matched_dimension)
             }
         }
     }
@@ -339,26 +348,55 @@ impl<'a> DimensionMatcher<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+    use crate::cube_bridge::member_sql::MemberSql;
+    use crate::cube_bridge::options_member::OptionsMember;
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
-    use crate::test_fixtures::cube_bridge::MockSchema;
+    use crate::test_fixtures::cube_bridge::{
+        MockMemberExpressionDefinition, MockMemberSql, MockSchema,
+    };
     use crate::test_fixtures::test_utils::TestContext;
     use indoc::indoc;
+    use std::rc::Rc;
 
     fn create_test_context() -> TestContext {
         let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml");
         TestContext::new(schema).unwrap()
     }
 
+    /// Builds an ad-hoc member-expression segment (no registered `segments:`
+    /// path) from constant SQL — mirrors the `rlsAccessDenied` `1 = 0` segment.
+    fn const_expr_segment(name: &str, cube: &str, sql: &str) -> OptionsMember {
+        let member_sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(sql).unwrap());
+        let expr = MockMemberExpressionDefinition::builder()
+            .expression_name(Some(name.to_string()))
+            .cube_name(Some(cube.to_string()))
+            .expression(MemberExpressionExpressionDef::Sql(member_sql))
+            .build();
+        OptionsMember::MemberExpression(Rc::new(expr))
+    }
+
     fn match_pre_agg(ctx: &TestContext, pre_agg_name: &str, query_yaml: &str) -> MatchState {
+        match_pre_agg_with_segments(ctx, pre_agg_name, query_yaml, vec![])
+    }
+
+    fn match_pre_agg_with_segments(
+        ctx: &TestContext,
+        pre_agg_name: &str,
+        query_yaml: &str,
+        extra_segments: Vec<OptionsMember>,
+    ) -> MatchState {
         let cube_names = vec!["orders".to_string()];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
         let pre_agg = compiler.compile_pre_aggregation(&name).unwrap();
 
-        let qp = ctx.create_query_properties(query_yaml).unwrap();
+        let qp = ctx
+            .create_query_properties_with_segments(query_yaml, extra_segments)
+            .unwrap();
         let mut matcher = DimensionMatcher::new(ctx.query_tools().query_tools().clone(), &pre_agg);
         matcher
             .try_match(
@@ -740,6 +778,30 @@ mod tests {
                 "},
             ),
             MatchState::Partial,
+        );
+    }
+
+    #[test]
+    fn test_constant_member_expression_segment_full_match() {
+        let ctx = create_test_context();
+        // The ad-hoc `1 = 0` rlsAccessDenied segment references no members, so it's a
+        // constant filter pushable on top of any rollup and imposes no coverage
+        // requirement: with both rollup dimensions selected the match stays Full
+        // (without the fix the bare segment forces NotMatched).
+        assert_eq!(
+            match_pre_agg_with_segments(
+                &ctx,
+                "main_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                      - orders.city
+                "},
+                vec![const_expr_segment("rlsAccessDenied", "orders", "1 = 0")],
+            ),
+            MatchState::Full,
         );
     }
 

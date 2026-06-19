@@ -460,7 +460,15 @@ impl TestContext {
     }
 
     pub fn create_query_properties(&self, yaml: &str) -> Result<Rc<QueryProperties>, CubeError> {
-        let options = self.create_query_options_from_yaml(yaml);
+        self.create_query_properties_with_segments(yaml, vec![])
+    }
+
+    pub fn create_query_properties_with_segments(
+        &self,
+        yaml: &str,
+        extra_segments: Vec<OptionsMember>,
+    ) -> Result<Rc<QueryProperties>, CubeError> {
+        let options = self.create_query_options_from_yaml_with_segments(yaml, extra_segments);
         QueryPropertiesCompiler::new(self.query_tools.clone()).build(options)
     }
 

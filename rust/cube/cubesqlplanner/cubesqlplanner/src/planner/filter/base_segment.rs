@@ -14,6 +14,9 @@ pub struct BaseSegment {
     member_evaluator: Rc<MemberSymbol>,
     cube_name: String,
     name: String,
+    /// True when this segment is an ad-hoc query-level member expression (no
+    /// registered `segments:` path), as opposed to a named cube segment.
+    is_member_expression: bool,
 }
 
 impl PartialEq for BaseSegment {
@@ -38,6 +41,7 @@ impl BaseSegment {
             None,
             vec![cube_name.clone()],
         )?;
+        let is_member_expression = full_name.is_none();
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
         let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
 
@@ -46,7 +50,12 @@ impl BaseSegment {
             member_evaluator,
             cube_name,
             name,
+            is_member_expression,
         }))
+    }
+
+    pub fn is_member_expression(&self) -> bool {
+        self.is_member_expression
     }
     pub fn full_name(&self) -> String {
         self.full_name.clone()
