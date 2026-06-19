@@ -171,8 +171,25 @@ impl SqlNodesFactory {
     /// a top-level `RenderReferencesSqlNode` for query-wide reference
     /// substitution.
     pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
-        let evaluate_sql_processor =
-            MaskedSqlNode::new(EvaluateSqlNode::new(), self.group_by_members.clone());
+        // Build an "unmasked" copy of the tree first (masking disabled, but still
+        // dispatching by member kind). It is handed to the masked nodes so they
+        // can render mask-filter member references through it — routing
+        // dimensions through the dimension chain and avoiding mask recursion.
+        let unmasked_root = self.build_node_processor(true, None);
+        self.build_node_processor(false, Some(unmasked_root))
+    }
+
+    fn build_node_processor(
+        &self,
+        skip_masking: bool,
+        unmasked_root: Option<Rc<dyn SqlNode>>,
+    ) -> Rc<dyn SqlNode> {
+        let evaluate_sql_processor = MaskedSqlNode::new(
+            EvaluateSqlNode::new(),
+            self.group_by_members.clone(),
+            skip_masking,
+            unmasked_root.clone(),
+        );
         let auto_prefix_processor = AutoPrefixSqlNode::new(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
@@ -188,9 +205,19 @@ impl SqlNodesFactory {
         // Wrap the entire measure chain with MaskedSqlNode so masked measures
         // are intercepted before aggregation/ungrouped wrapping.
         let measure_processor = if self.ungrouped || self.ungrouped_measure {
-            MaskedSqlNode::new_ungrouped(measure_processor, self.group_by_members.clone())
+            MaskedSqlNode::new_ungrouped(
+                measure_processor,
+                self.group_by_members.clone(),
+                skip_masking,
+                unmasked_root.clone(),
+            )
         } else {
-            MaskedSqlNode::new(measure_processor, self.group_by_members.clone())
+            MaskedSqlNode::new(
+                measure_processor,
+                self.group_by_members.clone(),
+                skip_masking,
+                unmasked_root.clone(),
+            )
         };
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());

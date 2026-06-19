@@ -2192,7 +2192,8 @@ cubes:
       const [sql] = query.buildSqlAndParams();
       expect(sql).not.toMatch(/CASE\s+WHEN/);
       expect(sql).not.toMatch(/owner_id\s*=/);
-      expect(sql).toMatch(/-1\s+"transactions__total_cost"/);
+      // The Tesseract planner parenthesizes the masked literal, e.g. `(-1)`.
+      expect(sql).toMatch(/\(?-1\)?\s+"transactions__total_cost"/);
     });
 
     it('still applies conditional CASE WHEN masking for aggregate measures when the filter member is in the group by', async () => {
@@ -2236,6 +2237,52 @@ cubes:
       expect(sql).toMatch(/owner_id/);
     });
 
+    it('tesseract: still applies conditional CASE WHEN masking for aggregate measures when the filter member is in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id', 'transactions.owner_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+        useNativeSqlPlanner: true,
+      });
+      // Regression for "render dimension mask filters on grouped masked measures":
+      // the mask filter references owner_id, a dimension that is in the GROUP BY. The
+      // native planner must route it through the dimension chain instead of the measure
+      // chain — previously this threw "Measure filter node processor called for wrong node".
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/owner_id/);
+    });
+
     it('does not recurse when filter member is also masked', async () => {
       const compilers = prepareYamlCompiler(`
 cubes:
@@ -2274,6 +2321,53 @@ cubes:
           },
         ],
       });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/product_id/);
+      expect(sql).not.toMatch(/Maximum call stack/);
+    });
+
+    it('tesseract: does not recurse when filter member is also masked', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: items
+    sql_table: public.items
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: product_id
+        sql: product_id
+        type: number
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['items.count'],
+        dimensions: ['items.product_id', 'items.price'],
+        maskedMembers: [
+          {
+            member: 'items.product_id',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+          {
+            member: 'items.price',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+        ],
+        useNativeSqlPlanner: true,
+      });
+      // The filter member (product_id) is itself masked; rendering the mask filter
+      // through the "skip"-masking unmasked tree must not recurse back into masking.
       const [sql] = query.buildSqlAndParams();
       expect(sql).toMatch(/CASE\s+WHEN/);
       expect(sql).toMatch(/product_id/);
