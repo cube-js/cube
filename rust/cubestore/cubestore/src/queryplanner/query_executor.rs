@@ -970,18 +970,21 @@ impl CubeTable {
                             "Record batch for in memory chunk {:?} is not provided",
                             chunk
                         )))?;
-                    if let Some(batch) = record_batches.iter().next() {
-                        if batch.schema() != index_schema {
-                            return Err(CubeError::internal(format!(
-                                "Index schema {:?} and in memory chunk schema {:?} mismatch",
-                                index_schema,
-                                record_batches[0].schema()
-                            )));
-                        }
-                    }
+                    // In-memory chunks are written with plain column types. When dictionary encoding
+                    // is on the index schema exposes string columns as Dictionary, so cast the chunk
+                    // batches to the index schema (Utf8 -> Dictionary) instead of rejecting them --
+                    // this keeps the memory scan consistent with the dictionary parquet partitions
+                    // and feeds the dict-aware aggregate.
+                    let record_batches = match record_batches.iter().next() {
+                        Some(batch) if batch.schema() != index_schema => record_batches
+                            .iter()
+                            .map(|b| cast_record_batch_to_schema(b, &index_schema))
+                            .collect::<Result<Vec<_>, _>>()?,
+                        _ => record_batches.clone(),
+                    };
                     Arc::new(DataSourceExec::new(Arc::new(
                         MemorySourceConfig::try_new(
-                            &[record_batches.clone()],
+                            &[record_batches],
                             index_schema.clone(),
                             index_projection_or_none_on_schema_match.clone(),
                         )?
@@ -2190,6 +2193,26 @@ macro_rules! convert_array {
     }};
 }
 
+/// Cast a record batch's columns to `schema`'s field types. Used to bring in-memory chunk batches
+/// (written with plain types) up to the index schema, whose string columns are `Dictionary` when
+/// dictionary encoding is on.
+fn cast_record_batch_to_schema(
+    batch: &RecordBatch,
+    schema: &SchemaRef,
+) -> Result<RecordBatch, DataFusionError> {
+    // Columns are cast positionally, so the batch must align with the schema.
+    debug_assert_eq!(batch.num_columns(), schema.fields().len());
+    let mut columns = Vec::with_capacity(batch.num_columns());
+    for (column, field) in batch.columns().iter().zip(schema.fields()) {
+        if column.data_type() == field.data_type() {
+            columns.push(Arc::clone(column));
+        } else {
+            columns.push(cast(column, field.data_type())?);
+        }
+    }
+    Ok(RecordBatch::try_new(Arc::clone(schema), columns)?)
+}
+
 /// Cast any `Dictionary` columns of a batch to their value type, leaving other columns untouched.
 fn decode_dictionary_columns(batch: RecordBatch) -> Result<RecordBatch, CubeError> {
     let schema = batch.schema();
@@ -2602,7 +2625,75 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use datafusion::arrow::datatypes::Field;
+    use datafusion::arrow::array::DictionaryArray;
+    use datafusion::arrow::datatypes::{Field, Int32Type};
+
+    #[test]
+    fn test_cast_record_batch_to_dictionary_schema() -> Result<(), CubeError> {
+        // An in-memory chunk batch (plain Utf8) cast up to a dictionary-encoded index schema: the
+        // string column becomes Dictionary(Int32, Utf8) preserving values and nulls; other columns
+        // are untouched.
+        let src = Arc::new(Schema::new(vec![
+            Field::new("s", DataType::Utf8, true),
+            Field::new("n", DataType::Int64, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            src,
+            vec![
+                Arc::new(StringArray::from(vec![
+                    Some("b"),
+                    Some("a"),
+                    None,
+                    Some("b"),
+                ])) as ArrayRef,
+                Arc::new(Int64Array::from(vec![1, 2, 3, 4])) as ArrayRef,
+            ],
+        )?;
+        let target = Arc::new(Schema::new(vec![
+            Field::new(
+                "s",
+                DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
+                true,
+            ),
+            Field::new("n", DataType::Int64, true),
+        ]));
+
+        let out = cast_record_batch_to_schema(&batch, &target)?;
+        assert_eq!(out.schema(), target);
+        let dict = out
+            .column(0)
+            .as_any()
+            .downcast_ref::<DictionaryArray<Int32Type>>()
+            .unwrap();
+        let vals = dict
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let got: Vec<Option<String>> = dict
+            .keys()
+            .iter()
+            .map(|k| k.map(|k| vals.value(k as usize).to_string()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                Some("b".to_string()),
+                Some("a".to_string()),
+                None,
+                Some("b".to_string())
+            ]
+        );
+        assert_eq!(
+            out.column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .values(),
+            &[1, 2, 3, 4]
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_batch_to_dataframe() -> Result<(), CubeError> {

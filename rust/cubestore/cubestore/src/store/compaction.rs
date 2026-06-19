@@ -2873,6 +2873,86 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn dictionary_encoding_in_memory_group_by() {
+        Config::test("dictionary_encoding_in_memory_group_by")
+            .update_config(|mut c| {
+                c.dictionary_encoding_enabled = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service
+                    .exec_query("CREATE SCHEMA d")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // A unique-key table routes inserts through the streaming in-memory chunk path, so
+                // the scan reads them via the memory source (not parquet). `s` is a non-key string
+                // dimension we group by.
+                service
+                    .exec_query("CREATE TABLE d.t (id int, s text, n int) unique key (id)")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                service
+                    .exec_query(
+                        "INSERT INTO d.t (id, s, n, __seq) VALUES \
+                         (1, 'b', 10, 1), (2, 'a', 5, 2), (3, 'b', 7, 3), \
+                         (4, 'c', 1, 4), (5, 'a', 2, 5)",
+                    )
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // No compaction: the data stays in an in-memory chunk (Utf8), while the dictionary
+                // index schema exposes `s` as Dictionary. The memory scan must cast it instead of
+                // rejecting the mismatch.
+                let chunks = services
+                    .meta_store
+                    .get_chunks_by_partition(1, false)
+                    .await
+                    .unwrap();
+                assert!(
+                    !chunks.is_empty() && chunks.iter().all(|c| c.get_row().in_memory()),
+                    "expected in-memory chunks, got: {:?}",
+                    chunks
+                );
+
+                let result = service
+                    .exec_query("SELECT s, sum(n) FROM d.t GROUP BY 1 ORDER BY 1")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("a".to_string()),
+                            TableValue::Int(7)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("b".to_string()),
+                            TableValue::Int(17)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("c".to_string()),
+                            TableValue::Int(1)
+                        ]),
+                    ]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn compaction_wide_string_batches() {
         // Each chunk is read as a single sorted run whose batches keep their on-disk row-group
         // size (larger than the merge output batch size). Feed chunks whose batches exceed the
