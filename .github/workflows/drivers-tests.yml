@@ -62,7 +62,7 @@ on:
       use_tesseract_sql_planner:
         description: 'Enable TESSERACT_SQL_PLANNER?'
         required: true
-        default: 'false'
+        default: 'true'
         type: choice
         options:
           - 'true'
@@ -280,28 +280,28 @@ jobs:
           - snowflake-export-bucket-azure-via-storage-integration
           - snowflake-export-bucket-gcs
           - snowflake-export-bucket-gcs-prefix
-        use_tesseract_sql_planner: [ false ]
+        use_tesseract_sql_planner: [ true ]
         include:
           - database: postgres
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: snowflake
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: redshift
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: bigquery-export-bucket-gcs
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: athena-export-bucket-s3
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: databricks-jdbc
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: mysql
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: clickhouse
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: mssql
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: oracle
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
       fail-fast: false
 
     steps:
