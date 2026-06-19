@@ -272,7 +272,13 @@ impl QueryPropertiesCompiler {
                 }
                 let source_measure_compiled =
                     evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
-                let symbol = if let Ok(source_measure) = source_measure_compiled.as_measure() {
+                // A view measure is a reference wrapper whose type collapses to
+                // `number` (Calculated), which rejects additional filters. Resolve
+                // the reference chain to the owning cube measure so the filter is
+                // pushed inside the aggregation (`SUM(CASE WHEN ... END)`); a no-op
+                // for plain cube measures.
+                let resolved_source = source_measure_compiled.clone().resolve_reference_chain();
+                let symbol = if let Ok(source_measure) = resolved_source.as_measure() {
                     let patched_measure =
                         source_measure.new_patched(new_measure_type, filters_to_add)?;
                     MemberSymbol::new_measure(patched_measure)

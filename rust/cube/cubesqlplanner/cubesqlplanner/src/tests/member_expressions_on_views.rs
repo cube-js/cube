@@ -1,9 +1,9 @@
-use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::cube_bridge::member_expression::{ExpressionStruct, MemberExpressionExpressionDef};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::options_member::OptionsMember;
 use crate::test_fixtures::cube_bridge::{
-    members_from_strings, MockBaseQueryOptions, MockMemberExpressionDefinition, MockMemberSql,
-    MockSchema,
+    members_from_strings, MockBaseQueryOptions, MockExpressionStruct,
+    MockMemberExpressionDefinition, MockMemberSql, MockSchema, MockStructWithSqlMember,
 };
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -21,6 +21,34 @@ fn make_member_expression(expression_name: &str, cube_name: &str, sql: &str) -> 
         .name(Some(expression_name.to_string()))
         .cube_name(Some(cube_name.to_string()))
         .expression(MemberExpressionExpressionDef::Sql(member_sql))
+        .build();
+    OptionsMember::MemberExpression(Rc::new(expr))
+}
+
+// Builds a `PatchMeasure` member expression that adds one ad-hoc CASE-WHEN
+// filter to `source_measure` — the SQL-API mechanism for pushing a filter
+// inside a measure's aggregation.
+fn make_patched_measure(
+    expression_name: &str,
+    cube_name: &str,
+    source_measure: &str,
+    filter_sql: &str,
+) -> OptionsMember {
+    let filter = MockStructWithSqlMember::builder()
+        .sql(filter_sql.to_string())
+        .build();
+    let expr_struct = MockExpressionStruct::builder()
+        .expression_type("PatchMeasure".to_string())
+        .source_measure(Some(source_measure.to_string()))
+        .add_filters(Some(vec![Rc::new(filter)]))
+        .build();
+    let expr = MockMemberExpressionDefinition::builder()
+        .expression_name(Some(expression_name.to_string()))
+        .name(Some(expression_name.to_string()))
+        .cube_name(Some(cube_name.to_string()))
+        .expression(MemberExpressionExpressionDef::Struct(
+            Rc::new(expr_struct) as Rc<dyn ExpressionStruct>
+        ))
         .build();
     OptionsMember::MemberExpression(Rc::new(expr))
 }
@@ -175,6 +203,51 @@ async fn test_many_to_one_view_child_distinct_dim() {
     );
     let options = build_options_with_member_expression(&ctx, expr);
     ctx.build_sql_from_options(options.clone()).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg_from_options(options, "many_to_one_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Regression for 58b5c96 (push ad-hoc filters into view measure aggregation).
+// A PatchMeasure adding a CASE-WHEN filter to a measure exposed through a view
+// (`root_val_sum`, a SUM) must resolve the reference chain to the owning cube
+// measure so the filter is pushed inside the aggregation. Before the fix the
+// view measure's type collapsed to `number` (Calculated) and build_sql failed
+// with "Unsupported additional filters for measure ... type number".
+// root_test_dim='rt_x' → roots 1,2 → SUM = 10 + 20 = 30.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_many_to_one_view_patched_measure_filter() {
+    let ctx = create_test_context();
+    let expr = make_patched_measure(
+        "filtered_root_sum",
+        "many_to_one_view",
+        "many_to_one_view.root_val_sum",
+        "{many_to_one_view.root_test_dim} = 'rt_x'",
+    );
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![expr]))
+            .build(),
+    );
+
+    // build_sql itself is the regression guard: before the fix it returned
+    // Err("Unsupported additional filters ...") and this unwrap panicked.
+    let sql = ctx.build_sql_from_options(options.clone()).unwrap();
+    // The ad-hoc filter is pushed inside the aggregation (measure_filter.rs
+    // renders `CASE WHEN <filter> THEN <result> END`), not as an outer WHERE.
+    assert!(
+        sql.contains("CASE WHEN"),
+        "ad-hoc filter must be pushed inside the aggregation, got: {sql}"
+    );
 
     if let Some(result) = ctx
         .try_execute_pg_from_options(options, "many_to_one_tables.sql")
