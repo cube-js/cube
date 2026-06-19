@@ -4040,7 +4040,10 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    return localTimestampToUtc(this.timezone, this.timestampFormat(), date);
+    // Pre-aggregation partition ranges are computed eagerly by the native
+    // planner during matching; default to UTC when the query has no timezone
+    // so an unset timezone doesn't throw "Unknown timezone: undefined".
+    return localTimestampToUtc(this.timezone || 'UTC', this.timestampFormat(), date);
   }
 
   /**
