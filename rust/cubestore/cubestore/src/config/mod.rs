@@ -633,6 +633,10 @@ pub trait ConfigObj: DIService {
 
     fn disk_space_cache_duration_secs(&self) -> u64;
 
+    fn disk_space_compute_lock_timeout_ms(&self) -> u64;
+
+    fn metastore_batch_rpc(&self) -> bool;
+
     fn transport_max_message_size(&self) -> usize;
     fn transport_max_frame_size(&self) -> usize;
 
@@ -764,6 +768,8 @@ pub struct ConfigObjImpl {
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
+    pub disk_space_compute_lock_timeout_ms: u64,
+    pub metastore_batch_rpc: bool,
     pub transport_max_message_size: usize,
     pub transport_max_frame_size: usize,
     pub local_files_cleanup_interval_secs: u64,
@@ -1170,6 +1176,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn disk_space_cache_duration_secs(&self) -> u64 {
         self.disk_space_cache_duration_secs
+    }
+
+    fn disk_space_compute_lock_timeout_ms(&self) -> u64 {
+        self.disk_space_compute_lock_timeout_ms
+    }
+
+    fn metastore_batch_rpc(&self) -> bool {
+        self.metastore_batch_rpc
     }
 
     fn transport_max_message_size(&self) -> usize {
@@ -1850,6 +1864,13 @@ impl Config {
                     * 1024
                     * 1024,
                 disk_space_cache_duration_secs: 300,
+                disk_space_compute_lock_timeout_ms: env_parse_duration(
+                    "CUBESTORE_DISK_SPACE_LOCK_WAIT_MS",
+                    1000,
+                    Some(60_000),
+                    None,
+                ),
+                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", false),
                 transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
@@ -2045,6 +2066,8 @@ impl Config {
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
+                disk_space_compute_lock_timeout_ms: 1000,
+                metastore_batch_rpc: false,
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
                 local_files_cleanup_interval_secs: 600,

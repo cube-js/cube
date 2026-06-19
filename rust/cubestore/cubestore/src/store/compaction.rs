@@ -608,12 +608,19 @@ impl CompactionService for CompactionServiceImpl {
             let new_partitions_count =
                 new_partitions_count_by_rows.max(new_partitions_count_by_file_size);
 
-            for _ in 0..new_partitions_count {
-                new_partitions.push(
-                    self.meta_store
-                        .create_partition(Partition::new_child(&partition, None))
-                        .await?,
-                );
+            if self.config.metastore_batch_rpc() {
+                let children = (0..new_partitions_count)
+                    .map(|_| Partition::new_child(&partition, None))
+                    .collect::<Vec<_>>();
+                new_partitions = self.meta_store.create_partitions(children).await?;
+            } else {
+                for _ in 0..new_partitions_count {
+                    new_partitions.push(
+                        self.meta_store
+                            .create_partition(Partition::new_child(&partition, None))
+                            .await?,
+                    );
+                }
             }
         }
 
@@ -694,10 +701,8 @@ impl CompactionService for CompactionServiceImpl {
             None => Arc::new(EmptyExec::new(schema.clone())),
         };
 
-        let table = self
-            .meta_store
-            .get_table_by_id(index.get_row().table_id())
-            .await?;
+        // `table` is already loaded by get_partition_for_compaction above and is immutable for
+        // the duration of the job, so reuse it instead of re-fetching over the metastore RPC.
         let unique_key = table.get_row().unique_key_columns();
         let aggregate_columns = match index.get_row().get_type() {
             IndexType::Regular => None,
@@ -960,6 +965,7 @@ impl CompactionService for CompactionServiceImpl {
             self.meta_store.clone(),
             self.remote_fs.clone(),
             self.metadata_cache_factory.clone(),
+            self.config.metastore_batch_rpc(),
             keys,
             key_len,
             multi_partition_id,
@@ -1003,6 +1009,7 @@ impl CompactionService for CompactionServiceImpl {
             self.meta_store.clone(),
             self.remote_fs.clone(),
             self.metadata_cache_factory.clone(),
+            self.config.metastore_batch_rpc(),
             keys,
             key_len,
             multi_partition_id,
@@ -1790,6 +1797,9 @@ mod tests {
             .expect_compaction_split_by_total_file_size_enabled()
             .returning(|| false);
 
+        // Exercise the batched create_partitions path for the split below.
+        config.expect_metastore_batch_rpc().returning(|| true);
+
         let compaction_service = CompactionServiceImpl::new(
             metastore.clone(),
             Arc::new(chunk_store),
@@ -2361,7 +2371,13 @@ mod tests {
         ];
 
         let (chunk, _) = chunk_store
-            .add_chunk_columns(aggr_index.clone(), partition.clone(), data1.clone(), false)
+            .add_chunk_columns(
+                aggr_index.clone(),
+                &table,
+                partition.clone(),
+                data1.clone(),
+                false,
+            )
             .await
             .unwrap()
             .await
@@ -2370,7 +2386,13 @@ mod tests {
         metastore.chunk_uploaded(chunk.get_id()).await.unwrap();
 
         let (chunk, _) = chunk_store
-            .add_chunk_columns(aggr_index.clone(), partition.clone(), data2.clone(), false)
+            .add_chunk_columns(
+                aggr_index.clone(),
+                &table,
+                partition.clone(),
+                data2.clone(),
+                false,
+            )
             .await
             .unwrap()
             .await
@@ -2856,6 +2878,7 @@ struct MultiSplit {
     meta: Arc<dyn MetaStore>,
     fs: Arc<dyn RemoteFs>,
     metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
+    metastore_batch_rpc: bool,
     keys: Vec<Row>,
     key_len: usize,
     multi_partition_id: u64,
@@ -2872,6 +2895,7 @@ impl MultiSplit {
         meta: Arc<dyn MetaStore>,
         fs: Arc<dyn RemoteFs>,
         metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
+        metastore_batch_rpc: bool,
         keys: Vec<Row>,
         key_len: usize,
         multi_partition_id: u64,
@@ -2882,6 +2906,7 @@ impl MultiSplit {
             meta,
             fs,
             metadata_cache_factory,
+            metastore_batch_rpc,
             keys,
             key_len,
             multi_partition_id,
@@ -2902,18 +2927,28 @@ impl MultiSplit {
         let new_partition_rows = &mut self.new_partition_rows;
         let uploads = &mut self.uploads;
 
-        let mut children = Vec::with_capacity(mchildren.len());
-        for mc in mchildren.iter() {
-            let c = Partition::new_child(&p.partition, Some(mc.get_id()));
-            let c = c.update_min_max_and_row_count(
-                mc.get_row().min_row().cloned(),
-                mc.get_row().max_row().cloned(),
-                0,
-                None,
-                None,
-            );
-            children.push(self.meta.create_partition(c).await?)
-        }
+        let child_defs = mchildren
+            .iter()
+            .map(|mc| {
+                let c = Partition::new_child(&p.partition, Some(mc.get_id()));
+                c.update_min_max_and_row_count(
+                    mc.get_row().min_row().cloned(),
+                    mc.get_row().max_row().cloned(),
+                    0,
+                    None,
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
+        let children = if self.metastore_batch_rpc {
+            self.meta.create_partitions(child_defs).await?
+        } else {
+            let mut children = Vec::with_capacity(child_defs.len());
+            for c in child_defs {
+                children.push(self.meta.create_partition(c).await?);
+            }
+            children
+        };
 
         let mut in_files = Vec::new();
         collect_remote_files(&p, &mut in_files);
