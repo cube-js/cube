@@ -2786,6 +2786,93 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn dictionary_encoding_native_read_group_by() {
+        Config::test("dictionary_encoding_native_read_group_by")
+            .update_config(|mut c| {
+                c.dictionary_encoding_enabled = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("CREATE SCHEMA d")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // A string group key alongside Timestamp and Decimal columns: with dictionary encoding
+                // the parquet reader is handed the dictionary schema, whose strict per-field check must
+                // accept every column type (not just the dictionary one).
+                service
+                    .exec_query("CREATE TABLE d.t (s text, ts timestamp, dec decimal(10,2), n int)")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                service
+                    .exec_query(
+                        "INSERT INTO d.t (s, ts, dec, n) VALUES \
+                         ('b', '2020-01-01T00:00:00.000Z', 1.50, 10), \
+                         ('a', '2020-01-02T00:00:00.000Z', 2.50, 5), \
+                         ('b', '2020-01-03T00:00:00.000Z', 3.50, 7), \
+                         ('c', '2020-01-04T00:00:00.000Z', 4.50, 1), \
+                         ('a', '2020-01-05T00:00:00.000Z', 2.00, 2)",
+                    )
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // Persist the in-memory chunk into the partition's parquet main table so the scan goes
+                // through the native dictionary reader rather than the in-memory chunk.
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 1);
+                assert_eq!(partitions[0].get_row().main_table_row_count(), 5);
+
+                let result = service
+                    .exec_query("SELECT s, sum(n) FROM d.t GROUP BY 1 ORDER BY 1")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("a".to_string()),
+                            TableValue::Int(7)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("b".to_string()),
+                            TableValue::Int(17)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("c".to_string()),
+                            TableValue::Int(1)
+                        ]),
+                    ]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn compaction_wide_string_batches() {
         // Each chunk is read as a single sorted run whose batches keep their on-disk row-group
         // size (larger than the merge output batch size). Feed chunks whose batches exceed the

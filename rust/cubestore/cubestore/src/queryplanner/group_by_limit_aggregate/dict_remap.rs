@@ -87,3 +87,82 @@ impl GlobalDict {
         Ok(Arc::new(dict))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dict(values: Vec<Option<&str>>, keys: Vec<Option<i32>>) -> ArrayRef {
+        let values = StringArray::from(values);
+        let keys = Int32Array::from(keys);
+        Arc::new(DictionaryArray::<Int32Type>::try_new(keys, Arc::new(values)).unwrap())
+    }
+
+    fn ids(a: &ArrayRef) -> Int32Array {
+        a.as_any().downcast_ref::<Int32Array>().unwrap().clone()
+    }
+
+    fn rebuilt_strings(a: &ArrayRef) -> Vec<Option<String>> {
+        let d = a
+            .as_any()
+            .downcast_ref::<DictionaryArray<Int32Type>>()
+            .unwrap();
+        let v = d.values().as_any().downcast_ref::<StringArray>().unwrap();
+        d.keys()
+            .iter()
+            .map(|k| k.map(|k| v.value(k as usize).to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn remaps_to_consistent_global_ids_across_batches() {
+        let mut gd = GlobalDict::new();
+        // batch 1: local dict ["b", "a"], rows b, a, b
+        let b1 = ids(&gd
+            .remap(&dict(
+                vec![Some("b"), Some("a")],
+                vec![Some(0), Some(1), Some(0)],
+            ))
+            .unwrap());
+        // batch 2: a DIFFERENT local dict ["a", "c"], rows c, a -- "a" must reuse its global id
+        let b2 = ids(&gd
+            .remap(&dict(vec![Some("a"), Some("c")], vec![Some(1), Some(0)]))
+            .unwrap());
+
+        assert_eq!(b1.values(), &[0, 1, 0]); // b=0, a=1 (first-seen)
+        assert_eq!(b2.value(1), b1.value(1)); // same string "a" -> same global id across batches
+        assert_ne!(b2.value(0), b1.value(0)); // "c" is a new id
+
+        // rebuild over the accumulated global ids yields the original strings
+        let all: ArrayRef = Arc::new(Int32Array::from(vec![
+            b1.value(0),
+            b1.value(1),
+            b2.value(0),
+        ]));
+        assert_eq!(
+            rebuilt_strings(&gd.rebuild(&all).unwrap()),
+            vec![
+                Some("b".to_string()),
+                Some("a".to_string()),
+                Some("c".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn null_keys_and_null_entries_stay_null() {
+        let mut gd = GlobalDict::new();
+        // local dict ["x", null]; rows: x, null-key, points-to-null-entry
+        let r = gd
+            .remap(&dict(vec![Some("x"), None], vec![Some(0), None, Some(1)]))
+            .unwrap();
+        let r = ids(&r);
+        assert!(r.is_valid(0));
+        assert!(r.is_null(1));
+        assert!(r.is_null(2));
+        assert_eq!(
+            rebuilt_strings(&gd.rebuild(&(Arc::new(r) as ArrayRef)).unwrap()),
+            vec![Some("x".to_string()), None, None]
+        );
+    }
+}
