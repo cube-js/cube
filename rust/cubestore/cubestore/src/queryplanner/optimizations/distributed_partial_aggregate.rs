@@ -1,5 +1,6 @@
 use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::check_memory::CheckMemoryExec;
+use crate::queryplanner::group_by_limit_aggregate::GroupByLimitAggregateExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
@@ -286,13 +287,15 @@ pub fn push_sorted_partial_aggregate_below_merge(
 /// key) would drop partial states of tied groups.
 pub fn push_worker_sort_and_limit(
     p: Arc<dyn ExecutionPlan>,
+    group_by_limit_factor: usize,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // Worker side: wrap the partial aggregate with a per-partition bounded sort.
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
         };
-        let Some(new_input) = resort_worker_subtree(&w.input, &cols, fetch) else {
+        let Some(new_input) = resort_worker_subtree(&w.input, &cols, fetch, group_by_limit_factor)
+        else {
             return Ok(p);
         };
         return Ok(Arc::new(WorkerExec::new(
@@ -324,8 +327,12 @@ pub fn push_worker_sort_and_limit(
     let Some((cols, fetch)) = cs.worker_sort_and_limit.clone() else {
         return Ok(p);
     };
-    let Some(new_worker_subtree) = resort_worker_subtree(&cs.input_for_optimizations, &cols, fetch)
-    else {
+    let Some(new_worker_subtree) = resort_worker_subtree(
+        &cs.input_for_optimizations,
+        &cols,
+        fetch,
+        group_by_limit_factor,
+    ) else {
         return Ok(p);
     };
     let new_cs: Arc<dyn ExecutionPlan> =
@@ -377,6 +384,7 @@ fn resort_worker_subtree(
     worker_subtree: &Arc<dyn ExecutionPlan>,
     cols: &[(usize, bool, bool)],
     fetch: usize,
+    group_by_limit_factor: usize,
 ) -> Option<Arc<dyn ExecutionPlan>> {
     let partial = locate_partial_aggregate(worker_subtree)?;
     let schema = partial.schema();
@@ -392,8 +400,44 @@ fn resort_worker_subtree(
         });
     }
     let worker_order = LexOrdering::new(exprs);
+
+    // Trim during aggregation: replace the partial hash aggregate with a GroupByLimitAggregateExec
+    // so it keeps only the top-k groups by `cols` instead of materializing every group and letting
+    // the Sort below trim afterwards. The Sort above still sorts the (now <= k) groups so the
+    // router's sort-preserving merge stays correct. `group_by_limit_factor == 0` disables this and
+    // falls back to the plain sort-then-trim.
+    let trimmed: Arc<dyn ExecutionPlan> = if group_by_limit_factor > 0 {
+        if let Some(agg) = partial.as_any().downcast_ref::<AggregateExec>() {
+            let order: Vec<(usize, SortOptions)> = cols
+                .iter()
+                .map(|(idx, asc, nulls_first)| {
+                    (
+                        *idx,
+                        SortOptions {
+                            descending: !asc,
+                            nulls_first: *nulls_first,
+                        },
+                    )
+                })
+                .collect();
+            match GroupByLimitAggregateExec::try_new_from_partial(
+                agg,
+                fetch,
+                group_by_limit_factor,
+                order,
+            ) {
+                Some(e) => Arc::new(e) as Arc<dyn ExecutionPlan>,
+                None => partial,
+            }
+        } else {
+            partial
+        }
+    } else {
+        partial
+    };
+
     let per_partition_sort: Arc<dyn ExecutionPlan> = Arc::new(
-        SortExec::new(worker_order.clone(), partial)
+        SortExec::new(worker_order.clone(), trimmed)
             .with_fetch(Some(fetch))
             .with_preserve_partitioning(true),
     );

@@ -567,6 +567,7 @@ impl QueryExecutorImpl {
             cluster,
             serialized_plan,
             self.memory_handler.clone(),
+            self.config.group_by_limit_factor(),
         ))
     }
 
@@ -582,6 +583,7 @@ impl QueryExecutorImpl {
             worker_planning_params,
             self.memory_handler.clone(),
             data_loaded_size.clone(),
+            self.config.group_by_limit_factor(),
         ))
     }
 
