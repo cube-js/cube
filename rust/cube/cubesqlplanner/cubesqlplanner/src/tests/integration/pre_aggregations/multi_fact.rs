@@ -304,6 +304,48 @@ async fn test_regular_plus_two_multiplied_separate_pre_aggs() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unmultiplied_measure_rejects_multiplied_pre_agg(
+) -> Result<(), cubenativeutils::CubeError> {
+    // Regression for b07edca: a query for an unmultiplied measure must not match
+    // a pre-agg that multiplies it. `orders_by_addr_street` groups `orders.count`
+    // by `addresses.street`, and the orders → customers → addresses path crosses
+    // a one_to_many join, so `orders.count` is multiplied there and stores a
+    // different value. A plain `orders.count` query (no addresses.street) must
+    // fall back to the unmultiplied `orders_totals`, not roll up the multiplied
+    // pre-agg.
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_pre_aggs.yaml")
+        .only_pre_aggregations(&["orders_totals", "orders_by_addr_street"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query)?;
+
+    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
+
+    assert_eq!(
+        pre_aggrs.len(),
+        1,
+        "Expected exactly one pre-aggregation usage; got {:?}",
+        names
+    );
+    assert_eq!(
+        pre_aggrs[0].name(),
+        "orders_totals",
+        "Expected unmultiplied orders_totals; multiplied orders_by_addr_street must be rejected; got {:?}",
+        names
+    );
+
+    if let Some(result) = ctx.try_execute(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+    Ok(())
+}
+
 // --- Filtered variants ---
 // Each test below uses the same query shape as its non-filtered counterpart
 // above but adds a filter on customers.name (not in projection) to verify
