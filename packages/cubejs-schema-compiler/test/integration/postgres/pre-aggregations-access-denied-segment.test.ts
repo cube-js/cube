@@ -5,8 +5,7 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 // (CompilerApi.applyRowLevelSecurity) appends a member-expression segment
 // `{ expression: () => '1 = 0', cubeName, name: 'rlsAccessDenied' }`. The rollup
 // must still be selected (the `1 = 0` is just a constant filter on top of it).
-// This guards that the segment doesn't disqualify pre-aggregation matching —
-// the planner is exercised both with and without the Tesseract flags in CI.
+// This guards that the segment doesn't disqualify pre-aggregation matching.
 describe('PreAggregations access-denied segment', () => {
   jest.setTimeout(200000);
 
