@@ -2,6 +2,7 @@ use super::join_graph::{JoinGraph, NativeJoinGraph};
 use super::join_hints::JoinHintItem;
 use super::options_member::OptionsMember;
 use super::security_context::{NativeSecurityContext, SecurityContext};
+use super::subquery_join::{NativeSubqueryJoin, SubqueryJoin};
 use crate::cube_bridge::base_tools::{BaseTools, NativeBaseTools};
 use crate::cube_bridge::evaluator::{CubeEvaluator, NativeCubeEvaluator};
 use cubenativeutils::wrappers::serializer::{
@@ -239,6 +240,8 @@ pub trait BaseQueryOptions {
     fn security_context(&self) -> Result<Rc<dyn SecurityContext>, CubeError>;
     #[nbridge(field, optional, vec)]
     fn join_hints(&self) -> Result<Option<Vec<JoinHintItem>>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn subquery_joins(&self) -> Result<Option<Vec<Rc<dyn SubqueryJoin>>>, CubeError>;
 }
 
 #[cfg(test)]

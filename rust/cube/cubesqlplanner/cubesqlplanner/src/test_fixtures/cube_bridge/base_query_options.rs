@@ -17,6 +17,7 @@ use crate::{
         join_hints::JoinHintItem,
         options_member::OptionsMember,
         security_context::SecurityContext,
+        subquery_join::SubqueryJoin,
     },
     impl_static_data,
 };
@@ -39,6 +40,8 @@ pub struct MockBaseQueryOptions {
     segments: Option<Vec<OptionsMember>>,
     #[builder(default)]
     join_hints: Option<Vec<JoinHintItem>>,
+    #[builder(default)]
+    subquery_joins: Option<Vec<Rc<dyn SubqueryJoin>>>,
 
     // Fields from BaseQueryOptionsStatic
     #[builder(default)]
@@ -200,6 +203,14 @@ impl BaseQueryOptions for MockBaseQueryOptions {
 
     fn join_hints(&self) -> Result<Option<Vec<JoinHintItem>>, CubeError> {
         Ok(self.join_hints.clone())
+    }
+
+    fn has_subquery_joins(&self) -> Result<bool, CubeError> {
+        Ok(self.subquery_joins.is_some())
+    }
+
+    fn subquery_joins(&self) -> Result<Option<Vec<Rc<dyn SubqueryJoin>>>, CubeError> {
+        Ok(self.subquery_joins.clone())
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

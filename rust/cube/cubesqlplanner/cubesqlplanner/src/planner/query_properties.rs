@@ -9,6 +9,7 @@
 use super::state::State;
 use super::MemberSymbol;
 use crate::cube_bridge::base_query_options::FilterValue;
+use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
@@ -176,6 +177,10 @@ pub struct QueryProperties {
     disable_external_pre_aggregations: bool,
     #[builder(default)]
     pre_aggregation_id: Option<String>,
+    /// Query-level joins against opaque sub-queries, from the SQL API
+    /// `subqueryJoins`. Folded into the query's `LogicalJoin` source.
+    #[builder(default)]
+    subquery_joins: Vec<LogicalSubqueryJoinItem>,
     #[builder(setter(skip), default)]
     multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
 }
@@ -205,6 +210,10 @@ impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
 impl QueryProperties {
     pub fn allow_multi_stage(&self) -> bool {
         self.allow_multi_stage
+    }
+
+    pub fn subquery_joins(&self) -> &Vec<LogicalSubqueryJoinItem> {
+        &self.subquery_joins
     }
 
     // Push every entry of `dimensions_filters` into matching `case`
@@ -1140,6 +1149,7 @@ impl PartialEq for QueryProperties {
             disable_external_pre_aggregations,
             pre_aggregation_id,
             query_join_hints,
+            subquery_joins,
             // Not part of semantic equality:
             query_tools: _,
             multi_fact_join_groups: _,
@@ -1164,5 +1174,14 @@ impl PartialEq for QueryProperties {
             && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
             && *pre_aggregation_id == other.pre_aggregation_id
             && *query_join_hints == other.query_join_hints
+            // Compare sub-query joins by their request-derived identity (the
+            // compiled `on_sql` is derived deterministically from these).
+            && subquery_joins.len() == other.subquery_joins.len()
+            && subquery_joins
+                .iter()
+                .zip(other.subquery_joins.iter())
+                .all(|(a, b)| {
+                    a.sql == b.sql && a.alias == b.alias && a.join_type == b.join_type
+                })
     }
 }

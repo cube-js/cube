@@ -1,6 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::LogicalJoin;
-use crate::physical_plan::{From, JoinBuilder, JoinCondition};
+use crate::physical_plan::{From, JoinBuilder, JoinCondition, SingleSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::SqlJoinCondition;
 use cubenativeutils::CubeError;
@@ -38,6 +38,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         let root = logical_join.root().clone().unwrap().cube().clone();
         if logical_join.joins().is_empty()
             && logical_join.dimension_subqueries().is_empty()
+            && logical_join.subquery_joins().is_empty()
             && multi_stage_dimension.is_none()
         {
             Ok(From::new_from_cube(
@@ -89,6 +90,17 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     &mut join_builder,
                     &context,
                 )?;
+            }
+            for subquery_join in logical_join.subquery_joins().iter() {
+                let source = SingleSource::RawSubquerySql(subquery_join.sql.clone());
+                let on = JoinCondition::new_base_join(SqlJoinCondition::try_new(
+                    subquery_join.on_sql.clone(),
+                )?);
+                if subquery_join.join_type.eq_ignore_ascii_case("INNER") {
+                    join_builder.inner_join_source(source, subquery_join.alias.clone(), on);
+                } else {
+                    join_builder.left_join_source(source, subquery_join.alias.clone(), on);
+                }
             }
             Ok(From::new_from_join(join_builder.build()))
         }

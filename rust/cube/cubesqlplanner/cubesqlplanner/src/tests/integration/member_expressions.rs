@@ -1,11 +1,13 @@
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::options_member::OptionsMember;
+use crate::cube_bridge::subquery_join::SubqueryJoin;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockMemberExpressionDefinition, MockMemberSql,
-    MockSchema,
+    MockSchema, MockSubqueryJoin,
 };
 use crate::test_fixtures::test_utils::TestContext;
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 const SEED: &str = "integration_basic_tables.sql";
@@ -35,6 +37,33 @@ fn make_measure_expression(name: &str, cube: &str, sql: &str) -> OptionsMember {
         .expression(MemberExpressionExpressionDef::Sql(member_sql))
         .build();
     OptionsMember::MemberExpression(Rc::new(expr))
+}
+
+// Mirrors a SQL-API `subqueryJoins` entry: opaque sub-query `sql`, a join type
+// and alias, and an `on` condition expressed as a member expression (the alias
+// arrives pre-quoted and is referenced verbatim inside `on`).
+fn make_subquery_join(
+    sql: &str,
+    alias: &str,
+    join_type: &str,
+    on_cube: &str,
+    on_sql: &str,
+) -> Rc<dyn SubqueryJoin> {
+    let on_member_sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(on_sql).unwrap());
+    let on: Rc<dyn crate::cube_bridge::member_expression::MemberExpressionDefinition> = Rc::new(
+        MockMemberExpressionDefinition::builder()
+            .cube_name(Some(on_cube.to_string()))
+            .expression(MemberExpressionExpressionDef::Sql(on_member_sql))
+            .build(),
+    );
+    Rc::new(
+        MockSubqueryJoin::builder()
+            .sql(sql.to_string())
+            .join_type(Some(join_type.to_string()))
+            .alias(alias.to_string())
+            .on(on)
+            .build(),
+    )
 }
 
 // LOWER(status) as dimension expression + count
@@ -204,4 +233,102 @@ async fn test_multiplied_dim_only_me_measure() {
     if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
         insta::assert_snapshot!(result);
     }
+}
+
+const TOP_ORDERS_SUBQUERY: &str =
+    "SELECT status, SUM(amount) FROM orders GROUP BY 1 ORDER BY 2 DESC LIMIT 2";
+
+// A SQL-API grouped sub-query join: the opaque sub-query (with its inner
+// ORDER BY/LIMIT) must be emitted verbatim, INNER-joined under the
+// pre-quoted alias used verbatim in the ON condition.
+#[test]
+fn test_subquery_join_grouped() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_ORDERS_SUBQUERY,
+        "\"top_orders\"",
+        "INNER",
+        "orders",
+        "{orders.status} = \"top_orders\".status",
+    );
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(members_from_strings(vec!["orders.count"])))
+            .dimensions(Some(members_from_strings(vec!["orders.status"])))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = ctx.build_sql_from_options(options)?;
+
+    // The opaque sub-query is emitted verbatim (inner ORDER BY/LIMIT preserved).
+    assert!(
+        sql.contains(TOP_ORDERS_SUBQUERY),
+        "sub-query SQL should be emitted verbatim, got: {sql}"
+    );
+    assert!(
+        sql.contains("INNER JOIN"),
+        "expected INNER JOIN, got: {sql}"
+    );
+    // The pre-quoted alias is emitted as-is, not re-quoted.
+    assert!(
+        sql.contains("\"top_orders\"") && !sql.contains("\"\"\"top_orders\"\"\""),
+        "alias should be emitted verbatim (no re-quoting), got: {sql}"
+    );
+    // The ON condition references the sub-query alias.
+    assert!(
+        sql.contains("\"top_orders\".status"),
+        "expected ON condition referencing the sub-query alias, got: {sql}"
+    );
+
+    Ok(())
+}
+
+// Empty-members case: only the sub-query column is projected, so no `orders`
+// member selects the base cube. The join root is derived from the ON
+// dependencies so the base cube and the sub-query join are still emitted.
+#[test]
+fn test_subquery_join_empty_members() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_ORDERS_SUBQUERY,
+        "\"top_orders\"",
+        "INNER",
+        "orders",
+        "{orders.status} = \"top_orders\".status",
+    );
+    let top_status = make_dim_expression("top_status", "orders", "\"top_orders\".status");
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .dimensions(Some(vec![top_status]))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = ctx.build_sql_from_options(options)?;
+
+    assert!(
+        sql.contains("INNER JOIN"),
+        "expected INNER JOIN, got: {sql}"
+    );
+    assert!(
+        sql.contains(TOP_ORDERS_SUBQUERY),
+        "sub-query SQL should be emitted verbatim, got: {sql}"
+    );
+    assert!(
+        sql.contains("\"top_orders\".status"),
+        "expected reference to the sub-query alias, got: {sql}"
+    );
+
+    Ok(())
 }

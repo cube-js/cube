@@ -16,6 +16,7 @@ use crate::cube_bridge::member_expression::{
 };
 use crate::cube_bridge::options_member::OptionsMember;
 use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
+use crate::logical_plan::LogicalSubqueryJoinItem;
 
 use super::filter::compiler::FilterCompiler;
 use super::filter::{BaseSegment, FilterItem};
@@ -92,6 +93,8 @@ impl QueryPropertiesCompiler {
             options.join_hints()?.unwrap_or_default(),
         ));
 
+        let subquery_joins = self.compile_subquery_joins(&mut evaluator_compiler, options)?;
+
         QueryProperties::builder()
             .query_tools(self.query_tools)
             .measures(measures)
@@ -110,7 +113,51 @@ impl QueryPropertiesCompiler {
             .query_join_hints(query_join_hints)
             .disable_external_pre_aggregations(disable_external_pre_aggregations)
             .pre_aggregation_id(pre_aggregation_id)
+            .subquery_joins(subquery_joins)
             .build()
+    }
+
+    /// Compiles SQL-API `subqueryJoins` into [`LogicalSubqueryJoinItem`]s:
+    /// keeps the opaque sub-query `sql`/`alias`/`joinType` and compiles the
+    /// `on` condition (a member expression) into a `SqlCall` bound to its
+    /// declared cube.
+    fn compile_subquery_joins(
+        &self,
+        evaluator_compiler: &mut Compiler,
+        options: &dyn BaseQueryOptions,
+    ) -> Result<Vec<LogicalSubqueryJoinItem>, CubeError> {
+        let Some(subquery_joins) = options.subquery_joins()? else {
+            return Ok(Vec::new());
+        };
+        subquery_joins
+            .iter()
+            .map(|join| -> Result<LogicalSubqueryJoinItem, CubeError> {
+                let static_data = join.static_data();
+                let on = join.on()?;
+                let on_cube_name = on.static_data().cube_name.clone().unwrap_or_default();
+                let on_sql = match on.expression()? {
+                    MemberExpressionExpressionDef::Sql(sql) => {
+                        evaluator_compiler.compile_sql_call(&on_cube_name, sql)?
+                    }
+                    MemberExpressionExpressionDef::Struct(_) => {
+                        return Err(CubeError::user(
+                            "Struct expression is not supported for subquery join condition"
+                                .to_string(),
+                        ));
+                    }
+                };
+                let join_type = static_data
+                    .join_type
+                    .clone()
+                    .unwrap_or_else(|| "LEFT".to_string());
+                Ok(LogicalSubqueryJoinItem {
+                    sql: static_data.sql.clone(),
+                    alias: static_data.alias.clone(),
+                    join_type,
+                    on_sql,
+                })
+            })
+            .collect()
     }
 
     fn compile_dimensions(

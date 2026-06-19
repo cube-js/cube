@@ -962,6 +962,7 @@ export class BaseQuery {
       convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
       maskedMembers: this.options.maskedMembers,
       memberToAlias: this.options.memberToAlias,
+      subqueryJoins: this.options.subqueryJoins,
     };
 
     try {
@@ -1011,6 +1012,7 @@ export class BaseQuery {
       securityContext: this.contextSymbols.securityContext,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
+      subqueryJoins: this.options.subqueryJoins,
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);

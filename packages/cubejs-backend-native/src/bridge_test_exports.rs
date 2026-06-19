@@ -626,6 +626,7 @@ fn invoke_base_query_options<IT: InnerTypes>(b: &NativeBaseQueryOptions<IT>) -> 
     r.record("join_graph", b.join_graph());
     r.record("security_context", b.security_context());
     r.record("join_hints", b.join_hints());
+    r.record("subquery_joins", b.subquery_joins());
     r
 }
 
