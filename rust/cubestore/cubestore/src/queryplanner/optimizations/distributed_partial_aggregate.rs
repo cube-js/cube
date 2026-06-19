@@ -289,7 +289,13 @@ pub fn push_worker_sort_and_limit(
     p: Arc<dyn ExecutionPlan>,
     group_by_limit_factor: usize,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    // Worker side: wrap the partial aggregate with a per-partition bounded sort.
+    // The worker top-k engages only when the trimming aggregate is enabled (factor > 0); otherwise
+    // leave the plan as planned (no trim).
+    if group_by_limit_factor == 0 {
+        return Ok(p);
+    }
+
+    // Worker side: replace the partial aggregate's merge with the trimmed top-k.
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
@@ -310,10 +316,8 @@ pub fn push_worker_sort_and_limit(
         )));
     }
 
-    // Router side: rebuild the final aggregate over a sort-preserving merge in `worker_order`, and
-    // reorder the (optimization-only) worker subtree to match. Same keys are adjacent in
-    // `worker_order`, so the sorted final combines them; its output is `worker_order`-sorted (whose
-    // prefix is the query's ORDER BY), so the limit above stays correct.
+    // Router side: combine the workers' top-k with a hash final aggregate, then re-apply the top-k
+    // sort by `worker_order` (the total order T).
     let Some(final_agg) = FinalAggregateInfo::extract(&p) else {
         return Ok(p);
     };
@@ -339,36 +343,23 @@ pub fn push_worker_sort_and_limit(
         Arc::new(cs.with_changed_schema(new_worker_subtree, cs.required_input_ordering.clone()));
     let worker_order = worker_ordering(&final_agg.group_expr, &cols)?;
 
-    // Hash-final variant: combine the worker top-k with a hash final aggregate over coalesced
-    // (unordered) streams, then re-apply the top-k sort by the total order. The Sort(fetch) is
-    // required even for a bare LIMIT: it picks the k smallest by the total order, which are exactly
-    // the groups every worker kept (and therefore fully combined here); a plain limit could take a
-    // group only one worker kept (undercounted).
-    if group_by_limit_factor > 0 && hash_final_enabled() {
-        let coalesced: Arc<dyn ExecutionPlan> = Arc::new(CoalescePartitionsExec::new(new_cs));
-        let final_hash: Arc<dyn ExecutionPlan> = Arc::new(AggregateExec::try_new(
-            AggregateMode::Final,
-            final_agg.group_expr,
-            final_agg.aggr_expr,
-            final_agg.filter_expr,
-            coalesced,
-            final_agg.input_schema,
-        )?);
-        return Ok(Arc::new(
-            SortExec::new(worker_order, final_hash).with_fetch(Some(fetch)),
-        ));
-    }
-
-    let merged: Arc<dyn ExecutionPlan> =
-        Arc::new(SortPreservingMergeExec::new(worker_order, new_cs));
-    Ok(Arc::new(AggregateExec::try_new(
+    // Combine the worker top-k with a hash final aggregate over coalesced (unordered) streams, then
+    // re-apply the top-k sort by the total order T. The Sort(fetch) is required even for a bare
+    // LIMIT: it keeps the k smallest by T -- exactly the groups every worker kept and fully combined
+    // here -- where a plain limit could take a group only one worker kept (undercounted). The
+    // coalesce also drains the workers' streams in parallel.
+    let coalesced: Arc<dyn ExecutionPlan> = Arc::new(CoalescePartitionsExec::new(new_cs));
+    let final_hash: Arc<dyn ExecutionPlan> = Arc::new(AggregateExec::try_new(
         AggregateMode::Final,
         final_agg.group_expr,
         final_agg.aggr_expr,
         final_agg.filter_expr,
-        merged,
+        coalesced,
         final_agg.input_schema,
-    )?))
+    )?);
+    Ok(Arc::new(
+        SortExec::new(worker_order, final_hash).with_fetch(Some(fetch)),
+    ))
 }
 
 /// Builds the `worker_order` LexOrdering over an aggregate's group columns from the descriptor.
@@ -393,14 +384,9 @@ fn worker_ordering(
     Ok(LexOrdering::new(exprs))
 }
 
-/// Rebuilds a worker subtree as `SortPreservingMerge(worker_order) <- Sort(worker_order, fetch, per
-/// partition) <- partial`. Returns `None` for an unrecognized or already-rewritten subtree, which
-/// keeps [push_worker_sort_and_limit] idempotent.
-///
-/// The per-partition `Sort` does the bounding (a bounded heap, O(fetch) memory); the merge above it
-/// carries no fetch. Because this pass runs last, `replace_suboptimal_merge_sorts` has already run
-/// and won't push the query's row limit into the merge -- which would cut the merged stream of
-/// (still uncombined) partial rows by rows and undercount groups split across partitions.
+/// Rebuilds a worker subtree as `CoalescePartitions <- GroupByLimitAggregate <- ...`: the trimmed
+/// top-k is emitted unsorted and coalesced to one stream for the router's hash final aggregate.
+/// Returns `None` for an unrecognized subtree (no locatable partial aggregate).
 fn resort_worker_subtree(
     worker_subtree: &Arc<dyn ExecutionPlan>,
     cols: &[(usize, bool, bool)],
@@ -409,10 +395,10 @@ fn resort_worker_subtree(
 ) -> Option<Arc<dyn ExecutionPlan>> {
     let partial = locate_partial_aggregate(worker_subtree)?;
 
-    // N-way experiment: drop the per-partition merge below the aggregate so it runs per partition;
-    // the hash-final CoalescePartitions then parallelizes all partitions. Only with hash-final (the
-    // sorted path's SortPreservingMerge would not parallelize the extra partitions anyway).
-    let partial = if group_by_limit_factor > 0 && hash_final_enabled() && per_partition_enabled() {
+    // Per-partition (CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION): drop the merge below the aggregate so
+    // it runs over every raw partition; the CoalescePartitions below then parallelizes all of them
+    // (N-way) instead of one stream per union branch.
+    let partial = if per_partition_enabled() {
         partial
             .as_any()
             .downcast_ref::<AggregateExec>()
@@ -426,8 +412,8 @@ fn resort_worker_subtree(
     };
 
     // Trim during aggregation: replace the partial hash aggregate with a GroupByLimitAggregateExec
-    // so it keeps only the top-k groups by `cols` instead of materializing every group and letting
-    // the Sort below trim afterwards. `group_by_limit_factor == 0` disables this.
+    // keeping only the top-k groups by `cols`. `group_by_limit_factor` is the trim threshold; the
+    // caller only reaches here with it > 0.
     let trimmed: Arc<dyn ExecutionPlan> = if group_by_limit_factor > 0 {
         if let Some(agg) = partial.as_any().downcast_ref::<AggregateExec>() {
             let order: Vec<(usize, SortOptions)> = cols
@@ -458,60 +444,16 @@ fn resort_worker_subtree(
         partial
     };
 
-    // Hash-final variant (CUBESTORE_GROUP_BY_LIMIT_HASH_FINAL): emit the trimmed top-k unsorted,
-    // coalesced to one stream. The router hash-combines and re-applies the top-k sort, so no
-    // worker-side sort/merge holds the whole result, and the aggregates run in parallel
-    // (CoalescePartitions spawns a task per input). Gated on `group_by_limit_factor > 0`; when
-    // `worker_sort_and_limit` is set the partial is the hash `AggregateExec` so the trim engages and
-    // the coalesced output is <= partitions*k rows. (If the trim ever fell back to the untrimmed
-    // partial -- e.g. grouping sets -- the router hash final would size to all groups: a memory
-    // regression, not a correctness bug.)
-    if group_by_limit_factor > 0 && hash_final_enabled() {
-        return Some(Arc::new(CoalescePartitionsExec::new(trimmed)));
-    }
-
-    // Sorted path: per-partition bounded sort, then a sort-preserving merge, so the router's sorted
-    // final aggregate sees adjacent equal keys and its limit cuts on the total order.
-    let schema = trimmed.schema();
-    let mut exprs = Vec::with_capacity(cols.len());
-    for (idx, asc, nulls_first) in cols {
-        let field = schema.fields().get(*idx)?;
-        exprs.push(PhysicalSortExpr {
-            expr: Arc::new(Column::new(field.name(), *idx)),
-            options: SortOptions {
-                descending: !asc,
-                nulls_first: *nulls_first,
-            },
-        });
-    }
-    let worker_order = LexOrdering::new(exprs);
-    let per_partition_sort: Arc<dyn ExecutionPlan> = Arc::new(
-        SortExec::new(worker_order.clone(), trimmed)
-            .with_fetch(Some(fetch))
-            .with_preserve_partitioning(true),
-    );
-    Some(Arc::new(SortPreservingMergeExec::new(
-        worker_order,
-        per_partition_sort,
-    )))
+    // Emit the trimmed top-k unsorted, coalesced to one stream. The router hash-combines and
+    // re-applies the top-k sort, so no worker-side sort/merge holds the whole result and the
+    // per-partition aggregates run in parallel (CoalescePartitions spawns a task per input) instead
+    // of being drained one at a time by a sort-preserving merge.
+    Some(Arc::new(CoalescePartitionsExec::new(trimmed)))
 }
 
-/// Experiment toggle: route the worker top-k through a router-side hash final aggregate instead of
-/// the sorted-merge framework.
-///
-/// Must be set consistently across the whole fleet: the worker and router re-plan in separate
-/// processes, each reading this flag. A worker emitting unsorted top-k (flag on) into a router that
-/// still expects the sorted-merge input (flag off) would silently undercount. Set it via deployment
-/// env so every node agrees.
-fn hash_final_enabled() -> bool {
-    std::env::var("CUBESTORE_GROUP_BY_LIMIT_HASH_FINAL")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false)
-}
-
-/// Experiment toggle (only meaningful with [hash_final_enabled]): drop the per-partition merge
-/// below the trimmed aggregate so it runs per partition (N-way) instead of per union branch. The
-/// hash-final `CoalescePartitions` then parallelizes all partitions.
+/// Toggle (CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION): drop the merge below the trimmed aggregate so it
+/// runs per partition (N-way) instead of per union branch. The `CoalescePartitions` then
+/// parallelizes all partitions.
 ///
 /// Trades memory for parallelism: one group table per DF partition (= per parquet file and chunk),
 /// so peak memory is bounded by the partition count, not by k. It stays low only while partitions
