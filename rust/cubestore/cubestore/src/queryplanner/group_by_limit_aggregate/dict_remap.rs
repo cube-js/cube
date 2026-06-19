@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use datafusion::arrow::array::{Array, ArrayRef, DictionaryArray, Int32Array, StringArray};
+use datafusion::arrow::array::{
+    Array, ArrayRef, DictionaryArray, Int32Array, Int32Builder, StringArray,
+};
+use datafusion::arrow::compute::take;
 use datafusion::arrow::datatypes::{DataType, Int32Type};
 use datafusion::error::{DataFusionError, Result as DFResult};
 
@@ -56,25 +59,21 @@ impl GlobalDict {
                 DataFusionError::Internal("GlobalDict::remap expected Utf8 values".to_string())
             })?;
 
-        // Intern each distinct dictionary value once; `None` marks a null entry.
-        let mut local_to_global: Vec<Option<i32>> = Vec::with_capacity(local_values.len());
+        // local id -> global id, interning each distinct value once; a null dictionary entry is a
+        // null in this map. Built once per batch (O(distinct values)).
+        let mut builder = Int32Builder::with_capacity(local_values.len());
         for i in 0..local_values.len() {
             if local_values.is_null(i) {
-                local_to_global.push(None);
+                builder.append_null();
             } else {
-                local_to_global.push(Some(self.intern_value(local_values.value(i))));
+                builder.append_value(self.intern_value(local_values.value(i)));
             }
         }
+        let local_to_global = builder.finish();
 
-        let ids: Int32Array = dict
-            .keys()
-            .iter()
-            .map(|k| match k {
-                Some(local) => local_to_global[local as usize],
-                None => None,
-            })
-            .collect();
-        Ok(Arc::new(ids))
+        // Gather the global id per row via a vectorized take: null keys and null dictionary entries
+        // both propagate to null, matching how the string path groups nulls.
+        Ok(take(&local_to_global, dict.keys(), None)?)
     }
 
     /// Rebuild a `Dictionary(Int32, Utf8)` array from an `Int32Array` of global ids emitted by the
