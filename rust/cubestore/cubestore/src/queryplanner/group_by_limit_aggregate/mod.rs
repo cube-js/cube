@@ -192,8 +192,23 @@ impl ExecutionPlan for GroupByLimitAggregateExec {
     }
 
     fn statistics(&self) -> DFResult<Statistics> {
+        // The trim keeps at most `factor * k` groups per output partition, so the output is bounded
+        // by that and by the input row count. Report it (inexact) instead of Absent, which makes
+        // downstream planners bail. `factor` is always > 0 here (the rewriter only builds this exec
+        // when trimming is enabled), but guard anyway.
+        let input_rows = self.input.statistics()?.num_rows;
+        let num_rows = if self.factor == 0 {
+            input_rows
+        } else {
+            let parts = self.cache.output_partitioning().partition_count().max(1);
+            let cap = self.factor.saturating_mul(self.k).saturating_mul(parts);
+            match input_rows {
+                Precision::Exact(n) | Precision::Inexact(n) => Precision::Inexact(n.min(cap)),
+                Precision::Absent => Precision::Inexact(cap),
+            }
+        };
         Ok(Statistics {
-            num_rows: Precision::Absent,
+            num_rows,
             column_statistics: Statistics::unknown_column(&self.schema),
             total_byte_size: Precision::Absent,
         })

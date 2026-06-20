@@ -65,6 +65,9 @@ impl<K: ArrowDictionaryKeyType> GroupColumn for DictionaryGroupColumn<K> {
         }
     }
 
+    // Scalar fallbacks, not a fast path: on the sorted/inline path the column comparator does the
+    // hot row-by-row work, so these per-row loops are not on the critical path. A vectorized
+    // implementation would only matter if this column were used by the hash aggregate.
     fn vectorized_equal_to(
         &self,
         lhs_rows: &[usize],

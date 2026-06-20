@@ -403,7 +403,7 @@ fn resort_worker_subtree(
             .as_any()
             .downcast_ref::<AggregateExec>()
             .and_then(|agg| {
-                let new_input = strip_coalesce_partitions(agg.input()).ok()?;
+                let new_input = strip_leading_coalesce_partitions(agg.input());
                 partial.clone().with_new_children(vec![new_input]).ok()
             })
             .unwrap_or(partial)
@@ -465,23 +465,16 @@ fn per_partition_enabled() -> bool {
         .unwrap_or(false)
 }
 
-/// Recursively drop `CoalescePartitionsExec` nodes, exposing the underlying multi-partition streams
-/// to the parent.
-fn strip_coalesce_partitions(
-    p: &Arc<dyn ExecutionPlan>,
-) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+/// Peel the leading `CoalescePartitionsExec` chain directly feeding the aggregate, exposing the
+/// underlying multi-partition streams. Only the immediate coalesce(s) are removed; any
+/// `CoalescePartitionsExec` deeper in the subtree (e.g. one a child inserted to satisfy its own
+/// single-partition input requirement, as in a UNION branch) is left intact so plan semantics are
+/// preserved.
+fn strip_leading_coalesce_partitions(p: &Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
     if p.as_any().is::<CoalescePartitionsExec>() {
-        return strip_coalesce_partitions(&p.children()[0].clone());
+        return strip_leading_coalesce_partitions(&p.children()[0]);
     }
-    let children = p.children();
-    if children.is_empty() {
-        return Ok(p.clone());
-    }
-    let new_children = children
-        .iter()
-        .map(|c| strip_coalesce_partitions(c))
-        .collect::<Result<Vec<_>, _>>()?;
-    p.clone().with_new_children(new_children)
+    p.clone()
 }
 
 /// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in

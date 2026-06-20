@@ -19,8 +19,8 @@ pub(crate) fn is_int32_utf8_dict(dt: &DataType) -> bool {
 /// materializing the string on every row. The per-batch string work is proportional to the batch's
 /// distinct dictionary values, not its row count. Null dictionary entries and null keys stay null.
 pub(crate) struct GlobalDict {
-    value_to_id: HashMap<String, i32>,
-    values: Vec<String>,
+    value_to_id: HashMap<Arc<str>, i32>,
+    values: Vec<Arc<str>>,
 }
 
 impl GlobalDict {
@@ -36,8 +36,10 @@ impl GlobalDict {
             return *id;
         }
         let id = self.values.len() as i32;
-        self.values.push(v.to_string());
-        self.value_to_id.insert(v.to_string(), id);
+        // One allocation shared between the map key and the values vec.
+        let key: Arc<str> = Arc::from(v);
+        self.values.push(key.clone());
+        self.value_to_id.insert(key, id);
         id
     }
 

@@ -109,6 +109,7 @@ fn analyze(root: &Arc<dyn ExecutionPlan>) -> Option<Target> {
     for e in &order {
         let column = e.expr.as_any().downcast_ref::<Column>()?;
         let idx = group_names.iter().position(|n| n == column.name())?;
+        // A repeated ORDER BY column adds nothing to the total order; skip it.
         if used[idx] {
             continue;
         }
