@@ -391,6 +391,12 @@ an **external URL** (`url`) or to **another Cube Cloud dashboard** (`dashboard`,
 a drill-in), and its URL is built per row from the dimension's data. The example
 below declares two links on one dimension (an external search and a drill-in).
 
+<Note>
+
+Dimension `links` require Cube **v1.6.53** or newer.
+
+</Note>
+
 ### Parameters
 
 `links` is a list of link objects. Each link accepts:
@@ -403,7 +409,7 @@ below declares two links on one dimension (an external search and a drill-in).
 | `dashboard` | **Either `url` or `dashboard`** | The target Cube Cloud dashboard's **slug** (a **drill-in**). Each link sets exactly one of `url` or `dashboard` — never both — but different links on the same dimension can mix the two. |
 | `icon` | Optional | A [Tabler icon][link-tabler] name (see [Icons](#icons)). Defaults to a generic link icon. |
 | `target` | Optional | Where to open the link: `blank` (default — new tab) or `self` (same tab). Applies to **external** links only — drill-ins always navigate in-app (see [Behavior](#behavior)). |
-| `params` | Optional | Extra per-row parameters. For `url:` they are appended as query parameters; for `dashboard:` they become filters on the target dashboard. |
+| `params` | Optional | Extra per-row parameters. For `url:` they are appended as query parameters. For `dashboard:` they become **equality filters** on the target dashboard — each `key` is a member of the target dashboard's view (a cube path such as `orders.status` is auto-resolved to the matching view member), and `value` is the per-row value. |
 
 ### Example
 
