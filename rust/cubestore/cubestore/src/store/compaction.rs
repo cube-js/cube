@@ -2873,6 +2873,80 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn dictionary_encoding_topk_by_aggregate() {
+        // ORDER BY <aggregate> DESC LIMIT goes through the ClusterAggregateTopK path, whose scalar
+        // helpers (cube_match_scalar) had no dictionary arm and panicked when the group key was
+        // dictionary-encoded. The top-k result must materialize the dictionary group key correctly.
+        Config::test("dictionary_encoding_topk_by_aggregate")
+            .update_config(|mut c| {
+                c.dictionary_encoding_enabled = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("CREATE SCHEMA d")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                service
+                    .exec_query("CREATE TABLE d.t (s text, n int)")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // Includes a NULL group key landing in the top-k, to exercise the dictionary
+                // builder's null path in the result.
+                service
+                    .exec_query(
+                        "INSERT INTO d.t (s, n) VALUES \
+                         ('a', 5), ('b', 10), ('b', 7), ('c', 1), ('a', 2), ('d', 100), (NULL, 50)",
+                    )
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
+
+                // groups: a=7, b=17, c=1, d=100, NULL=50 -> top 3 by sum desc: d=100, NULL=50, b=17
+                let result = service
+                    .exec_query("SELECT s, sum(n) FROM d.t GROUP BY 1 ORDER BY 2 DESC LIMIT 3")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("d".to_string()),
+                            TableValue::Int(100)
+                        ]),
+                        Row::new(vec![TableValue::Null, TableValue::Int(50)]),
+                        Row::new(vec![
+                            TableValue::String("b".to_string()),
+                            TableValue::Int(17)
+                        ]),
+                    ]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn dictionary_encoding_in_memory_group_by() {
         Config::test("dictionary_encoding_in_memory_group_by")
             .update_config(|mut c| {
