@@ -548,9 +548,15 @@ export type ViewGroup = {
   views: string[];
 };
 
+export type MetaResponseSettings = {
+  defaultLimit: number;
+  maxLimit: number;
+};
+
 export type MetaResponse = {
   cubes: Cube[];
   viewGroups?: ViewGroup[];
+  settings?: MetaResponseSettings;
 };
 
 export type FilterOperator = {

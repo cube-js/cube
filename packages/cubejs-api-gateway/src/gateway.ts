@@ -450,17 +450,20 @@ class ApiGateway {
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
         const onlyViews = req.query.onlyViews === 'true';
+        const includeSettings = 'includeSettings' in req.query;
         if ('extended' in req.query) {
           await this.metaExtended({
             context: req.context,
             res: this.resToResultFn(res),
             onlyViews,
+            includeSettings,
           });
         } else {
           await this.meta({
             context: req.context,
             res: this.resToResultFn(res),
             onlyViews,
+            includeSettings,
           });
         }
       })
@@ -653,12 +656,32 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
-  public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
+  /**
+   * Build the `settings` object returned by `/v1/meta`. Exposes server-wide
+   * query limits so clients can render correct defaults and validation
+   * without having to know about Cube env vars.
+   *
+   * These are non-sensitive deployment settings — only operational knobs
+   * that affect query shape (limits, defaults), never credentials, secrets,
+   * or anything that would let a caller infer infrastructure details.
+   *
+   * `defaultLimit` is clamped to `maxLimit` to mirror the behaviour in
+   * `query.js#normalizeQuery`, where `dbQueryDefaultLimit` is reduced to
+   * `dbQueryLimit` if it ever exceeds it.
+   */
+  protected getMetaSettings(): { defaultLimit: number, maxLimit: number } {
+    const maxLimit = getEnv('dbQueryLimit');
+    const defaultLimit = Math.min(getEnv('dbQueryDefaultLimit'), maxLimit);
+    return { defaultLimit, maxLimit };
+  }
+
+  public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews, includeSettings }: {
     context: RequestContext,
     res: MetaResponseResultFn,
     includeCompilerId?: boolean,
     onlyCompilerId?: boolean,
     onlyViews?: boolean,
+    includeSettings?: boolean,
   }) {
     const requestStarted = new Date();
 
@@ -689,12 +712,20 @@ class ApiGateway {
           views: group.views.filter((v: string) => visibleCubeNames.has(v)),
         }))
         .filter(group => group.views.length > 0);
-      const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
+      const response: {
+        cubes: any[],
+        viewGroups?: any[],
+        compilerId?: string,
+        settings?: { defaultLimit: number, maxLimit: number },
+      } = { cubes };
       if (viewGroups.length > 0) {
         response.viewGroups = viewGroups;
       }
       if (includeCompilerId) {
         response.compilerId = metaConfig.compilerId;
+      }
+      if (includeSettings) {
+        response.settings = this.getMetaSettings();
       }
       res(response);
     } catch (e: any) {
@@ -708,10 +739,11 @@ class ApiGateway {
     }
   }
 
-  public async metaExtended({ context, res, onlyViews }: {
+  public async metaExtended({ context, res, onlyViews, includeSettings }: {
     context: ExtendedRequestContext,
     res: ResponseResultFn,
     onlyViews?: boolean,
+    includeSettings?: boolean,
   }) {
     const requestStarted = new Date();
 
@@ -743,7 +775,10 @@ class ApiGateway {
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
 
-      await res({ cubes });
+      await res({
+        cubes,
+        ...(includeSettings ? { settings: this.getMetaSettings() } : {}),
+      });
     } catch (e: any) {
       this.handleError({
         e,

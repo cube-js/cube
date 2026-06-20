@@ -22,6 +22,12 @@ paths:
       #       type: boolean
       #       default: false
       #     description: When set to "true", only views (entries with type="view") and their viewGroups are returned, excluding cubes
+      #   - in: query
+      #     name: includeSettings
+      #     required: false
+      #     schema:
+      #       type: boolean
+      #     description: When this parameter is present (presence-only, value is ignored), the response includes a `settings` object with server-wide query limits. Omitted by default to keep the response minimal.
       description: ""
       operationId: "metaV1"
       responses:
@@ -381,6 +387,22 @@ components:
             $ref: "#/components/schemas/V1CubeMeta"
         compilerId:
           type: "string"
+        settings:
+          $ref: "#/components/schemas/V1MetaSettings"
+          description: "Only present when the request includes the `includeSettings` query parameter."
+    V1MetaSettings:
+      type: "object"
+      description: "Server-wide settings returned alongside meta when `includeSettings` is set. Useful for clients that need to render UI defaults or validate queries before sending them."
+      required:
+        - defaultLimit
+        - maxLimit
+      properties:
+        defaultLimit:
+          type: "integer"
+          description: "Default row limit applied to incoming queries when `limit` is not specified. Sourced from `CUBEJS_DB_QUERY_DEFAULT_LIMIT`, clamped to `maxLimit`."
+        maxLimit:
+          type: "integer"
+          description: "Maximum row limit allowed for an incoming query. Sourced from `CUBEJS_DB_QUERY_LIMIT`. Requests with `limit` above this value are rejected."
     V1LoadResultAnnotation:
       type: "object"
       required:

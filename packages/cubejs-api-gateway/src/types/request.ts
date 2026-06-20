@@ -95,7 +95,13 @@ type ErrorResponse = {
   error: string,
 };
 
-type MetaResponse = { cubes: any[], viewGroups?: any[], compilerId?: string };
+type MetaResponseSettings = { defaultLimit: number, maxLimit: number };
+type MetaResponse = {
+  cubes: any[],
+  viewGroups?: any[],
+  compilerId?: string,
+  settings?: MetaResponseSettings,
+};
 type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
 
 /**
