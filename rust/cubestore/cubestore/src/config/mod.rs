@@ -1095,6 +1095,7 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn repartition_check_overlapping_children(&self) -> bool {
         self.repartition_check_overlapping_children
+    }
     fn dictionary_encoding_enabled(&self) -> bool {
         self.dictionary_encoding_enabled
     }
@@ -1799,11 +1800,10 @@ impl Config {
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
-                // TODO: dev default; flip back to false before merge.
-                dictionary_encoding_enabled: env_bool("CUBESTORE_DICTIONARY_ENCODING", true),
+                dictionary_encoding_enabled: env_bool("CUBESTORE_DICTIONARY_ENCODING", false),
                 group_by_limit_factor: env_parse(
                     "CUBESTORE_GROUP_BY_LIMIT_FACTOR",
-                    2,
+                    0,
                 ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
