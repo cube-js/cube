@@ -320,8 +320,27 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         cx,
         handle: chunk_array,
     };
+    // Don't unwrap: a panic across the FFI boundary crashes the process.
+    // Signal the error on both sides of the bridge — reject() for the Rust
+    // downstream, the chunk callback for JS.
     let value =
-        transform_response(&mut value_object, this.schema.clone(), &this.member_fields).unwrap();
+        match transform_response(&mut value_object, this.schema.clone(), &this.member_fields) {
+            Ok(v) => v,
+            Err(e) => {
+                let err_msg = e.message.to_string();
+                this.reject(err_msg.clone());
+
+                let err_future = async move { Err(CubeError::internal(err_msg)) };
+                wait_for_future_and_execute_callback(
+                    this.tokio_handle.clone(),
+                    value_object.cx.channel(),
+                    callback,
+                    err_future,
+                );
+
+                return Ok(value_object.cx.undefined());
+            }
+        };
     let future = this.push_chunk(value);
     wait_for_future_and_execute_callback(
         this.tokio_handle.clone(),

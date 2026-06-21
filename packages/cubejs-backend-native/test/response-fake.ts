@@ -112,3 +112,34 @@ export class FakeRowStream extends stream.Readable {
     }
   }
 }
+
+// Pushes rows with nested-array field values, which the native bridge can't
+// convert to primitives — triggers a deterministic transform_response failure
+// without needing a real database error (see #10875).
+export class FakeMalformedRowStream extends stream.Readable {
+  protected readonly fieldNames: string[];
+
+  public constructor(query: any) {
+    super({
+      objectMode: true,
+      highWaterMark: 1024,
+    });
+    this.fieldNames = [
+      ...(query.dimensions || []),
+      ...(query.measures || []),
+    ];
+    if (this.fieldNames.length === 0) {
+      throw new Error('FakeMalformedRowStream requires at least one dimension or measure');
+    }
+    this.setMaxListeners(10);
+  }
+
+  public _read(_size: number) {
+    const row: Record<string, unknown> = {};
+    for (const field of this.fieldNames) {
+      row[field] = [1, 2, 3];
+    }
+    this.push(row);
+    this.push(null);
+  }
+}
