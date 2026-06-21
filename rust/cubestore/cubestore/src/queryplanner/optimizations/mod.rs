@@ -173,8 +173,13 @@ fn pre_optimize_physical_plan(
         p
     };
 
-    // Global (no GROUP BY) aggregates don't need their input merged in the sort order
-    let p = rewrite_physical_plan(p, &mut |p| drop_sort_merge_under_global_aggregate(p))?;
+    // Global (no GROUP BY) aggregates -- and, when enabled, grouped hash aggregates -- don't need
+    // their input merged in the sort order. Read the flag once, not per node.
+    let coalesce_grouped_hash =
+        distributed_partial_aggregate::coalesce_under_hash_aggregate_enabled();
+    let p = rewrite_physical_plan(p, &mut |p| {
+        drop_sort_merge_under_global_aggregate(p, coalesce_grouped_hash)
+    })?;
 
     // Replace sorted AggregateExec with InlineAggregateExec for better performance
     let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;

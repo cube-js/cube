@@ -131,30 +131,39 @@ pub fn push_aggregate_to_workers(
     )?))
 }
 
-/// A global (no GROUP BY) aggregate doesn't use the input ordering, but the scan still merges
-/// its partitions with a SortPreservingMergeExec when the index has a sort key (e.g. picked
-/// from the filters for partition pruning). Replace such merges under the aggregate with plain
-/// partition coalescing: the per-row key comparisons are pure waste there, and particularly
-/// bad when the filters above make the merge keys constant, turning every comparison into a
-/// full-length tie.
+/// Whether the experimental grouped-hash coalescing in [`drop_sort_merge_under_global_aggregate`]
+/// is enabled (`CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE`). Read once at the call site, not per node.
+pub fn coalesce_under_hash_aggregate_enabled() -> bool {
+    std::env::var("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false)
+}
+
+/// A Linear aggregate doesn't use input ordering, but the scan still merges its partitions with a
+/// SortPreservingMergeExec when the index has a sort key (e.g. picked from the filters for partition
+/// pruning). Replace such merges under the aggregate with plain partition coalescing: the per-row
+/// key comparisons are pure waste there, and particularly bad when the leading sort columns are
+/// constant (low-cardinality / NULL-heavy), turning every comparison into a full-length tie.
 ///
-/// Restricted to aggregates without group expressions: those hold a single accumulator set per
-/// partition even when later optimizations make them run per partition. A grouped hash
-/// aggregate over unmerged partitions could end up with a hash table per partition,
-/// multiplying its memory by the partition count.
+/// Always applied to global (no GROUP BY) aggregates. A grouped hash aggregate is equally safe --
+/// CoalescePartitions still yields a single output partition, hence one hash table and no
+/// per-partition memory blowup -- but it is gated behind `coalesce_grouped_hash` while the win is
+/// validated.
 pub fn drop_sort_merge_under_global_aggregate(
     p: Arc<dyn ExecutionPlan>,
+    coalesce_grouped_hash: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let Some(agg) = p.as_any().downcast_ref::<AggregateExec>() else {
         return Ok(p);
     };
-    if !matches!(agg.input_order_mode(), InputOrderMode::Linear)
-        || !agg.group_expr().expr().is_empty()
-    {
+    if !matches!(agg.input_order_mode(), InputOrderMode::Linear) {
         return Ok(p);
     }
-    // Order-sensitive aggregates (first_value, array_agg(ORDER BY), ...) stay Linear with an
-    // empty GROUP BY but still need their input ordered
+    if !agg.group_expr().expr().is_empty() && !coalesce_grouped_hash {
+        return Ok(p);
+    }
+    // Order-sensitive aggregates (first_value, array_agg(ORDER BY), ...) stay Linear but still
+    // require their input ordered -- leave their merge in place.
     if agg.required_input_ordering()[0].is_some() {
         return Ok(p);
     }
@@ -1445,7 +1454,7 @@ mod tests {
         );
         let original = global_sum_aggregate(filter);
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
 
         let agg = rewritten.as_any().downcast_ref::<AggregateExec>().unwrap();
         let filter = agg
@@ -1500,7 +1509,7 @@ mod tests {
             .required_input_ordering()[0]
             .is_some());
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
         assert!(Arc::ptr_eq(&rewritten, &original));
     }
 
@@ -1533,8 +1542,39 @@ mod tests {
             InputOrderMode::Linear
         ));
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
         assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    /// With the flag on, the same grouped hash aggregate's under-scan merge is replaced by plain
+    /// partition coalescing (single output partition -> one hash table), dropping the useless sort.
+    #[test]
+    fn coalesces_sort_merge_under_grouped_hash_aggregate_when_enabled() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, false),
+            Field::new("g", DataType::Int64, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2])),
+                Arc::new(Int64Array::from(vec![5, 4])),
+                Arc::new(Int64Array::from(vec![10, 20])),
+            ],
+        )
+        .unwrap();
+        let source = sorted_source(&schema, vec![vec![batch.clone()], vec![batch]]);
+        let original = sum_aggregate(AggregateMode::Partial, "g", merge_by_k(source));
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), true).unwrap();
+        // The aggregate stays grouped, but its input merge becomes a plain CoalescePartitionsExec
+        // (still a single output partition -> one hash table).
+        assert!(!Arc::ptr_eq(&rewritten, &original));
+        assert!(rewritten.as_any().is::<AggregateExec>());
+        assert!(rewritten.children()[0]
+            .as_any()
+            .is::<CoalescePartitionsExec>());
     }
 
     fn global_sum_aggregate(input: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
@@ -1581,7 +1621,7 @@ mod tests {
         let source = two_partition_source(&schema);
         let original = sum_aggregate(AggregateMode::Partial, "k", merge_by_k(source));
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
         assert!(Arc::ptr_eq(&rewritten, &original));
     }
 
