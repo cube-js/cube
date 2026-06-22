@@ -5,6 +5,7 @@ use crate::planner::filter::{
 use crate::planner::DebugSql;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
+use cubenativeutils::CubeError;
 
 #[test]
 fn test_dimension_basic() {
@@ -167,6 +168,53 @@ fn test_filter_simple_expanded() {
 
     let sql = filter.debug_sql(true);
     assert_eq!(sql, "source equals: ['google']");
+}
+
+#[test]
+fn test_filter_bool_and_num_values_unquoted() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema)?;
+    let symbol = ctx.create_symbol("visitors.id")?;
+
+    // Booleans and numbers render bare; only strings are quoted.
+    let filter = BaseFilter::try_new(
+        ctx.query_tools().query_tools().clone(),
+        symbol,
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::In,
+        Some(vec![
+            FilterValue::Num(42.0),
+            FilterValue::Bool(true),
+            FilterValue::Str("google".to_string()),
+        ]),
+        None,
+    )?;
+
+    let sql = filter.debug_sql(false);
+    assert_eq!(sql, "{visitors.id} in: [42, true, 'google']");
+
+    Ok(())
+}
+
+#[test]
+fn test_filter_null_value_renders_null() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema)?;
+    let symbol = ctx.create_symbol("visitors.source")?;
+
+    let filter = BaseFilter::try_new(
+        ctx.query_tools().query_tools().clone(),
+        symbol,
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![FilterValue::Null]),
+        None,
+    )?;
+
+    let sql = filter.debug_sql(false);
+    assert_eq!(sql, "{visitors.source} equals: [NULL]");
+
+    Ok(())
 }
 
 #[test]

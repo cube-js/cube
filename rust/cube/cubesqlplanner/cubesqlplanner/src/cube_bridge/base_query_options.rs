@@ -42,6 +42,15 @@ impl FilterValue {
         }
     }
 
+    pub fn to_debug_string(&self) -> String {
+        match self {
+            FilterValue::Str(s) => format!("'{}'", s),
+            FilterValue::Bool(b) => b.to_string(),
+            FilterValue::Num(n) => Self::format_number(*n),
+            FilterValue::Null => "NULL".to_string(),
+        }
+    }
+
     fn format_number(n: f64) -> String {
         if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 {
             format!("{}", n as i64)
