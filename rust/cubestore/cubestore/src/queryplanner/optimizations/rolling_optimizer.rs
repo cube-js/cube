@@ -195,6 +195,17 @@ impl RollingOptimizerRule {
                     })
                     .collect::<Option<Vec<_>>>()?;
 
+                // A grouped aggregate with no aggregate expressions is a key generator
+                // (e.g. `SELECT DISTINCT dim` over the time series, used to assemble the
+                // dimension keys of a multi-measure rolling query), not a rolling window.
+                // Converting it to a RollingWindowAggregate yields an empty `rolling_aggs`,
+                // whose executor leaves the per-bucket `had_values` mask empty and then
+                // indexes out of bounds. Leave it as a plain aggregate/range-join, which
+                // produces the same dimension keys.
+                if rolling_aggs.is_empty() {
+                    return None;
+                }
+
                 let RollingWindowJoinExtractorResult {
                     input,
                     dimension,
