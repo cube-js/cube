@@ -10,6 +10,7 @@ use crate::test_fixtures::cube_bridge::{
     MockMemberExpressionDefinition, MockMemberSql, MockSchema,
 };
 use crate::test_fixtures::test_utils::TestContext;
+use cubenativeutils::CubeError;
 use indoc::indoc;
 use std::rc::Rc;
 
@@ -1194,4 +1195,148 @@ fn test_count_distinct_approx_multistage_pre_agg_reads_cardinality() {
         "Multi-stage leaf should finalize HLL to cardinality, got:\n{}",
         sql
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rollup_lambda_cross_cube_union_aliases() {
+    // `lambda_union` UNIONs `visitor_checkins.for_lambda` with
+    // `visitor_checkins2.for_lambda`. The lambda exposes the first member
+    // rollup's symbols, so the dimension's unified output alias is
+    // `visitor_checkins__visitor_id`, but the second branch stores it as
+    // `visitor_checkins2__visitor_id`. Each branch must read its own column
+    // while projecting the unified alias.
+    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    // Force the lambda; otherwise the matcher would pick the plain `for_lambda`
+    // rollup that the lambda is built from (it is declared first).
+    let query_yaml = indoc! {"
+        measures:
+          - visitor_checkins.count
+        dimensions:
+          - visitor_checkins.visitor_id
+        time_dimensions:
+          - dimension: visitor_checkins.created_at
+            granularity: day
+        pre_aggregation_id: visitor_checkins.lambda_union
+    "};
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(query_yaml)
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "lambda_union");
+
+    // The second branch (visitor_checkins2) must read its own stored columns and
+    // project them under the lambda's unified `visitor_checkins__*` aliases. Before
+    // the fix the branch read `visitor_checkins__visitor_id` (the first cube's alias)
+    // from the visitor_checkins2 table, which does not exist there.
+    for (read, out) in [
+        (
+            "visitor_checkins2__visitor_id",
+            "visitor_checkins__visitor_id",
+        ),
+        (
+            "visitor_checkins2__created_at_day",
+            "visitor_checkins__created_at_day",
+        ),
+        ("visitor_checkins2__count", "visitor_checkins__count"),
+    ] {
+        assert!(
+            sql.contains(&format!("\"{}\" \"{}\"", read, out)),
+            "Expected branch to read {read} and project {out}, got:\n{sql}",
+        );
+    }
+}
+
+// A cube `foo` whose `originalSql` pre-aggregation (`main`) materializes its base
+// SQL, plus a `second` rollup. The mock renders the originalSql pre-agg table as
+// `foo__main` and the raw cube SQL references `foo_table`.
+fn use_original_sql_pre_aggregations_in_pre_aggregation_schema() -> Result<MockSchema, CubeError> {
+    MockSchema::from_yaml(indoc! {"
+        cubes:
+          - name: foo
+            sql: SELECT * FROM foo_table
+            dimensions:
+              - name: time
+                type: time
+                sql: timestamp
+            measures:
+              - name: total
+                type: sum
+                sql: amount
+            pre_aggregations:
+              - name: main
+                type: originalSql
+              - name: second
+                type: rollup
+                measures:
+                  - total
+                time_dimension: time
+                granularity: day
+    "})
+}
+
+// Building a rollup with `useOriginalSqlPreAggregations` must source it from the cube's
+// `originalSql` pre-aggregation table instead of the raw cube SQL
+#[test]
+fn test_rollup_build_with_use_original_sql_pre_aggregations_in_pre_aggregation_reads_original_sql_pre_agg(
+) -> Result<(), CubeError> {
+    let ctx = TestContext::new(use_original_sql_pre_aggregations_in_pre_aggregation_schema()?)?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - foo.total
+        time_dimensions:
+          - dimension: foo.time
+            granularity: day
+        pre_aggregation_query: true
+        use_original_sql_pre_aggregations_in_pre_aggregation: true
+    "};
+
+    let sql = ctx.build_sql(query_yaml)?;
+
+    assert!(
+        sql.contains("foo__main"),
+        "Build SQL should source from the originalSql pre-agg table, got:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("foo_table"),
+        "Build SQL should not read the raw cube table when useOriginalSqlPreAggregations is set, got:\n{}",
+        sql
+    );
+    Ok(())
+}
+
+// Without the flag, a rollup build reads the raw cube SQL — the originalSql
+// pre-agg table must not be substituted in.
+#[test]
+fn test_rollup_build_without_use_original_sql_pre_aggregations_in_pre_aggregation_reads_raw_table(
+) -> Result<(), CubeError> {
+    let ctx = TestContext::new(use_original_sql_pre_aggregations_in_pre_aggregation_schema()?)?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - foo.total
+        time_dimensions:
+          - dimension: foo.time
+            granularity: day
+        pre_aggregation_query: true
+    "};
+
+    let sql = ctx.build_sql(query_yaml)?;
+
+    assert!(
+        sql.contains("foo_table"),
+        "Build SQL should read the raw cube table without useOriginalSqlPreAggregations, got:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("foo__main"),
+        "Build SQL should not source from the originalSql pre-agg table without the flag, got:\n{}",
+        sql
+    );
+    Ok(())
 }

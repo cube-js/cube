@@ -65,6 +65,8 @@ pub struct MockBaseQueryOptions {
     #[builder(default)]
     pre_aggregation_query: Option<bool>,
     #[builder(default)]
+    use_original_sql_pre_aggregations_in_pre_aggregation: Option<bool>,
+    #[builder(default)]
     total_query: Option<bool>,
     #[builder(default)]
     cubestore_support_multistage: Option<bool>,
@@ -93,6 +95,7 @@ impl_static_data!(
     ungrouped,
     export_annotated_sql,
     pre_aggregation_query,
+    use_original_sql_pre_aggregations_in_pre_aggregation,
     total_query,
     cubestore_support_multistage,
     disable_external_pre_aggregations,
