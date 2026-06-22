@@ -1282,4 +1282,114 @@ view_groups:
       expect(e.message).toContain('view group');
     }
   });
+
+  it('fails on nested view group name colliding across sibling top-level groups', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'dup', includes: [revenue] }
+        ]
+      });
+
+      view_group('finance', {
+        includes: [
+          { name: 'dup', includes: [revenue] }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View group "dup" already exists');
+    }
+  });
+
+  it('fails when a nested view group name collides with a top-level group name', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'finance', includes: [revenue] }
+        ]
+      });
+
+      view_group('finance', {
+        includes: [revenue]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View group "finance" already exists');
+    }
+  });
+
+  it('fails on a nested view group using the legacy views field', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'ent_sales', views: ['revenue'] }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('view group');
+    }
+  });
+
+  it('fails on an empty nested view group (neither views nor includes)', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'empty' }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('view group');
+    }
+  });
 });

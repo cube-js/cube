@@ -1227,6 +1227,27 @@ const folderSchema = Joi.object().keys({
   ]).required(),
 }).id('folderSchema');
 
+// A nested view group authored inside another group's `includes`. Unlike a
+// top-level group, it MUST use `includes` (no legacy `views`), and `fileName`
+// is meaningless here, so neither is accepted. Enforcing this at validation
+// time prevents nested groups from being silently dropped by the evaluator.
+const nestedViewGroupSchema = Joi.object().keys({
+  name: Joi.string().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  includes: Joi.alternatives([
+    Joi.func(),
+    Joi.array().items(
+      Joi.alternatives([
+        Joi.string().required(),
+        Joi.func(),
+        Joi.link('#nestedViewGroupSchema'), // Can contain nested view groups
+      ]),
+    ),
+  ]).required(),
+})
+  .id('nestedViewGroupSchema');
+
 const viewGroupSchema = Joi.object().keys({
   name: Joi.string().required(),
   title: Joi.string(),
@@ -1240,7 +1261,7 @@ const viewGroupSchema = Joi.object().keys({
       Joi.alternatives([
         Joi.string().required(),
         Joi.func(),
-        Joi.link('#viewGroupSchema'), // Can contain nested view groups
+        Joi.link('#nestedViewGroupSchema'), // Can contain nested view groups
       ]),
     ),
   ]),
@@ -1250,6 +1271,8 @@ const viewGroupSchema = Joi.object().keys({
   .messages({
     'object.oxor': 'View group must use either "views" or "includes", but not both'
   })
+  // Register the nested schema so the `#nestedViewGroupSchema` link above resolves.
+  .shared(nestedViewGroupSchema)
   .id('viewGroupSchema');
 
 const ViewDefaultFilterSchema = Joi.object().keys({

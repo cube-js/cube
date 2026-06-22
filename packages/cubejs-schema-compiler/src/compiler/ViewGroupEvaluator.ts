@@ -75,6 +75,16 @@ export class ViewGroupEvaluator implements CompilerInterface {
   public compile(viewGroups: ViewGroupInput[], errorReporter?: ErrorReporter): void {
     this.viewGroupDefinitions = new Map<string, CompiledViewGroup>();
 
+    // Group names must be globally unique across the entire hierarchy — a
+    // nested group cannot reuse the name of another nested group (in any tree)
+    // or of any top-level group. Seed the set with all top-level names up front
+    // and thread it through the recursion so collisions are caught regardless
+    // of where in the hierarchy they occur.
+    const seenNames = new Set<string>();
+    for (const viewGroup of viewGroups) {
+      seenNames.add(viewGroup.name);
+    }
+
     for (const viewGroup of viewGroups) {
       if (errorReporter) {
         this.cubeValidator.validateViewGroup(viewGroup, errorReporter);
@@ -83,19 +93,18 @@ export class ViewGroupEvaluator implements CompilerInterface {
       if (errorReporter && this.viewGroupDefinitions.has(viewGroup.name)) {
         errorReporter.error(`View group "${viewGroup.name}" already exists!`);
       } else {
-        this.viewGroupDefinitions.set(viewGroup.name, this.compileViewGroup(viewGroup, errorReporter));
+        this.viewGroupDefinitions.set(viewGroup.name, this.compileViewGroup(viewGroup, seenNames, errorReporter));
       }
     }
 
     this.resolve(errorReporter);
   }
 
-  private compileViewGroup(viewGroup: ViewGroupInput, errorReporter?: ErrorReporter): CompiledViewGroup {
+  private compileViewGroup(viewGroup: ViewGroupInput, seenNames: Set<string>, errorReporter?: ErrorReporter): CompiledViewGroup {
     // `views` and `includes` are mutually exclusive on a view group definition;
     // this is enforced by the Joi `viewGroupSchema` (oxor). `includes` is the
     // preferred form, so it takes precedence here if both somehow slip through.
     if (viewGroup.includes !== undefined) {
-      const seenNames = new Set<string>([viewGroup.name]);
       const { views, includes } = this.compileIncludes(viewGroup.includes, seenNames, errorReporter);
       return {
         name: viewGroup.name,
@@ -205,8 +214,12 @@ export class ViewGroupEvaluator implements CompilerInterface {
       viewGroupMap.set(name, this.resolveGroup(def, validViewNames, errorReporter));
     }
 
-    // Auto-attach views that reference a top-level group via their own
-    // `viewGroup` / `viewGroups` properties.
+    // Auto-attach views that reference a group via their own `viewGroup` /
+    // `viewGroups` properties. Note: `viewGroupMap` holds top-level groups only,
+    // so a cube referencing a *nested* group name resolves to "not defined".
+    // This is intentional and left unsupported — attaching cubes to groups via
+    // these cube-level properties is a discouraged pattern; nested membership
+    // should be authored through the group's own `includes`.
     for (const cube of this.cubeEvaluator.cubeList) {
       if (!cube.isView) {
         // eslint-disable-next-line no-continue

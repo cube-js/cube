@@ -674,7 +674,16 @@ class ApiGateway {
       return null;
     }
 
-    return { ...group, views, includes };
+    // Explicit projection (rather than spreading `group`) so internal fields
+    // added to the compiled view group in the future don't leak into the meta
+    // response by accident.
+    return {
+      name: group.name,
+      title: group.title,
+      description: group.description,
+      views,
+      includes,
+    };
   }
 
   public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
