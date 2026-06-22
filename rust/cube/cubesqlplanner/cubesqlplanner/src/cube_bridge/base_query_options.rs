@@ -240,3 +240,78 @@ pub trait BaseQueryOptions {
     #[nbridge(field, optional, vec)]
     fn join_hints(&self) -> Result<Option<Vec<JoinHintItem>>, CubeError>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::FilterValue;
+
+    #[test]
+    fn deserializes_native_boolean() {
+        let values: Vec<FilterValue> = serde_json::from_str("[true, false]").unwrap();
+        assert_eq!(
+            values,
+            vec![FilterValue::Bool(true), FilterValue::Bool(false)]
+        );
+    }
+
+    #[test]
+    fn deserializes_native_integer() {
+        let values: Vec<FilterValue> = serde_json::from_str("[42]").unwrap();
+        assert_eq!(values, vec![FilterValue::Num(42.0)]);
+    }
+
+    #[test]
+    fn deserializes_native_fractional_number() {
+        let values: Vec<FilterValue> = serde_json::from_str("[42.5]").unwrap();
+        assert_eq!(values, vec![FilterValue::Num(42.5)]);
+    }
+
+    #[test]
+    fn deserializes_quoted_value_as_string() {
+        let values: Vec<FilterValue> = serde_json::from_str(r#"["42"]"#).unwrap();
+        assert_eq!(values, vec![FilterValue::Str("42".to_string())]);
+    }
+
+    #[test]
+    fn deserializes_null() {
+        let values: Vec<FilterValue> = serde_json::from_str("[null]").unwrap();
+        assert_eq!(values, vec![FilterValue::Null]);
+    }
+
+    #[test]
+    fn deserializes_mixed_value_array() {
+        let values: Vec<FilterValue> = serde_json::from_str(r#"[true, 42, "x", null]"#).unwrap();
+        assert_eq!(
+            values,
+            vec![
+                FilterValue::Bool(true),
+                FilterValue::Num(42.0),
+                FilterValue::Str("x".to_string()),
+                FilterValue::Null,
+            ]
+        );
+    }
+
+    #[test]
+    fn to_param_string_renders_canonical_form() {
+        assert_eq!(
+            FilterValue::Bool(true).to_param_string().as_deref(),
+            Some("true")
+        );
+        assert_eq!(
+            FilterValue::Num(42.0).to_param_string().as_deref(),
+            Some("42")
+        );
+        assert_eq!(
+            FilterValue::Num(42.5).to_param_string().as_deref(),
+            Some("42.5")
+        );
+        assert_eq!(
+            FilterValue::Str("42".to_string())
+                .to_param_string()
+                .as_deref(),
+            Some("42")
+        );
+        assert_eq!(FilterValue::Null.to_param_string(), None);
+    }
+}
