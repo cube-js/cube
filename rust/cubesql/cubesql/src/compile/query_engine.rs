@@ -6,6 +6,7 @@ use crate::{
             df::{
                 optimizers::{
                     FilterPushDown, FilterSplitMeta, LimitPushDown, PlanNormalize, SortPushDown,
+                    UnionSortLimitPushDown,
                 },
                 planner::CubeQueryPlanner,
                 scan::CubeScanNode,
@@ -146,6 +147,12 @@ pub trait QueryEngine {
             Arc::new(PlanNormalize::new(&cube_ctx)),
             Arc::new(ProjectionDropOut::new()),
             Arc::new(FilterPushDown::new()),
+            Arc::new(SortPushDown::new()),
+            Arc::new(LimitPushDown::new()),
+            // Duplicate any Sort/Limit sitting above a Union into the Union's inputs,
+            // then run Sort/Limit Push Down again so the duplicated clauses get pushed
+            // all the way down to CubeScans inside the Union.
+            Arc::new(UnionSortLimitPushDown::new()),
             Arc::new(SortPushDown::new()),
             Arc::new(LimitPushDown::new()),
             Arc::new(FilterSplitMeta::new()),
