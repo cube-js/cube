@@ -6339,8 +6339,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "worker-side limit-pushdown Sort(fetch) is not emitted on the inline path in this \
-                cluster setup; re-enable once compute_worker_sort_and_limit produces it again"]
     async fn worker_sort_and_limit_cluster() -> Result<(), CubeError> {
         Config::test("worker_sort_limit_router")
             .update_config(|mut config| {
@@ -6489,7 +6487,9 @@ mod tests {
                                     }
                                 }
 
-                                // Test 4: ORDER BY 1 DESC with LIMIT on non-prefix column
+                                // Test 4: ORDER BY DESC + LIMIT on a non-prefix column, grouped by a
+                                // non-prefix column (hash aggregate). The hash path bounds the worker
+                                // output with the trimming aggregate, not a Sort.
                                 {
                                     let result = service
                                         .exec_query(
@@ -6506,8 +6506,9 @@ mod tests {
                                         _ => panic!("expected string"),
                                     };
                                     assert!(
-                                        worker_plan.contains("Sort, fetch: 2"),
-                                        "Worker should have Sort with fetch=2 for DESC. Plan: {}",
+                                        worker_plan.contains("GroupByLimitAggregate"),
+                                        "Hash-aggregate worker should bound output with \
+                                         GroupByLimitAggregate. Plan: {}",
                                         worker_plan
                                     );
                                 }
