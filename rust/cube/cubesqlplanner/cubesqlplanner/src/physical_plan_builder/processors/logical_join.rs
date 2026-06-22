@@ -98,8 +98,13 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 )?);
                 if subquery_join.join_type.eq_ignore_ascii_case("INNER") {
                     join_builder.inner_join_source(source, subquery_join.alias.clone(), on);
-                } else {
+                } else if subquery_join.join_type.eq_ignore_ascii_case("LEFT") {
                     join_builder.left_join_source(source, subquery_join.alias.clone(), on);
+                } else {
+                    return Err(CubeError::user(format!(
+                        "Unsupported join type '{}' for sub-query join, expected INNER or LEFT",
+                        subquery_join.join_type
+                    )));
                 }
             }
             Ok(From::new_from_join(join_builder.build()))

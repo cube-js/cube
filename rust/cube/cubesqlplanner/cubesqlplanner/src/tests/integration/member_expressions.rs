@@ -280,10 +280,85 @@ fn test_subquery_join_grouped() -> Result<(), CubeError> {
         sql.contains("\"top_orders\"") && !sql.contains("\"\"\"top_orders\"\"\""),
         "alias should be emitted verbatim (no re-quoting), got: {sql}"
     );
-    // The ON condition references the sub-query alias.
     assert!(
         sql.contains("\"top_orders\".status"),
         "expected ON condition referencing the sub-query alias, got: {sql}"
+    );
+    insta::assert_snapshot!(sql);
+
+    Ok(())
+}
+
+#[test]
+fn test_subquery_join_grouped_left() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_ORDERS_SUBQUERY,
+        "\"top_orders\"",
+        "LEFT",
+        "orders",
+        "{orders.status} = \"top_orders\".status",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(members_from_strings(vec!["orders.count"])))
+            .dimensions(Some(members_from_strings(vec!["orders.status"])))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = ctx.build_sql_from_options(options)?;
+
+    assert!(
+        sql.contains(TOP_ORDERS_SUBQUERY),
+        "sub-query SQL should be emitted verbatim, got: {sql}"
+    );
+    assert!(sql.contains("LEFT JOIN"), "expected LEFT JOIN, got: {sql}");
+    // The pre-quoted alias is emitted as-is, not re-quoted.
+    assert!(
+        sql.contains("\"top_orders\"") && !sql.contains("\"\"\"top_orders\"\"\""),
+        "alias should be emitted verbatim (no re-quoting), got: {sql}"
+    );
+    insta::assert_snapshot!(sql);
+
+    Ok(())
+}
+
+#[test]
+fn test_subquery_join_unknown_join_type() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_ORDERS_SUBQUERY,
+        "\"top_orders\"",
+        "RIGHT",
+        "orders",
+        "{orders.status} = \"top_orders\".status",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(members_from_strings(vec!["orders.count"])))
+            .dimensions(Some(members_from_strings(vec!["orders.status"])))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let err = ctx
+        .build_sql_from_options(options)
+        .expect_err("unsupported join type should be rejected");
+    assert!(
+        err.message.contains("Unsupported join type") && err.message.contains("RIGHT"),
+        "expected a clear unsupported-join-type error, got: {}",
+        err.message
     );
 
     Ok(())
@@ -329,6 +404,7 @@ fn test_subquery_join_empty_members() -> Result<(), CubeError> {
         sql.contains("\"top_orders\".status"),
         "expected reference to the sub-query alias, got: {sql}"
     );
+    insta::assert_snapshot!(sql);
 
     Ok(())
 }

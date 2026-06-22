@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: sql
+---
+SELECT "orders".status "orders__status", count("orders".id) "orders__count" 
+FROM  orders  AS "orders"
+INNER JOIN (SELECT status, SUM(amount) FROM orders GROUP BY 1 ORDER BY 2 DESC LIMIT 2) AS "top_orders" ON "orders".status = "top_orders".status
+GROUP BY 1
+ORDER BY  2  DESC
