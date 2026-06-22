@@ -299,7 +299,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       const [tables] = await this.bigquery.dataset(schemaName).getTables();
       return tables.map(t => ({ table_name: t.id }));
     } catch (e) {
-      if ((<any>e).toString().indexOf('Not found')) {
+      if ((<any>e).toString().indexOf('Not found') !== -1) {
         return [];
       }
       throw e;
