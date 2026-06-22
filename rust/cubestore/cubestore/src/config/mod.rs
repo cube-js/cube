@@ -1792,7 +1792,7 @@ impl Config {
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
-                group_by_limit_factor: env_parse("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 2),
+                group_by_limit_factor: env_parse("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
