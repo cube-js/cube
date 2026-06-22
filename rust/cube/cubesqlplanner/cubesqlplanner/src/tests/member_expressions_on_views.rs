@@ -6,6 +6,7 @@ use crate::test_fixtures::cube_bridge::{
     MockMemberExpressionDefinition, MockMemberSql, MockSchema, MockStructWithSqlMember,
 };
 use crate::test_fixtures::test_utils::TestContext;
+use cubenativeutils::CubeError;
 use indoc::indoc;
 use std::rc::Rc;
 
@@ -220,7 +221,7 @@ async fn test_many_to_one_view_child_distinct_dim() {
 // with "Unsupported additional filters for measure ... type number".
 // root_test_dim='rt_x' → roots 1,2 → SUM = 10 + 20 = 30.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_many_to_one_view_patched_measure_filter() {
+async fn test_many_to_one_view_patched_measure_filter() -> Result<(), CubeError> {
     let ctx = create_test_context();
     let expr = make_patched_measure(
         "filtered_root_sum",
@@ -240,8 +241,9 @@ async fn test_many_to_one_view_patched_measure_filter() {
     );
 
     // build_sql itself is the regression guard: before the fix it returned
-    // Err("Unsupported additional filters ...") and this unwrap panicked.
-    let sql = ctx.build_sql_from_options(options.clone()).unwrap();
+    // Err("Unsupported additional filters ...") and this propagated as a
+    // test failure.
+    let sql = ctx.build_sql_from_options(options.clone())?;
     // The ad-hoc filter is pushed inside the aggregation (measure_filter.rs
     // renders `CASE WHEN <filter> THEN <result> END`), not as an outer WHERE.
     assert!(
@@ -255,4 +257,6 @@ async fn test_many_to_one_view_patched_measure_filter() {
     {
         insta::assert_snapshot!(result);
     }
+
+    Ok(())
 }
