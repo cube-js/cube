@@ -1,4 +1,3 @@
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::collectors::{
     collect_join_hints, collect_multiplied_measures, has_multi_stage_members,
 };

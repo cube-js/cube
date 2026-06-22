@@ -48,22 +48,22 @@ fn make_subquery_join(
     join_type: &str,
     on_cube: &str,
     on_sql: &str,
-) -> Rc<dyn SubqueryJoin> {
-    let on_member_sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(on_sql).unwrap());
+) -> Result<Rc<dyn SubqueryJoin>, CubeError> {
+    let on_member_sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(on_sql)?);
     let on: Rc<dyn crate::cube_bridge::member_expression::MemberExpressionDefinition> = Rc::new(
         MockMemberExpressionDefinition::builder()
             .cube_name(Some(on_cube.to_string()))
             .expression(MemberExpressionExpressionDef::Sql(on_member_sql))
             .build(),
     );
-    Rc::new(
+    Ok(Rc::new(
         MockSubqueryJoin::builder()
             .sql(sql.to_string())
             .join_type(Some(join_type.to_string()))
             .alias(alias.to_string())
             .on(on)
             .build(),
-    )
+    ))
 }
 
 // LOWER(status) as dimension expression + count
@@ -250,7 +250,7 @@ fn test_subquery_join_grouped() -> Result<(), CubeError> {
         "INNER",
         "orders",
         "{orders.status} = \"top_orders\".status",
-    );
+    )?;
 
     let options = Rc::new(
         MockBaseQueryOptions::builder()
@@ -301,7 +301,7 @@ fn test_subquery_join_empty_members() -> Result<(), CubeError> {
         "INNER",
         "orders",
         "{orders.status} = \"top_orders\".status",
-    );
+    )?;
     let top_status = make_dim_expression("top_status", "orders", "\"top_orders\".status");
 
     let options = Rc::new(
