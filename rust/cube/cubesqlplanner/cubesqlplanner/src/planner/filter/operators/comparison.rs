@@ -1,3 +1,5 @@
+use crate::cube_bridge::base_query_options::FilterValue;
+
 #[derive(Clone, Debug)]
 pub enum ComparisonKind {
     Gt,
@@ -11,12 +13,12 @@ pub enum ComparisonKind {
 #[derive(Clone, Debug)]
 pub struct ComparisonOp {
     pub(crate) kind: ComparisonKind,
-    pub(crate) value: String,
+    pub(crate) value: FilterValue,
     pub(crate) member_type: Option<String>,
 }
 
 impl ComparisonOp {
-    pub fn new(kind: ComparisonKind, value: String, member_type: Option<String>) -> Self {
+    pub fn new(kind: ComparisonKind, value: FilterValue, member_type: Option<String>) -> Self {
         Self {
             kind,
             value,

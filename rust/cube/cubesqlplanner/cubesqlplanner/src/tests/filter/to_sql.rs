@@ -1,7 +1,8 @@
 use super::{assert_filter, build_filter};
+use crate::cube_bridge::base_query_options::FilterValue;
 use indoc::indoc;
 
-fn build(filter_yaml: &str) -> (String, Vec<String>) {
+fn build(filter_yaml: &str) -> (String, Vec<FilterValue>) {
     build_filter("common/visitors.yaml", filter_yaml)
 }
 
@@ -45,6 +46,108 @@ fn test_equals_boolean() {
         r#"("visitors".is_active = $_0_$::boolean)"#,
         &["true"],
     );
+}
+
+#[test]
+fn test_equals_boolean_native() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.is_active
+            operator: equals
+            values:
+              - true
+    "});
+    assert_filter(
+        &result,
+        r#"("visitors".is_active = $_0_$::boolean)"#,
+        &["true"],
+    );
+}
+
+#[test]
+fn test_equals_boolean_native_false() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.is_active
+            operator: equals
+            values:
+              - false
+    "});
+    assert_filter(
+        &result,
+        r#"("visitors".is_active = $_0_$::boolean)"#,
+        &["false"],
+    );
+}
+
+#[test]
+fn test_not_equals_boolean_native() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.is_active
+            operator: notEquals
+            values:
+              - true
+    "});
+    assert_filter(
+        &result,
+        r#"("visitors".is_active <> $_0_$::boolean OR "visitors".is_active IS NULL)"#,
+        &["true"],
+    );
+}
+
+#[test]
+fn test_equals_number_native() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.id
+            operator: equals
+            values:
+              - 42
+    "});
+    assert_filter(&result, r#"("visitors".id = $_0_$::numeric)"#, &["42"]);
+}
+
+#[test]
+fn test_equals_number_native_fractional() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.id
+            operator: equals
+            values:
+              - 42.5
+    "});
+    assert_filter(&result, r#"("visitors".id = $_0_$::numeric)"#, &["42.5"]);
+}
+
+#[test]
+fn test_in_numbers_native() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.id
+            operator: in
+            values:
+              - 1
+              - 2
+              - 3
+    "});
+    assert_filter(
+        &result,
+        r#"("visitors".id IN ($_0_$::numeric, $_1_$::numeric, $_2_$::numeric))"#,
+        &["1", "2", "3"],
+    );
+}
+
+#[test]
+fn test_gt_number_native() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.id
+            operator: gt
+            values:
+              - 100
+    "});
+    assert_filter(&result, r#"("visitors".id > $_0_$::numeric)"#, &["100"]);
 }
 
 #[test]

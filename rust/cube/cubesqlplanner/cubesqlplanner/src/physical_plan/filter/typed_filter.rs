@@ -78,21 +78,22 @@ impl TypedFilter {
                         let from = self
                             .values()
                             .first()
-                            .and_then(|v| v.as_ref())
-                            .map(|v| ctx.format_and_allocate_from_date(v))
+                            .and_then(|v| v.to_param_string())
+                            .map(|v| ctx.format_and_allocate_from_date(&v))
                             .transpose()?;
                         let to = self
                             .values()
                             .get(1)
-                            .and_then(|v| v.as_ref())
-                            .map(|v| ctx.format_and_allocate_to_date(v))
+                            .and_then(|v| v.to_param_string())
+                            .map(|v| ctx.format_and_allocate_to_date(&v))
                             .transpose()?;
                         [from, to].into_iter().flatten().collect()
                     }
                     _ => self
                         .values()
                         .iter()
-                        .filter_map(|v| v.as_ref().map(|v| query_tools.allocate_param(v)))
+                        .filter_map(|v| v.to_param_string())
+                        .map(|v| query_tools.allocate_param(&v))
                         .collect::<Vec<_>>(),
                 };
                 callback.call(&args)

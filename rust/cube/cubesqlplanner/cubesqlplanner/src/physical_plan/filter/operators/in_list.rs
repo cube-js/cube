@@ -4,7 +4,7 @@ use cubenativeutils::CubeError;
 
 impl FilterOperationSql for InListOp {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
-        let has_null = self.values.iter().any(|v| v.is_none());
+        let has_null = self.values.iter().any(|v| v.is_null());
         let need_null_check = if self.negated { !has_null } else { has_null };
         let allocated = ctx.allocate_and_cast_values(&self.values, &self.member_type)?;
 

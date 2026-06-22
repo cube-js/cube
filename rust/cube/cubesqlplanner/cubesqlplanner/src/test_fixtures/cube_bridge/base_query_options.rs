@@ -8,8 +8,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     cube_bridge::{
         base_query_options::{
-            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, MaskedMemberItem, OrderByItem,
-            TimeDimension,
+            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, FilterValue, MaskedMemberItem,
+            OrderByItem, TimeDimension,
         },
         base_tools::BaseTools,
         evaluator::CubeEvaluator,
@@ -116,7 +116,12 @@ pub fn filter_item<M: ToString, O: ToString, V: ToString>(
         member: Some(member.to_string()),
         dimension: None,
         operator: Some(operator.to_string()),
-        values: Some(values.into_iter().map(|v| Some(v.to_string())).collect()),
+        values: Some(
+            values
+                .into_iter()
+                .map(|v| FilterValue::Str(v.to_string()))
+                .collect(),
+        ),
         or: None,
         and: None,
     }

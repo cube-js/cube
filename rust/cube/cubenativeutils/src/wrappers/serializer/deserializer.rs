@@ -40,8 +40,15 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
         } else if let Ok(val) = self.input.to_string() {
             visitor.visit_string(val.value().unwrap())
         } else if let Ok(val) = self.input.to_number() {
-            visitor.visit_i64(val.value().unwrap() as i64) //We deserialize float value in
-                                                           //different methods
+            let num = val.value().unwrap();
+            // Preserve fractional numbers as floats; only integral values are
+            // narrowed to i64 (whole-number JS values are the common case, and
+            // self-describing consumers like FilterValue expect them as ints).
+            if num.fract() == 0.0 && num.is_finite() {
+                visitor.visit_i64(num as i64)
+            } else {
+                visitor.visit_f64(num)
+            }
         } else if let Ok(val) = self.input.to_array() {
             let deserializer = NativeSeqDeserializer::<IT>::new(val);
             visitor.visit_seq(deserializer)
@@ -67,14 +74,21 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
 
     fn deserialize_enum<V>(
         self,
-        _name: &'static str,
+        name: &'static str,
         _variants: &'static [&'static str],
         _visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        // The native deserializer has no notion of serde's tagged enum
+        // representation, so a derived `Deserialize` on an enum can't work here.
+        // Implement `Deserialize` manually via `deserialize_any` instead (see
+        // `FilterValue` in cubesqlplanner for an example).
+        Err(NativeObjSerializerError::Message(format!(
+            "Deserializing enum `{name}` is not supported by the native deserializer; \
+             implement Deserialize manually via deserialize_any"
+        )))
     }
 
     fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value, Self::Error>

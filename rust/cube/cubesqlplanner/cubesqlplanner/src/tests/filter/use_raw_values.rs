@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::filter::base_filter::{BaseFilter, FilterType};
 use crate::planner::filter::filter_operator::FilterOperator;
 use crate::test_fixtures::cube_bridge::MockSchema;
@@ -8,7 +9,7 @@ fn create_ctx() -> TestContext {
     TestContext::new(schema).unwrap()
 }
 
-fn assert_raw(result: &(String, Vec<String>), expected_sql: &str) {
+fn assert_raw(result: &(String, Vec<FilterValue>), expected_sql: &str) {
     assert_eq!(result.0, expected_sql, "SQL mismatch");
     assert!(
         result.1.is_empty(),
@@ -28,8 +29,8 @@ fn test_in_date_range_use_raw_values() {
         FilterType::Dimension,
         FilterOperator::InDateRange,
         Some(vec![
-            Some("2024-01-01".to_string()),
-            Some("2024-12-31".to_string()),
+            FilterValue::Str("2024-01-01".to_string()),
+            FilterValue::Str("2024-12-31".to_string()),
         ]),
         None,
     )
@@ -39,8 +40,8 @@ fn test_in_date_range_use_raw_values() {
         .change_operator(
             FilterOperator::InDateRange,
             vec![
-                Some("(SELECT min(df) FROM cte)".to_string()),
-                Some("(SELECT max(dt) FROM cte)".to_string()),
+                FilterValue::Str("(SELECT min(df) FROM cte)".to_string()),
+                FilterValue::Str("(SELECT max(dt) FROM cte)".to_string()),
             ],
             true,
             ctx.query_tools().query_tools().clone(),
@@ -66,8 +67,8 @@ fn test_not_in_date_range_use_raw_values() {
         FilterType::Dimension,
         FilterOperator::NotInDateRange,
         Some(vec![
-            Some("2024-01-01".to_string()),
-            Some("2024-12-31".to_string()),
+            FilterValue::Str("2024-01-01".to_string()),
+            FilterValue::Str("2024-12-31".to_string()),
         ]),
         None,
     )
@@ -77,8 +78,8 @@ fn test_not_in_date_range_use_raw_values() {
         .change_operator(
             FilterOperator::NotInDateRange,
             vec![
-                Some("(SELECT min(df) FROM cte)".to_string()),
-                Some("(SELECT max(dt) FROM cte)".to_string()),
+                FilterValue::Str("(SELECT min(df) FROM cte)".to_string()),
+                FilterValue::Str("(SELECT max(dt) FROM cte)".to_string()),
             ],
             true,
             ctx.query_tools().query_tools().clone(),
@@ -104,8 +105,8 @@ fn test_before_or_on_date_use_raw_values() {
         FilterType::Dimension,
         FilterOperator::InDateRange,
         Some(vec![
-            Some("2024-01-01".to_string()),
-            Some("2024-12-31".to_string()),
+            FilterValue::Str("2024-01-01".to_string()),
+            FilterValue::Str("2024-12-31".to_string()),
         ]),
         None,
     )
@@ -114,7 +115,7 @@ fn test_before_or_on_date_use_raw_values() {
     let raw_filter = filter
         .change_operator(
             FilterOperator::BeforeOrOnDate,
-            vec![Some("(SELECT max(dt) FROM cte)".to_string())],
+            vec![FilterValue::Str("(SELECT max(dt) FROM cte)".to_string())],
             true,
             ctx.query_tools().query_tools().clone(),
             None,
@@ -139,8 +140,8 @@ fn test_after_or_on_date_use_raw_values() {
         FilterType::Dimension,
         FilterOperator::InDateRange,
         Some(vec![
-            Some("2024-01-01".to_string()),
-            Some("2024-12-31".to_string()),
+            FilterValue::Str("2024-01-01".to_string()),
+            FilterValue::Str("2024-12-31".to_string()),
         ]),
         None,
     )
@@ -149,7 +150,7 @@ fn test_after_or_on_date_use_raw_values() {
     let raw_filter = filter
         .change_operator(
             FilterOperator::AfterOrOnDate,
-            vec![Some("(SELECT min(df) FROM cte)".to_string())],
+            vec![FilterValue::Str("(SELECT min(df) FROM cte)".to_string())],
             true,
             ctx.query_tools().query_tools().clone(),
             None,

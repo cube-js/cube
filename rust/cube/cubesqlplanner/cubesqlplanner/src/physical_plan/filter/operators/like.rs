@@ -4,14 +4,11 @@ use cubenativeutils::CubeError;
 
 impl FilterOperationSql for LikeOp {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
-        let allocated = ctx.allocate_and_cast_values(
-            &self
-                .values
-                .iter()
-                .map(|v| Some(v.clone()))
-                .collect::<Vec<_>>(),
-            &self.member_type,
-        )?;
+        let allocated = self
+            .values
+            .iter()
+            .map(|v| ctx.allocate_and_cast_str(v, &self.member_type))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let like_parts = allocated
             .into_iter()

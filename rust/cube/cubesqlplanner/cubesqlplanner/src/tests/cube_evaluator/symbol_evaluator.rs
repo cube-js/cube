@@ -270,7 +270,7 @@ fn masked_sum_measure_returns_mask_literal() {
 
 #[test]
 fn masked_aggregate_measure_with_filter_not_in_group_by_renders_mask() {
-    use crate::cube_bridge::base_query_options::{FilterItem, MaskedMemberItem};
+    use crate::cube_bridge::base_query_options::{FilterItem, FilterValue, MaskedMemberItem};
 
     let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
     // sum_revenue is masked with a row-level filter on public_dim. The aggregate
@@ -287,7 +287,7 @@ fn masked_aggregate_measure_with_filter_not_in_group_by_renders_mask() {
                 member: Some("masking_cube.public_dim".to_string()),
                 dimension: None,
                 operator: Some("equals".to_string()),
-                values: Some(vec![Some("active".to_string())]),
+                values: Some(vec![FilterValue::Str("active".to_string())]),
             }),
         }],
     )

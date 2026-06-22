@@ -3,6 +3,7 @@ use super::{
     MultiStageMemberQueryPlanner, MultiStageMemberType, MultiStageQueryDescription, PlanningScope,
     RollingWindowDescription, TimeSeriesDescription,
 };
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
 use crate::planner::apply_static_filter_to_symbol;
@@ -428,7 +429,7 @@ impl MultiStageQueryPlanner {
                         switch_member.clone(),
                         FilterType::Dimension,
                         FilterOperator::Equal,
-                        Some(values.into_iter().map(Some).collect_vec()),
+                        Some(values.into_iter().map(FilterValue::Str).collect_vec()),
                         None,
                     )?;
                     state.add_dimension_filter(FilterItem::Item(filter));

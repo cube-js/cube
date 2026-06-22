@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
 use crate::planner::QueryDateTimeHelper;
@@ -34,6 +35,17 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn allocate_and_cast(
         &self,
+        value: &FilterValue,
+        member_type: &Option<String>,
+    ) -> Result<String, CubeError> {
+        let value = value.to_param_string().ok_or_else(|| {
+            CubeError::internal("Unexpected null value for a single-value filter".to_string())
+        })?;
+        self.allocate_and_cast_str(&value, member_type)
+    }
+
+    pub fn allocate_and_cast_str(
+        &self,
         value: &str,
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
@@ -43,12 +55,12 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn allocate_and_cast_values(
         &self,
-        values: &[Option<String>],
+        values: &[FilterValue],
         member_type: &Option<String>,
     ) -> Result<Vec<String>, CubeError> {
         values
             .iter()
-            .filter_map(|v| v.as_ref())
+            .filter(|v| !v.is_null())
             .map(|v| self.allocate_and_cast(v, member_type))
             .collect()
     }

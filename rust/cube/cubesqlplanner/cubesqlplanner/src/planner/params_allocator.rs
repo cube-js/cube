@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -9,7 +10,7 @@ lazy_static! {
     static ref PARAMS_MATCH_RE: Regex = Regex::new(r"\$_(\d+)_\$").unwrap();
 }
 pub struct ParamsAllocator {
-    params: Vec<String>,
+    params: Vec<FilterValue>,
     export_annotated_sql: bool,
 }
 
@@ -26,25 +27,31 @@ impl ParamsAllocator {
     }
 
     pub fn allocate_param(&mut self, name: &str) -> String {
-        self.params.push(name.to_string());
+        // Params allocated during Rust-side planning are already normalized to a
+        // string at the call site, so they enter the channel as `FilterValue::Str`.
+        // Native params (from the JS side) join later in `build_sql_and_params`
+        // and keep their natural type, including `Null`.
+        self.params.push(FilterValue::Str(name.to_string()));
         self.make_placeholder(self.params.len() - 1)
     }
 
-    pub fn get_params(&self) -> &Vec<String> {
+    pub fn get_params(&self) -> &Vec<FilterValue> {
         &self.params
     }
 
     pub fn build_sql_and_params(
         &self,
         sql: &str,
-        native_allocated_params: Vec<String>,
+        native_allocated_params: Vec<FilterValue>,
         should_reuse_params: bool,
         templates: &PlanSqlTemplates,
-    ) -> Result<(String, Vec<String>), CubeError> {
+    ) -> Result<(String, Vec<FilterValue>), CubeError> {
         let (sql, params) = self.add_native_allocated_params(sql, &native_allocated_params)?;
+
         let mut params_in_sql_order = Vec::new();
         let mut param_index_map: HashMap<usize, usize> = HashMap::new();
         let mut error = None;
+
         let result_sql = if should_reuse_params {
             PARAMS_MATCH_RE
                 .replace_all(&sql, |caps: &Captures| {
@@ -99,8 +106,8 @@ impl ParamsAllocator {
     fn add_native_allocated_params(
         &self,
         sql: &str,
-        native_allocated_params: &Vec<String>,
-    ) -> Result<(String, Vec<String>), CubeError> {
+        native_allocated_params: &[FilterValue],
+    ) -> Result<(String, Vec<FilterValue>), CubeError> {
         lazy_static! {
             static ref NATIVE_PARAMS_MATCH_RE: Regex = Regex::new(r"\$(\d+)\$").unwrap();
         }
@@ -119,5 +126,62 @@ impl ParamsAllocator {
                 .to_string();
             Ok((sql, result_params))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allocated_params_enter_channel_as_str() {
+        let mut allocator = ParamsAllocator::new(false);
+        let p0 = allocator.allocate_param("alpha");
+        let p1 = allocator.allocate_param("beta");
+
+        assert_eq!(p0, "$_0_$");
+        assert_eq!(p1, "$_1_$");
+        assert_eq!(
+            allocator.get_params(),
+            &vec![
+                FilterValue::Str("alpha".to_string()),
+                FilterValue::Str("beta".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn native_params_keep_natural_type_including_null() {
+        let mut allocator = ParamsAllocator::new(false);
+        allocator.allocate_param("internal_a"); // $_0_$
+        allocator.allocate_param("internal_b"); // $_1_$
+
+        // Native placeholders use the single-`$` form; a `null` securityContext
+        // field, a number, and a boolean must survive the merge with their type
+        // intact — `Null` in particular must NOT collapse to an empty string.
+        let sql = "SELECT $_0_$, $_1_$, $0$, $1$, $2$";
+        let native = vec![
+            FilterValue::Null,
+            FilterValue::Num(42.0),
+            FilterValue::Bool(true),
+        ];
+
+        let (rewritten_sql, params) = allocator
+            .add_native_allocated_params(sql, &native)
+            .expect("merge should succeed");
+
+        // Native placeholders are rewritten into the internal `$_N_$` space,
+        // appended after the two internal params.
+        assert_eq!(rewritten_sql, "SELECT $_0_$, $_1_$, $_2_$, $_3_$, $_4_$");
+        assert_eq!(
+            params,
+            vec![
+                FilterValue::Str("internal_a".to_string()),
+                FilterValue::Str("internal_b".to_string()),
+                FilterValue::Null,
+                FilterValue::Num(42.0),
+                FilterValue::Bool(true),
+            ]
+        );
     }
 }

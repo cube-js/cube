@@ -1,4 +1,4 @@
-use crate::cube_bridge::base_query_options::{BaseQueryOptions, MaskedMemberItem};
+use crate::cube_bridge::base_query_options::{BaseQueryOptions, FilterValue, MaskedMemberItem};
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::options_member::OptionsMember;
 use crate::logical_plan::PreAggregationUsage;
@@ -728,17 +728,22 @@ impl TestContext {
     }
 
     #[cfg(feature = "integration-postgres")]
-    fn inline_params(sql: &str, params: &[String]) -> String {
+    fn inline_params(sql: &str, params: &[FilterValue]) -> String {
         let mut result = sql.to_string();
         for (i, param) in params.iter().enumerate().rev() {
             let placeholder = format!("${}", i + 1);
-            let escaped = param.replace('\'', "''");
-            result = result.replace(&placeholder, &format!("'{}'", escaped));
+            // `Null` must inline as the bare SQL keyword; every other variant is
+            // rendered through its canonical string form and quoted.
+            let literal = match param.to_param_string() {
+                Some(value) => format!("'{}'", value.replace('\'', "''")),
+                None => "NULL".to_string(),
+            };
+            result = result.replace(&placeholder, &literal);
         }
         result
     }
 
-    pub fn build_filter_sql(&self, yaml: &str) -> Result<(String, Vec<String>), CubeError> {
+    pub fn build_filter_sql(&self, yaml: &str) -> Result<(String, Vec<FilterValue>), CubeError> {
         let props = self.create_query_properties(yaml)?;
 
         let filter = Filter {
@@ -769,7 +774,7 @@ impl TestContext {
     pub fn build_base_filter_sql(
         &self,
         base_filter: &Rc<crate::planner::filter::base_filter::BaseFilter>,
-    ) -> Result<(String, Vec<String>), CubeError> {
+    ) -> Result<(String, Vec<FilterValue>), CubeError> {
         let nodes_factory = SqlNodesFactory::default();
         let context = Rc::new(VisitorContext::new(
             self.query_tools.query_tools().clone(),

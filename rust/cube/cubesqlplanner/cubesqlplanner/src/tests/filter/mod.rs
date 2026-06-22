@@ -4,10 +4,11 @@ mod to_sql_timezone;
 mod tree_ops;
 mod use_raw_values;
 
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 
-pub fn build_filter(schema_file: &str, filter_yaml: &str) -> (String, Vec<String>) {
+pub fn build_filter(schema_file: &str, filter_yaml: &str) -> (String, Vec<FilterValue>) {
     let schema = MockSchema::from_yaml_file(schema_file);
     let ctx = TestContext::new(schema).unwrap();
 
@@ -16,9 +17,18 @@ pub fn build_filter(schema_file: &str, filter_yaml: &str) -> (String, Vec<String
         .expect("Should generate filter SQL")
 }
 
-pub fn assert_filter(result: &(String, Vec<String>), expected_sql: &str, expected_params: &[&str]) {
+pub fn assert_filter(
+    result: &(String, Vec<FilterValue>),
+    expected_sql: &str,
+    expected_params: &[&str],
+) {
     assert_eq!(result.0, expected_sql, "SQL mismatch");
-    let params: Vec<&str> = result.1.iter().map(|s| s.as_str()).collect();
+    let owned: Vec<String> = result
+        .1
+        .iter()
+        .map(|v| v.to_param_string().unwrap_or_else(|| "NULL".to_string()))
+        .collect();
+    let params: Vec<&str> = owned.iter().map(String::as_str).collect();
     assert_eq!(
         params, expected_params,
         "Params mismatch for SQL: {}",

@@ -1,5 +1,5 @@
 use crate::cube_bridge::base_query_options::{
-    FilterItem, MaskedMemberItem, OrderByItem, TimeDimension,
+    FilterItem, FilterValue, MaskedMemberItem, OrderByItem, TimeDimension,
 };
 use serde::de;
 use serde::{Deserialize, Deserializer};
@@ -114,7 +114,7 @@ pub struct YamlBaseFilter {
     #[serde(default)]
     pub operator: Option<String>,
     #[serde(default)]
-    pub values: Option<Vec<Option<String>>>,
+    pub values: Option<Vec<FilterValue>>,
 }
 
 impl YamlFilterItem {

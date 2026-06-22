@@ -8,6 +8,7 @@
 
 use super::state::State;
 use super::MemberSymbol;
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
@@ -960,7 +961,10 @@ impl QueryProperties {
         right_interval: Option<String>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
-        let values = vec![left_interval.clone(), right_interval.clone()];
+        let values = vec![
+            FilterValue::from(left_interval),
+            FilterValue::from(right_interval),
+        ];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -979,7 +983,7 @@ impl QueryProperties {
         granularity: &String,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::ToDateRollingWindowDateRange;
-        let values = vec![Some(granularity.clone())];
+        let values = vec![FilterValue::Str(granularity.clone())];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -999,7 +1003,7 @@ impl QueryProperties {
         new_to: String,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::InDateRange;
-        let replacement_values = vec![Some(new_from), Some(new_to)];
+        let replacement_values = vec![FilterValue::Str(new_from), FilterValue::Str(new_to)];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1021,7 +1025,7 @@ impl QueryProperties {
         new_to: String,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::InDateRange;
-        let replacement_values = vec![Some(new_from), Some(new_to)];
+        let replacement_values = vec![FilterValue::Str(new_from), FilterValue::Str(new_to)];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1040,8 +1044,8 @@ impl QueryProperties {
         filters: &[FilterItem],
         operator: &FilterOperator,
         use_raw_values: Option<bool>,
-        additional_values: &Vec<Option<String>>,
-        replacement_values: &Option<Vec<Option<String>>>,
+        additional_values: &Vec<FilterValue>,
+        replacement_values: &Option<Vec<FilterValue>>,
     ) -> Result<Vec<FilterItem>, CubeError> {
         let mut result = Vec::new();
         for item in filters.iter() {
