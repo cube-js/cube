@@ -653,6 +653,39 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
+  /**
+   * Recursively filters a (possibly nested) view group so that only visible
+   * views are exposed. A view group is dropped (returns null) when neither it
+   * nor any of its nested groups contains a visible view, preventing leaks of
+   * restricted view names.
+   */
+  private filterVisibleViewGroup(group: any, visibleCubeNames: Set<string>): any | null {
+    const views = (group.views || []).filter((v: string) => visibleCubeNames.has(v));
+    const includes = (group.includes || [])
+      .map((include: any) => {
+        if (typeof include === 'string') {
+          return visibleCubeNames.has(include) ? include : null;
+        }
+        return this.filterVisibleViewGroup(include, visibleCubeNames);
+      })
+      .filter((include: any) => include !== null);
+
+    if (views.length === 0 && includes.length === 0) {
+      return null;
+    }
+
+    // Explicit projection (rather than spreading `group`) so internal fields
+    // added to the compiled view group in the future don't leak into the meta
+    // response by accident.
+    return {
+      name: group.name,
+      title: group.title,
+      description: group.description,
+      views,
+      includes,
+    };
+  }
+
   public async meta({ context, res, includeCompilerId, onlyCompilerId, onlyViews }: {
     context: RequestContext,
     res: MetaResponseResultFn,
@@ -684,11 +717,8 @@ class ApiGateway {
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
       const visibleCubeNames = new Set(cubes.map(c => c.name));
       const viewGroups = (metaConfig.viewGroups || [])
-        .map(group => ({
-          ...group,
-          views: group.views.filter((v: string) => visibleCubeNames.has(v)),
-        }))
-        .filter(group => group.views.length > 0);
+        .map(group => this.filterVisibleViewGroup(group, visibleCubeNames))
+        .filter(group => group !== null);
       const response: { cubes: any[], viewGroups?: any[], compilerId?: string } = { cubes };
       if (viewGroups.length > 0) {
         response.viewGroups = viewGroups;

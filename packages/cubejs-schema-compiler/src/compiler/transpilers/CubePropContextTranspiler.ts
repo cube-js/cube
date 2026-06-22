@@ -78,8 +78,10 @@ export class CubePropContextTranspiler implements TranspilerInterface {
                 this.knownIdentifiersInjectVisitor('extends', name => this.cubeDictionary.resolveCube(name))
               );
             }
-          } else if (path.node.callee.name === 'context' || path.node.callee.name === 'view_group') {
+          } else if (path.node.callee.name === 'context') {
             args[args.length - 1].traverse(this.sqlAndReferencesFieldVisitor(null));
+          } else if (path.node.callee.name === 'view_group') {
+            args[args.length - 1].traverse(this.viewGroupReferencesVisitor());
           }
         }
       }
@@ -121,6 +123,62 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         ),
       );
     }
+  }
+
+  /**
+   * Visitor for the `view_group(...)` definition object. The legacy `views`
+   * array is wrapped as a whole (flat references), while `includes` is wrapped
+   * per-leaf so that nested view group definitions stay structurally intact and
+   * only their view references become resolvable arrow functions. This mirrors
+   * how nested folders preserve their structure.
+   */
+  protected viewGroupReferencesVisitor(): TraverseObject {
+    const resolveSymbol = n => this.viewCompiler.resolveSymbol(null, n) ||
+      this.cubeSymbols.resolveSymbol(null, n) ||
+      this.cubeSymbols.isCurrentCube(n);
+
+    const keyName = (node: t.ObjectProperty): string | undefined => {
+      if (node.key.type === 'Identifier') return node.key.name;
+      if (node.key.type === 'StringLiteral') return node.key.value;
+      return undefined;
+    };
+
+    const wrapIncludes = (valuePath: NodePath<any>) => {
+      if (!valuePath.isArrayExpression()) {
+        return;
+      }
+      for (const element of valuePath.get('elements')) {
+        if (element.isObjectExpression()) {
+          // Nested view group: recurse into its own `includes` only.
+          for (const prop of element.get('properties')) {
+            if (prop.isObjectProperty() && keyName(prop.node) === 'includes') {
+              wrapIncludes(prop.get('value') as NodePath<any>);
+            }
+          }
+        } else if (element.isIdentifier() || element.isStringLiteral()) {
+          CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, element);
+        }
+      }
+    };
+
+    return {
+      ObjectProperty: (path) => {
+        const key = keyName(path.node);
+        if (key !== 'includes' && key !== 'views') {
+          return;
+        }
+        // Only handle the top-level definition properties here; nested
+        // `includes` arrays are reached via manual recursion above.
+        if (CubePropContextTranspiler.fullPath(path) !== key) {
+          return;
+        }
+        if (key === 'views') {
+          this.transformObjectProperty(path, resolveSymbol);
+        } else {
+          wrapIncludes(path.get('value') as NodePath<any>);
+        }
+      }
+    };
   }
 
   protected sqlAndReferencesFieldVisitor(cubeName: string | null | undefined): TraverseObject {

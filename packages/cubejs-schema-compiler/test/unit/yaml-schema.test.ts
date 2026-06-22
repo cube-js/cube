@@ -1237,6 +1237,7 @@ view_groups:
         title: 'Sales',
         description: 'Sales related views',
         views: ['revenue'],
+        includes: ['revenue'],
       }]);
 
       const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
@@ -1273,6 +1274,7 @@ view_groups:
       expect(metaTransformer.viewGroups).toEqual([{
         name: 'sales',
         views: ['revenue'],
+        includes: ['revenue'],
       }]);
 
       const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
@@ -1474,6 +1476,7 @@ view_groups:
       expect(metaTransformer.viewGroups).toEqual([{
         name: 'sales',
         views: ['revenue'],
+        includes: ['revenue'],
       }]);
     });
 
@@ -1622,6 +1625,100 @@ view_groups:
       expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
       expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
       expect(metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
+    });
+
+    it('nested view groups via includes in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+  - name: enterprise_deals
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    includes:
+      - revenue
+      - name: ent_sales
+        title: Enterprise Sales
+        description: Enterprise deals
+        includes:
+          - enterprise_deals
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        title: 'Sales',
+        views: ['revenue'],
+        includes: [
+          'revenue',
+          {
+            name: 'ent_sales',
+            title: 'Enterprise Sales',
+            description: 'Enterprise deals',
+            views: ['enterprise_deals'],
+            includes: ['enterprise_deals'],
+          },
+        ],
+      }]);
+
+      const entView = metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals');
+      expect(entView?.config.viewGroups).toEqual(['ent_sales']);
+    });
+
+    it('fails when a view group uses both views and includes in YAML', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    views:
+      - revenue
+    includes:
+      - revenue
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('View group must use either "views" or "includes", but not both');
+      }
     });
   });
 

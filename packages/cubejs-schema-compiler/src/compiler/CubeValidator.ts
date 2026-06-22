@@ -1227,6 +1227,51 @@ const folderSchema = Joi.object().keys({
   ]).required(),
 }).id('folderSchema');
 
+// A view group's `includes`: a function, or an array of view references
+// (string/function) and nested view group definitions (resolved via the shared
+// `#nestedViewGroupSchema` link). Shared between the top-level and nested
+// schemas; the nested schema makes it `.required()`.
+const viewGroupIncludesSchema = Joi.alternatives([
+  Joi.func(),
+  Joi.array().items(
+    Joi.alternatives([
+      Joi.string().required(),
+      Joi.func(),
+      Joi.link('#nestedViewGroupSchema'), // Can contain nested view groups
+    ]),
+  ),
+]);
+
+// A nested view group authored inside another group's `includes`. Unlike a
+// top-level group, it MUST use `includes` (no legacy `views`), and `fileName`
+// is meaningless here, so neither is accepted. Enforcing this at validation
+// time prevents nested groups from being silently dropped by the evaluator.
+const nestedViewGroupSchema = Joi.object().keys({
+  name: Joi.string().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  includes: viewGroupIncludesSchema.required(),
+})
+  .id('nestedViewGroupSchema');
+
+const viewGroupSchema = Joi.object().keys({
+  name: Joi.string().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  // Legacy way of including views into a group, kept for backward compatibility.
+  views: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]),
+  // Preferred way of including views (and nested view groups) into a group.
+  includes: viewGroupIncludesSchema,
+  fileName: Joi.string(),
+})
+  .oxor('views', 'includes')
+  .messages({
+    'object.oxor': 'View group must use either "views" or "includes", but not both'
+  })
+  // Register the nested schema so the `#nestedViewGroupSchema` link above resolves.
+  .shared(nestedViewGroupSchema)
+  .id('viewGroupSchema');
+
 const ViewDefaultFilterSchema = Joi.object().keys({
   member: Joi.func().required(),
   operator: Joi.any().valid(
@@ -1384,6 +1429,22 @@ export class CubeValidator implements CompilerInterface {
       errorReporter.error(formatErrorMessage(result.error));
     } else {
       this.validCubes.set(cube.name, true);
+    }
+
+    return result;
+  }
+
+  public validateViewGroup(viewGroup, errorReporter: ErrorReporter) {
+    const options = {
+      nonEnumerables: true,
+      abortEarly: false, // This will allow all errors to be reported, not just the first one
+    };
+    const result = viewGroupSchema.validate(viewGroup, options);
+
+    if (result.error != null) {
+      errorReporter
+        .inContext(`${viewGroup?.name} view group`)
+        .error(formatErrorMessage(result.error));
     }
 
     return result;
