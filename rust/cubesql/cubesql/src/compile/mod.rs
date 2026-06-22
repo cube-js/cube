@@ -3071,6 +3071,40 @@ limit
     }
 
     #[tokio::test]
+    async fn test_where_filter_timezone() {
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender
+                FROM KibanaSampleDataEcommerce
+                WHERE order_date <= CAST('2025-01-01 00:00:00 America/Los_Angeles' AS TIMESTAMP)
+                GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
+        );
+
+        // Timezone offset (America/Los_Angeles is UTC-8 in January) must be
+        // applied while converting the literal to the UTC value sent to Cube.
+        assert_eq!(
+            cube_scan.request.filters,
+            Some(vec![V1LoadRequestQueryFilterItem {
+                member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                operator: Some("beforeOrOnDate".to_string()),
+                values: Some(vec!["2025-01-01T08:00:00.000Z".to_string()]),
+                ..Default::default()
+            }])
+        );
+    }
+
+    #[tokio::test]
     async fn test_where_filter_simple() {
         init_testing_logger();
 
