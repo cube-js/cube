@@ -54,8 +54,7 @@ impl GroupByLimitAggregateStream {
         let batch_size = context.session_config().batch_size();
         let input = agg.input().execute(partition, Arc::clone(&context))?;
 
-        let aggregate_arguments =
-            aggregate_expressions(agg.aggr_expr(), agg_group_by.num_group_exprs())?;
+        let aggregate_arguments = aggregate_expressions(agg.aggr_expr())?;
 
         let accumulators: Vec<_> = agg
             .aggr_expr()
@@ -202,10 +201,10 @@ impl GroupByLimitAggregateStream {
 }
 
 /// Partial-aggregate argument expressions, one vec per aggregate. Mirrors DataFusion's private
-/// `aggregate_expressions` for `AggregateMode::Partial`.
+/// `aggregate_expressions` for `AggregateMode::Partial` only — the Final-mode column offset that
+/// DataFusion's version takes is not needed here, so it is omitted.
 fn aggregate_expressions(
     aggr_expr: &[Arc<AggregateFunctionExpr>],
-    _col_idx_base: usize,
 ) -> DFResult<Vec<Vec<Arc<dyn PhysicalExpr>>>> {
     Ok(aggr_expr
         .iter()
