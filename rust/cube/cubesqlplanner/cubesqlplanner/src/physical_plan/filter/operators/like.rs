@@ -1,18 +1,14 @@
 use super::{FilterOperationSql, FilterSqlContext};
-use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::filter::operators::like::LikeOp;
 use cubenativeutils::CubeError;
 
 impl FilterOperationSql for LikeOp {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
-        let allocated = ctx.allocate_and_cast_values(
-            &self
-                .values
-                .iter()
-                .map(|v| FilterValue::Str(v.clone()))
-                .collect::<Vec<_>>(),
-            &self.member_type,
-        )?;
+        let allocated = self
+            .values
+            .iter()
+            .map(|v| ctx.allocate_and_cast_str(v, &self.member_type))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let like_parts = allocated
             .into_iter()

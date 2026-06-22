@@ -1,5 +1,5 @@
 use super::ParamsAllocator;
-use crate::cube_bridge::base_query_options::MaskedMemberItem;
+use crate::cube_bridge::base_query_options::{FilterValue, MaskedMemberItem};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
@@ -182,7 +182,7 @@ impl QueryTools {
     pub fn allocate_param(&self, name: &str) -> String {
         self.params_allocator.borrow_mut().allocate_param(name)
     }
-    pub fn get_allocated_params(&self) -> Vec<String> {
+    pub fn get_allocated_params(&self) -> Vec<FilterValue> {
         self.params_allocator.borrow().get_params().clone()
     }
     pub fn build_sql_and_params(
@@ -190,16 +190,8 @@ impl QueryTools {
         sql: &str,
         should_reuse_params: bool,
         templates: &PlanSqlTemplates,
-    ) -> Result<(String, Vec<String>), CubeError> {
-        // Normalize allocated params to their canonical string form (a param can
-        // be a boolean/number scalar — e.g. a `securityContext` value), keeping
-        // the param channel as `Vec<String>`.
-        let native_allocated_params = self
-            .base_tools
-            .get_allocated_params()?
-            .into_iter()
-            .map(|p| p.to_param_string().unwrap_or_default())
-            .collect::<Vec<_>>();
+    ) -> Result<(String, Vec<FilterValue>), CubeError> {
+        let native_allocated_params = self.base_tools.get_allocated_params()?;
         self.params_allocator.borrow().build_sql_and_params(
             sql,
             native_allocated_params,

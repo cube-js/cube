@@ -41,7 +41,15 @@ impl<'a> FilterSqlContext<'a> {
         let value = value.to_param_string().ok_or_else(|| {
             CubeError::internal("Unexpected null value for a single-value filter".to_string())
         })?;
-        let allocated = self.allocate_param(&value);
+        self.allocate_and_cast_str(&value, member_type)
+    }
+
+    pub fn allocate_and_cast_str(
+        &self,
+        value: &str,
+        member_type: &Option<String>,
+    ) -> Result<String, CubeError> {
+        let allocated = self.allocate_param(value);
         self.cast_param(&allocated, member_type)
     }
 

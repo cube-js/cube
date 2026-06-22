@@ -173,9 +173,12 @@ impl TypedFilterBuilder {
     /// First non-null value rendered as its parameter string. Used by the
     /// date/interval operators, which operate on the string form.
     fn first_non_null_string(values: &[FilterValue]) -> Result<String, CubeError> {
-        Self::first_non_null_value(values)?
+        // `first_non_null_value` already rejects an all-null/empty list, and a
+        // non-null `FilterValue` always renders to `Some`, so the fallback here
+        // is unreachable.
+        Ok(Self::first_non_null_value(values)?
             .to_param_string()
-            .ok_or_else(|| CubeError::user("Expected one parameter but nothing found".to_string()))
+            .unwrap_or_default())
     }
 
     // FIXME: late compilation. `compiler` and the builder's `query_tools` are

@@ -9,7 +9,7 @@ fn create_ctx() -> TestContext {
     TestContext::new(schema).unwrap()
 }
 
-fn assert_raw(result: &(String, Vec<String>), expected_sql: &str) {
+fn assert_raw(result: &(String, Vec<FilterValue>), expected_sql: &str) {
     assert_eq!(result.0, expected_sql, "SQL mismatch");
     assert!(
         result.1.is_empty(),

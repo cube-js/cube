@@ -1,7 +1,8 @@
 use super::{assert_filter, build_filter};
+use crate::cube_bridge::base_query_options::FilterValue;
 use indoc::indoc;
 
-fn build(filter_yaml: &str) -> (String, Vec<String>) {
+fn build(filter_yaml: &str) -> (String, Vec<FilterValue>) {
     build_filter("common/visitors.yaml", filter_yaml)
 }
 

@@ -962,8 +962,8 @@ impl QueryProperties {
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
         let values = vec![
-            FilterValue::from(left_interval.clone()),
-            FilterValue::from(right_interval.clone()),
+            FilterValue::from(left_interval),
+            FilterValue::from(right_interval),
         ];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,

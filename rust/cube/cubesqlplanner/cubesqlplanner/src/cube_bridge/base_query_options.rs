@@ -30,13 +30,6 @@ impl FilterValue {
         matches!(self, FilterValue::Null)
     }
 
-    pub fn as_str(&self) -> Option<&str> {
-        match self {
-            FilterValue::Str(s) => Some(s.as_str()),
-            _ => None,
-        }
-    }
-
     /// Canonical string representation bound as a SQL parameter. `Null` yields
     /// `None` (the value is dropped / handled as `IS NULL`). Whole numbers are
     /// rendered without a trailing `.0` (`42.0` → `"42"`).
