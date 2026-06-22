@@ -80,10 +80,7 @@ export class ViewGroupEvaluator implements CompilerInterface {
     // or of any top-level group. Seed the set with all top-level names up front
     // and thread it through the recursion so collisions are caught regardless
     // of where in the hierarchy they occur.
-    const seenNames = new Set<string>();
-    for (const viewGroup of viewGroups) {
-      seenNames.add(viewGroup.name);
-    }
+    const seenNames = new Set<string>(viewGroups.map(g => g.name));
 
     for (const viewGroup of viewGroups) {
       if (errorReporter) {

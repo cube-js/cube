@@ -1227,6 +1227,21 @@ const folderSchema = Joi.object().keys({
   ]).required(),
 }).id('folderSchema');
 
+// A view group's `includes`: a function, or an array of view references
+// (string/function) and nested view group definitions (resolved via the shared
+// `#nestedViewGroupSchema` link). Shared between the top-level and nested
+// schemas; the nested schema makes it `.required()`.
+const viewGroupIncludesSchema = Joi.alternatives([
+  Joi.func(),
+  Joi.array().items(
+    Joi.alternatives([
+      Joi.string().required(),
+      Joi.func(),
+      Joi.link('#nestedViewGroupSchema'), // Can contain nested view groups
+    ]),
+  ),
+]);
+
 // A nested view group authored inside another group's `includes`. Unlike a
 // top-level group, it MUST use `includes` (no legacy `views`), and `fileName`
 // is meaningless here, so neither is accepted. Enforcing this at validation
@@ -1235,16 +1250,7 @@ const nestedViewGroupSchema = Joi.object().keys({
   name: Joi.string().required(),
   title: Joi.string(),
   description: Joi.string(),
-  includes: Joi.alternatives([
-    Joi.func(),
-    Joi.array().items(
-      Joi.alternatives([
-        Joi.string().required(),
-        Joi.func(),
-        Joi.link('#nestedViewGroupSchema'), // Can contain nested view groups
-      ]),
-    ),
-  ]).required(),
+  includes: viewGroupIncludesSchema.required(),
 })
   .id('nestedViewGroupSchema');
 
@@ -1255,16 +1261,7 @@ const viewGroupSchema = Joi.object().keys({
   // Legacy way of including views into a group, kept for backward compatibility.
   views: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]),
   // Preferred way of including views (and nested view groups) into a group.
-  includes: Joi.alternatives([
-    Joi.func(),
-    Joi.array().items(
-      Joi.alternatives([
-        Joi.string().required(),
-        Joi.func(),
-        Joi.link('#nestedViewGroupSchema'), // Can contain nested view groups
-      ]),
-    ),
-  ]),
+  includes: viewGroupIncludesSchema,
   fileName: Joi.string(),
 })
   .oxor('views', 'includes')
