@@ -210,6 +210,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         ),
         t("rolling_window_offsets", rolling_window_offsets),
         t("rolling_window_filtered", rolling_window_filtered),
+        t("rolling_window_no_aggregates", rolling_window_no_aggregates),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -5457,6 +5458,65 @@ LIMIT
     //     .exec_query("SELECT day, ROLLING(SUM(n) RANGE 2 PRECEDING) FROM s.Data ROLLING_WINDOW DIMENSION day FROM 10 to 0 EVERY 10")
     //     .await
     //     .unwrap_err();
+    Ok(())
+}
+
+async fn rolling_window_no_aggregates(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await?;
+
+    // Regression test for the rolling optimizer (commit 9481045): a grouped
+    // aggregate with no aggregate expressions — a `SELECT DISTINCT dim` key
+    // generator over the time series, as emitted for a multi-rolling-measure
+    // query — used to be rewritten into a RollingWindowAggregate with an empty
+    // `rolling_aggs` list, which panicked in the executor. It must instead run as
+    // a plain aggregate/range-join and return the series dimension keys.
+    let r = service
+        .exec_query(
+            r#"SELECT
+  q_0.`orders__created_at_day`
+FROM
+  (
+    SELECT
+      `orders.created_at_series`.`date_from` `orders__created_at_day`
+    FROM
+      (
+        SELECT
+          date_from as `date_from`,
+          date_from + 1 AS `date_to`
+        FROM (
+            select unnest(generate_series(1, 5, 1))
+        ) AS series(date_from)
+      ) AS `orders.created_at_series`
+      LEFT JOIN (
+        SELECT
+            day `orders__created_at_day`,
+            SUM(n) `orders__rolling_number`
+            FROM s.Data GROUP BY 1
+      ) AS `orders_rolling_number_cumulative__base` ON `orders_rolling_number_cumulative__base`.`orders__created_at_day` > `orders.created_at_series`.`date_to` - 1
+      AND `orders_rolling_number_cumulative__base`.`orders__created_at_day` <= `orders.created_at_series`.`date_to`
+    GROUP BY
+      1
+  ) as q_0
+ORDER BY
+  1 ASC
+LIMIT
+  5000"#,
+        )
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[1i64, 2, 3, 4, 5]));
     Ok(())
 }
 
