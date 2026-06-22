@@ -1,0 +1,70 @@
+---
+title: New tab page
+description: The launchpad shown when you open an Explorer or a new workbook tab — search and browse view groups, views, workbooks, certified queries, and source tables to start a report.
+---
+
+When you open an Explorer or add a new tab in a [workbook](/docs/explore-analyze/workbooks),
+Cube shows the **new tab page** — a single launchpad for starting a report. From here you can
+search across your data model, browse starting points by type, or jump straight to pasting a
+query, asking an AI agent, or uploading a file.
+
+## Searching and browsing
+
+A search box sits at the top of the launchpad. Typing filters every category at once, and the
+count next to each category updates to the number of matches.
+
+The category selector lets you switch between starting-point types:
+
+- **View groups** — browse [view groups](/docs/data-modeling/view-groups) as folders. Drilling
+  into a group reveals its sub-groups and views.
+- **Views** — every [view](/docs/data-modeling/views) in the model. Search also matches a view's
+  measures and dimensions; when a view matches through a member, the row notes which one.
+- **Workbooks** — existing workbooks you can open as a starting point.
+- **Certified queries** — trusted, pre-approved queries (see
+  [Certified queries](/admin/ai/certified-queries)).
+- **Source tables** — raw tables from your connected data sources, browsable by data source and
+  schema.
+
+A category with no items is shown disabled. The launchpad opens on the first category that has
+items.
+
+Click through the list to drill down to an individual view, report, or table. Once you reach a
+starting point, the data model sidebar activates so you can continue building your query there.
+
+## Starting from a pasted query, an agent, or a file
+
+The launchpad also offers shortcuts at the bottom:
+
+- **Paste semantic SQL query** — opens the SQL panel so you can paste a semantic SQL query. The
+  dropdown adds **Paste source SQL query** (raw data-source SQL), **Paste JSON query**, and
+  **Paste GraphQL query** — the JSON and GraphQL queries are converted to a semantic query for you.
+- **Ask Cube agent** — opens the chat sidebar so you can describe the report you want in natural
+  language.
+- **Upload file** — opens the file upload flow.
+
+## Setting a default view group
+
+Administrators can configure a **default view group** so the launchpad opens inside a specific
+top-level view group instead of listing all of them. This is useful for steering users toward a
+curated set of governed starting points.
+
+<Steps>
+  <Step title="Open deployment settings">
+    Go to **Settings → Configuration** for your deployment.
+  </Step>
+  <Step title="Set the default view group">
+    Under **New tab page**, enter the name of the view group the launchpad should open inside, then
+    save.
+  </Step>
+</Steps>
+
+When a default view group is set, new Explorer and workbook tabs open inside that group. Users can
+still navigate up to **All view groups** to browse everything. If the configured group no longer
+exists, the launchpad falls back to showing all categories.
+
+<Note>
+
+The default view group is a per-deployment Cube Cloud setting — it controls the launchpad
+experience only and does not change your data model.
+
+</Note>

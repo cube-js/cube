@@ -56,6 +56,7 @@
                 ]
               },
               "docs/explore-analyze/explore",
+              "docs/explore-analyze/new-tab-page",
               {
                 "group": "Charts",
                 "root": "docs/explore-analyze/charts/index",
