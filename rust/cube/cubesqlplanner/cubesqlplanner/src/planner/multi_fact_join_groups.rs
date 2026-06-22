@@ -208,13 +208,6 @@ impl MultiFactJoinGroups {
                 .measure_hints
                 .iter()
                 .map(|mh| -> Result<_, CubeError> {
-                    // A measure with no resolvable hints is a dependency-free
-                    // member expression such as `count(*)` whose query carries
-                    // no dimensions/filters to seed the join. Resolving an empty
-                    // hint set yields a null join (`JoinGraph.buildJoin([])`),
-                    // which fails to deserialize. Fall back to the measure's own
-                    // cube — but only when it is a real, joinable cube; for view
-                    // members the join is provided by the other query members.
                     let measure_hints = if mh.hints.is_empty() {
                         Self::fallback_hints_for_measure(query_tools, &mh.measure)?
                     } else {
