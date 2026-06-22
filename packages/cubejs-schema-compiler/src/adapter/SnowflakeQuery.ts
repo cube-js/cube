@@ -114,6 +114,12 @@ export class SnowflakeQuery extends BaseQuery {
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    // Snowflake can't EXTRACT(EPOCH FROM <interval>), so the epoch of a timestamp
+    // difference (left - right) is rendered as fractional seconds between them.
+    // TIMESTAMPDIFF is measured once at microsecond granularity (no per-second
+    // boundary rounding) and divided to seconds, matching Postgres' fractional
+    // EXTRACT(EPOCH FROM interval).
+    templates.expressions.extract_epoch_diff = 'TIMESTAMPDIFF(MICROSECOND, {{ right }}, {{ left }}) / 1000000';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\\\'{% endif %}';

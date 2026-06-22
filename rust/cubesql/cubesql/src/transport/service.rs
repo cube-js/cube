@@ -777,6 +777,20 @@ impl SqlTemplates {
         )
     }
 
+    /// Renders the epoch (in seconds) of a timestamp difference `left - right`.
+    /// Used for dialects (e.g. Snowflake) where `EXTRACT(EPOCH FROM (left - right))`
+    /// is invalid because EPOCH can't be extracted from an interval.
+    pub fn extract_epoch_diff_expr(
+        &self,
+        left: String,
+        right: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/extract_epoch_diff",
+            context! { left => left, right => right },
+        )
+    }
+
     pub fn interval_any_expr(
         &self,
         interval: String,
