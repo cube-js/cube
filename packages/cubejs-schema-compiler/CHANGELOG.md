@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
+
+### Bug Fixes
+
+- **tesseract:** keep pre-aggregations for RBAC access-denied 1=0 segment ([#11123](https://github.com/cube-js/cube/issues/11123)) ([a67fa3c](https://github.com/cube-js/cube/commit/a67fa3c236120a4d6b5a62547c7d524753156e0f))
+
+### Features
+
+- support nested view groups via includes ([#10999](https://github.com/cube-js/cube/issues/10999)) ([155987f](https://github.com/cube-js/cube/commit/155987faab5ae9e33a5571e725f7f6f6b239cb94))
+
 ## [1.6.60](https://github.com/cube-js/cube/compare/v1.6.59...v1.6.60) (2026-06-18)
 
 ### Bug Fixes

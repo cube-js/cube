@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
+
+### Bug Fixes
+
+- **cubejs-client-core:** surface cubeSql error chunks instead of dropping rows ([#11097](https://github.com/cube-js/cube/issues/11097)) ([88e57d4](https://github.com/cube-js/cube/commit/88e57d48b36407aa76ed7076e51903fd9daeffd7))
+
+### Features
+
+- support nested view groups via includes ([#10999](https://github.com/cube-js/cube/issues/10999)) ([155987f](https://github.com/cube-js/cube/commit/155987faab5ae9e33a5571e725f7f6f6b239cb94))
+
 ## [1.6.60](https://github.com/cube-js/cube/compare/v1.6.59...v1.6.60) (2026-06-18)
 
 **Note:** Version bump only for package @cubejs-client/core

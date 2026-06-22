@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
+
+### Bug Fixes
+
+- **cubejs-client-core:** surface cubeSql error chunks instead of dropping rows ([#11097](https://github.com/cube-js/cube/issues/11097)) ([88e57d4](https://github.com/cube-js/cube/commit/88e57d48b36407aa76ed7076e51903fd9daeffd7))
+- **cubestore:** Skip rolling rewrite for aggregates without aggregates ([#11134](https://github.com/cube-js/cube/issues/11134)) ([2ef39d1](https://github.com/cube-js/cube/commit/2ef39d1a47b41b12c7435591d226cd0673f3dafd))
+- **tesseract:** keep pre-aggregations for RBAC access-denied 1=0 segment ([#11123](https://github.com/cube-js/cube/issues/11123)) ([a67fa3c](https://github.com/cube-js/cube/commit/a67fa3c236120a4d6b5a62547c7d524753156e0f))
+
+### Features
+
+- support nested view groups via includes ([#10999](https://github.com/cube-js/cube/issues/10999)) ([155987f](https://github.com/cube-js/cube/commit/155987faab5ae9e33a5571e725f7f6f6b239cb94))
+
+### Performance Improvements
+
+- **cubestore:** faster repartition (prefetch, per-partition merge, range jobs) ([#11088](https://github.com/cube-js/cube/issues/11088)) ([f1b0ea4](https://github.com/cube-js/cube/commit/f1b0ea4d32d30673a85032c3aeef5943df7fca90))
+- **cubestore:** reduce metastore RPC fan-out during partitioning ([#11095](https://github.com/cube-js/cube/issues/11095)) ([3eae361](https://github.com/cube-js/cube/commit/3eae3613d2faf5581ca04fe2cd69984d4b7e76bb))
+
 ## [1.6.60](https://github.com/cube-js/cube/compare/v1.6.59...v1.6.60) (2026-06-18)
 
 ### Bug Fixes

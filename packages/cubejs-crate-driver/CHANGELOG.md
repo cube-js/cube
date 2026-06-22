@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
+
+**Note:** Version bump only for package @cubejs-backend/crate-driver
+
 ## [1.6.60](https://github.com/cube-js/cube/compare/v1.6.59...v1.6.60) (2026-06-18)
 
 **Note:** Version bump only for package @cubejs-backend/crate-driver
