@@ -62,6 +62,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     context,
                 )?;
             }
+
             for join in logical_join.joins().iter() {
                 join_builder.left_join_cube(
                     join.cube().cube().clone(),
@@ -84,6 +85,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     )?;
                 }
             }
+
             if let Some(multi_stage_dimension) = &multi_stage_dimension {
                 self.builder.add_multistage_dimension_join(
                     multi_stage_dimension,
@@ -91,11 +93,13 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     &context,
                 )?;
             }
+
             for subquery_join in logical_join.subquery_joins().iter() {
                 let source = SingleSource::RawSubquerySql(subquery_join.sql.clone());
                 let on = JoinCondition::new_base_join(SqlJoinCondition::try_new(
                     subquery_join.on_sql.clone(),
                 )?);
+
                 if subquery_join.join_type.eq_ignore_ascii_case("INNER") {
                     join_builder.inner_join_source(source, subquery_join.alias.clone(), on);
                 } else if subquery_join.join_type.eq_ignore_ascii_case("LEFT") {
@@ -107,6 +111,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     )));
                 }
             }
+
             Ok(From::new_from_join(join_builder.build()))
         }
     }

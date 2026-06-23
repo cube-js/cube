@@ -241,8 +241,8 @@ const TOP_ORDERS_SUBQUERY: &str =
 // A SQL-API grouped sub-query join: the opaque sub-query (with its inner
 // ORDER BY/LIMIT) must be emitted verbatim, INNER-joined under the
 // pre-quoted alias used verbatim in the ON condition.
-#[test]
-fn test_subquery_join_grouped() -> Result<(), CubeError> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_join_grouped() -> Result<(), CubeError> {
     let ctx = create_context();
     let subquery_join = make_subquery_join(
         TOP_ORDERS_SUBQUERY,
@@ -264,7 +264,7 @@ fn test_subquery_join_grouped() -> Result<(), CubeError> {
             .build(),
     );
 
-    let sql = ctx.build_sql_from_options(options)?;
+    let sql = ctx.build_sql_from_options(options.clone())?;
 
     // The opaque sub-query is emitted verbatim (inner ORDER BY/LIMIT preserved).
     assert!(
@@ -284,13 +284,16 @@ fn test_subquery_join_grouped() -> Result<(), CubeError> {
         sql.contains("\"top_orders\".status"),
         "expected ON condition referencing the sub-query alias, got: {sql}"
     );
-    insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 
     Ok(())
 }
 
-#[test]
-fn test_subquery_join_grouped_left() -> Result<(), CubeError> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_join_grouped_left() -> Result<(), CubeError> {
     let ctx = create_context();
     let subquery_join = make_subquery_join(
         TOP_ORDERS_SUBQUERY,
@@ -312,7 +315,7 @@ fn test_subquery_join_grouped_left() -> Result<(), CubeError> {
             .build(),
     );
 
-    let sql = ctx.build_sql_from_options(options)?;
+    let sql = ctx.build_sql_from_options(options.clone())?;
 
     assert!(
         sql.contains(TOP_ORDERS_SUBQUERY),
@@ -324,7 +327,10 @@ fn test_subquery_join_grouped_left() -> Result<(), CubeError> {
         sql.contains("\"top_orders\"") && !sql.contains("\"\"\"top_orders\"\"\""),
         "alias should be emitted verbatim (no re-quoting), got: {sql}"
     );
-    insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 
     Ok(())
 }
@@ -367,8 +373,8 @@ fn test_subquery_join_unknown_join_type() -> Result<(), CubeError> {
 // Empty-members case: only the sub-query column is projected, so no `orders`
 // member selects the base cube. The join root is derived from the ON
 // dependencies so the base cube and the sub-query join are still emitted.
-#[test]
-fn test_subquery_join_empty_members() -> Result<(), CubeError> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_join_empty_members() -> Result<(), CubeError> {
     let ctx = create_context();
     let subquery_join = make_subquery_join(
         TOP_ORDERS_SUBQUERY,
@@ -390,7 +396,7 @@ fn test_subquery_join_empty_members() -> Result<(), CubeError> {
             .build(),
     );
 
-    let sql = ctx.build_sql_from_options(options)?;
+    let sql = ctx.build_sql_from_options(options.clone())?;
 
     assert!(
         sql.contains("INNER JOIN"),
@@ -404,7 +410,10 @@ fn test_subquery_join_empty_members() -> Result<(), CubeError> {
         sql.contains("\"top_orders\".status"),
         "expected reference to the sub-query alias, got: {sql}"
     );
-    insta::assert_snapshot!(sql);
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 
     Ok(())
 }
