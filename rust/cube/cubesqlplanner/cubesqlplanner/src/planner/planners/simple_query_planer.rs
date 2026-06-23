@@ -90,11 +90,22 @@ impl SimpleQueryPlanner {
             // ON Cube.x = t.x`). Derive the join root from those ON references so
             // the base cube — and the sub-query joins below — are emitted.
             let mut hints = JoinHints::new();
+
             for subquery_join in subquery_joins {
                 for dep in subquery_join.on_sql.get_dependencies() {
                     hints.extend(&collect_join_hints(&dep)?);
                 }
             }
+
+            if hints.is_empty() {
+                return Err(CubeError::user(
+                    "Sub-query join requires its ON condition to reference at least one \
+                     cube member so the base table can be resolved \
+                     (e.g. `{cube.field} = alias.field`)"
+                        .to_string(),
+                ));
+            }
+
             self.join_planner
                 .make_join_logical_plan_with_join_hints(hints, subquery_dimension_queries)?
         } else {

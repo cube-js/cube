@@ -417,3 +417,39 @@ async fn test_subquery_join_empty_members() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[test]
+fn test_subquery_join_no_cube_reference_in_on() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_ORDERS_SUBQUERY,
+        "\"top_orders\"",
+        "INNER",
+        "orders",
+        "\"top_orders\".status IS NOT NULL",
+    )?;
+    let top_status = make_dim_expression("top_status", "orders", "\"top_orders\".status");
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .dimensions(Some(vec![top_status]))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let err = ctx
+        .build_sql_from_options(options)
+        .expect_err("sub-query join with no cube reference in ON should be rejected");
+    assert!(
+        err.message
+            .contains("Sub-query join requires its ON condition to reference"),
+        "expected a clear no-cube-reference error, got: {}",
+        err.message
+    );
+
+    Ok(())
+}
