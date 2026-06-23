@@ -379,6 +379,150 @@ See the following recipes:
 
 </Note>
 
+## Links
+
+Dimensions can declare **links** — clickable navigation targets that supporting
+tools (such as [Cube Cloud Workbooks][ref-workbooks]) surface next to the
+dimension's values.
+
+`links` is a **list**, so a single dimension can declare **any number of
+links** — they all appear together in the cell menu. Each link points either to
+an **external URL** (`url`) or to **another Cube Cloud dashboard** (`dashboard`,
+a drill-in), and its URL is built per row from the dimension's data. The example
+below declares two links on one dimension (an external search and a drill-in).
+
+<Note>
+
+Dimension `links` require Cube **v1.6.53** or newer.
+
+</Note>
+
+### Parameters
+
+`links` is a list of link objects. Each link accepts:
+
+| Parameter | Required? | Description |
+| --- | --- | --- |
+| `name` | **Required** | Identifier, unique within the dimension. Also used in the synthetic dimension name (see [Behavior](#behavior)). |
+| `label` | **Required** | The text shown for the link in the UI. |
+| `url` | **Either `url` or `dashboard`** | SQL expression that builds an **external** URL per row. May [reference][ref-references] columns and other dimensions. |
+| `dashboard` | **Either `url` or `dashboard`** | The target Cube Cloud dashboard's **slug** (a **drill-in**). Each link sets exactly one of `url` or `dashboard` — never both — but different links on the same dimension can mix the two. |
+| `icon` | Optional | A [Tabler icon][link-tabler] name (see [Icons](#icons)). Defaults to a generic link icon. |
+| `target` | Optional | Where to open the link: `blank` (default — new tab) or `self` (same tab). Applies to **external** links only — drill-ins always navigate in-app (see [Behavior](#behavior)). |
+| `params` | Optional | Extra per-row parameters. For `url:` they are appended as query parameters. For `dashboard:` they become **equality filters** on the target dashboard — each `key` is a member of the target dashboard's view (a cube path such as `orders.status` is auto-resolved to the matching view member), and `value` is the per-row value. |
+
+### Example
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+        links:
+          # External link — opens a URL built from the row's value
+          - name: search
+            label: Search the web
+            url: "CONCAT('https://www.google.com/search?q=order+', {CUBE}.status)"
+            icon: brand-google
+            target: blank
+
+          # Drill-in link — opens another Cube Cloud dashboard, filtered by the row
+          - name: details
+            label: Open order details
+            dashboard: orders-detail   # the target dashboard's slug
+            params:
+              - key: orders_view.status
+                value: "{CUBE}.status"
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+      links: [
+        {
+          name: `search`,
+          label: `Search the web`,
+          url: `CONCAT('https://www.google.com/search?q=order+', ${CUBE}.status)`,
+          icon: `brand-google`,
+          target: `blank`
+        },
+        {
+          name: `details`,
+          label: `Open order details`,
+          dashboard: `orders-detail`,
+          params: [{ key: `orders_view.status`, value: `${CUBE}.status` }]
+        }
+      ]
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### Icons
+
+`icon` accepts any name from the [Tabler icon set][link-tabler] — the
+kebab-case name **without** any prefix, for example `brand-google`,
+`external-link`, `layout-dashboard`, or `send`. Browse and search the available
+names at [tabler.io/icons][link-tabler]. If `icon` is omitted, a default link
+icon is shown.
+
+### Setting a dashboard slug
+
+A `dashboard:` link targets another dashboard by its **slug** — a short, stable,
+human-readable identifier (e.g. `orders-detail`). The slug is **portable across
+environments**: it is resolved within the current deployment, so the same model
+works in development and production without hardcoding dashboard IDs.
+
+To set a slug in Cube Cloud, open the target dashboard, open its **options
+sidebar**, and fill the **Slug** field (see
+[Dashboards → Dashboard slug](/docs/explore-analyze/dashboards#dashboard-slug)).
+Slugs are **unique per deployment**, and the `dashboard:` value in your link must
+match the slug exactly.
+
+**There is no required order.** You can write the `dashboard:` slug in the model
+first (it won't break anything — a link whose slug doesn't yet resolve is simply
+skipped in the cell menu) and set the dashboard's slug later, or set the
+dashboard slug first and reference it from the model afterwards. The link starts
+working as soon as both sides use the same slug.
+
+### Behavior
+
+- **Per-row resolution** — each link's `url` (and its `params`) is evaluated for
+  every row, so the destination reflects the clicked cell. Internally a link
+  compiles to a hidden **synthetic dimension** named
+  `<dimension>___link_<name>_url` holding the resolved URL; it is added to the
+  query automatically and is never shown as a column.
+- **Null values** — if the source value (and thus the resolved URL) is null for
+  a row, that link is omitted from the menu for that row.
+- **Where links appear** — in Cube Cloud, links surface in the table
+  [**cell menu**](/docs/explore-analyze/charts/chart-types/table#cell-menu) on
+  every results table (dashboard and workbook table charts, embedded dashboards,
+  and Explore / SQL results). A left-click on a cell opens the menu listing the
+  dimension's links, alongside **Copy value** and, on measures, **Drill down**.
+- **Drill-in vs external** — a `dashboard:` link navigates **in-app, in the same
+  tab** (Cmd/Ctrl-click opens a new tab), ignoring `target`; a `url:` link opens
+  per its `target` (`blank` by default).
+- **Filters** — for `dashboard:` links, each `params` entry becomes an
+  **equality filter** on the target (the `key` is a view member, the `value` is
+  the per-row value). An unknown or inaccessible target slug is skipped
+  gracefully — the user is notified and no navigation happens.
+
+See the [`links` reference][ref-dimensions-ref] for the canonical parameter
+list.
+
 ## Hierarchies
 
 Dimensions can be organized into [hierarchies][ref-hierarchies] to define
@@ -418,6 +562,9 @@ cubes:
   and non-standard time periods
 
 [ref-dimensions-ref]: /reference/data-modeling/dimensions
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-references]: /docs/data-modeling/syntax#references
+[link-tabler]: https://tabler.io/icons
 [ref-measures-page]: /docs/data-modeling/measures
 [ref-joins]: /docs/data-modeling/joins
 [ref-type]: /reference/data-modeling/dimensions#type
