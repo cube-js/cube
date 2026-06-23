@@ -37,13 +37,19 @@ sub-tabs: **Evaluations** (runs) and **Questions** (the benchmark set).
 ## Authoring benchmark questions
 
 Questions live in your [data model repository](/admin/ai#agent-configuration),
-versioned and branched like the rest of it — under `agents/eval_questions/*.yml`.
+versioned and branched like the rest of it. You can keep them in a single
+top-level `agents/eval_questions.yml` file — the simplest place to start — or
+split them across any number of `agents/eval_questions/*.yml` files as your set
+grows. The parser picks up both and merges every file's `eval_questions` list
+into one set, so you can move from one file to many at any time without changing
+anything else.
+
 Each file has a top-level `eval_questions` list. A question needs a unique
 `name`, a `question`, and exactly one ground truth: a `certifiedQuery`
 reference **or** inline `sql`.
 
 ```yaml
-# agents/eval_questions/revenue.yml
+# agents/eval_questions.yml
 eval_questions:
   - name: revenue_by_quarter
     question: What was our revenue by quarter over the last two years?
