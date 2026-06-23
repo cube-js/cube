@@ -145,7 +145,8 @@ impl GroupByLimitAggregateStream {
         let input_values = evaluate_many(&self.aggregate_arguments, &batch)?;
         let filter_values = evaluate_optional(&self.filter_expressions, &batch)?;
 
-        assert_eq!(group_by_values.len(), 1, "Exactly 1 group value required");
+        // Grouping sets are rejected by try_new_from_partial, so there is exactly one group value.
+        debug_assert_eq!(group_by_values.len(), 1, "Exactly 1 group value required");
         self.group_values
             .intern(&group_by_values[0], &mut self.current_group_indices)?;
         let group_indices = &self.current_group_indices;

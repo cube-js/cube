@@ -568,6 +568,7 @@ impl QueryExecutorImpl {
             serialized_plan,
             self.memory_handler.clone(),
             self.config.group_by_limit_factor(),
+            self.config.group_by_limit_per_partition(),
         ))
     }
 
@@ -584,6 +585,7 @@ impl QueryExecutorImpl {
             self.memory_handler.clone(),
             data_loaded_size.clone(),
             self.config.group_by_limit_factor(),
+            self.config.group_by_limit_per_partition(),
         ))
     }
 
@@ -607,6 +609,7 @@ impl QueryExecutorImpl {
             Arc::new(PreOptimizeRule::new(
                 self.config.push_partial_aggregate_below_merge_enabled(),
                 self.config.group_by_limit_factor(),
+                self.config.coalesce_under_hash_aggregate(),
             )),
             // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.
             Arc::new(OutputRequirements::new_add_mode()),

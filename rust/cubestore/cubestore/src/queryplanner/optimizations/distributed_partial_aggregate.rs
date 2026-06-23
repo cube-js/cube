@@ -131,14 +131,6 @@ pub fn push_aggregate_to_workers(
     )?))
 }
 
-/// Whether the experimental grouped-hash coalescing in [`drop_sort_merge_under_global_aggregate`]
-/// is enabled (`CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE`). Read once at the call site, not per node.
-pub fn coalesce_under_hash_aggregate_enabled() -> bool {
-    std::env::var("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false)
-}
-
 /// A Linear aggregate doesn't use input ordering, but the scan still merges its partitions with a
 /// SortPreservingMergeExec when the index has a sort key (e.g. picked from the filters for partition
 /// pruning). Replace such merges under the aggregate with plain partition coalescing: the per-row
@@ -297,6 +289,7 @@ pub fn push_sorted_partial_aggregate_below_merge(
 pub fn push_worker_sort_and_limit(
     p: Arc<dyn ExecutionPlan>,
     group_by_limit_factor: usize,
+    group_by_limit_per_partition: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // Worker side: bound the partial aggregate's output. The sorted (inline) aggregate is always
     // bounded with a per-partition Sort(fetch) -- the group count is unknown, so we can't trim, we
@@ -307,8 +300,13 @@ pub fn push_worker_sort_and_limit(
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
         };
-        let Some(new_input) = resort_worker_subtree(&w.input, &cols, fetch, group_by_limit_factor)
-        else {
+        let Some(new_input) = resort_worker_subtree(
+            &w.input,
+            &cols,
+            fetch,
+            group_by_limit_factor,
+            group_by_limit_per_partition,
+        ) else {
             return Ok(p);
         };
         return Ok(Arc::new(WorkerExec::new(
@@ -348,6 +346,7 @@ pub fn push_worker_sort_and_limit(
         &cols,
         fetch,
         group_by_limit_factor,
+        group_by_limit_per_partition,
     ) else {
         return Ok(p);
     };
@@ -426,6 +425,7 @@ fn resort_worker_subtree(
     cols: &[(usize, bool, bool)],
     fetch: usize,
     group_by_limit_factor: usize,
+    group_by_limit_per_partition: bool,
 ) -> Option<Arc<dyn ExecutionPlan>> {
     let partial = locate_partial_aggregate(worker_subtree)?;
 
@@ -444,7 +444,7 @@ fn resort_worker_subtree(
         //    ("under merge"): N parallel hash tables -- more parallelism, peak ~N*k. The trim keeps
         //    each per-partition output to ~factor*k, and the global top-k argument (full group key)
         //    guarantees a surviving group stays within every partition's local top-k.
-        let partial = if per_partition_enabled() {
+        let partial = if group_by_limit_per_partition {
             partial
         } else {
             partial
@@ -528,18 +528,6 @@ fn lex_ordering_from_cols(
         });
     }
     Some(LexOrdering::new(exprs))
-}
-
-/// Toggle (CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION) for the worker hash trim. Off by default: the
-/// aggregate's input is coalesced so the worker builds a single hash table over the merged partitions
-/// ("over merge"), peak ~k. On: the aggregate keeps its raw multi-partition input and runs per
-/// partition ("under merge") -- one group table per DF partition (= per parquet file/chunk), trading
-/// memory for intra-worker parallelism (peak ~N*k; on a key spread across many partitions each table
-/// approaches full cardinality).
-fn per_partition_enabled() -> bool {
-    std::env::var("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false)
 }
 
 /// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in

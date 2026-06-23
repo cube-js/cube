@@ -46,6 +46,7 @@ pub struct CubeQueryPlanner {
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
     group_by_limit_factor: usize,
+    group_by_limit_per_partition: bool,
 }
 
 impl CubeQueryPlanner {
@@ -54,6 +55,7 @@ impl CubeQueryPlanner {
         serialized_plan: Arc<PreSerializedPlan>,
         memory_handler: Arc<dyn MemoryHandler>,
         group_by_limit_factor: usize,
+        group_by_limit_per_partition: bool,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             cluster: Some(cluster),
@@ -62,6 +64,7 @@ impl CubeQueryPlanner {
             memory_handler,
             data_loaded_size: None,
             group_by_limit_factor,
+            group_by_limit_per_partition,
         }
     }
 
@@ -71,6 +74,7 @@ impl CubeQueryPlanner {
         memory_handler: Arc<dyn MemoryHandler>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
         group_by_limit_factor: usize,
+        group_by_limit_per_partition: bool,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             serialized_plan,
@@ -79,6 +83,7 @@ impl CubeQueryPlanner {
             memory_handler,
             data_loaded_size,
             group_by_limit_factor,
+            group_by_limit_per_partition,
         }
     }
 }
@@ -112,6 +117,7 @@ impl QueryPlanner for CubeQueryPlanner {
             self.data_loaded_size.clone(),
             ctx_state.config().options(),
             self.group_by_limit_factor,
+            self.group_by_limit_per_partition,
         );
         result
     }
@@ -121,13 +127,19 @@ impl QueryPlanner for CubeQueryPlanner {
 pub struct PreOptimizeRule {
     push_partial_aggregate_below_merge: bool,
     group_by_limit_factor: usize,
+    coalesce_under_hash_aggregate: bool,
 }
 
 impl PreOptimizeRule {
-    pub fn new(push_partial_aggregate_below_merge: bool, group_by_limit_factor: usize) -> Self {
+    pub fn new(
+        push_partial_aggregate_below_merge: bool,
+        group_by_limit_factor: usize,
+        coalesce_under_hash_aggregate: bool,
+    ) -> Self {
         Self {
             push_partial_aggregate_below_merge,
             group_by_limit_factor,
+            coalesce_under_hash_aggregate,
         }
     }
 }
@@ -142,6 +154,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
             plan,
             self.push_partial_aggregate_below_merge,
             self.group_by_limit_factor,
+            self.coalesce_under_hash_aggregate,
         )
     }
 
@@ -158,6 +171,7 @@ fn pre_optimize_physical_plan(
     p: Arc<dyn ExecutionPlan>,
     push_partial_aggregate_below_merge: bool,
     group_by_limit_factor: usize,
+    coalesce_under_hash_aggregate: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))?;
 
@@ -174,11 +188,9 @@ fn pre_optimize_physical_plan(
     };
 
     // Global (no GROUP BY) aggregates -- and, when enabled, grouped hash aggregates -- don't need
-    // their input merged in the sort order. Read the flag once, not per node.
-    let coalesce_grouped_hash =
-        distributed_partial_aggregate::coalesce_under_hash_aggregate_enabled();
+    // their input merged in the sort order.
     let p = rewrite_physical_plan(p, &mut |p| {
-        drop_sort_merge_under_global_aggregate(p, coalesce_grouped_hash)
+        drop_sort_merge_under_global_aggregate(p, coalesce_under_hash_aggregate)
     })?;
 
     // Replace sorted AggregateExec with InlineAggregateExec for better performance
@@ -199,6 +211,7 @@ fn finalize_physical_plan(
     data_loaded_size: Option<Arc<DataLoadedSize>>,
     config: &ConfigOptions,
     group_by_limit_factor: usize,
+    group_by_limit_per_partition: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| add_check_memory_exec(p, memory_handler.clone()))?;
     log::trace!(
@@ -228,7 +241,7 @@ fn finalize_physical_plan(
     // after replace_suboptimal_merge_sorts so it doesn't push the query's row limit into the
     // worker merge we add (which would cut uncombined partial rows and undercount).
     let p = rewrite_physical_plan(p, &mut |p| {
-        push_worker_sort_and_limit(p, group_by_limit_factor)
+        push_worker_sort_and_limit(p, group_by_limit_factor, group_by_limit_per_partition)
     })?;
     log::trace!(
         "Rewrote physical plan by push_worker_sort_and_limit:\n{}",

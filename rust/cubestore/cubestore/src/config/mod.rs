@@ -590,6 +590,16 @@ pub trait ConfigObj: DIService {
     /// `k = limit + offset`. `0` disables the optimization.
     fn group_by_limit_factor(&self) -> usize;
 
+    /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
+    /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
+    /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
+    /// partition ("under merge").
+    fn group_by_limit_per_partition(&self) -> bool;
+
+    /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
+    /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
+    fn coalesce_under_hash_aggregate(&self) -> bool;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -750,6 +760,8 @@ pub struct ConfigObjImpl {
     pub repartition_merge_max_rows: u64,
     pub repartition_check_overlapping_children: bool,
     pub group_by_limit_factor: usize,
+    pub group_by_limit_per_partition: bool,
+    pub coalesce_under_hash_aggregate: bool,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1094,6 +1106,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn group_by_limit_factor(&self) -> usize {
         self.group_by_limit_factor
+    }
+
+    fn group_by_limit_per_partition(&self) -> bool {
+        self.group_by_limit_per_partition
+    }
+
+    fn coalesce_under_hash_aggregate(&self) -> bool {
+        self.coalesce_under_hash_aggregate
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1793,6 +1813,14 @@ impl Config {
                     false,
                 ),
                 group_by_limit_factor: env_parse("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
+                group_by_limit_per_partition: env_bool(
+                    "CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION",
+                    false,
+                ),
+                coalesce_under_hash_aggregate: env_bool(
+                    "CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE",
+                    false,
+                ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -2050,6 +2078,8 @@ impl Config {
                 repartition_merge_max_rows: 4_000_000,
                 repartition_check_overlapping_children: false,
                 group_by_limit_factor: 2,
+                group_by_limit_per_partition: false,
+                coalesce_under_hash_aggregate: false,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
