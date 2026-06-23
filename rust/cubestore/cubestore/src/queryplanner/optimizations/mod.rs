@@ -8,6 +8,7 @@ mod trace_data_loaded;
 
 use super::serialized_plan::PreSerializedPlan;
 use crate::cluster::{Cluster, WorkerPlanningParams};
+use crate::config::TopKAggregateStrategy;
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     add_limit_to_workers, drop_sort_merge_under_global_aggregate, ensure_partition_merge,
     push_aggregate_to_workers, push_sorted_partial_aggregate_below_merge,
@@ -45,6 +46,7 @@ pub struct CubeQueryPlanner {
     data_loaded_size: Option<Arc<DataLoadedSize>>,
     group_by_limit_factor: usize,
     group_by_limit_per_partition: bool,
+    topk_strategy: TopKAggregateStrategy,
 }
 
 impl CubeQueryPlanner {
@@ -54,6 +56,7 @@ impl CubeQueryPlanner {
         memory_handler: Arc<dyn MemoryHandler>,
         group_by_limit_factor: usize,
         group_by_limit_per_partition: bool,
+        topk_strategy: TopKAggregateStrategy,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             cluster: Some(cluster),
@@ -63,6 +66,7 @@ impl CubeQueryPlanner {
             data_loaded_size: None,
             group_by_limit_factor,
             group_by_limit_per_partition,
+            topk_strategy,
         }
     }
 
@@ -73,6 +77,7 @@ impl CubeQueryPlanner {
         data_loaded_size: Option<Arc<DataLoadedSize>>,
         group_by_limit_factor: usize,
         group_by_limit_per_partition: bool,
+        topk_strategy: TopKAggregateStrategy,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             serialized_plan,
@@ -82,6 +87,7 @@ impl CubeQueryPlanner {
             data_loaded_size,
             group_by_limit_factor,
             group_by_limit_per_partition,
+            topk_strategy,
         }
     }
 }
@@ -104,6 +110,7 @@ impl QueryPlanner for CubeQueryPlanner {
                 cluster: self.cluster.clone(),
                 worker_planning_params: self.worker_partition_count,
                 serialized_plan: self.serialized_plan.clone(),
+                topk_strategy: self.topk_strategy,
             }),
             Arc::new(RollingWindowPlanner {}),
         ])
