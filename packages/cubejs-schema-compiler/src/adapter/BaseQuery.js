@@ -1790,6 +1790,11 @@ export class BaseQuery {
       multiStageDimensions: withQuery.multiStageDimensions,
       multiStageTimeDimensions: withQuery.multiStageTimeDimensions,
       filters: withQuery.filters,
+      // Propagate SQL API member aliases so dimension columns produced by this stage
+      // match how the outer aggregate (and renderedReference) reference them. Without it
+      // the stage names columns with full internal aliases while the consumer references
+      // them by memberToAlias, producing `invalid identifier` errors.
+      memberToAlias: this.options.memberToAlias,
       // TODO do we need it?
       multiStageQuery: true, // !!fromDimensions.find(d => this.newDimension(d).isMultiStage())
       disableExternalPreAggregations: true,
@@ -1812,6 +1817,8 @@ export class BaseQuery {
       multiStageTimeDimensions: withQuery.multiStageTimeDimensions,
       filters: withQuery.filters,
       segments: withQuery.segments,
+      // See note above: keep member aliases consistent across multi-stage CTEs.
+      memberToAlias: this.options.memberToAlias,
       from: fromSql && {
         sql: fromSql,
         alias: `${withQuery.alias}_join`,
