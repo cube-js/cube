@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
+
+### Bug Fixes
+
+- **cubesql:** Support EXTRACT(EPOCH) over timestamp diff on Snowflake ([#11105](https://github.com/cube-js/cube/issues/11105)) ([8e9d38c](https://github.com/cube-js/cube/commit/8e9d38cdaffb8b7f9f22377eeb3a35a338cacbab))
+
+### Features
+
+- **tesseract:** Support SQL API grouped sub-query joins ([#11138](https://github.com/cube-js/cube/issues/11138)) ([4d4b8cd](https://github.com/cube-js/cube/commit/4d4b8cde62fdf3c676467b712b9759b601c574e8))
+
 ## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
 
 ### Bug Fixes

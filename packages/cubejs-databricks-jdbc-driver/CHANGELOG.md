@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
+
+### Bug Fixes
+
+- **databricks-jdbc-driver:** support OIDC/workload identity for export buckets ([#11143](https://github.com/cube-js/cube/issues/11143)) ([f4d2dde](https://github.com/cube-js/cube/commit/f4d2ddec1a74865357998b47d83805c2623d9a57))
+
 ## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

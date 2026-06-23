@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
+
+### Bug Fixes
+
+- **cubesql:** Support EXTRACT(EPOCH) over timestamp diff on Snowflake ([#11105](https://github.com/cube-js/cube/issues/11105)) ([8e9d38c](https://github.com/cube-js/cube/commit/8e9d38cdaffb8b7f9f22377eeb3a35a338cacbab))
+
+### Features
+
+- **cubesql:** Push `Limit`-`Sort` down `Union` inputs ([#11125](https://github.com/cube-js/cube/issues/11125)) ([932e253](https://github.com/cube-js/cube/commit/932e2538b165ffbb168d8ee7de1e4f2c93684717))
+- **cubesql:** Support parsing IANA timezones ([#11140](https://github.com/cube-js/cube/issues/11140)) ([c79eb98](https://github.com/cube-js/cube/commit/c79eb986fb696398b3c3e959b836c02d3af0c211))
+
 ## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

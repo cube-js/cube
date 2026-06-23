@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
+
+### Features
+
+- **cubesql:** Support parsing IANA timezones ([#11140](https://github.com/cube-js/cube/issues/11140)) ([c79eb98](https://github.com/cube-js/cube/commit/c79eb986fb696398b3c3e959b836c02d3af0c211))
+- **tesseract:** Support SQL API grouped sub-query joins ([#11138](https://github.com/cube-js/cube/issues/11138)) ([4d4b8cd](https://github.com/cube-js/cube/commit/4d4b8cde62fdf3c676467b712b9759b601c574e8))
+
 ## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
 
 **Note:** Version bump only for package @cubejs-backend/native

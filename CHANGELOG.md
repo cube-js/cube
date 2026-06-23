@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
+
+### Bug Fixes
+
+- **cubesql:** Support EXTRACT(EPOCH) over timestamp diff on Snowflake ([#11105](https://github.com/cube-js/cube/issues/11105)) ([8e9d38c](https://github.com/cube-js/cube/commit/8e9d38cdaffb8b7f9f22377eeb3a35a338cacbab))
+- **databricks-jdbc-driver:** support OIDC/workload identity for export buckets ([#11143](https://github.com/cube-js/cube/issues/11143)) ([f4d2dde](https://github.com/cube-js/cube/commit/f4d2ddec1a74865357998b47d83805c2623d9a57))
+- **tesseract:** Push ad-hoc filters into view measure aggregation ([#11137](https://github.com/cube-js/cube/issues/11137)) ([a4a3e79](https://github.com/cube-js/cube/commit/a4a3e79f2e5a2bf9f0e915df4df509175fa122de))
+- **tesseract:** Resolve join for hint-less member-expression measures ([#11136](https://github.com/cube-js/cube/issues/11136)) ([741138a](https://github.com/cube-js/cube/commit/741138a21ca96eec64d2e0e329da91de8898948c))
+
+### Features
+
+- **cubesql:** Push `Limit`-`Sort` down `Union` inputs ([#11125](https://github.com/cube-js/cube/issues/11125)) ([932e253](https://github.com/cube-js/cube/commit/932e2538b165ffbb168d8ee7de1e4f2c93684717))
+- **cubesql:** Support parsing IANA timezones ([#11140](https://github.com/cube-js/cube/issues/11140)) ([c79eb98](https://github.com/cube-js/cube/commit/c79eb986fb696398b3c3e959b836c02d3af0c211))
+- **tesseract:** Support boolean and numeric filter values ([#11135](https://github.com/cube-js/cube/issues/11135)) ([789333d](https://github.com/cube-js/cube/commit/789333d313dc22281a9af3610781a7c1e6b7b28f))
+- **tesseract:** Support SQL API grouped sub-query joins ([#11138](https://github.com/cube-js/cube/issues/11138)) ([4d4b8cd](https://github.com/cube-js/cube/commit/4d4b8cde62fdf3c676467b712b9759b601c574e8))
+
 ## [1.6.61](https://github.com/cube-js/cube/compare/v1.6.60...v1.6.61) (2026-06-22)
 
 ### Bug Fixes
