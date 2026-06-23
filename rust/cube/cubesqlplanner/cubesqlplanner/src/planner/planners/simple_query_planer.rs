@@ -1,6 +1,7 @@
 use super::{DimensionSubqueryPlanner, JoinPlanner};
 use crate::logical_plan::*;
-use crate::planner::collectors::collect_sub_query_dimensions_from_symbols;
+use crate::planner::collectors::{collect_join_hints, collect_sub_query_dimensions_from_symbols};
+use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
 use crate::planner::QueryProperties;
@@ -77,11 +78,43 @@ impl SimpleQueryPlanner {
         )?;
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
+        // Query-level SQL-API sub-query joins (from `subqueryJoins`) extend the
+        // FROM clause with opaque joined sub-queries.
+        let subquery_joins = self.query_properties.subquery_joins();
         let source = if let Some(join) = &join {
             self.join_planner
                 .make_join_logical_plan(join, subquery_dimension_queries)
+        } else if !subquery_joins.is_empty() {
+            // No selected member resolves the base cube, but the sub-query joins'
+            // ON conditions reference it (e.g. `SELECT t.col FROM Cube JOIN (...) t
+            // ON Cube.x = t.x`). Derive the join root from those ON references so
+            // the base cube — and the sub-query joins below — are emitted.
+            let mut hints = JoinHints::new();
+
+            for subquery_join in subquery_joins {
+                for dep in subquery_join.on_sql.get_dependencies() {
+                    hints.extend(&collect_join_hints(&dep)?);
+                }
+            }
+
+            if hints.is_empty() {
+                return Err(CubeError::user(
+                    "Sub-query join requires its ON condition to reference at least one \
+                     cube member so the base table can be resolved \
+                     (e.g. `{cube.field} = alias.field`)"
+                        .to_string(),
+                ));
+            }
+
+            self.join_planner
+                .make_join_logical_plan_with_join_hints(hints, subquery_dimension_queries)?
         } else {
             self.join_planner.make_empty_join_logical_plan()
+        };
+        let source = if subquery_joins.is_empty() {
+            source
+        } else {
+            source.with_subquery_joins(subquery_joins.clone())
         };
         Ok(source)
     }

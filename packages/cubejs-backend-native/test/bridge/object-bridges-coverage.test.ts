@@ -57,6 +57,7 @@ const BRIDGES: BridgeSpec[] = [
       'row_limit',
       'security_context',
       'segments',
+      'subquery_joins',
       'time_dimensions',
       'timezone',
       'total_query',

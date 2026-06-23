@@ -247,6 +247,21 @@ impl PlanSqlTemplates {
         )
     }
 
+    /// Like [`Self::query_aliased`] but takes an alias that is already a final,
+    /// quote-ready identifier and must not be re-quoted. Used for SQL-API
+    /// sub-query joins, whose alias the SQL API emits pre-quoted and references
+    /// verbatim in the ON condition.
+    pub fn query_aliased_prequoted(
+        &self,
+        query: &str,
+        quoted_alias: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/query_aliased",
+            context! { query => query, quoted_alias => quoted_alias },
+        )
+    }
+
     pub fn order_by(
         &self,
         expr: &str,

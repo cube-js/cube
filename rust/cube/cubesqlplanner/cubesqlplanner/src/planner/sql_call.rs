@@ -492,6 +492,22 @@ impl SqlCall {
             .collect()
     }
 
+    pub fn struct_eq(&self, other: &Self) -> bool {
+        self.template == other.template
+            && self.deps.len() == other.deps.len()
+            && self
+                .deps
+                .iter()
+                .zip(&other.deps)
+                .all(|(a, b)| match (a, b) {
+                    (SqlDependency::Symbol(x), SqlDependency::Symbol(y)) => x == y,
+                    (SqlDependency::CubeRef(x), SqlDependency::CubeRef(y)) => {
+                        x.cube_name() == y.cube_name() && x.path() == y.path()
+                    }
+                    _ => false,
+                })
+    }
+
     pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         for dep in self.deps.iter() {
             if let Some(s) = dep.as_symbol() {
