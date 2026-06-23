@@ -5,6 +5,23 @@ export type GoogleStorageClientConfig = {
 };
 
 /**
+ * Whether the provided GCS credentials are usable. Empty string / undefined
+ * (no credentials configured, e.g. OIDC / workload identity) and an empty
+ * object are treated as absent so the Google SDK falls back to Application
+ * Default Credentials (which honors `GOOGLE_APPLICATION_CREDENTIALS`, including
+ * workload-identity-federation `external_account` config files).
+ */
+export function hasGCSCredentials(credentials: any): boolean {
+  if (!credentials) {
+    return false;
+  }
+  if (typeof credentials === 'object' && Object.keys(credentials).length === 0) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Returns an array of signed GCS URLs of the unloaded csv files.
  */
 export async function extractFilesFromGCS(
@@ -13,7 +30,7 @@ export async function extractFilesFromGCS(
   tableName: string
 ): Promise<string[]> {
   const storage = new Storage(
-    gcsConfig.credentials
+    hasGCSCredentials(gcsConfig.credentials)
       ? { credentials: gcsConfig.credentials, projectId: gcsConfig.credentials.project_id }
       : undefined
   );
