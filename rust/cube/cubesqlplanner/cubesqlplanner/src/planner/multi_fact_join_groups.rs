@@ -1,3 +1,4 @@
+use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::collectors::{
     collect_join_hints, collect_multiplied_measures, has_multi_stage_members,
 };
@@ -207,7 +208,12 @@ impl MultiFactJoinGroups {
                 .measure_hints
                 .iter()
                 .map(|mh| -> Result<_, CubeError> {
-                    let (key, join_tree) = resolve(&mh.hints)?;
+                    let measure_hints = if mh.hints.is_empty() {
+                        Self::fallback_hints_for_measure(query_tools, &mh.measure)?
+                    } else {
+                        mh.hints.clone()
+                    };
+                    let (key, join_tree) = resolve(&measure_hints)?;
                     Ok((vec![mh.measure.clone()], key, join_tree))
                 })
                 .collect::<Result<Vec<_>, _>>()?
@@ -228,6 +234,27 @@ impl MultiFactJoinGroups {
             .into_iter()
             .map(|key| grouped.remove(&key).unwrap())
             .collect())
+    }
+
+    /// Hints to use for a measure whose own hint set resolved to empty.
+    /// Seeds the measure's owning cube when it is a real, joinable cube;
+    /// returns empty for views (resolved via the query's other members).
+    fn fallback_hints_for_measure(
+        query_tools: &Rc<State>,
+        measure: &Rc<MemberSymbol>,
+    ) -> Result<JoinHints, CubeError> {
+        let cube_name = measure.cube_name();
+        let is_view = query_tools
+            .cube_evaluator()
+            .cube_from_path(cube_name.clone())
+            .ok()
+            .and_then(|cube| cube.static_data().is_view)
+            .unwrap_or(false);
+        if is_view {
+            Ok(JoinHints::new())
+        } else {
+            Ok(JoinHints::from_items(vec![JoinHintItem::Single(cube_name)]))
+        }
     }
 
     pub fn measures_join_hints(&self) -> &MeasuresJoinHints {

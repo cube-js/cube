@@ -145,6 +145,34 @@ async fn test_expr_measure_sum() {
     }
 }
 
+// COUNT(*) is a dependency-free measure expression: it references no members, so it
+// resolves an empty join-hint set, and with no dimensions/filters to seed the join the
+// planner must fall back to the measure's own cube (`orders`) instead of building a
+// null join. Regression for hint-less member-expression measures: without the fallback,
+// the empty hints reach `JoinGraph.build_join([])`, which yields no joinable cube.
+// integration_basic seed has 9 orders → 9.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_expr_measure_count_star_no_hints() {
+    let ctx = create_context();
+    let expr = make_measure_expression("total_count", "orders", "COUNT(*)");
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![expr]))
+            .build(),
+    );
+
+    ctx.build_sql_from_options(options.clone()).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // Multiplied dim-only ME: a measure expression evaluating to a
 // dimension expression (MAX over `customers.city`) used together
 // with an `orders` dimension. `orders→customers` is many_to_one, so
