@@ -95,6 +95,9 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
     - **Agent** (one per deployment by default; multi-agent is also supported)
       - Rules
       - Certified queries
+      - **Evals**
+        - Questions (the benchmark set)
+        - Eval run (one execution of the agent against the question set)
     - **Analytics Chat**
     - **Workbook**
       - Tab
@@ -203,3 +206,17 @@ Every [Deployment](#product-taxonomy) ships with **one agent** by default. The a
 - Refer to specific agents by their user-given names.
 - Use **default agent** to contrast against user-created agents within a deployment.
 - Continue to use **Cube agent** for product-level / abstract references.
+
+# Evals Terminology
+
+Benchmarking the agent's answers against a known-correct ground truth.
+
+- **Evals** — the feature, the model IDE tab, and the runs sub-tab. Use this
+  everywhere the feature or its UI is named.
+- **eval run** — a single execution of the agent against the question set.
+  Action label: **New eval**; column label: **Eval name**.
+- **Question** — a natural-language question plus its ground truth; lives under
+  the **Questions** sub-tab.
+- **Avoid "Evaluate" / "Evaluation" / "Evaluations"** — legacy UI labels,
+  replaced by **Evals**. (Generic verb uses like "evaluate the expression" are
+  unrelated and fine.)
