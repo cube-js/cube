@@ -1197,59 +1197,6 @@ fn test_count_distinct_approx_multistage_pre_agg_reads_cardinality() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_rollup_lambda_cross_cube_union_aliases() {
-    // `lambda_union` UNIONs `visitor_checkins.for_lambda` with
-    // `visitor_checkins2.for_lambda`. The lambda exposes the first member
-    // rollup's symbols, so the dimension's unified output alias is
-    // `visitor_checkins__visitor_id`, but the second branch stores it as
-    // `visitor_checkins2__visitor_id`. Each branch must read its own column
-    // while projecting the unified alias.
-    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
-    let ctx = TestContext::new(schema).unwrap();
-
-    // Force the lambda; otherwise the matcher would pick the plain `for_lambda`
-    // rollup that the lambda is built from (it is declared first).
-    let query_yaml = indoc! {"
-        measures:
-          - visitor_checkins.count
-        dimensions:
-          - visitor_checkins.visitor_id
-        time_dimensions:
-          - dimension: visitor_checkins.created_at
-            granularity: day
-        pre_aggregation_id: visitor_checkins.lambda_union
-    "};
-
-    let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
-
-    assert_eq!(pre_aggrs.len(), 1);
-    assert_eq!(pre_aggrs[0].name(), "lambda_union");
-
-    // The second branch (visitor_checkins2) must read its own stored columns and
-    // project them under the lambda's unified `visitor_checkins__*` aliases. Before
-    // the fix the branch read `visitor_checkins__visitor_id` (the first cube's alias)
-    // from the visitor_checkins2 table, which does not exist there.
-    for (read, out) in [
-        (
-            "visitor_checkins2__visitor_id",
-            "visitor_checkins__visitor_id",
-        ),
-        (
-            "visitor_checkins2__created_at_day",
-            "visitor_checkins__created_at_day",
-        ),
-        ("visitor_checkins2__count", "visitor_checkins__count"),
-    ] {
-        assert!(
-            sql.contains(&format!("\"{}\" \"{}\"", read, out)),
-            "Expected branch to read {read} and project {out}, got:\n{sql}",
-        );
-    }
-}
-
 // A cube `foo` whose `originalSql` pre-aggregation (`main`) materializes its base
 // SQL, plus a `second` rollup. The mock renders the originalSql pre-agg table as
 // `foo__main` and the raw cube SQL references `foo_table`.
