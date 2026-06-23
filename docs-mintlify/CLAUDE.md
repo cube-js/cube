@@ -230,7 +230,7 @@ Benchmarking the agent's answers against a known-correct ground truth.
 - **Evals** — the feature, the model IDE tab, and the runs sub-tab. Use this
   everywhere the feature or its UI is named.
 - **eval run** — a single execution of the agent against the question set.
-  Action label: **New eval**; column label: **Eval name**.
+  Action label: **Run eval**; column label: **Eval name**.
 - **Question** — a natural-language question plus its ground truth; lives under
   the **Questions** sub-tab.
 - **Avoid "Evaluate" / "Evaluation" / "Evaluations"** — legacy UI labels,
