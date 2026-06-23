@@ -1302,6 +1302,13 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+/// Lenient boolean env read for opt-in toggles: only `1`/`true` enable it, anything else (including a
+/// typo) is treated as off. Unlike [`env_bool`] it never panics -- a malformed value on a
+/// performance flag must not take a node down on startup.
+fn env_flag(name: &str) -> bool {
+    env::var(name).map_or(false, |v| v == "true" || v == "1")
+}
+
 pub fn env_parse<T>(name: &str, default: T) -> T
 where
     T: FromStr,
@@ -1813,14 +1820,8 @@ impl Config {
                     false,
                 ),
                 group_by_limit_factor: env_parse("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
-                group_by_limit_per_partition: env_bool(
-                    "CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION",
-                    false,
-                ),
-                coalesce_under_hash_aggregate: env_bool(
-                    "CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE",
-                    false,
-                ),
+                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
+                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
