@@ -2,6 +2,7 @@ use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::options_member::OptionsMember;
 use crate::cube_bridge::subquery_join::SubqueryJoin;
+use crate::planner::QueryPropertiesCompiler;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockMemberExpressionDefinition, MockMemberSql,
     MockSchema, MockSubqueryJoin,
@@ -449,6 +450,52 @@ fn test_subquery_join_no_cube_reference_in_on() -> Result<(), CubeError> {
             .contains("Sub-query join requires its ON condition to reference"),
         "expected a clear no-cube-reference error, got: {}",
         err.message
+    );
+
+    Ok(())
+}
+
+// The compiled ON condition participates in `QueryProperties` equality: two
+// otherwise-identical queries whose sub-query joins differ only in their ON
+// must not compare equal, while identical ONs must (structural, not pointer,
+// equality).
+#[test]
+fn test_subquery_join_on_participates_in_equality() -> Result<(), CubeError> {
+    let ctx = create_context();
+
+    let build_qp = |on_sql: &str| -> Result<Rc<crate::planner::QueryProperties>, CubeError> {
+        let subquery_join = make_subquery_join(
+            TOP_ORDERS_SUBQUERY,
+            "\"top_orders\"",
+            "INNER",
+            "orders",
+            on_sql,
+        )?;
+        let options = Rc::new(
+            MockBaseQueryOptions::builder()
+                .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+                .base_tools(ctx.query_tools().base_tools().clone())
+                .join_graph(ctx.query_tools().join_graph().clone())
+                .security_context(ctx.security_context().clone())
+                .measures(Some(members_from_strings(vec!["orders.count"])))
+                .dimensions(Some(members_from_strings(vec!["orders.status"])))
+                .subquery_joins(Some(vec![subquery_join]))
+                .build(),
+        );
+        QueryPropertiesCompiler::new(ctx.query_tools().clone()).build(options)
+    };
+
+    let qp_eq = build_qp("{orders.status} = \"top_orders\".status")?;
+    let qp_ne = build_qp("{orders.status} <> \"top_orders\".status")?;
+    let qp_eq_again = build_qp("{orders.status} = \"top_orders\".status")?;
+
+    assert!(
+        qp_eq != qp_ne,
+        "sub-query joins differing only in their ON must not compare equal"
+    );
+    assert!(
+        qp_eq == qp_eq_again,
+        "sub-query joins with identical ON must compare equal"
     );
 
     Ok(())

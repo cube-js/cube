@@ -1174,14 +1174,19 @@ impl PartialEq for QueryProperties {
             && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
             && *pre_aggregation_id == other.pre_aggregation_id
             && *query_join_hints == other.query_join_hints
-            // Compare sub-query joins by their request-derived identity (the
-            // compiled `on_sql` is derived deterministically from these).
+            // Sub-query joins compared semantically: the request triple
+            // (`sql`, `alias`, `join_type`) plus the compiled ON condition
+            // (`on_sql` via `SqlCall::struct_eq`), so two joins differing
+            // only in their ON are not equal.
             && subquery_joins.len() == other.subquery_joins.len()
             && subquery_joins
                 .iter()
                 .zip(other.subquery_joins.iter())
                 .all(|(a, b)| {
-                    a.sql == b.sql && a.alias == b.alias && a.join_type == b.join_type
+                    a.sql == b.sql
+                        && a.alias == b.alias
+                        && a.join_type == b.join_type
+                        && a.on_sql.struct_eq(&b.on_sql)
                 })
     }
 }
