@@ -213,12 +213,9 @@ async fn test_many_to_one_view_child_distinct_dim() {
     }
 }
 
-// Regression for 58b5c96 (push ad-hoc filters into view measure aggregation).
 // A PatchMeasure adding a CASE-WHEN filter to a measure exposed through a view
 // (`root_val_sum`, a SUM) must resolve the reference chain to the owning cube
-// measure so the filter is pushed inside the aggregation. Before the fix the
-// view measure's type collapsed to `number` (Calculated) and build_sql failed
-// with "Unsupported additional filters for measure ... type number".
+// measure so the filter is pushed inside the aggregation.
 // root_test_dim='rt_x' → roots 1,2 → SUM = 10 + 20 = 30.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_many_to_one_view_patched_measure_filter() -> Result<(), CubeError> {
@@ -240,9 +237,6 @@ async fn test_many_to_one_view_patched_measure_filter() -> Result<(), CubeError>
             .build(),
     );
 
-    // build_sql itself is the regression guard: before the fix it returned
-    // Err("Unsupported additional filters ...") and this propagated as a
-    // test failure.
     let sql = ctx.build_sql_from_options(options.clone())?;
     // The ad-hoc filter is pushed inside the aggregation (measure_filter.rs
     // renders `CASE WHEN <filter> THEN <result> END`), not as an outer WHERE.
