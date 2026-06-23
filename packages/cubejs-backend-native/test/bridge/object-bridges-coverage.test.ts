@@ -62,6 +62,7 @@ const BRIDGES: BridgeSpec[] = [
       'timezone',
       'total_query',
       'ungrouped',
+      'use_original_sql_pre_aggregations_in_pre_aggregation',
     ],
   },
   {

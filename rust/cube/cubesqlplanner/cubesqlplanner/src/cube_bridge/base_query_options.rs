@@ -206,6 +206,8 @@ pub struct BaseQueryOptionsStatic {
     pub export_annotated_sql: bool,
     #[serde(rename = "preAggregationQuery")]
     pub pre_aggregation_query: Option<bool>,
+    #[serde(rename = "useOriginalSqlPreAggregationsInPreAggregation")]
+    pub use_original_sql_pre_aggregations_in_pre_aggregation: Option<bool>,
     #[serde(rename = "totalQuery")]
     pub total_query: Option<bool>,
     #[serde(rename = "cubestoreSupportMultistage")]
