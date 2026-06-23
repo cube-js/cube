@@ -436,20 +436,29 @@ fn resort_worker_subtree(
             return None;
         }
 
-        // Per-partition (CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION): drop the merge below the aggregate
-        // so it runs over every raw partition; the CoalescePartitions below then parallelizes all of
-        // them (N-way) instead of one stream per union branch.
+        // CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION decides where the worker's hash table lives:
+        //  - off (default): coalesce the aggregate's input to a single partition, so the worker
+        //    builds ONE hash table over the merged partitions ("over merge"). Peak memory ~k, no
+        //    intra-worker parallelism on the aggregation.
+        //  - on: keep the raw multi-partition input, so the aggregate runs once per partition
+        //    ("under merge"): N parallel hash tables -- more parallelism, peak ~N*k. The trim keeps
+        //    each per-partition output to ~factor*k, and the global top-k argument (full group key)
+        //    guarantees a surviving group stays within every partition's local top-k.
         let partial = if per_partition_enabled() {
+            partial
+        } else {
             partial
                 .as_any()
                 .downcast_ref::<AggregateExec>()
                 .and_then(|agg| {
-                    let new_input = strip_leading_coalesce_partitions(agg.input());
-                    partial.clone().with_new_children(vec![new_input]).ok()
+                    if agg.input().output_partitioning().partition_count() <= 1 {
+                        return None;
+                    }
+                    let merged: Arc<dyn ExecutionPlan> =
+                        Arc::new(CoalescePartitionsExec::new(agg.input().clone()));
+                    partial.clone().with_new_children(vec![merged]).ok()
                 })
                 .unwrap_or(partial)
-        } else {
-            partial
         };
 
         let order: Vec<(usize, SortOptions)> = cols
@@ -478,10 +487,10 @@ fn resort_worker_subtree(
             None => partial,
         };
 
-        // Emit the trimmed top-k unsorted, coalesced to one stream. The router hash-combines and
-        // re-applies the top-k sort, so no worker-side sort/merge holds the whole result and the
-        // per-partition aggregates run in parallel (CoalescePartitions spawns a task per input)
-        // instead of being drained one at a time by a sort-preserving merge.
+        // Emit the trimmed top-k unsorted, coalesced to one stream for the ClusterSend. The router
+        // hash-combines and re-applies the top-k sort, so no worker-side sort/merge holds the whole
+        // result. Under "over merge" the trimmed agg is already single-partition and this coalesce is
+        // a passthrough; under "under merge" it drains the per-partition aggregates concurrently.
         return Some(Arc::new(CoalescePartitionsExec::new(trimmed)));
     }
 
@@ -521,30 +530,16 @@ fn lex_ordering_from_cols(
     Some(LexOrdering::new(exprs))
 }
 
-/// Toggle (CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION): drop the merge below the trimmed aggregate so it
-/// runs per partition (N-way) instead of per union branch. The `CoalescePartitions` then
-/// parallelizes all partitions.
-///
-/// Trades memory for parallelism: one group table per DF partition (= per parquet file and chunk),
-/// so peak memory is bounded by the partition count, not by k. It stays low only while partitions
-/// are key-local (group keys do not span partitions) -- true for index-sorted pre-aggregations. On
-/// a group key spread across many partitions each table approaches full cardinality (~N x memory).
+/// Toggle (CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION) for the worker hash trim. Off by default: the
+/// aggregate's input is coalesced so the worker builds a single hash table over the merged partitions
+/// ("over merge"), peak ~k. On: the aggregate keeps its raw multi-partition input and runs per
+/// partition ("under merge") -- one group table per DF partition (= per parquet file/chunk), trading
+/// memory for intra-worker parallelism (peak ~N*k; on a key spread across many partitions each table
+/// approaches full cardinality).
 fn per_partition_enabled() -> bool {
     std::env::var("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false)
-}
-
-/// Peel the leading `CoalescePartitionsExec` chain directly feeding the aggregate, exposing the
-/// underlying multi-partition streams. Only the immediate coalesce(s) are removed; any
-/// `CoalescePartitionsExec` deeper in the subtree (e.g. one a child inserted to satisfy its own
-/// single-partition input requirement, as in a UNION branch) is left intact so plan semantics are
-/// preserved.
-fn strip_leading_coalesce_partitions(p: &Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
-    if p.as_any().is::<CoalescePartitionsExec>() {
-        return strip_leading_coalesce_partitions(&p.children()[0]);
-    }
-    p.clone()
 }
 
 /// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in
