@@ -31,13 +31,27 @@ impl TimeDimensionSymbol {
         granularity_obj: Option<Granularity>,
         date_range: Option<(String, String)>,
     ) -> Rc<Self> {
+        Self::new_with_alias(base_symbol, granularity, granularity_obj, date_range, None)
+    }
+
+    /// Like [`Self::new`] but with an explicit alias override (e.g. the SQL
+    /// API's `memberToAlias` entry for the granularized member). When `None`,
+    /// the alias falls back to `{base alias}_{granularity}`.
+    pub fn new_with_alias(
+        base_symbol: Rc<MemberSymbol>,
+        granularity: Option<String>,
+        granularity_obj: Option<Granularity>,
+        date_range: Option<(String, String)>,
+        alias_override: Option<String>,
+    ) -> Rc<Self> {
         let name_suffix = if let Some(granularity) = &granularity {
             granularity.clone()
         } else {
             "day".to_string()
         };
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
-        let alias = format!("{}_{}", base_symbol.alias(), name_suffix);
+        let alias =
+            alias_override.unwrap_or_else(|| format!("{}_{}", base_symbol.alias(), name_suffix));
         let compiled_path = CompiledMemberPath::new(
             base_symbol.compiled_path().cube().clone(),
             full_name,

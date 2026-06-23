@@ -1066,6 +1066,57 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }
   ]));
 
+  it('member to alias for granularized time dimension', async () => runQueryTest({
+    measures: [
+      'visitors.visitor_revenue',
+      'visitors.visitor_count',
+      'visitors.per_visitor_revenue'
+    ],
+    dimensions: [
+      'visitors.source'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      dateRange: ['2017-01-01', '2017-01-30'],
+      granularity: 'month'
+    }],
+    timezone: 'America/Los_Angeles',
+    // SQL API keys a granularized override `{member}.{granularity}` (dotted) and
+    // references the CubeScan column by it. The native planner must honor it
+    // instead of defaulting to `{base alias}_{granularity}`.
+    memberToAlias: {
+      'visitors.visitor_revenue': 'custom_revenue',
+      'visitors.visitor_count': 'custom_count',
+      'visitors.source': 'custom_source',
+      'visitors.created_at.month': 'custom_created_at_month',
+    },
+    order: []
+  },
+
+  [
+    {
+      custom_source: 'google',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '1',
+      visitors__per_visitor_revenue: null
+    },
+    {
+      custom_source: 'some',
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: '300',
+      custom_count: '2',
+      visitors__per_visitor_revenue: '150'
+    },
+    {
+      custom_source: null,
+      custom_created_at_month: '2017-01-01T00:00:00.000Z',
+      custom_revenue: null,
+      custom_count: '2',
+      visitors__per_visitor_revenue: null
+    }
+  ]));
+
   it('running total', async () => {
     await compiler.compile();
 
