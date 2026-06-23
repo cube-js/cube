@@ -6,7 +6,7 @@ use datafusion::arrow::array::{ArrayBuilder, ArrayRef, StringBuilder};
 use datafusion::arrow::compute::{concat_batches, SortOptions};
 use datafusion::arrow::datatypes::{i256, Field, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::arrow::row::{OwnedRow, RowConverter, Rows, SortField};
+use datafusion::arrow::row::{RowConverter, Rows, SortField};
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 
@@ -31,6 +31,7 @@ use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::any::Any;
 use std::cmp::Ordering;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -1130,7 +1131,10 @@ struct TopKStateV2<'a> {
     row_converter: RowConverter,
     /// Distinct group keys; group `gid` is `key_store.row(gid)`.
     key_store: Rows,
-    group_index: HashMap<OwnedRow, usize>,
+    /// Maps a key's hash to the group ids carrying it. Storing hash -> gids (rather than
+    /// `OwnedRow -> gid`) keeps lookups allocation-free: the probe row is borrowed from
+    /// `scratch_rows` and equality is checked against `key_store.row(gid)`.
+    group_index: HashMap<u64, SmallVec<[usize; 1]>>,
     /// Reused per-batch buffer for the incoming keys.
     scratch_rows: Rows,
 
@@ -1248,9 +1252,20 @@ impl<'a> TopKStateV2<'a> {
             .append(&mut self.scratch_rows, &b.columns()[0..self.key_len])?;
 
         for r in 0..n {
-            let probe = self.scratch_rows.row(r).owned();
-            let (gid, is_new) = match self.group_index.get(&probe) {
-                Some(&g) => {
+            let probe = self.scratch_rows.row(r);
+            let hash = {
+                let mut h = DefaultHasher::new();
+                probe.hash(&mut h);
+                h.finish()
+            };
+            let existing = self.group_index.get(&hash).and_then(|bucket| {
+                bucket
+                    .iter()
+                    .copied()
+                    .find(|&g| self.key_store.row(g) == probe)
+            });
+            let (gid, is_new) = match existing {
+                Some(g) => {
                     let old = self.cur_estimate[g].clone();
                     self.sorted.remove(&SortKey {
                         order_by: self.order_by,
@@ -1262,8 +1277,8 @@ impl<'a> TopKStateV2<'a> {
                 }
                 None => {
                     let g = self.key_store.num_rows();
-                    self.key_store.push(self.scratch_rows.row(r));
-                    self.group_index.insert(probe, g);
+                    self.key_store.push(probe);
+                    self.group_index.entry(hash).or_default().push(g);
                     let mut a = SmallVec::with_capacity(n_agg);
                     for i in 0..n_agg {
                         a.push(ScalarValue::try_from_array(&value_cols[i], r)?);
@@ -1477,6 +1492,8 @@ fn decimal_scale_mismatch() -> DataFusionError {
     DataFusionError::Internal("topk v2 decimal precision/scale mismatch in sum".to_string())
 }
 
+/// Integer and decimal SUM wrap on overflow (`wrapping_add`), matching DataFusion's `SumAccumulator`
+/// (which uses `add_wrapping`); so V2 stays consistent with the default merge rather than erroring.
 fn scalar_add_assign(dst: &mut ScalarValue, src: &ScalarValue) -> Result<(), DataFusionError> {
     macro_rules! add {
         ($d:expr, $s:expr) => {{
