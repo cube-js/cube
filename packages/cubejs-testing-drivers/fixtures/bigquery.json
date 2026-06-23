@@ -7,7 +7,7 @@
       "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "bigquery",
       "CUBEJS_DB_NAME": "test",
-      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "dev_pre_aggregations",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "${DRIVERS_TESTS_CUBEJS_PRE_AGGREGATIONS_SCHEMA:-dev_pre_aggregations}",
       "CUBEJS_DB_BQ_PROJECT_ID": "cube-open-source",
       "CUBEJS_DB_BQ_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS}",
 
