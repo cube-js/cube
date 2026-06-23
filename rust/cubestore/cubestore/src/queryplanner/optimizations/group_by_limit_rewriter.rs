@@ -24,7 +24,7 @@ use std::sync::Arc;
 /// partial state for such a group keeps it (its local rank can only be smaller), so every needed
 /// partial state reaches the router. Ordering the router by `T` instead of the bare `ORDER BY` does
 /// not change the query contract: `ORDER BY` is a prefix of `T`, so the output stays validly
-/// ordered and the previously-unspecified tie order just becomes deterministic.
+/// ordered and the tie order, left unspecified by the query, just becomes deterministic.
 ///
 /// We only rewrite when the plan matches exactly `Sort(/Limit) -> [passthrough] -> Final aggregate
 /// -> [passthrough/cluster boundary] -> Partial hash aggregate`; anything else on the path (a

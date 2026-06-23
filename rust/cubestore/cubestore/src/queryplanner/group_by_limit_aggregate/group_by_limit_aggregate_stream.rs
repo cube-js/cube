@@ -179,7 +179,9 @@ impl GroupByLimitAggregateStream {
 
     fn trim_top_k(&self, batch: RecordBatch) -> DFResult<RecordBatch> {
         let g = batch.num_rows();
-        if self.k == 0 || g <= self.factor.saturating_mul(self.k) {
+        // `factor == 0` means "no trimming" (mirrors the guard in `statistics`); the exec is only
+        // built with `factor > 0` today, so this is defensive.
+        if self.k == 0 || self.factor == 0 || g <= self.factor.saturating_mul(self.k) {
             return Ok(batch);
         }
         let sort_columns: Vec<SortColumn> = self

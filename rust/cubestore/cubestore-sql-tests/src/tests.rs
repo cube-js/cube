@@ -333,6 +333,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "limit_pushdown_group_nonprefix_order",
             limit_pushdown_group_nonprefix_order,
         ),
+        t(
+            "limit_pushdown_group_null_appended",
+            limit_pushdown_group_null_appended,
+        ),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
             "limit_pushdown_group_where_order",
@@ -427,6 +431,7 @@ lazy_static::lazy_static! {
         "global_aggregate_unique_key_keeps_merge",
         "limit_pushdown_group_having",
         "limit_pushdown_group_nonprefix_order",
+        "limit_pushdown_group_null_appended",
         "prefilter_chunks_shared_scan",
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
@@ -3331,13 +3336,15 @@ async fn planning_topk_hash_aggregate(service: Box<dyn SqlClient>) -> Result<(),
 
     // Bare LIMIT (no ORDER BY) on a non-indexed group column: the limit can't ride the index, so the
     // worker still trims to the smallest groups by the full group key -- "any k" made deterministic.
+    // The appended group column uses ascending nulls-first, matching the rewriter's appended-column
+    // order (`SortOptions::default()`) so the worker cut and the router select agree.
     let p = service
         .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 LIMIT 10")
         .await?;
     let pp = pp_phys_plan_ext(p.worker.as_ref(), &PPOptions::none());
     assert!(
         pp.contains("GroupByLimitAggregate, k: 10, factor: 2,")
-            && pp.contains("(0, SortOptions { descending: false, nulls_first: false })"),
+            && pp.contains("(0, SortOptions { descending: false, nulls_first: true })"),
         "expected GroupByLimitAggregate on a bare LIMIT, got:\n{}",
         pp
     );
@@ -9344,6 +9351,53 @@ async fn limit_pushdown_group_nonprefix_order(
             vec![TableValue::Int(3), TableValue::Int(3330)],
             vec![TableValue::Int(2), TableValue::Int(2220)],
         ]
+    );
+    Ok(())
+}
+
+/// Multi-column GROUP BY where the appended (non-ORDER-BY) total-order column carries NULLs and the
+/// group spans chunks. `GROUP BY b, c` is not the index prefix, so this is the hash trim path; the
+/// worker cut and the router select both extend the order with the appended column `c`, and they must
+/// agree on its NULL placement or the NULL group's partial states get dropped across chunks
+/// (undercount). The NULL group's membership is fixed by `b` (uniquely smallest), so the assertion
+/// does not depend on the tie order -- only on the sum being fully combined across all three chunks.
+async fn limit_pushdown_group_null_appended(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.nag (a int, b int, c int, val int) INDEX bidx (a, b, c)")
+        .await?;
+    // Three chunks. The (b = 1, c = NULL) group appears in every chunk, so it spans all three and
+    // its sum must combine to 1110. Five distinct (b, c) groups so the trim engages (5 > factor*k).
+    service
+        .exec_query(
+            "INSERT INTO s.nag (a, b, c, val) VALUES \
+             (1, 1, NULL, 10), (1, 2, 20, 1), (1, 3, 30, 1), (1, 4, 40, 1), (1, 5, 50, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nag (a, b, c, val) VALUES \
+             (1, 1, NULL, 100), (1, 2, 20, 1), (1, 3, 30, 1), (1, 4, 40, 1), (1, 5, 50, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nag (a, b, c, val) VALUES \
+             (1, 1, NULL, 1000), (1, 2, 20, 1), (1, 3, 30, 1), (1, 4, 40, 1), (1, 5, 50, 1)",
+        )
+        .await?;
+
+    // Smallest b is the NULL-c group; its sum must combine across all three chunks.
+    let r = service
+        .exec_query("SELECT b, c, sum(val) FROM s.nag GROUP BY b, c ORDER BY b LIMIT 1")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![
+            TableValue::Int(1),
+            TableValue::Null,
+            TableValue::Int(1110),
+        ]]
     );
     Ok(())
 }

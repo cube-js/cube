@@ -1161,9 +1161,12 @@ impl ChooseIndex<'_> {
             }
         }
         // Extend with the remaining group keys to make it a total order on the full group key.
+        // Their NULL placement is arbitrary (these columns are not in the query's ORDER BY), but it
+        // must match the rewriter's appended-column order (`SortOptions::default()`, i.e. ascending
+        // nulls-first) so the worker cut and the router select agree on the total order.
         for (idx, is_used) in used.iter().enumerate() {
             if !is_used {
-                cols.push((idx, true, false));
+                cols.push((idx, true, true));
             }
         }
         Some((cols, limit))
