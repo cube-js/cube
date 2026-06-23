@@ -261,6 +261,27 @@ pub struct JsValueObject<'a> {
     pub handle: Handle<'a, JsArray>,
 }
 
+fn js_value_to_json_string<'a, C: Context<'a>>(
+    cx: &mut C,
+    value: Handle<'a, JsValue>,
+) -> Result<String, CubeError> {
+    let global = cx.global_object();
+    let json = global
+        .get::<JsObject, _, _>(cx, "JSON")
+        .map_err(|e| CubeError::internal(format!("Can't get JSON global: {}", e)))?;
+    let stringify = json
+        .get::<JsFunction, _, _>(cx, "stringify")
+        .map_err(|e| CubeError::internal(format!("Can't get JSON.stringify: {}", e)))?;
+    let undefined = cx.undefined().upcast::<JsValue>();
+    let result = stringify
+        .call(cx, undefined, [value])
+        .map_err(|e| CubeError::internal(format!("JSON.stringify failed: {}", e)))?;
+    let s = result.downcast::<JsString, _>(cx).map_err(|e| {
+        CubeError::internal(format!("JSON.stringify did not return a string: {}", e))
+    })?;
+    Ok(s.value(cx))
+}
+
 impl ValueObject for JsValueObject<'_> {
     fn len(&mut self) -> Result<usize, CubeError> {
         Ok(self.handle.len(&mut self.cx) as usize)
@@ -287,17 +308,22 @@ impl ValueObject for JsValueObject<'_> {
             || value.downcast::<JsNull, _>(&mut self.cx).is_ok()
         {
             Ok(FieldValue::Null)
-        } else if let Ok(b) = value.downcast::<JsArray, _>(&mut self.cx) {
-            Err(CubeError::internal(format!(
-                "Expected primitive value but found JsArray({:?})",
-                b
-            )))
+        } else if value.is_a::<JsArray, _>(&mut self.cx) {
+            Ok(FieldValue::String(Cow::Owned(js_value_to_json_string(
+                &mut self.cx,
+                value,
+            )?)))
         } else if let Ok(b) = value.downcast::<JsDate, _>(&mut self.cx) {
             // TODO: Support it?
             Err(CubeError::internal(format!(
                 "Expected primitive value but found JsDate({:?})",
                 b
             )))
+        } else if value.is_a::<JsObject, _>(&mut self.cx) {
+            Ok(FieldValue::String(Cow::Owned(js_value_to_json_string(
+                &mut self.cx,
+                value,
+            )?)))
         } else {
             Err(CubeError::internal(format!(
                 "Expected primitive value but found: {:?}",
@@ -321,7 +347,10 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         handle: chunk_array,
     };
     let value =
-        transform_response(&mut value_object, this.schema.clone(), &this.member_fields).unwrap();
+        match transform_response(&mut value_object, this.schema.clone(), &this.member_fields) {
+            Ok(value) => value,
+            Err(e) => return value_object.cx.throw_error(e.message),
+        };
     let future = this.push_chunk(value);
     wait_for_future_and_execute_callback(
         this.tokio_handle.clone(),
