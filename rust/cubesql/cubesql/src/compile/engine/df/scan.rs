@@ -350,11 +350,10 @@ fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_
         })?),
         Value::Bool(b) => FieldValue::Bool(*b),
         Value::Null => FieldValue::Null,
-        x => {
-            return Err(CubeError::user(format!(
-                "Expected primitive value but found: {:?}",
-                x
-            )));
+        x @ (Value::Array(_) | Value::Object(_)) => {
+            FieldValue::String(Cow::Owned(serde_json::to_string(x).map_err(|e| {
+                CubeError::internal(format!("Can't serialize non-scalar value to JSON: {}", e))
+            })?))
         }
     })
 }
@@ -1380,7 +1379,8 @@ mod tests {
     use datafusion::{
         arrow::{
             array::{
-                BooleanArray, Date32Array, Float64Array, StringArray, TimestampNanosecondArray,
+                Array, BooleanArray, Date32Array, Float64Array, StringArray,
+                TimestampNanosecondArray,
             },
             datatypes::{Field, Schema},
         },
@@ -1477,6 +1477,52 @@ mod tests {
             metadata.get("lastRefreshTime"),
             Some(&"2000-01-01T00:00:00.000Z".to_string())
         );
+    }
+
+    #[test]
+    fn convert_transport_response_serializes_non_scalar_values_to_json_strings() {
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": [
+                        {"c": ["a", "b"], "d": {"k": 1}},
+                        {"c": null, "d": "plain"}
+                    ]
+                }]
+            }
+        "#;
+        let response: V1LoadResponse = serde_json::from_str(raw).unwrap();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("c", DataType::Utf8, true),
+            Field::new("d", DataType::Utf8, true),
+        ]));
+        let member_fields = vec![
+            MemberField::regular("c".to_string()),
+            MemberField::regular("d".to_string()),
+        ];
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+
+        let c = batches[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(c.value(0), r#"["a","b"]"#);
+        assert!(c.is_null(1));
+
+        let d = batches[0]
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(d.value(0), r#"{"k":1}"#);
+        assert_eq!(d.value(1), "plain");
     }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {

@@ -296,6 +296,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     if (!this.userDefinedTypes) {
       // Postgres enum types defined as typcategory = 'E' these can be assumed
       // to be of type varchar for the drivers purposes.
+      // Postgres array types defined as typcategory = 'A' these can be assumed
+      // to be of type text for the drivers purposes.
       // TODO: if full implmentation the constraints can be looked up via pg_enum
       // https://www.postgresql.org/docs/9.1/catalog-pg-enum.html
       const customTypes = await conn.query(
@@ -303,12 +305,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
             oid,
             CASE
                 WHEN typcategory = 'E' THEN 'varchar'
+                WHEN typcategory = 'A' THEN 'text'
                 ELSE typname
-            END
+            END AS typname
         FROM
             pg_type
         WHERE
-            typcategory in ('U', 'E')`,
+            typcategory in ('U', 'E', 'A')`,
         []
       );
 
