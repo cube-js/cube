@@ -21,7 +21,6 @@ import {
   StreamOptions,
   StreamTableDataWithTypes,
   TableColumn,
-  TableColumnQueryResult,
   TableQueryResult,
   TableStructure,
   UnloadOptions,

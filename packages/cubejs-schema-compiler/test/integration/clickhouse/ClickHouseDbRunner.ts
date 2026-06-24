@@ -123,6 +123,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     } else {
       if (!this.container) {
         this.container = await new GenericContainer(`clickhouse/clickhouse-server:${this.clickHouseVersion}`)
+          .withEnvironment({ CLICKHOUSE_SKIP_USER_SETUP: '1' })
           .withExposedPorts(this.port())
           .start();
       }
