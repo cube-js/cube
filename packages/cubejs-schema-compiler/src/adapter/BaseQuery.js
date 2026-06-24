@@ -4559,7 +4559,7 @@ export class BaseQuery {
         PERCENTILECONT: 'PERCENTILE_CONT({{ args_concat }})',
       },
       statements: {
-        select: '{% if ctes %} WITH \n' +
+        select: '{% if ctes %} WITH {% if recursive %}RECURSIVE {% endif %}\n' +
           '{{ ctes | join(\',\n\') }}\n' +
           '{% endif %}' +
           'SELECT {% if distinct %}DISTINCT {% endif %}' +

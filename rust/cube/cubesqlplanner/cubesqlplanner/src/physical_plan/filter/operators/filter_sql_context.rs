@@ -172,6 +172,7 @@ impl<'a> FilterSqlContext<'a> {
             None,
             None,
             false,
+            false,
         )?;
         let to = self.plan_templates.select(
             vec![],
@@ -183,6 +184,7 @@ impl<'a> FilterSqlContext<'a> {
             vec![],
             None,
             None,
+            false,
             false,
         )?;
         Ok((format!("({})", from), format!("({})", to)))

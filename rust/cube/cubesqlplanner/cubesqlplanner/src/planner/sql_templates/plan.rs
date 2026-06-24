@@ -436,6 +436,7 @@ impl PlanSqlTemplates {
         limit: Option<usize>,
         offset: Option<usize>,
         distinct: bool,
+        recursive: bool,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/select",
@@ -451,6 +452,7 @@ impl PlanSqlTemplates {
                 offset => offset,
                 distinct => distinct,
                 ctes => ctes,
+                recursive => recursive,
             },
         )
     }
@@ -539,6 +541,15 @@ impl PlanSqlTemplates {
                 || self
                     .driver_tools()
                     .support_generated_series_for_custom_td()?))
+    }
+
+    /// Whether the dialect's generated time series is a self-referencing
+    /// recursive CTE that must be wrapped in `WITH RECURSIVE` (e.g. MySQL).
+    /// MSSQL also uses a recursive CTE but relies on implicit recursion (plain
+    /// `WITH`), so it does not set this marker.
+    pub fn generated_time_series_is_recursive(&self) -> bool {
+        self.render
+            .contains_template("statements/generated_time_series_recursive")
     }
 
     pub fn generated_time_series_select(

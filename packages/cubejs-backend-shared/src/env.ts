@@ -1011,6 +1011,19 @@ const variables: Record<string, (...args: any) => any> = {
       .asBool()
   ),
 
+  /**
+   * Use the generated (recursive CTE based) time series for the Tesseract SQL
+   * planner instead of the portable VALUES/UNION ALL series. Defaults to TRUE.
+   * Recursive CTEs require MySQL 8.0+ — set this to FALSE for MySQL < 8.0,
+   * which has no CTE support. When disabled, time series are materialized as a
+   * VALUES list.
+   */
+  mysqlUseGeneratedTimeSeries: ({ dataSource, preAggregations }: DataSourceOpts) => (
+    get(keyByDataSource('CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES', dataSource, preAggregations))
+      .default('true')
+      .asBool()
+  ),
+
   /** ****************************************************************
    * MSSQL Driver                                                    *
    ***************************************************************** */
