@@ -115,6 +115,10 @@ impl Select {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Dialects like MySQL require `WITH RECURSIVE` when any CTE is a
+        // self-referencing recursive CTE (e.g. a generated time series).
+        let recursive = self.ctes.iter().any(|cte| cte.is_recursive());
+
         let order_by = self
             .order_by
             .iter()
@@ -141,6 +145,7 @@ impl Select {
             self.limit,
             self.offset,
             self.is_distinct,
+            recursive,
         )?;
 
         /* let res = format!(
