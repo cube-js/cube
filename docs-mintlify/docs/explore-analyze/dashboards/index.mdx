@@ -18,6 +18,22 @@ Dashboards enable you to:
 
 In the dashboard builder inside your [workbook][ref-workbooks], select the reports you want to include and arrange them on the canvas alongside other [widgets][ref-widgets] to tell your data story, then publish the dashboard. This gives stakeholders direct access to the insights that matter most, without the complexity of the underlying analysis.
 
+## Linking between dashboards
+
+Dashboards can link to one another. When a table widget shows a dimension that
+has [links][ref-dimension-links] defined in the data model, left-clicking a cell
+opens a menu with those links: a **drill-in** link (`dashboard:`) navigates to
+another dashboard in the same deployment, filtered by the values in the clicked
+row, and an **external** link (`url:`) opens a URL. This is how you build
+overview → detail flows — click a row in a summary dashboard to jump straight to
+a focused dashboard scoped to that row.
+
+Links are declared once on the dimension in the data model (not configured
+per-dashboard), so every table that shows that dimension — in dashboards,
+workbooks, embedded dashboards, and Explore — offers the same links. A drill-in
+link targets a dashboard by its [slug](#dashboard-slug); see [Dimensions →
+Links][ref-dimension-links] to define them.
+
 ## Dashboard slug
 
 A dashboard can have a **slug** — a short, stable, human-readable identifier
