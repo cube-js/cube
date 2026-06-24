@@ -79,13 +79,13 @@ impl TypedFilter {
                             .values()
                             .first()
                             .and_then(|v| v.to_param_string())
-                            .map(|v| ctx.format_and_allocate_from_date(&v))
+                            .map(|v| ctx.format_and_allocate_from_date_no_cast(&v))
                             .transpose()?;
                         let to = self
                             .values()
                             .get(1)
                             .and_then(|v| v.to_param_string())
-                            .map(|v| ctx.format_and_allocate_to_date(&v))
+                            .map(|v| ctx.format_and_allocate_to_date_no_cast(&v))
                             .transpose()?;
                         [from, to].into_iter().flatten().collect()
                     }

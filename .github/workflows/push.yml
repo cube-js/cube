@@ -416,6 +416,9 @@ jobs:
           - db: firebolt
             node-version: 22.x
             use_tesseract_sql_planner: true
+          - db: clickhouse
+            node-version: 22.x
+            use_tesseract_sql_planner: true
       fail-fast: false
 
     steps:

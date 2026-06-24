@@ -5,6 +5,7 @@ import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 import { logSqlAndParams } from '../../unit/TestUtil';
+import { getEnv } from "@cubejs-backend/shared";
 
 const itif = (condition, description, fn) => (condition ? it(description, fn) : it.skip(description, fn));
 
@@ -347,7 +348,12 @@ describe('ClickHouse DataSchemaCompiler', () => {
         { visitors__created_at: '2017-01-04T16:00:00.000' },
         { visitors__created_at: '2017-01-05T16:00:00.000' }
       ],
-      [{ visitors__created_at: '2017-01-06T16:00:00.000' }]
+      // afterDate boundary differs by planner: Tesseract uses the symmetric model
+      // (`> endOfDay`, so the 2017-01-06 16:00 row is excluded → empty), whereas the
+      // legacy planner used `> startOfDay` and returned that row.
+      getEnv('nativeSqlPlanner')
+        ? []
+        : [{ visitors__created_at: '2017-01-06T16:00:00.000' }]
     ];
     ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
       const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];

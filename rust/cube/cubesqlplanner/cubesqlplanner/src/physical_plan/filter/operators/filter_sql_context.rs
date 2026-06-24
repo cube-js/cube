@@ -99,6 +99,32 @@ impl<'a> FilterSqlContext<'a> {
         self.allocate_timestamp_param(&with_tz)
     }
 
+    pub fn format_and_allocate_from_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.to_string());
+        }
+        if self.is_partition_range(value) {
+            return Ok(self.query_tools.allocate_param(value));
+        }
+        let precision = self.plan_templates.timestamp_precision()?;
+        let formatted = QueryDateTimeHelper::format_from_date(value, precision)?;
+        let with_tz = self.apply_db_time_zone(formatted)?;
+        Ok(self.query_tools.allocate_param(&with_tz))
+    }
+
+    pub fn format_and_allocate_to_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.to_string());
+        }
+        if self.is_partition_range(value) {
+            return Ok(self.query_tools.allocate_param(value));
+        }
+        let precision = self.plan_templates.timestamp_precision()?;
+        let formatted = QueryDateTimeHelper::format_to_date(value, precision)?;
+        let with_tz = self.apply_db_time_zone(formatted)?;
+        Ok(self.query_tools.allocate_param(&with_tz))
+    }
+
     fn is_partition_range(&self, value: &str) -> bool {
         value == FROM_PARTITION_RANGE || value == TO_PARTITION_RANGE
     }
