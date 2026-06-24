@@ -30,6 +30,8 @@ items.
 
 Click through the list to drill down to an individual view, report, or table. Once you reach a
 starting point, the data model sidebar activates so you can continue building your query there.
+Selecting a workbook lists its reports; choosing a report derives that report's query (and chart)
+into your new report without navigating away from the new tab.
 
 ## Starting from a pasted query, an agent, or a file
 
@@ -42,19 +44,31 @@ The launchpad also offers shortcuts at the bottom:
   language.
 - **Upload file** — opens the file upload flow.
 
-## Setting a default view group
+## Configuring the launchpad
 
-Administrators can configure a **default view group** so the launchpad opens inside a specific
-top-level view group instead of listing all of them. This is useful for steering users toward a
-curated set of governed starting points.
+Administrators can tailor the launchpad per deployment under **Settings → Configuration**, in the
+**Workbooks and Explore** section. Two settings are available.
+
+### Available tabs
+
+Choose which categories appear on the launchpad. **View groups** and **Views** are always shown
+and cannot be turned off; **Workbooks**, **Certified queries**, and **Source tables** can each be
+enabled or disabled to simplify the starting points your users see.
+
+### Default view group
+
+Set a **default view group** so the launchpad opens inside a specific top-level view group instead
+of listing all of them — useful for steering users toward a curated set of governed starting
+points.
 
 <Steps>
   <Step title="Open deployment settings">
     Go to **Settings → Configuration** for your deployment.
   </Step>
-  <Step title="Set the default view group">
-    Under **New tab page**, enter the name of the view group the launchpad should open inside, then
-    save.
+  <Step title="Choose the available tabs and default group">
+    In the **Workbooks and Explore** section, select the tabs to show and, optionally, enter the
+    **name** of the view group the launchpad should open inside. Leave the group empty to show all
+    view groups. Save your changes.
   </Step>
 </Steps>
 
@@ -64,7 +78,7 @@ exists, the launchpad falls back to showing all categories.
 
 <Note>
 
-The default view group is a per-deployment Cube Cloud setting — it controls the launchpad
-experience only and does not change your data model.
+These are per-deployment Cube Cloud settings — they control the launchpad experience only and do
+not change your data model.
 
 </Note>
