@@ -49,6 +49,12 @@ export class FireboltQuery extends BaseQuery {
     return new FireboltFilter(this, filter);
   }
 
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOLEAN)';
+    return templates;
+  }
+
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
