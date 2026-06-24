@@ -12536,6 +12536,31 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/redshift-driver SQL API: Window function over measure (running total) 1`] = `
+Array [
+  Object {
+    "count": "5",
+    "orderDateQ": 2020-01-01T00:00:00.000Z,
+    "runningTotal": "5",
+  },
+  Object {
+    "count": "13",
+    "orderDateQ": 2020-04-01T00:00:00.000Z,
+    "runningTotal": "18",
+  },
+  Object {
+    "count": "6",
+    "orderDateQ": 2020-07-01T00:00:00.000Z,
+    "runningTotal": "24",
+  },
+  Object {
+    "count": "20",
+    "orderDateQ": 2020-10-01T00:00:00.000Z,
+    "runningTotal": "44",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/redshift-driver SQL API: metabase count cast to float32 from push down: metabase_count_cast_to_float32_from_push_down 1`] = `
 Array [
   Object {
