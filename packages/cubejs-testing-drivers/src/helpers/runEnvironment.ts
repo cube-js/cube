@@ -127,10 +127,19 @@ export async function runEnvironment(
     const { length } = val;
 
     if (val.indexOf('${') === 0 && val.indexOf('}') === length - 1) {
-      const name = val.slice(2, length - 1).trim();
+      // Supports docker-compose style interpolation `${VAR}` and `${VAR:-default}`.
+      // The `:-default` fallback lets shared-cloud fixtures point a value (e.g. the
+      // pre-aggregations schema) at a per-run env var in CI while keeping the original
+      // literal as the default for local/other runs where the var is unset.
+      const expr = val.slice(2, length - 1).trim();
+      const sepIdx = expr.indexOf(':-');
+      const name = (sepIdx === -1 ? expr : expr.slice(0, sepIdx)).trim();
+      const fallback = sepIdx === -1 ? undefined : expr.slice(sepIdx + 2);
       const value = process.env[name];
       if (value) {
-        process.env[key] = process.env[name];
+        process.env[key] = value;
+      } else if (fallback !== undefined) {
+        process.env[key] = fallback;
       } else {
         throw new Error(`Env variable ${name} must be defined, because it's used as ${key}`);
       }
