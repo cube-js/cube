@@ -8,6 +8,12 @@ use std::rc::Rc;
 const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
 const TO_PARTITION_RANGE: &str = "__TO_PARTITION_RANGE";
 
+#[derive(Clone, Copy)]
+enum DateBound {
+    From,
+    To,
+}
+
 pub struct FilterSqlContext<'a> {
     pub member_sql: &'a str,
     pub query_tools: &'a Rc<QueryTools>,
@@ -74,55 +80,47 @@ impl<'a> FilterSqlContext<'a> {
     }
 
     pub fn format_and_allocate_from_date(&self, value: &str) -> Result<String, CubeError> {
-        if self.use_raw_values {
-            return Ok(value.to_string());
-        }
-        if self.is_partition_range(value) {
-            return self.allocate_timestamp_param(value);
-        }
-        let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_from_date(value, precision)?;
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        self.allocate_timestamp_param(&with_tz)
+        self.format_and_allocate_date(value, DateBound::From, true)
     }
 
     pub fn format_and_allocate_to_date(&self, value: &str) -> Result<String, CubeError> {
-        if self.use_raw_values {
-            return Ok(value.to_string());
-        }
-        if self.is_partition_range(value) {
-            return self.allocate_timestamp_param(value);
-        }
-        let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_to_date(value, precision)?;
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        self.allocate_timestamp_param(&with_tz)
+        self.format_and_allocate_date(value, DateBound::To, true)
     }
 
     pub fn format_and_allocate_from_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
-        if self.use_raw_values {
-            return Ok(value.to_string());
-        }
-        if self.is_partition_range(value) {
-            return Ok(self.query_tools.allocate_param(value));
-        }
-        let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_from_date(value, precision)?;
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        Ok(self.query_tools.allocate_param(&with_tz))
+        self.format_and_allocate_date(value, DateBound::From, false)
     }
 
     pub fn format_and_allocate_to_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
+        self.format_and_allocate_date(value, DateBound::To, false)
+    }
+
+    fn format_and_allocate_date(
+        &self,
+        value: &str,
+        bound: DateBound,
+        cast: bool,
+    ) -> Result<String, CubeError> {
+        let allocate = |value: &str| {
+            if cast {
+                self.allocate_timestamp_param(value)
+            } else {
+                Ok(self.query_tools.allocate_param(value))
+            }
+        };
         if self.use_raw_values {
             return Ok(value.to_string());
         }
         if self.is_partition_range(value) {
-            return Ok(self.query_tools.allocate_param(value));
+            return allocate(value);
         }
         let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_to_date(value, precision)?;
+        let formatted = match bound {
+            DateBound::From => QueryDateTimeHelper::format_from_date(value, precision)?,
+            DateBound::To => QueryDateTimeHelper::format_to_date(value, precision)?,
+        };
         let with_tz = self.apply_db_time_zone(formatted)?;
-        Ok(self.query_tools.allocate_param(&with_tz))
+        allocate(&with_tz)
     }
 
     fn is_partition_range(&self, value: &str) -> bool {

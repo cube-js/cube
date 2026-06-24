@@ -1,3 +1,5 @@
+import { getEnv } from '@cubejs-backend/shared';
+
 import { CompileError } from '../../../src/compiler/CompileError';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
@@ -5,7 +7,6 @@ import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 import { logSqlAndParams } from '../../unit/TestUtil';
-import { getEnv } from "@cubejs-backend/shared";
 
 const itif = (condition, description, fn) => (condition ? it(description, fn) : it.skip(description, fn));
 
