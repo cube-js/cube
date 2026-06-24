@@ -1396,6 +1396,57 @@ async fn test_grouped_join_wrapper_full_outer_without_template() {
     );
 }
 
+/// FULL OUTER JOIN between grouped CTEs from two *different* cubes (no join relationship
+/// defined between them). Both sides are standalone grouped subqueries joined in SQL
+/// (non-push-to-Cube path), so FULL should be supported and pushed down.
+#[tokio::test]
+async fn test_grouped_join_wrapper_full_outer_cross_cube() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH m1 AS (
+            SELECT
+                id,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        m2 AS (
+            SELECT
+                dim0,
+                MEASURE(WideCube.count) AS cnt
+            FROM WideCube
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(m1.id, m2.dim0) AS id,
+            m1.first_price,
+            m2.cnt
+        FROM m1
+        FULL OUTER JOIN m2 ON m1.id = m2.dim0
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a FULL JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("FULL JOIN"),
+        "wrapped SQL is missing FULL JOIN:\n{}",
+        sql
+    );
+}
+
 /// Regression test for smoke test "select __user and literal grouped under wrapper".
 /// Inner CTE has unaliased DATE_TRUNC expressions; outer query references those columns
 /// through the SubqueryAlias qualifier (`cube_scan_subq`). The CTE-level Remapper must
