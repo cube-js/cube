@@ -67,34 +67,10 @@ When a column contains both positive and negative values, bars are drawn in both
 
 ## Cell menu
 
-A **left-click on any table cell** selects it and opens a context menu (links,
-copy, drill-down). The menu
-is consistent everywhere a results table appears — dashboard and workbook table
-charts, embedded dashboards, and the Explore / SQL-runner results grid. It lists,
-top to bottom:
-
-- **Data-model links** — drill into another dashboard or open an external URL.
-  These come from [`links` defined on the dimension](/docs/data-modeling/dimensions#links)
-  in the data model (not configured per-table). A **drill-in** link
-  (`dashboard:`) navigates in-app to the target dashboard, filtered by the
-  clicked row; an **external** link (`url:`) opens its URL. Each link shows its
-  configured icon (or a default link icon).
-- **Copy value** — copies the cell's value to the clipboard.
-- **Drill down** — on a measure cell with drill members, opens the drill-down
-  modal for that value. (Shown where the surface supports drill-through, e.g.
-  dashboard and workbook tables; not in Explore results.)
-
-Other gestures:
-
-- **Cmd/Ctrl-click a link** opens its target in a **new tab** (drill-ins
-  otherwise stay in the same tab).
-- **Shift-click a cell** selects it without opening the menu, so `Cmd`/`Ctrl`+`C`
-  copies the value.
-- **Right-click** opens your **browser's native menu** (not the cell menu).
-
-Links are declared once on the dimension in the data model, not configured
-per-table — see [Dimensions → Links](/docs/data-modeling/dimensions#links) to
-define them.
+Left-clicking a table cell opens a context menu with any [`links` defined on the
+dimension](/docs/data-modeling/dimensions#links) — drill into another dashboard
+(`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, on
+measure cells that support it, **Drill down**.
 
 ## Style options
 
