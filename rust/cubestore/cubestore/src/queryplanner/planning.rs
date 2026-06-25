@@ -1464,15 +1464,21 @@ fn pick_index(
 
     let schema = Arc::new(schema);
     let create_snapshot = |index: &IdRow<Index>| {
-        let index_sort_on = sort_on.map(|sc| {
-            index
-                .get_row()
-                .columns()
-                .iter()
-                .take(sc.0.len())
-                .map(|c| c.get_name().clone())
-                .collect::<Vec<_>>()
-        });
+        // An empty join `on` (a cross/range join, as rolling-window queries produce) yields an
+        // empty `sort_on`. Normalize it to `None` here so every consumer of `IndexSnapshot::sort_on`
+        // (scan construction and `required_input_ordering`) consistently falls back to the index
+        // sort key instead of describing an empty ordering.
+        let index_sort_on = sort_on
+            .map(|sc| {
+                index
+                    .get_row()
+                    .columns()
+                    .iter()
+                    .take(sc.0.len())
+                    .map(|c| c.get_name().clone())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|cols| !cols.is_empty());
         IndexSnapshot {
             index: index.clone(),
             partitions: Vec::new(), // filled with results of `pick_partitions` later.
