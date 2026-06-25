@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
+
+### Bug Fixes
+
+- **cubestore:** Фvoid empty SortPreservingMerge for empty sort_on ([#11160](https://github.com/cube-js/cube/issues/11160)) ([c7d3ad1](https://github.com/cube-js/cube/commit/c7d3ad18ac6327d6196d2ef0430d3e2ac6b0ec33))
+
 ## [1.6.63](https://github.com/cube-js/cube/compare/v1.6.62...v1.6.63) (2026-06-25)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

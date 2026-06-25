@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
+
+### Features
+
+- **clickhouse-driver:** Support passing custom HTTP headers ([#11161](https://github.com/cube-js/cube/issues/11161)) ([dd791e2](https://github.com/cube-js/cube/commit/dd791e2b9f52c71ac24add05cab0a9912a964d84))
+
 ## [1.6.63](https://github.com/cube-js/cube/compare/v1.6.62...v1.6.63) (2026-06-25)
 
 ### Bug Fixes
