@@ -120,6 +120,44 @@ To enable SSL-encrypted connections between Cube and ClickHouse, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+## Custom headers
+
+The ClickHouse driver supports forwarding custom HTTP headers on every request to
+the ClickHouse server. This is useful when requests pass through a proxy or gateway
+that expects additional headers (e.g., for routing or tracing). See the [ClickHouse
+JavaScript client configuration][clickhouse-docs-js-config] for more details.
+
+Custom headers can't be configured via environment variables. Instead, use the
+[`driverFactory`][ref-config-driverfactory] configuration option to pass a `headers`
+object to the driver:
+
+```javascript
+module.exports = {
+  driverFactory: ({ dataSource }) => ({
+    type: "clickhouse",
+    headers: {
+      "X-Custom-Header": "value",
+      "X-Routing-Group": "analytics"
+    }
+  })
+};
+```
+
+In multitenant deployments, you can use the [security context][ref-sec-ctx] to pass
+per-tenant headers, for example to forward a user token from the API request down to
+ClickHouse:
+
+```javascript
+module.exports = {
+  driverFactory: ({ securityContext }) => ({
+    type: "clickhouse",
+    headers: {
+      "X-Custom-User-Token": securityContext.token
+    }
+  })
+};
+```
+
 ## Additional Configuration
 
 You can connect to a ClickHouse database when your user's permissions are
@@ -132,7 +170,10 @@ You can connect to a ClickHouse database with compression enabled, by setting
 [clickhouse]: https://clickhouse.tech/
 [clickhouse-docs-users]:
   https://clickhouse.tech/docs/en/operations/settings/settings-users/
+[clickhouse-docs-js-config]: https://clickhouse.com/docs/integrations/javascript#configuration
 [clickhouse-readonly]: https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#readonly
+[ref-config-driverfactory]: /product/configuration/reference/config#driver_factory
+[ref-sec-ctx]: /product/auth/context
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]:

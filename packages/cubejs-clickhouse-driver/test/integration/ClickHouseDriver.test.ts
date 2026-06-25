@@ -1,8 +1,8 @@
 import { ClickhouseDBRunner } from '@cubejs-backend/testing-shared';
 import { streamToArray } from '@cubejs-backend/shared';
 
-import { ClickHouseDriver } from '../src';
-import type { ClickHouseDriverOptions } from '../src';
+import { ClickHouseDriver } from '../../src';
+import type { ClickHouseDriverOptions } from '../../src';
 
 describe('ClickHouseDriver', () => {
   jest.setTimeout(20 * 1000);
