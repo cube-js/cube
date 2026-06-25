@@ -244,15 +244,62 @@ export const preAggsJobsRequestSchema = Joi.object({
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
-const normalizeQueryFilters = (filter) => (
+const DATE_RANGE_OPERATORS = ['inDateRange', 'notInDateRange'];
+const SINGLE_DATE_OPERATORS = ['onTheDate', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate'];
+
+// Resolve a dateRange input — a relative string ("last 2 weeks"), a single
+// absolute date, or a 2-element array — to a normalized [startISO, endISO]
+// pair.
+export const resolveDateRange = (input, timezone) => {
+  let dateRange;
+  if (typeof input === 'string') {
+    dateRange = dateParser(input, timezone);
+  } else if (Array.isArray(input)) {
+    dateRange = input.length === 1 ? [input[0], input[0]] : input;
+  } else {
+    return input;
+  }
+
+  return dateRange && dateRange.map(
+    (d, i) => (
+      i === 0 ?
+        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
+        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
+    )
+  );
+};
+
+// Resolve relative date strings inside a filter leaf's `values` so that
+// date-range filters can appear inside OR/AND groups (and at the top level)
+// with the same relative-date support that `timeDimensions.dateRange` has.
+// Reuses resolveDateRange so both paths produce identical output. Non-date
+// operators and already-absolute values pass through unchanged.
+export const normalizeDateFilterValues = (filter, timezone) => {
+  if (!filter || !filter.operator || !Array.isArray(filter.values) || filter.values.length !== 1) {
+    return filter;
+  }
+
+  if (DATE_RANGE_OPERATORS.includes(filter.operator)) {
+    return { ...filter, values: resolveDateRange(filter.values[0], timezone) };
+  }
+
+  if (SINGLE_DATE_OPERATORS.includes(filter.operator)) {
+    const [start] = resolveDateRange(filter.values[0], timezone);
+    return { ...filter, values: [start] };
+  }
+
+  return filter;
+};
+
+const normalizeQueryFilters = (filter, timezone) => (
   filter.map(f => {
     const res = { ...f };
     if (f.or) {
-      res.or = normalizeQueryFilters(f.or);
+      res.or = normalizeQueryFilters(f.or, timezone);
       return res;
     }
     if (f.and) {
-      res.and = normalizeQueryFilters(f.and);
+      res.and = normalizeQueryFilters(f.and, timezone);
       return res;
     }
 
@@ -277,7 +324,7 @@ const normalizeQueryFilters = (filter) => (
       delete res.dimension;
     }
 
-    return res;
+    return normalizeDateFilterValues(res, timezone);
   })
 );
 
@@ -377,27 +424,14 @@ const normalizeQuery = (query, persistent, cacheMode) => {
     ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
-    filters: normalizeQueryFilters(query.filters || []),
+    filters: normalizeQueryFilters(query.filters || [], timezone),
     dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
-      let dateRange;
-
       const compareDateRange = td.compareDateRange ? td.compareDateRange.map((currentDateRange) => (typeof currentDateRange === 'string' ? dateParser(currentDateRange, timezone) : currentDateRange)) : null;
 
-      if (typeof td.dateRange === 'string') {
-        dateRange = dateParser(td.dateRange, timezone);
-      } else {
-        dateRange = td.dateRange && td.dateRange.length === 1 ? [td.dateRange[0], td.dateRange[0]] : td.dateRange;
-      }
       return {
         ...td,
-        dateRange: dateRange && dateRange.map(
-          (d, i) => (
-            i === 0 ?
-              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
-              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
-          )
-        ),
+        dateRange: resolveDateRange(td.dateRange, timezone),
         ...(compareDateRange ? { compareDateRange } : {})
       };
     }).concat(regularToTimeDimension)
