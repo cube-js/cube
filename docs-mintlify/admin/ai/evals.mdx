@@ -3,14 +3,6 @@ title: Evals
 description: Benchmark your agent's answers against a known-correct ground truth and track accuracy across data-model and agent changes.
 ---
 
-<Warning>
-
-Evals are currently in preview, and the user experience and file format may
-still change. Reach out to the [Cube support team](/admin/account-billing/support)
-to activate this feature for your account.
-
-</Warning>
-
 Evals let you benchmark your agent's answers against a known-correct ground
 truth, on any branch. You author a set of questions, each with the SQL or
 [certified query](/admin/ai/certified-queries) that represents the right
@@ -74,9 +66,9 @@ eval_questions:
 
 <Note>
 
-While in preview, the **Questions** tab is a read-only view of these files. To
-add or edit questions, edit the YAML in the IDE — there's no in-product
-question editor yet.
+The **Questions** tab is a read-only view of these files. To add or edit
+questions, edit the YAML in the IDE — there's no in-product question editor
+yet.
 
 </Note>
 
@@ -146,10 +138,8 @@ Verdicts:
 | **review** | Nothing to compare automatically — the question has no ground truth, or the agent didn't run a query. Compare manually. |
 | **error** | The agent run failed, the ground-truth query failed, or a referenced certified query wasn't found. |
 
-## Preview limitations
+## Limitations
 
-- Evals must be activated for your account by the
-  [Cube support team](/admin/account-billing/support).
 - Questions are authored as code only; the **Questions** tab is read-only.
 - Very large question sets can be slow to run.
 - Grading is execution-based on the result set; it does not semantically judge
