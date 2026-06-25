@@ -1223,6 +1223,32 @@ impl SchedulerImpl {
         self.cluster.schedule_repartition(p).await
     }
 
+    // Stateless hash placement of (table_id, location). Empty counts make every worker tie,
+    // so pick_import_worker degenerates to the plain hash pick.
+    async fn schedule_import_jobs_hashed(
+        &self,
+        table_id: u64,
+        locations: &[&String],
+    ) -> Result<(), CubeError> {
+        let empty = HashMap::new();
+        for &l in locations {
+            let node = pick_import_worker(self.config.as_ref(), table_id, l, &empty);
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, table_id),
+                    JobType::TableImportCSV(l.clone()),
+                    node.clone(),
+                ))
+                .await?;
+            if job.is_some() {
+                // TODO queue failover
+                self.cluster.notify_job_runner(node).await?;
+            }
+        }
+        Ok(())
+    }
+
     async fn schedule_table_import(
         &self,
         table_id: u64,
@@ -1233,25 +1259,20 @@ impl SchedulerImpl {
             return Ok(());
         }
 
+        // Stream imports are long-lived and run on a separate pool; they need stable,
+        // deterministic placement, so they always use plain hash placement and are never
+        // affected by load-aware placement, which targets bursty CSV file imports only.
+        let (csv_locations, stream_locations): (Vec<&String>, Vec<&String>) = locations
+            .iter()
+            .copied()
+            .partition(|&l| !Table::is_stream_location(l));
+
+        self.schedule_import_jobs_hashed(table_id, &stream_locations)
+            .await?;
+
         if !self.config.load_aware_import_placement_enabled() {
-            // Default: stateless hash placement of (table_id, location). Empty counts make
-            // every worker tie, so pick_import_worker degenerates to the plain hash pick.
-            let empty = HashMap::new();
-            for &l in locations {
-                let node = pick_import_worker(self.config.as_ref(), table_id, l, &empty);
-                let job = self
-                    .meta_store
-                    .add_job(Job::new(
-                        RowKey::Table(TableId::Tables, table_id),
-                        JobType::TableImportCSV(l.clone()),
-                        node.clone(),
-                    ))
-                    .await?;
-                if job.is_some() {
-                    // TODO queue failover
-                    self.cluster.notify_job_runner(node).await?;
-                }
-            }
+            self.schedule_import_jobs_hashed(table_id, &csv_locations)
+                .await?;
             return Ok(());
         }
 
@@ -1270,7 +1291,7 @@ impl SchedulerImpl {
                 );
             }
             let mut counts = self.meta_store.in_flight_import_jobs_by_node().await?;
-            for &l in locations {
+            for &l in &csv_locations {
                 let node = pick_import_worker(self.config.as_ref(), table_id, l, &counts);
                 let job = self
                     .meta_store
@@ -1683,6 +1704,54 @@ mod tests {
         // cleanup_test_metastore only removes the test-<name>-* dirs; the metastore's local
         // cache also uses the config data_dir (<name>-local-store), so clean that too.
         RocksMetaStore::cleanup_test_metastore("schedule_table_import_load_aware");
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+    }
+
+    #[tokio::test]
+    async fn schedule_table_import_stream_ignores_load_aware() {
+        let config =
+            Config::test("schedule_table_import_stream_load_aware").update_config(|mut c| {
+                c.select_workers = (0..4).map(|i| format!("worker{}", i)).collect();
+                c.load_aware_import_placement_enabled = true;
+                c
+            });
+        let (meta_store, scheduler) = test_scheduler(
+            "schedule_table_import_stream_load_aware",
+            config.config_obj(),
+        );
+        meta_store
+            .create_schema("s".to_string(), false)
+            .await
+            .unwrap();
+
+        // Heavily pre-seed worker0 with CSV imports. Stream locations must ignore this load and
+        // follow the stateless hash, since load-aware placement targets CSV imports only.
+        let seed = create_import_table(&meta_store, "seed").await;
+        for i in 0..5 {
+            add_import_job(&meta_store, seed, &format!("seed-{}", i), "worker0").await;
+        }
+
+        let table = create_import_table(&meta_store, "bar").await;
+        let locs: Vec<String> = (0..6).map(|i| format!("stream:topic-{}", i)).collect();
+        let loc_refs: Vec<&String> = locs.iter().collect();
+        scheduler
+            .schedule_table_import(table, &loc_refs)
+            .await
+            .unwrap();
+
+        let placement = import_placement(&meta_store, table).await;
+        let empty = HashMap::new();
+        for l in &locs {
+            let expected = pick_import_worker(config.config_obj().as_ref(), table, l, &empty);
+            assert_eq!(
+                placement.get(l),
+                Some(&expected),
+                "stream placement must follow the stateless hash even with load-aware enabled"
+            );
+        }
+
+        RocksMetaStore::cleanup_test_metastore("schedule_table_import_stream_load_aware");
         let _ = fs::remove_dir_all(config.local_dir());
         let _ = fs::remove_dir_all(config.remote_dir());
     }
