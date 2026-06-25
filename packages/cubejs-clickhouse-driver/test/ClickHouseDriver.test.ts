@@ -210,7 +210,7 @@ describe('ClickHouseDriver', () => {
         await driver.createSchemaIfNotExists(name);
         await driver.command(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`);
         await driver.insert(`${name}.test`, [[1, 'str1'], [2, 'str2'], [3, 'str3']]);
-        const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = ?`, [2]);
+        const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = ___ClickHouseParam_0___`, [2]);
         expect(values).toEqual([{ x: '2', s: 'str2' }]);
       } finally {
         await driver.command(`DROP DATABASE ${name}`);
@@ -249,7 +249,7 @@ describe('ClickHouseDriver', () => {
 
   it('datetime with specific timezone', async () => {
     await doWithDriver(async (driver) => {
-      const rows = await driver.query('SELECT toDateTime(?, \'Asia/Istanbul\') as dt', [
+      const rows = await driver.query('SELECT toDateTime(___ClickHouseParam_0___, \'Asia/Istanbul\') as dt', [
         '2020-01-01 00:00:00'
       ]);
       expect(rows).toEqual([{
