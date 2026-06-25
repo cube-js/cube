@@ -54,6 +54,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("float_merge", float_merge),
         t("join", join),
         t("filtered_join", filtered_join),
+        t("cross_join_empty_sort_on", cross_join_empty_sort_on),
         t("three_tables_join", three_tables_join),
         t(
             "three_tables_join_with_filter",
@@ -871,6 +872,48 @@ async fn join(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         )
         .await?;
     assert_eq!(to_rows(&result), rows(&[("a", "a"), ("b", "b")]));
+    Ok(())
+}
+
+/// Reproduces CORE-593: a rolling-window pre-aggregation generates a cross/range join (empty
+/// equi-join `on`) over a rollup table plus GROUP BY + ORDER BY. The empty `on` propagates as an
+/// empty `sort_on` to the index scan, which builds a SortPreservingMergeExec with no sort
+/// expressions. With DataFusion 46 such a merge errors at execution ("Sort expressions cannot be
+/// empty for streaming merge") -- but only when the worker has more than one partition to merge,
+/// so the table must hold several chunks.
+async fn cross_join_empty_sort_on(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    let _ = service.exec_query("CREATE SCHEMA foo").await?;
+    let _ = service
+        .exec_query("CREATE TABLE foo.t (source text, n int)")
+        .await?;
+
+    // Separate inserts produce separate chunks, so the index scan merges more than one partition.
+    service
+        .exec_query("INSERT INTO foo.t (source, n) VALUES ('a', 1), ('b', 2)")
+        .await?;
+    service
+        .exec_query("INSERT INTO foo.t (source, n) VALUES ('a', 3)")
+        .await?;
+    service
+        .exec_query("INSERT INTO foo.t (source, n) VALUES ('c', 4)")
+        .await?;
+
+    let result = service
+        .exec_query(
+            "SELECT q.source, sum(q.n) FROM foo.t q \
+             CROSS JOIN (SELECT 1 AS x UNION ALL SELECT 2 AS x) series \
+             GROUP BY q.source ORDER BY q.source",
+        )
+        .await?;
+
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("a".to_string()), TableValue::Int(8)],
+            vec![TableValue::String("b".to_string()), TableValue::Int(4)],
+            vec![TableValue::String("c".to_string()), TableValue::Int(8)],
+        ]
+    );
     Ok(())
 }
 

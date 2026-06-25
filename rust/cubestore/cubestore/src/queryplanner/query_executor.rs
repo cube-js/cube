@@ -1134,7 +1134,11 @@ impl CubeTable {
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
             Arc::new(ProjectionExec::try_new(proj_exprs, exec)?)
-        } else if let Some(join_columns) = self.index_snapshot.sort_on() {
+        } else if let Some(join_columns) = self
+            .index_snapshot
+            .sort_on()
+            .filter(|join_columns| !join_columns.is_empty())
+        {
             assert!(join_columns.len() <= (self.index_snapshot().index.get_row().sort_key_size() as usize), "The number of columns to sort is greater than the number of sorted columns in the index");
             assert!(
                 self.index_snapshot()
