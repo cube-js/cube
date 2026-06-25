@@ -1,6 +1,5 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { DockerComposeEnvironment, StartedDockerComposeEnvironment, Wait } from 'testcontainers';
-// eslint-disable-next-line import/no-extraneous-dependencies
+import { streamToArray } from '@cubejs-backend/shared';
 import path from 'path';
 
 import { DruidDriver, DruidDriverConfiguration } from '../src/DruidDriver';
@@ -109,6 +108,33 @@ describe('DruidDriver', () => {
           { name: 'created', type: 'timestamp' }
         ]
       });
+    });
+  });
+
+  it('stream', async () => {
+    jest.setTimeout(10 * 1000);
+
+    return doWithDriver(async (driver) => {
+      const tableData = await driver.stream(
+        'SELECT 1 as id, true as finished, \'netherlands\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created UNION ALL SELECT 2 as id, false as finished, \'spain\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created',
+        [],
+        { highWaterMark: 1000 }
+      );
+
+      try {
+        expect(tableData.types).toEqual([
+          { name: 'id', type: 'int' },
+          { name: 'finished', type: 'boolean' },
+          { name: 'country', type: 'text' },
+          { name: 'created', type: 'timestamp' }
+        ]);
+        expect(await streamToArray(tableData.rowStream as any)).toEqual([
+          { id: 1, finished: true, country: 'netherlands', created: '2020-01-01T01:01:01.111Z' },
+          { id: 2, finished: false, country: 'spain', created: '2020-01-01T01:01:01.111Z' }
+        ]);
+      } finally {
+        await tableData.release!();
+      }
     });
   });
 });
