@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.63](https://github.com/cube-js/cube/compare/v1.6.62...v1.6.63) (2026-06-25)
+
+### Bug Fixes
+
+- **tesseract:** Support time series queries for MySQL 8+ ([#11154](https://github.com/cube-js/cube/issues/11154)) ([da1d68d](https://github.com/cube-js/cube/commit/da1d68d616c45cf0a21d95cdf2fd376e0873794c))
+
 ## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
 
 **Note:** Version bump only for package @cubejs-backend/shared

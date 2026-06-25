@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.63](https://github.com/cube-js/cube/compare/v1.6.62...v1.6.63) (2026-06-25)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
 ## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

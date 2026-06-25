@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.63](https://github.com/cube-js/cube/compare/v1.6.62...v1.6.63) (2026-06-25)
+
+### Bug Fixes
+
+- **cubesql:** Handle array-typed columns in streaming SQL mode ([#11149](https://github.com/cube-js/cube/issues/11149)) ([56ba7c6](https://github.com/cube-js/cube/commit/56ba7c65fa1133a7d4b55b39e3f16bdca743ad46))
+
+### Features
+
+- **tesseract:** Support use_original_sql_pre_aggregations in rollup ([#11146](https://github.com/cube-js/cube/issues/11146)) ([6a640a6](https://github.com/cube-js/cube/commit/6a640a63d79ea844ae31269efed84a246f82f162))
+
 ## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
 
 ### Features

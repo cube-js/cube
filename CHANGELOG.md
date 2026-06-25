@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.63](https://github.com/cube-js/cube/compare/v1.6.62...v1.6.63) (2026-06-25)
+
+### Bug Fixes
+
+- **cubesql:** Handle array-typed columns in streaming SQL mode ([#11149](https://github.com/cube-js/cube/issues/11149)) ([56ba7c6](https://github.com/cube-js/cube/commit/56ba7c65fa1133a7d4b55b39e3f16bdca743ad46))
+- **firebolt-driver:** Cast BOOLEAN filter params under Tesseract planner ([#11153](https://github.com/cube-js/cube/issues/11153)) ([0f0300d](https://github.com/cube-js/cube/commit/0f0300db04fbc3150d59e8f6147f9a446a12cdd9))
+- **schema-compiler:** Thread memberToAlias through multi-stage CTEs ([#11150](https://github.com/cube-js/cube/issues/11150)) ([9a24249](https://github.com/cube-js/cube/commit/9a2424909b2a4d0bfe1610d42efeb4ce12538f88))
+- **tesseract:** Incorrect time dimenssion cast for Clickhouse ([#11155](https://github.com/cube-js/cube/issues/11155)) ([b33b95c](https://github.com/cube-js/cube/commit/b33b95ca0b2cb5702725c8c57bffb298692b7072))
+- **tesseract:** Support time series queries for MySQL 8+ ([#11154](https://github.com/cube-js/cube/issues/11154)) ([da1d68d](https://github.com/cube-js/cube/commit/da1d68d616c45cf0a21d95cdf2fd376e0873794c))
+
+### Features
+
+- **tesseract:** Support use_original_sql_pre_aggregations in rollup ([#11146](https://github.com/cube-js/cube/issues/11146)) ([6a640a6](https://github.com/cube-js/cube/commit/6a640a63d79ea844ae31269efed84a246f82f162))
+
 ## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
 
 ### Bug Fixes

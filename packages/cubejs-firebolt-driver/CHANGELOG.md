@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.63](https://github.com/cube-js/cube/compare/v1.6.62...v1.6.63) (2026-06-25)
+
+### Bug Fixes
+
+- **firebolt-driver:** Cast BOOLEAN filter params under Tesseract planner ([#11153](https://github.com/cube-js/cube/issues/11153)) ([0f0300d](https://github.com/cube-js/cube/commit/0f0300db04fbc3150d59e8f6147f9a446a12cdd9))
+
 ## [1.6.62](https://github.com/cube-js/cube/compare/v1.6.61...v1.6.62) (2026-06-23)
 
 **Note:** Version bump only for package @cubejs-backend/firebolt-driver
