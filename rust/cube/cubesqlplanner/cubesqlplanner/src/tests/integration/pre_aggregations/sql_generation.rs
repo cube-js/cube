@@ -1368,3 +1368,60 @@ fn test_rollup_build_without_use_original_sql_pre_aggregations_in_pre_aggregatio
     );
     Ok(())
 }
+
+// A measure referenced only in ORDER BY (not in the selected measures) is dropped
+// from the ORDER BY when reading a pre-aggregation. CubeStore cannot ORDER BY an
+// aggregate of a rollup column that isn't projected, and the legacy planner
+// likewise ignores such keys, so the remaining keys (here the time dimension and
+// the selected dimension) drive the order. Mirrors the driver-test "partitioned
+// pre-agg" queries that order by `created_at asc, <unselected measure> desc, <dim> asc`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_only_measure_dropped_from_pre_agg() {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["daily_countries_rollup"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.country
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+        order:
+          - id: orders.created_at
+            desc: false
+          - id: orders.total_amount
+            desc: true
+          - id: orders.country
+            desc: false
+    "};
+
+    let (sql, pre_aggrs) = ctx
+        .build_sql_with_used_pre_aggregations(query_yaml)
+        .unwrap();
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
+    // total_amount is neither selected nor projected by the rollup read, so it must
+    // not appear in ORDER BY — neither as the base column nor the rollup column.
+    assert!(
+        !sql.contains("\"orders\".amount"),
+        "ORDER BY must not reference the base-table column, got:\n{sql}"
+    );
+    assert!(
+        !sql.contains("orders__total_amount"),
+        "order-by-only measure must be dropped, not reference the rollup column, got:\n{sql}"
+    );
+
+    if let Some(result) = ctx
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(
+            "order_by_only_measure_dropped_from_pre_agg_cubestore_result",
+            result
+        );
+    }
+}

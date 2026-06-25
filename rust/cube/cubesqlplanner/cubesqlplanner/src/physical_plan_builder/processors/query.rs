@@ -195,9 +195,30 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             context_factory.set_ungrouped(true);
         }
 
+        // When reading from a pre-aggregation, drop ORDER BY keys on measures that
+        // are not part of the selection. CubeStore cannot ORDER BY an aggregate of a
+        // rollup column that isn't projected, and the legacy planner likewise ignores
+        // such keys — matching that keeps results consistent across planners.
+        let order_by = if is_pre_aggregation {
+            logical_plan
+                .modifers()
+                .order_by
+                .iter()
+                .filter(|o| {
+                    !(o.member_symbol().is_measure()
+                        && logical_plan
+                            .schema()
+                            .find_member_positions(&o.name())
+                            .is_empty())
+                })
+                .cloned()
+                .collect()
+        } else {
+            logical_plan.modifers().order_by.clone()
+        };
         select_builder.set_order_by(
             self.builder
-                .make_order_by(logical_plan.schema(), &logical_plan.modifers().order_by)?,
+                .make_order_by(logical_plan.schema(), &order_by)?,
         );
 
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
