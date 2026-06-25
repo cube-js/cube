@@ -20,6 +20,8 @@ use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder)]
 pub struct MockMeasureDefinition {
+    #[builder(default)]
+    name: String,
     measure_type: String,
     #[builder(default = Some(false))]
     owned_by_cube: Option<bool>,
@@ -35,6 +37,8 @@ pub struct MockMeasureDefinition {
     time_shift_references: Option<Vec<TimeShiftReference>>,
     #[builder(default)]
     rolling_window: Option<RollingWindow>,
+    #[builder(default)]
+    alias_member: Option<String>,
 
     #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
@@ -57,6 +61,7 @@ pub struct MockMeasureDefinition {
 impl_static_data!(
     MockMeasureDefinition,
     MeasureDefinitionStatic,
+    name,
     measure_type,
     owned_by_cube,
     multi_stage,
@@ -64,7 +69,8 @@ impl_static_data!(
     add_group_by_references,
     group_by_references,
     time_shift_references,
-    rolling_window
+    rolling_window,
+    alias_member
 );
 
 impl MockMeasureDefinition {
@@ -346,7 +352,7 @@ mod tests {
         "};
 
         let yaml_def: YamlMeasureDefinition = serde_yaml::from_str(yaml).unwrap();
-        let measure = yaml_def.build_with_cube_name(Some("orders"));
+        let measure = yaml_def.build_with_cube_name(Some("orders"), "amount".to_string());
         let filter = measure.filter().unwrap().expect("filter present");
 
         assert_eq!(
@@ -416,7 +422,7 @@ mod tests {
         "};
 
         let yaml_def: YamlMeasureDefinition = serde_yaml::from_str(yaml).unwrap();
-        let measure = yaml_def.build_with_cube_name(Some("orders"));
+        let measure = yaml_def.build_with_cube_name(Some("orders"), "amount".to_string());
         let grain = measure.grain().unwrap().expect("grain present");
 
         assert_eq!(

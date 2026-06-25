@@ -148,6 +148,22 @@ impl MockSchema {
         self.cubes.keys().collect()
     }
 
+    pub fn cubes_iter(&self) -> impl Iterator<Item = (&String, &MockCube)> {
+        self.cubes.iter()
+    }
+
+    /// Build the domain `Model` from the same data the existing
+    /// `MockCubeEvaluator` consumes. Goes through the production
+    /// `SchemaModelBuilder` via a `MockSchemaSource` adapter — same
+    /// code path that runs against real schemas in production.
+    pub fn build_model(&self) -> Result<Rc<crate::model::Model>, CubeError> {
+        use crate::cube_bridge::schema_source::SchemaSource;
+        use crate::model::SchemaModelBuilder;
+        use crate::test_fixtures::cube_bridge::MockSchemaSource;
+        let source: Rc<dyn SchemaSource> = Rc::new(MockSchemaSource::from_schema(self));
+        SchemaModelBuilder::new(source).build().map(Rc::new)
+    }
+
     pub fn create_evaluator(self) -> Rc<MockCubeEvaluator> {
         let mut primary_keys = std::collections::HashMap::new();
 

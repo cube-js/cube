@@ -162,13 +162,6 @@ export const viewFilterDefinitionFixture = (): unknown => ({
   unlessReferences: ['orders.currency'],
 });
 
-export const cubeDefinitionFixture = (): unknown => ({
-  name: 'Orders',
-  // sqlAlias, isView, isCalendar, joinMap optional
-  // sql_table, sql optional getters
-  defaultFilters: [viewFilterDefinitionFixture()],
-});
-
 export const dimensionDefinitionFixture = (): unknown => ({
   type: 'string',
   // owned_by_cube, multi_stage, etc. — all optional
@@ -179,6 +172,19 @@ export const measureDefinitionFixture = (): unknown => ({
   type: 'count',
   // owned_by_cube, multi_stage, reduce_by_references, etc. — all optional
   // sql/case/filters/drill_filters/order_by/mask_sql — all optional getters
+});
+
+export const cubeDefinitionFixture = (): unknown => ({
+  name: 'Orders',
+  // sqlAlias, isView, isCalendar, joinMap optional
+  // sql_table, sql optional getters
+  defaultFilters: [viewFilterDefinitionFixture()],
+  // measures/dimensions/segments are required vec fields
+  measures: [measureDefinitionFixture()],
+  dimensions: [dimensionDefinitionFixture()],
+  segments: [segmentDefinitionFixture()],
+  // joins/preAggregations/accessPolicy/includedMembers are optional vec
+  // getters — omitted, the getters return None
 });
 
 export const expressionStructFixture = (): unknown => ({

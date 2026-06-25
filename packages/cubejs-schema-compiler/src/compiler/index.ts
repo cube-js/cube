@@ -11,3 +11,4 @@ export {
   PreAggregationInfo,
   EvaluatedCube,
 } from './CubeEvaluator';
+export { SchemaSource } from './SchemaSource';

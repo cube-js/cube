@@ -10,6 +10,8 @@ use typed_builder::TypedBuilder;
 
 #[derive(Clone, TypedBuilder)]
 pub struct MockGranularityDefinition {
+    #[builder(default, setter(into))]
+    name: String,
     #[builder(setter(into))]
     interval: String,
     #[builder(default, setter(strip_option(fallback = origin_opt), into))]
@@ -23,6 +25,7 @@ pub struct MockGranularityDefinition {
 impl_static_data!(
     MockGranularityDefinition,
     GranularityDefinitionStatic,
+    name,
     interval,
     origin,
     offset

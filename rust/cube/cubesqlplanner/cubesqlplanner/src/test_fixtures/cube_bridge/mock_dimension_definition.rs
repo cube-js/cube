@@ -1,6 +1,7 @@
 use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::dimension_definition::{DimensionDefinition, DimensionDefinitionStatic};
 use crate::cube_bridge::geo_item::GeoItem;
+use crate::cube_bridge::granularity_definition::GranularityDefinition;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences;
 use crate::cube_bridge::timeshift_definition::TimeShiftDefinition;
@@ -16,6 +17,8 @@ use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder)]
 pub struct MockDimensionDefinition {
+    #[builder(default)]
+    name: String,
     #[builder(default = "string".to_string())]
     dimension_type: String,
     #[builder(default = Some(false))]
@@ -32,6 +35,8 @@ pub struct MockDimensionDefinition {
     values: Option<Vec<String>>,
     #[builder(default)]
     primary_key: Option<bool>,
+    #[builder(default)]
+    alias_member: Option<String>,
 
     #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
@@ -52,6 +57,7 @@ pub struct MockDimensionDefinition {
 impl_static_data!(
     MockDimensionDefinition,
     DimensionDefinitionStatic,
+    name,
     dimension_type,
     owned_by_cube,
     multi_stage,
@@ -59,7 +65,8 @@ impl_static_data!(
     sub_query,
     propagate_filters_to_sub_query,
     values,
-    primary_key
+    primary_key,
+    alias_member
 );
 
 impl MockDimensionDefinition {
@@ -158,6 +165,14 @@ impl DimensionDefinition for MockDimensionDefinition {
             Some(sql_str) => Ok(Some(Rc::new(MockMemberSql::new(sql_str)?))),
             None => Ok(None),
         }
+    }
+
+    fn has_granularities(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn granularities(&self) -> Result<Option<Vec<Rc<dyn GranularityDefinition>>>, CubeError> {
+        Ok(None)
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

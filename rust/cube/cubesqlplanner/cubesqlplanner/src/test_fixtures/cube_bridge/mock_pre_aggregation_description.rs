@@ -23,6 +23,14 @@ pub struct MockPreAggregationDescription {
     external: Option<bool>,
     #[builder(default)]
     allow_non_strict_date_range_match: Option<bool>,
+    #[builder(default)]
+    scheduled_refresh: Option<bool>,
+    #[builder(default)]
+    use_original_sql_pre_aggregations: Option<bool>,
+    #[builder(default)]
+    partition_granularity: Option<String>,
+    #[builder(default)]
+    owned_by_cube: Option<bool>,
 
     #[builder(default, setter(strip_option(fallback = measure_references_opt)))]
     measure_references: Option<Rc<dyn MemberSql>>,
@@ -46,7 +54,11 @@ impl_static_data!(
     granularity,
     sql_alias,
     external,
-    allow_non_strict_date_range_match
+    allow_non_strict_date_range_match,
+    scheduled_refresh,
+    use_original_sql_pre_aggregations,
+    partition_granularity,
+    owned_by_cube
 );
 
 impl PreAggregationDescription for MockPreAggregationDescription {
@@ -107,6 +119,54 @@ impl PreAggregationDescription for MockPreAggregationDescription {
             )),
             None => Ok(None),
         }
+    }
+
+    fn has_build_range_start(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn build_range_start(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
+        Ok(None)
+    }
+
+    fn has_build_range_end(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn build_range_end(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
+        Ok(None)
+    }
+
+    fn has_indexes(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn indexes(
+        &self,
+    ) -> Result<
+        Option<
+            Vec<
+                Rc<
+                    dyn crate::cube_bridge::pre_aggregation_index_definition::PreAggregationIndexDefinition,
+                >,
+            >,
+        >,
+        CubeError,
+    >{
+        Ok(None)
+    }
+
+    fn has_refresh_key(&self) -> Result<bool, CubeError> {
+        Ok(false)
+    }
+
+    fn refresh_key(
+        &self,
+    ) -> Result<
+        Option<Rc<dyn crate::cube_bridge::refresh_key_definition::RefreshKeyDefinition>>,
+        CubeError,
+    > {
+        Ok(None)
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

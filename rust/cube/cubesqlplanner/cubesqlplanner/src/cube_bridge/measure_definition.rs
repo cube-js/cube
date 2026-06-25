@@ -37,6 +37,11 @@ pub struct RollingWindow {
 
 #[derive(Serialize, Deserialize, Debug, nativebridge::NativeBridgeStatic)]
 pub struct MeasureDefinitionStatic {
+    /// Local name of the measure on its cube. Populated by
+    /// `prepareMembers` on the JS side so the bridge can return
+    /// measures as an array (`name` is the Record key otherwise).
+    #[serde(default)]
+    pub name: String,
     #[serde(rename = "type")]
     pub measure_type: String,
     #[serde(rename = "ownedByCube")]
@@ -53,6 +58,8 @@ pub struct MeasureDefinitionStatic {
     pub time_shift_references: Option<Vec<TimeShiftReference>>,
     #[serde(rename = "rollingWindow")]
     pub rolling_window: Option<RollingWindow>,
+    #[serde(rename = "aliasMember")]
+    pub alias_member: Option<String>,
 }
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic, with_static_meta)]

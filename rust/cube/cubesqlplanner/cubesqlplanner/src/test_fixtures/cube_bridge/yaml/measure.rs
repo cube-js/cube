@@ -176,10 +176,14 @@ fn qualify_references(refs: Option<Vec<String>>, cube_name: Option<&str>) -> Opt
 
 impl YamlMeasureDefinition {
     pub fn build(self) -> Rc<MockMeasureDefinition> {
-        self.build_with_cube_name(None)
+        self.build_with_cube_name(None, String::new())
     }
 
-    pub fn build_with_cube_name(self, cube_name: Option<&str>) -> Rc<MockMeasureDefinition> {
+    pub fn build_with_cube_name(
+        self,
+        cube_name: Option<&str>,
+        name: String,
+    ) -> Rc<MockMeasureDefinition> {
         let case = self.case.map(|cv| match cv {
             YamlCaseVariant::Case(case_def) => Rc::new(CaseVariant::Case(case_def.build())),
             YamlCaseVariant::CaseSwitch(switch_def) => {
@@ -225,6 +229,7 @@ impl YamlMeasureDefinition {
 
         Rc::new(
             MockMeasureDefinition::builder()
+                .name(name)
                 .measure_type(self.measure_type)
                 .multi_stage(self.multi_stage)
                 .reduce_by_references(qualify_references(self.reduce_by_references, cube_name))

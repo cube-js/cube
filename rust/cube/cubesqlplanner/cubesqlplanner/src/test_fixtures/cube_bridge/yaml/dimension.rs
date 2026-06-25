@@ -64,6 +64,10 @@ pub struct YamlDimensionDefinition {
 
 impl YamlDimensionDefinition {
     pub fn build(self) -> YamlDimensionBuildResult {
+        self.build_with_name(String::new())
+    }
+
+    pub fn build_with_name(self, name: String) -> YamlDimensionBuildResult {
         let time_shift = if !self.time_shift.is_empty() {
             Some(self.time_shift.into_iter().map(|ts| ts.build()).collect())
         } else {
@@ -116,6 +120,7 @@ impl YamlDimensionDefinition {
         let filter = self.filter.map(|f| f.build(None));
 
         let definition = MockDimensionDefinition::builder()
+            .name(name)
             .dimension_type(self.dimension_type)
             .multi_stage(self.multi_stage)
             .add_group_by_references(self.add_group_by_references)
