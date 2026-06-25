@@ -122,6 +122,80 @@ To enable SSL-encrypted connections between Cube and ClickHouse, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+## Custom headers
+
+The ClickHouse driver supports forwarding custom HTTP headers on every request to
+the ClickHouse server. This is useful when requests pass through a proxy or gateway
+that expects additional headers (e.g., for routing or tracing). See the [ClickHouse
+JavaScript client configuration][clickhouse-docs-js-config] for more details.
+
+Custom headers can't be configured via environment variables. Instead, use the
+[`driver_factory`](/reference/configuration/config#driver_factory) configuration
+option to pass a `headers` object to the driver:
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  return {
+    'type': 'clickhouse',
+    'headers': {
+      'X-Custom-Header': 'value',
+      'X-Routing-Group': 'analytics'
+    }
+  }
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  driverFactory: ({ dataSource }) => ({
+    type: "clickhouse",
+    headers: {
+      "X-Custom-Header": "value",
+      "X-Routing-Group": "analytics"
+    }
+  })
+};
+```
+
+</CodeGroup>
+
+In multitenant deployments, you can use the [security
+context](/embedding/authentication/security-context) to pass per-tenant headers, for example
+to forward a user token from the API request down to ClickHouse:
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  security_context = ctx['securityContext']
+  return {
+    'type': 'clickhouse',
+    'headers': {
+      'X-Custom-User-Token': security_context['token']
+    }
+  }
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  driverFactory: ({ securityContext }) => ({
+    type: "clickhouse",
+    headers: {
+      "X-Custom-User-Token": securityContext.token
+    }
+  })
+};
+```
+
+</CodeGroup>
+
 ## Additional Configuration
 
 You can connect to a ClickHouse database when your user's permissions are
@@ -134,6 +208,7 @@ You can connect to a ClickHouse database with compression enabled, by setting
 [clickhouse]: https://clickhouse.tech/
 [clickhouse-docs-users]:
   https://clickhouse.tech/docs/en/operations/settings/settings-users/
+[clickhouse-docs-js-config]: https://clickhouse.com/docs/integrations/javascript#configuration
 [clickhouse-readonly]: https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#readonly
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source

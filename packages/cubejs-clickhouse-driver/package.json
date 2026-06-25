@@ -23,8 +23,9 @@
     "watch": "tsc -w",
     "lint": "eslint src/* test/* --ext .ts",
     "lint:fix": "eslint --fix src/* test/* --ext .ts",
-    "integration": "jest dist/test",
-    "integration:clickhouse": "jest dist/test"
+    "unit": "jest dist/test/unit",
+    "integration": "jest dist/test/integration",
+    "integration:clickhouse": "jest dist/test/integration"
   },
   "dependencies": {
     "@clickhouse/client": "^1.12.0",
