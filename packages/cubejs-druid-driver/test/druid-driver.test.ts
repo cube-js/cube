@@ -137,4 +137,14 @@ describe('DruidDriver', () => {
       }
     });
   });
+
+  it('stream with an error', async () => {
+    jest.setTimeout(10 * 1000);
+
+    return doWithDriver(async (driver) => {
+      await expect(
+        driver.stream('SELECT * FROM this_table_does_not_exist', [], { highWaterMark: 1000 })
+      ).rejects.toThrow(/Object 'this_table_does_not_exist' not found/);
+    });
+  });
 });
