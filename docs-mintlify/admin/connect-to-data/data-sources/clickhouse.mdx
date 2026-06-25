@@ -38,6 +38,10 @@ CUBEJS_DB_PASS=**********
 | [`CUBEJS_DB_PASS`](/reference/configuration/environment-variables#cubejs_db_pass)                   | The password used to connect to the database                                        | A valid database password |    ✅    |
 | [`CUBEJS_DB_CLICKHOUSE_READONLY`](/reference/configuration/environment-variables#cubejs_db_clickhouse_readonly)    | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |
 | [`CUBEJS_DB_CLICKHOUSE_COMPRESSION`](/reference/configuration/environment-variables#cubejs_db_clickhouse_compression) | Whether the ClickHouse client has compression enabled or not                        | `true`, `false`           |    ❌    |
+| [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl)                     | If `true`, enables SSL/TLS encryption between Cube and the database                  | `true`, `false`           |    ❌    |
+| [`CUBEJS_DB_SSL_CA`](/reference/configuration/environment-variables#cubejs_db_ssl_ca)               | The CA certificate, or a path to it. Required to enable mutual TLS                   | A valid certificate or path |  ❌    |
+| [`CUBEJS_DB_SSL_CERT`](/reference/configuration/environment-variables#cubejs_db_ssl_cert)           | The client certificate, or a path to it. Set with `CUBEJS_DB_SSL_KEY` for mutual TLS | A valid certificate or path |  ❌    |
+| [`CUBEJS_DB_SSL_KEY`](/reference/configuration/environment-variables#cubejs_db_ssl_key)             | The client private key, or a path to it. Set with `CUBEJS_DB_SSL_CERT` for mutual TLS | A valid key or path        |  ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)               | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)               | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
 
@@ -121,6 +125,56 @@ To enable SSL-encrypted connections between Cube and ClickHouse, set the
 [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl) environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
+
+### Mutual TLS (client certificates)
+
+ClickHouse can authenticate users by client certificate (users created with
+[`IDENTIFIED WITH ssl_certificate`](https://clickhouse.com/docs/en/operations/external-authenticators/ssl-x509)).
+To connect Cube using mutual TLS, provide a CA certificate together with a
+client certificate and key via the standard SSL environment variables:
+
+```dotenv
+CUBEJS_DB_SSL=true
+CUBEJS_DB_SSL_CA=/path/to/ca.pem
+CUBEJS_DB_SSL_CERT=/path/to/client.crt
+CUBEJS_DB_SSL_KEY=/path/to/client.key
+```
+
+These variables accept either the certificate/key contents or a path to a file.
+When `CUBEJS_DB_SSL_CERT` and `CUBEJS_DB_SSL_KEY` are both set, the driver
+authenticates using the client certificate; the matching ClickHouse user should
+be created with `IDENTIFIED WITH ssl_certificate CN '<common-name>'` and Cube's
+`CUBEJS_DB_USER` set to that user.
+
+<Info>
+
+`@clickhouse/client` requires a CA certificate (`CUBEJS_DB_SSL_CA`) to be present
+in order to enable mutual TLS.
+
+</Info>
+
+For dynamic, per-connection certificates — for example, authenticating each
+tenant as a distinct ClickHouse user — pass the certificate material
+programmatically from a [`driverFactory`](/reference/configuration/config#driverfactory)
+using the `ssl` option. Unlike the environment variables, values passed here are
+treated as raw certificate/key contents (string or `Buffer`), not file paths:
+
+```javascript
+const { ClickHouseDriver } = require('@cubejs-backend/clickhouse-driver');
+
+module.exports = {
+  driverFactory: ({ securityContext }) => {
+    const { ca, cert, key } = loadTenantCertificate(securityContext.tenantId);
+
+    return new ClickHouseDriver({
+      host: process.env.CUBEJS_DB_HOST,
+      port: '8443',
+      username: securityContext.tenantId, // must match the certificate's CN-mapped user
+      ssl: { ca, cert, key },
+    });
+  },
+};
+```
 
 ## Additional Configuration
 
