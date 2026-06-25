@@ -30,6 +30,8 @@ fn main() {
         "repartition_multi_node_consistency".to_string(),
         "--skip".to_string(),
         "rolling_window_no_aggregates".to_string(),
+        "--skip".to_string(),
+        "cross_join_empty_sort_on".to_string(),
     ];
     run_sql_tests("migration", extra_args, move |test_name, test_fn| {
         let r = Builder::new_current_thread()
