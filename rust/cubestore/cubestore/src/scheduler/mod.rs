@@ -1270,6 +1270,12 @@ impl SchedulerImpl {
         self.schedule_import_jobs_hashed(table_id, &stream_locations)
             .await?;
 
+        // Stream-only tables (the common reconcile path) have nothing left to place; skip the
+        // load-aware lock and the in_flight_import_jobs_by_node scan entirely.
+        if csv_locations.is_empty() {
+            return Ok(());
+        }
+
         if !self.config.load_aware_import_placement_enabled() {
             self.schedule_import_jobs_hashed(table_id, &csv_locations)
                 .await?;
