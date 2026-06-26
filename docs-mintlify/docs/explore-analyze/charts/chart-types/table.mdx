@@ -49,13 +49,37 @@ Click the dropdown arrow on any field in the **Fields** section to configure it:
 | **Word wrap** | Allow cell content to wrap to multiple lines |
 | **Hide** | Show or hide the column |
 
-## Inline bars
+## Display tab — showing columns as links, images, bars, or sparklines
+
+By default, columns display their raw value. The **Display** tab for each field lets you change this:
+
+### Links
+
+Display a field's value as a clickable hyperlink. To create dynamic per-row links:
+
+1. Add a [calculated field](/docs/explore-analyze/workbooks/calculated-fields) that produces a URL — for example:
+   ```
+   CONCAT("https://example.com/orders/", order_items.order_id)
+   ```
+2. In the table visualization, hide the calculated field column.
+3. In the **Display** tab for the field you want to link, set **Display as** to **Link** and select the hidden URL field as the source.
+
+{/* TODO screenshot: column display dropdown showing Link option selected (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Images
+
+Display a field as an image by setting **Display as** to **Image**. Configure height and width. To make the image a link, check **Link image** and set the **Link URL**.
+
+The URL must be publicly accessible without authentication.
+
+### Inline bars
 
 Display a numeric column as a proportional in-cell bar. In the column's per-column section on the **Style** tab, use the **Display as** control to add a bar. Each bar's length reflects the value's magnitude within the column's range.
 
 | Option | Description |
 |---|---|
-| **Display as** | Choose **Value**, **Bar**, or both. Checking **Bar** reveals the bar options below; keeping **Value** checked shows the number alongside the bar (uncheck it for a bar-only cell). |
+| **Display as** | Choose **Value**, **Inline bars**, or **Sparkline** — a single choice; the modes are mutually exclusive. Selecting **Inline bars** reveals the bar options below. |
+| **Show value** | Show the formatted number alongside the bar. Turn it off for a bar-only cell. |
 | **Positive bar color** | Fill color for non-negative bars |
 | **Negative bar color** | Fill color for negative bars (used when the column contains both positive and negative values) |
 | **Bar scale** | **Auto** anchors each bar at zero and scales to the column's largest value, so even the smallest value still shows a bar; **Manual** scales against the bounds you set |
@@ -64,6 +88,38 @@ Display a numeric column as a proportional in-cell bar. In the column's per-colu
 When a column contains both positive and negative values, bars are drawn in both directions from a centered zero baseline — positive values to the right, negative to the left — using the positive and negative bar colors. Values outside the scale are clamped to a full or empty bar, but the displayed number is always the true value.
 
 {/* TODO screenshot: table with inline bar column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Sparklines
+
+Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. In the column's per-column section on the **Style** tab, set **Display as** to **Sparkline**.
+
+A sparkline needs a time dimension to use as its horizontal axis. When you switch a column to **Sparkline** and pick its horizontal axis time dimension, that dimension is **removed from the table query** (if it was there): the table shows one row per remaining dimension, correctly aggregated, while the sparkline plots the measure's value across the time dimension. Values are always correct for any measure type, including counts of distinct values, averages, and custom measures.
+
+<Note>
+
+Internally, sparklines are powered by additional queries grouped by time dimension and granularity: measures sharing the same dimension and granularity are fetched together, so a chart with several sparklines runs at most one extra query per distinct dimension and granularity combination.
+
+</Note>
+
+| Option | Description |
+|---|---|
+| **Display as** | Set to **Sparkline**. Available only for numeric columns, and only when the query has a time dimension. |
+| **Horizontal axis** | The time dimension plotted along the sparkline. Auto-selected (the first time dimension in the query); change it here when the query has several. |
+| **Granularity** | The time bucket for the horizontal axis. Defaults to the dimension's granularity in the query if present, otherwise month. |
+| **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
+| **Line color** / **Area color** | Stroke color for line and bar; fill color for area. |
+| **Line width** | Stroke width in pixels (Line and Area types). |
+| **Show value** | Show the most recent value as a headline number next to the sparkline. Turn it off for a chart-only cell. |
+
+A row needs at least two data points to draw a sparkline; cells with fewer fall back to the formatted value.
+
+<Note>
+
+A granularity that is too fine for the data's time span (e.g. by the second over several years) makes each background query return many rows, which can make a table with sparklines slow to load for end users. Pick the coarsest granularity that still shows the trend you need.
+
+</Note>
+
+{/* TODO screenshot: table with a sparkline column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Cell menu
 
