@@ -17,8 +17,6 @@ RUN apt-get update \
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod \
-    # Remove DuckDB sources to reduce image size
-    && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
 FROM node:22.22.0-bookworm-slim

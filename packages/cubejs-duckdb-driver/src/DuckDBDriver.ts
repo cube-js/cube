@@ -9,9 +9,8 @@ import {
   TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
-import { promisify } from 'util';
 import * as stream from 'stream';
-import { Connection, Database } from 'duckdb';
+import { DuckDBConnection, DuckDBInstance, DuckDBValue } from '@duckdb/node-api';
 
 import { DuckDBQuery } from './DuckDBQuery';
 import { HydrationStream, transformRow } from './HydrationStream';
@@ -29,9 +28,11 @@ export type DuckDBDriverConfiguration = {
 };
 
 type InitPromise = {
-  defaultConnection: Connection,
-  db: Database;
+  defaultConnection: DuckDBConnection,
+  instance: DuckDBInstance;
 };
+
+type ExecFn = (sql: string) => Promise<unknown>;
 
 const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
   // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
@@ -64,7 +65,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     return DuckDBToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType.toLowerCase(), precision, scale);
   }
 
-  private async installExtensions(extensions: string[], execAsync: (sql: string, ...params: any[]) => Promise<void>, repository: string = ''): Promise<void> {
+  private async installExtensions(extensions: string[], execAsync: ExecFn, repository: string = ''): Promise<void> {
     repository = repository ? ` FROM ${repository}` : '';
     for (const extension of extensions) {
       try {
@@ -79,7 +80,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async loadExtensions(extensions: string[], execAsync: (sql: string, ...params: any[]) => Promise<void>): Promise<void> {
+  private async loadExtensions(extensions: string[], execAsync: ExecFn): Promise<void> {
     for (const extension of extensions) {
       try {
         await execAsync(`LOAD ${extension}`);
@@ -106,17 +107,16 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       dbUrl = ':memory:';
     }
 
-    let dbOptions;
+    let dbOptions: Record<string, string> | undefined;
     if (token) {
       dbOptions = { custom_user_agent: `Cube/${version}` };
     }
 
-    // Create a new Database instance with the determined URL and custom user agent
-    const db = new Database(dbUrl, dbOptions);
+    // Create a new DuckDB instance with the determined URL and custom user agent
+    const instance = await DuckDBInstance.create(dbUrl, dbOptions);
 
-    // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
-    const defaultConnection = db.connect();
-    const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
+    const defaultConnection = await instance.connect();
+    const execAsync: ExecFn = (sql: string) => defaultConnection.run(sql);
 
     const configuration = [
       {
@@ -206,7 +206,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
     return {
       defaultConnection,
-      db
+      instance
     };
   }
 
@@ -250,13 +250,15 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
     const { defaultConnection } = await this.getInitiatedState();
-    const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(defaultConnection.all).bind(defaultConnection) as any;
 
-    const result = await fetchAsync(query, ...values);
-    return result.map((item) => {
+    const reader = await defaultConnection.runAndReadAll(query, values as DuckDBValue[]);
+    // getRowObjectsJS returns JS built-ins (numbers, bigints, Dates, strings),
+    // which HydrationStream's transformRow normalizes into Cube's expected shape.
+    const rows = reader.getRowObjectsJS();
+    return rows.map((item) => {
       transformRow(item);
 
-      return item;
+      return item as R;
     });
   }
 
@@ -265,26 +267,36 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableData> {
-    const { db } = await this.getInitiatedState();
+    const { instance } = await this.getInitiatedState();
 
     // new connection, because stream can break with
     // Attempting to execute an unsuccessful or closed pending query result
     // PreAggregation queue has a concurrency limit, it's why pool is not needed here
-    const connection = db.connect();
-    const closeAsync = promisify(connection.close).bind(connection);
+    const connection = await instance.connect();
 
     try {
-      const asyncIterator = connection.stream(query, ...(values || []));
-      const rowStream = stream.Readable.from(asyncIterator, { highWaterMark }).pipe(new HydrationStream());
+      const result = await connection.stream(query, (values || []) as DuckDBValue[]);
+
+      // yieldRowObjectJs yields one array of JS-converted row objects per chunk;
+      // flatten to a row-at-a-time async iterable for the Readable stream.
+      const rowIterator = async function* rows(): AsyncGenerator<Record<string, unknown>> {
+        for await (const chunk of result.yieldRowObjectJs()) {
+          for (const row of chunk) {
+            yield row;
+          }
+        }
+      };
+
+      const rowStream = stream.Readable.from(rowIterator(), { highWaterMark }).pipe(new HydrationStream());
 
       return {
         rowStream,
         release: async () => {
-          await closeAsync();
+          connection.closeSync();
         }
       };
     } catch (e) {
-      await closeAsync();
+      connection.closeSync();
 
       throw e;
     }
@@ -300,11 +312,11 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async release(): Promise<void> {
     if (this.initPromise) {
-      const { db } = await this.initPromise;
-      const close = promisify(db.close).bind(db);
+      const { defaultConnection, instance } = await this.initPromise;
       this.initPromise = null;
 
-      await close();
+      defaultConnection.closeSync();
+      instance.closeSync();
     }
   }
 }
