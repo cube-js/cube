@@ -5,12 +5,10 @@ import {
   QueryOptions,
   StreamTableData,
   GenericDataBaseType,
-  TableStructure,
-  TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import * as stream from 'stream';
-import { DuckDBConnection, DuckDBInstance, DuckDBValue } from '@duckdb/node-api';
+import { DuckDBConnection, DuckDBInstance, DuckDBValue, timestampMillisValue } from '@duckdb/node-api';
 
 import { DuckDBQuery } from './DuckDBQuery';
 import { HydrationStream, transformRow } from './HydrationStream';
@@ -33,6 +31,10 @@ type InitPromise = {
 };
 
 type ExecFn = (sql: string) => Promise<unknown>;
+
+const normalizeValues = (values: unknown[] = []): DuckDBValue[] => values.map(
+  value => (value instanceof Date ? timestampMillisValue(BigInt(value.getTime())) : value as DuckDBValue)
+);
 
 const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
   // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
@@ -251,7 +253,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
     const { defaultConnection } = await this.getInitiatedState();
 
-    const reader = await defaultConnection.runAndReadAll(query, values as DuckDBValue[]);
+    const reader = await defaultConnection.runAndReadAll(query, normalizeValues(values));
     // getRowObjectsJS returns JS built-ins (numbers, bigints, Dates, strings),
     // which HydrationStream's transformRow normalizes into Cube's expected shape.
     const rows = reader.getRowObjectsJS();
@@ -275,7 +277,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     const connection = await instance.connect();
 
     try {
-      const result = await connection.stream(query, (values || []) as DuckDBValue[]);
+      const result = await connection.stream(query, normalizeValues(values));
 
       // yieldRowObjectJs yields one array of JS-converted row objects per chunk;
       // flatten to a row-at-a-time async iterable for the Readable stream.
