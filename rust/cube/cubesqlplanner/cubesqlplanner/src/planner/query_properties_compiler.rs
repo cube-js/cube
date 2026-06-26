@@ -253,12 +253,26 @@ impl QueryPropertiesCompiler {
                 } else {
                     None
                 };
-                Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                    base_symbol,
-                    d.granularity.clone(),
-                    granularity_obj,
-                    date_range_tuple,
-                )))
+                // Honor an explicit `memberToAlias` override for the granularized
+                // member. The SQL API (cubesql) keys it `{member}.{granularity}`
+                // (dotted) and references the CubeScan column by that alias; the
+                // default `{base alias}_{granularity}` would otherwise mismatch.
+                let alias_override = d.granularity.as_ref().and_then(|granularity| {
+                    evaluator_compiler.alias_for_member(&format!(
+                        "{}.{}",
+                        base_symbol.full_name(),
+                        granularity
+                    ))
+                });
+                Ok(MemberSymbol::new_time_dimension(
+                    TimeDimensionSymbol::new_with_alias(
+                        base_symbol,
+                        d.granularity.clone(),
+                        granularity_obj,
+                        date_range_tuple,
+                        alias_override,
+                    ),
+                ))
             })
             .collect()
     }
