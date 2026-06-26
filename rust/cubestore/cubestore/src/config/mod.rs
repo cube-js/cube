@@ -477,6 +477,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_log_enabled(&self) -> bool;
 
+    fn cachestore_wal_ttl_seconds(&self) -> Option<u64>;
+
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
 
     fn cachestore_gc_loop_interval(&self) -> u64;
@@ -707,6 +709,7 @@ pub struct ConfigObjImpl {
     pub metastore_rocks_store_config: RocksStoreConfig,
     pub cachestore_log_upload_interval: u64,
     pub cachestore_log_enabled: bool,
+    pub cachestore_wal_ttl_seconds: Option<u64>,
     pub cachestore_rocks_store_config: RocksStoreConfig,
     pub cachestore_gc_loop_interval: u64,
     pub cachestore_cache_eviction_loop_interval: u64,
@@ -950,6 +953,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_log_enabled(&self) -> bool {
         self.cachestore_log_enabled
+    }
+
+    fn cachestore_wal_ttl_seconds(&self) -> Option<u64> {
+        self.cachestore_wal_ttl_seconds
     }
 
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
@@ -1426,6 +1433,17 @@ where
     })
 }
 
+// Validates CUBESTORE_CACHESTORE_WAL_TTL_SECONDS. `None` means unset, in which case open_db
+// falls back to the upstream default (snapshot + log-upload interval). A value below 2 is
+// rejected: 0 disables RocksDB's WAL-ttl purge entirely (the archived WAL would grow unbounded),
+// and the purge runs on a ttl / 2 cycle.
+fn validate_cachestore_wal_ttl_seconds(ttl: Option<u64>) -> Option<u64> {
+    if matches!(ttl, Some(v) if v < 2) {
+        panic!("CUBESTORE_CACHESTORE_WAL_TTL_SECONDS must be >= 2 (0 disables WAL purge)");
+    }
+    ttl
+}
+
 // Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
 // back to per_chunk, so a typo in the strategy env never takes the process down.
 fn env_repartition_strategy() -> RepartitionStrategy {
@@ -1648,6 +1666,9 @@ impl Config {
                     Some(15),
                 ),
                 cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", false),
+                cachestore_wal_ttl_seconds: validate_cachestore_wal_ttl_seconds(env_optparse(
+                    "CUBESTORE_CACHESTORE_WAL_TTL_SECONDS",
+                )),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: env_parse_duration(
                     "CUBESTORE_CACHESTORE_GC_LOOP",
@@ -1997,6 +2018,7 @@ impl Config {
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
                 cachestore_log_upload_interval: 30,
                 cachestore_log_enabled: true,
+                cachestore_wal_ttl_seconds: None,
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: 30,
                 cachestore_cache_eviction_loop_interval: 60,
@@ -2927,5 +2949,18 @@ mod tests {
             RepartitionStrategy::Range
         );
         assert!("nonsense".parse::<RepartitionStrategy>().is_err());
+    }
+
+    #[test]
+    fn cachestore_wal_ttl_seconds_validation() {
+        assert_eq!(validate_cachestore_wal_ttl_seconds(None), None);
+        assert_eq!(validate_cachestore_wal_ttl_seconds(Some(2)), Some(2));
+        assert_eq!(validate_cachestore_wal_ttl_seconds(Some(330)), Some(330));
+    }
+
+    #[test]
+    #[should_panic(expected = "must be >= 2")]
+    fn cachestore_wal_ttl_seconds_rejects_below_min() {
+        validate_cachestore_wal_ttl_seconds(Some(1));
     }
 }

@@ -96,10 +96,13 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
             compaction_state,
         ));
-        // TODO(ovr): Decrease after additional fix for get_updates_since
-        opts.set_wal_ttl_seconds(
-            config.meta_store_snapshot_interval() + config.meta_store_log_upload_interval(),
-        );
+        // WAL retention for get_updates_since (log upload). Default = snapshot + log-upload
+        // interval; exposed via CUBESTORE_CACHESTORE_WAL_TTL_SECONDS so deployments that do not use
+        // cachestore log upload can lower it to bound the archived WAL on disk. RocksDB purges
+        // archived WAL older than this on a wal_ttl/2 cycle, so a lower value tightens the bound.
+        opts.set_wal_ttl_seconds(config.cachestore_wal_ttl_seconds().unwrap_or_else(|| {
+            config.meta_store_snapshot_interval() + config.meta_store_log_upload_interval()
+        }));
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
 

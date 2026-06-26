@@ -1553,6 +1553,19 @@ The address/port pair for Cube Store's MySQL-compatible interface.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `0.0.0.0:3306`         | `0.0.0.0:3306`        |
 
+## `CUBESTORE_CACHESTORE_WAL_TTL_SECONDS`
+
+How long, in seconds, Cube Store keeps an archived cachestore write-ahead log
+(WAL) file before deleting it; RocksDB checks on a `ttl / 2` cycle. Lower values
+keep less WAL on disk under sustained write load. When unset, it defaults to the
+cachestore snapshot interval plus the log-upload interval. Lower it only when
+cachestore log upload is disabled (the default), since that is the only consumer
+of the retained WAL. Minimum `2`.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | N/A                    | N/A                   |
+
 ## `CUBESTORE_DATA_DIR`
 
 A path on the local filesystem to store a local replica of the data. Must be
