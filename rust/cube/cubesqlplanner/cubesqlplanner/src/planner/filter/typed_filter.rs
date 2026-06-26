@@ -277,7 +277,7 @@ impl TypedFilterBuilder {
                     FilterOp::RegularRollingWindow(RegularRollingWindowOp::new(trailing, leading))
                 }
                 FilterOperator::RollingWindowOffsetDateRange => {
-                    let from = values.get(0).and_then(|v| v.to_param_string());
+                    let from = values.first().and_then(|v| v.to_param_string());
                     let to = values.get(1).and_then(|v| v.to_param_string());
                     let trailing = values.get(2).and_then(|v| v.to_param_string());
                     let leading = values.get(3).and_then(|v| v.to_param_string());
