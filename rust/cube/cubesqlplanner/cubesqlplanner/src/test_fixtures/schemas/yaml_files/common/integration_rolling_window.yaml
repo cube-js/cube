@@ -177,6 +177,30 @@ cubes:
                 trailing: 3 day
                 leading: 1 day
                 offset: end
+          - name: rolling_sum_trailing_offset_start
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: unbounded
+                offset: start
+          - name: rolling_sum_trailing_offset_end
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: unbounded
+                offset: end
+          - name: rolling_sum_leading_offset_start
+            type: sum
+            sql: amount
+            rolling_window:
+                leading: unbounded
+                offset: start
+          - name: rolling_sum_leading_offset_end
+            type: sum
+            sql: amount
+            rolling_window:
+                leading: unbounded
+                offset: end
           # Cat 15 — running total
           - name: running_total
             type: runningTotal

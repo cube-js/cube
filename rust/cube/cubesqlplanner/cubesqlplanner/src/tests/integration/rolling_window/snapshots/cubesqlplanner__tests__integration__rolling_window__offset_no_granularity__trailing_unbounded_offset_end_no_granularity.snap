@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/offset_no_granularity.rs
+assertion_line: 84
+expression: result
+---
+orders__rolling_sum_trailing_offset_end
+---------------------------------------
+2275.00

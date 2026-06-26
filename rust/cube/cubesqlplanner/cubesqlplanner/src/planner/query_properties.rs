@@ -885,26 +885,25 @@ impl QueryProperties {
         false
     }
 
-    /// Rewrite an `InDateRange` filter on `member_name` according to the
-    /// trailing/leading bounds: both `unbounded` removes the filter entirely;
-    /// trailing-`unbounded` rewrites to `BeforeOrOnDate(to)`; leading-
-    /// `unbounded` rewrites to `AfterOrOnDate(from)`. Other inputs are
-    /// no-ops.
+    /// Rewrite an `InDateRange(from, to)` filter on `member_name` into a single
+    /// rolling-window-over-date-range filter anchored by `offset`. The window is
+    /// rendered by `RollingWindowOffsetOp`; here we only carry the inputs
+    /// (`from`, `to`, `trailing`, `leading`, `offset`). No rolling interval on
+    /// either side (e.g. running total, to_date) keeps the filter as-is; both
+    /// sides `unbounded` drops it entirely.
     pub fn replace_date_range_for_rolling_window_without_granularity(
         &mut self,
         member_name: &str,
         trailing: &Option<String>,
         leading: &Option<String>,
+        offset: &str,
     ) -> Result<(), CubeError> {
-        let trailing_unbounded = trailing.as_deref() == Some("unbounded");
-        let leading_unbounded = leading.as_deref() == Some("unbounded");
-
-        if !trailing_unbounded && !leading_unbounded {
+        if trailing.is_none() && leading.is_none() {
             return Ok(());
         }
 
-        if trailing_unbounded && leading_unbounded {
-            // Both unbounded — remove the date range filter entirely
+        // Both sides unbounded: the window spans everything, drop the date filter.
+        if trailing.as_deref() == Some("unbounded") && leading.as_deref() == Some("unbounded") {
             self.time_dimensions_filters.retain(|item| match item {
                 FilterItem::Item(itm) => {
                     !(itm.member_name() == member_name
@@ -912,61 +911,25 @@ impl QueryProperties {
                 }
                 _ => true,
             });
-        } else if trailing_unbounded {
-            // Remove lower bound: InDateRange(from, to) → BeforeOrOnDate(to)
-            let mut new_filters = Vec::new();
-            for item in self.time_dimensions_filters.iter() {
-                match item {
-                    FilterItem::Item(itm)
-                        if itm.member_name() == member_name
-                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
-                    {
-                        let values = itm.values();
-                        let to_value = if values.len() >= 2 {
-                            vec![values[1].clone()]
-                        } else {
-                            values.clone()
-                        };
-                        new_filters.push(FilterItem::Item(itm.change_operator(
-                            FilterOperator::BeforeOrOnDate,
-                            to_value,
-                            itm.use_raw_values(),
-                            self.query_tools.query_tools().clone(),
-                            None,
-                        )?));
-                    }
-                    other => new_filters.push(other.clone()),
-                }
-            }
-            self.time_dimensions_filters = new_filters;
-        } else {
-            // leading unbounded: remove upper bound: InDateRange(from, to) → AfterOrOnDate(from)
-            let mut new_filters = Vec::new();
-            for item in self.time_dimensions_filters.iter() {
-                match item {
-                    FilterItem::Item(itm)
-                        if itm.member_name() == member_name
-                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
-                    {
-                        let values = itm.values();
-                        let from_value = if !values.is_empty() {
-                            vec![values[0].clone()]
-                        } else {
-                            values.clone()
-                        };
-                        new_filters.push(FilterItem::Item(itm.change_operator(
-                            FilterOperator::AfterOrOnDate,
-                            from_value,
-                            itm.use_raw_values(),
-                            self.query_tools.query_tools().clone(),
-                            None,
-                        )?));
-                    }
-                    other => new_filters.push(other.clone()),
-                }
-            }
-            self.time_dimensions_filters = new_filters;
+            self.invalidate_join_groups_cache();
+            return Ok(());
         }
+
+        // Keep the original [from, to] values and append the window inputs, so
+        // the filter carries [from, to, trailing, leading, offset].
+        let additional_values = vec![
+            FilterValue::from(trailing.clone()),
+            FilterValue::from(leading.clone()),
+            FilterValue::Str(offset.to_string()),
+        ];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &FilterOperator::RollingWindowOffsetDateRange,
+            None,
+            &additional_values,
+            &None,
+        )?;
         self.invalidate_join_groups_cache();
         Ok(())
     }

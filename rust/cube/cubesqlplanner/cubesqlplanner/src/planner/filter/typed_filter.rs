@@ -14,7 +14,7 @@ use super::operators::in_list::InListOp;
 use super::operators::like::LikeOp;
 use super::operators::measure_filter::MeasureFilterOp;
 use super::operators::nullability::NullabilityOp;
-use super::operators::rolling_window::RegularRollingWindowOp;
+use super::operators::rolling_window::{RegularRollingWindowOp, RollingWindowOffsetOp};
 use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use super::FilterOperator;
 use crate::planner::GranularityHelper;
@@ -43,6 +43,7 @@ pub enum FilterOp {
     MeasureFilter(MeasureFilterOp),
     Nullability(NullabilityOp),
     RegularRollingWindow(RegularRollingWindowOp),
+    RollingWindowOffset(RollingWindowOffsetOp),
     ToDateRollingWindow(ToDateRollingWindowOp),
 }
 
@@ -274,6 +275,19 @@ impl TypedFilterBuilder {
                     let trailing = values.get(2).and_then(|v| v.to_param_string());
                     let leading = values.get(3).and_then(|v| v.to_param_string());
                     FilterOp::RegularRollingWindow(RegularRollingWindowOp::new(trailing, leading))
+                }
+                FilterOperator::RollingWindowOffsetDateRange => {
+                    let from = values.first().and_then(|v| v.to_param_string());
+                    let to = values.get(1).and_then(|v| v.to_param_string());
+                    let trailing = values.get(2).and_then(|v| v.to_param_string());
+                    let leading = values.get(3).and_then(|v| v.to_param_string());
+                    let offset = values
+                        .get(4)
+                        .and_then(|v| v.to_param_string())
+                        .unwrap_or_else(|| "end".to_string());
+                    FilterOp::RollingWindowOffset(RollingWindowOffsetOp::new(
+                        from, to, trailing, leading, offset,
+                    ))
                 }
                 FilterOperator::ToDateRollingWindowDateRange => {
                     let granularity_name = values

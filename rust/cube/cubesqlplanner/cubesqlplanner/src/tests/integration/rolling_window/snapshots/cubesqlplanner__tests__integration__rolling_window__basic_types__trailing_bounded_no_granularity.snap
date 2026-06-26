@@ -1,8 +1,8 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/basic_types.rs
-assertion_line: 82
+assertion_line: 277
 expression: result
 ---
-orders__rolling_sum_leading
----------------------------
-1455.00
+orders__rolling_sum_trailing_7d
+-------------------------------
+450.00
