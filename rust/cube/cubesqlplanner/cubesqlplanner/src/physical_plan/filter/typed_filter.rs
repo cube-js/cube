@@ -67,7 +67,11 @@ impl TypedFilter {
             }
             FilterParamsColumn::Callback(callback) => {
                 let args = match self.operation() {
-                    FilterOp::DateRange(_) | FilterOp::DateSingle(_) => {
+                    // RollingWindowOffset carries [from, to, trailing, leading, offset];
+                    // only the from/to dates are filter-param args for the callback.
+                    FilterOp::DateRange(_)
+                    | FilterOp::DateSingle(_)
+                    | FilterOp::RollingWindowOffset(_) => {
                         let ctx = FilterSqlContext {
                             member_sql: "",
                             query_tools,
@@ -115,6 +119,7 @@ fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, Cube
         }
         FilterOp::Nullability(op) => op.to_sql(ctx),
         FilterOp::RegularRollingWindow(op) => op.to_sql(ctx),
+        FilterOp::RollingWindowOffset(op) => op.to_sql(ctx),
         FilterOp::ToDateRollingWindow(op) => op.to_sql(ctx),
     }
 }
