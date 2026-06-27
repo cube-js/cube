@@ -1,4 +1,5 @@
 mod column_comparator;
+mod dictionary_group_column;
 mod inline_aggregate_stream;
 mod sorted_group_values;
 mod sorted_group_values_rows;
@@ -279,31 +280,48 @@ fn supported_schema(schema: &datafusion::arrow::datatypes::Schema) -> bool {
 ///
 /// Types not in this list will use the row-based [`SortedGroupValuesRows`] implementation
 fn supported_type(data_type: &DataType) -> bool {
-    matches!(
-        *data_type,
+    match data_type {
         DataType::Int8
-            | DataType::Int16
-            | DataType::Int32
-            | DataType::Int64
-            | DataType::UInt8
-            | DataType::UInt16
-            | DataType::UInt32
-            | DataType::UInt64
-            | DataType::Float32
-            | DataType::Float64
-            | DataType::Decimal128(_, _)
-            | DataType::Utf8
-            | DataType::LargeUtf8
-            | DataType::Binary
-            | DataType::LargeBinary
-            | DataType::Date32
-            | DataType::Date64
-            | DataType::Time32(_)
-            | DataType::Time64(_)
-            | DataType::Timestamp(_, _)
-            | DataType::Utf8View
-            | DataType::BinaryView
-    )
+        | DataType::Int16
+        | DataType::Int32
+        | DataType::Int64
+        | DataType::UInt8
+        | DataType::UInt16
+        | DataType::UInt32
+        | DataType::UInt64
+        | DataType::Float32
+        | DataType::Float64
+        | DataType::Decimal128(_, _)
+        | DataType::Utf8
+        | DataType::LargeUtf8
+        | DataType::Binary
+        | DataType::LargeBinary
+        | DataType::Date32
+        | DataType::Date64
+        | DataType::Time32(_)
+        | DataType::Time64(_)
+        | DataType::Timestamp(_, _)
+        | DataType::Utf8View
+        | DataType::BinaryView => true,
+        // Dictionary group columns handled by DictionaryGroupColumn + DictionaryComparator.
+        DataType::Dictionary(key_type, value_type) => {
+            matches!(
+                key_type.as_ref(),
+                DataType::Int8
+                    | DataType::Int16
+                    | DataType::Int32
+                    | DataType::Int64
+                    | DataType::UInt8
+                    | DataType::UInt16
+                    | DataType::UInt32
+                    | DataType::UInt64
+            ) && matches!(
+                value_type.as_ref(),
+                DataType::Utf8 | DataType::LargeUtf8 | DataType::Binary | DataType::LargeBinary
+            )
+        }
+        _ => false,
+    }
 }
 
 #[cfg(test)]

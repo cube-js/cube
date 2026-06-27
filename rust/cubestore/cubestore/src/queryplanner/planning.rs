@@ -85,7 +85,7 @@ pub async fn choose_index(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
-    choose_index_ext(p, metastore, true).await
+    choose_index_ext(p, metastore, true, false).await
 }
 
 /// Information required to distribute the logical plan into multiple workers.
@@ -123,6 +123,7 @@ pub async fn choose_index_ext(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
+    dictionary_encoding: bool,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
@@ -238,6 +239,7 @@ pub async fn choose_index_ext(
         chosen_indices: &indices,
         next_index: 0,
         enable_topk,
+        dictionary_encoding,
         can_pushdown_limit: true,
         cluster_send_next_id: 1,
     };
@@ -831,6 +833,7 @@ struct ChooseIndex<'a> {
     next_index: usize,
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
+    dictionary_encoding: bool,
     can_pushdown_limit: bool,
     cluster_send_next_id: usize,
 }
@@ -1057,6 +1060,7 @@ impl ChooseIndex<'_> {
                             HashMap::new(),
                             Vec::new(),
                             NoopParquetMetadataCache::new(),
+                            self.dictionary_encoding,
                         )?)));
 
                         let index_schema = source.schema();
@@ -1143,19 +1147,22 @@ impl ChooseIndex<'_> {
             return None;
         }
         let limit = ctx.limit?;
-        let sort = ctx.sort.as_ref().filter(|s| !s.is_empty())?;
         let group_by = ctx.group_by.as_ref().filter(|g| !g.is_empty())?;
 
-        // Every ORDER BY column must be a group-by column; map it to its group-key position.
+        // Every ORDER BY column must be a group-by column; map it to its group-key position. A bare
+        // LIMIT (no ORDER BY) leaves the prefix empty, so the total order is the full group key in
+        // group-by order -- "any n groups" becomes "the n smallest by group key", still valid.
         let mut cols: Vec<(usize, bool, bool)> = Vec::with_capacity(group_by.len());
         let mut used = vec![false; group_by.len()];
-        for name in sort {
-            let idx = group_by.iter().position(|g| g == name)?;
-            if used[idx] {
-                continue;
+        if let Some(sort) = ctx.sort.as_ref().filter(|s| !s.is_empty()) {
+            for name in sort {
+                let idx = group_by.iter().position(|g| g == name)?;
+                if used[idx] {
+                    continue;
+                }
+                used[idx] = true;
+                cols.push((idx, ctx.sort_is_asc, !ctx.sort_is_asc));
             }
-            used[idx] = true;
-            cols.push((idx, ctx.sort_is_asc, !ctx.sort_is_asc));
         }
         // Extend with the remaining group keys to make it a total order on the full group key.
         for (idx, is_used) in used.iter().enumerate() {
@@ -1839,6 +1846,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             }
             let mut union_snapshots = Vec::new();
             let mut limits = Vec::new();
+            let mut worker_sort_and_limits = Vec::new();
             let mut id = 0;
             for i in inputs.into_iter() {
                 let send;
@@ -1854,6 +1862,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 }
                 union_snapshots.extend(send.snapshots.concat());
                 limits.push(send.limit_and_reverse);
+                worker_sort_and_limits.push(send.worker_sort_and_limit.clone());
                 *i = send.input.clone();
             }
             let limit = if limits.is_empty() || limits.iter().any(|l| l.is_none()) {
@@ -1863,8 +1872,23 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             } else {
                 limits[0]
             };
+            // The same group-by/limit context descends to every UNION branch, so the per-branch
+            // descriptors are identical and stay valid over the union (same schema, group columns by
+            // position). Keep it only when all branches agree; otherwise drop the pushdown.
+            let worker_sort_and_limit = if worker_sort_and_limits.is_empty()
+                || worker_sort_and_limits.iter().any(|w| w.is_none())
+                || worker_sort_and_limits
+                    .iter()
+                    .any(|w| w != &worker_sort_and_limits[0])
+            {
+                None
+            } else {
+                worker_sort_and_limits[0].clone()
+            };
             snapshots = vec![union_snapshots];
-            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
+            let mut new_send = ClusterSendNode::new(id, Arc::new(p), snapshots, limit);
+            new_send.worker_sort_and_limit = worker_sort_and_limit;
+            return Ok(new_send.into_plan());
         }
         LogicalPlan::Join(Join { left, right, .. }) => {
             let lsend;

@@ -1,4 +1,5 @@
-use datafusion::arrow::array::ArrayBuilder;
+use datafusion::arrow::array::{ArrayBuilder, StringDictionaryBuilder};
+use datafusion::arrow::datatypes::{DataType, Int32Type};
 use datafusion::error::DataFusionError;
 use datafusion::scalar::ScalarValue;
 
@@ -50,8 +51,42 @@ macro_rules! cube_match_scalar {
     }};
 }
 
+/// Dictionary group keys (CubeStore dictionary encoding produces `Dictionary(Int32, Utf8)`) are not
+/// handled by [cube_match_scalar], which works on plain scalar variants. Build/append into a string
+/// dictionary builder so the top-k result columns keep the dictionary type of the schema.
+fn create_dictionary_builder(key_type: &DataType, value: &ScalarValue) -> Box<dyn ArrayBuilder> {
+    match (key_type, value) {
+        (DataType::Int32, ScalarValue::Utf8(_)) => {
+            Box::new(StringDictionaryBuilder::<Int32Type>::new())
+        }
+        _ => panic!(
+            "Unhandled dictionary topk type: key={:?} value={:?}",
+            key_type, value
+        ),
+    }
+}
+
+fn append_dictionary_value(
+    b: &mut dyn ArrayBuilder,
+    value: &ScalarValue,
+) -> Result<(), DataFusionError> {
+    let b = b
+        .as_any_mut()
+        .downcast_mut::<StringDictionaryBuilder<Int32Type>>()
+        .expect("expected StringDictionaryBuilder<Int32Type>");
+    match value {
+        ScalarValue::Utf8(None) => b.append_null(),
+        ScalarValue::Utf8(Some(v)) => b.append_value(v),
+        other => panic!("Unhandled dictionary topk value: {:?}", other),
+    }
+    Ok(())
+}
+
 #[allow(unused_variables)]
 pub fn create_builder(s: &ScalarValue) -> Box<dyn ArrayBuilder> {
+    if let ScalarValue::Dictionary(key_type, value) = s {
+        return create_dictionary_builder(key_type, value);
+    }
     macro_rules! create_list_builder {
         ($v: expr, $inner_data_type: expr, ListBuilder $(, $rest: tt)*) => {{
             panic!("nested lists not supported")
@@ -84,6 +119,9 @@ pub(crate) fn append_value(
     b: &mut dyn ArrayBuilder,
     v: &ScalarValue,
 ) -> Result<(), DataFusionError> {
+    if let ScalarValue::Dictionary(_key_type, value) = v {
+        return append_dictionary_value(b, value);
+    }
     let b = b.as_any_mut();
     macro_rules! append_list_value {
         ($list: expr, $dummy: expr, $inner_data_type: expr, ListBuilder $(, $rest: tt)*) => {{

@@ -6487,7 +6487,9 @@ mod tests {
                                     }
                                 }
 
-                                // Test 4: ORDER BY 1 DESC with LIMIT on non-prefix column
+                                // Test 4: ORDER BY DESC + LIMIT on a non-prefix column, grouped by a
+                                // non-prefix column (hash aggregate). The hash path bounds the worker
+                                // output with the trimming aggregate, not a Sort.
                                 {
                                     let result = service
                                         .exec_query(
@@ -6504,8 +6506,9 @@ mod tests {
                                         _ => panic!("expected string"),
                                     };
                                     assert!(
-                                        worker_plan.contains("Sort, fetch: 2"),
-                                        "Worker should have Sort with fetch=2 for DESC. Plan: {}",
+                                        worker_plan.contains("GroupByLimitAggregate"),
+                                        "Hash-aggregate worker should bound output with \
+                                         GroupByLimitAggregate. Plan: {}",
                                         worker_plan
                                     );
                                 }

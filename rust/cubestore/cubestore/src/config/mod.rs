@@ -585,6 +585,14 @@ pub trait ConfigObj: DIService {
     /// streaming split never drops rows (the first child is the low catch-all, the last
     /// the high one), and the legacy per-chunk path performed no such metadata check.
     fn repartition_check_overlapping_children(&self) -> bool;
+    /// Master gate for string dictionary-encoding work: reading string columns as
+    /// `DictionaryArray` and the dictionary-aware inline aggregate paths. Off by default while
+    /// the feature is built up incrementally behind this flag.
+    fn dictionary_encoding_enabled(&self) -> bool;
+    /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
+    /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
+    /// `k = limit + offset`. `0` disables the optimization.
+    fn group_by_limit_factor(&self) -> usize;
 
     fn allow_decimal128(&self) -> bool;
 
@@ -745,6 +753,8 @@ pub struct ConfigObjImpl {
     pub repartition_merge_max_input_files: usize,
     pub repartition_merge_max_rows: u64,
     pub repartition_check_overlapping_children: bool,
+    pub dictionary_encoding_enabled: bool,
+    pub group_by_limit_factor: usize,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1085,6 +1095,13 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn repartition_check_overlapping_children(&self) -> bool {
         self.repartition_check_overlapping_children
+    }
+    fn dictionary_encoding_enabled(&self) -> bool {
+        self.dictionary_encoding_enabled
+    }
+
+    fn group_by_limit_factor(&self) -> usize {
+        self.group_by_limit_factor
     }
 
     fn allow_decimal128(&self) -> bool {
@@ -1783,6 +1800,11 @@ impl Config {
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
+                dictionary_encoding_enabled: env_bool("CUBESTORE_DICTIONARY_ENCODING", false),
+                group_by_limit_factor: env_parse(
+                    "CUBESTORE_GROUP_BY_LIMIT_FACTOR",
+                    0,
+                ),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -2039,6 +2061,8 @@ impl Config {
                 repartition_merge_max_input_files: 50,
                 repartition_merge_max_rows: 4_000_000,
                 repartition_check_overlapping_children: false,
+                dictionary_encoding_enabled: false,
+                group_by_limit_factor: 2,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2734,10 +2758,6 @@ impl Config {
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
-                let push_partial_aggregate_below_merge = i
-                    .get_service_typed::<dyn ConfigObj>()
-                    .await
-                    .push_partial_aggregate_below_merge_enabled();
                 QueryExecutorImpl::new(
                     i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
                         .await
@@ -2745,7 +2765,7 @@ impl Config {
                         .clone(),
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    push_partial_aggregate_below_merge,
+                    i.get_service_typed::<dyn ConfigObj>().await,
                 )
             })
             .await;

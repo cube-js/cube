@@ -22,9 +22,10 @@ use datafusion::physical_plan::aggregates::group_values::multi_group_by::{
 use datafusion::physical_plan::aggregates::group_values::GroupValues;
 
 use crate::queryplanner::inline_aggregate::column_comparator::ColumnComparator;
+use crate::queryplanner::inline_aggregate::dictionary_group_column::new_dictionary_group_column;
 use crate::{
     instantiate_byte_array_comparator, instantiate_byte_view_comparator,
-    instantiate_primitive_comparator,
+    instantiate_dictionary_comparator, instantiate_primitive_comparator,
 };
 
 pub struct SortedGroupValues {
@@ -319,6 +320,52 @@ impl GroupValues for SortedGroupValues {
                         v.push(Box::new(b) as _);
                         instantiate_byte_view_comparator!(comparators, nullable, BinaryViewType);
                     }
+                    &DataType::Dictionary(ref key_type, ref value_type) => {
+                        v.push(new_dictionary_group_column(key_type, value_type)?);
+                        match key_type.as_ref() {
+                            DataType::Int8 => {
+                                instantiate_dictionary_comparator!(comparators, nullable, Int8Type)
+                            }
+                            DataType::Int16 => {
+                                instantiate_dictionary_comparator!(comparators, nullable, Int16Type)
+                            }
+                            DataType::Int32 => {
+                                instantiate_dictionary_comparator!(comparators, nullable, Int32Type)
+                            }
+                            DataType::Int64 => {
+                                instantiate_dictionary_comparator!(comparators, nullable, Int64Type)
+                            }
+                            DataType::UInt8 => {
+                                instantiate_dictionary_comparator!(comparators, nullable, UInt8Type)
+                            }
+                            DataType::UInt16 => {
+                                instantiate_dictionary_comparator!(
+                                    comparators,
+                                    nullable,
+                                    UInt16Type
+                                )
+                            }
+                            DataType::UInt32 => {
+                                instantiate_dictionary_comparator!(
+                                    comparators,
+                                    nullable,
+                                    UInt32Type
+                                )
+                            }
+                            DataType::UInt64 => {
+                                instantiate_dictionary_comparator!(
+                                    comparators,
+                                    nullable,
+                                    UInt64Type
+                                )
+                            }
+                            dt => {
+                                return not_impl_err!(
+                                    "dictionary key type {dt} not supported in SortedGroupValues"
+                                )
+                            }
+                        }
+                    }
                     dt => return not_impl_err!("{dt} not supported in SortedGroupValues"),
                 }
             }
@@ -388,5 +435,189 @@ impl GroupValues for SortedGroupValues {
         self.comparators.clear();
         self.rows_inds.clear();
         self.equal_to_results.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::arrow::array::{Int32Array, StringArray};
+    use datafusion::arrow::datatypes::{Field, Schema};
+    use std::sync::Arc;
+
+    fn dict_schema(nullable: bool) -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new(
+            "g",
+            DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
+            nullable,
+        )]))
+    }
+
+    fn decode(dict: &ArrayRef) -> Vec<Option<String>> {
+        let dict = dict
+            .as_any()
+            .downcast_ref::<datafusion::arrow::array::DictionaryArray<Int32Type>>()
+            .unwrap();
+        let values = dict
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        (0..dict.len())
+            .map(|i| {
+                if dict.is_null(i) {
+                    None
+                } else {
+                    Some(values.value(dict.keys().value(i) as usize).to_string())
+                }
+            })
+            .collect()
+    }
+
+    /// Groups must continue across a batch boundary even when the two batches carry different
+    /// local dictionaries (the same string is encoded with different keys per batch).
+    #[test]
+    fn sorted_group_values_dictionary_cross_batch() {
+        let mut gv = SortedGroupValues::try_new(dict_schema(false)).unwrap();
+
+        // Batch 1: a, a, b  (values [a,b], keys [0,0,1])
+        let b1 = datafusion::arrow::array::DictionaryArray::<Int32Type>::new(
+            Int32Array::from(vec![0, 0, 1]),
+            Arc::new(StringArray::from(vec!["a", "b"])),
+        );
+        let mut groups = vec![];
+        gv.intern(&[Arc::new(b1) as ArrayRef], &mut groups).unwrap();
+        assert_eq!(groups, vec![0, 0, 1]);
+
+        // Batch 2: b, c  with a DIFFERENT local dictionary (values [b,c], keys [0,1]).
+        let b2 = datafusion::arrow::array::DictionaryArray::<Int32Type>::new(
+            Int32Array::from(vec![0, 1]),
+            Arc::new(StringArray::from(vec!["b", "c"])),
+        );
+        gv.intern(&[Arc::new(b2) as ArrayRef], &mut groups).unwrap();
+        // "b" continues the last group (idx 1), "c" opens group 2.
+        assert_eq!(groups, vec![1, 2]);
+
+        assert_eq!(gv.len(), 3);
+        let out = gv.emit(EmitTo::All).unwrap();
+        assert_eq!(
+            decode(&out[0]),
+            vec![
+                Some("a".to_string()),
+                Some("b".to_string()),
+                Some("c".to_string())
+            ]
+        );
+    }
+
+    /// Isolated timing: dictionary vs Utf8 group keys over a sorted 10-column stream.
+    /// Run with: cargo test -p cubestore --lib sorted_group_values_dict_vs_utf8_bench -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn sorted_group_values_dict_vs_utf8_bench() {
+        use std::time::Instant;
+        const NCOLS: usize = 10;
+        const ROWS: usize = 2_000_000;
+        const BATCH: usize = 8192;
+        const ROWS_PER_GROUP: usize = 20; // ~100k groups, low per-column cardinality
+
+        // tuple value for column j of group g, c0 most significant -> stream is sorted ascending
+        let val = |g: usize, j: usize| -> String {
+            let digit = (g / 4usize.pow((NCOLS - 1 - j) as u32)) % 4;
+            format!("c{j}_{digit}")
+        };
+
+        // Build Utf8 batches and Dictionary batches for the same sorted data.
+        let mut utf8_batches: Vec<Vec<ArrayRef>> = vec![];
+        let mut dict_batches: Vec<Vec<ArrayRef>> = vec![];
+        let mut row = 0usize;
+        while row < ROWS {
+            let n = BATCH.min(ROWS - row);
+            let mut utf8_cols: Vec<ArrayRef> = Vec::with_capacity(NCOLS);
+            let mut dict_cols: Vec<ArrayRef> = Vec::with_capacity(NCOLS);
+            for j in 0..NCOLS {
+                let vals: Vec<String> =
+                    (0..n).map(|i| val((row + i) / ROWS_PER_GROUP, j)).collect();
+                let strs: Vec<&str> = vals.iter().map(|s| s.as_str()).collect();
+                utf8_cols.push(Arc::new(StringArray::from(strs.clone())) as ArrayRef);
+                let dict: datafusion::arrow::array::DictionaryArray<Int32Type> =
+                    strs.into_iter().collect();
+                dict_cols.push(Arc::new(dict) as ArrayRef);
+            }
+            utf8_batches.push(utf8_cols);
+            dict_batches.push(dict_cols);
+            row += n;
+        }
+
+        let utf8_schema = Arc::new(Schema::new(
+            (0..NCOLS)
+                .map(|j| Field::new(format!("c{j}"), DataType::Utf8, false))
+                .collect::<Vec<_>>(),
+        ));
+        let dict_schema = Arc::new(Schema::new(
+            (0..NCOLS)
+                .map(|j| {
+                    Field::new(
+                        format!("c{j}"),
+                        DataType::Dictionary(Box::new(DataType::Int32), Box::new(DataType::Utf8)),
+                        false,
+                    )
+                })
+                .collect::<Vec<_>>(),
+        ));
+
+        let run = |schema: SchemaRef, batches: &Vec<Vec<ArrayRef>>| -> (u128, usize) {
+            let mut gv = SortedGroupValues::try_new(schema).unwrap();
+            let mut groups = vec![];
+            let t0 = Instant::now();
+            for cols in batches {
+                gv.intern(cols, &mut groups).unwrap();
+            }
+            (t0.elapsed().as_micros(), gv.len())
+        };
+
+        // warm + measure (best of 3)
+        let mut utf8_us = u128::MAX;
+        let mut dict_us = u128::MAX;
+        let mut ngroups = 0;
+        for _ in 0..3 {
+            let (u, gu) = run(utf8_schema.clone(), &utf8_batches);
+            let (d, gd) = run(dict_schema.clone(), &dict_batches);
+            assert_eq!(gu, gd, "group counts must match");
+            ngroups = gu;
+            utf8_us = utf8_us.min(u);
+            dict_us = dict_us.min(d);
+        }
+        println!(
+            "intern over {ROWS} rows x {NCOLS} cols, {ngroups} groups:\n  Utf8: {:.1} ms\n  Dict: {:.1} ms\n  speedup: {:.2}x",
+            utf8_us as f64 / 1000.0,
+            dict_us as f64 / 1000.0,
+            utf8_us as f64 / dict_us as f64,
+        );
+    }
+
+    /// Null keys form their own group and continue across batches.
+    #[test]
+    fn sorted_group_values_dictionary_nulls() {
+        let mut gv = SortedGroupValues::try_new(dict_schema(true)).unwrap();
+
+        // rows: null, null, a
+        let b1: datafusion::arrow::array::DictionaryArray<Int32Type> =
+            vec![None, None, Some("a")].into_iter().collect();
+        let mut groups = vec![];
+        gv.intern(&[Arc::new(b1) as ArrayRef], &mut groups).unwrap();
+        assert_eq!(groups, vec![0, 0, 1]);
+
+        // rows: a, b -> "a" continues group 1, "b" new
+        let b2: datafusion::arrow::array::DictionaryArray<Int32Type> =
+            vec![Some("a"), Some("b")].into_iter().collect();
+        gv.intern(&[Arc::new(b2) as ArrayRef], &mut groups).unwrap();
+        assert_eq!(groups, vec![1, 2]);
+
+        let out = gv.emit(EmitTo::All).unwrap();
+        assert_eq!(
+            decode(&out[0]),
+            vec![None, Some("a".to_string()), Some("b".to_string())]
+        );
     }
 }

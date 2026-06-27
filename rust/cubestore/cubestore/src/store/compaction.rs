@@ -2786,6 +2786,247 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn dictionary_encoding_native_read_group_by() {
+        Config::test("dictionary_encoding_native_read_group_by")
+            .update_config(|mut c| {
+                c.dictionary_encoding_enabled = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("CREATE SCHEMA d")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // A string group key alongside Timestamp and Decimal columns: with dictionary encoding
+                // the parquet reader is handed the dictionary schema, whose strict per-field check must
+                // accept every column type (not just the dictionary one).
+                service
+                    .exec_query("CREATE TABLE d.t (s text, ts timestamp, dec decimal(10,2), n int)")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                service
+                    .exec_query(
+                        "INSERT INTO d.t (s, ts, dec, n) VALUES \
+                         ('b', '2020-01-01T00:00:00.000Z', 1.50, 10), \
+                         ('a', '2020-01-02T00:00:00.000Z', 2.50, 5), \
+                         ('b', '2020-01-03T00:00:00.000Z', 3.50, 7), \
+                         ('c', '2020-01-04T00:00:00.000Z', 4.50, 1), \
+                         ('a', '2020-01-05T00:00:00.000Z', 2.00, 2)",
+                    )
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // Persist the in-memory chunk into the partition's parquet main table so the scan goes
+                // through the native dictionary reader rather than the in-memory chunk.
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 1);
+                assert_eq!(partitions[0].get_row().main_table_row_count(), 5);
+
+                let result = service
+                    .exec_query("SELECT s, sum(n) FROM d.t GROUP BY 1 ORDER BY 1")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("a".to_string()),
+                            TableValue::Int(7)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("b".to_string()),
+                            TableValue::Int(17)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("c".to_string()),
+                            TableValue::Int(1)
+                        ]),
+                    ]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn dictionary_encoding_topk_by_aggregate() {
+        // ORDER BY <aggregate> DESC LIMIT goes through the ClusterAggregateTopK path, whose scalar
+        // helpers (cube_match_scalar) had no dictionary arm and panicked when the group key was
+        // dictionary-encoded. The top-k result must materialize the dictionary group key correctly.
+        Config::test("dictionary_encoding_topk_by_aggregate")
+            .update_config(|mut c| {
+                c.dictionary_encoding_enabled = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("CREATE SCHEMA d")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                service
+                    .exec_query("CREATE TABLE d.t (s text, n int)")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // Includes a NULL group key landing in the top-k, to exercise the dictionary
+                // builder's null path in the result.
+                service
+                    .exec_query(
+                        "INSERT INTO d.t (s, n) VALUES \
+                         ('a', 5), ('b', 10), ('b', 7), ('c', 1), ('a', 2), ('d', 100), (NULL, 50)",
+                    )
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
+
+                // groups: a=7, b=17, c=1, d=100, NULL=50 -> top 3 by sum desc: d=100, NULL=50, b=17
+                let result = service
+                    .exec_query("SELECT s, sum(n) FROM d.t GROUP BY 1 ORDER BY 2 DESC LIMIT 3")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("d".to_string()),
+                            TableValue::Int(100)
+                        ]),
+                        Row::new(vec![TableValue::Null, TableValue::Int(50)]),
+                        Row::new(vec![
+                            TableValue::String("b".to_string()),
+                            TableValue::Int(17)
+                        ]),
+                    ]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn dictionary_encoding_in_memory_group_by() {
+        Config::test("dictionary_encoding_in_memory_group_by")
+            .update_config(|mut c| {
+                c.dictionary_encoding_enabled = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service
+                    .exec_query("CREATE SCHEMA d")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // A unique-key table routes inserts through the streaming in-memory chunk path, so
+                // the scan reads them via the memory source (not parquet). `s` is a non-key string
+                // dimension we group by.
+                service
+                    .exec_query("CREATE TABLE d.t (id int, s text, n int) unique key (id)")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                service
+                    .exec_query(
+                        "INSERT INTO d.t (id, s, n, __seq) VALUES \
+                         (1, 'b', 10, 1), (2, 'a', 5, 2), (3, 'b', 7, 3), \
+                         (4, 'c', 1, 4), (5, 'a', 2, 5)",
+                    )
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                // No compaction: the data stays in an in-memory chunk (Utf8), while the dictionary
+                // index schema exposes `s` as Dictionary. The memory scan must cast it instead of
+                // rejecting the mismatch.
+                let chunks = services
+                    .meta_store
+                    .get_chunks_by_partition(1, false)
+                    .await
+                    .unwrap();
+                assert!(
+                    !chunks.is_empty() && chunks.iter().all(|c| c.get_row().in_memory()),
+                    "expected in-memory chunks, got: {:?}",
+                    chunks
+                );
+
+                let result = service
+                    .exec_query("SELECT s, sum(n) FROM d.t GROUP BY 1 ORDER BY 1")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("a".to_string()),
+                            TableValue::Int(7)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("b".to_string()),
+                            TableValue::Int(17)
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("c".to_string()),
+                            TableValue::Int(1)
+                        ]),
+                    ]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn compaction_wide_string_batches() {
         // Each chunk is read as a single sorted run whose batches keep their on-disk row-group
         // size (larger than the merge output batch size). Feed chunks whose batches exceed the
