@@ -139,9 +139,10 @@
   },
   "skip": [
     "---------------------------------------",
-    "SKIPPED FOR ORACLE (driver download/stream not implemented)",
+    "SKIPPED FOR ORACLE (streaming download not implemented)",
+    "downloadQueryResults ignores streamImport and always returns rows in memory,",
+    "so the stream test never gets a rowStream. The memory path IS implemented and tested.",
     "---------------------------------------",
-    "must download query from the data source via memory",
     "must download query from the data source via stream",
 
     "---------------------------------------",
