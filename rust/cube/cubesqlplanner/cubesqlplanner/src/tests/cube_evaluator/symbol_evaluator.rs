@@ -308,11 +308,6 @@ fn masked_aggregate_measure_with_filter_in_group_by_renders_conditional_case_whe
     use crate::cube_bridge::base_query_options::{FilterItem, FilterValue, MaskedMemberItem};
 
     let schema = MockSchema::from_yaml_file("symbol_evaluator/masking_test.yaml");
-    // Regression for "render dimension mask filters on grouped masked measures":
-    // sum_revenue is masked with a row-level filter on the dimension public_dim, and
-    // public_dim IS in the GROUP BY. The mask filter (a dimension reference) must be
-    // rendered through the dimension chain. Before the fix it was rendered through the
-    // measure chain and crashed with "Measure filter node processor called for wrong node".
     let context = TestContext::new_with_masked_member_items(
         schema,
         vec![MaskedMemberItem {

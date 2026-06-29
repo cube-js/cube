@@ -2274,10 +2274,6 @@ cubes:
         }],
         useNativeSqlPlanner: true,
       });
-      // Regression for "render dimension mask filters on grouped masked measures":
-      // the mask filter references owner_id, a dimension that is in the GROUP BY. The
-      // native planner must route it through the dimension chain instead of the measure
-      // chain — previously this threw "Measure filter node processor called for wrong node".
       const [sql] = query.buildSqlAndParams();
       expect(sql).toMatch(/CASE\s+WHEN/);
       expect(sql).toMatch(/owner_id/);
