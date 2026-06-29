@@ -3,7 +3,6 @@ use crate::cube_bridge::pre_aggregation_description::{
     PreAggregationDescription, PreAggregationDescriptionStatic,
 };
 use crate::cube_bridge::pre_aggregation_time_dimension::PreAggregationTimeDimension;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::mock_pre_aggregation_time_dimension::MockPreAggregationTimeDimension;
 use cubenativeutils::CubeError;
 use std::any::Any;

@@ -1,6 +1,5 @@
 use crate::cube_bridge::case_switch_item::{CaseSwitchItem, CaseSwitchItemStatic};
 use crate::cube_bridge::member_sql::MemberSql;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::MockMemberSql;
 use cubenativeutils::CubeError;
 use std::any::Any;

@@ -517,10 +517,7 @@ impl PreAggregationOptimizer {
         // Even when the query itself has no multiplied measures, a measure that
         // is multiplied in the pre-aggregation (because the pre-agg groups by a
         // multiplier dimension) stores a different value than the query expects,
-        // so the pre-aggregation can't serve it. This mirrors the leaf-measure
-        // additive check in the JS planner, which only applies when the query has
-        // no multiplied and no multi-stage measures: a multiplying filter (or a
-        // multi-stage measure) makes the multiplied pre-agg a legitimate match.
+        // so the pre-aggregation can't serve it.
         let pre_aggr_multiplied = pre_aggregation
             .multi_fact_join_groups
             .multiplied_measures()?;

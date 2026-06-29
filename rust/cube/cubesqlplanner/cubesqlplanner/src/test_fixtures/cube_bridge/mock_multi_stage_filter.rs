@@ -2,7 +2,6 @@ use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::cube_bridge::multi_stage_filter::{
     MultiStageFilterReferences, MultiStageFilterReferencesStatic,
 };
-use crate::impl_static_data;
 use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
