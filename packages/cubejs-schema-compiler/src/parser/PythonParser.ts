@@ -258,15 +258,10 @@ export class PythonParser {
           if (children.length === 1) {
             return children[0];
           }
-
-          const comparisons: t.BinaryExpression[] = [];
-          for (let i = 1; i < children.length; i += 2) {
-            comparisons.push(t.binaryExpression(children[i], children[i - 1], children[i + 1]));
+          if (children.length !== 3) {
+            throw new UserError('Chained Python comparisons are not supported');
           }
-          return comparisons.slice(1).reduce<t.Expression>(
-            (left, right) => t.logicalExpression('&&', left, right),
-            comparisons[0]
-          );
+          return t.binaryExpression(children[1], children[0], children[2]);
         } else if (node instanceof ArglistContext) {
           return children;
         } else {
