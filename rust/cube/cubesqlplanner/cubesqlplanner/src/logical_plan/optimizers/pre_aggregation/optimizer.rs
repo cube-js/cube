@@ -524,32 +524,38 @@ impl PreAggregationOptimizer {
         let pre_aggr_multiplied = pre_aggregation
             .multi_fact_join_groups
             .multiplied_measures()?;
-        if !pre_aggr_multiplied.is_empty() {
-            // Account for multiplying joins introduced by filters/segments — like
-            // the JS planner's `hasMultipliedMeasures`, this is filter-aware.
-            let query_groups_with_filters = MultiFactJoinGroups::try_new(
-                self.query_tools.clone(),
-                MeasuresJoinHints::builder(&JoinHints::new())
-                    .add_dimensions(&schema.dimensions)
-                    .add_dimensions(&schema.time_dimensions)
-                    .add_filters(&filters.dimensions_filters)
-                    .add_filters(&filters.time_dimensions_filters)
-                    .add_filters(&filters.segments)
-                    .build(&all_measures)?,
-            )?;
+        if matched_measures
+            .iter()
+            .any(|m| pre_aggr_multiplied.contains(m))
+        {
             let query_has_multi_stage =
                 all_measures
                     .iter()
                     .try_fold(false, |acc, m| -> Result<bool, CubeError> {
                         Ok(acc || has_multi_stage_members(m, false)?)
                     })?;
-            if !query_groups_with_filters.has_multiplied_measures()?
-                && !query_has_multi_stage
-                && matched_measures
-                    .iter()
-                    .any(|m| pre_aggr_multiplied.contains(m))
-            {
-                return Ok(None);
+            if !query_has_multi_stage {
+                let has_filters = !filters.dimensions_filters.is_empty()
+                    || !filters.time_dimensions_filters.is_empty()
+                    || !filters.segments.is_empty();
+                let query_has_multiplied = if has_filters {
+                    MultiFactJoinGroups::try_new(
+                        self.query_tools.clone(),
+                        MeasuresJoinHints::builder(&JoinHints::new())
+                            .add_dimensions(&schema.dimensions)
+                            .add_dimensions(&schema.time_dimensions)
+                            .add_filters(&filters.dimensions_filters)
+                            .add_filters(&filters.time_dimensions_filters)
+                            .add_filters(&filters.segments)
+                            .build(&all_measures)?,
+                    )?
+                    .has_multiplied_measures()?
+                } else {
+                    query_groups.has_multiplied_measures()?
+                };
+                if !query_has_multiplied {
+                    return Ok(None);
+                }
             }
         }
 
