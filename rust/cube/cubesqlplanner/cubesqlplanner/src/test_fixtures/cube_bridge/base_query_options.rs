@@ -5,21 +5,18 @@ use std::rc::Rc;
 use cubenativeutils::CubeError;
 use typed_builder::TypedBuilder;
 
-use crate::{
-    cube_bridge::{
-        base_query_options::{
-            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, FilterValue, MaskedMemberItem,
-            OrderByItem, TimeDimension,
-        },
-        base_tools::BaseTools,
-        evaluator::CubeEvaluator,
-        join_graph::JoinGraph,
-        join_hints::JoinHintItem,
-        options_member::OptionsMember,
-        security_context::SecurityContext,
-        subquery_join::SubqueryJoin,
+use crate::cube_bridge::{
+    base_query_options::{
+        BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, FilterValue, MaskedMemberItem,
+        OrderByItem, TimeDimension,
     },
-    impl_static_data,
+    base_tools::BaseTools,
+    evaluator::CubeEvaluator,
+    join_graph::JoinGraph,
+    join_hints::JoinHintItem,
+    options_member::OptionsMember,
+    security_context::SecurityContext,
+    subquery_join::SubqueryJoin,
 };
 
 /// Mock implementation of BaseQueryOptions for testing

@@ -11,7 +11,7 @@ use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// A single measure paired with the complete set of join hints it
@@ -284,6 +284,25 @@ impl MultiFactJoinGroups {
         Ok(false)
     }
 
+    /// Full names of the (leaf) measures that are multiplied — i.e. sit below a
+    /// one-to-many join — in these join groups. Like `has_multiplied_measures`,
+    /// but returns the concrete measures so callers can compare the
+    /// multiplicativity of a measure between two different groupings (e.g. the
+    /// query vs a pre-aggregation).
+    pub fn multiplied_measures(&self) -> Result<HashSet<String>, CubeError> {
+        let mut result = HashSet::new();
+        for (join, measures) in self.groups.iter() {
+            for measure in measures.iter() {
+                for item in collect_multiplied_measures(measure, join)? {
+                    if item.multiplied {
+                        result.insert(item.measure.full_name());
+                    }
+                }
+            }
+        }
+        Ok(result)
+    }
+
     pub fn groups(&self) -> &[(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)] {
         &self.groups
     }
@@ -445,6 +464,78 @@ mod tests {
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
         assert!(!groups.has_multiplied_measures().unwrap());
+    }
+
+    #[test]
+    fn test_multiplied_measures_one_side_measure() -> Result<(), CubeError> {
+        // `customers` is the `one` side of a one_to_many join to `orders`.
+        // Grouping `customers.count` by an `orders` dimension multiplies it,
+        // so its full name is returned.
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema)?;
+
+        let customers_count = ctx.create_symbol("customers.count")?;
+        let orders_status = ctx.create_symbol("orders.status")?;
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[orders_status])
+            .build(&[customers_count])?;
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints)?;
+
+        assert_eq!(
+            groups.multiplied_measures()?,
+            HashSet::from(["customers.count".to_string()])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_multiplied_measures_many_side_measure() -> Result<(), CubeError> {
+        // `orders` is the `many` side, so joining the `customers` dimension
+        // does not multiply order rows: `orders.count` is not multiplied and
+        // the set is empty.
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema)?;
+
+        let orders_count = ctx.create_symbol("orders.count")?;
+        let customers_name = ctx.create_symbol("customers.name")?;
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[customers_name])
+            .build(&[orders_count])?;
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints)?;
+
+        assert!(groups.multiplied_measures()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_multiplied_measures_multi_fact_mixed() -> Result<(), CubeError> {
+        // Multi-fact query grouped by an `orders` dimension: `customers.count`
+        // is multiplied (one side), `orders.count` is not (many side). Only the
+        // multiplied measure is returned — discriminating per-measure where the
+        // boolean `has_multiplied_measures()` cannot.
+        let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
+        let ctx = TestContext::new(schema)?;
+
+        let customers_count = ctx.create_symbol("customers.count")?;
+        let orders_count = ctx.create_symbol("orders.count")?;
+        let orders_status = ctx.create_symbol("orders.status")?;
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[orders_status])
+            .build(&[customers_count, orders_count])?;
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints)?;
+
+        assert!(groups.has_multiplied_measures()?);
+        assert_eq!(
+            groups.multiplied_measures()?,
+            HashSet::from(["customers.count".to_string()])
+        );
+        Ok(())
     }
 
     #[test]

@@ -2,6 +2,7 @@ use super::PreAggregationsCompiler;
 use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
+use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOp;
 use crate::planner::join_hints::JoinHints;
@@ -509,15 +510,57 @@ impl PreAggregationOptimizer {
             pre_aggregation,
             match_state == MatchState::Partial,
         )?;
-        if matched.is_none() {
+        let Some(matched_measures) = matched else {
             return Ok(None);
+        };
+
+        // Even when the query itself has no multiplied measures, a measure that
+        // is multiplied in the pre-aggregation (because the pre-agg groups by a
+        // multiplier dimension) stores a different value than the query expects,
+        // so the pre-aggregation can't serve it.
+        let pre_aggr_multiplied = pre_aggregation
+            .multi_fact_join_groups
+            .multiplied_measures()?;
+        if matched_measures
+            .iter()
+            .any(|m| pre_aggr_multiplied.contains(m))
+        {
+            let query_has_multi_stage =
+                all_measures
+                    .iter()
+                    .try_fold(false, |acc, m| -> Result<bool, CubeError> {
+                        Ok(acc || has_multi_stage_members(m, false)?)
+                    })?;
+            if !query_has_multi_stage {
+                let has_filters = !filters.dimensions_filters.is_empty()
+                    || !filters.time_dimensions_filters.is_empty()
+                    || !filters.segments.is_empty();
+                let query_has_multiplied = if has_filters {
+                    MultiFactJoinGroups::try_new(
+                        self.query_tools.clone(),
+                        MeasuresJoinHints::builder(&JoinHints::new())
+                            .add_dimensions(&schema.dimensions)
+                            .add_dimensions(&schema.time_dimensions)
+                            .add_filters(&filters.dimensions_filters)
+                            .add_filters(&filters.time_dimensions_filters)
+                            .add_filters(&filters.segments)
+                            .build(&all_measures)?,
+                    )?
+                    .has_multiplied_measures()?
+                } else {
+                    query_groups.has_multiplied_measures()?
+                };
+                if !query_has_multiplied {
+                    return Ok(None);
+                }
+            }
         }
 
         if !self.are_join_paths_matching(schema, &all_measures, &query_groups, pre_aggregation)? {
             return Ok(None);
         }
 
-        Ok(matched)
+        Ok(Some(matched_measures))
     }
 
     fn query_join_groups(

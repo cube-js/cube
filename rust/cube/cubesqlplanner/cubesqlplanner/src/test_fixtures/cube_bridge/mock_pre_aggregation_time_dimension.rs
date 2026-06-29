@@ -2,7 +2,6 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_time_dimension::{
     PreAggregationTimeDimension, PreAggregationTimeDimensionStatic,
 };
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::MockMemberSql;
 use cubenativeutils::CubeError;
 use std::any::Any;
