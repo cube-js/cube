@@ -337,6 +337,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "limit_pushdown_group_null_appended",
             limit_pushdown_group_null_appended,
         ),
+        t(
+            "limit_pushdown_group_null_order_first",
+            limit_pushdown_group_null_order_first,
+        ),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
         t(
             "limit_pushdown_group_where_order",
@@ -432,6 +436,7 @@ lazy_static::lazy_static! {
         "limit_pushdown_group_having",
         "limit_pushdown_group_nonprefix_order",
         "limit_pushdown_group_null_appended",
+        "limit_pushdown_group_null_order_first",
         "prefilter_chunks_shared_scan",
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
@@ -9398,6 +9403,51 @@ async fn limit_pushdown_group_null_appended(service: Box<dyn SqlClient>) -> Resu
             TableValue::Null,
             TableValue::Int(1110),
         ]]
+    );
+    Ok(())
+}
+
+/// Explicit `NULLS FIRST` on the ORDER BY column, contradicting the ASC default null placement. The
+/// NULL group must be the single smallest under the query's own order, so `LIMIT 1` must return it.
+/// `GROUP BY b` (b not the index prefix) routes through the hash trim path; the worker cut and the
+/// router select must both rank the NULL group first, or the worker trims it away and the query
+/// silently returns the wrong group. Pins that the total order honors the query's NULL placement
+/// rather than deriving it from the sort direction alone.
+async fn limit_pushdown_group_null_order_first(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.nf (a int, b int, val int) INDEX bidx (a, b)")
+        .await?;
+    // Three chunks; the NULL-b group appears in each (under a different `a`), so it spans all three
+    // and its sum must combine to 1110. Five distinct b groups so the trim engages (5 > factor*k).
+    service
+        .exec_query(
+            "INSERT INTO s.nf (a, b, val) VALUES \
+             (1, NULL, 10), (1, 2, 1), (1, 3, 1), (1, 4, 1), (1, 5, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nf (a, b, val) VALUES \
+             (2, NULL, 100), (2, 2, 1), (2, 3, 1), (2, 4, 1), (2, 5, 1)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.nf (a, b, val) VALUES \
+             (3, NULL, 1000), (3, 2, 1), (3, 3, 1), (3, 4, 1), (3, 5, 1)",
+        )
+        .await?;
+
+    // ASC NULLS FIRST: the NULL group ranks first, so LIMIT 1 must return it with its combined sum.
+    let r = service
+        .exec_query("SELECT b, sum(val) FROM s.nf GROUP BY b ORDER BY b ASC NULLS FIRST LIMIT 1")
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![vec![TableValue::Null, TableValue::Int(1110)]]
     );
     Ok(())
 }
