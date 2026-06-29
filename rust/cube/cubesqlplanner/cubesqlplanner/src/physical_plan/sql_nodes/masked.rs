@@ -23,7 +23,7 @@ pub struct MaskedSqlNode {
     // When true this node never applies masking and just delegates to `input`.
     // Used to build an "unmasked" copy of the whole processor tree that still
     // dispatches by member kind (see `unmasked_root`).
-    skip: bool,
+    skip_masking: bool,
     // A kind-dispatching processor (a full `RootSqlNode`-based tree built in
     // `skip` mode) used to render mask-filter member references. It routes a
     // dimension reference through the dimension chain and a measure reference
@@ -37,14 +37,14 @@ impl MaskedSqlNode {
     pub fn new(
         input: Rc<dyn SqlNode>,
         group_by_members: HashSet<String>,
-        skip: bool,
+        skip_masking: bool,
         unmasked_root: Option<Rc<dyn SqlNode>>,
     ) -> Rc<Self> {
         Rc::new(Self {
             input,
             ungrouped: false,
             group_by_members,
-            skip,
+            skip_masking,
             unmasked_root,
         })
     }
@@ -52,14 +52,14 @@ impl MaskedSqlNode {
     pub fn new_ungrouped(
         input: Rc<dyn SqlNode>,
         group_by_members: HashSet<String>,
-        skip: bool,
+        skip_masking: bool,
         unmasked_root: Option<Rc<dyn SqlNode>>,
     ) -> Rc<Self> {
         Rc::new(Self {
             input,
             ungrouped: true,
             group_by_members,
-            skip,
+            skip_masking,
             unmasked_root,
         })
     }
@@ -170,7 +170,7 @@ impl SqlNode for MaskedSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if !self.skip {
+        if !self.skip_masking {
             if let Some(masked) = self.resolve_mask(
                 node,
                 visitor,
