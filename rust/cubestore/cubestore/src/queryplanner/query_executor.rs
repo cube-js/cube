@@ -608,7 +608,6 @@ impl QueryExecutorImpl {
             // Cube rules
             Arc::new(PreOptimizeRule::new(
                 self.config.push_partial_aggregate_below_merge_enabled(),
-                self.config.group_by_limit_factor(),
                 self.config.coalesce_under_hash_aggregate(),
             )),
             // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.

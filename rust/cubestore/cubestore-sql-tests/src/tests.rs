@@ -3341,8 +3341,7 @@ async fn planning_topk_hash_aggregate(service: Box<dyn SqlClient>) -> Result<(),
 
     // Bare LIMIT (no ORDER BY) on a non-indexed group column: the limit can't ride the index, so the
     // worker still trims to the smallest groups by the full group key -- "any k" made deterministic.
-    // The appended group column uses ascending nulls-first, matching the rewriter's appended-column
-    // order (`SortOptions::default()`) so the worker cut and the router select agree.
+    // The full group key is the total order, all columns ascending nulls-first.
     let p = service
         .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1 LIMIT 10")
         .await?;

@@ -215,8 +215,8 @@ impl ExecutionPlan for GroupByLimitAggregateExec {
     fn statistics(&self) -> DFResult<Statistics> {
         // The trim keeps at most `factor * k` groups per output partition, so the output is bounded
         // by that and by the input row count. Report it (inexact) instead of Absent, which makes
-        // downstream planners bail. `factor` is always > 0 here (the rewriter only builds this exec
-        // when trimming is enabled), but guard anyway.
+        // downstream planners bail. `factor` is always > 0 here (this exec is only built when
+        // trimming is enabled), but guard anyway.
         let input_rows = self.input.statistics()?.num_rows;
         let num_rows = if self.factor == 0 {
             input_rows
