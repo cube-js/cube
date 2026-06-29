@@ -595,6 +595,36 @@ fn test_not_contains_with_null() {
     );
 }
 
+// ── measure filters (HAVING) ──────────────────────────────────────────────────
+
+#[test]
+fn test_measure_filter_count_gt_casts_param() {
+    let result = build(indoc! {"
+        filters:
+          - member: visitors.count
+            operator: gt
+            values:
+              - \"10\"
+    "});
+    assert_filter(&result, r#"(count(COUNT(*)) > $_0_$::numeric)"#, &["10"]);
+}
+
+#[test]
+fn test_measure_filter_sum_lt_casts_param() {
+    let result = build(indoc! {"
+        filters:
+          - member: visitors.total_revenue
+            operator: lt
+            values:
+              - \"100\"
+    "});
+    assert_filter(
+        &result,
+        r#"(sum("visitors".revenue) < $_0_$::numeric)"#,
+        &["100"],
+    );
+}
+
 // ── filter groups (OR / AND) ────────────────────────────────────────────────
 
 #[test]

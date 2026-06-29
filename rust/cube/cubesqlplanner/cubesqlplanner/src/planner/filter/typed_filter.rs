@@ -158,7 +158,18 @@ impl TypedFilterBuilder {
         let symbol = resolve_base_symbol(member_evaluator);
         match symbol.as_ref() {
             MemberSymbol::Dimension(d) => Some(d.dimension_type().to_string()),
-            MemberSymbol::Measure(m) => Some(m.measure_type().to_string()),
+            // A measure filter compares against an aggregated expression, so its
+            // bound value needs the same numeric cast as a number member. The
+            // aggregation kind (count, sum, ...) is not a comparable scalar type,
+            // so map any non-boolean measure to "number" for cast purposes.
+            MemberSymbol::Measure(m) => {
+                let measure_type = m.measure_type();
+                if measure_type == "boolean" {
+                    Some("boolean".to_string())
+                } else {
+                    Some("number".to_string())
+                }
+            }
             _ => None,
         }
     }
