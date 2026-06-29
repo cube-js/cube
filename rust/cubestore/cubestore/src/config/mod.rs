@@ -1317,6 +1317,30 @@ where
     env_optparse(name).unwrap_or(default)
 }
 
+/// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
+/// falls back to the default instead of panicking, so a typo can't take a node down on startup.
+pub fn env_parse_lenient<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    match env::var(name) {
+        Ok(v) => match v.parse::<T>() {
+            Ok(n) => n,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring environment variable '{}' with '{}' value: {}; using default",
+                    name,
+                    v,
+                    e
+                );
+                default
+            }
+        },
+        Err(_) => default,
+    }
+}
+
 pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
 where
     T: FromStr + PartialOrd + Display,
@@ -1819,7 +1843,7 @@ impl Config {
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
-                group_by_limit_factor: env_parse("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
+                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
