@@ -24,6 +24,9 @@ import Python3Parser, {
   And_testContext,
   // eslint-disable-next-line camelcase
   Or_testContext,
+  ComparisonContext,
+  // eslint-disable-next-line camelcase
+  Comp_opContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import Python3ParserVisitor from './Python3ParserVisitor';
@@ -244,6 +247,26 @@ export class PythonParser {
             return children[0];
           }
           return children.reduce((left, right) => t.logicalExpression('||', left, right));
+        } else if (node instanceof Comp_opContext) {
+          if (node.EQUALS()) {
+            return '===';
+          } else if (node.NOT_EQ_2()) {
+            return '!==';
+          }
+          throw new UserError(`Unsupported Python comparison operator: ${node.getText()}`);
+        } else if (node instanceof ComparisonContext) {
+          if (children.length === 1) {
+            return children[0];
+          }
+
+          const comparisons: t.BinaryExpression[] = [];
+          for (let i = 1; i < children.length; i += 2) {
+            comparisons.push(t.binaryExpression(children[i], children[i - 1], children[i + 1]));
+          }
+          return comparisons.slice(1).reduce<t.Expression>(
+            (left, right) => t.logicalExpression('&&', left, right),
+            comparisons[0]
+          );
         } else if (node instanceof ArglistContext) {
           return children;
         } else {

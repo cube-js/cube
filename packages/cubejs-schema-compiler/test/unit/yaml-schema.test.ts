@@ -839,6 +839,33 @@ cubes:
   });
 
   describe('Access policy: ', () => {
+    it('supports equality and inequality operators in conditions', async () => {
+      const compilers = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          measures:
+            - name: count
+              type: count
+          accessPolicy:
+            - role: admin
+              conditions:
+                - if: "{ securityContext.region == 'EMEA' }"
+                - if: "{ securityContext.department != 'Sales' }"
+        `
+      );
+
+      await compilers.compiler.compile();
+
+      const conditions = compilers.cubeEvaluator.cubeFromPath('Orders').accessPolicy![0].conditions!;
+      expect(conditions[0].if.toString()).toContain('securityContext.region === "EMEA"');
+      expect(conditions[1].if.toString()).toContain('securityContext.department !== "Sales"');
+      expect(conditions[0].if({ region: 'EMEA' })).toBe(true);
+      expect(conditions[1].if({ department: 'Sales' })).toBe(false);
+      expect(conditions[1].if({ department: 'Marketing' })).toBe(true);
+    });
+
     it('defines a correct accessPolicy', async () => {
       const { compiler } = prepareYamlCompiler(
         `
