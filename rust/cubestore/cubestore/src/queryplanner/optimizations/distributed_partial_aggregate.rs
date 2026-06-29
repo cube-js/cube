@@ -291,11 +291,10 @@ pub fn push_worker_sort_and_limit(
     group_by_limit_factor: usize,
     group_by_limit_per_partition: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    // Worker side: bound the partial aggregate's output. The sorted (inline) aggregate is always
-    // bounded with a per-partition Sort(fetch) -- the group count is unknown, so we can't trim, we
-    // just sort. The hash aggregate uses the trimming top-k, engaged only when factor > 0.
-    // `resort_worker_subtree` returns None when nothing applies (hash with factor == 0), leaving the
-    // plan as planned.
+    // Worker side: bound the partial aggregate's output. A hash aggregate uses the trimming top-k
+    // when factor > 0, otherwise (and for the sorted/inline aggregate, whose group count is unknown)
+    // it is bounded with a per-partition Sort(fetch). `resort_worker_subtree` returns None only when
+    // there is no locatable partial aggregate, leaving the plan as planned.
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
@@ -416,12 +415,13 @@ fn worker_ordering(
 }
 
 /// Rebuilds a worker subtree to bound its output to the top `fetch` groups by the total order in
-/// `cols`. Two shapes, by partial aggregate kind:
-/// - hash (`AggregateExec`): `CoalescePartitions <- GroupByLimitAggregate` -- trim during
-///   aggregation, emitted unsorted for the router's hash final. Only when `factor > 0`; returns
-///   `None` otherwise (trimming disabled, leave the plan as planned).
-/// - sorted/inline: `SortPreservingMerge(T) <- Sort(T, fetch, per partition) <- PartialAggregate` --
-///   we can't trim a sorted aggregate and don't know the group count, so always bound with a sort.
+/// `cols`. Two shapes:
+/// - hash (`AggregateExec`) with `factor > 0`: `CoalescePartitions <- GroupByLimitAggregate` --
+///   trim during aggregation, emitted unsorted for the router's hash final.
+/// - sorted/inline, and hash with `factor == 0`:
+///   `SortPreservingMerge(T) <- Sort(T, fetch, per partition) <- PartialAggregate` -- bound each
+///   partition with a sort. For hash this is the pre-trim behavior, kept as the `factor == 0`
+///   fallback so disabling the trim still bounds the worker rather than leaving it unbounded.
 ///
 /// Returns `None` for an unrecognized subtree (no locatable partial aggregate), otherwise the
 /// rebuilt subtree paired with `is_hash` (true for the hash path) so the caller doesn't have to
@@ -435,13 +435,11 @@ fn resort_worker_subtree(
 ) -> Option<(Arc<dyn ExecutionPlan>, bool)> {
     let partial = locate_partial_aggregate(worker_subtree)?;
 
-    // Hash path: trim during aggregation, emit unsorted for the router's hash final. The factor
-    // gates whether trimming applies; with it off, nothing applies on this path.
-    if partial.as_any().is::<AggregateExec>() {
-        if group_by_limit_factor == 0 {
-            return None;
-        }
-
+    // Hash path: trim during aggregation, emit unsorted for the router's hash final. Engaged only
+    // when factor > 0; with it off, the hash aggregate falls through to the sorted-bounding path
+    // below (a per-partition Sort(fetch) + merge), which is the pre-trim behavior -- so disabling
+    // the trim bounds the worker exactly as before, not leaving it unbounded.
+    if partial.as_any().is::<AggregateExec>() && group_by_limit_factor > 0 {
         // CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION decides where the worker's hash table lives:
         //  - off (default): coalesce the aggregate's input to a single partition, so the worker
         //    builds ONE hash table over the merged partitions ("over merge"). Peak memory ~k, no
@@ -492,10 +490,11 @@ fn resort_worker_subtree(
         return Some((Arc::new(CoalescePartitionsExec::new(trimmed)), true));
     }
 
-    // Sorted/inline path: bound each partition with Sort(fetch) and merge in the total order. The
-    // per-partition `fetch` is sound because the key is the full group key: a globally top-`fetch`
-    // group stays within every partition's first `fetch`, so the router's sorted final still sees
-    // all its partial states (see this function's doc and the module note on the total order).
+    // Sorted/inline path (and the factor == 0 fallback for hash aggregates): bound each partition
+    // with Sort(fetch) and merge in the total order. The per-partition `fetch` is sound because the
+    // key is the full group key: a globally top-`fetch` group stays within every partition's first
+    // `fetch`, so the router's sorted final still sees all its partial states (see this function's
+    // doc and the module note on the total order).
     let worker_order = lex_ordering_from_cols(cols, &partial.schema())?;
     let per_partition_sort: Arc<dyn ExecutionPlan> = Arc::new(
         SortExec::new(worker_order.clone(), partial)
