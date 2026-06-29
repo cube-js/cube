@@ -1,0 +1,35 @@
+cubes:
+  - name: visitors
+    sql: "SELECT * FROM visitors"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: source
+        type: string
+        sql: source
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: daily_rollup
+        type: rollup
+        external: true
+        measures:
+          - count
+        dimensions:
+          - source
+        time_dimension: created_at
+        granularity: day
+        indexes:
+          - name: source_idx
+            columns:
+              - source
+          - name: source_agg_idx
+            columns:
+              - source
+            type: aggregate

@@ -1,5 +1,5 @@
 ---
-source: cubesqlplanner/src/tests/integration/pre_aggregations/sql_generation.rs
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/cubestore/basic.rs
 expression: result
 ---
 visitors__source | visitors__count

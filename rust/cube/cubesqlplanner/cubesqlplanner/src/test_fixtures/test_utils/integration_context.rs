@@ -20,6 +20,10 @@ pub fn format_simple_query_results(messages: &[tokio_postgres::SimpleQueryMessag
         }
     }
 
+    format_rows_table(columns, rows)
+}
+
+pub fn format_rows_table(columns: Vec<String>, rows: Vec<Vec<String>>) -> String {
     if columns.is_empty() {
         return "(empty result)".to_string();
     }
