@@ -132,7 +132,10 @@ class OracleDriver extends BaseDriver {
     );
   }
 
-  async getConnectionFromPool() {
+  /**
+   * @protected
+   */
+  async getConnection() {
     if (!this.pool) {
       this.pool = await this.db.createPool({ ...this.config, sessionCallback: OracleDriver.initConnection });
     }
@@ -191,7 +194,7 @@ class OracleDriver extends BaseDriver {
   }
 
   async query(query, values) {
-    const conn = await this.getConnectionFromPool();
+    const conn = await this.getConnection();
 
     try {
       const { sql, binds } = OracleDriver.normalizeParams(query, values);
@@ -224,7 +227,7 @@ class OracleDriver extends BaseDriver {
   }
 
   async downloadQueryResults(query, values, _options) {
-    const conn = await this.getConnectionFromPool();
+    const conn = await this.getConnection();
 
     try {
       const { sql, binds } = OracleDriver.normalizeParams(query, values);
