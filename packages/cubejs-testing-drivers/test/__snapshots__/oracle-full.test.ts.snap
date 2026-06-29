@@ -8670,7 +8670,13 @@ Array [
 
 exports[`Queries with the @cubejs-backend/oracle-driver filtering Products: contains + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/oracle-driver filtering Products: contains with special chars + dimensions 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/oracle-driver filtering Products: contains with special chars + dimensions 1`] = `
+Array [
+  Object {
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
+  },
+]
+`;
 
 exports[`Queries with the @cubejs-backend/oracle-driver filtering Products: endsWith filter + dimensions + order, first 1`] = `
 Array [
