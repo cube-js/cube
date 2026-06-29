@@ -11,6 +11,7 @@ const GRANULARITY_VALUE = {
   minute: 'mm',
   second: 'ss',
   month: 'MM',
+  quarter: 'Q',
   year: 'YYYY'
 };
 
@@ -94,6 +95,7 @@ export class OracleQuery extends BaseQuery {
     if (!granularity) {
       return dimension;
     }
+
     return `TRUNC(${dimension}, '${GRANULARITY_VALUE[granularity]}')`;
   }
 
@@ -202,15 +204,15 @@ export class OracleQuery extends BaseQuery {
     throw new UserError(`Mixed month/second intervals are not supported for Oracle custom granularities: ${interval}`);
   }
 
-  /**
-   * Dialect templates for the Tesseract (native) planner. The legacy-planner
-   * overrides above (`asSyntaxTable`, `groupByDimensionLimit`, `groupByClause`)
-   * don't apply to the native planner, which renders SQL purely from these
-   * templates. Oracle needs three deviations from the defaults:
-   *   - no `AS` keyword before table / subquery aliases,
-   *   - `OFFSET ... ROWS FETCH NEXT ... ROWS ONLY` instead of `LIMIT`/`OFFSET`,
-   *   - expression-based `GROUP BY` (Oracle has no positional GROUP BY).
-   */
+  public seriesSql(timeDimension) {
+    const values = timeDimension.timeSeries().map(
+      ([from, to]) => `SELECT '${from}' f, '${to}' t FROM DUAL`
+    ).join(' UNION ALL ');
+    return `SELECT TO_TIMESTAMP(dates.f, 'YYYY-MM-DD"T"HH24:MI:SS.FF3') as ${this.escapeColumnName('date_from')}, ` +
+      `TO_TIMESTAMP(dates.t, 'YYYY-MM-DD"T"HH24:MI:SS.FF3') as ${this.escapeColumnName('date_to')} ` +
+      `FROM (${values}) dates`;
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     // Oracle forbids `AS` before a table/subquery alias.
