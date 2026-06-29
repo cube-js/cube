@@ -179,6 +179,29 @@ export class OracleQuery extends BaseQuery {
     return res;
   }
 
+  public dateBin(interval: string, source: string, origin: string): string {
+    const parsed = parseSqlInterval(interval);
+    const originTs = `TO_TIMESTAMP('${origin}', 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
+
+    const totalMonths = (parsed.year || 0) * 12 + (parsed.quarter || 0) * 3 + (parsed.month || 0);
+    const totalSeconds = (parsed.week || 0) * 604800 + (parsed.day || 0) * 86400 +
+      (parsed.hour || 0) * 3600 + (parsed.minute || 0) * 60 + (parsed.second || 0);
+
+    // Pure month-based interval: bin with calendar-accurate month arithmetic.
+    if (totalMonths > 0 && totalSeconds === 0) {
+      return `ADD_MONTHS(${originTs}, FLOOR(MONTHS_BETWEEN(${source}, ${originTs}) / ${totalMonths}) * ${totalMonths})`;
+    }
+
+    // Pure fixed-length interval: bin with second arithmetic.
+    // (CAST(... AS DATE) - CAST(... AS DATE)) yields a day count; * 86400 → seconds.
+    if (totalSeconds > 0 && totalMonths === 0) {
+      const diffSeconds = `(CAST(${source} AS DATE) - CAST(${originTs} AS DATE)) * 86400`;
+      return `${originTs} + NUMTODSINTERVAL(FLOOR(${diffSeconds} / ${totalSeconds}) * ${totalSeconds}, 'SECOND')`;
+    }
+
+    throw new UserError(`Mixed month/second intervals are not supported for Oracle custom granularities: ${interval}`);
+  }
+
   /**
    * Dialect templates for the Tesseract (native) planner. The legacy-planner
    * overrides above (`asSyntaxTable`, `groupByDimensionLimit`, `groupByClause`)
@@ -227,6 +250,11 @@ export class OracleQuery extends BaseQuery {
     delete templates.expressions.ilike;
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
     templates.filters.like_pattern = '{% if start_wild %}\'%\' || {% endif %}LOWER({{ value }}){% if end_wild %} || \'%\'{% endif %}';
+
+    // Oracle has no `STRING` type (used by the default in CAST(... AS STRING),
+    // e.g. the multi-column count() concatenation). CAST to VARCHAR2 requires a
+    // length, so use the max standard VARCHAR2 size.
+    templates.types.string = 'VARCHAR2(4000)';
 
     return templates;
   }

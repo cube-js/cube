@@ -25,6 +25,7 @@ const OracleTypeToGenericType = {
   binary_float: 'float',
   binary_double: 'double',
   date: 'timestamp',
+  'number': 'decimal',
 };
 
 const sortByKeys = (unordered) => {
@@ -116,9 +117,24 @@ class OracleDriver extends BaseDriver {
     return reduce(reduceCb, {}, data);
   }
 
+  /**
+   * Runs once per pooled session. Aligns the session NLS formats with the ISO-ish
+   * date strings Cube binds, so implicit string→DATE/TIMESTAMP conversions (e.g.
+   * the native planner's `CAST(? AS TIMESTAMP)` over a 'YYYY-MM-DD' filter bound)
+   * parse instead of failing with ORA-01843 under Oracle's default NLS. Explicit
+   * TO_DATE/TO_TIMESTAMP calls carry their own masks and are unaffected.
+   * @protected
+   */
+  static initConnection(connection, requestedTag, cb) {
+    connection.execute(
+      "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD' NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD' NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF TZH:TZM'",
+      (err) => cb(err)
+    );
+  }
+
   async getConnectionFromPool() {
     if (!this.pool) {
-      this.pool = await this.db.createPool(this.config);
+      this.pool = await this.db.createPool({ ...this.config, sessionCallback: OracleDriver.initConnection });
     }
 
     return this.pool.getConnection()
@@ -143,15 +159,31 @@ class OracleDriver extends BaseDriver {
     }
 
     const binds = {};
+    const valueToName = new Map();
     let idx = 0;
+    let nextName = 0;
 
     // `:"?"` must be matched as a whole before a lone `?`, so it appears first
     // in the alternation; since it starts with `:`, its inner `?` is consumed
     // as part of the match and never matched again on its own.
+    //
+    // Placeholders carrying the same value share a single named bind. This is
+    // semantically identical (the same value is bound) and keeps repeated
+    // expressions textually identical across clauses — required by Oracle, which
+    // otherwise rejects e.g. a CASE expression in both SELECT and GROUP BY when
+    // its param renders as two different bind names (ORA-00979).
     const sql = query.replace(/:"\?"|\?/g, () => {
-      const name = `cb_param_${idx}`;
-      binds[name] = values[idx];
+      const value = values[idx];
       idx += 1;
+      // A Map distinguishes values by SameValueZero, so 1 and '1' stay separate;
+      // the raw value works as the key without stringifying.
+      let name = valueToName.get(value);
+      if (name === undefined) {
+        name = `cb_param_${nextName}`;
+        nextName += 1;
+        valueToName.set(value, name);
+        binds[name] = value;
+      }
       return `:${name}`;
     });
 
@@ -181,11 +213,7 @@ class OracleDriver extends BaseDriver {
       const dbTypeName = (column.dbTypeName || '').toLowerCase();
       let type = 'text';
 
-      if (dbTypeName === 'number') {
-        // scale === 0 → integer family; otherwise (decimals, or float NUMBER
-        // with undefined/negative scale from aggregations) → decimal.
-        type = column.scale === 0 ? 'bigint' : 'decimal';
-      } else if (dbTypeName.startsWith('timestamp')) {
+      if (dbTypeName.startsWith('timestamp')) {
         type = 'timestamp';
       } else {
         type = OracleTypeToGenericType[dbTypeName] || 'text';
