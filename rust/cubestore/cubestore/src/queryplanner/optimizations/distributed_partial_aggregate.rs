@@ -300,7 +300,7 @@ pub fn push_worker_sort_and_limit(
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
         };
-        let Some(new_input) = resort_worker_subtree(
+        let Some((new_input, _is_hash)) = resort_worker_subtree(
             &w.input,
             &cols,
             fetch,
@@ -336,12 +336,11 @@ pub fn push_worker_sort_and_limit(
     let Some((cols, fetch)) = cs.worker_sort_and_limit.clone() else {
         return Ok(p);
     };
-    // The hash aggregate emits unordered trimmed groups (combined by a hash final + re-sort); the
-    // sorted/inline aggregate emits bounded sorted streams (combined by a sort-preserving merge +
-    // sorted final). Decide from the worker's partial aggregate before rebuilding.
-    let is_hash = locate_partial_aggregate(&cs.input_for_optimizations)
-        .map_or(false, |partial| partial.as_any().is::<AggregateExec>());
-    let Some(new_worker_subtree) = resort_worker_subtree(
+    // `resort_worker_subtree` reports `is_hash` from the same descent it already does, so we don't
+    // walk to the partial aggregate twice. The hash aggregate emits unordered trimmed groups
+    // (combined by a hash final + re-sort); the sorted/inline aggregate emits bounded sorted streams
+    // (combined by a sort-preserving merge + sorted final).
+    let Some((new_worker_subtree, is_hash)) = resort_worker_subtree(
         &cs.input_for_optimizations,
         &cols,
         fetch,
@@ -389,6 +388,14 @@ pub fn push_worker_sort_and_limit(
     }
 }
 
+/// The `SortOptions` a `worker_sort_and_limit` descriptor entry `(asc, nulls_first)` maps to.
+fn descriptor_sort_options(asc: bool, nulls_first: bool) -> SortOptions {
+    SortOptions {
+        descending: !asc,
+        nulls_first,
+    }
+}
+
 /// Builds the `worker_order` LexOrdering over an aggregate's group columns from the descriptor.
 fn worker_ordering(
     group_expr: &datafusion::physical_plan::aggregates::PhysicalGroupBy,
@@ -402,10 +409,7 @@ fn worker_ordering(
         })?;
         exprs.push(PhysicalSortExpr {
             expr: Arc::new(Column::new(name, *idx)),
-            options: SortOptions {
-                descending: !asc,
-                nulls_first: *nulls_first,
-            },
+            options: descriptor_sort_options(*asc, *nulls_first),
         });
     }
     Ok(LexOrdering::new(exprs))
@@ -419,14 +423,16 @@ fn worker_ordering(
 /// - sorted/inline: `SortPreservingMerge(T) <- Sort(T, fetch, per partition) <- PartialAggregate` --
 ///   we can't trim a sorted aggregate and don't know the group count, so always bound with a sort.
 ///
-/// Returns `None` for an unrecognized subtree (no locatable partial aggregate).
+/// Returns `None` for an unrecognized subtree (no locatable partial aggregate), otherwise the
+/// rebuilt subtree paired with `is_hash` (true for the hash path) so the caller doesn't have to
+/// walk down to the partial aggregate a second time to decide the router shape.
 fn resort_worker_subtree(
     worker_subtree: &Arc<dyn ExecutionPlan>,
     cols: &[(usize, bool, bool)],
     fetch: usize,
     group_by_limit_factor: usize,
     group_by_limit_per_partition: bool,
-) -> Option<Arc<dyn ExecutionPlan>> {
+) -> Option<(Arc<dyn ExecutionPlan>, bool)> {
     let partial = locate_partial_aggregate(worker_subtree)?;
 
     // Hash path: trim during aggregation, emit unsorted for the router's hash final. The factor
@@ -463,15 +469,7 @@ fn resort_worker_subtree(
 
         let order: Vec<(usize, SortOptions)> = cols
             .iter()
-            .map(|(idx, asc, nulls_first)| {
-                (
-                    *idx,
-                    SortOptions {
-                        descending: !asc,
-                        nulls_first: *nulls_first,
-                    },
-                )
-            })
+            .map(|(idx, asc, nulls_first)| (*idx, descriptor_sort_options(*asc, *nulls_first)))
             .collect();
         let trimmed: Arc<dyn ExecutionPlan> = match partial.as_any().downcast_ref::<AggregateExec>()
         {
@@ -491,7 +489,7 @@ fn resort_worker_subtree(
         // hash-combines and re-applies the top-k sort, so no worker-side sort/merge holds the whole
         // result. Under "over merge" the trimmed agg is already single-partition and this coalesce is
         // a passthrough; under "under merge" it drains the per-partition aggregates concurrently.
-        return Some(Arc::new(CoalescePartitionsExec::new(trimmed)));
+        return Some((Arc::new(CoalescePartitionsExec::new(trimmed)), true));
     }
 
     // Sorted/inline path: bound each partition with Sort(fetch) and merge in the total order. The
@@ -504,10 +502,13 @@ fn resort_worker_subtree(
             .with_fetch(Some(fetch))
             .with_preserve_partitioning(true),
     );
-    Some(Arc::new(SortPreservingMergeExec::new(
-        worker_order,
-        per_partition_sort,
-    )))
+    Some((
+        Arc::new(SortPreservingMergeExec::new(
+            worker_order,
+            per_partition_sort,
+        )),
+        false,
+    ))
 }
 
 /// Build a `LexOrdering` over the partial aggregate's group columns from the descriptor (indices
@@ -521,10 +522,7 @@ fn lex_ordering_from_cols(
         let field = schema.fields().get(*idx)?;
         exprs.push(PhysicalSortExpr {
             expr: Arc::new(Column::new(field.name(), *idx)),
-            options: SortOptions {
-                descending: !asc,
-                nulls_first: *nulls_first,
-            },
+            options: descriptor_sort_options(*asc, *nulls_first),
         });
     }
     Some(LexOrdering::new(exprs))

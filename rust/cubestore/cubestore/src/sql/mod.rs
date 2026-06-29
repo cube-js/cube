@@ -6505,10 +6505,14 @@ mod tests {
                                         TableValue::String(s) => s.clone(),
                                         _ => panic!("expected string"),
                                     };
+                                    // Pin that the trim is actually configured to bound (fetch k=2,
+                                    // factor>0), not merely that the node is present -- a factor of 0
+                                    // would leave it a passthrough and reintroduce the memory pressure
+                                    // this path exists to avoid.
                                     assert!(
-                                        worker_plan.contains("GroupByLimitAggregate"),
-                                        "Hash-aggregate worker should bound output with \
-                                         GroupByLimitAggregate. Plan: {}",
+                                        worker_plan.contains("GroupByLimitAggregate, k: 2, factor: 2"),
+                                        "Hash-aggregate worker should bound output with a configured \
+                                         GroupByLimitAggregate (k=2, factor=2). Plan: {}",
                                         worker_plan
                                     );
                                 }
