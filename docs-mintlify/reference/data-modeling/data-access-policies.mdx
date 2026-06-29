@@ -234,6 +234,9 @@ The following operators and constructs are supported:
 | Ternary | — | `? :` |
 | Optional chaining | — | `?.` |
 
+Chained comparisons aren't supported in YAML. Write `a == b and b == c` instead
+of `a == b == c`.
+
 For example, the following policy applies to users who are not blocked, are either
 administrators or based in the EMEA region, and belong to the `admins` group. Each
 requirement is expressed as a separate condition, and all conditions must be `true`
