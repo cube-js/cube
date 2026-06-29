@@ -6487,7 +6487,9 @@ mod tests {
                                     }
                                 }
 
-                                // Test 4: ORDER BY 1 DESC with LIMIT on non-prefix column
+                                // Test 4: ORDER BY DESC + LIMIT on a non-prefix column, grouped by a
+                                // non-prefix column (hash aggregate). The hash path bounds the worker
+                                // output with the trimming aggregate, not a Sort.
                                 {
                                     let result = service
                                         .exec_query(
@@ -6503,9 +6505,14 @@ mod tests {
                                         TableValue::String(s) => s.clone(),
                                         _ => panic!("expected string"),
                                     };
+                                    // Pin that the trim is actually configured to bound (fetch k=2,
+                                    // factor>0), not merely that the node is present -- a factor of 0
+                                    // would leave it a passthrough and reintroduce the memory pressure
+                                    // this path exists to avoid.
                                     assert!(
-                                        worker_plan.contains("Sort, fetch: 2"),
-                                        "Worker should have Sort with fetch=2 for DESC. Plan: {}",
+                                        worker_plan.contains("GroupByLimitAggregate, k: 2, factor: 2"),
+                                        "Hash-aggregate worker should bound output with a configured \
+                                         GroupByLimitAggregate (k=2, factor=2). Plan: {}",
                                         worker_plan
                                     );
                                 }
