@@ -250,8 +250,7 @@ export class OracleQuery extends BaseQuery {
       ') dates';
 
     delete templates.expressions.ilike;
-    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
-    templates.filters.like_pattern = '{% if start_wild %}\'%\' || {% endif %}LOWER({{ value }}){% if end_wild %} || \'%\'{% endif %}';
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
 
     // Oracle has no `STRING` type (used by the default in CAST(... AS STRING),
     // e.g. the multi-column count() concatenation). CAST to VARCHAR2 requires a
