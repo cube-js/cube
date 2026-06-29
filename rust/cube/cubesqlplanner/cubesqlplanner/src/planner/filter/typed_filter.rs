@@ -158,18 +158,17 @@ impl TypedFilterBuilder {
         let symbol = resolve_base_symbol(member_evaluator);
         match symbol.as_ref() {
             MemberSymbol::Dimension(d) => Some(d.dimension_type().to_string()),
-            // A measure filter compares against an aggregated expression, so its
-            // bound value needs the same numeric cast as a number member. The
-            // aggregation kind (count, sum, ...) is not a comparable scalar type,
-            // so map any non-boolean measure to "number" for cast purposes.
-            MemberSymbol::Measure(m) => {
-                let measure_type = m.measure_type();
-                if measure_type == "boolean" {
-                    Some("boolean".to_string())
-                } else {
-                    Some("number".to_string())
-                }
-            }
+            // The cast type drives how a bound comparison value is wrapped.
+            // Aggregations (count, sum, ...) and number measures compare as
+            // numbers. String/time measures are non-numeric scalars and must
+            // not be coerced to a number; date comparisons take the dedicated
+            // date operators instead. min/max carry their operand type, which
+            // isn't known here, so they fall through to the numeric default.
+            MemberSymbol::Measure(m) => match m.measure_type() {
+                "boolean" => Some("boolean".to_string()),
+                "string" | "time" => None,
+                _ => Some("number".to_string()),
+            },
             _ => None,
         }
     }

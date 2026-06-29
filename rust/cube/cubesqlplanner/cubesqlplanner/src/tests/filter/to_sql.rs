@@ -625,6 +625,18 @@ fn test_measure_filter_sum_lt_casts_param() {
     );
 }
 
+#[test]
+fn test_measure_filter_string_no_cast() {
+    let result = build(indoc! {"
+        filters:
+          - member: visitors.source_label
+            operator: equals
+            values:
+              - google
+    "});
+    assert_filter(&result, r#"(MAX("visitors".source) = $_0_$)"#, &["google"]);
+}
+
 // ── filter groups (OR / AND) ────────────────────────────────────────────────
 
 #[test]
