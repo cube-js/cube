@@ -35,7 +35,7 @@ export function testConnection(type: string): void {
         it(name, test);
       }
     }
-  
+
     beforeAll(async () => {
       env = await runEnvironment(type, 'driver');
       if (env.data) {
@@ -44,16 +44,16 @@ export function testConnection(type: string): void {
       }
       driver = (await getDriver(type)).source;
     });
-  
+
     afterAll(async () => {
       await driver.release();
       await env.stop();
     });
-  
+
     execute('must establish a connection', async () => {
       await driver.testConnection();
     });
-  
+
     execute('must creates a data source', async () => {
       query = getCreateQueries(type, 'driver');
       await Promise.all(query.map(async (q) => {
@@ -122,6 +122,7 @@ export function testConnection(type: string): void {
     execute('must download query from the data source via memory', async () => {
       query = getSelectQueries(type, 'driver');
       expect(driver.downloadQueryResults).toBeDefined();
+
       const response = await Promise.all(
         query.map(async (q) => {
           const memory = <DownloadTableMemoryData>(
@@ -136,6 +137,7 @@ export function testConnection(type: string): void {
           };
         })
       );
+
       expect(response.length).toBe(3);
       expect(response[0].data.length).toBe(28);
       expect(response[1].data.length).toBe(41);
@@ -145,6 +147,7 @@ export function testConnection(type: string): void {
     execute('must download query from the data source via stream', async () => {
       query = getSelectQueries(type, 'driver');
       expect(driver.downloadQueryResults).toBeDefined();
+
       const response = await Promise.all(
         query.map(async (q) => {
           const stream = <StreamTableDataWithTypes>(
@@ -170,6 +173,7 @@ export function testConnection(type: string): void {
           return { types, data };
         })
       );
+
       expect(response.length).toBe(3);
       expect(response[0].data.length).toBe(28);
       expect(response[1].data.length).toBe(41);

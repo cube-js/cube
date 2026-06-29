@@ -46,6 +46,9 @@
     "mysql-driver": "yarn test-driver -i dist/test/mysql-driver.test.js",
     "mysql-core": "yarn test-driver -i dist/test/mysql-core.test.js",
     "mysql-full": "yarn test-driver -i dist/test/mysql-full.test.js",
+    "oracle-driver": "yarn test-driver -i dist/test/oracle-driver.test.js",
+    "oracle-core": "yarn test-driver -i dist/test/oracle-core.test.js",
+    "oracle-full": "yarn test-driver -i dist/test/oracle-full.test.js",
     "postgres-driver": "yarn test-driver -i dist/test/postgres-driver.test.js",
     "postgres-core": "yarn test-driver -i dist/test/postgres-core.test.js",
     "postgres-full": "yarn test-driver -i dist/test/postgres-full.test.js",
@@ -66,7 +69,7 @@
     "redshift-core": "yarn test-driver -i dist/test/redshift-core.test.js",
     "redshift-full": "yarn test-driver -i dist/test/redshift-full.test.js",
     "redshift-export-bucket-s3-full": "yarn test-driver -i dist/test/redshift-export-bucket-s3-full.test.js",
-    "update-all-snapshots-local": "yarn run athena-export-bucket-s3-full --mode=local -u; yarn run bigquery-export-bucket-gcs-full --mode=local -u; yarn run clickhouse-full --mode=local -u; yarn run clickhouse-export-bucket-s3-full --mode=local -u; yarn run clickhouse-export-bucket-s3-prefix-full --mode=local -u; yarn run databricks-jdbc-export-bucket-azure-full --mode=local -u; yarn run databricks-jdbc-export-bucket-azure-prefix-full --mode=local -u; yarn run databricks-jdbc-export-bucket-gcs-full --mode=local -u; yarn run databricks-jdbc-export-bucket-gcs-prefix-full --mode=local -u; yarn run databricks-jdbc-export-bucket-s3-full --mode=local -u; yarn run databricks-jdbc-export-bucket-s3-prefix-full --mode=local -u; yarn run databricks-jdbc-full --mode=local -u; yarn run mssql-full --mode=local -u; yarn run mysql-full --mode=local -u; yarn run postgres-full --mode=local -u; yarn run redshift-export-bucket-s3-full --mode=local -u; yarn run redshift-full --mode=local -u; yarn run snowflake-encrypted-pk-full --mode=local -u; yarn run snowflake-export-bucket-azure-full --mode=local -u; yarn run snowflake-export-bucket-azure-prefix-full --mode=local -u; yarn run snowflake-export-bucket-azure-via-storage-integration-full --mode=local -u; yarn run snowflake-export-bucket-gcs-full --mode=local -u; yarn run snowflake-export-bucket-gcs-prefix-full --mode=local -u; yarn run snowflake-export-bucket-s3-full --mode=local -u; yarn run snowflake-export-bucket-s3-via-storage-integration-iam-roles-full --mode=local -u; yarn run snowflake-export-bucket-s3-prefix-full --mode=local -u; yarn run snowflake-export-bucket-azure-prefix-full --mode=local -u; yarn run snowflake-export-bucket-azure-full --mode=local -u; yarn run snowflake-full --mode=local -u",
+    "update-all-snapshots-local": "yarn run oracle-full --mode=local -u; yarn run athena-export-bucket-s3-full --mode=local -u; yarn run bigquery-export-bucket-gcs-full --mode=local -u; yarn run clickhouse-full --mode=local -u; yarn run clickhouse-export-bucket-s3-full --mode=local -u; yarn run clickhouse-export-bucket-s3-prefix-full --mode=local -u; yarn run databricks-jdbc-export-bucket-azure-full --mode=local -u; yarn run databricks-jdbc-export-bucket-azure-prefix-full --mode=local -u; yarn run databricks-jdbc-export-bucket-gcs-full --mode=local -u; yarn run databricks-jdbc-export-bucket-gcs-prefix-full --mode=local -u; yarn run databricks-jdbc-export-bucket-s3-full --mode=local -u; yarn run databricks-jdbc-export-bucket-s3-prefix-full --mode=local -u; yarn run databricks-jdbc-full --mode=local -u; yarn run mssql-full --mode=local -u; yarn run mysql-full --mode=local -u; yarn run postgres-full --mode=local -u; yarn run redshift-export-bucket-s3-full --mode=local -u; yarn run redshift-full --mode=local -u; yarn run snowflake-encrypted-pk-full --mode=local -u; yarn run snowflake-export-bucket-azure-full --mode=local -u; yarn run snowflake-export-bucket-azure-prefix-full --mode=local -u; yarn run snowflake-export-bucket-azure-via-storage-integration-full --mode=local -u; yarn run snowflake-export-bucket-gcs-full --mode=local -u; yarn run snowflake-export-bucket-gcs-prefix-full --mode=local -u; yarn run snowflake-export-bucket-s3-full --mode=local -u; yarn run snowflake-export-bucket-s3-via-storage-integration-iam-roles-full --mode=local -u; yarn run snowflake-export-bucket-s3-prefix-full --mode=local -u; yarn run snowflake-export-bucket-azure-prefix-full --mode=local -u; yarn run snowflake-export-bucket-azure-full --mode=local -u; yarn run snowflake-full --mode=local -u",
     "tst": "clear && yarn tsc && yarn bigquery-core"
   },
   "files": [
@@ -83,6 +86,7 @@
     "@cubejs-backend/linter": "1.6.64",
     "@cubejs-backend/mssql-driver": "1.6.64",
     "@cubejs-backend/mysql-driver": "1.6.64",
+    "@cubejs-backend/oracle-driver": "1.6.64",
     "@cubejs-backend/postgres-driver": "1.6.64",
     "@cubejs-backend/query-orchestrator": "1.6.64",
     "@cubejs-backend/server-core": "1.6.64",
