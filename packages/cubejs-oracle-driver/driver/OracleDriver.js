@@ -135,12 +135,24 @@ class OracleDriver extends BaseDriver {
   /**
    * @protected
    */
-  async getConnection() {
-    if (!this.pool) {
-      this.pool = await this.db.createPool({ ...this.config, sessionCallback: OracleDriver.initConnection });
+  getPool() {
+    if (!this.poolPromise) {
+      this.poolPromise = this.db.createPool({
+        ...this.config,
+        sessionCallback: OracleDriver.initConnection
+      });
     }
 
-    return this.pool.getConnection()
+    return this.poolPromise;
+  }
+
+  /**
+   * @protected
+   */
+  async getConnection() {
+    const pool = await this.getPool();
+
+    return pool.getConnection();
   }
 
   async testConnection() {
@@ -245,8 +257,13 @@ class OracleDriver extends BaseDriver {
     }
   }
 
-  release() {
-    return this.pool && this.pool.close();
+  async release() {
+    if (this.poolPromise) {
+      const pool = await this.poolPromise;
+      this.poolPromise = null;
+
+      return pool.close();
+    }
   }
 
   readOnly() {
