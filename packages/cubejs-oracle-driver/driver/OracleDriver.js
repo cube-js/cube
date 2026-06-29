@@ -7,8 +7,9 @@
 const {
   getEnv,
   assertDataSource,
+  Pool,
 } = require('@cubejs-backend/shared');
-const { BaseDriver, TableColumn } = require('@cubejs-backend/base-driver');
+const { BaseDriver, TableColumn, createPoolName } = require('@cubejs-backend/base-driver');
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 
@@ -79,20 +80,51 @@ class OracleDriver extends BaseDriver {
     this.db.partRows = 100000;
     this.db.maxRows = 100000;
     this.db.prefetchRows = 500;
+
+    const { maxPoolSize, pool, ...connectionConfig } = config;
+
     this.config = {
       user: getEnv('dbUser', { dataSource, preAggregations }),
       password: getEnv('dbPass', { dataSource, preAggregations }),
       db: getEnv('dbName', { dataSource, preAggregations }),
       host: getEnv('dbHost', { dataSource, preAggregations }),
       port: getEnv('dbPort', { dataSource, preAggregations }) || 1521,
-      poolMin: 0,
-      poolMax:
-        config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
-        50,
-      ...config
+      ...connectionConfig,
     };
     this.config.connectionString = this.config.connectionString || `${this.config.host}:${this.config.port}/${this.config.db}`;
+
+    const poolName = createPoolName('oracle', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
+      create: async () => {
+        const connection = await this.db.getConnection(this.config);
+        await OracleDriver.initConnection(connection);
+
+        return connection;
+      },
+      validate: async (connection) => {
+        try {
+          await connection.ping();
+        } catch (e) {
+          this.databasePoolError(e);
+          return false;
+        }
+
+        return true;
+      },
+      destroy: (connection) => connection.close(),
+    }, {
+      min: 0,
+      max:
+        maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
+        50,
+      evictionRunIntervalMillis: 10000,
+      softIdleTimeoutMillis: 30000,
+      idleTimeoutMillis: 30000,
+      testOnBorrow: true,
+      acquireTimeoutMillis: 20000,
+      ...pool,
+    });
   }
 
   async tablesSchema() {
@@ -125,34 +157,25 @@ class OracleDriver extends BaseDriver {
    * TO_DATE/TO_TIMESTAMP calls carry their own masks and are unaffected.
    * @protected
    */
-  static initConnection(connection, requestedTag, cb) {
-    connection.execute(
-      "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD' NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD' NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF TZH:TZM'",
-      (err) => cb(err)
+  static async initConnection(connection) {
+    await connection.execute(
+      "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD' NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD' NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF TZH:TZM'"
     );
   }
 
   /**
+   * Acquires a connection from the pool, runs `fn`, and always releases the
+   * connection back to the pool (on both success and failure).
    * @protected
    */
-  getPool() {
-    if (!this.poolPromise) {
-      this.poolPromise = this.db.createPool({
-        ...this.config,
-        sessionCallback: OracleDriver.initConnection
-      });
+  async withConnection(fn) {
+    const connection = await this.pool.acquire();
+
+    try {
+      return await fn(connection);
+    } finally {
+      await this.pool.release(connection);
     }
-
-    return this.poolPromise;
-  }
-
-  /**
-   * @protected
-   */
-  async getConnection() {
-    const pool = await this.getPool();
-
-    return pool.getConnection();
   }
 
   async testConnection() {
@@ -206,21 +229,11 @@ class OracleDriver extends BaseDriver {
   }
 
   async query(query, values) {
-    const conn = await this.getConnection();
-
-    try {
+    return this.withConnection(async (conn) => {
       const { sql, binds } = OracleDriver.normalizeParams(query, values);
       const res = await conn.execute(sql, binds);
       return res && res.rows;
-    } catch (e) {
-      throw (e);
-    } finally {
-      try {
-        await conn.close();
-      } catch (e) {
-        throw e;
-      }
-    }
+    });
   }
 
   static metaDataToColumnTypes(metaData) {
@@ -239,31 +252,19 @@ class OracleDriver extends BaseDriver {
   }
 
   async downloadQueryResults(query, values, _options) {
-    const conn = await this.getConnection();
-
-    try {
+    return this.withConnection(async (conn) => {
       const { sql, binds } = OracleDriver.normalizeParams(query, values);
       const res = await conn.execute(sql, binds);
       return {
         rows: (res && res.rows) || [],
         types: OracleDriver.metaDataToColumnTypes(res && res.metaData),
       };
-    } finally {
-      try {
-        await conn.close();
-      } catch (e) {
-        throw e;
-      }
-    }
+    });
   }
 
   async release() {
-    if (this.poolPromise) {
-      const pool = await this.poolPromise;
-      this.poolPromise = null;
-
-      return pool.close();
-    }
+    await this.pool.drain();
+    await this.pool.clear();
   }
 
   readOnly() {
