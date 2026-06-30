@@ -1529,6 +1529,19 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBESQL_DISABLE_POST_PROCESSING`
+
+If `true`, the [SQL API][ref-sql-api] rejects queries that can't be fully pushed
+down to the data source instead of running them with post-processing. This prevents
+results from being computed over a truncated intermediate result capped by
+[`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit). It can be overridden per request
+with the `disable_post_processing` option on the
+[`/v1/cubesql`](/reference/core-data-apis/rest-api/reference#base_path/v1/cubesql) endpoint.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBESQL_STREAM_MODE`
 
 If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][ref-sql-api].
