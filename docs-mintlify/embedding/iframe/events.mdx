@@ -1,0 +1,467 @@
+---
+title: Events & actions
+description: Listen to user-interaction events from an embedded Cube iframe and send actions back into it, over the browser postMessage API.
+---
+
+<Note>
+
+Available on [Premium and above plans](https://cube.dev/pricing).
+
+</Note>
+
+Embedded Cube surfaces communicate with your host page over the browser
+[`postMessage`](https://developer.mozilla.org/docs/Web/API/Window/postMessage)
+API, in both directions:
+
+- **Events** (`cube:event:*`) travel **embed → host**. Subscribe to them to learn
+  how a viewer interacts with the embed — when it loads, what they view,
+  download, drill into, search for with AI, and any errors they hit. Feed them
+  into your own analytics / event bus.
+- **Actions** (`cube:action:*`) travel **host → embed**. Send them to drive the
+  embed from your app — switch the color scheme, set a filter, navigate, or
+  refresh the data.
+
+No SDK is required — it's plain `window.postMessage` and a `message` listener.
+
+## Message envelope
+
+Every message — in either direction — is a single object with the same shape:
+
+```ts
+{
+  source: "cube-embed",              // discriminator — always this string
+  direction: "event" | "action",     // "event" = embed→host, "action" = host→embed
+  type: string,                      // e.g. "cube:event:download" / "cube:action:set-filter"
+  payload: object,                   // shape depends on `type` (see catalogs below)
+  timestamp: number,                 // epoch milliseconds
+  surface?: "dashboard" | "app" | "chat" // always on events; never on actions
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `source` | Always `"cube-embed"`. Check this first to tell Cube messages apart from other `postMessage` traffic on the page (browser extensions, other libraries, your own app). |
+| `direction` | `"event"` for messages emitted by the embed, `"action"` for messages you send into it. |
+| `type` | The event or action name (see the catalogs below). |
+| `payload` | Event/action-specific data. |
+| `timestamp` | When the message was created, in epoch milliseconds. |
+| `surface` | Which embedded surface the message relates to. **Always present on events**; never sent on actions — so event listeners never need to handle a missing `surface`. |
+
+## Listening to events
+
+Attach a single `message` listener to `window`. Always validate `event.origin`
+against your tenant's origin and check `data.source === "cube-embed"` before
+trusting a message.
+
+```js
+const CUBE_ORIGIN = "https://your-tenant.cubecloud.dev";
+
+window.addEventListener("message", (event) => {
+  // 1. Only trust messages from your Cube tenant.
+  if (event.origin !== CUBE_ORIGIN) return;
+
+  const data = event.data;
+
+  // 2. Only handle Cube embed events.
+  if (!data || data.source !== "cube-embed" || data.direction !== "event") return;
+
+  // 3. Dispatch on the event type.
+  switch (data.type) {
+    case "cube:event:ready":
+      console.log("Embed ready", data.payload.embedTenant, data.payload.deploymentId);
+      break;
+    case "cube:event:download":
+      myAnalytics.track("embed_download", data.payload);
+      break;
+    case "cube:event:ai-query":
+      myAnalytics.track("embed_ai_query", { query: data.payload.query });
+      break;
+    case "cube:event:error":
+      console.error("Embed error", data.payload.message);
+      break;
+    default:
+      // ready, view, navigate, dashboard-loaded, drilldown, …
+      myAnalytics.track(data.type, { surface: data.surface, ...data.payload });
+  }
+});
+```
+
+### Event catalog
+
+| Event | Fires when | Surfaces |
+| --- | --- | --- |
+| [`cube:event:ready`](#cube-event-ready) | The embed has authenticated and mounted (the handshake) | all |
+| [`cube:event:view`](#cube-event-view) | A surface is viewed, on load and on each in-embed navigation | all |
+| [`cube:event:navigate`](#cube-event-navigate) | The viewer navigates within the embed | all |
+| [`cube:event:dashboard-loaded`](#cube-event-dashboard-loaded) | All widgets on a dashboard have rendered | dashboard |
+| [`cube:event:download`](#cube-event-download) | The viewer exports data or an image | dashboard |
+| [`cube:event:drilldown`](#cube-event-drilldown) | The viewer drills into a measure | dashboard |
+| [`cube:event:ai-query`](#cube-event-ai-query) | The viewer runs an AI / natural-language query | all |
+| [`cube:event:error`](#cube-event-error) | The embed surfaces an error | all |
+
+<Note>
+  Every event payload is also delivered with the envelope's `surface` field, so
+  you can always tell which surface (`dashboard`, `app`, or `chat`) it came from
+  — including AI queries, which report `app` when run inside the embedded app and
+  `chat` on the standalone chat surface.
+</Note>
+
+#### `cube:event:ready`
+
+Emitted once per session, as soon as the embed authenticates and mounts. The
+handshake — the first event you receive, and the moment to record an
+"embed opened".
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `embedTenant` | `string \| null` | The embed tenant the iframe resolved to, when known. |
+| `deploymentId` | `number \| null` | The deployment the embed is bound to, when known. |
+| `mode` | `"signed" \| "private"` | How the viewer was authenticated. |
+| `surface` | `"dashboard" \| "app" \| "chat"` | The surface that mounted. |
+| `publicId` | `string` _(optional)_ | The dashboard's public id, for the dashboard surface. |
+
+```json
+{
+  "embedTenant": "acme",
+  "deploymentId": 42,
+  "mode": "signed",
+  "surface": "dashboard",
+  "publicId": "a1b2c3d4"
+}
+```
+
+#### `cube:event:view`
+
+Emitted when a surface is viewed — on the initial load and again whenever the
+viewer navigates within the embed.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `surface` | `"dashboard" \| "app" \| "chat"` | The surface viewed. |
+| `path` | `string` | The in-embed route path that was viewed. |
+| `publicId` | `string` _(optional)_ | The dashboard's public id, when applicable. |
+| `title` | `string` _(optional)_ | Human-readable title of the surface, when available. |
+
+```json
+{
+  "surface": "app",
+  "path": "/embed/d/42/app/workbook/130"
+}
+```
+
+#### `cube:event:navigate`
+
+Emitted when the viewer navigates within the embed (a route change). Use it to
+mirror the embed's location in your own router or analytics.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `path` | `string` | The new path. |
+| `previousPath` | `string` _(optional)_ | The path navigated away from. |
+
+```json
+{
+  "path": "/embed/d/42/app/workbook/130",
+  "previousPath": "/embed/d/42/app"
+}
+```
+
+#### `cube:event:dashboard-loaded`
+
+Emitted when a dashboard has finished rendering all of its widgets — the "fully
+painted" signal (distinct from `ready`, which fires at mount, before data loads).
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `publicId` | `string` _(optional)_ | The dashboard's public id. |
+| `widgetCount` | `number` _(optional)_ | Number of widgets on the dashboard. |
+| `loadDurationMs` | `number` _(optional)_ | Milliseconds from mount to all widgets loaded, when measurable. |
+
+```json
+{
+  "publicId": "a1b2c3d4",
+  "widgetCount": 6
+}
+```
+
+#### `cube:event:download`
+
+Emitted when a viewer exports something — a widget's data as CSV, or (in future)
+a dashboard image. Reports _that_ an export happened and its shape — never the
+exported rows themselves.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. |
+| `target` | `"widget" \| "dashboard"` | Whether a single widget or the whole dashboard was exported. |
+| `widgetId` | `string` _(optional)_ | Id of the source widget, when `target` is `"widget"`. |
+| `title` | `string` _(optional)_ | Title of the exported widget / dashboard. |
+| `rowCount` | `number` _(optional)_ | Rows exported, for data exports (`csv` / `xlsx`). |
+
+```json
+{
+  "format": "csv",
+  "target": "widget",
+  "widgetId": "37",
+  "title": "Revenue by month",
+  "rowCount": 128
+}
+```
+
+<Note>
+  The CSV download action on a dashboard widget only appears when the embed URL
+  includes `allowExport=true` (see [Dashboards → Allow CSV
+  export](/embedding/iframe/dashboards#allow-csv-export)). The event fires when a
+  viewer uses it.
+</Note>
+
+#### `cube:event:drilldown`
+
+Emitted when a viewer drills into a measure (clicks a chart mark or table cell to
+see its detail rows).
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `member` | `string` | The fully-qualified measure that was drilled into. |
+| `value` | `unknown` _(optional)_ | The clicked value, when the click carried one. |
+| `widgetId` | `string` _(optional)_ | Id of the originating widget. |
+
+```json
+{
+  "member": "orders.count",
+  "value": "completed",
+  "widgetId": "37"
+}
+```
+
+#### `cube:event:ai-query`
+
+Emitted around an AI / natural-language query — capturing _what_ the viewer asked
+and the lifecycle stage. Fires wherever AI chat is used: the standalone chat
+surface, the dashboard agent, and the embedded app.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `query` | `string` | The natural-language query the viewer submitted. |
+| `status` | `"submitted" \| "completed" \| "error"` | Lifecycle stage of the query. |
+| `chatId` | `string` _(optional)_ | The chat/session id, when applicable. |
+| `agentId` | `string` _(optional)_ | The agent that answered, when applicable. |
+
+```json
+{
+  "query": "top 10 customers by revenue this quarter",
+  "status": "submitted",
+  "agentId": "1"
+}
+```
+
+#### `cube:event:error`
+
+Emitted when the embed surfaces an error (a render error, a query failure, an
+auth/session problem). `fatal` distinguishes an error that took the whole surface
+down from a recoverable one.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `message` | `string` | Human-readable message. |
+| `name` | `string` _(optional)_ | Error name/class, e.g. `"TypeError"`. |
+| `context` | `string` _(optional)_ | Where it originated, e.g. `"embed-render"`. |
+| `fatal` | `boolean` _(optional)_ | `true` when the error took down the whole surface. |
+
+```json
+{
+  "message": "Failed to load data",
+  "context": "embed-render",
+  "fatal": true
+}
+```
+
+## Sending actions
+
+Send actions into the embed by posting a message to the iframe's
+`contentWindow`. Always target your tenant's origin (not `"*"`) so the message
+can't leak to another document if the iframe navigates away.
+
+```js
+const iframe = document.querySelector("iframe#cube");
+const CUBE_ORIGIN = "https://your-tenant.cubecloud.dev";
+
+function sendAction(type, payload = {}) {
+  iframe.contentWindow.postMessage(
+    {
+      source: "cube-embed",
+      direction: "action",
+      type,
+      payload,
+      timestamp: Date.now(),
+    },
+    CUBE_ORIGIN
+  );
+}
+
+// Examples
+sendAction("cube:action:set-color-scheme", { scheme: "dark" });
+sendAction("cube:action:set-filter", {
+  filterUrlParameter: 'f_orders.status={"value":"completed"}',
+});
+sendAction("cube:action:refresh");
+```
+
+### Action catalog
+
+| Action | Effect | Payload |
+| --- | --- | --- |
+| [`cube:action:set-color-scheme`](#cube-action-set-color-scheme) | Switch light / dark / auto | `{ scheme }` |
+| [`cube:action:set-theme`](#cube-action-set-theme) | Apply a brand theme (colors, fonts) | `embedTheme` object |
+| [`cube:action:set-locale`](#cube-action-set-locale) | Switch the UI language | `{ locale }` |
+| [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard | `{ filterUrlParameter }` |
+| [`cube:action:navigate`](#cube-action-navigate) | Navigate the embed to a path | `{ path }` |
+| [`cube:action:refresh`](#cube-action-refresh) | Re-run the embed's queries | _none_ |
+
+#### `cube:action:set-color-scheme`
+
+Switch the embed's color scheme at runtime.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `scheme` | `"light" \| "dark" \| "auto"` | `"auto"` follows the viewer's OS preference. |
+
+```js
+sendAction("cube:action:set-color-scheme", { scheme: "dark" });
+```
+
+#### `cube:action:set-theme`
+
+Apply a brand theme (colors, fonts) to the embed at runtime. The payload is an
+`embedTheme` object — the same shape the [Generate Session API](/reference/embed-apis/generate-session)
+accepts. Common fields are `primaryColor`, `borderRadius`, and `font`; see
+[App customization](/embedding/iframe/customization#app-customization) for the
+full list.
+
+```js
+sendAction("cube:action:set-theme", {
+  primaryColor: "#7c5cff",
+  borderRadius: 8,
+});
+```
+
+#### `cube:action:set-locale`
+
+Switch the embed's UI language. Accepts a full code (`es-ES`), a short code
+(`es`), or a regional variant.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `locale` | `string` | The locale to switch to. |
+
+```js
+sendAction("cube:action:set-locale", { locale: "es" });
+```
+
+#### `cube:action:set-filter`
+
+Push a filter into a dashboard. The `filterUrlParameter` is the same
+`f_<semantic_view>.<dimension>=<JSON>` form used to
+[pre-set filters via URL](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url),
+so you can capture a viewer's filters and restore them later.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `filterUrlParameter` | `string` | Filter(s) in URL-query form, e.g. `f_orders.status={"value":"completed"}`. |
+
+```js
+sendAction("cube:action:set-filter", {
+  filterUrlParameter: 'f_orders.status={"value":"completed"}',
+});
+```
+
+#### `cube:action:navigate`
+
+Navigate the embed to an in-embed path.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `path` | `string` | The in-embed path to navigate to. |
+
+```js
+sendAction("cube:action:navigate", { path: "/embed/d/42/app/workbook/130" });
+```
+
+#### `cube:action:refresh`
+
+Re-run the embed's queries and refresh its data. No payload.
+
+```js
+sendAction("cube:action:refresh");
+```
+
+## Surfaces
+
+Events come from one of three customer-facing surfaces, reported in the envelope's
+`surface` field:
+
+- `dashboard` — a [published dashboard](/embedding/iframe/dashboards).
+- `app` — the [Creator-mode app](/embedding/iframe/creator-mode) (workbooks,
+  folders, in-app dashboards). AI chat run _inside_ the app reports `app`.
+- `chat` — the standalone [analytics chat](/embedding/iframe/analytics-chat).
+
+## Security
+
+- **Always validate `event.origin`** against your tenant's origin in your
+  `message` listener, and check `data.source === "cube-embed"`. Never act on a
+  message that fails either check.
+- **Target your tenant's origin when sending actions** (`iframe.contentWindow.postMessage(msg, CUBE_ORIGIN)`),
+  not `"*"`, so an action can't be delivered to an unexpected document.
+
+## Complete example
+
+A minimal host page that loads a signed dashboard embed, logs every event, and
+exposes buttons to drive it. Generate the `session` on your backend with the
+[Generate Session API](/reference/embed-apis/generate-session) — see
+[Signed embedding](/embedding/iframe/auth/signed) for the full flow.
+
+```html
+<!doctype html>
+<html>
+  <body>
+    <button id="dark">Dark mode</button>
+    <button id="refresh">Refresh</button>
+
+    <iframe
+      id="cube"
+      title="Dashboard"
+      src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+      width="100%"
+      height="800"
+    ></iframe>
+
+    <script>
+      const CUBE_ORIGIN = "https://your-tenant.cubecloud.dev";
+      const iframe = document.getElementById("cube");
+
+      // Receive events (embed → host)
+      window.addEventListener("message", (event) => {
+        if (event.origin !== CUBE_ORIGIN) return;
+        const data = event.data;
+        if (!data || data.source !== "cube-embed" || data.direction !== "event") return;
+
+        console.log(`[${data.surface}] ${data.type}`, data.payload);
+        // → forward to your own analytics / event bus here
+      });
+
+      // Send actions (host → embed)
+      function sendAction(type, payload = {}) {
+        iframe.contentWindow.postMessage(
+          { source: "cube-embed", direction: "action", type, payload, timestamp: Date.now() },
+          CUBE_ORIGIN
+        );
+      }
+
+      document.getElementById("dark").onclick = () =>
+        sendAction("cube:action:set-color-scheme", { scheme: "dark" });
+      document.getElementById("refresh").onclick = () =>
+        sendAction("cube:action:refresh");
+    </script>
+  </body>
+</html>
+```
