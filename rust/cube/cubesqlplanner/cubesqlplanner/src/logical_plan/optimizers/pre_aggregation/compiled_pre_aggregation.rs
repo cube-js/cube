@@ -20,7 +20,21 @@ pub struct PreAggregationJoin {
 
 #[derive(Clone, Debug)]
 pub struct PreAggregationUnion {
-    pub items: Vec<Rc<PreAggregationTable>>,
+    pub items: Vec<PreAggregationUnionItem>,
+}
+
+/// A single member rollup of a `rollupLambda` union, paired with the
+/// member symbols of *that* rollup. The lambda exposes the first member
+/// rollup's symbols, but each branch stores its columns under its own
+/// cube aliases (e.g. `requests_stream__tenant_id` vs `requests__tenant_id`),
+/// so the physical builder needs each branch's own symbols to read the
+/// right column while projecting the lambda's unified alias.
+#[derive(Clone, Debug)]
+pub struct PreAggregationUnionItem {
+    pub table: Rc<PreAggregationTable>,
+    pub measures: Vec<Rc<MemberSymbol>>,
+    pub dimensions: Vec<Rc<MemberSymbol>>,
+    pub time_dimensions: Vec<Rc<MemberSymbol>>,
 }
 
 #[derive(Clone, Debug)]

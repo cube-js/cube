@@ -673,61 +673,108 @@ impl TestContext {
         for key in &order {
             let usages = &grouped[key];
             let pre_agg = &usages[0].pre_aggregation;
-            let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
-            let mut union_measures: Vec<String> = Vec::new();
-            let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-            for u in usages {
-                for m in u.pre_aggregation.measures() {
-                    let n = m.full_name();
-                    if seen.insert(n.clone()) {
-                        union_measures.push(n);
+
+            match pre_agg.source().as_ref() {
+                // A rollupLambda unions member rollups that may live in different
+                // cubes. Production refreshes each member rollup independently, so
+                // every stored table carries ITS OWN cube aliases (e.g.
+                // `visitor_checkins2__visitor_id`).
+                PreAggregationSource::Union(union) => {
+                    for item in &union.items {
+                        let yaml = Self::build_pre_agg_query_yaml_from_members(
+                            &item.measures,
+                            &item.dimensions,
+                            &item.time_dimensions,
+                        );
+                        let inlined_sql = self.build_pre_agg_table_sql(&yaml);
+                        let name = item
+                            .table
+                            .alias
+                            .clone()
+                            .unwrap_or_else(|| item.table.name.clone());
+                        let table_name = PlanSqlTemplates::alias_name(&format!(
+                            "{}.{}",
+                            item.table.cube_name, name
+                        ));
+                        Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
+                    }
+                }
+                _ => {
+                    let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
+                    // Dedup usages by (cube, name): the optimizer creates a separate
+                    // PreAggregationUsage per subquery with only the measures consumed
+                    // in that subquery; the physical pre-agg table must expose the union.
+                    let mut union_measures: Vec<String> = Vec::new();
+                    let mut seen: std::collections::HashSet<String> =
+                        std::collections::HashSet::new();
+                    for u in usages {
+                        for m in u.pre_aggregation.measures() {
+                            let n = m.full_name();
+                            if seen.insert(n.clone()) {
+                                union_measures.push(n);
+                            }
+                        }
+                    }
+                    let yaml = Self::build_pre_agg_query_yaml(pre_agg, &union_measures);
+                    let inlined_sql = self.build_pre_agg_table_sql(&yaml);
+
+                    for table in &tables {
+                        let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+                        let table_name =
+                            PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
+                        Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
                     }
                 }
             }
-            let yaml = Self::build_pre_agg_query_yaml(pre_agg, &union_measures);
-
-            let pa_ctx =
-                Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
-                    .expect("Failed to create pre-agg context");
-
-            let (raw_sql, _) = pa_ctx
-                .build_sql_with_used_pre_aggregations(&yaml)
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}",
-                        yaml, e
-                    )
-                });
-
-            let templates = pa_ctx
-                .query_tools
-                .plan_sql_templates(false)
-                .expect("Failed to get SQL templates");
-            let (sql, params) = pa_ctx
-                .query_tools
-                .build_sql_and_params(&raw_sql, true, &templates)
-                .expect("Failed to build pre-agg SQL and params");
-            let inlined_sql = Self::inline_params(&sql, &params);
-
-            for table in &tables {
-                let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
-                let table_name =
-                    PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
-
-                client
-                    .batch_execute(&format!(
-                        "DROP TABLE IF EXISTS \"{table_name}\";\n\
-                         CREATE TABLE \"{table_name}\" AS ({inlined_sql})"
-                    ))
-                    .await
-                    .unwrap_or_else(|e| {
-                        panic!(
-                            "Failed to create pre-agg table {}: {}\nSQL: {}",
-                            table_name, e, inlined_sql
-                        )
-                    });
-            }
         }
+    }
+
+    /// Builds SQL that materializes a pre-aggregation table from a
+    /// `pre_aggregation_query: true` YAML (the rollup-defining SELECT), with
+    /// parameters inlined so it can run as `CREATE TABLE ... AS (...)`.
+    #[cfg(feature = "integration-postgres")]
+    fn build_pre_agg_table_sql(&self, yaml: &str) -> String {
+        let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
+            .expect("Failed to create pre-agg context");
+
+        let (raw_sql, _) = pa_ctx
+            .build_sql_with_used_pre_aggregations(yaml)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to build pre-agg SQL.\nQuery YAML:\n{}\nError: {}",
+                    yaml, e
+                )
+            });
+
+        let templates = pa_ctx
+            .query_tools
+            .plan_sql_templates(false)
+            .expect("Failed to get SQL templates");
+        let (sql, params) = pa_ctx
+            .query_tools
+            .build_sql_and_params(&raw_sql, true, &templates)
+            .expect("Failed to build pre-agg SQL and params");
+        Self::inline_params(&sql, &params)
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    async fn create_pg_pre_agg_table(
+        client: &tokio_postgres::Client,
+        table_name: &str,
+        inlined_sql: &str,
+    ) {
+        client
+            .batch_execute(&format!(
+                "DROP TABLE IF EXISTS \"{table_name}\";\n\
+                 CREATE TABLE \"{table_name}\" AS ({inlined_sql})"
+            ))
+            .await
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to create pre-agg table {}: {}\nSQL: {}",
+                    table_name, e, inlined_sql
+                )
+            });
     }
 
     #[cfg(feature = "integration-postgres")]
@@ -741,9 +788,11 @@ impl TestContext {
                 }
                 tables
             }
-            PreAggregationSource::Union(union) => {
-                union.items.iter().map(|t| t.as_ref().clone()).collect()
-            }
+            PreAggregationSource::Union(union) => union
+                .items
+                .iter()
+                .map(|item| item.table.as_ref().clone())
+                .collect(),
         }
     }
 
@@ -781,6 +830,52 @@ impl TestContext {
         if !pre_agg.time_dimensions().is_empty() {
             yaml.push_str("time_dimensions:\n");
             for td in pre_agg.time_dimensions() {
+                if let Ok(td_sym) = td.as_time_dimension() {
+                    yaml.push_str(&format!(
+                        "  - dimension: {}\n",
+                        td_sym.base_symbol().full_name()
+                    ));
+                    if let Some(gran) = td_sym.granularity() {
+                        yaml.push_str(&format!("    granularity: {}\n", gran));
+                    }
+                } else {
+                    yaml.push_str(&format!("  - dimension: {}\n", td.full_name()));
+                }
+            }
+        }
+
+        yaml.push_str("pre_aggregation_query: true\n");
+        yaml
+    }
+
+    /// Same as `build_pre_agg_query_yaml` but driven by explicit member symbols
+    /// instead of a `PreAggregation`. Used to materialize each rollupLambda union
+    /// member from its own cube's members.
+    #[cfg(feature = "integration-postgres")]
+    fn build_pre_agg_query_yaml_from_members(
+        measures: &[Rc<MemberSymbol>],
+        dimensions: &[Rc<MemberSymbol>],
+        time_dimensions: &[Rc<MemberSymbol>],
+    ) -> String {
+        let mut yaml = String::new();
+
+        if !measures.is_empty() {
+            yaml.push_str("measures:\n");
+            for m in measures {
+                yaml.push_str(&format!("  - {}\n", m.full_name()));
+            }
+        }
+
+        if !dimensions.is_empty() {
+            yaml.push_str("dimensions:\n");
+            for d in dimensions {
+                yaml.push_str(&format!("  - {}\n", d.full_name()));
+            }
+        }
+
+        if !time_dimensions.is_empty() {
+            yaml.push_str("time_dimensions:\n");
+            for td in time_dimensions {
                 if let Ok(td_sym) = td.as_time_dimension() {
                     yaml.push_str(&format!(
                         "  - dimension: {}\n",

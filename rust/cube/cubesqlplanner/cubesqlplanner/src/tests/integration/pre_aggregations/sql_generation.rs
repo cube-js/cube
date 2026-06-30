@@ -1478,3 +1478,45 @@ async fn test_ungrouped_pre_agg_measure_reads_rollup_column() -> Result<(), Cube
 
     Ok(())
 }
+
+// `lambda_union` UNIONs `visitor_checkins.for_lambda` with
+// `visitor_checkins2.for_lambda`. The lambda exposes the first member
+// rollup's symbols, so the dimension's unified output alias is
+// `visitor_checkins__visitor_id`, but the second branch stores it as
+// `visitor_checkins2__visitor_id`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rollup_lambda_cross_cube_union_aliases() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
+    let ctx = TestContext::new(schema)?;
+
+    // Force the lambda; otherwise the matcher would pick the plain `for_lambda`
+    // rollup that the lambda is built from (it is declared first). The total
+    // `order:` pins row order so the CubeStore result snapshot is stable.
+    let query_yaml = indoc! {"
+        measures:
+          - visitor_checkins.count
+        dimensions:
+          - visitor_checkins.visitor_id
+        time_dimensions:
+          - dimension: visitor_checkins.created_at
+            granularity: day
+        order:
+          - id: visitor_checkins.visitor_id
+          - id: visitor_checkins.created_at
+        pre_aggregation_id: visitor_checkins.lambda_union
+    "};
+
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "lambda_union");
+
+    if let Some(result) = ctx
+        .try_execute(query_yaml, "pre_aggregation_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("rollup_lambda_cross_cube_union_cubestore_result", result);
+    }
+
+    Ok(())
+}
