@@ -68,7 +68,7 @@ describe('Extensions', () => {
         timeDimensions: [{
           dimension: 'VisitorsFunnel.time',
           granularity: 'day',
-          dateRange: { from: '2017-01-01', to: '2017-01-30' }
+          dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles'
       });
@@ -92,7 +92,7 @@ describe('Extensions', () => {
         timeDimensions: [{
           dimension: 'FooBar.time',
           granularity: 'day',
-          dateRange: { from: '2017-01-01', to: '2017-01-30' }
+          dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles'
       });

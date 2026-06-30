@@ -967,7 +967,9 @@ export class BaseQuery {
     };
 
     try {
-      const buildResult = nativeBuildSqlAndParams(queryParams);
+      // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
+      // during the member-SQL callbacks the native planner makes back into JS.
+      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -4037,7 +4039,7 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    return localTimestampToUtc(this.timezone, this.timestampFormat(), date);
+    return localTimestampToUtc(this.timezone || 'UTC', this.timestampFormat(), date);
   }
 
   /**
