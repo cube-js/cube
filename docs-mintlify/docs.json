@@ -437,6 +437,7 @@
               "embedding/iframe/analytics-chat",
               "embedding/iframe/creator-mode",
               "embedding/iframe/customization",
+              "embedding/iframe/localization",
               "embedding/iframe/events",
               {
                 "group": "Authentication",
