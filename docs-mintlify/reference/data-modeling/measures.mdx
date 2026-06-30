@@ -697,6 +697,17 @@ which remain supported. To migrate, use `grain.keep_only` instead of `group_by`,
 
 </Note>
 
+<Note>
+
+The `grain` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
+(`CUBEJS_TESSERACT_SQL_PLANNER=true`) and is only valid on **measures** — it is rejected on
+dimensions. For a step-by-step explanation with worked result tables, see
+[Controlling grain](/docs/data-modeling/measures#controlling-grain) in the measures guide, and
+the [semi-additive measures recipe](/recipes/data-modeling/semi-additive-measures) for a worked
+end-of-period example.
+
+</Note>
+
 ### `group_by`, `reduce_by`, and `add_group_by` (legacy)
 
 These three parameters were the original way to control the inner aggregation stage's

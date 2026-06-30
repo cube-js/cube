@@ -412,13 +412,129 @@ measures:
     type: rank
 ```
 
-<Note>
+### Controlling grain
 
-`grain` replaces the standalone `group_by`, `reduce_by`, and `add_group_by`
-parameters, which remain supported. See the [`grain`][ref-grain] reference for
-the migration mapping.
+[`group_by`][ref-group-by], [`reduce_by`][ref-reduce-by], and
+[`add_group_by`][ref-add-group-by] each adjust the grain of a multi-stage
+measure's inner aggregation in one direction. The [`grain`][ref-grain] parameter
+is a unified alternative that expresses all of them — and their combinations —
+through three composable keys: `keep_only`, `exclude`, and `include`.
 
-</Note>
+A multi-stage measure is computed in two stages: an **inner** aggregation at some
+grain, then an **outer** aggregation that rolls the result up to the query's grain.
+`grain` sets that inner grain, so the measure can take a value at a different grain
+than the row it is returned on.
+
+The examples below use an `orders` cube with `status`, `category`, and `id`
+dimensions and a `total_amount` (`sum`) base measure.
+
+#### `keep_only`
+
+Restricts the measure's grain to only the listed dimensions that are present in the
+query; the value repeats across every other query dimension. This is the building
+block for "share within a group" — divide the base measure by a `keep_only` measure
+to get each row's share of its group total.
+
+```yaml
+measures:
+  - name: amount_by_status
+    multi_stage: true
+    sql: "{total_amount}"
+    type: sum
+    grain:
+      keep_only:
+        - orders.status
+```
+
+Querying both `status` and `category`, the measure returns the per-status total on
+every row, regardless of `category`:
+
+| `status` | `category` | `total_amount` | `amount_by_status` |
+|---|---|---:|---:|
+| completed | books | 170 | **370** |
+| completed | electronics | 200 | **370** |
+| pending | books | 50 | **125** |
+| pending | electronics | 75 | **125** |
+| cancelled | books | 30 | **30** |
+
+If none of the listed dimensions are present in the query — for example, grouping
+only by `category` so `status` is absent — the grain becomes empty and the measure
+collapses to the grand total:
+
+| `category` | `total_amount` | `amount_by_status` |
+|---|---:|---:|
+| books | 250 | **525** |
+| electronics | 275 | **525** |
+
+#### `exclude`
+
+Removes the listed dimensions from the grain. The measure is computed as if those
+dimensions were not in the query, so the same value repeats across them. `exclude`
+is the inverse framing of `keep_only` — convenient when you want to drop one
+dimension while keeping the rest.
+
+```yaml
+measures:
+  - name: amount_excl_status
+    multi_stage: true
+    sql: "{total_amount}"
+    type: sum
+    grain:
+      exclude:
+        - orders.status
+```
+
+Querying both `status` and `category`, excluding `status` from the grain leaves
+`category`, so each row gets the per-category total:
+
+| `status` | `category` | `total_amount` | `amount_excl_status` |
+|---|---|---:|---:|
+| completed | books | 170 | **250** |
+| pending | books | 50 | **250** |
+| cancelled | books | 30 | **250** |
+| completed | electronics | 200 | **275** |
+| pending | electronics | 75 | **275** |
+
+`exclude` accepts multiple members — for example `exclude: [status, id]` drops both
+from the grain, leaving only `category`.
+
+#### `include`
+
+Adds dimensions to the inner (leaf) grain that are not in the query; the outer stage
+then re-aggregates back to the query's grain. Use this to force a finer intermediate
+breakdown before the outer aggregation.
+
+```yaml
+measures:
+  - name: amount_incl_id
+    multi_stage: true
+    sql: "{total_amount}"
+    type: sum
+    grain:
+      include:
+        - orders.id
+```
+
+When you query by `category`, the inner stage groups by `(category, id)` and the
+outer stage sums back over `id` to the per-category total.
+
+`keep_only` and `include` can be combined: `keep_only` narrows the parent grain,
+then `include` extends the leaf. For example, `keep_only: [status]` with
+`include: [id]`, queried by `status` and `category`, narrows the parent grain to
+`status` and adds `id` to the leaf — the outer stage re-aggregates by
+`(status, category)`, broadcasting each per-status total across its categories:
+
+| `status` | `category` | `total_amount` | `amount_by_status_incl_id` |
+|---|---|---:|---:|
+| completed | books | 170 | **370** |
+| completed | electronics | 200 | **370** |
+| pending | books | 50 | **125** |
+| pending | electronics | 75 | **125** |
+| cancelled | books | 30 | **30** |
+
+See the [`grain` reference][ref-grain] for the parameter spec, and the
+[semi-additive measures recipe][ref-semi-additive-recipe] for a worked
+end-of-period example.
 
 ### Conditional measures
 
@@ -475,7 +591,11 @@ measures:
 [ref-format]: /reference/data-modeling/measures#format
 [ref-rolling-window]: /reference/data-modeling/measures#rolling_window
 [ref-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-group-by]: /reference/data-modeling/measures#group_by-reduce_by-and-add_group_by-legacy
+[ref-reduce-by]: /reference/data-modeling/measures#group_by-reduce_by-and-add_group_by-legacy
+[ref-add-group-by]: /reference/data-modeling/measures#group_by-reduce_by-and-add_group_by-legacy
 [ref-grain]: /reference/data-modeling/measures#grain
+[ref-semi-additive-recipe]: /recipes/data-modeling/semi-additive-measures
 [ref-filter]: /reference/data-modeling/measures#filter
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type

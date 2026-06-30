@@ -1,0 +1,311 @@
+---
+title: Semi-additive (end-of-period) measures
+description: Model balances and other snapshot metrics that sum across entities but not across time, using a multi-stage rank measure and the grain directive to pick each period's last snapshot at any date grain.
+---
+
+## Use case
+
+A **semi-additive** measure can be summed across some dimensions but not others. The canonical
+example is an **account balance**: summing every daily balance in a month is meaningless — what
+you want is the **balance on the last day of the period** (end-of-month, end-of-quarter, and so
+on). Balances are additive across entities (accounts, products, stores) but *not* across time.
+
+This recipe uses a multi-stage [`rank`][ref-type] measure and the [`grain`][ref-grain] directive
+to pick each period's final snapshot declaratively, so it works for *any* date grain the user
+groups by — no per-grain SQL and no query rewriting.
+
+<Warning>
+
+This pattern requires the Tesseract SQL planner. Set
+[`CUBEJS_TESSERACT_SQL_PLANNER=true`][ref-tesseract-env]. The multi-stage `grain` directive is
+not supported on the legacy planner.
+
+</Warning>
+
+## The data
+
+Consider a fact table of **daily balance snapshots**, one row per account per day:
+
+| `snapshot_date` | `account_id` | `balance` | `snapshot_frequency_key` |
+|---|---|---:|---|
+| 2024-01-30 | A1 | 1,000 | 1 *(daily)* |
+| 2024-01-31 | A1 | 1,200 | 1 *(daily)* |
+| 2024-01-31 | A2 | 500 | 1 *(daily)* |
+| 2024-02-29 | A1 | 900 | 1 *(daily)* |
+| 2024-01-31 | A1 | 1,150 | 2 *(month-end)* |
+| 2024-02-29 | A1 | 880 | 2 *(month-end)* |
+
+- **`snapshot_frequency_key`** discriminates independent snapshot streams — here `1` = daily and
+  `2` = a separate official month-end feed (note the daily and month-end balances for A1 on
+  2024-01-31 differ: 1,200 vs 1,150). Keeping it in the partition prevents the two streams from
+  contaminating each other's "latest" calculation; consumers then pick a stream with a filter.
+  Keep the key in the model even if you start with a single stream — it future-proofs the partition.
+- Note `A2` has **no row on 2024-01-30**. End-of-January for `A2` should be its 01-31 balance
+  (500); a *missing* account at period end should contribute **0**, not its last-seen value. That
+  edge case is exactly what the partition design below gets right.
+
+A standard date-dimension cube (`date_dim`) joins on `snapshot_date` and exposes the usual grains
+— `calendar_year`, `calendar_quarter`, `calendar_month`, `calendar_week`, and so on.
+
+## Data modeling
+
+The pattern is two multi-stage measures: a `rank` that finds each period's last snapshot date,
+and a `sum` that totals only the rows on that date.
+
+```yaml
+cubes:
+  - name: balance_snapshots
+    sql_table: analytics.balance_snapshots
+
+    joins:
+      - name: date_dim
+        relationship: many_to_one
+        sql: "{CUBE}.snapshot_date = {date_dim}.date_val"
+
+    dimensions:
+      - name: snapshot_date_key
+        sql: snapshot_date
+        type: time
+      - name: snapshot_frequency_key
+        sql: snapshot_frequency_key
+        type: number
+      - name: account_id
+        sql: account_id
+        type: string
+
+    measures:
+      # Plain additive base measure — safe to sum across accounts AND days.
+      - name: balance
+        sql: balance
+        type: sum
+
+      # ── Step 1: rank snapshot dates within each period (latest = 1) ──────────────
+      - name: eop_rank
+        public: false
+        multi_stage: true
+        type: rank
+        order_by:
+          - sql: "{snapshot_date_key}"
+            dir: desc
+        # A single grain block shapes both stages of this measure.
+        grain:
+          # include = the leaf GROUP BY. Pushes snapshot_date_key into the leaf so the
+          # rank has a physical column to order by (without it: "missing FROM-clause
+          # entry"), and snapshot_frequency_key so it survives into the partition below.
+          include:
+            - snapshot_date_key
+            - snapshot_frequency_key
+          # keep_only = the window PARTITION BY. List ONLY the date grains a query might
+          # group by, plus snapshot_frequency_key. Everything else (account_id) is
+          # dropped from the partition, so "rank = 1" means the period's GLOBAL last
+          # snapshot date — identical for every account.
+          keep_only:
+            - snapshot_frequency_key
+            - date_dim.calendar_year
+            - date_dim.calendar_quarter
+            - date_dim.calendar_month
+            - date_dim.calendar_week
+            # …add every date-dim grain a query might group by. A MISSING entry silently
+            #   over-counts (period computed too coarse); extra entries are harmless.
+
+      # ── Step 2: sum the base measure, keeping only the period's last snapshot ─────
+      - name: balance_eop
+        title: End-of-Period Balance
+        multi_stage: true
+        type: sum
+        sql: "{balance}"
+        # Repeat the leaf members (grain.include) so the rank filter is evaluated per
+        # snapshot date — same canonical form as eop_rank, no add_group_by.
+        grain:
+          include:
+            - snapshot_date_key
+            - snapshot_frequency_key
+        filters:
+          - sql: "{eop_rank} = 1"
+```
+
+That is the whole pattern. `balance_eop` now returns the correct end-of-period balance at **any**
+grain the consumer groups by — no rewrite logic and no per-grain measures.
+
+## What SQL this generates
+
+<Note>
+
+The SQL below is **illustrative** — simplified to show how `grain.include` and `grain.keep_only`
+map onto the `GROUP BY` and `PARTITION BY` clauses. The SQL Cube actually emits will differ in
+detail (CTE naming, column aliasing, extra wrapping subqueries, dialect-specific syntax). Inspect
+the real output for your setup via the [`/v1/sql` endpoint][ref-sql-api].
+
+</Note>
+
+For the query:
+
+```sql
+SELECT calendar_year, calendar_month, MEASURE(balance_snapshots.balance_eop)
+FROM balance_snapshots
+GROUP BY 1, 2
+```
+
+Cube compiles the multi-stage measure into two stacked stages:
+
+```sql
+-- STAGE 1 (leaf): the GROUP BY. Grain = queried dims + grain.include members.
+WITH leaf AS (
+  SELECT
+    calendar_year,
+    calendar_month,
+    snapshot_frequency_key,   --\__ injected by grain.include
+    snapshot_date_key,        --/   (not in the user's SELECT)
+    SUM(balance) AS balance
+  FROM balance_snapshots
+  JOIN date_dim ON balance_snapshots.snapshot_date = date_dim.date_val
+  GROUP BY 1, 2, 3, 4         -- ← grain.include forced cols 3 & 4 in here
+),
+
+-- STAGE 2 (window): the rank. PARTITION BY = grain AFTER keep_only.
+ranked AS (
+  SELECT
+    leaf.*,
+    RANK() OVER (
+      PARTITION BY calendar_year, calendar_month, snapshot_frequency_key
+                -- ↑ only date grains + frequency survived keep_only;
+                --   account_id was stripped out here.
+      ORDER BY snapshot_date_key DESC          -- ← order_by
+    ) AS eop_rank
+  FROM leaf
+)
+
+-- FINAL: sum the surviving rows.
+SELECT calendar_year, calendar_month, SUM(balance) AS balance_eop
+FROM ranked
+WHERE eop_rank = 1                              -- ← filters: {eop_rank} = 1
+GROUP BY 1, 2
+```
+
+## Why both `include` and `keep_only` are needed
+
+Both keys live in the **same `grain` block** but act on **different clauses of different stages**
+and pull in opposite directions:
+
+| | `grain.include` | `grain.keep_only` |
+|---|---|---|
+| Acts on | Stage 1 `GROUP BY` (leaf grain) | Stage 2 `PARTITION BY` (window) |
+| Direction | **adds** members | **restricts** members |
+| Purpose | make `snapshot_date_key` exist so `order_by` can reference it | scope the rank to the date grain only, dropping entity dims |
+| Omit it and… | `missing FROM-clause entry for snapshot_date_key` | rank computed per-account, not per period-end |
+
+<Note>
+
+`grain.include` is the canonical form of the legacy [`add_group_by`][ref-add-group-by] directive
+(and `keep_only` / `exclude` are the canonical forms of `group_by` / `reduce_by`). When a measure
+sets a `grain` block, those legacy directives are ignored — so keep everything inside `grain`
+rather than mixing the two styles.
+
+</Note>
+
+### The partition is the whole point
+
+```sql
+-- WITHOUT keep_only — account_id stays in the partition:
+PARTITION BY calendar_year, calendar_month, account_id, snapshot_frequency_key
+-- → rank = 1 is "latest date THIS account appears". An account absent on Jan 31 but
+--   present Jan 30 ranks its Jan-30 row = 1 → counted. WRONG.
+
+-- WITH keep_only — account_id dropped:
+PARTITION BY calendar_year, calendar_month, snapshot_frequency_key
+-- → rank = 1 is the month's GLOBAL last snapshot date (Jan 31), same for every account.
+--   An account with no Jan-31 row has no rank-1 row → contributes 0. CORRECT.
+```
+
+This "missing at period end ⇒ 0" behavior is usually what end-of-period reporting wants, and it
+falls out automatically once entity dimensions are excluded from the partition.
+
+## Defaulting the snapshot stream
+
+`snapshot_frequency_key` is in the partition, so `balance_eop` is computed *per stream*. If a
+query touches more than one stream at once — for example both the daily feed (`1`) and the
+official month-end feed (`2`) — every period ends up with one rank-1 row *per stream*, and the
+outer sum adds them together, double-counting the balance.
+
+That is exactly why the column exists: consumers should always be scoped to a single stream.
+Rather than rely on every consumer remembering to filter, expose the cube through a view with a
+[`default_filters`][ref-default-filters] entry that pins the stream by default but releases as
+soon as the consumer filters it themselves (via [`unless`][ref-default-filters]):
+
+```yaml
+views:
+  - name: balances
+    cubes:
+      - join_path: balance_snapshots
+        includes: "*"
+      # The calendar grains the measures partition by live on date_dim, so the
+      # view must include them via the join path or consumers can't group by them.
+      - join_path: balance_snapshots.date_dim
+        includes:
+          - calendar_year
+          - calendar_quarter
+          - calendar_month
+          - calendar_week
+
+    default_filters:
+      # Default every query to the daily snapshot stream...
+      - member: snapshot_frequency_key
+        operator: equals
+        values:
+          - "1"
+        # ...but step aside the moment the consumer filters the stream
+        # themselves (e.g. to the official month-end feed, 2).
+        unless:
+          - snapshot_frequency_key
+```
+
+With this in place, a consumer querying `balances` by `calendar_month` gets the daily-stream
+end-of-period balance with no extra effort, and a consumer who adds
+`snapshot_frequency_key = 2` transparently switches to the official month-end feed instead.
+
+<Tip>
+
+If you want the default to be editable or removable in a workbook (rather than released only by
+an explicit filter), use [`meta.default_ui_filters`][ref-default-ui-filters] instead of
+`default_filters`.
+
+</Tip>
+
+## Gotchas
+
+- **Tesseract only.** The `grain` directive requires
+  [`CUBEJS_TESSERACT_SQL_PLANNER=true`][ref-tesseract-env].
+- **Don't mix `grain` with the legacy directives.** When a measure sets a `grain` block, the
+  legacy [`group_by`][ref-group-by] / [`reduce_by`][ref-reduce-by] / [`add_group_by`][ref-add-group-by]
+  directives on that measure are ignored. Put leaf members under `grain.include`, not `add_group_by`.
+- **Members only.** Multi-stage measures reference **members**, never `{CUBE}.raw_column`. Wrap
+  raw columns in a base measure or dimension first (here, `balance` and `snapshot_date_key`).
+- **`order_by` must be in the leaf grain.** A `rank` can only order by a column present in the
+  leaf — that is why `snapshot_date_key` must be listed under `grain.include` on the rank measure
+  (and on the consuming sum).
+- **`keep_only` takes explicit member paths only** — no cube-level or wildcard references.
+  Enumerate every date grain a query might group by. A missing grain over-counts silently; extras
+  are harmless.
+- **Default the frequency.** Always scope queries to a single `snapshot_frequency_key` so streams
+  aren't mixed and double-counted — see [Defaulting the snapshot stream](#defaulting-the-snapshot-stream).
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="grain reference" icon="layer-group" href="/reference/data-modeling/measures#grain">
+    Full semantics of the `keep_only`, `exclude`, and `include` keys.
+  </Card>
+  <Card title="Calculating share of total" icon="percent" href="/recipes/data-modeling/share-of-total">
+    Use `grain` to compute each row's contribution to a group or grand total.
+  </Card>
+</CardGroup>
+
+[ref-type]: /reference/data-modeling/measures#type
+[ref-grain]: /reference/data-modeling/measures#grain
+[ref-add-group-by]: /reference/data-modeling/measures#group_by-reduce_by-and-add_group_by-legacy
+[ref-group-by]: /reference/data-modeling/measures#group_by-reduce_by-and-add_group_by-legacy
+[ref-reduce-by]: /reference/data-modeling/measures#group_by-reduce_by-and-add_group_by-legacy
+[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-sql-api]: /reference/core-data-apis/rest-api/reference
+[ref-default-filters]: /reference/data-modeling/view#default_filters
+[ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
