@@ -347,6 +347,10 @@ export class BigqueryQuery extends BaseQuery {
     // DATEADD is being rewritten to DATE_ADD
     templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    // DATE in CubeSQL is a day-truncating UDF that returns TIMESTAMP, so the
+    // rendered SQL must stay TIMESTAMP-typed; inner DATE() handles both string
+    // and timestamp arguments and keeps the truncation
+    templates.functions.DATE = 'TIMESTAMP(DATE({{ args_concat }}))';
     delete templates.functions.TO_CHAR;
     delete templates.functions.PERCENTILECONT;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
