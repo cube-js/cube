@@ -141,7 +141,10 @@ viewer navigates within the embed.
 | `title` | `string` _(optional)_ | Human-readable title of the surface, when available. |
 
 ```json
-{ "surface": "app", "path": "/embed/d/42/app/workbook/130" }
+{
+  "surface": "app",
+  "path": "/embed/d/42/app/workbook/130"
+}
 ```
 
 #### `cube:event:navigate`
@@ -155,7 +158,10 @@ mirror the embed's location in your own router or analytics.
 | `previousPath` | `string` _(optional)_ | The path navigated away from. |
 
 ```json
-{ "path": "/embed/d/42/app/workbook/130", "previousPath": "/embed/d/42/app" }
+{
+  "path": "/embed/d/42/app/workbook/130",
+  "previousPath": "/embed/d/42/app"
+}
 ```
 
 #### `cube:event:dashboard-loaded`
@@ -170,7 +176,10 @@ painted" signal (distinct from `ready`, which fires at mount, before data loads)
 | `loadDurationMs` | `number` _(optional)_ | Milliseconds from mount to all widgets loaded, when measurable. |
 
 ```json
-{ "publicId": "a1b2c3d4", "widgetCount": 6 }
+{
+  "publicId": "a1b2c3d4",
+  "widgetCount": 6
+}
 ```
 
 #### `cube:event:download`
@@ -188,7 +197,13 @@ exported rows themselves.
 | `rowCount` | `number` _(optional)_ | Rows exported, for data exports (`csv` / `xlsx`). |
 
 ```json
-{ "format": "csv", "target": "widget", "widgetId": "37", "title": "Revenue by month", "rowCount": 128 }
+{
+  "format": "csv",
+  "target": "widget",
+  "widgetId": "37",
+  "title": "Revenue by month",
+  "rowCount": 128
+}
 ```
 
 <Note>
@@ -210,7 +225,11 @@ see its detail rows).
 | `widgetId` | `string` _(optional)_ | Id of the originating widget. |
 
 ```json
-{ "member": "orders.count", "value": "completed", "widgetId": "37" }
+{
+  "member": "orders.count",
+  "value": "completed",
+  "widgetId": "37"
+}
 ```
 
 #### `cube:event:ai-query`
@@ -227,7 +246,11 @@ surface, the dashboard agent, and the embedded app.
 | `agentId` | `string` _(optional)_ | The agent that answered, when applicable. |
 
 ```json
-{ "query": "top 10 customers by revenue this quarter", "status": "submitted", "agentId": "1" }
+{
+  "query": "top 10 customers by revenue this quarter",
+  "status": "submitted",
+  "agentId": "1"
+}
 ```
 
 #### `cube:event:error`
@@ -244,7 +267,11 @@ down from a recoverable one.
 | `fatal` | `boolean` _(optional)_ | `true` when the error took down the whole surface. |
 
 ```json
-{ "message": "Failed to load data", "context": "embed-render", "fatal": true }
+{
+  "message": "Failed to load data",
+  "context": "embed-render",
+  "fatal": true
+}
 ```
 
 ## Sending actions
@@ -307,7 +334,10 @@ Apply a brand theme (colors, fonts) to the embed at runtime. The payload is an
 [`embedTheme`](/embedding/iframe/customization#app-customization) object.
 
 ```js
-sendAction("cube:action:set-theme", { primaryColor: "#7c5cff", borderRadius: 8 });
+sendAction("cube:action:set-theme", {
+  primaryColor: "#7c5cff",
+  borderRadius: 8,
+});
 ```
 
 #### `cube:action:set-locale`
