@@ -24,6 +24,13 @@ use crate::{
     CubeError,
 };
 
+fn timestamp_tz_named_timezone_cast_template() -> Vec<(String, String)> {
+    vec![(
+        "expressions/timestamp_tz_named_timezone_cast".to_string(),
+        "CONVERT_TIMEZONE('{{ timezone }}', 'UTC', '{{ timestamp }}'::timestamp_ntz)".to_string(),
+    )]
+}
+
 #[tokio::test]
 async fn test_simple_wrapper() {
     if !Rewriter::sql_push_down_enabled() {
@@ -496,7 +503,7 @@ async fn test_wrapper_timestamptz() {
     }
     init_testing_logger();
 
-    let query_plan = convert_select_to_query_plan(
+    let query_plan = convert_select_to_query_plan_customized(
         // language=PostgreSQL
         r#"
 SELECT
@@ -504,6 +511,228 @@ SELECT
 FROM KibanaSampleDataEcommerce
 WHERE
     order_date >= TIMESTAMP WITH TIME ZONE '2024-02-03T04:05:06Z'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        timestamp_tz_named_timezone_cast_template(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains(
+            "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
+        ));
+}
+
+/// Using TIMESTAMP WITH TIME ZONE with an IANA timezone in wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz_named_timezone() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2026-06-14T00:00:00 America/Los_Angeles'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        timestamp_tz_named_timezone_cast_template(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = &query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(wrapped_sql.contains(
+        "${KibanaSampleDataEcommerce.order_date} >= CONVERT_TIMEZONE('America/Los_Angeles', 'UTC', '2026-06-14T00:00:00'::timestamp_ntz)"
+    ));
+}
+
+/// A named timezone timestamp without a seconds component should still render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz_named_timezone_no_seconds() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2026-06-14 00:00 America/Los_Angeles'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        timestamp_tz_named_timezone_cast_template(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = &query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(wrapped_sql.contains(
+        "${KibanaSampleDataEcommerce.order_date} >= CONVERT_TIMEZONE('America/Los_Angeles', 'UTC', '2026-06-14 00:00'::timestamp_ntz)"
+    ));
+}
+
+#[tokio::test]
+async fn test_wrapper_timestamptz_named_timezone_rejects_malformed_timestamp() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2026-06-14 00:00'' ) OR TRUE -- America/Los_Angeles'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        timestamp_tz_named_timezone_cast_template(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = &query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(!wrapped_sql.contains("CONVERT_TIMEZONE"));
+    assert!(!wrapped_sql.contains("OR TRUE"));
+}
+
+/// Using plain TIMESTAMP with an IANA timezone-like suffix should not render as timestamptz
+#[tokio::test]
+async fn test_wrapper_timestamp_named_timezone_not_timestamptz() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP '2026-06-14 00:00 America/Los_Angeles'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        timestamp_tz_named_timezone_cast_template(),
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = &query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(!wrapped_sql.contains("CONVERT_TIMEZONE"));
+    assert!(!wrapped_sql.contains("America/Los_Angeles"));
+    assert!(wrapped_sql.contains("CAST($1 AS TIMESTAMP)"));
+}
+
+#[tokio::test]
+async fn test_wrapper_timestamptz_named_timezone_no_template_fallback() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2026-06-14T00:00:00 America/Los_Angeles'
     AND
 --   This filter should trigger pushdown
     LOWER(customer_gender) = 'male'
@@ -522,14 +751,12 @@ GROUP BY
         displayable(physical_plan.as_ref()).indent()
     );
 
-    assert!(query_plan
+    let wrapped_sql = &query_plan
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .sql
-        .contains(
-            "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
-        ));
+        .sql;
+    assert!(!wrapped_sql.contains("CONVERT_TIMEZONE"));
 }
 
 // TODO add more time zones

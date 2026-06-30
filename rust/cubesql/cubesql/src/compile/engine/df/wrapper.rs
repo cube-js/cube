@@ -19,6 +19,7 @@ use crate::{
         AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator,
         SqlTemplates, TransportLoadRequestQuery, TransportService,
     },
+    utils::{parse_named_timezone_timestamp, TIMESTAMP_TZ_NAMED_TIMEZONE_CAST_TEMPLATE},
     CubeError,
 };
 use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
@@ -1816,6 +1817,38 @@ impl WrappedSelectNode {
             .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e)))
     }
 
+    fn generate_sql_for_named_timezone_timestamp_cast(
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: &Expr,
+        data_type: &DataType,
+    ) -> result::Result<Option<String>, DataFusionError> {
+        // DataFusion erases WITH TIME ZONE for these literals.
+        if !matches!(data_type, DataType::Timestamp(_, _)) {
+            return Ok(None);
+        }
+
+        let sql_templates = sql_generator.get_sql_templates();
+        if !sql_templates.contains_template(TIMESTAMP_TZ_NAMED_TIMEZONE_CAST_TEMPLATE) {
+            return Ok(None);
+        }
+
+        if let Expr::Literal(ScalarValue::Utf8(Some(value))) = expr {
+            if let Some((timestamp, timezone)) = parse_named_timezone_timestamp(value) {
+                return sql_templates
+                    .timestamp_tz_named_timezone_cast_expr(timestamp, timezone, value.clone())
+                    .map(Some)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for timestamp with named timezone cast: {}",
+                            e
+                        ))
+                    });
+            }
+        }
+
+        Ok(None)
+    }
+
     fn generate_sql_type(
         sql_generator: Arc<dyn SqlGenerator>,
         data_type: DataType,
@@ -2127,6 +2160,13 @@ impl WrappedSelectNode {
                 subqueries,
             ),
             Expr::Cast { expr, data_type } => {
+                if let Some(resulting_sql) = Self::generate_sql_for_named_timezone_timestamp_cast(
+                    sql_generator.clone(),
+                    expr.as_ref(),
+                    &data_type,
+                )? {
+                    return Ok((resulting_sql, sql_query));
+                }
                 let (expr, sql_query) = Self::generate_sql_for_expr(
                     sql_query,
                     sql_generator.clone(),

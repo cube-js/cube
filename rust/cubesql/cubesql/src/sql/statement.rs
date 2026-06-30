@@ -11,7 +11,7 @@ use sqlparser::ast::{
 use std::{collections::HashMap, error::Error};
 
 use super::types::ColumnType;
-use crate::sql::postgres::ConnectionError;
+use crate::{sql::postgres::ConnectionError, utils::parse_named_timezone_timestamp};
 
 #[derive(Debug)]
 enum PlaceholderType {
@@ -856,6 +856,81 @@ impl CastReplacer {
     }
 }
 
+#[derive(Debug)]
+pub struct PlainTimestampTimezoneSuffixReplacer {}
+
+impl PlainTimestampTimezoneSuffixReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+
+    fn is_plain_timestamp_data_type(data_type: &ast::DataType) -> bool {
+        matches!(
+            data_type,
+            ast::DataType::Timestamp(
+                _,
+                ast::TimezoneInfo::None | ast::TimezoneInfo::WithoutTimeZone
+            )
+        )
+    }
+
+    fn strip_plain_timestamp_timezone_suffix(value: &mut ast::Value) {
+        // Postgres ignores zones in timestamp without time zone literals.
+        let timestamp = match value {
+            Value::SingleQuotedString(str) | Value::DoubleQuotedString(str) => {
+                parse_named_timezone_timestamp(str).map(|(timestamp, _)| timestamp)
+            }
+            _ => None,
+        };
+
+        if let Some(timestamp) = timestamp {
+            *value = Value::SingleQuotedString(timestamp);
+        }
+    }
+
+    fn strip_plain_timestamp_timezone_literal(expr: &mut Expr) {
+        if let Expr::Value(value) = expr {
+            Self::strip_plain_timestamp_timezone_suffix(&mut value.value);
+        }
+    }
+}
+
+impl<'ast> Visitor<'ast, ConnectionError> for PlainTimestampTimezoneSuffixReplacer {
+    fn transform_expr(&mut self, expr: &mut Expr) -> Result<(), ConnectionError> {
+        if let Expr::TypedString(typed_string) = expr {
+            if Self::is_plain_timestamp_data_type(&typed_string.data_type) {
+                Self::strip_plain_timestamp_timezone_suffix(&mut typed_string.value.value);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn visit_cast(&mut self, expr: &mut Expr) -> Result<(), ConnectionError> {
+        if let Expr::Cast {
+            expr: cast_expr,
+            data_type,
+            ..
+        } = expr
+        {
+            self.visit_expr(&mut *cast_expr)?;
+            if Self::is_plain_timestamp_data_type(data_type) {
+                Self::strip_plain_timestamp_timezone_literal(cast_expr);
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
     fn visit_cast(&mut self, expr: &mut Expr) -> Result<(), ConnectionError> {
         if let Expr::Cast {
@@ -1373,6 +1448,40 @@ mod tests {
         Ok(())
     }
 
+    fn run_plain_timestamp_timezone_suffix_replacer(
+        input: &str,
+        output: &str,
+    ) -> Result<(), CubeError> {
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
+
+        let replacer = PlainTimestampTimezoneSuffixReplacer::new();
+        let res = replacer.replace(stmt);
+
+        assert_eq!(res.to_string(), output);
+
+        Ok(())
+    }
+
+    fn run_plain_timestamp_timezone_suffix_replacer_unchanged(
+        input: &str,
+    ) -> Result<(), CubeError> {
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
+        let expected = stmt.to_string();
+
+        let replacer = PlainTimestampTimezoneSuffixReplacer::new();
+        let res = replacer.replace(stmt);
+
+        assert_eq!(res.to_string(), expected);
+
+        Ok(())
+    }
+
     #[test]
     fn test_cast_replacer() -> Result<(), CubeError> {
         run_cast_replacer("SELECT 'pg_class'::regclass", "SELECT 1259")?;
@@ -1398,6 +1507,48 @@ mod tests {
         run_cast_replacer(
             "SELECT CAST(1 as INT8 UNSIGNED)",
             "SELECT CAST(1 AS BIGINT UNSIGNED)",
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_plain_timestamp_timezone_suffix_replacer() -> Result<(), CubeError> {
+        run_plain_timestamp_timezone_suffix_replacer(
+            "SELECT TIMESTAMP '2026-06-14 00:00 America/Los_Angeles'",
+            "SELECT TIMESTAMP '2026-06-14 00:00'",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer(
+            "SELECT CAST('2026-06-14 00:00 America/Los_Angeles' AS TIMESTAMP)",
+            "SELECT CAST('2026-06-14 00:00' AS TIMESTAMP)",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT TIMESTAMP 'not a timestamp America/Los_Angeles'",
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_plain_timestamp_timezone_suffix_replacer_leaves_timestamptz_unchanged(
+    ) -> Result<(), CubeError> {
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT TIMESTAMP WITH TIME ZONE '2026-06-14T00:00:00 America/Los_Angeles'",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT CAST('2026-06-14 00:00 America/Los_Angeles' AS TIMESTAMPTZ)",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT CAST(order_date AS TIMESTAMPTZ)",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT CAST(order_date AS TIMESTAMP WITH TIME ZONE)",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT TIMESTAMP WITH TIME ZONE '2026-06-14 00:00:00+02:00'",
+        )?;
+        run_plain_timestamp_timezone_suffix_replacer_unchanged(
+            "SELECT CAST('2026-06-14 00:00:00+02:00' AS TIMESTAMPTZ)",
         )?;
 
         Ok(())
