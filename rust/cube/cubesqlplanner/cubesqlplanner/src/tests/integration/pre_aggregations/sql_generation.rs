@@ -1506,7 +1506,7 @@ async fn test_rollup_lambda_cross_cube_union_aliases() -> Result<(), CubeError> 
         pre_aggregation_id: visitor_checkins.lambda_union
     "};
 
-    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "lambda_union");
