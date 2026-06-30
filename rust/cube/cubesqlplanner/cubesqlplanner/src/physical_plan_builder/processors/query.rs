@@ -197,8 +197,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         // When reading from a pre-aggregation, drop ORDER BY keys on measures that
         // are not part of the selection. CubeStore cannot ORDER BY an aggregate of a
-        // rollup column that isn't projected, and the legacy planner likewise ignores
-        // such keys — matching that keeps results consistent across planners.
+        // rollup column that isn't projected.
         let order_by = if is_pre_aggregation {
             logical_plan
                 .modifers()
