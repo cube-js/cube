@@ -255,6 +255,21 @@ impl SqlNodesFactory {
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())
     }
+
+    /// When an ungrouped query reads from a pre-aggregation, a measure must
+    /// resolve to its stored rollup column. Unlike the grouped case, the column
+    /// already holds the aggregated value and is returned as-is, so it's a plain
+    /// column reference with no `sum()` wrap. Wrapping the ungrouped node keeps
+    /// the reference outermost so the measure is intercepted before it would
+    /// otherwise re-render its base-table SQL.
+    fn wrap_ungrouped_pre_aggregation_measure(&self, node: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        if !self.pre_aggregation_measures_references.is_empty() {
+            RenderReferencesSqlNode::new(node, self.pre_aggregation_measures_references.clone())
+        } else {
+            node
+        }
+    }
+
     fn add_ungrouped_measure_reference_if_needed(
         &self,
         default: Rc<dyn SqlNode>,
@@ -288,9 +303,11 @@ impl SqlNodesFactory {
 
     fn final_measure_node_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
         if self.ungrouped_measure {
-            UngroupedMeasureSqlNode::new(input)
+            self.wrap_ungrouped_pre_aggregation_measure(UngroupedMeasureSqlNode::new(input))
         } else if self.ungrouped {
-            UngroupedQueryFinalMeasureSqlNode::new(input)
+            self.wrap_ungrouped_pre_aggregation_measure(UngroupedQueryFinalMeasureSqlNode::new(
+                input,
+            ))
         } else {
             let final_processor: Rc<dyn SqlNode> =
                 FinalMeasureSqlNode::new(input.clone(), self.count_approx_as_state);

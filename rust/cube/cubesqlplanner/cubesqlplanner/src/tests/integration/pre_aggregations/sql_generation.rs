@@ -1432,3 +1432,49 @@ async fn test_order_by_only_measure_dropped_from_pre_agg() -> Result<(), CubeErr
 
     Ok(())
 }
+
+// An ungrouped query reading from a rollup must reference the stored measure
+// column as-is (no `sum()`), not re-render the measure's base-table SQL.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_pre_agg_measure_reads_rollup_column() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["main_rollup"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.total_amount
+        dimensions:
+          - orders.status
+          - orders.city
+        ungrouped: true
+        order:
+          - id: orders.status
+          - id: orders.city
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "main_rollup");
+    assert!(
+        sql.contains("\"orders__total_amount\" \"orders__total_amount\""),
+        "ungrouped measure should project the rollup column, got:\n{sql}"
+    );
+    assert!(
+        !sql.contains("\"orders\".amount"),
+        "ungrouped measure must not reference the base-table column, got:\n{sql}"
+    );
+
+    if let Some(result) = ctx
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(
+            "ungrouped_pre_agg_measure_reads_rollup_column_cubestore_result",
+            result
+        );
+    }
+
+    Ok(())
+}
