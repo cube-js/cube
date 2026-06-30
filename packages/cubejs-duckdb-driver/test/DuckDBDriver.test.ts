@@ -40,6 +40,14 @@ describe('DuckDBDriver', () => {
     ]);
   });
 
+  test('query with Date parameter', async () => {
+    const result = await driver.query('SELECT ?::TIMESTAMP AS created', [new Date('2020-04-04T04:04:04.444Z')]);
+
+    expect(result).toEqual([
+      { created: '2020-04-04T04:04:04.444Z' }
+    ]);
+  });
+
   test('column types', async () => {
     expect(await driver.tableColumnTypes('test.select_test')).toEqual([
       {
@@ -71,6 +79,16 @@ describe('DuckDBDriver', () => {
       { id: '1', created: '2020-01-01T01:01:01.111Z', created_date: '2020-01-01T00:00:00.000Z', price: '100' },
       { id: '2', created: '2020-02-02T02:02:02.222Z', created_date: '2020-02-02T00:00:00.000Z', price: '200' },
       { id: '3', created: '2020-03-03T03:03:03.333Z', created_date: '2020-03-03T00:00:00.000Z', price: '300' }
+    ]);
+  });
+
+  test('stream with Date parameter', async () => {
+    const tableData = await driver.stream('SELECT ?::TIMESTAMP AS created', [new Date('2020-04-04T04:04:04.444Z')], {
+      highWaterMark: 1000,
+    });
+
+    expect(await streamToArray(tableData.rowStream as any)).toEqual([
+      { created: '2020-04-04T04:04:04.444Z' }
     ]);
   });
 });
