@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/views.rs
+expression: result
+---
+orders_rank_view__status | orders_rank_view__amount_rank_by_status
+-------------------------+----------------------------------------
+cancelled                | 3                                      
+pending                  | 2                                      
+completed                | 1

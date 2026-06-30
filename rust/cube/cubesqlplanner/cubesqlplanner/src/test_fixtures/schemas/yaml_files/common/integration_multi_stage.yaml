@@ -533,3 +533,12 @@ views:
                 - total_amount
                 - amount_prev_month
                 - mom_growth
+
+    # Exposes a rank measure WITHOUT the measure its order_by references
+    # (total_amount) — regression model for cube-js/cube#10856.
+    - name: orders_rank_view
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+                - amount_rank_by_status

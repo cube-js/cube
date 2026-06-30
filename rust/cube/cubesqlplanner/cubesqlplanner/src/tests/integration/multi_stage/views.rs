@@ -80,3 +80,25 @@ async fn test_view_with_filter() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Regression test for cube-js/cube#10856: the rank's order_by references
+// total_amount, which orders_rank_view does not expose. order_by must compile
+// in the owning cube's context, not the view's — before the fix this failed
+// to plan at all.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_rank_order_by_referencing_unexposed_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders_rank_view.amount_rank_by_status
+        dimensions:
+          - orders_rank_view.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
