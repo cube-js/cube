@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/group_by.rs
+expression: result
+---
+orders__category | orders__amount_group_by_status
+-----------------+-------------------------------
+books            | 2250.00                       
+clothing         | 2250.00                       
+electronics      | 2250.00

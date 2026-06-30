@@ -20,12 +20,19 @@ pub struct V1CubeMetaCustomNumericFormat {
     /// d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format
     #[serde(rename = "value")]
     pub value: String,
+    /// Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used.
+    #[serde(rename = "alias", skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
 }
 
 impl V1CubeMetaCustomNumericFormat {
     /// Custom numeric format for numeric measures and dimensions
     pub fn new(r#type: Type, value: String) -> V1CubeMetaCustomNumericFormat {
-        V1CubeMetaCustomNumericFormat { r#type, value }
+        V1CubeMetaCustomNumericFormat {
+            r#type,
+            value,
+            alias: None,
+        }
     }
 }
 /// Type of the format (must be 'custom-numeric')

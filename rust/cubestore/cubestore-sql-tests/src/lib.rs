@@ -116,7 +116,12 @@ pub struct BasicSqlClient {
 #[async_trait]
 impl SqlClient for BasicSqlClient {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError> {
-        self.service.as_ref().exec_query(query).await
+        self.service
+            .as_ref()
+            .exec_query(query)
+            .await?
+            .collect()
+            .await
     }
 
     async fn exec_query_with_context(
@@ -127,6 +132,8 @@ impl SqlClient for BasicSqlClient {
         self.service
             .as_ref()
             .exec_query_with_context(context, query)
+            .await?
+            .collect()
             .await
     }
 

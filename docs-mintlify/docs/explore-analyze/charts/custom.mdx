@@ -1,0 +1,52 @@
+---
+title: Custom visualizations
+description: Edit raw Vega-Lite specs to build visualizations beyond what the chart builder supports.
+---
+
+All standard Cube chart types are built on [Vega-Lite v5](https://vega.github.io/vega-lite/). The visual builder covers the most common patterns, but for anything beyond that — multiple layers with transforms, complex dual-axis rules, custom aggregations, or annotations — you can edit the raw spec directly.
+
+For fully freeform layouts using HTML and CSS, see [HTML charts](/docs/explore-analyze/charts/chart-types/html).
+
+## When the spec editor appears
+
+The chart panel automatically falls back to the **spec editor** when the current Vega-Lite spec has features the visual builder cannot represent:
+
+- Top-level `transform` clauses
+- More than two non-text layers
+- Certain dual-axis + rule mark combinations
+
+In these cases, the visual builder is replaced by a code editor showing the full Vega-Lite JSON.
+
+{/* Screenshot: Vega spec editor open with a multi-layer spec (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Opening the spec editor manually
+
+Click the **Edit spec** button in the chart panel (visible on Vega-based charts) to open the spec editor. This lets you inspect and modify the generated spec even when the visual builder is active.
+
+Changes take effect immediately in the preview.
+
+{/* Screenshot: Edit spec button and dialog (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Spec structure
+
+Cube generates standard Vega-Lite v5 specs. The key fields:
+
+```json
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "mark": { "type": "bar" },
+  "encoding": {
+    "x": { "field": "order_items.status", "type": "nominal" },
+    "y": { "field": "order_items.count", "type": "quantitative" },
+    "color": { "field": "order_items.status", "type": "nominal" }
+  }
+}
+```
+
+Any valid Vega-Lite v5 spec is supported. Refer to the [Vega-Lite documentation](https://vega.github.io/vega-lite/docs/) for the full spec reference.
+
+## AI-generated specs
+
+The AI agent can generate a full Vega-Lite spec from a natural language description. After running a query, prompt the agent — for example: _"Show this as a heatmap of order count by status and month"_ — and the agent will write the complete spec.
+
+AI-generated specs produce valid Vega-Lite v5 JSON and can be further refined in the spec editor.

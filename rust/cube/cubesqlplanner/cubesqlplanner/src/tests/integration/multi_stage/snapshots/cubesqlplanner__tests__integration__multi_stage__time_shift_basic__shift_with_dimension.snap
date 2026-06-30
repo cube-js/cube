@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/time_shift_basic.rs
+expression: result
+---
+orders__status | orders__created_at_month | orders__total_amount | orders__amount_prev_month
+---------------+--------------------------+----------------------+--------------------------
+cancelled      | 2024-01-01 00:00:00      | 50.00                | NULL                     
+cancelled      | 2024-02-01 00:00:00      | 50.00                | 50.00                    
+cancelled      | 2024-03-01 00:00:00      | 100.00               | 50.00                    
+completed      | 2024-01-01 00:00:00      | 300.00               | NULL                     
+completed      | 2024-02-01 00:00:00      | 500.00               | 300.00                   
+completed      | 2024-03-01 00:00:00      | 600.00               | 500.00                   
+pending        | 2024-01-01 00:00:00      | 150.00               | NULL                     
+pending        | 2024-02-01 00:00:00      | 200.00               | 150.00                   
+pending        | 2024-03-01 00:00:00      | 300.00               | 200.00

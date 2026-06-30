@@ -2,7 +2,9 @@ use crate::metastore::snapshot_info::SnapshotInfo;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
-use datafusion::arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray};
+use datafusion::arrow::array::{
+    ArrayRef, BooleanBuilder, StringBuilder, TimestampNanosecondBuilder,
+};
 use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
 
@@ -16,8 +18,8 @@ impl InfoSchemaTableDef for SystemSnapshotsTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         _limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.meta_store.get_snapshots_list().await?))
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.meta_store.get_snapshots_list().await?)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -32,23 +34,22 @@ impl InfoSchemaTableDef for SystemSnapshotsTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut id_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut created_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut current_builder = BooleanBuilder::with_capacity(num_rows);
+
+        for row in rows.into_iter() {
+            id_builder.append_value(format!("{}", row.id));
+            created_builder.append_value((row.id * 1000000) as i64);
+            current_builder.append_value(row.current);
+        }
+
         vec![
-            Box::new(|snapshots| {
-                Arc::new(StringArray::from_iter_values(
-                    snapshots.iter().map(|row| format!("{}", row.id)),
-                ))
-            }),
-            Box::new(|snapshots| {
-                Arc::new(TimestampNanosecondArray::from_iter_values(
-                    snapshots.iter().map(|row| (row.id * 1000000) as i64),
-                ))
-            }),
-            Box::new(|snapshots| {
-                Arc::new(BooleanArray::from_iter(
-                    snapshots.iter().map(|row| Some(row.current)),
-                ))
-            }),
+            Arc::new(id_builder.finish()),
+            Arc::new(created_builder.finish()),
+            Arc::new(current_builder.finish()),
         ]
     }
 }

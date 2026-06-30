@@ -6,6 +6,7 @@ use datafusion::arrow::array::{ArrayBuilder, ArrayRef, StringBuilder};
 use datafusion::arrow::compute::{concat_batches, SortOptions};
 use datafusion::arrow::datatypes::{i256, Field, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::row::{RowConverter, Rows, SortField};
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 
@@ -24,13 +25,15 @@ use datafusion::physical_plan::{
     PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::scalar::ScalarValue;
-use flatbuffers::bitflags::_core::cmp::Ordering;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::any::Any;
+use std::cmp::Ordering;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
@@ -42,6 +45,16 @@ pub enum TopKAggregateFunction {
     Min,
     Max,
     Merge,
+}
+
+/// Selects which router-side merge implementation [`AggregateTopKExec`] runs. Both keep the same
+/// streaming early-termination semantics (so router memory stays bounded); `V2` is a vectorized,
+/// allocation-light rewrite of `V1`'s per-row machinery, selected by
+/// `CUBESTORE_TOPK_STRATEGY=vectorized`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopKMergeVersion {
+    V1,
+    V2,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +70,7 @@ pub struct AggregateTopKExec {
     pub schema: SchemaRef,
     pub cache: PlanProperties,
     pub sort_requirement: LexRequirement,
+    pub merge_version: TopKMergeVersion,
 }
 
 /// Third item is the neutral value for the corresponding aggregate function.
@@ -74,6 +88,7 @@ impl AggregateTopKExec {
         schema: SchemaRef,
         // sort_requirement is passed in by topk_plan mostly for the sake of code deduplication
         sort_requirement: LexRequirement,
+        merge_version: TopKMergeVersion,
     ) -> AggregateTopKExec {
         assert_eq!(schema.fields().len(), agg_expr.len() + key_len);
         assert_eq!(agg_fun.len(), agg_expr.len());
@@ -99,6 +114,7 @@ impl AggregateTopKExec {
             schema,
             cache,
             sort_requirement,
+            merge_version,
         }
     }
 
@@ -176,6 +192,7 @@ impl ExecutionPlan for AggregateTopKExec {
             schema: self.schema.clone(),
             cache: self.cache.clone(),
             sort_requirement: self.sort_requirement.clone(),
+            merge_version: self.merge_version,
         }))
     }
 
@@ -217,44 +234,37 @@ impl ExecutionPlan for AggregateTopKExec {
                 })??);
             }
 
-            let mut buffer = TopKBuffer::default();
-            let mut state = TopKState::new(
-                plan.limit,
-                nodes,
-                plan.key_len,
-                &plan.order_by,
-                &plan.having,
-                &plan.agg_expr,
-                &plan.agg_descr,
-                &mut buffer,
-                &context,
-                plan.schema(),
-            )?;
-            let mut wanted_nodes = vec![true; nodes];
-            let mut batches = Vec::with_capacity(nodes);
-            'processing: loop {
-                assert!(batches.is_empty());
-                for i in 0..nodes {
-                    let (schema, s) = &mut streams[i];
-                    let batch;
-                    if wanted_nodes[i] {
-                        batch = next_non_empty(s).await?;
-                    } else {
-                        batch = Some(RecordBatch::new_empty(schema.clone()))
-                    }
-                    batches.push(batch);
+            match plan.merge_version {
+                TopKMergeVersion::V1 => {
+                    let mut buffer = TopKBuffer::default();
+                    let state = TopKState::new(
+                        plan.limit,
+                        nodes,
+                        plan.key_len,
+                        &plan.order_by,
+                        &plan.having,
+                        &plan.agg_expr,
+                        &plan.agg_descr,
+                        &mut buffer,
+                        &context,
+                        plan.schema(),
+                    )?;
+                    run_merge_loop(state, &mut streams, nodes).await
                 }
-
-                if state.update(&mut batches).await? {
-                    batches.clear();
-                    break 'processing;
+                TopKMergeVersion::V2 => {
+                    let state = TopKStateV2::new(
+                        plan.limit,
+                        nodes,
+                        plan.key_len,
+                        &plan.order_by,
+                        &plan.having,
+                        &plan.agg_descr,
+                        &context,
+                        plan.schema(),
+                    )?;
+                    run_merge_loop(state, &mut streams, nodes).await
                 }
-                state.populate_wanted_nodes(&mut wanted_nodes);
-                batches.clear();
             }
-
-            let batch = state.finish().await?;
-            Ok(batch)
         };
 
         let stream = futures::stream::once(fut);
@@ -1029,6 +1039,528 @@ fn finalize_aggregation_into(
     Ok(())
 }
 
+/// Shared streaming driver for both merge implementations. Pulls one batch per "wanted" node each
+/// round, feeds them to the merge state, and stops as soon as the state reports the top-k is final.
+/// Keeping this loop common guarantees V1 and V2 share the exact early-termination cadence.
+trait TopKMerge {
+    async fn merge_update(
+        &mut self,
+        batches: &mut [Option<RecordBatch>],
+    ) -> Result<bool, DataFusionError>;
+    fn merge_wanted_nodes(&self, wanted_nodes: &mut Vec<bool>);
+    async fn merge_finish(self) -> Result<RecordBatch, DataFusionError>;
+}
+
+async fn run_merge_loop<S: TopKMerge>(
+    mut state: S,
+    streams: &mut [(SchemaRef, futures::stream::Fuse<SendableRecordBatchStream>)],
+    nodes: usize,
+) -> Result<RecordBatch, DataFusionError> {
+    let mut wanted_nodes = vec![true; nodes];
+    let mut batches = Vec::with_capacity(nodes);
+    loop {
+        assert!(batches.is_empty());
+        for i in 0..nodes {
+            let (schema, s) = &mut streams[i];
+            let batch = if wanted_nodes[i] {
+                next_non_empty(s).await?
+            } else {
+                Some(RecordBatch::new_empty(schema.clone()))
+            };
+            batches.push(batch);
+        }
+
+        if state.merge_update(&mut batches).await? {
+            batches.clear();
+            break;
+        }
+        state.merge_wanted_nodes(&mut wanted_nodes);
+        batches.clear();
+    }
+    state.merge_finish().await
+}
+
+impl TopKMerge for TopKState<'_> {
+    async fn merge_update(
+        &mut self,
+        batches: &mut [Option<RecordBatch>],
+    ) -> Result<bool, DataFusionError> {
+        self.update(batches).await
+    }
+    fn merge_wanted_nodes(&self, wanted_nodes: &mut Vec<bool>) {
+        self.populate_wanted_nodes(wanted_nodes)
+    }
+    async fn merge_finish(self) -> Result<RecordBatch, DataFusionError> {
+        self.finish().await
+    }
+}
+
+impl TopKMerge for TopKStateV2<'_> {
+    async fn merge_update(
+        &mut self,
+        batches: &mut [Option<RecordBatch>],
+    ) -> Result<bool, DataFusionError> {
+        self.update(batches).await
+    }
+    fn merge_wanted_nodes(&self, wanted_nodes: &mut Vec<bool>) {
+        self.populate_wanted_nodes(wanted_nodes)
+    }
+    async fn merge_finish(self) -> Result<RecordBatch, DataFusionError> {
+        self.finish().await
+    }
+}
+
+/// Vectorized router-side top-k merge (`CUBESTORE_TOPK_STRATEGY=vectorized`). Same NRA early-termination as
+/// [`TopKState`] -- sorted worker streams plus per-node frontier upper bounds decide how far to pull
+/// and when to stop, so router memory stays bounded. The difference is purely the hot path: group
+/// keys go through an arrow [`RowConverter`] (interned per batch, no per-row `ScalarValue` key
+/// vectors), per-group aggregate state is plain `ScalarValue` arithmetic (no `Mutex`, no per-row
+/// 1-element `update_batch`/`to_array`), and estimates are typed combines instead of accumulator
+/// state round-trips. Only the monotone primitive aggregates (Sum/Min/Max) are handled here; HLL
+/// `Merge` falls back to V1 at plan time.
+struct TopKStateV2<'a> {
+    limit: usize,
+    key_len: usize,
+    num_nodes: usize,
+    order_by: &'a [SortColumn],
+    having: &'a Option<Arc<dyn PhysicalExpr>>,
+    agg_descr: &'a [AggDescr],
+    context: &'a Arc<TaskContext>,
+    schema: SchemaRef,
+
+    row_converter: RowConverter,
+    /// Distinct group keys; group `gid` is `key_store.row(gid)`.
+    key_store: Rows,
+    /// Maps a key's hash to the group ids carrying it. Storing hash -> gids (rather than
+    /// `OwnedRow -> gid`) keeps lookups allocation-free: the probe row is borrowed from
+    /// `scratch_rows` and equality is checked against `key_store.row(gid)`.
+    group_index: HashMap<u64, SmallVec<[usize; 1]>>,
+    /// Reused per-batch buffer for the incoming keys.
+    scratch_rows: Rows,
+
+    /// `acc[gid][i]` -- accumulated value of aggregate `i` across the nodes seen so far.
+    acc: Vec<SmallVec<[ScalarValue; 1]>>,
+    /// `cur_estimate[gid]` mirrors the estimate currently stored for `gid` in `sorted` (so it can be
+    /// removed before being updated).
+    cur_estimate: Vec<SmallVec<[ScalarValue; 1]>>,
+    /// `nodes_seen[gid][node]` -- whether `node` has reported this group.
+    nodes_seen: Vec<Vec<bool>>,
+    /// `node_frontier[node][i]` -- upper bound (clamped to the neutral value) on aggregate `i` for any
+    /// group not yet seen on `node`. `None` only before the node's first batch (then the node is
+    /// either about to be pulled or already finished).
+    node_frontier: Vec<Option<SmallVec<[ScalarValue; 1]>>>,
+    finished_nodes: Vec<bool>,
+
+    sorted: BTreeSet<SortKey<'a>>,
+    top: Vec<usize>,
+    result: RecordBatch,
+}
+
+impl<'a> TopKStateV2<'a> {
+    fn new(
+        limit: usize,
+        num_nodes: usize,
+        key_len: usize,
+        order_by: &'a [SortColumn],
+        having: &'a Option<Arc<dyn PhysicalExpr>>,
+        agg_descr: &'a [AggDescr],
+        context: &'a Arc<TaskContext>,
+        schema: SchemaRef,
+    ) -> Result<TopKStateV2<'a>, DataFusionError> {
+        let key_fields = schema.fields()[0..key_len]
+            .iter()
+            .map(|f| SortField::new(f.data_type().clone()))
+            .collect();
+        let row_converter = RowConverter::new(key_fields)?;
+        let key_store = row_converter.empty_rows(0, 0);
+        let scratch_rows = row_converter.empty_rows(0, 0);
+        Ok(TopKStateV2 {
+            limit,
+            key_len,
+            num_nodes,
+            order_by,
+            having,
+            agg_descr,
+            context,
+            schema: schema.clone(),
+            row_converter,
+            key_store,
+            group_index: HashMap::new(),
+            scratch_rows,
+            acc: Vec::new(),
+            cur_estimate: Vec::new(),
+            nodes_seen: Vec::new(),
+            node_frontier: vec![None; num_nodes],
+            finished_nodes: vec![false; num_nodes],
+            sorted: BTreeSet::new(),
+            top: Vec::new(),
+            result: RecordBatch::new_empty(schema),
+        })
+    }
+
+    async fn update(
+        &mut self,
+        batches: &mut [Option<RecordBatch>],
+    ) -> Result<bool, DataFusionError> {
+        assert_eq!(batches.len(), self.num_nodes);
+        // Refresh frontiers (and finished flags) for the whole round *before* merging any rows, so
+        // every group estimate computed this round sees an up-to-date upper bound for each node --
+        // including nodes processed later in the loop. Without this, a group seen only on an
+        // already-processed node would be under-estimated against a node whose frontier was still
+        // unset, and could be dropped from the top-k.
+        for node in 0..self.num_nodes {
+            match &batches[node] {
+                None => self.finished_nodes[node] = true,
+                Some(b) if b.num_rows() == 0 => {} // not pulled this round: keep previous frontier
+                Some(b) => self.update_frontier(node, b)?,
+            }
+        }
+        for node in 0..self.num_nodes {
+            if let Some(b) = &batches[node] {
+                if b.num_rows() > 0 {
+                    self.process_batch_rows(node, b)?;
+                }
+            }
+        }
+        self.pop_top_elements().await
+    }
+
+    /// Sets `node`'s per-aggregate frontier from the last (smallest, since streams are sorted by the
+    /// order-by aggregate) row of its current batch -- the upper bound on any group not yet seen on
+    /// this node.
+    fn update_frontier(&mut self, node: usize, b: &RecordBatch) -> Result<(), DataFusionError> {
+        let n_agg = self.agg_descr.len();
+        let value_cols = &b.columns()[self.key_len..];
+        let last = b.num_rows() - 1;
+        let mut frontier = SmallVec::with_capacity(n_agg);
+        for i in 0..n_agg {
+            let mut v = ScalarValue::try_from_array(&value_cols[i], last)?;
+            clamp_to_neutral_bound(&mut v, &self.agg_descr[i]);
+            frontier.push(v);
+        }
+        self.node_frontier[node] = Some(frontier);
+        Ok(())
+    }
+
+    fn process_batch_rows(&mut self, node: usize, b: &RecordBatch) -> Result<(), DataFusionError> {
+        let n_agg = self.agg_descr.len();
+        let n = b.num_rows();
+        let value_cols = &b.columns()[self.key_len..];
+
+        self.scratch_rows.clear();
+        self.row_converter
+            .append(&mut self.scratch_rows, &b.columns()[0..self.key_len])?;
+
+        for r in 0..n {
+            let probe = self.scratch_rows.row(r);
+            let hash = {
+                let mut h = DefaultHasher::new();
+                probe.hash(&mut h);
+                h.finish()
+            };
+            let existing = self.group_index.get(&hash).and_then(|bucket| {
+                bucket
+                    .iter()
+                    .copied()
+                    .find(|&g| self.key_store.row(g) == probe)
+            });
+            let (gid, is_new) = match existing {
+                Some(g) => {
+                    let old = self.cur_estimate[g].clone();
+                    self.sorted.remove(&SortKey {
+                        order_by: self.order_by,
+                        estimate: old,
+                        index: g,
+                        estimate_correct: false,
+                    });
+                    (g, false)
+                }
+                None => {
+                    let g = self.key_store.num_rows();
+                    self.key_store.push(probe);
+                    self.group_index.entry(hash).or_default().push(g);
+                    let mut a = SmallVec::with_capacity(n_agg);
+                    for i in 0..n_agg {
+                        a.push(ScalarValue::try_from_array(&value_cols[i], r)?);
+                    }
+                    self.acc.push(a);
+                    self.cur_estimate.push(SmallVec::new());
+                    self.nodes_seen.push(self.finished_nodes.clone());
+                    (g, true)
+                }
+            };
+
+            if !is_new {
+                for i in 0..n_agg {
+                    let v = ScalarValue::try_from_array(&value_cols[i], r)?;
+                    scalar_combine(&mut self.acc[gid][i], &v, &self.agg_descr[i].0)?;
+                }
+            }
+            self.nodes_seen[gid][node] = true;
+
+            let est = self.group_estimate(gid)?;
+            let correct = self.estimate_correct(gid);
+            self.cur_estimate[gid] = est.clone();
+            self.sorted.insert(SortKey {
+                order_by: self.order_by,
+                estimate: est,
+                index: gid,
+                estimate_correct: correct,
+            });
+        }
+        Ok(())
+    }
+
+    /// Upper bound on `gid`'s final per-aggregate values: its accumulated value combined with each
+    /// not-yet-seen node's frontier. Exact once the group has been seen (or the node finished) on
+    /// every node.
+    fn group_estimate(&self, gid: usize) -> Result<SmallVec<[ScalarValue; 1]>, DataFusionError> {
+        let mut est = self.acc[gid].clone();
+        for i in 0..est.len() {
+            // Mirror V1: never turn a NULL estimate into a non-NULL one via node bounds.
+            let use_node = !self.agg_descr[i].1.nulls_first || !est[i].is_null();
+            if !use_node {
+                continue;
+            }
+            for node in 0..self.num_nodes {
+                if self.nodes_seen[gid][node] || self.finished_nodes[node] {
+                    continue;
+                }
+                if let Some(frontier) = &self.node_frontier[node] {
+                    scalar_combine(&mut est[i], &frontier[i], &self.agg_descr[i].0)?;
+                }
+            }
+        }
+        Ok(est)
+    }
+
+    fn estimate_correct(&self, gid: usize) -> bool {
+        (0..self.num_nodes).all(|n| self.nodes_seen[gid][n] || self.finished_nodes[n])
+    }
+
+    fn populate_wanted_nodes(&self, wanted_nodes: &mut Vec<bool>) {
+        match self.sorted.first() {
+            None => {
+                for w in wanted_nodes.iter_mut() {
+                    *w = true;
+                }
+            }
+            Some(candidate) => {
+                let seen = &self.nodes_seen[candidate.index];
+                assert_eq!(seen.len(), wanted_nodes.len());
+                for i in 0..wanted_nodes.len() {
+                    wanted_nodes[i] = !seen[i];
+                }
+            }
+        }
+    }
+
+    async fn pop_top_elements(&mut self) -> Result<bool, DataFusionError> {
+        while self.result.num_rows() < self.limit && !self.sorted.is_empty() {
+            let mut candidate = self.sorted.pop_first().unwrap();
+            while !candidate.estimate_correct {
+                let est = self.group_estimate(candidate.index)?;
+                let correct = self.estimate_correct(candidate.index);
+                self.cur_estimate[candidate.index] = est.clone();
+                self.sorted.insert(SortKey {
+                    order_by: self.order_by,
+                    estimate: est,
+                    index: candidate.index,
+                    estimate_correct: correct,
+                });
+
+                let next_candidate = self.sorted.first().unwrap();
+                if candidate.index == next_candidate.index && !next_candidate.estimate_correct {
+                    return Ok(false);
+                } else {
+                    candidate = self.sorted.pop_first().unwrap();
+                }
+            }
+            self.top.push(candidate.index);
+            if self.top.len() == self.limit {
+                self.push_top_to_result().await?;
+            }
+        }
+        Ok(self.result.num_rows() == self.limit || self.finished_nodes.iter().all(|f| *f))
+    }
+
+    async fn push_top_to_result(&mut self) -> Result<(), DataFusionError> {
+        if self.top.is_empty() {
+            return Ok(());
+        }
+        let n_agg = self.agg_descr.len();
+        let mut columns = self
+            .row_converter
+            .convert_rows(self.top.iter().map(|&g| self.key_store.row(g)))?;
+        for i in 0..n_agg {
+            let mut builder = create_builder(&self.acc[self.top[0]][i]);
+            for &g in &self.top {
+                append_value(&mut *builder, &self.acc[g][i])?;
+            }
+            columns.push(builder.finish());
+        }
+
+        let new_batch = RecordBatch::try_new(self.schema.clone(), columns)?;
+        let new_batch = if let Some(having) = self.having {
+            let schema = new_batch.schema();
+            let filter_exec = Arc::new(FilterExec::try_new(
+                having.clone(),
+                try_make_memory_data_source(&vec![vec![new_batch]], schema.clone(), None)?,
+            )?);
+            let batches_stream =
+                GlobalLimitExec::new(filter_exec, 0, Some(self.limit - self.result.num_rows()))
+                    .execute(0, self.context.clone())?;
+            let batches = collect(batches_stream).await?;
+            concat_batches(&schema, &batches)?
+        } else {
+            new_batch
+        };
+
+        let mut tmp = RecordBatch::new_empty(self.schema.clone());
+        std::mem::swap(&mut self.result, &mut tmp);
+        self.result = concat_batches(&self.schema, &vec![tmp, new_batch])?;
+        self.top.clear();
+        Ok(())
+    }
+
+    async fn finish(mut self) -> Result<RecordBatch, DataFusionError> {
+        self.push_top_to_result().await?;
+        Ok(self.result)
+    }
+}
+
+/// Merges `src` into `dst` the way the aggregate's distributed final step would: Sum adds, Min keeps
+/// the smaller, Max the larger. NULLs are skipped (a NULL contributes nothing). `Merge` (HLL) is
+/// gated out at plan time, so it is unreachable here.
+///
+/// This is the V2-only combine. Float SUM is not associative, and V2 accumulates in a different
+/// order than V1 (per node, whole batches) -- so a float SUM top-k can differ from V1 in the last
+/// ULPs, and on a near-tie at the k-th place even the *boundary group* can flip. This is inherent to
+/// reordered distributed summation (the full-merge strategy reorders too, via DataFusion's own sum
+/// kernel) and is not gated. MIN/MAX, by contrast, are exact: NaN is skipped to match arrow's
+/// Min/Max accumulators.
+fn scalar_combine(
+    dst: &mut ScalarValue,
+    src: &ScalarValue,
+    fun: &TopKAggregateFunction,
+) -> Result<(), DataFusionError> {
+    if src.is_null() {
+        return Ok(());
+    }
+    if dst.is_null() {
+        *dst = src.clone();
+        return Ok(());
+    }
+    match fun {
+        // SUM keeps float semantics (a NaN input poisons the sum, matching arrow's sum).
+        TopKAggregateFunction::Sum => scalar_add_assign(dst, src)?,
+        // MIN/MAX skip NaN, matching arrow's Min/MaxAccumulator (`natural_cmp`/`total_cmp` would
+        // otherwise rank NaN above every finite value and let it stick).
+        TopKAggregateFunction::Min => {
+            if !is_nan(src) && (is_nan(dst) || natural_cmp(src, dst) == Ordering::Less) {
+                *dst = src.clone();
+            }
+        }
+        TopKAggregateFunction::Max => {
+            if !is_nan(src) && (is_nan(dst) || natural_cmp(src, dst) == Ordering::Greater) {
+                *dst = src.clone();
+            }
+        }
+        TopKAggregateFunction::Merge => {
+            return Err(DataFusionError::Internal(
+                "topk v2 does not support HLL merge".to_string(),
+            ))
+        }
+    }
+    Ok(())
+}
+
+/// Natural ascending comparison of two non-NULL numeric scalars (no sort-direction flip).
+fn natural_cmp(l: &ScalarValue, r: &ScalarValue) -> Ordering {
+    cmp_same_types(l, r, /*nulls_first*/ true, /*asc*/ true)
+}
+
+fn is_nan(s: &ScalarValue) -> bool {
+    match s {
+        ScalarValue::Float32(Some(v)) => v.is_nan(),
+        ScalarValue::Float64(Some(v)) => v.is_nan(),
+        _ => false,
+    }
+}
+
+fn decimal_scale_mismatch() -> DataFusionError {
+    DataFusionError::Internal("topk v2 decimal precision/scale mismatch in sum".to_string())
+}
+
+/// Integer and decimal SUM wrap on overflow (`wrapping_add`), matching DataFusion's `SumAccumulator`
+/// (which uses `add_wrapping`); so V2 stays consistent with the default merge rather than erroring.
+fn scalar_add_assign(dst: &mut ScalarValue, src: &ScalarValue) -> Result<(), DataFusionError> {
+    macro_rules! add {
+        ($d:expr, $s:expr) => {{
+            *$d = Some($d.unwrap_or(0).wrapping_add($s.unwrap_or(0)));
+        }};
+    }
+    match (dst, src) {
+        (ScalarValue::Int8(d), ScalarValue::Int8(s)) => add!(d, s),
+        (ScalarValue::Int16(d), ScalarValue::Int16(s)) => add!(d, s),
+        (ScalarValue::Int32(d), ScalarValue::Int32(s)) => add!(d, s),
+        (ScalarValue::Int64(d), ScalarValue::Int64(s)) => add!(d, s),
+        (ScalarValue::UInt8(d), ScalarValue::UInt8(s)) => add!(d, s),
+        (ScalarValue::UInt16(d), ScalarValue::UInt16(s)) => add!(d, s),
+        (ScalarValue::UInt32(d), ScalarValue::UInt32(s)) => add!(d, s),
+        (ScalarValue::UInt64(d), ScalarValue::UInt64(s)) => add!(d, s),
+        (ScalarValue::Float32(d), ScalarValue::Float32(s)) => {
+            *d = Some(d.unwrap_or(0.0) + s.unwrap_or(0.0))
+        }
+        (ScalarValue::Float64(d), ScalarValue::Float64(s)) => {
+            *d = Some(d.unwrap_or(0.0) + s.unwrap_or(0.0))
+        }
+        (ScalarValue::Decimal128(d, dp, ds), ScalarValue::Decimal128(s, sp, ss)) => {
+            if dp != sp || ds != ss {
+                return Err(decimal_scale_mismatch());
+            }
+            *d = Some(d.unwrap_or(0).wrapping_add(s.unwrap_or(0)));
+        }
+        (ScalarValue::Decimal256(d, dp, ds), ScalarValue::Decimal256(s, sp, ss)) => {
+            if dp != sp || ds != ss {
+                return Err(decimal_scale_mismatch());
+            }
+            *d = Some(
+                d.unwrap_or(i256::ZERO)
+                    .wrapping_add(s.unwrap_or(i256::ZERO)),
+            );
+        }
+        (d, s) => {
+            return Err(DataFusionError::Internal(format!(
+                "topk v2 unsupported sum types: {} and {}",
+                d.data_type(),
+                s.data_type()
+            )))
+        }
+    }
+    Ok(())
+}
+
+/// Replaces a frontier value with the aggregate's neutral value when the neutral value is a tighter
+/// (or required) upper bound in the sort direction -- e.g. for `SUM(x) ... DESC` a missing group
+/// contributes `0`, which beats a negative frontier. Mirrors V1's `update_node_estimates`.
+fn clamp_to_neutral_bound(v: &mut ScalarValue, descr: &AggDescr) {
+    if v.is_null() {
+        return;
+    }
+    let mut neutral = v.clone();
+    to_neutral_value(&mut neutral, &descr.0);
+    let o = cmp_same_types(
+        &neutral,
+        v,
+        descr.1.nulls_first,
+        /*asc*/ !descr.1.descending,
+    );
+    if o < Ordering::Equal {
+        *v = neutral;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1534,16 +2066,19 @@ mod tests {
             Arc::new(EmptyExec::new(input_schema.inner().clone())),
             output_schema,
             sort_requirement,
+            TopKMergeVersion::V1,
         ))
     }
 
-    async fn run_topk_as_batch(
-        proto: Arc<AggregateTopKExec>,
-        inputs: Vec<Vec<RecordBatch>>,
+    async fn run_one_version(
+        proto: &AggregateTopKExec,
+        version: TopKMergeVersion,
+        input: Arc<dyn ExecutionPlan>,
         context: Arc<TaskContext>,
     ) -> Result<RecordBatch, DataFusionError> {
-        let input = try_make_memory_data_source(&inputs, proto.cluster.schema(), None)?;
-        let results = proto
+        let mut plan = proto.clone();
+        plan.merge_version = version;
+        let results = Arc::new(plan)
             .with_new_children(vec![input])?
             .execute(0, context)?
             .collect::<Vec<_>>()
@@ -1552,6 +2087,88 @@ mod tests {
             .collect::<Result<Vec<_>, DataFusionError>>()?;
         assert_eq!(results.len(), 1);
         Ok(results.into_iter().next().unwrap())
+    }
+
+    /// Runs both merge implementations on the same input and asserts they agree, so every existing
+    /// test doubles as a V1-vs-V2 equivalence check. Returns the (shared) result.
+    async fn run_topk_as_batch(
+        proto: Arc<AggregateTopKExec>,
+        inputs: Vec<Vec<RecordBatch>>,
+        context: Arc<TaskContext>,
+    ) -> Result<RecordBatch, DataFusionError> {
+        let input = try_make_memory_data_source(&inputs, proto.cluster.schema(), None)?;
+        let r1 =
+            run_one_version(&proto, TopKMergeVersion::V1, input.clone(), context.clone()).await?;
+        let r2 = run_one_version(&proto, TopKMergeVersion::V2, input, context).await?;
+        assert_batches_eq(&r1, &r2);
+        Ok(r1)
+    }
+
+    // Exact, and used only with Int64 fixtures on purpose: float SUM is order-dependent, so a float
+    // V1-vs-V2 case would need a tolerant (epsilon/ULP) comparison instead. Typed float/decimal
+    // arithmetic is covered directly in `scalar_arithmetic` below.
+    fn assert_batches_eq(a: &RecordBatch, b: &RecordBatch) {
+        assert_eq!(a.schema(), b.schema(), "schema mismatch v1 vs v2");
+        assert_eq!(a.num_rows(), b.num_rows(), "row count mismatch v1 vs v2");
+        for col in 0..a.num_columns() {
+            for row in 0..a.num_rows() {
+                let va = ScalarValue::try_from_array(a.column(col), row).unwrap();
+                let vb = ScalarValue::try_from_array(b.column(col), row).unwrap();
+                assert_eq!(va, vb, "v1 vs v2 differ at col {col} row {row}");
+            }
+        }
+    }
+
+    #[test]
+    fn scalar_arithmetic() {
+        use TopKAggregateFunction::*;
+        let i = |v: i64| ScalarValue::Int64(Some(v));
+        let f = |v: f64| ScalarValue::Float64(Some(v));
+
+        // SUM: add; NULL src skipped; NULL dst adopts src.
+        let mut d = i(5);
+        scalar_combine(&mut d, &i(3), &Sum).unwrap();
+        assert_eq!(d, i(8));
+        let mut d = i(5);
+        scalar_combine(&mut d, &ScalarValue::Int64(None), &Sum).unwrap();
+        assert_eq!(d, i(5));
+        let mut d = ScalarValue::Int64(None);
+        scalar_combine(&mut d, &i(7), &Sum).unwrap();
+        assert_eq!(d, i(7));
+
+        // MIN/MAX pick the extreme.
+        let mut d = i(5);
+        scalar_combine(&mut d, &i(3), &Min).unwrap();
+        assert_eq!(d, i(3));
+        let mut d = i(5);
+        scalar_combine(&mut d, &i(9), &Max).unwrap();
+        assert_eq!(d, i(9));
+
+        // MIN/MAX skip NaN from either side (matches arrow's Min/Max accumulators).
+        let mut d = f(5.0);
+        scalar_combine(&mut d, &f(f64::NAN), &Max).unwrap();
+        assert_eq!(d, f(5.0));
+        let mut d = f(f64::NAN);
+        scalar_combine(&mut d, &f(3.0), &Max).unwrap();
+        assert_eq!(d, f(3.0));
+        let mut d = f(5.0);
+        scalar_combine(&mut d, &f(f64::NAN), &Min).unwrap();
+        assert_eq!(d, f(5.0));
+        let mut d = f(f64::NAN);
+        scalar_combine(&mut d, &f(3.0), &Min).unwrap();
+        assert_eq!(d, f(3.0));
+
+        // SUM does NOT skip NaN (a NaN input poisons the sum, matching arrow sum).
+        let mut d = f(5.0);
+        scalar_combine(&mut d, &f(f64::NAN), &Sum).unwrap();
+        assert!(matches!(d, ScalarValue::Float64(Some(v)) if v.is_nan()));
+
+        // Decimal scale mismatch is a hard error, not a silent raw-mantissa add.
+        let mut d = ScalarValue::Decimal128(Some(100), 10, 2);
+        assert!(scalar_combine(&mut d, &ScalarValue::Decimal128(Some(100), 10, 3), &Sum).is_err());
+        let mut d = ScalarValue::Decimal128(Some(100), 10, 2);
+        scalar_combine(&mut d, &ScalarValue::Decimal128(Some(50), 10, 2), &Sum).unwrap();
+        assert_eq!(d, ScalarValue::Decimal128(Some(150), 10, 2));
     }
 
     async fn run_topk(

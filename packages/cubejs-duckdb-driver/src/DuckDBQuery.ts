@@ -65,6 +65,8 @@ export class DuckDBQuery extends BaseQuery {
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.STRING_AGG = 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}, COALESCE({{ args[1] }}, \'\'))';
     templates.expressions.timestamp_literal = '\'{{ value }}\'';
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     return templates;
   }
 

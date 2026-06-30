@@ -16,7 +16,8 @@ type RequestType =
  */
 type ResultType =
   'default' |
-  'compact';
+  'compact' |
+  'columnar';
 
 /**
  * API type data type.

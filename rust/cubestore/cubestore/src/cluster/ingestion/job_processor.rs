@@ -1,5 +1,5 @@
 use crate::config::injection::DIService;
-use crate::config::Config;
+use crate::config::{Config, ConfigObj, RepartitionStrategy};
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::table::Table;
@@ -11,6 +11,7 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct JobProcessResult {
@@ -52,6 +53,7 @@ impl JobProcessorImpl {
         chunk_store: Arc<dyn ChunkDataStore>,
         compaction_service: Arc<dyn CompactionService>,
         import_service: Arc<dyn ImportService>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(Self {
             processor: JobIsolatedProcessor::new(
@@ -59,6 +61,7 @@ impl JobProcessorImpl {
                 chunk_store,
                 compaction_service,
                 import_service,
+                config_obj,
             ),
         })
     }
@@ -84,6 +87,7 @@ pub struct JobIsolatedProcessor {
     chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
     import_service: Arc<dyn ImportService>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 impl JobIsolatedProcessor {
@@ -92,17 +96,20 @@ impl JobIsolatedProcessor {
         chunk_store: Arc<dyn ChunkDataStore>,
         compaction_service: Arc<dyn CompactionService>,
         import_service: Arc<dyn ImportService>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(Self {
             meta_store,
             chunk_store,
             compaction_service,
             import_service,
+            config_obj,
         })
     }
 
     pub async fn new_from_config(config: &Config) -> Arc<Self> {
         Self::new(
+            config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
@@ -215,9 +222,54 @@ impl JobIsolatedProcessor {
                     }
                     let data_loaded_size = DataLoadedSize::new();
                     app_metrics::JOBS_REPARTITION_CHUNK.add(1);
+                    // PerPartition reuses the RepartitionChunk job with the smallest chunk
+                    // as the anchor (one job per partition) and merges all its chunks;
+                    // PerChunk gets one job per chunk and repartitions just that chunk. We
+                    // overload the existing RepartitionChunk type (no new JobType) so an
+                    // older binary stays able to deserialize it across channel switches.
+                    let r = if self.config_obj.repartition_strategy()
+                        == RepartitionStrategy::PerPartition
+                    {
+                        let partition_id = chunk.get_row().get_partition_id();
+                        let time_budget = Duration::from_secs(
+                            self.config_obj.repartition_chunks_time_budget_secs(),
+                        );
+                        self.chunk_store
+                            .repartition_partition_chunks(
+                                partition_id,
+                                chunk_id,
+                                time_budget,
+                                data_loaded_size.clone(),
+                            )
+                            .await
+                    } else {
+                        self.chunk_store
+                            .repartition_chunk(chunk_id, data_loaded_size.clone())
+                            .await
+                    };
+                    if let Err(e) = r {
+                        app_metrics::JOBS_REPARTITION_CHUNK_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_REPARTITION_CHUNK_COMPLETED.add(1);
+                    Ok(JobProcessResult::new(data_loaded_size.get()))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::RepartitionRange(end_chunk_id) => {
+                if let RowKey::Table(TableId::Chunks, start_chunk_id) = job.row_reference() {
+                    let start_chunk_id = *start_chunk_id;
+                    let end_chunk_id = *end_chunk_id;
+                    let data_loaded_size = DataLoadedSize::new();
+                    app_metrics::JOBS_REPARTITION_CHUNK.add(1);
                     let r = self
                         .chunk_store
-                        .repartition_chunk(chunk_id, data_loaded_size.clone())
+                        .repartition_chunk_range(
+                            start_chunk_id,
+                            end_chunk_id,
+                            data_loaded_size.clone(),
+                        )
                         .await;
                     if let Err(e) = r {
                         app_metrics::JOBS_REPARTITION_CHUNK_FAILURES.add(1);

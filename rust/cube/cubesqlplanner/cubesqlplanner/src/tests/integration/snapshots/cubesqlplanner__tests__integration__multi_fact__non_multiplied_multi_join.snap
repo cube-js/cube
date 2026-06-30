@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__name | customers__city | orders__count | orders__total_amount
+----------------+-----------------+---------------+---------------------
+Alice           | New York        | 4             | 425.00              
+Bob             | Boston          | 3             | 550.00              
+Charlie         | Chicago         | 0             | NULL                
+Diana           | New York        | 1             | 400.00

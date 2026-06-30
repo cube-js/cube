@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/member_expressions_on_views.rs
+expression: result
+---
+filtered_root_sum
+-----------------
+30.00

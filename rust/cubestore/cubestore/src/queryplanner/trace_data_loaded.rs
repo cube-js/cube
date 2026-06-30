@@ -8,9 +8,9 @@ use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, RecordBatchStream,
     SendableRecordBatchStream,
 };
-use flatbuffers::bitflags::_core::any::Any;
 use futures::stream::Stream;
 use futures::StreamExt;
+use std::any::Any;
 use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};

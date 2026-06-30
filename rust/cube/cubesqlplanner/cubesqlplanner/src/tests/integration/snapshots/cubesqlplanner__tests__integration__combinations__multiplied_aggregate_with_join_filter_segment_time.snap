@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/combinations.rs
+expression: result
+---
+customers__name | orders__created_at_month | customers__total_lifetime_value | orders__count
+----------------+--------------------------+---------------------------------+--------------
+Alice           | 2025-03-01 00:00:00      | 1000.00                         | 2            
+Diana           | 2025-03-01 00:00:00      | 1500.00                         | 1

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/filtered_measures.rs
+expression: result
+---
+customers__city | orders__avg_amount_per_return
+----------------+------------------------------
+Boston          | 275.0000000000000000         
+Chicago         | NULL                         
+New York        | 825.0000000000000000

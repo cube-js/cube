@@ -24,6 +24,10 @@ cube(`Orders`, {
       type: `count_distinct`,
       sql: `CASE WHEN ${Orders.status} = 'shipped' THEN ${CUBE}.id END`
     },
+    approxOrderCount: {
+      type: `count_distinct_approx`,
+      sql: `CASE WHEN ${Orders.status} = 'shipped' THEN ${CUBE}.id END`
+    },
     netCollectionCompleted: {
       type: `sum`,
       sql: `CASE WHEN ${Orders.status} = 'shipped' THEN ${CUBE}.amount END`
@@ -47,13 +51,34 @@ cube(`Orders`, {
     totalAmount: {
       sql: `amount`,
       type: `sum`,
+      format: `currency`,
+      currency: `usd`,
+    },
+    avgAmount: {
+      sql: `amount`,
+      type: `avg`,
+      format: `currency`,
+      currency: `usd`,
+    },
+    minAmount: {
+      sql: `amount`,
+      type: `min`,
+      format: `currency`,
+      currency: `usd`,
+    },
+    maxAmount: {
+      sql: `amount`,
+      type: `max`,
+      format: `currency`,
+      currency: `usd`,
     },
     toRemove: {
       type: `count`,
     },
     numberTotal: {
       sql: `${totalAmount}`,
-      type: `number`
+      type: `number`,
+      format: '$,.2f',
     },
     amountRank: {
       multi_stage: true,
@@ -121,7 +146,8 @@ cube(`Orders`, {
 
     createdAt: {
       sql: `created_at`,
-      type: `time`
+      type: `time`,
+      format: '%Y-%m-%d',
     },
 
     updatedAt: {

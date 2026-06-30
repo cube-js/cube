@@ -67,6 +67,8 @@ impl Bench for SimpleBench {
         let r = services
             .sql_service
             .exec_query(state.query.as_str())
+            .await?
+            .collect()
             .await?;
         let rows = to_rows(&r);
         assert_eq!(rows, vec![vec![TableValue::Int(23)]]);
@@ -105,11 +107,13 @@ impl Bench for ParquetMetadataCacheBench {
         let _ = services
             .sql_service
             .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+            .await?
+            .collect()
             .await?;
 
         let _ = services.sql_service
             .exec_query(format!("CREATE TABLE test.table (`repo` text, `email` text, `commit_count` int) WITH (input_format = 'csv') LOCATION '{}'", path_to_string(path)?).as_str())
-            .await?;
+            .await?.collect().await?;
 
         // Wait for all pending (compaction) jobs to finish.
         wait_for_all_jobs(services).await?;
@@ -137,6 +141,8 @@ impl Bench for ParquetMetadataCacheBench {
                 )
                 .as_str(),
             )
+            .await?
+            .collect()
             .await?;
         let rows = to_rows(&r);
         assert_eq!(rows, vec![vec![TableValue::Int(6)]]);
@@ -157,6 +163,8 @@ impl Bench for CacheSetGetBench {
         services
             .sql_service
             .exec_query("CACHE SET TTL 600 'my_key' 'my_value'")
+            .await?
+            .collect()
             .await?;
 
         let state = Arc::new(());
@@ -171,6 +179,8 @@ impl Bench for CacheSetGetBench {
         let r = services
             .sql_service
             .exec_query("CACHE GET 'my_key'")
+            .await?
+            .collect()
             .await?;
 
         let rows = to_rows(&r);
@@ -208,6 +218,8 @@ impl Bench for crate::benches::QueueListBench {
                     i,
                     "a".repeat(self.payload_size)
                 ))
+                .await?
+                .collect()
                 .await?;
         }
 
@@ -223,6 +235,8 @@ impl Bench for crate::benches::QueueListBench {
         let r = services
             .sql_service
             .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?
+            .collect()
             .await?;
 
         assert_eq!(

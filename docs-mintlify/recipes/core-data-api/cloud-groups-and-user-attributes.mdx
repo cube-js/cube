@@ -1,0 +1,160 @@
+---
+title: Using cloud groups and user attributes with Core Data APIs
+description: Pass Cube Cloud groups and user attributes via JWT when querying Core Data APIs directly, so data access policies work seamlessly.
+---
+
+## Use case
+
+You have [groups][ref-groups] and [user attributes][ref-user-attributes]
+configured in Cube Cloud. Now you want to query
+[Core Data APIs][ref-core-data-apis] directly (e.g., the SQL API) while
+still having your [data access policies][ref-dap] enforced based on those
+groups and attributes.
+
+By wrapping groups and user attributes inside the `cubeCloud` property of
+your JWT payload, the API request is treated the same as a request from an
+authenticated Cube Cloud user.
+
+## Configuration
+
+### JWT payload
+
+Include a `cubeCloud` object in the JWT payload with `groups` and, optionally,
+`userAttributes`:
+
+```json
+{
+  "cubeCloud": {
+    "groups": ["marketing"],
+    "userAttributes": {
+      "country": "United States"
+    }
+  }
+}
+```
+
+- `groups` is an array of group names the user belongs to.
+- `userAttributes` is an object whose keys match the attribute names you
+  defined in Cube Cloud.
+
+### Data access policy
+
+In your data model, reference `groups` and `userAttributes` as usual.
+Because the `cubeCloud` wrapper maps them automatically, the same policy
+works for both Cube Cloud UI users and direct API callers.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders_transactions
+    # ...
+
+    access_policy:
+      - group: marketing
+        row_level:
+          filters:
+            - member: users_country
+              operator: equals
+              values: ["{ userAttributes.country }"]
+```
+
+```javascript title="JavaScript"
+cube(`orders_transactions`, {
+  // ...
+
+  access_policy: [
+    {
+      group: `marketing`,
+      row_level: {
+        filters: [
+          {
+            member: `users_country`,
+            operator: `equals`,
+            values: [`{ userAttributes.country }`]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeGroup>
+
+## Example
+
+The following Node.js script signs a JWT with `cubeCloud` groups and user
+attributes, then queries the SQL API:
+
+```javascript
+import jwt from "jsonwebtoken";
+
+// ── Configuration ──────────────────────────────────────────────
+const CUBE_API_URL = "YOUR_SQL_API_URL";
+const CUBE_SECRET = "YOUR_CUBE_API_SECRET";
+
+const JWT_PAYLOAD = {
+  cubeCloud: {
+    groups: ["marketing"],
+    userAttributes: {
+      country: "United States"
+    }
+  }
+};
+
+const JWT_OPTIONS = {
+  expiresIn: "1d"
+};
+
+// ── SQL query ──────────────────────────────────────────────────
+const sql = `SELECT DISTINCT
+  orders_transactions.users_country
+FROM
+  orders_transactions
+LIMIT 5000`;
+
+// ── Execute ────────────────────────────────────────────────────
+const token = jwt.sign(JWT_PAYLOAD, CUBE_SECRET, JWT_OPTIONS);
+
+const res = await fetch(CUBE_API_URL, {
+  method: "POST",
+  headers: {
+    Authorization: token,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ query: sql })
+});
+
+if (!res.ok) {
+  console.error(`HTTP ${res.status}: ${res.statusText}`);
+  console.error(await res.text());
+  process.exit(1);
+}
+
+const text = await res.text();
+const lines = text.trim().split("\n").filter(Boolean);
+for (const line of lines) {
+  console.log(JSON.stringify(JSON.parse(line), null, 2));
+}
+```
+
+## Result
+
+Because the JWT contains `cubeCloud.groups: ["marketing"]` and
+`cubeCloud.userAttributes.country: "United States"`, the query is filtered
+by the `marketing` group's access policy. Only rows matching the user
+attribute filter are returned:
+
+```json
+{
+  "data": [
+    ["United States"]
+  ]
+}
+```
+
+[ref-groups]: /admin/users-and-permissions/user-groups
+[ref-user-attributes]: /admin/users-and-permissions/user-attributes
+[ref-core-data-apis]: /reference/core-data-apis
+[ref-dap]: /docs/data-modeling/data-access-policies

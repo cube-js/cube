@@ -86,6 +86,11 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -109,27 +114,28 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
       readOnly: true,
-      server: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      domain: getEnv('dbDomain', { dataSource }),
+      server: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      domain: getEnv('dbDomain', { dataSource, preAggregations }),
       requestTimeout: getEnv('dbQueryTimeout') * 1000,
       options: {
-        encrypt: getEnv('dbSsl', { dataSource }),
+        encrypt: getEnv('dbSsl', { dataSource, preAggregations }),
         useUTC: true
       },
       pool: {
         max:
           config.maxPoolSize ||
-          getEnv('dbMaxPoolSize', { dataSource }) ||
+          getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
           8,
         min: config.minPoolSize ||
-          getEnv('dbMinPoolSize', { dataSource }) ||
+          getEnv('dbMinPoolSize', { dataSource, preAggregations }) ||
           0,
         idleTimeoutMillis: 30 * 1000,
         acquireTimeoutMillis: 20 * 1000

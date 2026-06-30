@@ -1,0 +1,16 @@
+---
+source: cubesqlplanner/src/tests/integration/calendar.rs
+expression: result
+---
+custom_calendar__retail_date_week | calendar_orders__count | calendar_orders__count_shifted_calendar_w
+----------------------------------+------------------------+------------------------------------------
+2025-02-02                        | 1                      | NULL                                     
+2025-02-09                        | 1                      | 1                                        
+2025-02-16                        | 1                      | 1                                        
+2025-02-23                        | 1                      | 1                                        
+2025-03-02                        | NULL                   | 1                                        
+2025-03-09                        | 1                      | NULL                                     
+2025-03-16                        | 1                      | 1                                        
+2025-03-23                        | NULL                   | 1                                        
+2025-03-30                        | 1                      | NULL                                     
+2025-04-06                        | 1                      | 1

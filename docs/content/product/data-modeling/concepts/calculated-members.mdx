@@ -158,7 +158,7 @@ cube(`users`, {
     },
 
     purchases_to_users_ratio: {
-      sql: `100.0 * ${orders.purchases} / ${CUBE.count}`,
+      sql: `1.0 * ${orders.purchases} / ${CUBE.count}`,
       type: `number`,
       format: `percent`
     }

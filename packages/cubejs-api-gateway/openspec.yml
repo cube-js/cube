@@ -11,10 +11,17 @@ paths:
       # parameters:
       #   - in: query
       #     name: extended
-      #     required: true
+      #     required: false
       #     schema:
       #       type: boolean
-      #     description: You will receive extended response if this parameter is true
+      #     description: You will receive extended response if this parameter is present (presence-only, value is ignored)
+      #   - in: query
+      #     name: onlyViews
+      #     required: false
+      #     schema:
+      #       type: boolean
+      #       default: false
+      #     description: When set to "true", only views (entries with type="view") and their viewGroups are returned, excluding cubes
       description: ""
       operationId: "metaV1"
       responses:
@@ -145,6 +152,11 @@ components:
           type: "object"
         format:
           $ref: "#/components/schemas/V1CubeMetaFormat"
+        formatDescription:
+          $ref: "#/components/schemas/V1CubeMetaFormatDescription"
+        currency:
+          type: "string"
+          description: "ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)"
         order:
           $ref: "#/components/schemas/V1CubeMetaDimensionOrder"
         key:
@@ -177,6 +189,11 @@ components:
           type: "object"
         format:
           $ref: "#/components/schemas/V1CubeMetaFormat"
+        formatDescription:
+          $ref: "#/components/schemas/V1CubeMetaFormatDescription"
+        currency:
+          type: "string"
+          description: "ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)"
         aliasMember:
           description: "When measure is defined in View, it keeps the original path: Cube.measure"
           type: "string"
@@ -326,6 +343,9 @@ components:
         value:
           type: "string"
           description: "d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format"
+        alias:
+          type: "string"
+          description: "Name of the predefined format (e.g., 'percent_2', 'currency_1'). Present only when a named format was used."
       required:
         - type
         - value
@@ -336,6 +356,22 @@ components:
         - $ref: "#/components/schemas/V1CubeMetaCustomTimeFormat"
         - $ref: "#/components/schemas/V1CubeMetaCustomNumericFormat"
       description: Format of measure or dimension - can be a simple string format, a link configuration, a custom time format, or a custom numeric format
+    V1CubeMetaFormatDescription:
+      type: "object"
+      description: Resolved format description with the predefined name and d3-format specifier
+      required:
+        - name
+        - specifier
+      properties:
+        name:
+          type: "string"
+          description: "Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number', or 'custom' for ad-hoc specifiers"
+        specifier:
+          type: "string"
+          description: "d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f'). See https://d3js.org/d3-format"
+        currency:
+          type: "string"
+          description: "ISO 4217 currency code in uppercase (e.g. USD, EUR). Present when a currency format is used."
     V1MetaResponse:
       type: "object"
       properties:
@@ -361,8 +397,53 @@ components:
           type: "object"
         timeDimensions:
           type: "object"
-    V1LoadResultData:
+    V1LoadResultDataRow:
+      type: "array"
+      description: "Row-oriented (default) data format - an array of rows, each row is an object keyed by member name."
+      items:
+        type: "object"
+    V1LoadResultDataCompact:
       type: "object"
+      description: "Compact data format - a single object with the members list and a dataset of primitive arrays. Returned when `responseFormat=compact` is requested."
+      required:
+        - members
+        - dataset
+      properties:
+        members:
+          type: "array"
+          description: "Ordered list of member names that correspond to each cell position in `dataset` rows."
+          items:
+            type: "string"
+        dataset:
+          type: "array"
+          description: "Array of rows, where each row is an array of primitive values (null, boolean, number, string) aligned with `members`."
+          items:
+            type: "array"
+            items: {}
+    V1LoadResultDataColumnar:
+      type: "object"
+      description: "Columnar data format - members list paired with one primitive array per column. Returned when `responseFormat=columnar` is requested."
+      required:
+        - members
+        - columns
+      properties:
+        members:
+          type: "array"
+          description: "Ordered list of member names. Element `i` of `columns` holds the values for `members[i]` across all rows."
+          items:
+            type: "string"
+        columns:
+          type: "array"
+          description: "One array per member, in the same order as `members`. Each inner array contains the primitive value of that member for every row (null, boolean, number, string)."
+          items:
+            type: "array"
+            items: {}
+    V1LoadResultData:
+      description: "Result `data` payload. Either an array of objects keyed by member name (default); a compact `{ members, dataset }` object when `responseFormat=compact`; or a columnar `{ members, columns }` object when `responseFormat=columnar`."
+      oneOf:
+        - $ref: "#/components/schemas/V1LoadResultDataRow"
+        - $ref: "#/components/schemas/V1LoadResultDataCompact"
+        - $ref: "#/components/schemas/V1LoadResultDataColumnar"
     V1LoadResult:
       type: "object"
       required:
@@ -374,9 +455,7 @@ components:
         annotation:
           $ref: "#/components/schemas/V1LoadResultAnnotation"
         data:
-          type: "array"
-          items:
-            $ref: "#/components/schemas/V1LoadResultData"
+          $ref: "#/components/schemas/V1LoadResultData"
         refreshKeyValues:
           type: "array"
           items:
@@ -523,6 +602,13 @@ components:
             $ref: "#/components/schemas/V1LoadRequestJoinHint"
         timezone:
           type: "string"
+        responseFormat:
+          type: "string"
+          description: "Output format of the result `data` payload. `default` returns row-oriented data (`V1LoadResultDataRow`); `compact` returns a `{ members, dataset }` object with rows of primitive arrays (`V1LoadResultDataCompact`); `columnar` returns a `{ members, columns }` object with one primitive array per member (`V1LoadResultDataColumnar`)."
+          enum:
+            - default
+            - compact
+            - columnar
     V1LoadRequest:
       type: "object"
       properties:

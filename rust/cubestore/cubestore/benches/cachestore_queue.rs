@@ -63,6 +63,7 @@ async fn do_insert(
             orphaned: None,
             process_id: None,
             exclusive: false,
+            external_id: None,
         });
 
         let res = fut.await;
@@ -110,6 +111,7 @@ async fn do_list(
             status_filter.clone(),
             true,
             false,
+            None,
         );
 
         let res = fut.await;

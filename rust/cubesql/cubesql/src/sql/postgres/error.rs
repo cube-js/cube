@@ -6,7 +6,7 @@ use pg_srv::{
     ProtocolError,
 };
 
-use crate::{compile::CompilationError, transport::SpanId, CubeError};
+use crate::{compile::CompilationError, transport::SpanId, CubeError, CubeErrorCauseType};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ConnectionError {
@@ -36,33 +36,10 @@ impl ConnectionError {
     /// Converts Error to protocol::ErrorResponse which is usefully for writing response to the client
     pub fn to_error_response(self) -> protocol::ErrorResponse {
         match self {
-            ConnectionError::Cube(e, _) => Self::cube_to_error_response(&e),
-            ConnectionError::DataFusion(e, _) => Self::df_to_error_response(&e),
-            ConnectionError::Arrow(e, _) => Self::arrow_to_error_response(&e),
-            ConnectionError::CompilationError(e, _) => {
-                fn to_error_response(e: CompilationError) -> protocol::ErrorResponse {
-                    match e {
-                        CompilationError::Internal(_, _, _) => protocol::ErrorResponse::error(
-                            protocol::ErrorCode::InternalError,
-                            e.to_string(),
-                        ),
-                        CompilationError::User(_, _) => protocol::ErrorResponse::error(
-                            protocol::ErrorCode::InvalidSqlStatement,
-                            e.to_string(),
-                        ),
-                        CompilationError::Unsupported(_, _) => protocol::ErrorResponse::error(
-                            protocol::ErrorCode::FeatureNotSupported,
-                            e.to_string(),
-                        ),
-                        CompilationError::Fatal(_, _) => protocol::ErrorResponse::fatal(
-                            protocol::ErrorCode::InternalError,
-                            e.to_string(),
-                        ),
-                    }
-                }
-
-                to_error_response(e)
-            }
+            ConnectionError::Cube(e, _) => Self::cube_to_error_response(e),
+            ConnectionError::DataFusion(e, _) => Self::df_to_error_response(e),
+            ConnectionError::Arrow(e, _) => Self::arrow_to_error_response(e),
+            ConnectionError::CompilationError(e, _) => Self::compilation_to_error_response(e),
             ConnectionError::Protocol(e, _) => e.to_error_response(),
         }
     }
@@ -89,51 +66,64 @@ impl ConnectionError {
         }
     }
 
-    fn cube_to_error_response(e: &CubeError) -> protocol::ErrorResponse {
-        let message = e.to_string();
-        // Remove `Error: ` prefix that can come from JS
-        let message = if let Some(message) = message.strip_prefix("Error: ") {
-            message.to_string()
-        } else {
-            message
-        };
-        protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, message)
+    fn cube_to_error_response(e: CubeError) -> protocol::ErrorResponse {
+        match e.cause {
+            CubeErrorCauseType::User(_) => protocol::ErrorResponse::error(
+                protocol::ErrorCode::InvalidSqlStatement,
+                e.to_string(),
+            ),
+            CubeErrorCauseType::Internal(_) => {
+                protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, e.to_string())
+            }
+            CubeErrorCauseType::RestApi(_) => {
+                protocol::ErrorResponse::error(protocol::ErrorCode::SystemError, e.to_string())
+            }
+            CubeErrorCauseType::SqlParser(_) => {
+                protocol::ErrorResponse::error(protocol::ErrorCode::SyntaxError, e.to_string())
+            }
+            CubeErrorCauseType::Unsupported(_) => protocol::ErrorResponse::error(
+                protocol::ErrorCode::FeatureNotSupported,
+                e.to_string(),
+            ),
+            CubeErrorCauseType::Planning(_) => protocol::ErrorResponse::error(
+                protocol::ErrorCode::SyntaxErrorOrAccessRuleViolation,
+                e.to_string(),
+            ),
+            CubeErrorCauseType::PostProcessing(_) => {
+                protocol::ErrorResponse::error(protocol::ErrorCode::DataException, e.to_string())
+            }
+            CubeErrorCauseType::Rewrite(_) => {
+                protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, e.to_string())
+            }
+            CubeErrorCauseType::DatabaseExecution(_) => {
+                protocol::ErrorResponse::error(protocol::ErrorCode::SystemError, e.to_string())
+            }
+            CubeErrorCauseType::ContinueWait => {
+                // Should never happen
+                protocol::ErrorResponse::error(
+                    protocol::ErrorCode::SqlStatementNotYetComplete,
+                    e.to_string(),
+                )
+            }
+        }
     }
 
-    fn df_to_error_response(e: &DataFusionError) -> protocol::ErrorResponse {
-        match e {
-            DataFusionError::ArrowError(arrow_err) => {
-                return Self::arrow_to_error_response(arrow_err);
-            }
-            DataFusionError::External(err) => {
-                if let Some(cube_err) = err.downcast_ref::<CubeError>() {
-                    return Self::cube_to_error_response(cube_err);
-                }
-            }
-            _ => {}
-        }
-        protocol::ErrorResponse::error(
-            protocol::ErrorCode::InternalError,
-            format!("Post-processing Error: {}", e),
-        )
+    fn df_to_error_response(e: DataFusionError) -> protocol::ErrorResponse {
+        Self::cube_to_error_response(CubeError::from(e))
     }
 
-    fn arrow_to_error_response(e: &ArrowError) -> protocol::ErrorResponse {
-        match e {
-            ArrowError::ExternalError(err) => {
-                if let Some(df_err) = err.downcast_ref::<DataFusionError>() {
-                    return Self::df_to_error_response(df_err);
-                }
-                if let Some(cube_err) = err.downcast_ref::<CubeError>() {
-                    return Self::cube_to_error_response(cube_err);
-                }
-            }
-            _ => {}
+    fn arrow_to_error_response(e: ArrowError) -> protocol::ErrorResponse {
+        Self::cube_to_error_response(CubeError::from(e))
+    }
+
+    fn compilation_to_error_response(e: CompilationError) -> protocol::ErrorResponse {
+        if let CompilationError::Fatal(message, _) = e {
+            return protocol::ErrorResponse::fatal(
+                protocol::ErrorCode::InternalError,
+                format!("Fatal Error: {}", message),
+            );
         }
-        protocol::ErrorResponse::error(
-            protocol::ErrorCode::InternalError,
-            format!("Post-processing Error: {}", e),
-        )
+        Self::cube_to_error_response(CubeError::from(e))
     }
 }
 

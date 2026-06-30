@@ -73,7 +73,7 @@ export default function Header({ selectedKeys }: Props) {
 
           <StyledMenuButton
             key="docs"
-            href="https://cube.dev/docs"
+            href="https://cube.dev/docs/introduction"
             target="_blank"
           >
             <FileFilled />

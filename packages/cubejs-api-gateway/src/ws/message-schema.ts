@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const messageId = z.union([z.string().max(16), z.int()]);
+const messageId = z.union([z.string().max(16), z.int()]).transform(String);
 const requestId = z.string().max(64).optional();
 
 export const authMessageSchema = z.object({

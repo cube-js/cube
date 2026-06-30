@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/rolling_window/edge_cases.rs
+expression: result
+---
+orders__created_at_day | orders__rolling_sum_trailing_7d
+-----------------------+--------------------------------
+2024-01-15 00:00:00    | 530.00

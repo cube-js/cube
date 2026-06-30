@@ -297,6 +297,10 @@ export class OrchestratorApi {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
   }
 
+  public async cancelQueryByRequestId(requestId: string) {
+    return this.orchestrator.cancelQueryByRequestId(requestId);
+  }
+
   public async updateRefreshEndReached() {
     return this.orchestrator.updateRefreshEndReached();
   }

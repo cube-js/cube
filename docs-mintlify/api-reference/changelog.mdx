@@ -1,0 +1,66 @@
+---
+title: Changelog
+description: Release notes for the Cube Cloud platform client and management API.
+rss: true
+---
+
+{/* GENERATED FILE — do not edit by hand. */}
+{/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
+
+<Update label="2026-06-17" description="v0.1.2" tags={["Added","Changed"]}>
+  ### Added
+
+  - `GET /api/v1/app-config` operation (`AppThemePublicController.getAppConfig`) returning the deployment's app configuration — `appTheme`, `applyThemeGlobally`, and `creatorMode`. New schemas: `AppConfigResponse`, `AppTheme`, `CreatorMode`.
+  - Scheduled notifications can now carry dashboard `filters` and `timeGrains` that are applied when the dashboard is run. Available on `CreateNotificationInput`, `UpdateNotificationInput`, and the `Notification` response. New schemas: `DashboardFilter`, `DashboardFilterInput`, `DashboardFilterOperator`, `DashboardFilterInputOperator`, `DashboardTimeGrain`, `DashboardTimeGrainInput`.
+  - `CreateNotificationInput` accepts `dashboardPublicId` (string) as an alternative to the numeric `dashboardId` — supply exactly one.
+  - `GET /notifications` accepts new filter query parameters: `dashboardPublicId`, and recipient filters `recipientUserId` / `recipientEmail` (console user) or `recipientEmbedTenantName` + `recipientExternalId` (embed user).
+  - `POST /workbooks/{workbookId}/duplicate` accepts an optional `DuplicateWorkbookInput` body with a `shared` flag to clone a workbook from the shared workspace. New schema: `DuplicateWorkbookInput`.
+  - `Dashboard` now includes a `fromSharedWorkspace` field.
+  - `Workbook` now includes a `user` field (`ResourceOwner`).
+  - `InheritedUserPolicyDto` and `ResourceUserPolicyDto` now include `email`, `firstName`, and `picture` fields.
+
+  ### Changed
+
+  - `CreateNotificationInput.dashboardId` is now optional; identify the target dashboard with either `dashboardId` or the new `dashboardPublicId`.
+</Update>
+
+<Update label="2026-06-10" description="v0.1.1" tags={["Added","Changed","Deprecated"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/reports` now supports cursor-based pagination via the `first` and `after` query parameters, and returns an `items` array alongside a `pageInfo` cursor block — matching the folders and other list endpoints. (Cursor pagination is not available when sorting by `lastViewedAt`.)
+  - The reports list now accepts `name` as a `sortBy` value, in addition to `createdAt`, `updatedAt`, and `lastViewedAt`.
+  - `NotificationRecipient` now includes an optional `username` field.
+
+  ### Changed
+
+  - **BREAKING:** The reports list response type `ReportsFindAllResult` is now `ReportsListResponse`.
+
+  ### Deprecated
+
+  - The `data` and `count` fields on the reports list response are deprecated in favor of `items` and `pageInfo`. They remain populated for backward compatibility.
+</Update>
+
+<Update label="2026-06-07" description="v0.1.0" tags={["Added","Changed","Deprecated"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/folders` now supports cursor-based pagination via the `first` and `after` query parameters, and returns an `items` array alongside a `pageInfo` cursor block — matching the other list endpoints.
+
+  ### Changed
+
+  - **BREAKING:** The folders list response type `FoldersFindAllResult` is now `FoldersListResponse`.
+
+  ### Deprecated
+
+  - The `data` and `count` fields on the folders list response are deprecated in favor of `items` and `pageInfo`. They remain populated for backward compatibility.
+</Update>
+
+<Update label="2026-06-05" description="v0.0.20" tags={["Added","Deprecated"]}>
+  ### Added
+
+  - `createCubePlatformClient` — the new name for the client factory.
+  - Cube Platform-branded type and hook names: `CubePlatformClient`, `CubePlatformClientConfig`, `PlatformApiSchemas`, and the react-query exports `CubePlatformApiProvider`, `useCubePlatformApi`, `useCubePlatformApiQuery`, `useCubePlatformApiSuspenseQuery`, `useCubePlatformApiMutation`, `useCubePlatformApiLazyQuery`, `useCubePlatformApiQueryOptions`, `CubePlatformApiQueryKey`, `UseCubePlatformApiLazyQueryResult`.
+
+  ### Deprecated
+
+  - The former `CubeCloud*` / `ConsoleApiSchemas` names are deprecated in favor of the `CubePlatform*` / `PlatformApiSchemas` equivalents. All remain as aliases and will be removed in a future major version: `createCubeCloudApiClient`, `CubeCloudApiClient`, `CubeCloudApiClientConfig`, `ConsoleApiSchemas`, `CubeCloudApiProvider`, `CubeCloudApiProviderProps`, `useCubeCloudApi`, `useCubeCloudApiQuery`, `useCubeCloudApiSuspenseQuery`, `useCubeCloudApiMutation`, `useCubeCloudApiLazyQuery`, `useCubeCloudApiQueryOptions`, `CubeCloudApiQueryKey`, `UseCubeCloudApiLazyQueryResult`.
+</Update>

@@ -786,7 +786,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
             ];
           case 'percent':
             return [
-              `${formatNumber(typeof value === 'string' ? parseFloat(value) : value)}%`,
+              `${formatNumber((typeof value === 'string' ? parseFloat(value) : value) * 100)}%`,
               'percent',
             ];
           default:

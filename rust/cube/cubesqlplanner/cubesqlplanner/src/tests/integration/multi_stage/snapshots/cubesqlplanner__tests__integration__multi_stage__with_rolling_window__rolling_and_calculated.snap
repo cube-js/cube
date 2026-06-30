@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/with_rolling_window.rs
+expression: result
+---
+orders__created_at_month | orders__rolling_sum_7d | orders__mom_growth    
+-------------------------+------------------------+-----------------------
+2024-01-01 00:00:00      | NULL                   | NULL                  
+2024-02-01 00:00:00      | 30.00                  | 0.50000000000000000000
+2024-03-01 00:00:00      | 50.00                  | 0.33333333333333333333

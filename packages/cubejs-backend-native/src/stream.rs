@@ -89,6 +89,72 @@ impl OnDrainHandler {
     }
 }
 
+fn handle_on_close(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let this = cx
+        .this::<JsBox<OnCloseHandler>>()?
+        .downcast_or_throw::<JsBox<OnCloseHandler>, _>(&mut cx)?;
+    this.on_close();
+
+    Ok(cx.undefined())
+}
+
+pub struct OnCloseHandler {
+    channel: Arc<Channel>,
+    js_stream: Arc<Root<JsObject>>,
+    sender: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+}
+
+unsafe impl Sync for OnCloseHandler {}
+
+impl Finalize for OnCloseHandler {}
+
+impl OnCloseHandler {
+    pub fn new(
+        channel: Arc<Channel>,
+        js_stream: Arc<Root<JsObject>>,
+        sender: oneshot::Sender<()>,
+    ) -> Self {
+        Self {
+            channel,
+            js_stream,
+            sender: Arc::new(Mutex::new(Some(sender))),
+        }
+    }
+
+    pub async fn handle(&self, js_stream_on_fn: Arc<Root<JsFunction>>) -> Result<(), CubeError> {
+        let js_stream_obj = self.js_stream.clone();
+        let handler = Self {
+            channel: self.channel.clone(),
+            js_stream: self.js_stream.clone(),
+            sender: self.sender.clone(),
+        };
+
+        call_js_fn(
+            self.channel.clone(),
+            js_stream_on_fn,
+            Box::new(|cx| {
+                let on_close_fn = JsFunction::new(cx, handle_on_close)?;
+
+                let this = cx.boxed(handler).upcast::<JsValue>();
+                let on_close_fn = bind_method(cx, on_close_fn, this)?;
+
+                let event_arg = cx.string("close").upcast::<JsValue>();
+
+                Ok(vec![event_arg, on_close_fn.upcast::<JsValue>()])
+            }),
+            Box::new(|_, _| Ok(())),
+            js_stream_obj,
+        )
+        .await
+    }
+
+    fn on_close(&self) {
+        if let Some(sender) = self.sender.lock().unwrap().take() {
+            let _ = sender.send(());
+        }
+    }
+}
+
 pub struct JsWriteStream {
     sender: Sender<Chunk>,
     ready_sender: Mutex<Option<oneshot::Sender<Result<(), CubeError>>>>,
@@ -131,7 +197,7 @@ impl JsWriteStream {
             sender
                 .send(Some(Ok(chunk)))
                 .await
-                .map_err(|e| CubeError::user(format!("Can't send to channel: {}", e)))
+                .map_err(|e| CubeError::internal(format!("Can't send to channel: {}", e)))
         }
     }
 
@@ -147,7 +213,7 @@ impl JsWriteStream {
             sender
                 .send(None)
                 .await
-                .map_err(|e| CubeError::user(format!("Can't send to channel: {}", e)))
+                .map_err(|e| CubeError::internal(format!("Can't send to channel: {}", e)))
         }
     }
 
@@ -195,6 +261,27 @@ pub struct JsValueObject<'a> {
     pub handle: Handle<'a, JsArray>,
 }
 
+fn js_value_to_json_string<'a, C: Context<'a>>(
+    cx: &mut C,
+    value: Handle<'a, JsValue>,
+) -> Result<String, CubeError> {
+    let global = cx.global_object();
+    let json = global
+        .get::<JsObject, _, _>(cx, "JSON")
+        .map_err(|e| CubeError::internal(format!("Can't get JSON global: {}", e)))?;
+    let stringify = json
+        .get::<JsFunction, _, _>(cx, "stringify")
+        .map_err(|e| CubeError::internal(format!("Can't get JSON.stringify: {}", e)))?;
+    let undefined = cx.undefined().upcast::<JsValue>();
+    let result = stringify
+        .call(cx, undefined, [value])
+        .map_err(|e| CubeError::internal(format!("JSON.stringify failed: {}", e)))?;
+    let s = result.downcast::<JsString, _>(cx).map_err(|e| {
+        CubeError::internal(format!("JSON.stringify did not return a string: {}", e))
+    })?;
+    Ok(s.value(cx))
+}
+
 impl ValueObject for JsValueObject<'_> {
     fn len(&mut self) -> Result<usize, CubeError> {
         Ok(self.handle.len(&mut self.cx) as usize)
@@ -205,11 +292,11 @@ impl ValueObject for JsValueObject<'_> {
             .handle
             .get::<JsObject, _, _>(&mut self.cx, index as u32)
             .map_err(|e| {
-                CubeError::user(format!("Can't get object at array index {}: {}", index, e))
+                CubeError::internal(format!("Can't get object at array index {}: {}", index, e))
             })?
             .get::<JsValue, _, _>(&mut self.cx, field_name)
             .map_err(|e| {
-                CubeError::user(format!("Can't get '{}' field value: {}", field_name, e))
+                CubeError::internal(format!("Can't get '{}' field value: {}", field_name, e))
             })?;
         if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
             Ok(FieldValue::String(Cow::Owned(s.value(&mut self.cx))))
@@ -221,19 +308,24 @@ impl ValueObject for JsValueObject<'_> {
             || value.downcast::<JsNull, _>(&mut self.cx).is_ok()
         {
             Ok(FieldValue::Null)
-        } else if let Ok(b) = value.downcast::<JsArray, _>(&mut self.cx) {
-            Err(CubeError::user(format!(
-                "Expected primitive value but found JsArray({:?})",
-                b
-            )))
+        } else if value.is_a::<JsArray, _>(&mut self.cx) {
+            Ok(FieldValue::String(Cow::Owned(js_value_to_json_string(
+                &mut self.cx,
+                value,
+            )?)))
         } else if let Ok(b) = value.downcast::<JsDate, _>(&mut self.cx) {
             // TODO: Support it?
-            Err(CubeError::user(format!(
+            Err(CubeError::internal(format!(
                 "Expected primitive value but found JsDate({:?})",
                 b
             )))
+        } else if value.is_a::<JsObject, _>(&mut self.cx) {
+            Ok(FieldValue::String(Cow::Owned(js_value_to_json_string(
+                &mut self.cx,
+                value,
+            )?)))
         } else {
-            Err(CubeError::user(format!(
+            Err(CubeError::internal(format!(
                 "Expected primitive value but found: {:?}",
                 value
             )))
@@ -255,7 +347,10 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         handle: chunk_array,
     };
     let value =
-        transform_response(&mut value_object, this.schema.clone(), &this.member_fields).unwrap();
+        match transform_response(&mut value_object, this.schema.clone(), &this.member_fields) {
+            Ok(value) => value,
+            Err(e) => return value_object.cx.throw_error(e.message),
+        };
     let future = this.push_chunk(value);
     wait_for_future_and_execute_callback(
         this.tokio_handle.clone(),

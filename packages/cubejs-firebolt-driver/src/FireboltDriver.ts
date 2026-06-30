@@ -68,6 +68,11 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -85,25 +90,26 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
-    const username = getEnv('dbUser', { dataSource });
+    const username = getEnv('dbUser', { dataSource, preAggregations });
     const auth = username.includes('@')
-      ? { username, password: getEnv('dbPass', { dataSource }) }
-      : { client_id: username, client_secret: getEnv('dbPass', { dataSource }) };
+      ? { username, password: getEnv('dbPass', { dataSource, preAggregations }) }
+      : { client_id: username, client_secret: getEnv('dbPass', { dataSource, preAggregations }) };
 
     this.config = {
       readOnly: true,
       requestTimeout: getEnv('dbQueryTimeout') * 1000,
       apiEndpoint:
-        getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
+        getEnv('fireboltApiEndpoint', { dataSource, preAggregations }) || 'api.app.firebolt.io',
       ...config,
       connection: {
         auth,
-        database: getEnv('dbName', { dataSource }),
-        account: getEnv('fireboltAccount', { dataSource }),
-        engineName: getEnv('fireboltEngineName', { dataSource }),
+        database: getEnv('dbName', { dataSource, preAggregations }),
+        account: getEnv('fireboltAccount', { dataSource, preAggregations }),
+        engineName: getEnv('fireboltEngineName', { dataSource, preAggregations }),
         // engineEndpoint was deprecated in favor of engineName + account
-        engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource }),
+        engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource, preAggregations }),
         additionalParameters: {
           userClients: [{
             name: 'CubeDev+Cube',

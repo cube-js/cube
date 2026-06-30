@@ -4,7 +4,7 @@ use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
-use datafusion::arrow::array::{ArrayRef, StringArray, TimestampNanosecondArray};
+use datafusion::arrow::array::{ArrayRef, StringBuilder, TimestampNanosecondBuilder};
 use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
 
@@ -18,8 +18,8 @@ impl InfoSchemaTableDef for SystemCacheTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.cache_store.cache_all(limit).await?))
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.cache_store.cache_all(limit).await?)
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -35,33 +35,26 @@ impl InfoSchemaTableDef for SystemCacheTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut key_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut prefix_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut expire_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut value_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+
+        for row in rows.into_iter() {
+            let item = row.get_row();
+            key_builder.append_value(item.get_key());
+            prefix_builder.append_option(item.get_prefix().as_deref());
+            expire_builder.append_option(item.get_expire().as_ref().map(timestamp_nanos_or_panic));
+            value_builder.append_value(item.get_value());
+        }
+
         vec![
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| Some(row.get_row().get_key())),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| row.get_row().get_prefix().clone()),
-                ))
-            }),
-            Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from_iter(items.iter().map(
-                    |row| {
-                        row.get_row()
-                            .get_expire()
-                            .as_ref()
-                            .map(timestamp_nanos_or_panic)
-                    },
-                )))
-            }),
-            Box::new(|items| {
-                Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| Some(row.get_row().get_value())),
-                ))
-            }),
+            Arc::new(key_builder.finish()),
+            Arc::new(prefix_builder.finish()),
+            Arc::new(expire_builder.finish()),
+            Arc::new(value_builder.finish()),
         ]
     }
 }

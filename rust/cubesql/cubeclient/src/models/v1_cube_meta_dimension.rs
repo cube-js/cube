@@ -32,6 +32,11 @@ pub struct V1CubeMetaDimension {
     pub meta: Option<serde_json::Value>,
     #[serde(rename = "format", skip_serializing_if = "Option::is_none")]
     pub format: Option<Box<models::V1CubeMetaFormat>>,
+    #[serde(rename = "formatDescription", skip_serializing_if = "Option::is_none")]
+    pub format_description: Option<Box<models::V1CubeMetaFormatDescription>>,
+    /// ISO 4217 currency code in uppercase (3 characters, e.g. USD, EUR)
+    #[serde(rename = "currency", skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
     #[serde(rename = "order", skip_serializing_if = "Option::is_none")]
     pub order: Option<models::V1CubeMetaDimensionOrder>,
     /// Key reference for the dimension
@@ -51,6 +56,8 @@ impl V1CubeMetaDimension {
             granularities: None,
             meta: None,
             format: None,
+            format_description: None,
+            currency: None,
             order: None,
             key: None,
         }

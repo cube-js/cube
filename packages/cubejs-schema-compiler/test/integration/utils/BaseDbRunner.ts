@@ -95,6 +95,16 @@ export class BaseDbRunner {
             range => `SELECT * FROM ${PreAggregationPartitionRangeLoader.partitionTableName(desc.tableName, desc.partitionGranularity, range)}_${suffix}`
           ).join(' UNION ALL ');
           const targetTableName = desc.dateRange ? `(${partitionUnion})` : `${desc.tableName}_${suffix}`;
+          // Replace usage-suffixed placeholders first (e.g. tableName__usage_0)
+          if (desc.usageMapping) {
+            for (const usageSuffix of Object.keys(desc.usageMapping)) {
+              replacedQuery = replacedQuery.replace(
+                new RegExp(`${desc.tableName}${usageSuffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'g'),
+                `${targetTableName} `
+              );
+            }
+          }
+          // Replace base table name
           return replacedQuery.replace(
             new RegExp(`${desc.tableName}\\s+`, 'g'),
             `${targetTableName} `

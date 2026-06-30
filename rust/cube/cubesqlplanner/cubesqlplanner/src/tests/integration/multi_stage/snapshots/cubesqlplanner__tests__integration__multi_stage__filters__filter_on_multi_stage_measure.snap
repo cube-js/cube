@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/filters.rs
+expression: result
+---
+orders__status | orders__category | orders__total_amount | orders__amount_reduce_category
+---------------+------------------+----------------------+-------------------------------
+completed      | books            | 600.00               | 1400.00                       
+completed      | clothing         | 300.00               | 1400.00                       
+completed      | electronics      | 500.00               | 1400.00                       
+pending        | books            | 180.00               | 650.00                        
+pending        | clothing         | 370.00               | 650.00                        
+pending        | electronics      | 100.00               | 650.00

@@ -22,7 +22,18 @@ fn main() {
             )).unwrap()
     };
 
-    run_sql_tests("migration", vec![], move |test_name, test_fn| {
+    // These tests were added after the migration fixture tarball was recorded, so
+    // they have no pre-migration data directory to copy from. Skip them here; they
+    // still run under in-process/cluster/multi-process.
+    let extra_args = vec![
+        "--skip".to_string(),
+        "repartition_multi_node_consistency".to_string(),
+        "--skip".to_string(),
+        "rolling_window_no_aggregates".to_string(),
+        "--skip".to_string(),
+        "cross_join_empty_sort_on".to_string(),
+    ];
+    run_sql_tests("migration", extra_args, move |test_name, test_fn| {
         let r = Builder::new_current_thread()
             .thread_stack_size(4 * 1024 * 1024)
             .enable_all()
@@ -60,7 +71,10 @@ fn main() {
         r.block_on(Config::run_migration_test(
             &test_name,
             |services| async move {
-                test_fn(Box::new(FilterWritesSqlClient::new(services.sql_service))).await;
+                test_fn(Box::new(FilterWritesSqlClient::new(services.sql_service)))
+                    .await
+                    .unwrap();
+                Ok(())
             },
         ));
     });
@@ -145,7 +159,9 @@ impl FilterWritesSqlClient {
 impl SqlClient for FilterWritesSqlClient {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError> {
         match self.compute_filter_flag(query) {
-            FilterQueryResult::RunQuery => self.sql_service.exec_query(query).await,
+            FilterQueryResult::RunQuery => {
+                self.sql_service.exec_query(query).await?.collect().await
+            }
             FilterQueryResult::Hardcoded(result) => result,
             FilterQueryResult::UnrecognizedQueryType => unimplemented!(
                 "FilterWritesSqlClient does not support query prefix for '{}'",
@@ -162,6 +178,8 @@ impl SqlClient for FilterWritesSqlClient {
             FilterQueryResult::RunQuery => {
                 self.sql_service
                     .exec_query_with_context(context, query)
+                    .await?
+                    .collect()
                     .await
             }
             FilterQueryResult::Hardcoded(result) => result,

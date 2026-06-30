@@ -1,0 +1,54 @@
+---
+title: HTML
+description: Build fully custom layouts using HTML templates with Handlebars and JavaScript.
+---
+
+HTML charts let you render any layout that Vega-Lite cannot produce — custom scorecards, branded cards, rich tables, or any structure built with HTML, CSS, and JavaScript. Query results are available inside the template via [Handlebars](https://handlebarsjs.com/) expressions.
+
+## Variant
+
+### HTML template
+
+A free-form HTML document with Handlebars expressions. Write any markup and bind query result data directly in the template.
+
+{/* Screenshot: HTML chart with a custom branded scorecard layout. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Template structure
+
+Query results are available in the template context under `result`.
+
+**Access the first row** with `result._first`:
+
+```html
+<div class="scorecard">
+  <h2>{{result._first.order_items.status}}</h2>
+  <p>{{result._first.order_items.count}} orders</p>
+</div>
+```
+
+**Iterate over all rows** with `{{#each result.data}}`:
+
+```html
+<ul>
+  {{#each result.data}}
+    <li>{{this.order_items.status}}: {{this.order_items.count}}</li>
+  {{/each}}
+</ul>
+```
+
+## Using JavaScript
+
+Standard `<script>` tags are supported, enabling the use of charting libraries (D3, Chart.js, etc.) or any JavaScript that manipulates the rendered DOM.
+
+```html
+<canvas id="myChart"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const labels = [{{#each result.data}}"{{this.order_items.status}}"{{#unless @last}},{{/unless}}{{/each}}];
+  const data = [{{#each result.data}}{{this.order_items.count}}{{#unless @last}},{{/unless}}{{/each}}];
+  new Chart(document.getElementById('myChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data }] }
+  });
+</script>
+```

@@ -47,45 +47,46 @@ class DremioDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
       dbUrl:
         config.dbUrl ||
-        getEnv('dbUrl', { dataSource }) ||
+        getEnv('dbUrl', { dataSource, preAggregations }) ||
         '',
       dremioAuthToken:
         config.dremioAuthToken ||
-        getEnv('dremioAuthToken', { dataSource }) ||
+        getEnv('dremioAuthToken', { dataSource, preAggregations }) ||
         '',
       host:
         config.host ||
-        getEnv('dbHost', { dataSource }) ||
+        getEnv('dbHost', { dataSource, preAggregations }) ||
         'localhost',
       port:
         config.port ||
-        getEnv('dbPort', { dataSource }) ||
+        getEnv('dbPort', { dataSource, preAggregations }) ||
         9047,
       user:
         config.user ||
-        getEnv('dbUser', { dataSource }),
+        getEnv('dbUser', { dataSource, preAggregations }),
       password:
         config.password ||
-        getEnv('dbPass', { dataSource }),
+        getEnv('dbPass', { dataSource, preAggregations }),
       database:
         config.database ||
-        getEnv('dbName', { dataSource }),
+        getEnv('dbName', { dataSource, preAggregations }),
       ssl:
         config.ssl ||
-        getEnv('dbSsl', { dataSource }),
+        getEnv('dbSsl', { dataSource, preAggregations }),
       ...config,
       pollTimeout: (
         config.pollTimeout ||
-        getEnv('dbPollTimeout', { dataSource }) ||
-        getEnv('dbQueryTimeout', { dataSource })
+        getEnv('dbPollTimeout', { dataSource, preAggregations }) ||
+        getEnv('dbQueryTimeout', { dataSource, preAggregations })
       ) * 1000,
       pollMaxInterval: (
         config.pollMaxInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
     };
 

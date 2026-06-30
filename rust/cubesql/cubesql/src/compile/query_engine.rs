@@ -1,7 +1,4 @@
-use std::{
-    backtrace::Backtrace, collections::HashMap, future::Future, pin::Pin, sync::Arc,
-    time::SystemTime,
-};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::SystemTime};
 
 use crate::{
     compile::{
@@ -9,6 +6,7 @@ use crate::{
             df::{
                 optimizers::{
                     FilterPushDown, FilterSplitMeta, LimitPushDown, PlanNormalize, SortPushDown,
+                    UnionSortLimitPushDown,
                 },
                 planner::CubeQueryPlanner,
                 scan::CubeScanNode,
@@ -31,7 +29,7 @@ use crate::{
         SessionManager, SessionState,
     },
     transport::{LoadRequestMeta, MetaContext, SpanId, TransportService},
-    CubeErrorCauseType,
+    CubeError, CubeErrorCauseType,
 };
 use datafusion::{
     error::DataFusionError,
@@ -116,8 +114,7 @@ pub trait QueryEngine {
                             "planningId": query_planning_id.to_string(),
                         }),
                     )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
+                    .await?;
             }
         }
 
@@ -137,7 +134,7 @@ pub trait QueryEngine {
                     ),
                 ]));
 
-                CompilationError::internal(message).with_meta(meta)
+                CompilationError::planning(message).with_meta(meta)
             })?;
 
         let mut optimized_plan = plan;
@@ -150,6 +147,12 @@ pub trait QueryEngine {
             Arc::new(PlanNormalize::new(&cube_ctx)),
             Arc::new(ProjectionDropOut::new()),
             Arc::new(FilterPushDown::new()),
+            Arc::new(SortPushDown::new()),
+            Arc::new(LimitPushDown::new()),
+            // Duplicate any Sort/Limit sitting above a Union into the Union's inputs,
+            // then run Sort/Limit Push Down again so the duplicated clauses get pushed
+            // all the way down to CubeScans inside the Union.
+            Arc::new(UnionSortLimitPushDown::new()),
             Arc::new(SortPushDown::new()),
             Arc::new(LimitPushDown::new()),
             Arc::new(FilterSplitMeta::new()),
@@ -179,7 +182,7 @@ pub trait QueryEngine {
                 &mut query_params,
                 &mut LogicalPlanToLanguageContext::default(),
             )
-            .map_err(|e| CompilationError::internal(e.to_string()))?;
+            .map_err(|e| CompilationError::rewrite(e.to_string()))?;
 
         let rewriting_start = SystemTime::now();
         if let Some(span_id) = span_id.as_ref() {
@@ -194,8 +197,7 @@ pub trait QueryEngine {
                             "planningId": query_planning_id.to_string(),
                         }),
                     )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
+                    .await?;
             }
         }
 
@@ -209,34 +211,15 @@ pub trait QueryEngine {
                 qtrace,
             )
             .await
-            .map_err(|e| match e.cause {
-                CubeErrorCauseType::Internal(_) => CompilationError::Internal(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
+            .map_err(|mut e| {
+                e.cause = CubeErrorCauseType::Rewrite(e.cause.meta().cloned());
+                CompilationError::from(e).with_meta(Some(HashMap::from([
+                    ("query".to_string(), stmt.to_string()),
+                    (
+                        "sanitizedQuery".to_string(),
+                        self.sanitize_statement(&stmt).to_string(),
                     ),
-                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            self.sanitize_statement(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
-                CubeErrorCauseType::User(_) => CompilationError::User(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            self.sanitize_statement(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
+                ])))
             })?;
 
         // Replace Analysis as at least time has changed but it might be also context may affect rewriting in some other ways
@@ -256,34 +239,15 @@ pub trait QueryEngine {
                 span_id.clone(),
             )
             .await
-            .map_err(|e| match e.cause {
-                CubeErrorCauseType::Internal(_) => CompilationError::Internal(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
+            .map_err(|mut e| {
+                e.cause = CubeErrorCauseType::Rewrite(e.cause.meta().cloned());
+                CompilationError::from(e).with_meta(Some(HashMap::from([
+                    ("query".to_string(), stmt.to_string()),
+                    (
+                        "sanitizedQuery".to_string(),
+                        self.sanitize_statement(&stmt).to_string(),
                     ),
-                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            self.sanitize_statement(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
-                CubeErrorCauseType::User(_) => CompilationError::User(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            self.sanitize_statement(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
+                ])))
             });
 
         if let Err(_) = &result {
@@ -305,8 +269,7 @@ pub trait QueryEngine {
                             "duration": rewriting_start.elapsed().unwrap().as_millis() as u64,
                         }),
                     )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
+                    .await?;
             }
         }
 
@@ -340,8 +303,7 @@ pub trait QueryEngine {
                             "duration": planning_start.elapsed().unwrap().as_millis() as u64,
                         }),
                     )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
+                    .await?;
             }
         }
 
@@ -381,8 +343,7 @@ pub trait QueryEngine {
                                     load_request_meta.clone(),
                                     state.clone(),
                                 )
-                                .await
-                                .map_err(|e| CompilationError::internal(e.to_string()))?,
+                                .await?,
                         ),
                     }));
                 }
@@ -400,7 +361,7 @@ pub trait QueryEngine {
                 );
             }
             from_plan(&plan, plan.expressions().as_slice(), children.as_slice())
-                .map_err(|e| CompilationError::internal(e.to_string()))
+                .map_err(|e| CompilationError::from(CubeError::from(e)))
         })
     }
 }
@@ -617,7 +578,7 @@ impl QueryEngine for SqlQueryEngine {
                 state.protocol.clone(),
             )
             .await
-            .map_err(|e| CompilationError::internal(e.to_string()))
+            .map_err(|e| CompilationError::from(e))
     }
 }
 

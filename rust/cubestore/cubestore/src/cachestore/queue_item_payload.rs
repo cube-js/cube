@@ -19,7 +19,7 @@ pub struct QueueItemPayload {
 
 impl RocksEntity for QueueItemPayload {
     fn version() -> u32 {
-        2
+        3
     }
 }
 

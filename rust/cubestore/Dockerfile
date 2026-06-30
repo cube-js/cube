@@ -2,7 +2,7 @@ FROM cubejs/rust-builder:bookworm-llvm-18 AS builder
 
 WORKDIR /build/cubestore
 
-COPY cubeshared /build/cubeshared
+COPY cube/cubeshared /build/cube/cubeshared
 
 COPY cubestore/rust-toolchain.toml .
 COPY cubestore/Cargo.toml .

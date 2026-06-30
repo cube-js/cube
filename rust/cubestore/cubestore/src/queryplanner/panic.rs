@@ -177,6 +177,7 @@ pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         /* max_batch_rows */ 1,
         /* limit_and_reverse */ None,
         /* required_input_ordering */ None,
+        /* worker_sort_and_limit */ None,
         // worker_partition_count is generally set to 1 for panic worker messages
         // (SystemCommand::PanicWorker).  What is important is that router and worker nodes have the
         // same plan properties so that DF optimizations run identically -- router node is creating

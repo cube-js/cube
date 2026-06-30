@@ -1,0 +1,66 @@
+---
+title: Chart palettes
+description: Create custom color palettes so charts across your account stay consistent and on-brand.
+---
+
+Chart palettes control the colors used in chart visualizations across [workbooks][ref-workbooks] and [dashboards][ref-dashboards]. Cube ships with a set of built-in palettes, and you can also define your own custom palettes — for example, to match your company brand — and reuse them on any chart in the account.
+
+Custom palettes are managed centrally and are available across every deployment in the account.
+
+[ref-workbooks]: /workbooks
+[ref-dashboards]: /workbooks/dashboards
+
+## Requirements
+
+Custom chart palettes are managed under the **Manage chart palettes** permission. The built-in **Admin** [role][ref-roles] has this permission by default; for other users, grant the **Manage chart palettes** global permission via a [custom role][ref-custom-roles].
+
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+
+## Browse palettes
+
+Go to **Admin → Customization → Chart Palettes** to see every palette available in your account. The list combines:
+
+- **Built-in palettes** shipped with Cube — these can be used in charts but cannot be edited or deleted.
+- **Custom palettes** created in your account — these can be edited, renamed, and deleted.
+
+Each row shows the palette name and a preview of its colors.
+
+## Create a custom palette
+
+1. Go to **Admin → Customization → Chart Palettes**.
+2. Click **Add palette**.
+3. Give the palette a **Name** and provide its colors as a comma-separated list of hex codes (for example, `#1F77B4, #FF7F0E, #2CA02C`).
+4. Click **Save**.
+
+The new palette appears in the list immediately and becomes selectable in the chart styling controls.
+
+## Edit a custom palette
+
+1. Go to **Admin → Customization → Chart Palettes**.
+2. Click the row action on the palette you want to change and select **Edit**.
+3. Update the name or colors and click **Save**.
+
+Existing charts that use the palette pick up the new colors automatically.
+
+## Delete a custom palette
+
+1. Go to **Admin → Customization → Chart Palettes**.
+2. Click the row action on the palette you want to remove and select **Delete**.
+
+Charts that were using the deleted palette fall back to the built-in **Default** palette.
+
+## Apply a palette to a chart
+
+Palettes are applied per chart from the chart's styling controls:
+
+1. Open a workbook and select a chart.
+2. Open the **Style** panel for the chart.
+3. Use the **Palette** dropdown to pick a built-in or custom palette.
+
+The dropdown shows palettes that match the chart's color encoding:
+
+- **Discrete** palettes appear when the color encoding is categorical (for example, color by `status` or `category`).
+- **Continuous** palettes appear when the color encoding is quantitative or temporal (for example, color by `total_sale_price` or `created_at`).
+
+If no palette is explicitly selected, charts use the built-in **Default** palette.

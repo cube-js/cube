@@ -25,11 +25,11 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
-    Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float32Array,
+    Float64Array, Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
-use datafusion::arrow::compute::SortOptions;
+use datafusion::arrow::compute::{filter_record_batch, SortOptions};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::ipc::reader::StreamReader;
 use datafusion::arrow::ipc::writer::StreamWriter;
@@ -46,6 +46,8 @@ use datafusion::datasource::physical_plan::{
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
+use datafusion::execution::memory_pool::{MemoryPool, MemoryReservation};
+use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
@@ -68,6 +70,7 @@ use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
@@ -79,6 +82,7 @@ use datafusion::physical_plan::{
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
+use datafusion_proto::bytes::Serializeable;
 use futures_util::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
@@ -90,12 +94,78 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::io::Cursor;
 use std::mem::take;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
 use super::serialized_plan::PreSerializedPlan;
 use super::{try_make_memory_data_source, QueryPlannerImpl};
+
+/// Unbounded `MemoryPool` that records the peak of all operator reservations for a
+/// single query execution. The pool lives in that query's `RuntimeEnv`, so the peak
+/// is per-query and isolated from concurrent queries sharing the process. Covers only
+/// memory that operators voluntarily reserve (sort/aggregate/join buffers), not every
+/// allocation — by design.
+#[derive(Debug, Default)]
+pub struct TrackingMemoryPool {
+    used: AtomicUsize,
+    peak: AtomicUsize,
+}
+
+impl TrackingMemoryPool {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn peak(&self) -> usize {
+        self.peak.load(Ordering::Relaxed)
+    }
+}
+
+impl MemoryPool for TrackingMemoryPool {
+    fn grow(&self, _reservation: &MemoryReservation, additional: usize) {
+        let used = self.used.fetch_add(additional, Ordering::Relaxed) + additional;
+        self.peak.fetch_max(used, Ordering::Relaxed);
+    }
+
+    fn shrink(&self, _reservation: &MemoryReservation, shrink: usize) {
+        self.used.fetch_sub(shrink, Ordering::Relaxed);
+    }
+
+    fn try_grow(&self, reservation: &MemoryReservation, additional: usize) -> DFResult<()> {
+        // Unbounded: always succeeds; we only measure, never reject.
+        self.grow(reservation, additional);
+        Ok(())
+    }
+
+    fn reserved(&self) -> usize {
+        self.used.load(Ordering::Relaxed)
+    }
+}
+
+/// Walk an executed physical plan and record each node's `elapsed_compute` and
+/// `output_rows` into the active trace as `OpKind::Execution` samples keyed by node
+/// type. Same-typed nodes aggregate (summed time/rows, node count).
+fn record_plan_node_metrics(plan: &Arc<dyn ExecutionPlan>) {
+    if let Some(metrics) = plan.metrics() {
+        let elapsed_us = metrics.elapsed_compute().map(|ns| (ns / 1000) as u64);
+        let rows = metrics.output_rows().map(|r| r as u64);
+        if elapsed_us.is_some() || rows.is_some() {
+            crate::trace::record_op(
+                crate::trace::OpKind::Execution,
+                plan.name(),
+                elapsed_us.unwrap_or(0),
+                None,
+                rows,
+                1,
+            );
+        }
+    }
+    for child in plan.children() {
+        record_plan_node_metrics(child);
+    }
+}
 
 #[automock]
 #[async_trait]
@@ -106,12 +176,23 @@ pub trait QueryExecutor: DIService + Send + Sync {
         cluster: Arc<dyn Cluster>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
+    /// Like [execute_router_plan], but runs under detailed tracing: the worker-trace
+    /// collector rides in the session config so ClusterSendExec records per-worker
+    /// traces. Result rows are discarded; returns the execution memory peak if known.
+    async fn execute_router_plan_detailed(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+        worker_traces: Arc<crate::trace::WorkerTraceCollector>,
+    ) -> Result<Option<u64>, CubeError>;
+
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        memory_pool: Option<Arc<TrackingMemoryPool>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError>;
 
     async fn router_plan(
@@ -145,6 +226,7 @@ pub struct QueryExecutorImpl {
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     memory_handler: Arc<dyn MemoryHandler>,
+    config: Arc<dyn ConfigObj>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
@@ -160,6 +242,51 @@ impl QueryExecutorImpl {
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
+    async fn execute_router_plan_detailed(
+        &self,
+        plan: SerializedPlan,
+        cluster: Arc<dyn Cluster>,
+        worker_traces: Arc<crate::trace::WorkerTraceCollector>,
+    ) -> Result<Option<u64>, CubeError> {
+        let (physical_plan, _logical_plan) = {
+            let _g = crate::trace::OpGuard::start(
+                crate::trace::OpKind::Planning,
+                "main.router_physical_plan",
+            );
+            self.router_plan(plan, cluster).await?
+        };
+        // The collector rides in the session config so ClusterSendExec can record
+        // per-worker traces through DataFusion's own task context propagation.
+        let config = self
+            .metadata_cache_factory
+            .make_session_config()
+            .with_extension(worker_traces);
+        // Per-query tracking pool in this execution's own RuntimeEnv: the peak is
+        // isolated from concurrent queries sharing the process.
+        let memory_pool = TrackingMemoryPool::new();
+        let runtime_env = Arc::new(
+            RuntimeEnvBuilder::new()
+                .with_memory_pool(memory_pool.clone())
+                .build()?,
+        );
+        let session_context = Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
+            config,
+            runtime_env,
+        ));
+        {
+            let _g = crate::trace::OpGuard::start_wrapper(
+                crate::trace::OpKind::Execution,
+                "main.execute",
+            );
+            let _results = collect(physical_plan.clone(), session_context.task_ctx()).await?;
+        }
+        // Harvest per-node DataFusion metrics of the final stages (router-level nodes
+        // above ClusterSend), aggregated by node type into the active trace.
+        record_plan_node_metrics(&physical_plan);
+        crate::trace::set_plan_text(pp_phys_plan(physical_plan.as_ref()));
+        Ok(Some(memory_pool.peak() as u64))
+    }
+
     #[instrument(level = "trace", skip(self, plan, cluster))]
     async fn execute_router_plan(
         &self,
@@ -235,6 +362,7 @@ impl QueryExecutor for QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        memory_pool: Option<Arc<TrackingMemoryPool>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError> {
         let data_loaded_size = DataLoadedSize::new();
         let create_worker_physical_plan_time = SystemTime::now();
@@ -268,7 +396,20 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
-        let session_context = self.execution_context()?;
+        let session_context = match &memory_pool {
+            Some(pool) => {
+                let runtime = Arc::new(
+                    RuntimeEnvBuilder::new()
+                        .with_memory_pool(pool.clone())
+                        .build()?,
+                );
+                Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
+                    self.metadata_cache_factory.make_session_config(),
+                    runtime,
+                ))
+            }
+            None => self.execution_context()?,
+        };
         let results = collect(worker_plan.clone(), session_context.task_ctx())
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
@@ -311,6 +452,11 @@ impl QueryExecutor for QueryExecutorImpl {
         }
         // TODO: stream results as they become available.
         let results = regroup_batches(results?, max_batch_rows)?;
+        // Detailed trace: record per-node metrics + the worker subplan text.
+        if memory_pool.is_some() {
+            record_plan_node_metrics(&worker_plan);
+            crate::trace::set_plan_text(pp_phys_plan(worker_plan.as_ref()));
+        }
         Ok((worker_plan.schema(), results, data_loaded_size.get()))
     }
 
@@ -401,11 +547,13 @@ impl QueryExecutorImpl {
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
         parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
         memory_handler: Arc<dyn MemoryHandler>,
+        config: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         Arc::new(QueryExecutorImpl {
             metadata_cache_factory,
             parquet_metadata_cache,
             memory_handler,
+            config,
         })
     }
 
@@ -419,6 +567,9 @@ impl QueryExecutorImpl {
             cluster,
             serialized_plan,
             self.memory_handler.clone(),
+            self.config.group_by_limit_factor(),
+            self.config.group_by_limit_per_partition(),
+            self.config.topk_aggregate_strategy(),
         ))
     }
 
@@ -434,6 +585,9 @@ impl QueryExecutorImpl {
             worker_planning_params,
             self.memory_handler.clone(),
             data_loaded_size.clone(),
+            self.config.group_by_limit_factor(),
+            self.config.group_by_limit_per_partition(),
+            self.config.topk_aggregate_strategy(),
         ))
     }
 
@@ -454,7 +608,10 @@ impl QueryExecutorImpl {
     fn physical_optimizer_rules(&self) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
         vec![
             // Cube rules
-            Arc::new(PreOptimizeRule::new()),
+            Arc::new(PreOptimizeRule::new(
+                self.config.push_partial_aggregate_below_merge_enabled(),
+                self.config.coalesce_under_hash_aggregate(),
+            )),
             // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.
             Arc::new(OutputRequirements::new_add_mode()),
             Arc::new(AggregateStatistics::new()),
@@ -680,7 +837,26 @@ impl CubeTable {
             None
         };
 
-        let predicate = combine_filters(filters);
+        let unique_key_columns = self
+            .index_snapshot
+            .table_path
+            .table
+            .get_row()
+            .unique_key_columns();
+
+        // Only filters referencing unique key columns commute with the last-row
+        // deduplication: the key is immutable within a version group, so such filters
+        // select whole groups. Filters on other columns apply to the last version of a
+        // row; acting on individual versions below the dedup — be it parquet row-group
+        // pruning or row filtering — could drop the last version while older ones
+        // survive elsewhere and get resurrected.
+        let predicate = if let Some(key_columns) = &unique_key_columns {
+            // Filters passed to a scan reference only this table's columns, so matching
+            // by bare column name is enough.
+            dedup_safe_unique_key_filter(filters, key_columns)
+        } else {
+            combine_filters(filters)
+        };
         let physical_predicate = if let Some(pred) = &predicate {
             Some(state.create_physical_expr(
                 pred.clone(),
@@ -856,6 +1032,21 @@ impl CubeTable {
             }
         }
 
+        // Apply the dedup-safe predicate to every stream of a unique key table to cut
+        // the merge and dedup input: parquet pruning above only skips whole row groups
+        // and does nothing for in-memory chunks.
+        if unique_key_columns.is_some() {
+            if let Some(predicate) = &predicate {
+                for p in &mut partition_execs {
+                    let phys_predicate = state.create_physical_expr(
+                        predicate.clone(),
+                        &p.schema().as_ref().clone().to_dfschema()?,
+                    )?;
+                    *p = Arc::new(FilterExec::try_new(phys_predicate, p.clone())?);
+                }
+            }
+        }
+
         // Schema for scan output and input to MergeSort and LastRowByUniqueKey
         let table_projected_schema = {
             Arc::new(Schema::new(
@@ -900,13 +1091,6 @@ impl CubeTable {
                 Boundedness::Bounded,
             ),
         });
-        let unique_key_columns = self
-            .index_snapshot()
-            .table_path
-            .table
-            .get_row()
-            .unique_key_columns();
-
         let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
             let sort_columns = self
                 .index_snapshot()
@@ -1296,6 +1480,8 @@ pub struct ClusterSendExec {
     pub limit_and_reverse: Option<(usize, bool)>,
     // Used to prevent SortExec on workers (e.g. with ClusterAggregateTopK) from being optimized away.
     pub required_input_ordering: Option<LexRequirement>,
+    /// Not used in execution, only stored to allow consistent optimization on router and worker.
+    pub worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
 }
 
 pub type PartitionWithFilters = (u64, RowRange);
@@ -1318,6 +1504,7 @@ impl ClusterSendExec {
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
         limit_and_reverse: Option<(usize, bool)>,
+        worker_sort_and_limit: Option<(Vec<(usize, bool, bool)>, usize)>,
         required_input_ordering: Option<LexRequirement>,
     ) -> Result<Self, CubeError> {
         let partitions = Self::distribute_to_workers(
@@ -1337,6 +1524,7 @@ impl ClusterSendExec {
             use_streaming,
             limit_and_reverse,
             required_input_ordering,
+            worker_sort_and_limit,
         })
     }
 
@@ -1371,11 +1559,12 @@ impl ClusterSendExec {
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Result<Vec<(String, (Vec<PartitionWithFilters>, Vec<InlineTableId>))>, CubeError> {
-        let partitions = Self::logical_partitions(snapshots, tree)?;
+        let partitions = Self::logical_partitions(config, snapshots, tree)?;
         Ok(Self::assign_nodes(config, partitions))
     }
 
     fn logical_partitions(
+        config: &dyn ConfigObj,
         snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Result<Vec<Vec<InlineCompoundPartition>>, CubeError> {
@@ -1449,7 +1638,14 @@ impl ClusterSendExec {
                 })
                 .collect());
         }
-        // Ordinary partitions need to be duplicated on multiple machines.
+
+        // For joins (multiple tables), distribute by root table partitions
+        // instead of cartesian product to reduce combinations.
+        if to_multiply.len() > 1 {
+            return Self::distribute_join_partitions(config, to_multiply);
+        }
+
+        // Single table — no join, just return partitions as-is.
         let partitions = to_multiply
             .into_iter()
             .multi_cartesian_product()
@@ -1494,6 +1690,63 @@ impl ClusterSendExec {
         let mut ps: Vec<_> = leaves.into_values().collect();
         ps.sort_unstable_by_key(|ps| ps[0].get_id());
         ps
+    }
+
+    /// Distributes join partitions by batching all tables' partitions according
+    /// to the configured limit, instead of taking a cartesian product.
+    ///
+    /// Iterates from the last table backwards. Tables that fit entirely within
+    /// the remaining budget are included whole in every batch (preserving JOIN
+    /// correctness). When a table would exceed the limit, its partitions are
+    /// split across batches. All tables before the split point are also included
+    /// whole in every batch.
+    fn distribute_join_partitions(
+        config: &dyn ConfigObj,
+        tables: Vec<Vec<InlineCompoundPartition>>,
+    ) -> Result<Vec<Vec<InlineCompoundPartition>>, CubeError> {
+        assert!(tables.len() > 1);
+
+        // Only the root (first/left-most) table can be safely split across
+        // batches.  All other (right) tables must be included whole in every
+        // batch, otherwise LEFT JOIN produces spurious NULLs / duplicates.
+        let right_partitions: Vec<InlineCompoundPartition> =
+            tables[1..].iter().flat_map(|t| t.iter().cloned()).collect();
+
+        let root = &tables[0];
+        let max = config.max_joined_partitions();
+        let right_total = right_partitions.len();
+        let right_active = right_partitions
+            .iter()
+            .filter(|p| match p {
+                InlineCompoundPartition::Partition(p) => p.get_row().is_active(),
+                InlineCompoundPartition::PartitionWithInlineTables(p, _) => p.get_row().is_active(),
+                InlineCompoundPartition::InlineTables(_) => true,
+            })
+            .count();
+
+        // Budget for root partitions per batch.
+        let chunk_size = if max == 0 || max <= right_active {
+            let required = right_active + 1;
+            return Err(CubeError::user(format!(
+                "Max number of joined partitions per batch limit is hit. Max limit is {}. Query requires at least {} per batch (1 on the left and {} on the right). {}",
+                max,
+                required,
+                right_active,
+                config.max_joined_partitions_message()
+            )));
+        } else {
+            (max - right_active).max(1)
+        };
+
+        let mut batches = Vec::new();
+        for chunk in root.chunks(chunk_size) {
+            let mut batch = Vec::with_capacity(chunk.len() + right_total);
+            batch.extend(chunk.iter().cloned());
+            batch.extend(right_partitions.iter().cloned());
+            batches.push(batch);
+        }
+
+        Ok(batches)
     }
 
     fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {
@@ -1592,6 +1845,7 @@ impl ClusterSendExec {
             // This is only set to self.limit_and_reverse to be consistent with WorkerExec having
             // the bug.
             limit_and_reverse: self.limit_and_reverse,
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             required_input_ordering: new_required_input_ordering,
         }
     }
@@ -1659,6 +1913,7 @@ impl ExecutionPlan for ClusterSendExec {
             input_for_optimizations,
             use_streaming: self.use_streaming,
             limit_and_reverse: self.limit_and_reverse,
+            worker_sort_and_limit: self.worker_sort_and_limit.clone(),
             required_input_ordering: self.required_input_ordering.clone(),
         }))
     }
@@ -1677,6 +1932,40 @@ impl ExecutionPlan for ClusterSendExec {
         let schema = self.properties.eq_properties.schema().clone();
         let node_name = node_name.to_string();
         let worker_planning_params = self.worker_planning_params();
+
+        // Detailed-trace path: when a worker-trace collector rides in the task context,
+        // pull rows + the worker's trace and record the trace. Rows still flow into the
+        // merge so the final stages execute (and can be measured) for real.
+        //
+        // FIDELITY CAVEAT: this path always materializes (non-streaming), even where prod
+        // would stream this ClusterSend. So main-side wall-time and RSS reflect the
+        // non-streaming variant; the per-query MemoryPool peak (operator reservations) is
+        // less affected, but a streaming prod path will diverge here. Streaming + trace
+        // return is a deferred follow-up.
+        if let Some(collector) = context
+            .session_config()
+            .get_extension::<crate::trace::WorkerTraceCollector>()
+        {
+            let record_batches = async move {
+                let started = std::time::Instant::now();
+                let (rows, mut trace) = cluster
+                    .run_select_detailed(
+                        &node_name,
+                        plan.to_serialized_plan()?,
+                        worker_planning_params,
+                    )
+                    .await?;
+                trace.net_roundtrip_us = Some(started.elapsed().as_micros() as u64);
+                collector.push(trace);
+                Ok::<_, CubeError>(rows)
+            };
+            let stream = futures::stream::once(record_batches).flat_map(|r| match r {
+                Ok(vec) => stream::iter(vec.into_iter().map(|b| Ok(b)).collect::<Vec<_>>()),
+                Err(e) => stream::iter(vec![Err(DataFusionError::Execution(e.to_string()))]),
+            });
+            return Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)));
+        }
+
         if self.use_streaming {
             // A future that yields a stream
             let fut = async move {
@@ -1901,6 +2190,16 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                 DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
+                DataType::Float32 => {
+                    let a = array.as_any().downcast_ref::<Float32Array>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Float((a.value(i) as f64).into())
+                        });
+                    }
+                }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
@@ -1986,7 +2285,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Binary => Ok(ColumnType::Bytes),
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
-        DataType::Float16 | DataType::Float64 => Ok(ColumnType::Float),
+        DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Float),
         // TODO upgrade DF
         // DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
         //     scale: scale as i32,
@@ -2037,6 +2336,10 @@ pub struct SerializedRecordBatchStream {
 }
 
 impl SerializedRecordBatchStream {
+    pub fn byte_size(&self) -> usize {
+        self.record_batch_file.len()
+    }
+
     pub fn write(
         schema: &Schema,
         record_batches: Vec<RecordBatch>,
@@ -2076,6 +2379,103 @@ impl SerializedRecordBatchStream {
 /// Combines an array of filter expressions into a single filter expression
 /// consisting of the input filter expressions joined with logical AND.
 /// Returns None if the filters array is empty.
+/// The subset of `filters` that commutes with last-row dedup on a unique-key table:
+/// non-volatile and referencing only unique-key columns. Such filters select whole
+/// version groups, so applying them below the dedup (or to raw chunks) can't resurrect
+/// an overwritten row. Combined into a single predicate, or `None` when nothing is
+/// pushable. Shared by the scan-time per-stream `FilterExec` and the worker-side
+/// in-memory chunk pre-filter so the two can't diverge.
+pub fn dedup_safe_unique_key_filter(filters: &[Expr], key_columns: &[&Column]) -> Option<Expr> {
+    let pushable = filters
+        .iter()
+        .filter(|f| {
+            !f.is_volatile()
+                && f.column_refs()
+                    .iter()
+                    .all(|c| key_columns.iter().any(|k| k.get_name() == &c.name))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    combine_filters(&pushable)
+}
+
+fn filter_batch_by_predicate(
+    predicate: &dyn PhysicalExpr,
+    batch: &RecordBatch,
+) -> Result<RecordBatch, CubeError> {
+    let mask = predicate.evaluate(batch)?.into_array(batch.num_rows())?;
+    let mask = mask
+        .as_any()
+        .downcast_ref::<BooleanArray>()
+        .ok_or_else(|| {
+            CubeError::internal(
+                "Pushable chunk filter did not evaluate to a boolean mask".to_string(),
+            )
+        })?;
+    Ok(filter_record_batch(batch, mask)?)
+}
+
+/// Trim loaded in-memory chunks by the per-index pushable predicate computed at planning
+/// time, before they are serialized and shipped over IPC to the select subprocess. The
+/// subprocess re-applies the same predicate, so this only reduces payload and is never
+/// relied on for correctness — any failure is logged and the affected chunks are left
+/// untrimmed rather than failing the query. Filtered batches keep their (possibly
+/// zero-row) schema.
+pub fn filter_in_memory_chunks_for_worker(
+    plan: &SerializedPlan,
+    chunks: &mut HashMap<u64, Vec<RecordBatch>>,
+) {
+    let groups = plan.in_memory_chunk_filter_groups();
+    if groups.is_empty() {
+        return;
+    }
+    let session_state =
+        QueryPlannerImpl::minimal_session_state_from_final_config(SessionConfig::new()).build();
+    'group: for (bytes, chunk_ids) in groups {
+        let predicate = match Expr::from_bytes_with_registry(&bytes, &session_state) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("Skipping in-memory chunk pre-filter, can't decode predicate: {e}");
+                continue;
+            }
+        };
+        // All chunks of a group share the index schema, so the physical expression is built
+        // once (lazily, from the first non-empty batch) and reused across the group.
+        let mut phys: Option<Arc<dyn PhysicalExpr>> = None;
+        for id in chunk_ids {
+            let Some(batches) = chunks.get_mut(&id) else {
+                continue;
+            };
+            for b in batches.iter_mut() {
+                if b.num_rows() == 0 {
+                    continue;
+                }
+                if phys.is_none() {
+                    match b
+                        .schema()
+                        .as_ref()
+                        .clone()
+                        .to_dfschema()
+                        .and_then(|s| session_state.create_physical_expr(predicate.clone(), &s))
+                    {
+                        Ok(p) => phys = Some(p),
+                        Err(e) => {
+                            warn!(
+                                "Skipping in-memory chunk pre-filter, can't build predicate: {e}"
+                            );
+                            continue 'group;
+                        }
+                    }
+                }
+                match filter_batch_by_predicate(phys.as_ref().unwrap().as_ref(), b) {
+                    Ok(filtered) => *b = filtered,
+                    Err(e) => warn!("Skipping in-memory chunk {id} pre-filter: {e}"),
+                }
+            }
+        }
+    }
+}
+
 fn combine_filters(filters: &[Expr]) -> Option<Expr> {
     if filters.is_empty() {
         return None;
@@ -2138,6 +2538,8 @@ mod tests {
             Field::new("uint32", DataType::UInt32, true),
             Field::new("int32", DataType::Int32, true),
             Field::new("str32", DataType::Utf8, true),
+            Field::new("float32", DataType::Float32, true),
+            Field::new("float64", DataType::Float64, true),
         ]));
         let result = batches_to_dataframe(vec![RecordBatch::try_new(
             schema,
@@ -2145,21 +2547,43 @@ mod tests {
                 Arc::new(UInt32Array::from_iter(vec![Some(1), None])) as ArrayRef,
                 Arc::new(Int32Array::from_iter(vec![Some(1), None])) as ArrayRef,
                 Arc::new(StringArray::from_iter(vec![Some("test".to_string()), None])) as ArrayRef,
+                Arc::new(Float32Array::from_iter(vec![Some(1.5f32), None])) as ArrayRef,
+                Arc::new(Float64Array::from_iter(vec![Some(2.5f64), None])) as ArrayRef,
             ],
         )?])?;
 
+        assert_eq!(
+            result.get_columns()[3].get_column_type(),
+            &ColumnType::Float
+        );
         assert_eq!(
             result.get_rows(),
             &vec![
                 Row::new(vec![
                     TableValue::Int(1),
                     TableValue::Int(1),
-                    TableValue::String("test".to_string())
+                    TableValue::String("test".to_string()),
+                    TableValue::Float((1.5f32 as f64).into()),
+                    TableValue::Float(2.5f64.into()),
                 ]),
-                Row::new(vec![TableValue::Null, TableValue::Null, TableValue::Null,])
+                Row::new(vec![
+                    TableValue::Null,
+                    TableValue::Null,
+                    TableValue::Null,
+                    TableValue::Null,
+                    TableValue::Null,
+                ])
             ]
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_arrow_to_column_type_floats() -> Result<(), CubeError> {
+        assert_eq!(arrow_to_column_type(DataType::Float16)?, ColumnType::Float);
+        assert_eq!(arrow_to_column_type(DataType::Float32)?, ColumnType::Float);
+        assert_eq!(arrow_to_column_type(DataType::Float64)?, ColumnType::Float);
         Ok(())
     }
 }

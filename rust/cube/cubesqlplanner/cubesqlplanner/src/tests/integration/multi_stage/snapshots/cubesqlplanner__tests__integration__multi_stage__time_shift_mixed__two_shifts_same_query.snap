@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/time_shift_mixed.rs
+expression: result
+---
+orders__created_at_month | orders__amount_prev_month | orders__amount_next_month
+-------------------------+---------------------------+--------------------------
+2024-01-01 00:00:00      | NULL                      | 750.00                   
+2024-02-01 00:00:00      | 500.00                    | 1000.00                  
+2024-03-01 00:00:00      | 750.00                    | NULL

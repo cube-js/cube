@@ -71,7 +71,7 @@
   },
   {
     "source": "/guides/recipes/data-exploration/query-history-export",
-    "destination": "/product/administration/workspace/recipes/query-history-export",
+    "destination": "/product/administration/monitoring/query-history-export",
     "permanent": true
   },
   {
@@ -406,7 +406,12 @@
   },
   {
     "source": "/product/workspace/visual-modeler",
-    "destination": "/product/administration/workspace/visual-model",
+    "destination": "/product/data-modeling/visual-modeler",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/visual-model",
+    "destination": "/product/data-modeling/visual-modeler",
     "permanent": true
   },
   {
@@ -476,27 +481,27 @@
   },
   {
     "source": "/product/monitoring/integrations/cloudwatch",
-    "destination": "/product/administration/workspace/monitoring/cloudwatch",
+    "destination": "/product/administration/deployment/monitoring/cloudwatch",
     "permanent": true
   },
   {
     "source": "/product/monitoring/integrations/s3",
-    "destination": "/product/administration/workspace/monitoring/s3",
+    "destination": "/product/administration/deployment/monitoring/s3",
     "permanent": true
   },
   {
     "source": "/product/monitoring/integrations/datadog",
-    "destination": "/product/administration/workspace/monitoring/datadog",
+    "destination": "/product/administration/deployment/monitoring/datadog",
     "permanent": true
   },
   {
     "source": "/product/monitoring/integrations/grafana-cloud",
-    "destination": "/product/administration/workspace/monitoring/grafana-cloud",
+    "destination": "/product/administration/deployment/monitoring/grafana-cloud",
     "permanent": true
   },
   {
     "source": "/product/monitoring/integrations",
-    "destination": "/product/administration/workspace/monitoring",
+    "destination": "/product/administration/deployment/monitoring",
     "permanent": true
   },
   {
@@ -576,7 +581,7 @@
   },
   {
     "source": "/cloud/sql-runner",
-    "destination": "/product/administration/workspace/sql-runner",
+    "destination": "/product/data-modeling/sql-runner",
     "permanent": true
   },
   {
@@ -586,17 +591,17 @@
   },
   {
     "source": "/cloud/inspecting-queries",
-    "destination": "/product/administration/workspace/query-history",
+    "destination": "/product/administration/monitoring/query-history",
     "permanent": true
   },
   {
     "source": "/cloud/inspecting-pre-aggregations",
-    "destination": "/product/administration/workspace/pre-aggregations",
+    "destination": "/product/administration/monitoring/pre-aggregations",
     "permanent": true
   },
   {
     "source": "/cloud/workspace/development-api",
-    "destination": "/product/administration/workspace/dev-mode",
+    "destination": "/product/data-modeling/dev-mode",
     "permanent": true
   },
   {
@@ -1036,22 +1041,22 @@
   },
   {
     "source": "/monitoring/integrations",
-    "destination": "/product/administration/workspace/monitoring",
+    "destination": "/product/administration/deployment/monitoring",
     "permanent": true
   },
   {
     "source": "/cloud/workspace/logs",
-    "destination": "/product/administration/workspace/monitoring",
+    "destination": "/product/administration/deployment/monitoring",
     "permanent": true
   },
   {
     "source": "/monitoring/grafana-cloud",
-    "destination": "/product/administration/workspace/monitoring/grafana-cloud",
+    "destination": "/product/administration/deployment/monitoring/grafana-cloud",
     "permanent": true
   },
   {
     "source": "/monitoring/datadog",
-    "destination": "/product/administration/workspace/monitoring/datadog",
+    "destination": "/product/administration/deployment/monitoring/datadog",
     "permanent": true
   },
   {
@@ -1686,17 +1691,47 @@
   },
   {
     "source": "/product/workspace/audit-log",
-    "destination": "/product/administration/workspace/audit-log",
+    "destination": "/product/administration/monitoring/audit-log",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/audit-log",
+    "destination": "/product/administration/monitoring/audit-log",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/chats-history",
+    "destination": "/product/administration/monitoring/chats-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/query-history",
+    "destination": "/product/administration/monitoring/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/pre-aggregations",
+    "destination": "/product/administration/monitoring/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/performance",
+    "destination": "/product/administration/monitoring/performance",
     "permanent": true
   },
   {
     "source": "/product/workspace/budgets",
-    "destination": "/product/administration/workspace/budgets",
+    "destination": "/product/administration/budgets",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/budgets",
+    "destination": "/product/administration/budgets",
     "permanent": true
   },
   {
     "source": "/product/workspace/chats-history",
-    "destination": "/product/administration/workspace/chats-history",
+    "destination": "/product/administration/monitoring/chats-history",
     "permanent": true
   },
   {
@@ -1721,17 +1756,32 @@
   },
   {
     "source": "/product/workspace/dev-mode",
-    "destination": "/product/administration/workspace/dev-mode",
+    "destination": "/product/data-modeling/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/dev-mode",
+    "destination": "/product/data-modeling/dev-mode",
     "permanent": true
   },
   {
     "source": "/product/workspace/encryption-keys",
-    "destination": "/product/administration/workspace/encryption-keys",
+    "destination": "/product/administration/deployment/encryption-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/encryption-keys",
+    "destination": "/product/administration/deployment/encryption-keys",
     "permanent": true
   },
   {
     "source": "/product/workspace/environments",
-    "destination": "/product/administration/workspace/environments",
+    "destination": "/product/administration/deployment/environments",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/environments",
+    "destination": "/product/administration/deployment/environments",
     "permanent": true
   },
   {
@@ -1741,37 +1791,67 @@
   },
   {
     "source": "/product/workspace/monitoring",
-    "destination": "/product/administration/workspace/monitoring",
+    "destination": "/product/administration/deployment/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring",
+    "destination": "/product/administration/deployment/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/cloudwatch",
+    "destination": "/product/administration/deployment/monitoring/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/s3",
+    "destination": "/product/administration/deployment/monitoring/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/datadog",
+    "destination": "/product/administration/deployment/monitoring/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/grafana-cloud",
+    "destination": "/product/administration/deployment/monitoring/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/monitoring/new-relic",
+    "destination": "/product/administration/deployment/monitoring/new-relic",
     "permanent": true
   },
   {
     "source": "/product/workspace/monitoring/cloudwatch",
-    "destination": "/product/administration/workspace/monitoring/cloudwatch",
+    "destination": "/product/administration/deployment/monitoring/cloudwatch",
     "permanent": true
   },
   {
     "source": "/product/workspace/monitoring/datadog",
-    "destination": "/product/administration/workspace/monitoring/datadog",
+    "destination": "/product/administration/deployment/monitoring/datadog",
     "permanent": true
   },
   {
     "source": "/product/workspace/monitoring/grafana-cloud",
-    "destination": "/product/administration/workspace/monitoring/grafana-cloud",
+    "destination": "/product/administration/deployment/monitoring/grafana-cloud",
     "permanent": true
   },
   {
     "source": "/product/workspace/monitoring/new-relic",
-    "destination": "/product/administration/workspace/monitoring/new-relic",
+    "destination": "/product/administration/deployment/monitoring/new-relic",
     "permanent": true
   },
   {
     "source": "/product/workspace/monitoring/s3",
-    "destination": "/product/administration/workspace/monitoring/s3",
+    "destination": "/product/administration/deployment/monitoring/s3",
     "permanent": true
   },
   {
     "source": "/product/workspace/performance",
-    "destination": "/product/administration/workspace/performance",
+    "destination": "/product/administration/monitoring/performance",
     "permanent": true
   },
   {
@@ -1786,7 +1866,7 @@
   },
   {
     "source": "/product/workspace/pre-aggregations",
-    "destination": "/product/administration/workspace/pre-aggregations",
+    "destination": "/product/administration/monitoring/pre-aggregations",
     "permanent": true
   },
   {
@@ -1796,22 +1876,27 @@
   },
   {
     "source": "/product/workspace/query-history",
-    "destination": "/product/administration/workspace/query-history",
+    "destination": "/product/administration/monitoring/query-history",
     "permanent": true
   },
   {
     "source": "/product/workspace/recipes/query-history-export",
-    "destination": "/product/administration/workspace/recipes/query-history-export",
+    "destination": "/product/administration/monitoring/query-history-export",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/recipes/query-history-export",
+    "destination": "/product/administration/monitoring/query-history-export",
     "permanent": true
   },
   {
     "source": "/product/workspace/rollup-designer",
-    "destination": "/product/administration/workspace/pre-aggregations",
+    "destination": "/product/administration/monitoring/pre-aggregations",
     "permanent": true
   },
   {
     "source": "/product/administration/workspace/rollup-designer",
-    "destination": "/product/administration/workspace/pre-aggregations",
+    "destination": "/product/administration/monitoring/pre-aggregations",
     "permanent": true
   },
   {
@@ -1826,7 +1911,12 @@
   },
   {
     "source": "/product/workspace/sql-runner",
-    "destination": "/product/administration/workspace/sql-runner",
+    "destination": "/product/data-modeling/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/sql-runner",
+    "destination": "/product/data-modeling/sql-runner",
     "permanent": true
   },
   {
@@ -1871,7 +1961,7 @@
   },
   {
     "source": "/product/workspace/visual-model",
-    "destination": "/product/administration/workspace/visual-model",
+    "destination": "/product/data-modeling/visual-modeler",
     "permanent": true
   },
   {

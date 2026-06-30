@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/case_switch.rs
+expression: result
+---
+orders__created_at_month | orders__status_weighted_amount
+-------------------------+-------------------------------
+2024-01-01 00:00:00      | 375.000                       
+2024-02-01 00:00:00      | 600.000                       
+2024-03-01 00:00:00      | 750.000

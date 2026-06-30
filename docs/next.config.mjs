@@ -1,6 +1,8 @@
 import nextra from 'nextra'
 import path from 'path'
-import redirects from './redirects.json' with { type: 'json' }
+// Cross-domain redirects to the new Mintlify docs at docs.cube.dev.
+// Generated from redirects.json by docs-mintlify/scripts/build_old_site_redirects.py.
+import redirects from './redirects-new-docs.json' with { type: 'json' }
 
 const withNextra = nextra({
   contentDirBasePath: '/',
@@ -21,8 +23,8 @@ export default withNextra({
     return [
       {
         source: '/',
-        destination: '/product/introduction',
-        permanent: false
+        destination: 'https://docs.cube.dev/docs/introduction',
+        permanent: true
       },
       ...redirects
     ]

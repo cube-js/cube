@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/joins.rs
+expression: result
+---
+customers__name | orders__category | orders__total_amount | orders__amount_reduce_category
+----------------+------------------+----------------------+-------------------------------
+Alice           | books            | 230.00               | 500.00                        
+Alice           | clothing         | 120.00               | 500.00                        
+Alice           | electronics      | 150.00               | 500.00                        
+Bob             | books            | 150.00               | 750.00                        
+Bob             | clothing         | 350.00               | 750.00                        
+Bob             | electronics      | 250.00               | 750.00                        
+Charlie         | books            | 500.00               | 1000.00                       
+Charlie         | clothing         | 250.00               | 1000.00                       
+Charlie         | electronics      | 250.00               | 1000.00

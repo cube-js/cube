@@ -12996,6 +12996,179 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure-prefix querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation 1`] = `
+Array [
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Canon PC1080F Personal Copier",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "1037.9827",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Logitech di_Novo Edge Keyboard",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "517.4793",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Google Nexus 5",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "494.9725",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "218.4",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "206.8704",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "168.6966",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Google Nexus 6",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "134.9925",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Google Nexus 7",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "134.9925",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "81.432",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "74.9985",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "60.5488",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "50.372",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "43.2796",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "HTC One",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "26.9973",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "21.098",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "13.604",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "8.5025",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "8.5025",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "5.5008",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "5.3984",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "5.2026",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "4.9068",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "Project Tote Personal File",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "4.0687",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "3.9296",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "BigECommerce.profitInCategory": "192.9558",
+    "BigECommerce.totalProfit": "-0.2355",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "-3.3506",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+    "BigECommerce.profitInCategory": "459.7526",
+    "BigECommerce.totalProfit": "-5.0098",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.productName": "Okidata C610n Printer",
+    "BigECommerce.profitInCategory": "2398.8443",
+    "BigECommerce.totalProfit": "-272.58",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure-prefix querying BigECommerce: filtering with possible casts 1`] = `
 Array [
   Object {
@@ -19733,6 +19906,61 @@ Array [
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
     "ECommerce.rollingCountByUnbounded": "44",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure-prefix querying ECommerce: count by month + order with non-UTC timezone (Asia/Kolkata) 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-03-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2020-05-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "7",
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "2020-09-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "9",
+    "ECommerce.customOrderDateNoPreAgg": "2020-11-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "7",
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-12-01T00:00:00.000",
   },
 ]
 `;

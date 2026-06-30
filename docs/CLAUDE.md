@@ -1,4 +1,9 @@
-# Cube Documentation
+# Cube Documentation (LEGACY — DEPRECATED)
+
+> **This `/docs` site is deprecated. Do not add or edit content here.**
+> The active documentation site is `/docs-mintlify` (Mintlify). Write all new and updated
+> docs there — see `docs-mintlify/CLAUDE.md` for conventions. The guidance below is kept
+> only for reference to the legacy site.
 
 This file provides guidance to Claude Code when working with the documentation site.
 

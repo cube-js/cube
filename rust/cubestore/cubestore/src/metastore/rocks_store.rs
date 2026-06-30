@@ -1,5 +1,4 @@
 use crate::config::ConfigObj;
-use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStoreEvent, MetaStoreFs};
 use crate::util::time_span::warn_long;
 
@@ -629,20 +628,22 @@ pub struct KeyVal {
     pub val: Vec<u8>,
 }
 
-pub struct BatchPipe<'a> {
+pub type PostCommitCallback<S> = Box<dyn FnOnce(&S) + Send + 'static>;
+
+pub struct BatchPipe<'a, S = ()> {
     db: &'a DB,
     write_batch: WriteBatch,
     events: Vec<MetaStoreEvent>,
-    pub invalidate_tables_cache: bool,
+    post_commit_callback: Option<PostCommitCallback<S>>,
 }
 
-impl<'a> BatchPipe<'a> {
-    pub fn new(db: &'a DB) -> BatchPipe<'a> {
+impl<'a, S> BatchPipe<'a, S> {
+    pub fn new(db: &'a DB) -> BatchPipe<'a, S> {
         BatchPipe {
             db,
             write_batch: WriteBatch::default(),
             events: Vec::new(),
-            invalidate_tables_cache: false,
+            post_commit_callback: None,
         }
     }
 
@@ -654,14 +655,24 @@ impl<'a> BatchPipe<'a> {
         self.events.push(event);
     }
 
-    pub fn batch_write_rows(self) -> Result<Vec<MetaStoreEvent>, CubeError> {
+    pub fn batch_write_rows(
+        self,
+    ) -> Result<(Vec<MetaStoreEvent>, Option<PostCommitCallback<S>>), CubeError> {
         let db = self.db;
         db.write(self.write_batch)?;
-        Ok(self.events)
+
+        Ok((self.events, self.post_commit_callback))
     }
 
-    pub fn invalidate_tables_cache(&mut self) {
-        self.invalidate_tables_cache = true;
+    /// Set the callback that runs on the RW-loop thread after the RocksDB
+    /// commit succeeds. Overwrites any previously set callback. The callback
+    /// receives the store instance so it can reach shared state. Must not
+    /// panic and must not block on async work.
+    pub fn set_post_commit_callback<F>(&mut self, f: F)
+    where
+        F: FnOnce(&S) + Send + 'static,
+    {
+        self.post_commit_callback = Some(Box::new(f));
     }
 }
 
@@ -882,8 +893,7 @@ pub struct RocksStore {
     last_check_seq: Arc<RwLock<u64>>,
     snapshot_uploaded: Arc<RwLock<bool>>,
     snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
-    pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
-    rw_loop_default_cf: RocksStoreRWLoop,
+    pub(crate) rw_loop_default_cf: RocksStoreRWLoop,
     details: Arc<dyn RocksStoreDetails>,
 }
 
@@ -936,7 +946,6 @@ impl RocksStore {
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             snapshots_upload_stopped: Arc::new(AsyncMutex::new(false)),
             config,
-            cached_tables: Arc::new(Mutex::new(None)),
             rw_loop_default_cf: RocksStoreRWLoop::new("metastore", "default"),
             details,
         };
@@ -1019,33 +1028,34 @@ impl RocksStore {
     #[inline(always)]
     pub async fn write_operation<F, R>(&self, op_name: &'static str, f: F) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+        F: for<'a> FnOnce(DbTableRef<'a>, &mut BatchPipe<'a>) -> Result<R, CubeError>
             + Send
             + Sync
             + 'static,
         R: Send + Sync + 'static,
     {
-        self.write_operation_impl::<F, R>(&self.rw_loop_default_cf, op_name, f)
+        self.write_operation_impl::<F, R, ()>(&self.rw_loop_default_cf, op_name, f, ())
             .await
     }
 
-    pub async fn write_operation_impl<F, R>(
+    pub async fn write_operation_impl<F, R, S>(
         &self,
         rw_loop: &RocksStoreRWLoop,
         op_name: &'static str,
         f: F,
+        store: S,
     ) -> Result<R, CubeError>
     where
-        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+        F: for<'a> FnOnce(DbTableRef<'a>, &mut BatchPipe<'a, S>) -> Result<R, CubeError>
             + Send
             + Sync
             + 'static,
         R: Send + Sync + 'static,
+        S: Send + Sync + 'static,
     {
         let db = self.db.clone();
         let mem_seq = MemorySequence::new(self.seq_store.clone());
         let db_to_send = db.clone();
-        let cached_tables = self.cached_tables.clone();
 
         let loop_name = rw_loop.get_name();
         let store_name = self.details.get_name();
@@ -1070,11 +1080,11 @@ impl RocksStore {
                 );
                 match res {
                     Ok(res) => {
-                        if batch.invalidate_tables_cache {
-                            *cached_tables.lock().unwrap() = None;
+                        let (events, callback) = batch.batch_write_rows()?;
+                        if let Some(cb) = callback {
+                            cb(&store);
                         }
-                        let write_result = batch.batch_write_rows()?;
-                        tx.send(Ok((res, write_result))).map_err(|_| {
+                        tx.send(Ok((res, events))).map_err(|_| {
                             CubeError::internal(format!(
                                 "[{}-{}] Write operation result receiver has been dropped",
                                 store_name, loop_name

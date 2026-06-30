@@ -147,6 +147,19 @@ SHOW ALL;
 (9 rows)
 ```
 
+### `SET`
+
+Synopsis:
+
+```sql
+SET name TO value
+SET name = value
+```
+
+The `SET` command changes a session variable to a new value.
+
+Use `SET` with the `cube_cache` session variable for [cache control][ref-sql-cache-control].
+
 ## SQL functions and operators
 
 SQL API currently implements a subset of functions and operators [supported by
@@ -429,3 +442,4 @@ See the [XIRR recipe](/product/data-modeling/recipes/xirr) for more details.
 [link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
 [link-github-new-sql-api-issue]: https://github.com/cube-js/cube/issues/new?assignees=&labels=&projects=&template=sql_api_query_issue.md&title=
 [link-xirr]: https://support.microsoft.com/en-us/office/xirr-function-de1242ec-6477-445b-b11b-a303ad9adc9d
+[ref-sql-cache-control]: /product/apis-integrations/sql-api#cache-control

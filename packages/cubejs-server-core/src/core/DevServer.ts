@@ -508,17 +508,14 @@ export class DevServer {
             throw new Error(`${type} is required`);
           }
 
-          // Backup env variables for restoring
-          const originalProcessEnv = process.env;
-          process.env = {
-            ...process.env,
-          };
+          // Backup env variables and set new ones in-place.
+          // We must mutate the existing process.env object (not replace it)
+          // because env-var holds a reference to the original object.
+          const backup: Record<string, string | undefined> = {};
 
-          // We suppose that variables names passed to the endpoint have their
-          // final form depending on whether multiple data sources are enabled
-          // or not. So, we don't need to convert anything here.
-          for (const [envName, value] of Object.entries(variables)) {
-            process.env[envName] = <string>value;
+          for (const [envName, envValue] of Object.entries(variables)) {
+            backup[envName] = process.env[envName];
+            process.env[envName] = <string>envValue;
           }
 
           // With multiple data sources enabled, we need to put the dataSource
@@ -530,8 +527,14 @@ export class DevServer {
             { dataSource },
           );
 
-          // Restore original process.env
-          process.env = originalProcessEnv;
+          // Restore original env values
+          for (const [envName, envValue] of Object.entries(backup)) {
+            if (envValue === undefined) {
+              delete process.env[envName];
+            } else {
+              process.env[envName] = envValue;
+            }
+          }
 
           await driver.testConnection();
 

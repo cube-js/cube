@@ -6,6 +6,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use crate::compile::test::TestContext;
+use crate::compile::CompilationError;
 use crate::compile::{
     rewrite::rewriter::Rewriter,
     test::{
@@ -536,10 +537,12 @@ async fn test_join_cubes_on_wrong_field_error() {
     )
     .await;
 
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
     assert_eq!(
-        query.unwrap_err().message(),
-        "Error during rewrite: Use __cubeJoinField to join Cubes. Please check logs for additional information.".to_string()
-    )
+        error.message(),
+        "Use __cubeJoinField to join Cubes".to_string()
+    );
 }
 
 #[tokio::test]
@@ -560,13 +563,15 @@ async fn test_join_cubes_filter_from_wrong_side_error() {
     )
         .await;
 
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
     assert_eq!(
-        query.unwrap_err().message(),
-        "Error during rewrite: Can not join Cubes. This is most likely due to one of the following reasons:\n\
+        error.message(),
+        "Can not join Cubes. This is most likely due to one of the following reasons:\n\
             • one of the cubes contains a group by\n\
             • one of the cubes contains a measure\n\
-            • the cube on the right contains a filter, sorting or limits\n\
-            . Please check logs for additional information.".to_string()
+            • the cube on the right contains a filter, sorting or limits\n"
+            .to_string()
     )
 }
 
@@ -587,13 +592,15 @@ async fn test_join_cubes_with_aggr_error() {
     )
         .await;
 
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
     assert_eq!(
-        query.unwrap_err().message(),
-        "Error during rewrite: Can not join Cubes. This is most likely due to one of the following reasons:\n\
+        error.message(),
+        "Can not join Cubes. This is most likely due to one of the following reasons:\n\
             • one of the cubes contains a group by\n\
             • one of the cubes contains a measure\n\
-            • the cube on the right contains a filter, sorting or limits\n\
-            . Please check logs for additional information.".to_string()
+            • the cube on the right contains a filter, sorting or limits\n"
+            .to_string()
     )
 }
 

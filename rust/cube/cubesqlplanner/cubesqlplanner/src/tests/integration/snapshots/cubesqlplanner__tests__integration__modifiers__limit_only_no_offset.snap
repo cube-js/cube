@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/modifiers.rs
+expression: result
+---
+orders__status | orders__count
+---------------+--------------
+cancelled      | 1            
+completed      | 5

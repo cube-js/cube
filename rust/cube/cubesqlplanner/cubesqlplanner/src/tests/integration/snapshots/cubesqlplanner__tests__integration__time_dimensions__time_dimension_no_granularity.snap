@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/time_dimensions.rs
+expression: result
+---
+orders__count | orders__total_amount
+--------------+---------------------
+5             | 690.00

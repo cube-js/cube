@@ -101,7 +101,7 @@ impl SplitRules {
                 .data
                 .original_expr
                 .as_ref()
-                .ok_or(CubeError::internal(format!(
+                .ok_or(CubeError::rewrite(format!(
                     "Original expr wasn't prepared for {:?}",
                     expr_id
                 )));

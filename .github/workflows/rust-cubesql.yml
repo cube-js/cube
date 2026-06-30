@@ -5,8 +5,7 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
-      - 'rust/cubenativeutils/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
       - 'rust/cubesql/**'
     branches:
       - 'master'
@@ -14,8 +13,7 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
-      - 'rust/cubenativeutils/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
       - 'rust/cubesql/**'
 
 jobs:
@@ -47,20 +45,16 @@ jobs:
         run: cd rust/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
-      - name: Lint cubenativeutils
-        run: cd rust/cubenativeutils && cargo fmt --all -- --check
-      - name: Lint cubesqlplanner
-        run: cd rust/cubesqlplanner && cargo fmt --all -- --check
+      - name: Lint cube workspace
+        run: cd rust/cube && cargo fmt --all -- --check
       - name: Clippy CubeSQL
         run: cd rust/cubesql && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going --features python -- -D warnings
-      - name: Clippy cubenativeutils
-        run: cd rust/cubenativeutils && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
-      - name: Clippy cubesqlplanner
-        run: cd rust/cubesqlplanner && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
+      - name: Clippy cube workspace
+        run: cd rust/cube && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
 
   unit:
     #  We use host instead of cross container, because it's much faster

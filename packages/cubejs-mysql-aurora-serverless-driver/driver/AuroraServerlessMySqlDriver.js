@@ -40,20 +40,21 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+    const preAggregations = config.preAggregations || false;
+
     this.config = {
       secretArn:
         config.secretArn ||
-        getEnv('auroraSecretArn', { dataSource }),
+        getEnv('auroraSecretArn', { dataSource, preAggregations }),
       resourceArn:
         config.resourceArn ||
         // TODO (buntarb): this looks like a typo. Deprecate?
         config.resourceArm ||
-        getEnv('auroraClusterArn', { dataSource }),
+        getEnv('auroraClusterArn', { dataSource, preAggregations }),
       database:
         config.database ||
-        getEnv('dbName', { dataSource }) ||
-        getEnv('dbDatabase', { dataSource }),
+        getEnv('dbName', { dataSource, preAggregations }) ||
+        getEnv('dbDatabase', { dataSource, preAggregations }),
       ...config
     };
 

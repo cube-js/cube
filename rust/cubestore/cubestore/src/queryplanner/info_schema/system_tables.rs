@@ -4,7 +4,7 @@ use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array,
+    ArrayRef, BooleanBuilder, StringBuilder, TimestampNanosecondBuilder, UInt64Builder,
 };
 use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
@@ -19,8 +19,10 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
         &self,
         ctx: InfoSchemaTableDefContext,
         _limit: Option<usize>,
-    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        ctx.meta_store.get_tables_with_path(true).await
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(Arc::unwrap_or_clone(
+            ctx.meta_store.get_tables_with_path(true).await?,
+        ))
     }
 
     fn schema(&self) -> Vec<Field> {
@@ -59,157 +61,83 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
         ]
     }
 
-    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut schema_id_builder = UInt64Builder::with_capacity(num_rows);
+        let mut schema_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut name_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut columns_builder = StringBuilder::with_capacity(num_rows, num_rows * 128);
+        let mut locations_builder = StringBuilder::with_capacity(num_rows, num_rows * 128);
+        let mut format_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut has_data_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut is_ready_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut unique_key_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut agg_columns_builder = StringBuilder::with_capacity(num_rows, num_rows * 64);
+        let mut seq_column_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+        let mut split_threshold_builder = UInt64Builder::with_capacity(num_rows);
+        let mut created_at_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut range_end_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut seal_at_builder = TimestampNanosecondBuilder::with_capacity(num_rows);
+        let mut sealed_builder = BooleanBuilder::with_capacity(num_rows);
+        let mut select_builder = StringBuilder::with_capacity(num_rows, num_rows * 128);
+        let mut extension_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+
+        for row in rows.into_iter() {
+            id_builder.append_value(row.table.get_id());
+            let table = row.table.get_row();
+            schema_id_builder.append_value(table.get_schema_id());
+            schema_builder.append_value(row.schema.get_row().get_name());
+            name_builder.append_value(table.get_table_name());
+            columns_builder.append_value(format!("{:?}", table.get_columns()));
+            locations_builder.append_value(format!("{:?}", table.locations()));
+            format_builder.append_value(format!("{:?}", table.import_format()));
+            has_data_builder.append_value(*table.has_data());
+            is_ready_builder.append_value(table.is_ready());
+            unique_key_builder.append_option(
+                table
+                    .unique_key_columns()
+                    .as_ref()
+                    .map(|v| format!("{:?}", v)),
+            );
+            agg_columns_builder.append_value(format!("{:?}", table.aggregate_columns()));
+            seq_column_builder
+                .append_option(table.seq_column().as_ref().map(|v| format!("{:?}", v)));
+            split_threshold_builder.append_option(*table.partition_split_threshold());
+            created_at_builder
+                .append_option(table.created_at().as_ref().map(timestamp_nanos_or_panic));
+            range_end_builder.append_option(
+                table
+                    .build_range_end()
+                    .as_ref()
+                    .map(timestamp_nanos_or_panic),
+            );
+            seal_at_builder.append_option(table.seal_at().as_ref().map(timestamp_nanos_or_panic));
+            sealed_builder.append_value(table.sealed());
+            select_builder.append_option(table.select_statement().as_ref().map(|s| s.as_str()));
+            extension_builder.append_option(table.extension().as_ref().map(|e| e.as_str()));
+        }
+
         vec![
-            Box::new(|tables| {
-                Arc::new(UInt64Array::from_iter_values(
-                    tables.iter().map(|row| row.table.get_id()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(UInt64Array::from_iter_values(
-                    tables.iter().map(|row| row.table.get_row().get_schema_id()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables.iter().map(|row| row.schema.get_row().get_name()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|row| row.table.get_row().get_table_name()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|row| format!("{:?}", row.table.get_row().get_columns())),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|row| format!("{:?}", row.table.get_row().locations())),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|row| format!("{:?}", row.table.get_row().import_format())),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(BooleanArray::from_iter(
-                    tables
-                        .iter()
-                        .map(|row| Some(*row.table.get_row().has_data())),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(BooleanArray::from_iter(
-                    tables
-                        .iter()
-                        .map(|row| Some(row.table.get_row().is_ready())),
-                ))
-            }),
-            Box::new(|tables| {
-                let unique_key_columns = tables
-                    .iter()
-                    .map(|row| {
-                        row.table
-                            .get_row()
-                            .unique_key_columns()
-                            .as_ref()
-                            .map(|v| format!("{:?}", v))
-                    })
-                    .collect::<Vec<_>>();
-                Arc::new(StringArray::from_iter(
-                    unique_key_columns.iter().map(|v| v.as_deref()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(tables.iter().map(|row| {
-                    format!("{:?}", row.table.get_row().aggregate_columns())
-                })))
-            }),
-            Box::new(|tables| {
-                let seq_columns = tables
-                    .iter()
-                    .map(|row| {
-                        row.table
-                            .get_row()
-                            .seq_column()
-                            .as_ref()
-                            .map(|v| format!("{:?}", v))
-                    })
-                    .collect::<Vec<_>>();
-                Arc::new(StringArray::from_iter(
-                    seq_columns.iter().map(|v| v.as_deref()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(UInt64Array::from_iter(tables.iter().map(|row| {
-                    row.table.get_row().partition_split_threshold().clone()
-                })))
-            }),
-            Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
-                    |row| {
-                        row.table
-                            .get_row()
-                            .created_at()
-                            .as_ref()
-                            .map(timestamp_nanos_or_panic)
-                    },
-                )))
-            }),
-            Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
-                    |row| {
-                        row.table
-                            .get_row()
-                            .build_range_end()
-                            .as_ref()
-                            .map(timestamp_nanos_or_panic)
-                    },
-                )))
-            }),
-            Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
-                    |row| {
-                        row.table
-                            .get_row()
-                            .seal_at()
-                            .as_ref()
-                            .map(timestamp_nanos_or_panic)
-                    },
-                )))
-            }),
-            Box::new(|tables| {
-                Arc::new(BooleanArray::from_iter(
-                    tables.iter().map(|row| Some(row.table.get_row().sealed())),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter(tables.iter().map(|row| {
-                    row.table
-                        .get_row()
-                        .select_statement()
-                        .as_ref()
-                        .map(|t| t.as_str())
-                })))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter(tables.iter().map(|row| {
-                    row.table.get_row().extension().as_ref().map(|t| t.as_str())
-                })))
-            }),
+            Arc::new(id_builder.finish()),
+            Arc::new(schema_id_builder.finish()),
+            Arc::new(schema_builder.finish()),
+            Arc::new(name_builder.finish()),
+            Arc::new(columns_builder.finish()),
+            Arc::new(locations_builder.finish()),
+            Arc::new(format_builder.finish()),
+            Arc::new(has_data_builder.finish()),
+            Arc::new(is_ready_builder.finish()),
+            Arc::new(unique_key_builder.finish()),
+            Arc::new(agg_columns_builder.finish()),
+            Arc::new(seq_column_builder.finish()),
+            Arc::new(split_threshold_builder.finish()),
+            Arc::new(created_at_builder.finish()),
+            Arc::new(range_end_builder.finish()),
+            Arc::new(seal_at_builder.finish()),
+            Arc::new(sealed_builder.finish()),
+            Arc::new(select_builder.finish()),
+            Arc::new(extension_builder.finish()),
         ]
     }
 }

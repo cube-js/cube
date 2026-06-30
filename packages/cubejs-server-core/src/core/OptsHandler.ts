@@ -64,6 +64,13 @@ export class OptsHandler {
   private decoratedFactory = false;
 
   /**
+   * Returns true if the user provided a custom driverFactory.
+   */
+  public isCustomDriverFactory(): boolean {
+    return !this.decoratedFactory;
+  }
+
+  /**
    * driverFactory function result type.
    */
   private driverFactoryType: undefined | 'BaseDriver' | 'DriverConfig';
@@ -203,6 +210,7 @@ export class OptsHandler {
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
     const type = <DatabaseType>getEnv('dbType', {
       dataSource: assertDataSource(ctx.dataSource),
+      preAggregations: ctx.preAggregations,
     });
     return { type };
   }
@@ -459,7 +467,8 @@ export class OptsHandler {
       externalDbType,
       externalDriverFactory,
       externalDialectFactory,
-      apiSecret: process.env.CUBEJS_API_SECRET,
+      apiSecret: getEnv('apiSecret'),
+      apiSecrets: getEnv('apiSecrets'),
       telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: getEnv('scheduledRefreshTimezones'),
       scheduledRefreshContexts: async () => [null],

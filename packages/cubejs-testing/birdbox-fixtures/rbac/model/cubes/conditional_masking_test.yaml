@@ -1,0 +1,53 @@
+cubes:
+  - name: conditional_masking_test
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: number
+
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_price
+        sql: price
+        type: sum
+
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+      - role: "conditional_mask_role"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: product_id
+              operator: lte
+              values:
+                - "3"
+
+      - role: "conditional_mask_role_extra"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: product_id
+              operator: equals
+              values:
+                - "5"

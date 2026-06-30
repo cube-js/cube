@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
@@ -1157,7 +1158,7 @@ describe('ClickHouse JoinGraph', () => {
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
       expect(res).toEqual(
-        [{ visitor_checkins__revenue_per_checkin: '60' }]
+        [{ visitor_checkins__revenue_per_checkin: getEnv('nativeSqlPlanner') ? '50' : '60' }]
       );
     });
   }));

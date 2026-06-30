@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+top_status
+----------
+completed 
+pending

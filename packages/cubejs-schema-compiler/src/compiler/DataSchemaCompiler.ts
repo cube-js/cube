@@ -28,6 +28,7 @@ const NATIVE_IS_SUPPORTED = isNativeSupported();
 const moduleFileCache = {};
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
+const JINJA_MACRO_DEFINITION = /{%[-+]?\s*macro\s/;
 
 const getThreadsCount = () => {
   const envThreads = getEnv('transpilationWorkerThreadsCount');
@@ -74,6 +75,8 @@ export type DataSchemaCompilerOptions = {
   cubeAndViewSymbols: CubeSymbols;
   cubeCompilers?: CompilerInterface[];
   contextCompilers?: CompilerInterface[];
+  viewGroupCompilers?: CompilerInterface[];
+  metaCompilers?: CompilerInterface[];
   transpilers?: TranspilerInterface[];
   viewCompilers?: CompilerInterface[];
   viewCompilationGate: ViewCompilationGate;
@@ -98,6 +101,7 @@ export type TranspileOptions = {
   compilerId?: string;
   stage?: 0 | 1 | 2 | 3;
   jinjaUsed?: boolean;
+  jinjaMacrosFingerprint?: string;
 };
 
 export type CompileStage = 0 | 1 | 2 | 3;
@@ -105,6 +109,8 @@ export type CompileStage = 0 | 1 | 2 | 3;
 type CompileCubeFilesCompilers = {
   cubeCompilers?: CompilerInterface[];
   contextCompilers?: CompilerInterface[];
+  viewGroupCompilers?: CompilerInterface[];
+  metaCompilers?: CompilerInterface[];
 };
 
 export type CompileContext = any;
@@ -115,6 +121,10 @@ export class DataSchemaCompiler {
   private readonly cubeCompilers: CompilerInterface[];
 
   private readonly contextCompilers: CompilerInterface[];
+
+  private readonly viewGroupCompilers: CompilerInterface[];
+
+  private readonly metaCompilers: CompilerInterface[];
 
   private readonly transpilers: TranspilerInterface[];
 
@@ -181,6 +191,8 @@ export class DataSchemaCompiler {
     this.repository = repository;
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
+    this.viewGroupCompilers = options.viewGroupCompilers || [];
+    this.metaCompilers = options.metaCompilers || [];
     this.transpilers = options.transpilers || [];
     this.viewCompilers = options.viewCompilers || [];
     this.preTranspileCubeCompilers = options.preTranspileCubeCompilers || [];
@@ -270,6 +282,8 @@ export class DataSchemaCompiler {
       this.loadJinjaTemplates(jinjaTemplatedFiles);
     }
 
+    const jinjaMacrosFingerprint = DataSchemaCompiler.computeJinjaMacrosFingerprint(jinjaTemplatedFiles);
+
     const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
     this.errorsReporter = errorsReport;
 
@@ -318,11 +332,11 @@ export class DataSchemaCompiler {
         }
 
         const jinjaFilesTasks = jinjaTemplatedFiles
-          .map(f => this.transpileJinjaFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames }));
+          .map(f => this.transpileJinjaFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, jinjaMacrosFingerprint }));
 
         results = (await Promise.all([...jsFilesTasks, ...yamlFilesTasks, ...jinjaFilesTasks])).flat();
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, jinjaMacrosFingerprint })));
       }
 
       return results.filter(f => !!f) as FileContent[];
@@ -366,6 +380,7 @@ export class DataSchemaCompiler {
     let cubes: CubeDefinition[] = [];
     let exports: Record<string, Record<string, any>> = {};
     let contexts: Record<string, any>[] = [];
+    let viewGroups: Record<string, any>[] = [];
     let compiledFiles: Record<string, boolean> = {};
     let asyncModules: CallableFunction[] = [];
     let transpiledFiles: FileContent[] = [];
@@ -374,6 +389,7 @@ export class DataSchemaCompiler {
       cubes = [];
       exports = {};
       contexts = [];
+      viewGroups = [];
       compiledFiles = {};
       asyncModules = [];
     };
@@ -403,6 +419,15 @@ export class DataSchemaCompiler {
           throw new Error('No file stored in context');
         }
         return contexts.push({ ...context, name, fileName: file.fileName });
+      },
+      view_group: (name: string, viewGroup) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
+        viewGroups.push({ ...viewGroup, name, fileName: file.fileName });
+        this.compileV8ContextCache![name] = name;
+        return name;
       },
       addExport: (obj) => {
         const file = ctxFileStorage.getStore();
@@ -473,7 +498,7 @@ export class DataSchemaCompiler {
       const convertedToJsFiles = transpiledFiles.filter(f => !f.fileName.endsWith('.js'));
       toCompile = [...originalJsFiles, ...convertedToJsFiles];
 
-      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
+      return this.compileCubeFiles(cubes, contexts, viewGroups, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
@@ -481,7 +506,7 @@ export class DataSchemaCompiler {
       cleanup();
       transpiledFiles = await transpilePhase(stage);
 
-      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
+      return this.compileCubeFiles(cubes, contexts, viewGroups, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
     return compilePhaseFirst({ cubeCompilers: this.cubeNameCompilers }, 0)
@@ -492,6 +517,8 @@ export class DataSchemaCompiler {
       .then(() => compilePhase({
         cubeCompilers: this.cubeCompilers,
         contextCompilers: this.contextCompilers,
+        viewGroupCompilers: this.viewGroupCompilers,
+        metaCompilers: this.metaCompilers,
       }, 3))
       .then(() => {
         // Free unneeded resources
@@ -551,6 +578,33 @@ export class DataSchemaCompiler {
     files.forEach((file) => {
       jinjaEngine.loadTemplate(file.fileName, file.content);
     });
+  }
+
+  /**
+   * Macro files are hidden dependencies of any cube file that imports them —
+   * minijinja resolves `{% import %}` lazily against its template store, so
+   * the per-file Jinja render cache must be invalidated when *any* macro file
+   * changes. Hashing all macro files together rather than tracking per-cube
+   * imports keeps the implementation simple at the cost of over-invalidating
+   * when macro edits happen (which is rare). CUB-2357.
+   */
+  private static computeJinjaMacrosFingerprint(files: FileContent[]): string {
+    const macroFiles = files
+      .filter((f) => JINJA_MACRO_DEFINITION.test(f.content))
+      .sort((a, b) => a.fileName.localeCompare(b.fileName));
+
+    if (macroFiles.length === 0) {
+      return '';
+    }
+
+    const hash = crypto.createHash('md5');
+    for (const f of macroFiles) {
+      hash.update(f.fileName);
+      hash.update('\0');
+      hash.update(f.content);
+      hash.update('\0');
+    }
+    return hash.digest('hex');
   }
 
   private prepareTranspileSymbols() {
@@ -779,7 +833,11 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const cacheKey = crypto.createHash('md5').update(file.content).digest('hex');
+    const cacheKey = crypto.createHash('md5')
+      .update(file.content)
+      .update('\0')
+      .update(options.jinjaMacrosFingerprint || '')
+      .digest('hex');
 
     let renderedFileContent: string;
 
@@ -820,6 +878,7 @@ export class DataSchemaCompiler {
   private async compileCubeFiles(
     cubes: CubeDefinition[],
     contexts: Record<string, any>[],
+    viewGroups: Record<string, any>[],
     compiledFiles: Record<string, boolean>,
     asyncModules: CallableFunction[],
     compilers: CompileCubeFilesCompilers,
@@ -836,7 +895,9 @@ export class DataSchemaCompiler {
       });
     await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
     return this.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
-      .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
+      .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
+      .then(() => this.compileObjects(compilers.viewGroupCompilers || [], viewGroups, errorsReport))
+      .then(() => this.compileObjects(compilers.metaCompilers || [], cubes, errorsReport));
   }
 
   public throwIfAnyErrors() {

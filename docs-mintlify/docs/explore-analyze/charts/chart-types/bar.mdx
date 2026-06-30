@@ -1,0 +1,78 @@
+---
+title: Bar
+description: Compare values across categories with grouped, stacked, percentage, and horizontal variants.
+---
+
+Bar charts compare values across discrete categories. Use them when the magnitude of individual values matters and direct comparison between categories is the goal.
+
+## Variants
+
+### Basic
+
+One dimension on the X axis, one measure on the Y axis. Each category gets a single bar.
+
+<Frame>
+  <img src="https://ucarecdn.com/4181db03-8959-4753-a09d-12aa182d5309/" />
+</Frame>
+
+### Grouped
+
+Each series renders as a separate cluster of bars side-by-side at every X-axis value. Best for comparing absolute values across multiple series at each category.
+
+{/* Screenshot: grouped bar chart — order count by status, grouped by product category. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Stacked
+
+Series are stacked on top of each other at each X-axis value. Use when you want to show both individual contributions and the total at a glance.
+
+{/* Screenshot: stacked bar chart — revenue by product category stacked by order status. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Percentage stacked (Stack %)
+
+Each stack is normalized to 100%, showing each series as a proportion of the total per X-axis value. Use when relative distribution matters more than absolute values.
+
+{/* Screenshot: percentage stacked bar — same data as stacked but normalized to 100%. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Horizontal
+
+All three vertical variants are also available horizontally. Horizontal bars work well for long category labels, many categories, or when a left-to-right reading direction feels more natural.
+
+{/* Screenshot: horizontal stacked bar chart. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Composite (bar + line)
+
+Assign one series to the right Y axis and set its mark type to **Line** in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration). This creates a dual-axis chart — useful for overlaying a rate on top of volume data (e.g. order count as bars, revenue per order as a line).
+
+{/* Screenshot: composite bar+line chart with dual Y axes — order count (bars, left axis) and average order value (line, right axis). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Stacking
+
+Stacking behavior is set in the **Color & stacking** section of the Style tab:
+
+| Option | Behavior |
+|---|---|
+| **Automatic** | Cube picks the best option based on your data |
+| **Stack** | Series at the same X value are stacked |
+| **Group** | Series at the same X value are placed side-by-side |
+| **Overlay** | Series are drawn on top of each other (rarely useful for bars) |
+| **Stack %** | Series are stacked and normalized to 100% |
+
+Stacking can also be set independently per Y-axis series — enabling grouped clusters of stacked sub-groups.
+
+{/* Screenshot: stacking dropdown open in the Style tab showing all five options. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Data labels
+
+Bar charts support totals labels on stacked charts — showing the aggregate value above each full stack. Enable **Data Labels** in the Fields tab, then configure:
+
+- **Format** — number format applied to the label value
+- **Font size** — size of the label text
+- **Position** — Outside end, Inside end, Inside center, or Inside base
+
+{/* Screenshot: stacked bar with total labels above each stack, Fields tab open showing Data Labels toggle enabled and Position set to "Outside end". Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Axis behavior
+
+Bar charts use an ordinal X axis — each bar is labeled independently, the axis is not time-aware, and categories not present in the result set are not plotted. With time fields, bars are ordered ascending automatically. For other data types, order follows the results table sort.
+
+Tooltips on stacked bars are scoped to the segment under the cursor, not the full stack total.

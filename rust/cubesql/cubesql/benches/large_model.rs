@@ -74,6 +74,8 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
                 meta: None,
                 alias_member: None,
                 format: None,
+                format_description: None,
+                currency: None,
             },
             V1CubeMetaMeasure {
                 name: format!("{}.sum", cube_name),
@@ -85,6 +87,8 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
                 meta: None,
                 alias_member: None,
                 format: None,
+                format_description: None,
+                currency: None,
             },
         ],
         dimensions: (1..=dims)

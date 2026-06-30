@@ -355,6 +355,14 @@ export class CubeStoreQuery extends BaseQuery {
     'select to_timestamp(\'{{ time_item[0] }}\') date_from, to_timestamp(\'{{ time_item[1] }}\') date_to \n' +
     '{% if not loop.last %} UNION ALL\n{% endif %}' +
     '{% endfor %}';
+    templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
+    // CubeStore has no native FULL OUTER JOIN (it is emulated via LEFT JOIN chains), and its
+    // distributed join executor assumes the left-most table is the split root, so RIGHT/FULL
+    // across partitioned tables is unsafe. Don't push those join types down to CubeStore.
+    delete templates.join_types.full;
+    delete templates.join_types.right;
     return templates;
   }
 }

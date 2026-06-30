@@ -1,5 +1,5 @@
-use crate::cluster::{pick_worker_by_ids, Cluster};
-use crate::config::ConfigObj;
+use crate::cluster::{pick_import_worker, pick_worker_by_ids, Cluster};
+use crate::config::{ConfigObj, RepartitionStrategy};
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
@@ -16,6 +16,7 @@ use crate::metastore::{
 use crate::remotefs::RemoteFs;
 use crate::shared::deadline_queue::DeadlineQueue;
 use crate::store::{ChunkStore, WALStore};
+use crate::util::lock::acquire_lock;
 use crate::util::time_span::warn_long_fut;
 use crate::util::WorkerLoop;
 use crate::CubeError;
@@ -47,6 +48,12 @@ pub struct SchedulerImpl {
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
     in_memory_chunks_to_delete: Mutex<Vec<(String, String)>>, //(node, chunk_is)
     node_last_actions: Mutex<HashMap<String, LastNodeActionTimes>>,
+    // Serializes load-aware import placement so concurrent CREATE TABLE events don't read
+    // the same in-flight counts and pile onto the same worker before either job is scheduled.
+    import_placement_lock: Mutex<()>,
+    // Short-TTL memo of the inactive parents still draining (range repartition), so the GC
+    // loop doesn't re-scan the whole chunk table on every cycle just to gate their deletion.
+    repartition_parents_cache: Mutex<Option<(Instant, Arc<HashSet<u64>>)>>,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -102,7 +109,36 @@ impl SchedulerImpl {
             in_memory_chunks_to_delete: Mutex::new(Vec::with_capacity(1000)),
             node_last_actions: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
+            import_placement_lock: Mutex::new(()),
+            repartition_parents_cache: Mutex::new(None),
         }
+    }
+
+    // Inactive parents that still have active chunks (range repartition in progress),
+    // memoized with a short TTL. The GC loop consults this to keep such parents' inactive
+    // chunks until they fully drain; the underlying query scans the chunk table, so caching
+    // avoids re-scanning it on every GC cycle. Staleness up to the TTL is harmless: the
+    // actual chunk deletion is already delayed by not_used_timeout.
+    async fn draining_repartition_parents(&self) -> Result<Arc<HashSet<u64>>, CubeError> {
+        const TTL: Duration = Duration::from_secs(5);
+        {
+            let guard = self.repartition_parents_cache.lock().await;
+            if let Some((at, set)) = guard.as_ref() {
+                if at.elapsed() < TTL {
+                    return Ok(set.clone());
+                }
+            }
+        }
+        let set = Arc::new(
+            self.meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?
+                .into_iter()
+                .map(|p| p.get_id())
+                .collect::<HashSet<u64>>(),
+        );
+        *self.repartition_parents_cache.lock().await = Some((Instant::now(), set.clone()));
+        Ok(set)
     }
 
     pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
@@ -284,6 +320,16 @@ impl SchedulerImpl {
         .await
         {
             error!("Error removing orphaned jobs: {}", e);
+        }
+
+        if let Err(e) = warn_long_fut(
+            "Removing unknown jobs",
+            Duration::from_millis(5000),
+            self.remove_unknown_jobs(),
+        )
+        .await
+        {
+            error!("Error removing unknown jobs: {}", e);
         }
 
         if let Err(e) = warn_long_fut(
@@ -618,8 +664,20 @@ impl SchedulerImpl {
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
+            // Range-based repartition slices an inactive parent over ALL its chunks
+            // (active and inactive) so the [start, end] ranges stay pinned to chunk ids.
+            // While such a parent is still draining, keep its inactive chunks: deleting
+            // them would shift the slicing boundaries on the next re-slice. Once the
+            // parent has no active chunks it is no longer in this set and its inactive
+            // chunks are collected normally.
+            let keep_parents = if self.config.repartition_strategy() == RepartitionStrategy::Range {
+                self.draining_repartition_parents().await?
+            } else {
+                Arc::new(HashSet::new())
+            };
             let ids = persistent_inactive
                 .iter()
+                .filter(|c| !keep_parents.contains(&c.get_row().get_partition_id()))
                 .map(|c| c.get_id())
                 .collect::<Vec<_>>();
             for part in ids.as_slice().chunks(10000) {
@@ -676,6 +734,14 @@ impl SchedulerImpl {
         for job in jobs_to_remove.into_iter() {
             log::info!("Removing job {:?} on non-existing node", job);
             self.meta_store.delete_job(job.get_id()).await?;
+        }
+        Ok(())
+    }
+
+    async fn remove_unknown_jobs(&self) -> Result<(), CubeError> {
+        let deleted = self.meta_store.delete_unknown_jobs().await?;
+        if deleted > 0 {
+            crate::app_metrics::JOBS_UNKNOWN_DELETED.add(deleted as i64);
         }
         Ok(())
     }
@@ -836,20 +902,25 @@ impl SchedulerImpl {
         }
         if let MetaStoreEvent::DeleteJob(job) = event {
             match job.get_row().job_type() {
-                JobType::RepartitionChunk => match job.get_row().row_reference() {
-                    RowKey::Table(TableId::Chunks, c) => {
-                        let c = self.meta_store.get_chunk(*c).await?;
-                        let p = self
-                            .meta_store
-                            .get_partition(c.get_row().get_partition_id())
-                            .await?;
-                        self.schedule_repartition_if_needed(&p).await?
+                JobType::RepartitionChunk | JobType::RepartitionRange(_) => {
+                    match job.get_row().row_reference() {
+                        RowKey::Table(TableId::Chunks, c) => {
+                            let c = self.meta_store.get_chunk(*c).await?;
+                            let p = self
+                                .meta_store
+                                .get_partition(c.get_row().get_partition_id())
+                                .await?;
+                            // Re-slice the parent: drains any range whose job has not run
+                            // yet and picks up a tail chunk that landed after the previous
+                            // slicing (re-slicing is id-pinned, so existing ranges dedup).
+                            self.schedule_repartition_if_needed(&p).await?
+                        }
+                        _ => panic!(
+                            "Unexpected row reference: {:?}",
+                            job.get_row().row_reference()
+                        ),
                     }
-                    _ => panic!(
-                        "Unexpected row reference: {:?}",
-                        job.get_row().row_reference()
-                    ),
-                },
+                }
                 JobType::MultiPartitionSplit => match job.get_row().row_reference() {
                     RowKey::Table(TableId::MultiPartitions, m) => {
                         self.schedule_finish_multi_split_if_needed(*m).await?
@@ -1152,28 +1223,99 @@ impl SchedulerImpl {
         self.cluster.schedule_repartition(p).await
     }
 
+    // Stateless hash placement of (table_id, location). Empty counts make every worker tie,
+    // so pick_import_worker degenerates to the plain hash pick.
+    async fn schedule_import_jobs_hashed(
+        &self,
+        table_id: u64,
+        locations: &[&String],
+    ) -> Result<(), CubeError> {
+        let empty = HashMap::new();
+        for &l in locations {
+            let node = pick_import_worker(self.config.as_ref(), table_id, l, &empty);
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Tables, table_id),
+                    JobType::TableImportCSV(l.clone()),
+                    node.clone(),
+                ))
+                .await?;
+            if job.is_some() {
+                // TODO queue failover
+                self.cluster.notify_job_runner(node).await?;
+            }
+        }
+        Ok(())
+    }
+
     async fn schedule_table_import(
         &self,
         table_id: u64,
         locations: &[&String],
     ) -> Result<(), CubeError> {
         let table = self.meta_store.get_table_by_id(table_id).await?;
-        if !table.get_row().sealed() {
-            for &l in locations {
-                let node = self.cluster.node_name_for_import(table_id, &l).await?;
+        if table.get_row().sealed() {
+            return Ok(());
+        }
+
+        // Stream imports are long-lived and run on a separate pool; they need stable,
+        // deterministic placement, so they always use plain hash placement and are never
+        // affected by load-aware placement, which targets bursty CSV file imports only.
+        let (csv_locations, stream_locations): (Vec<&String>, Vec<&String>) = locations
+            .iter()
+            .copied()
+            .partition(|&l| !Table::is_stream_location(l));
+
+        self.schedule_import_jobs_hashed(table_id, &stream_locations)
+            .await?;
+
+        // Stream-only tables (the common reconcile path) have nothing left to place; skip the
+        // load-aware lock and the in_flight_import_jobs_by_node scan entirely.
+        if csv_locations.is_empty() {
+            return Ok(());
+        }
+
+        if !self.config.load_aware_import_placement_enabled() {
+            self.schedule_import_jobs_hashed(table_id, &csv_locations)
+                .await?;
+            return Ok(());
+        }
+
+        // Load-aware placement. Scan in-flight import counts once, then place each location on
+        // the least-loaded worker, updating counts in memory. The lock serializes concurrent
+        // CREATE TABLE placements so they don't read the same counts and pile onto the same
+        // workers. It is best-effort: on timeout we proceed without it — the worst case is an
+        // uneven spread, never data corruption.
+        let mut nodes_to_notify = Vec::new();
+        {
+            let guard = acquire_lock("import placement", self.import_placement_lock.lock()).await;
+            if let Err(e) = &guard {
+                log::warn!(
+                    "Placing import jobs without serialization, spread may be uneven: {}",
+                    e
+                );
+            }
+            let mut counts = self.meta_store.in_flight_import_jobs_by_node().await?;
+            for &l in &csv_locations {
+                let node = pick_import_worker(self.config.as_ref(), table_id, l, &counts);
                 let job = self
                     .meta_store
                     .add_job(Job::new(
                         RowKey::Table(TableId::Tables, table_id),
                         JobType::TableImportCSV(l.clone()),
-                        node.to_string(),
+                        node.clone(),
                     ))
                     .await?;
                 if job.is_some() {
-                    // TODO queue failover
-                    self.cluster.notify_job_runner(node).await?;
+                    *counts.entry(node.clone()).or_insert(0) += 1;
+                    nodes_to_notify.push(node);
                 }
             }
+        }
+        for node in nodes_to_notify {
+            // TODO queue failover
+            self.cluster.notify_job_runner(node).await?;
         }
         Ok(())
     }
@@ -1328,6 +1470,7 @@ pub enum GCTask {
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::metastore::RocksMetaStore;
     use std::fs;
 
     #[tokio::test]
@@ -1439,6 +1582,229 @@ mod tests {
         job_ids.sort();
         assert_eq!(job_ids, existing_ids);
         services.stop_processing_loops().await.unwrap();
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+    }
+
+    // Creates a non-sealed table with no locations, so the Insert(Tables) event does not
+    // auto-schedule imports and the test drives schedule_table_import explicitly.
+    async fn create_import_table(meta_store: &Arc<dyn MetaStore>, name: &str) -> u64 {
+        use crate::metastore::{Column, ColumnType};
+        let table = meta_store
+            .create_table(
+                "s".to_string(),
+                name.to_string(),
+                vec![Column::new("n".to_string(), ColumnType::Int, 0)],
+                None,
+                None,
+                vec![],
+                false,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+        table.get_id()
+    }
+
+    async fn add_import_job(
+        meta_store: &Arc<dyn MetaStore>,
+        table_id: u64,
+        location: &str,
+        node: &str,
+    ) {
+        meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Tables, table_id),
+                JobType::TableImportCSV(location.to_string()),
+                node.to_string(),
+            ))
+            .await
+            .unwrap();
+    }
+
+    async fn import_placement(
+        meta_store: &Arc<dyn MetaStore>,
+        table_id: u64,
+    ) -> HashMap<String, String> {
+        let mut out = HashMap::new();
+        for j in meta_store.all_jobs().await.unwrap() {
+            match j.get_row().row_reference() {
+                RowKey::Table(TableId::Tables, t) if *t == table_id => {}
+                _ => continue,
+            }
+            if let (JobType::TableImportCSV(loc), JobStatus::Scheduled(node)) =
+                (j.get_row().job_type(), j.get_row().status())
+            {
+                out.insert(loc.clone(), node.clone());
+            }
+        }
+        out
+    }
+
+    // Builds a scheduler over a fresh test metastore with a no-op cluster (notify_job_runner
+    // does nothing, since the worker names are not real nodes). select_workers and the
+    // load-aware flag come from the passed config.
+    fn test_scheduler(
+        test_name: &str,
+        config: Arc<dyn ConfigObj>,
+    ) -> (Arc<dyn MetaStore>, SchedulerImpl) {
+        use crate::cluster::MockCluster;
+        let (remote_fs, rocks) = RocksMetaStore::prepare_test_metastore(test_name);
+        let meta_store: Arc<dyn MetaStore> = rocks;
+        let mut cluster = MockCluster::new();
+        cluster.expect_notify_job_runner().returning(|_| Ok(()));
+        let (_tx, rx) = broadcast::channel(16);
+        let scheduler =
+            SchedulerImpl::new(meta_store.clone(), Arc::new(cluster), remote_fs, rx, config);
+        (meta_store, scheduler)
+    }
+
+    #[tokio::test]
+    async fn schedule_table_import_load_aware_balances() {
+        let config = Config::test("schedule_table_import_load_aware").update_config(|mut c| {
+            c.select_workers = (0..4).map(|i| format!("worker{}", i)).collect();
+            c.load_aware_import_placement_enabled = true;
+            c
+        });
+        let (meta_store, scheduler) =
+            test_scheduler("schedule_table_import_load_aware", config.config_obj());
+        meta_store
+            .create_schema("s".to_string(), false)
+            .await
+            .unwrap();
+
+        // Pre-seed worker0 with 2 in-flight imports. Starting counts [2,0,0,0]; placing 6
+        // locations load-aware fills the deficit and levels every worker to exactly 2.
+        let seed = create_import_table(&meta_store, "seed").await;
+        add_import_job(&meta_store, seed, "seed-a", "worker0").await;
+        add_import_job(&meta_store, seed, "seed-b", "worker0").await;
+
+        let table = create_import_table(&meta_store, "bar").await;
+        let locs: Vec<String> = (0..6).map(|i| format!("loc-{}", i)).collect();
+        let loc_refs: Vec<&String> = locs.iter().collect();
+        scheduler
+            .schedule_table_import(table, &loc_refs)
+            .await
+            .unwrap();
+
+        let counts = meta_store.in_flight_import_jobs_by_node().await.unwrap();
+        for i in 0..4 {
+            assert_eq!(
+                counts.get(&format!("worker{}", i)).copied(),
+                Some(2),
+                "load-aware must level all workers to 2, got {:?}",
+                counts
+            );
+        }
+
+        // cleanup_test_metastore only removes the test-<name>-* dirs; the metastore's local
+        // cache also uses the config data_dir (<name>-local-store), so clean that too.
+        RocksMetaStore::cleanup_test_metastore("schedule_table_import_load_aware");
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+    }
+
+    #[tokio::test]
+    async fn schedule_table_import_stream_ignores_load_aware() {
+        let config =
+            Config::test("schedule_table_import_stream_load_aware").update_config(|mut c| {
+                c.select_workers = (0..4).map(|i| format!("worker{}", i)).collect();
+                c.load_aware_import_placement_enabled = true;
+                c
+            });
+        let (meta_store, scheduler) = test_scheduler(
+            "schedule_table_import_stream_load_aware",
+            config.config_obj(),
+        );
+        meta_store
+            .create_schema("s".to_string(), false)
+            .await
+            .unwrap();
+
+        // Heavily pre-seed worker0 with CSV imports. Stream locations must ignore this load and
+        // follow the stateless hash, since load-aware placement targets CSV imports only.
+        let seed = create_import_table(&meta_store, "seed").await;
+        for i in 0..5 {
+            add_import_job(&meta_store, seed, &format!("seed-{}", i), "worker0").await;
+        }
+
+        let table = create_import_table(&meta_store, "bar").await;
+        let locs: Vec<String> = (0..6).map(|i| format!("stream:topic-{}", i)).collect();
+        let loc_refs: Vec<&String> = locs.iter().collect();
+        scheduler
+            .schedule_table_import(table, &loc_refs)
+            .await
+            .unwrap();
+
+        let placement = import_placement(&meta_store, table).await;
+        let empty = HashMap::new();
+        for l in &locs {
+            let expected = pick_import_worker(config.config_obj().as_ref(), table, l, &empty);
+            assert_eq!(
+                placement.get(l),
+                Some(&expected),
+                "stream placement must follow the stateless hash even with load-aware enabled"
+            );
+        }
+
+        RocksMetaStore::cleanup_test_metastore("schedule_table_import_stream_load_aware");
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+    }
+
+    #[tokio::test]
+    async fn schedule_table_import_hash_placement_by_default() {
+        let config = Config::test("schedule_table_import_hash").update_config(|mut c| {
+            c.select_workers = (0..4).map(|i| format!("worker{}", i)).collect();
+            // load_aware_import_placement_enabled defaults to false (old behavior).
+            c
+        });
+        let (meta_store, scheduler) =
+            test_scheduler("schedule_table_import_hash", config.config_obj());
+        meta_store
+            .create_schema("s".to_string(), false)
+            .await
+            .unwrap();
+
+        // Heavily pre-seed worker0; the default hash placement must ignore in-flight load.
+        let seed = create_import_table(&meta_store, "seed").await;
+        for i in 0..5 {
+            add_import_job(&meta_store, seed, &format!("seed-{}", i), "worker0").await;
+        }
+
+        let table = create_import_table(&meta_store, "bar").await;
+        let locs: Vec<String> = (0..6).map(|i| format!("loc-{}", i)).collect();
+        let loc_refs: Vec<&String> = locs.iter().collect();
+        scheduler
+            .schedule_table_import(table, &loc_refs)
+            .await
+            .unwrap();
+
+        // Each location is placed by the pure hash of (table_id, location), independent of load.
+        let placement = import_placement(&meta_store, table).await;
+        let empty = HashMap::new();
+        for l in &locs {
+            let expected = pick_import_worker(config.config_obj().as_ref(), table, l, &empty);
+            assert_eq!(
+                placement.get(l),
+                Some(&expected),
+                "default placement must follow the stateless hash"
+            );
+        }
+
+        // cleanup_test_metastore only removes the test-<name>-* dirs; the metastore's local
+        // cache also uses the config data_dir (<name>-local-store), so clean that too.
+        RocksMetaStore::cleanup_test_metastore("schedule_table_import_hash");
         let _ = fs::remove_dir_all(config.local_dir());
         let _ = fs::remove_dir_all(config.remote_dir());
     }

@@ -1,0 +1,71 @@
+---
+title: Caching Overview
+description: Learn how Cube's caching layer accelerates queries with pre-aggregations.
+---
+
+ Caching
+
+Cube provides a powerful caching layer through **pre-aggregations** — materialized rollup tables that dramatically accelerate query performance and reduce data warehouse costs.
+
+## How it works
+
+<Steps>
+  <Step title="Define pre-aggregations">
+    Specify rollup tables in your data model with the measures and dimensions to cache.
+  </Step>
+  <Step title="Cube builds the cache">
+    Cube queries your data warehouse and stores results in Cube Store, a purpose-built caching engine.
+  </Step>
+  <Step title="Queries are served from cache">
+    When a query matches a pre-aggregation, Cube serves it from the cache instead of hitting the warehouse.
+  </Step>
+  <Step title="Automatic refresh">
+    Pre-aggregations are refreshed on a configurable schedule to keep data fresh.
+  </Step>
+</Steps>
+
+## Defining pre-aggregations
+
+Add pre-aggregations to your cube definitions:
+
+```yaml
+cubes:
+  - name: orders
+    # ... measures and dimensions ...
+
+    pre_aggregations:
+      - name: orders_by_day
+        measures:
+          - count
+          - total_amount
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: day
+```
+
+## Refresh strategy
+
+Control how often pre-aggregations are rebuilt:
+
+```yaml
+pre_aggregations:
+  - name: orders_by_day
+    measures:
+      - count
+    time_dimension: created_at
+    granularity: day
+    refresh_key:
+      every: "1 hour"
+```
+
+<Warning>
+Setting very frequent refresh intervals can increase your data warehouse costs. Balance freshness with cost.
+</Warning>
+
+## Benefits
+
+- **10-100x faster queries** compared to hitting the warehouse directly
+- **Reduced warehouse costs** by minimizing direct queries
+- **Consistent performance** regardless of data volume
+- **Automatic query routing** — no changes needed in your application code

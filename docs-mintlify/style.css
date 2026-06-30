@@ -1,0 +1,4 @@
+#content-area table,
+.mdx-content table {
+  width: 100% !important;
+}

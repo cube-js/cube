@@ -184,7 +184,7 @@ accessible for everyone.
 
 | API scope | REST API endpoints | Accessible by default? |
 | --- | --- | --- |
-| `meta`    | [`/v1/meta`][ref-ref-meta] | ✅ Yes |
+| `meta`    | [`/v1/meta`][ref-ref-meta], [Metadata API][ref-ref-metadata] | ✅ Yes |
 | `data`    | [`/v1/load`][ref-ref-load], [`/v1/cubesql`][ref-ref-cubesql] | ✅ Yes |
 | `graphql` | `/graphql` | ✅ Yes |
 | `sql`     | [`/v1/sql`][ref-ref-sql] | ✅ Yes |
@@ -264,13 +264,19 @@ Cube REST API has basic errors and HTTP Error codes for all requests.
 
 ### Request span annotation
 
-For monitoring tools such as Cube Cloud proper request span annotation should be
-provided in `x-request-id` header of a request. Each request id should consist
-of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as
-whole: `${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header
-should be unique for each separate request. `spanId` should define user
-interaction span such us `Continue wait` retry cycle and it's value shouldn't
-change during one single interaction.
+Both [`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints
+support request span annotation for monitoring and tracing.
+
+You can provide a request ID via the `x-request-id` header or the `traceparent`
+header. Each request ID should consist of two parts: `spanId` and
+`requestSequenceId` which define `x-request-id` as whole:
+`${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header should
+be unique for each separate request. `spanId` should define user interaction span
+such as `Continue wait` retry cycle and its value shouldn't change during one
+single interaction.
+
+If neither header is provided, Cube auto-generates a request ID in the
+`${uuid}-span-1` format.
 
 ## Cache control
 
@@ -352,3 +358,4 @@ warehouse][ref-data-warehouses].
 [ref-recipe-real-time-data-fetch]: /product/apis-integrations/recipes/real-time-data-fetch
 [ref-refresh-keys]: /product/data-modeling/reference/cube#refresh_key
 [link-websocat]: https://github.com/vi/websocat
+[ref-ref-metadata]: /product/apis-integrations/core-data-apis/rest-api/reference#metadata-api

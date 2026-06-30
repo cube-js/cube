@@ -188,6 +188,11 @@ export class DatabricksDriver extends JDBCDriver {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
@@ -202,12 +207,13 @@ export class DatabricksDriver extends JDBCDriver {
     const dataSource =
       conf.dataSource ||
       assertDataSource('default');
+    const preAggregations = conf.preAggregations || false;
 
     let showSparkProtocolWarn = false;
     let url: string =
       conf?.url ||
-      getEnv('databricksUrl', { dataSource }) ||
-      getEnv('jdbcUrl', { dataSource });
+      getEnv('databricksUrl', { dataSource, preAggregations }) ||
+      getEnv('jdbcUrl', { dataSource, preAggregations });
     if (url.indexOf('jdbc:spark://') !== -1) {
       showSparkProtocolWarn = true;
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
@@ -215,10 +221,10 @@ export class DatabricksDriver extends JDBCDriver {
 
     const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
     const passwd = conf?.token ||
-          getEnv('databricksToken', { dataSource }) ||
+          getEnv('databricksToken', { dataSource, preAggregations }) ||
           pwd;
-    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource });
-    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource });
+    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource, preAggregations });
+    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource, preAggregations });
 
     if (oauthClientId && !oauthClientSecret) {
       throw new Error('Invalid credentials: No OAuth Client Secret provided');
@@ -260,52 +266,52 @@ export class DatabricksDriver extends JDBCDriver {
       },
       catalog:
         conf?.catalog ||
-        getEnv('databricksCatalog', { dataSource }),
-      database: getEnv('dbName', { required: false, dataSource }),
+        getEnv('databricksCatalog', { dataSource, preAggregations }),
+      database: getEnv('dbName', { required: false, dataSource, preAggregations }),
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
+        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource, preAggregations }),
       exportBucket:
         conf?.exportBucket ||
-        getEnv('dbExportBucket', { dataSource }),
+        getEnv('dbExportBucket', { dataSource, preAggregations }),
       exportBucketMountDir:
         conf?.exportBucketMountDir ||
-        getEnv('dbExportBucketMountDir', { dataSource }),
+        getEnv('dbExportBucketMountDir', { dataSource, preAggregations }),
       pollInterval: (
         conf?.pollInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
       // AWS export bucket config
       awsKey:
         conf?.awsKey ||
-        getEnv('dbExportBucketAwsKey', { dataSource }),
+        getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
       awsSecret:
         conf?.awsSecret ||
-        getEnv('dbExportBucketAwsSecret', { dataSource }),
+        getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
       awsRegion:
         conf?.awsRegion ||
-        getEnv('dbExportBucketAwsRegion', { dataSource }),
+        getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
       // Azure export bucket
       azureKey:
         conf?.azureKey ||
-        getEnv('dbExportBucketAzureKey', { dataSource }),
+        getEnv('dbExportBucketAzureKey', { dataSource, preAggregations }),
       exportBucketCsvEscapeSymbol:
-        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       // Azure service principal
       azureTenantId:
         conf?.azureTenantId ||
-        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+        getEnv('dbExportBucketAzureTenantId', { dataSource, preAggregations }),
       azureClientId:
         conf?.azureClientId ||
-        getEnv('dbExportBucketAzureClientId', { dataSource }),
+        getEnv('dbExportBucketAzureClientId', { dataSource, preAggregations }),
       azureClientSecret:
         conf?.azureClientSecret ||
-        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
+        getEnv('dbExportBucketAzureClientSecret', { dataSource, preAggregations }),
       // GCS credentials
       gcsCredentials:
         conf?.gcsCredentials ||
-        getEnv('dbExportGCSCredentials', { dataSource }),
+        getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
     };
     if (config.readOnly === undefined) {
       // we can set readonly to true if there is no bucket config provided
@@ -831,8 +837,18 @@ export class DatabricksDriver extends JDBCDriver {
       const azureBucketPath = `${bucketName}/${username}`;
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      // Pass `undefined` (not empty strings) for unset values so the Azure SDK
+      // falls back to `DefaultAzureCredential` — which resolves a federated
+      // (workload identity) token from `AZURE_FEDERATED_TOKEN_FILE` together
+      // with `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` when no static key/secret
+      // is configured (OIDC).
       return this.extractFilesFromAzure(
-        { azureKey, clientId, tenantId, clientSecret },
+        {
+          azureKey: azureKey || undefined,
+          clientId: clientId || undefined,
+          tenantId: tenantId || undefined,
+          clientSecret: clientSecret || undefined,
+        },
         // Databricks uses different bucket address form, so we need to transform it
         // to the one understandable by extractFilesFromAzure implementation
         azureBucketPath,
@@ -842,13 +858,24 @@ export class DatabricksDriver extends JDBCDriver {
       const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      // Only pass static credentials when both key and secret are configured.
+      // Otherwise omit them (and a blank region) so the AWS SDK resolves
+      // credentials from its default provider chain — e.g. the web identity
+      // token file (`AWS_WEB_IDENTITY_TOKEN_FILE`) used for OIDC / workload
+      // identity. Passing empty strings makes S3 fail with
+      // `AuthorizationHeaderMalformed`.
+      const credentials =
+        this.config.awsKey && this.config.awsSecret
+          ? {
+            accessKeyId: this.config.awsKey,
+            secretAccessKey: this.config.awsSecret,
+          }
+          : undefined;
+
       return this.extractUnloadedFilesFromS3(
         {
-          credentials: {
-            accessKeyId: this.config.awsKey || '',
-            secretAccessKey: this.config.awsSecret || '',
-          },
-          region: this.config.awsRegion || '',
+          ...(credentials ? { credentials } : {}),
+          ...(this.config.awsRegion ? { region: this.config.awsRegion } : {}),
         },
         bucketName,
         exportPrefix,
@@ -857,8 +884,11 @@ export class DatabricksDriver extends JDBCDriver {
       const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      // Omit credentials when none are configured so the Google SDK falls back
+      // to Application Default Credentials (honors `GOOGLE_APPLICATION_CREDENTIALS`,
+      // including workload-identity-federation `external_account` configs).
       return this.extractFilesFromGCS(
-        { credentials: this.config.gcsCredentials },
+        { credentials: this.config.gcsCredentials || undefined },
         bucketName,
         exportPrefix,
       );

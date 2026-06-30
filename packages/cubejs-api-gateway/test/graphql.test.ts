@@ -7,7 +7,6 @@ import { graphqlHTTP } from 'express-graphql';
 import { GraphQLObjectType } from 'graphql';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import fs from 'fs-extra';
-// eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 
 import { makeSchema } from '../src/graphql';
@@ -19,6 +18,10 @@ const metaConfig = [
       measures: [
         {
           name: 'Orders.count',
+          isVisible: true,
+        },
+        {
+          name: 'Orders.totalAmount',
           isVisible: true,
         },
       ],
@@ -274,6 +277,11 @@ describe('GraphQL Schema', () => {
           shortTitle: 'Count',
           type: 'number',
         },
+        'Orders.totalAmount': {
+          title: 'Orders Total Amount',
+          shortTitle: 'Total Amount',
+          type: 'number',
+        },
       },
       dimensions: {
         'Orders.status': {
@@ -305,7 +313,8 @@ describe('GraphQL Schema', () => {
                 annotation: mockAnnotation,
                 lastRefreshTime: mockLastRefreshTime,
                 data: [
-                  { 'Orders.count': 10, 'Orders.status': 'completed' },
+                  { 'Orders.count': 10, 'Orders.totalAmount': 500, 'Orders.status': 'completed' },
+                  { 'Orders.count': 5, 'Orders.totalAmount': 200, 'Orders.status': 'pending' },
                 ],
               });
             },
@@ -318,7 +327,7 @@ describe('GraphQL Schema', () => {
     test('should return annotation and lastRefreshTime in extensions', async () => {
       const query = `query CubeQuery {
         cube {
-          orders { count status }
+          orders { count totalAmount status }
         }
       }`;
 
@@ -332,6 +341,26 @@ describe('GraphQL Schema', () => {
       expect(res.body.extensions).toBeDefined();
 
       expect(res.body).toMatchSnapshot();
+    });
+
+    it('should accumulate all measures and dimensions', async () => {
+      const query = `query CubeQuery {
+        cube {
+          orders { count totalAmount status }
+        }
+      }`;
+
+      const res = await request(app)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query));
+
+      expect(res.body.errors).toBeUndefined();
+
+      expect(res.body.data.cube).toEqual([
+        { orders: { count: '10', totalAmount: '500', status: 'completed' } },
+        { orders: { count: '5', totalAmount: '200', status: 'pending' } },
+      ]);
     });
   });
 });

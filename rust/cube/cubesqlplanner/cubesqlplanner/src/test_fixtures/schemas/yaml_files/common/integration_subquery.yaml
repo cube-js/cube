@@ -1,0 +1,93 @@
+cubes:
+    - name: Customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: CustomerOrders
+            relationship: one_to_many
+            sql: "{CUBE}.id = {CustomerOrders.customerId}"
+          - name: Sales
+            relationship: one_to_many
+            sql: "{CUBE}.id = {Sales.customerId}"
+          - name: Refunds
+            relationship: one_to_many
+            sql: "{CUBE}.id = {Refunds.customerId}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: totalSpend
+            type: number
+            sql: "{CustomerOrders.orderTotal}"
+            sub_query: true
+          - name: totalSpendPropagated
+            type: number
+            sql: "{CustomerOrders.orderTotal}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+      measures:
+          - name: count
+            type: count
+
+    - name: CustomerOrders
+      sql: "SELECT * FROM customer_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customerId
+            type: number
+            sql: customer_id
+      measures:
+          - name: orderTotal
+            type: sum
+            sql: amount
+
+    - name: Sales
+      sql: "SELECT * FROM sales"
+      joins:
+          - name: Customers
+            relationship: many_to_one
+            sql: "{CUBE}.customer_id = {Customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customerId
+            type: number
+            sql: customer_id
+          - name: category
+            type: string
+            sql: category
+      measures:
+          - name: count
+            type: count
+          - name: totalAmount
+            type: sum
+            sql: amount
+
+    - name: Refunds
+      sql: "SELECT * FROM refunds"
+      joins:
+          - name: Customers
+            relationship: many_to_one
+            sql: "{CUBE}.customer_id = {Customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customerId
+            type: number
+            sql: customer_id
+      measures:
+          - name: count
+            type: count
+          - name: totalRefund
+            type: sum
+            sql: amount

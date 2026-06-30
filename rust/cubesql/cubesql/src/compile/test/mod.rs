@@ -16,7 +16,7 @@ use crate::{
         CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
         SqlTemplates, TransportLoadRequestQuery, TransportLoadResponse, TransportService,
     },
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMetaType;
@@ -32,6 +32,8 @@ pub mod test_bi_workarounds;
 pub mod test_cube_join;
 #[cfg(test)]
 pub mod test_cube_join_grouped;
+#[cfg(test)]
+pub mod test_cube_join_views;
 #[cfg(test)]
 pub mod test_cube_scan;
 #[cfg(test)]
@@ -109,6 +111,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
@@ -120,6 +124,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.sumPrice".to_string(),
@@ -131,6 +137,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.minPrice".to_string(),
@@ -142,6 +150,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
@@ -153,6 +163,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
@@ -164,6 +176,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
             ],
             segments: vec![
@@ -224,6 +238,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
                 CubeMetaMeasure {
                     name: "Logs.agentCountApprox".to_string(),
@@ -235,6 +251,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 },
             ],
             segments: vec![],
@@ -263,6 +281,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 meta: None,
                 alias_member: None,
                 format: None,
+                format_description: None,
+                currency: None,
             }],
             segments: vec![],
             joins: None,
@@ -294,6 +314,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     meta: None,
                     alias_member: None,
                     format: None,
+                    format_description: None,
+                    currency: None,
                 })
                 .chain(
                     vec![
@@ -307,6 +329,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.maxPrice".to_string(),
@@ -318,6 +342,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.minPrice".to_string(),
@@ -329,6 +355,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.avgPrice".to_string(),
@@ -340,6 +368,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.countDistinct".to_string(),
@@ -351,6 +381,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                     ]
                     .into_iter(),
@@ -405,6 +437,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_str{}", i),
@@ -416,6 +450,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_date{}", i),
@@ -427,6 +463,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                     ]
                 })
@@ -442,6 +480,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
@@ -453,6 +493,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
@@ -464,6 +506,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
@@ -475,6 +519,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
@@ -486,6 +532,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                             alias_member: None,
                             format: None,
+                            format_description: None,
+                            currency: None,
                         },
                     ]
                     .into_iter(),
@@ -517,6 +565,8 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
             agg_type: Some("string".to_string()),
             meta: None,
             format: None,
+            format_description: None,
+            currency: None,
             alias_member: None,
         }],
         segments: vec![],
@@ -545,6 +595,8 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 agg_type: Some("sum".to_string()),
                 meta: None,
                 format: None,
+                format_description: None,
+                currency: None,
                 alias_member: None,
             },
             CubeMetaMeasure {
@@ -556,6 +608,8 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 agg_type: Some("avg".to_string()),
                 meta: None,
                 format: None,
+                format_description: None,
+                currency: None,
                 alias_member: None,
             },
             CubeMetaMeasure {
@@ -567,6 +621,8 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 agg_type: Some("count".to_string()),
                 meta: None,
                 format: None,
+                format_description: None,
+                currency: None,
                 alias_member: None,
             },
         ],
@@ -646,6 +702,7 @@ pub fn sql_generator(
                     ("functions/LOWER".to_string(), "LOWER({{ args_concat }})".to_string()),
                     ("functions/UPPER".to_string(), "UPPER({{ args_concat }})".to_string()),
                     ("functions/PERCENTILECONT".to_string(), "PERCENTILE_CONT({{ args_concat }})".to_string()),
+                    ("expressions/query_aliased".to_string(), "{{ query }} AS {{ quoted_alias }}".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
@@ -654,12 +711,17 @@ pub fn sql_generator(
   {% if from %}
 FROM (
   {{ from | indent(2) }}
-) AS {{ from_alias }} {% endif %} {% if filter %}
+) AS {{ from_alias }} {% endif %}{% for join in joins %}
+{{ join }}{% endfor %}{% if filter %}
 WHERE {{ filter }}{% endif %}{% if group_by %}
 GROUP BY {{ group_by }}{% endif %}{% if order_by %}
 ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit is not none %}
 LIMIT {{ limit }}{% endif %}{% if offset is not none %}
 OFFSET {{ offset }}{% endif %}"#.to_string(),
+                    ),
+                    (
+                        "statements/join".to_string(),
+                        "{{ join_type }} JOIN {{ source }} ON {{ condition }}".to_string(),
                     ),
                     (
                         "statements/group_by_exprs".to_string(),
@@ -694,6 +756,8 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/between".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}".to_string()),
                     ("join_types/inner".to_string(), "INNER".to_string()),
                     ("join_types/left".to_string(), "LEFT".to_string()),
+                    ("join_types/right".to_string(), "RIGHT".to_string()),
+                    ("join_types/full".to_string(), "FULL".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string()),
@@ -718,6 +782,11 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("types/binary".to_string(), "BINARY".to_string()),
                 ]
                     .into_iter().chain(custom_templates)
+                    .collect::<HashMap<_, _>>()
+                    .into_iter()
+                    // Custom template with an empty value removes the base template,
+                    // allowing tests to check behavior of data sources without it
+                    .filter(|(_, value)| !value.is_empty())
                     .collect(),
                     false,
             )
@@ -1111,10 +1180,11 @@ impl TestContext {
         let mut output_flags = StatusFlags::empty();
 
         for query in queries {
-            let query = self
-                .convert_sql_to_cube_query(&query)
-                .await
-                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            let query = self.convert_sql_to_cube_query(&query).await.map_err(|e| {
+                let mut error = CubeError::from(e);
+                error.cause = CubeErrorCauseType::Planning(error.cause.meta().cloned());
+                error
+            })?;
             match query {
                 QueryPlan::DataFusionSelect(plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
