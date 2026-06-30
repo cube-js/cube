@@ -384,7 +384,7 @@ Error: Query execution timeout after 10 min of waiting
 
 It means that your pre-aggregation is too heavy and takes too long to build.
 
-As a temporary solution, you can increase the timeout for all queies that Cube
+As a temporary solution, you can increase the timeout for all queries that Cube
 runs against your data source via the [`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout) environment variable.
 
 However, it is recommended that you optimize your pre-aggregations instead:
