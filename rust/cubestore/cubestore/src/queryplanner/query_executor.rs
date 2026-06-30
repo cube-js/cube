@@ -569,6 +569,7 @@ impl QueryExecutorImpl {
             self.memory_handler.clone(),
             self.config.group_by_limit_factor(),
             self.config.group_by_limit_per_partition(),
+            self.config.topk_aggregate_strategy(),
         ))
     }
 
@@ -586,6 +587,7 @@ impl QueryExecutorImpl {
             data_loaded_size.clone(),
             self.config.group_by_limit_factor(),
             self.config.group_by_limit_per_partition(),
+            self.config.topk_aggregate_strategy(),
         ))
     }
 

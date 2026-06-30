@@ -600,6 +600,9 @@ pub trait ConfigObj: DIService {
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
+    /// Router-side merge strategy for distributed value-ordered top-k.
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -762,6 +765,7 @@ pub struct ConfigObjImpl {
     pub group_by_limit_factor: usize,
     pub group_by_limit_per_partition: bool,
     pub coalesce_under_hash_aggregate: bool,
+    pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1116,6 +1120,10 @@ impl ConfigObj for ConfigObjImpl {
         self.coalesce_under_hash_aggregate
     }
 
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy {
+        self.topk_aggregate_strategy
+    }
+
     fn allow_decimal128(&self) -> bool {
         self.allow_decimal128
     }
@@ -1288,6 +1296,43 @@ pub async fn init_test_logger() {
                 .unwrap();
         }
         *initialized = true;
+    }
+}
+
+/// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
+/// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopKAggregateStrategy {
+    /// Original streaming NRA merge with per-row state (default).
+    Streaming,
+    /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
+    VectorizedStreaming,
+    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
+    /// termination, so the router materializes every distinct group.
+    FullMerge,
+}
+
+/// Parses [`TopKAggregateStrategy`] from an env var. Lenient: an unset or unrecognized value falls
+/// back to the default (`Streaming`) with a warning rather than panicking -- a malformed perf toggle
+/// must never take a node down.
+fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
+    match env::var(name) {
+        Err(_) => TopKAggregateStrategy::Streaming,
+        Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
+            "" | "streaming" | "default" | "v1" => TopKAggregateStrategy::Streaming,
+            "vectorized" | "vectorized_streaming" | "v2" => {
+                TopKAggregateStrategy::VectorizedStreaming
+            }
+            "full_merge" | "full-merge" | "fullmerge" => TopKAggregateStrategy::FullMerge,
+            other => {
+                log::warn!(
+                    "unknown {} value '{}', using default (streaming)",
+                    name,
+                    other
+                );
+                TopKAggregateStrategy::Streaming
+            }
+        },
     }
 }
 
@@ -1846,6 +1891,7 @@ impl Config {
                 group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
+                topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -2105,6 +2151,7 @@ impl Config {
                 group_by_limit_factor: 2,
                 group_by_limit_per_partition: false,
                 coalesce_under_hash_aggregate: false,
+                topk_aggregate_strategy: TopKAggregateStrategy::Streaming,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,

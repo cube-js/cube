@@ -33,6 +33,7 @@ use std::any::Any;
 use std::fmt::Formatter;
 
 use crate::cluster::{Cluster, WorkerPlanningParams};
+use crate::config::TopKAggregateStrategy;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
@@ -1970,6 +1971,7 @@ pub struct CubeExtensionPlanner {
     // Set on the workers.
     pub worker_planning_params: Option<WorkerPlanningParams>,
     pub serialized_plan: Arc<PreSerializedPlan>,
+    pub topk_strategy: TopKAggregateStrategy,
 }
 
 #[async_trait]
