@@ -19,8 +19,17 @@ class DuckDBFilter extends BaseFilter {
     if (numberTypes.includes(definition.type)) {
       return 'CAST(? AS DOUBLE)';
     }
-   
+
     return '?';
+  }
+
+  // DuckDB does not treat backslash as a default LIKE escape character, so the
+  // base `escapeWildcardChars` (which backslash-escapes `%`/`_` in user values)
+  // only works when the LIKE/ILIKE is given an explicit `ESCAPE '\'` clause.
+  public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
+    return `${column}${not ? ' NOT' : ''} ILIKE ${p}${this.allocateParam(param)}${s} ESCAPE '\\'`;
   }
 }
 
