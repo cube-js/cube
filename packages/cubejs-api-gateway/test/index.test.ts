@@ -1304,6 +1304,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         expect.any(String),
+        false,
       );
     });
 
@@ -1345,6 +1346,7 @@ describe('API Gateway', () => {
         'America/Los_Angeles',
         undefined,
         expect.any(String),
+        false,
       );
     });
 
@@ -1382,6 +1384,44 @@ describe('API Gateway', () => {
         undefined,
         true,
         expect.any(String),
+        false,
+      );
+    });
+
+    test('disable_post_processing can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      // Mock the sqlServer.execSql method
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          disable_post_processing: true,
+        })
+        .responseType('text')
+        .expect(200);
+
+      // Verify disable_post_processing is forwarded as the trailing argument
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+        true,
       );
     });
 
@@ -1419,6 +1459,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         'test-request-id-12345',
+        false,
       );
     });
 

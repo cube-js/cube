@@ -24,6 +24,13 @@ use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
+use cubesql::compile::datafusion::logical_plan::LogicalPlan;
+use cubesql::compile::datafusion::scalar::ScalarValue;
+use cubesql::compile::datafusion::variable::VarType;
+use cubesql::compile::engine::df::scan::CubeScanNode;
+use cubesql::compile::engine::df::wrapper::CubeScanWrappedSqlNode;
+use cubesql::compile::DatabaseVariable;
+use cubesql::sql::CUBESQL_PENALIZE_POST_PROCESSING_VAR;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
 use std::rc::Rc;
@@ -243,6 +250,7 @@ async fn handle_sql_query(
     timezone: Option<String>,
     throw_continue_wait: bool,
     request_id: Option<String>,
+    disable_post_processing: bool,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         request_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
@@ -301,6 +309,16 @@ async fn handle_sql_query(
             *cm = throw_continue_wait;
         }
 
+        if disable_post_processing {
+            session.state.set_variables(vec![DatabaseVariable {
+                name: CUBESQL_PENALIZE_POST_PROCESSING_VAR.to_string(),
+                value: ScalarValue::Boolean(Some(true)),
+                var_type: VarType::UserDefined,
+                readonly: false,
+                additional_params: None,
+            }]);
+        }
+
         let session_clone = Arc::clone(&session);
         let span_id_clone = span_id.clone();
 
@@ -323,6 +341,27 @@ async fn handle_sql_query(
                 span_id_clone,
             )
             .await?;
+
+            if disable_post_processing {
+                // A query needs no post-processing only when its plan root is a single
+                // CubeScan(Wrapped) node — i.e. the whole query maps to one source query.
+                // Anything else means DataFusion processes intermediate rows in-memory, which
+                // are capped at CUBEJS_DB_QUERY_LIMIT (default 50k) and can be silently
+                // truncated, so we fail loudly instead of returning inaccurate results.
+                if let Ok(logical_plan) = query_plan.try_as_logical_plan() {
+                    let is_pure_pushdown = matches!(
+                        logical_plan,
+                        LogicalPlan::Extension(ext)
+                            if ext.node.as_any().is::<CubeScanWrappedSqlNode>()
+                                || ext.node.as_any().is::<CubeScanNode>()
+                    );
+                    if !is_pure_pushdown {
+                        return Err(CubeError::user(
+                            "Provided query cannot be executed without post-processing (disabled to guarantee result accuracy).".to_string(),
+                        ));
+                    }
+                }
+            }
 
             let mut stream = get_df_batches(&query_plan).await?;
 
@@ -562,6 +601,20 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => None,
     };
 
+    let disable_post_processing: bool = match cx.argument::<JsValue>(8) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                false
+            } else {
+                match val.downcast::<JsBoolean, _>(&mut cx) {
+                    Ok(v) => v.value(&mut cx),
+                    Err(_) => false,
+                }
+            }
+        }
+        Err(_) => false,
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -615,6 +668,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             timezone,
             throw_continue_wait,
             request_id,
+            disable_post_processing,
         )
         .await;
 

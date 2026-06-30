@@ -117,6 +117,17 @@ describe('getEnv', () => {
     expect(getEnv('livePreview')).toBe(false);
   });
 
+  test('disablePostProcessing', () => {
+    delete process.env.CUBESQL_DISABLE_POST_PROCESSING;
+    expect(getEnv('disablePostProcessing')).toBe(false); // default off
+
+    process.env.CUBESQL_DISABLE_POST_PROCESSING = 'true';
+    expect(getEnv('disablePostProcessing')).toBe(true);
+
+    process.env.CUBESQL_DISABLE_POST_PROCESSING = 'false';
+    expect(getEnv('disablePostProcessing')).toBe(false);
+  });
+
   test('maxRequestSize', () => {
     delete process.env.CUBEJS_MAX_REQUEST_SIZE;
     expect(getEnv('maxRequestSize')).toBe(50 * 1024 * 1024); // default 50mb

@@ -411,6 +411,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `query` | The SQL query to run | ✅ Yes |
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
+| `disable_post_processing` | If `true`, reject the query instead of running it with [post-processing][ref-query-wpp]. `false` by default | ❌ No |
 
 ### Headers
 
@@ -424,6 +425,13 @@ the `schema` property with column names and types, and optionally
 `lastRefreshTime` indicating when the data was last refreshed.
 The following objects contain chunks of the result set under the `data` property.
 Each chunk includes one or more rows of the result set.
+
+If `disable_post_processing` is `true`, the query runs only if it fully pushes down
+to the data source. Otherwise the response contains an `error` property instead of
+results computed with [post-processing][ref-query-wpp], which are capped by
+[`CUBEJS_DB_QUERY_LIMIT`][ref-env-db-query-limit] and may be truncated. The server-wide
+default is set by the
+[`CUBESQL_DISABLE_POST_PROCESSING`][ref-env-disable-pp] environment variable.
 
 ### Example
 
@@ -1015,6 +1023,8 @@ Keep-Alive: timeout=5
 [ref-folders]: /reference/data-modeling/view#folders
 [ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
 [ref-time-zone]: /reference/core-data-apis/queries#time-zone
+[ref-env-db-query-limit]: /reference/configuration/environment-variables#cubejs_db_query_limit
+[ref-env-disable-pp]: /reference/configuration/environment-variables#cubesql_disable_post_processing
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api
