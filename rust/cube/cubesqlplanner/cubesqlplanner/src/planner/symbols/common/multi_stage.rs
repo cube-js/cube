@@ -63,6 +63,50 @@ pub struct MultiStageGrain {
     pub include: Option<Vec<Rc<MemberSymbol>>>,
 }
 
+impl MultiStageGrain {
+    // A grain entry with an explicit granularity (`created_at.month`) matches
+    // only that granularity; a bare entry matches the dimension at any
+    // granularity. Projected time dimensions carry a granularity suffix in
+    // full_name, so bare entries need both sides unwrapped to their base
+    // symbol — otherwise they silently match nothing, see cube-js/cube#10854.
+    fn member_matches(dim: &Rc<MemberSymbol>, entry: &Rc<MemberSymbol>) -> bool {
+        let entry_has_explicit_granularity = matches!(
+            entry.as_ref(),
+            MemberSymbol::TimeDimension(td) if td.has_granularity()
+        );
+        if entry_has_explicit_granularity {
+            dim.has_member_in_reference_chain(entry)
+        } else {
+            let base = |x: &Rc<MemberSymbol>| match x.as_ref() {
+                MemberSymbol::TimeDimension(td) => td.base_symbol().clone(),
+                _ => x.clone(),
+            };
+            base(dim).has_member_in_reference_chain(&base(entry))
+        }
+    }
+
+    /// Applies the partition-shaping part of the grain to a dimension list:
+    /// `exclude` removes matching dims, then `keep_only` intersects what's
+    /// left. `include` is appended by callers via `add_dimensions`.
+    pub fn partition_dimensions(&self, dims: &[Rc<MemberSymbol>]) -> Vec<Rc<MemberSymbol>> {
+        let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &self.exclude {
+            dims.iter()
+                .filter(|d| !exclude.iter().any(|m| Self::member_matches(d, m)))
+                .cloned()
+                .collect()
+        } else {
+            dims.to_vec()
+        };
+        if let Some(keep_only) = &self.keep_only {
+            dims.into_iter()
+                .filter(|d| keep_only.iter().any(|m| Self::member_matches(d, m)))
+                .collect()
+        } else {
+            dims
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct MultiStageProperties {
     pub grain: MultiStageGrain,

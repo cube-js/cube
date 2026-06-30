@@ -343,3 +343,104 @@ async fn test_reduce_by_with_time() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_time_dim() {
+    let ctx = create_context();
+
+    // Regression test for cube-js/cube#10854: `reduce_by: [<time_dim>]` was
+    // silently ignored because `TimeDimensionSymbol::full_name` carries a
+    // granularity suffix (defaulting to "_day" even with no granularity)
+    // while the reduce_by entry resolves to a base DimensionSymbol without
+    // the suffix — string equality at the comparison site failed and the
+    // time dim stayed in PARTITION BY, collapsing each window to a one-row
+    // partition.
+    //
+    // Expected: `amount_reduce_created_at` (sum reducing by created_at)
+    // returns the per-status grand total across all months, not split per
+    // (status, month). Status totals from seed: completed=1400, pending=650,
+    // cancelled=200. With reduce_by working, every row for a given status
+    // shows the same total regardless of month.
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_reduce_created_at
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.status
+          - id: orders.created_at
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Same bug as test_reduce_by_time_dim, but on the JOIN-model path: a non-sum
+// outer aggregation is not window-eligible, so the grain is applied via
+// partition_filter on the leaf state instead of PARTITION BY. Expected: each
+// status row carries the per-status max across all months.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_time_dim_join_model() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.max_amount_reduce_created_at
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.status
+          - id: orders.created_at
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Bare time-dim exclude spelled via the `grain:` directive, with a non-empty
+// include (which forces the JOIN-model path). Expected: per-status totals
+// independent of month.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_exclude_time_dim_join_model() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_grain_exclude_created_at_include_category
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.status
+          - id: orders.created_at
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
