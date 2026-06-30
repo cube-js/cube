@@ -10,6 +10,7 @@ use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
 use crate::physical_plan::sql_nodes::RenderReferences;
 use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::query_tools::QueryTools;
 use crate::planner::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -170,9 +171,34 @@ impl SqlNodesFactory {
     /// multi-stage wraps → mask). The whole tree is then wrapped in
     /// a top-level `RenderReferencesSqlNode` for query-wide reference
     /// substitution.
-    pub fn default_node_processor(&self) -> Rc<dyn SqlNode> {
-        let evaluate_sql_processor =
-            MaskedSqlNode::new(EvaluateSqlNode::new(), self.group_by_members.clone());
+    pub fn default_node_processor(&self, query_tools: &QueryTools) -> Rc<dyn SqlNode> {
+        // Build an "unmasked" copy of the tree (masking disabled, but still
+        // dispatching by member kind) only when the query has masked members. It
+        // is handed to the masked nodes so they can render mask-filter member
+        // references through it — routing dimensions through the dimension chain
+        // and avoiding mask recursion. For queries with no masked members
+        // `MaskedSqlNode::resolve_mask` short-circuits and never dereferences the
+        // unmasked root, so building it would be pure waste; passing `None` falls
+        // back to the masked node's own input (see masked.rs).
+        let unmasked_root = if query_tools.has_masked_members() {
+            Some(self.build_node_processor(true, None))
+        } else {
+            None
+        };
+        self.build_node_processor(false, unmasked_root)
+    }
+
+    fn build_node_processor(
+        &self,
+        skip_masking: bool,
+        unmasked_root: Option<Rc<dyn SqlNode>>,
+    ) -> Rc<dyn SqlNode> {
+        let evaluate_sql_processor = MaskedSqlNode::new(
+            EvaluateSqlNode::new(),
+            self.group_by_members.clone(),
+            skip_masking,
+            unmasked_root.clone(),
+        );
         let auto_prefix_processor = AutoPrefixSqlNode::new(
             evaluate_sql_processor.clone(),
             self.cube_name_references.clone(),
@@ -188,9 +214,19 @@ impl SqlNodesFactory {
         // Wrap the entire measure chain with MaskedSqlNode so masked measures
         // are intercepted before aggregation/ungrouped wrapping.
         let measure_processor = if self.ungrouped || self.ungrouped_measure {
-            MaskedSqlNode::new_ungrouped(measure_processor, self.group_by_members.clone())
+            MaskedSqlNode::new_ungrouped(
+                measure_processor,
+                self.group_by_members.clone(),
+                skip_masking,
+                unmasked_root.clone(),
+            )
         } else {
-            MaskedSqlNode::new(measure_processor, self.group_by_members.clone())
+            MaskedSqlNode::new(
+                measure_processor,
+                self.group_by_members.clone(),
+                skip_masking,
+                unmasked_root.clone(),
+            )
         };
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());

@@ -31,13 +31,15 @@ fn main() {
         ),
         Err(_) => metrics::Compatibility::StatsD,
     };
+    let metrics_bind_address =
+        std::env::var("CUBESTORE_METRICS_BIND_ADDRESS").unwrap_or("127.0.0.1".to_string());
     let metrics_addr =
         std::env::var("CUBESTORE_METRICS_ADDRESS").unwrap_or("127.0.0.1".to_string());
     let metrics_port = std::env::var("CUBESTORE_METRICS_PORT").unwrap_or("8125".to_string());
     let metrics_server_address = format!("{}:{}", metrics_addr, metrics_port);
 
     init_metrics(
-        "127.0.0.1:0",
+        format!("{}:0", metrics_bind_address),
         metrics_server_address,
         metrics_format,
         vec![],

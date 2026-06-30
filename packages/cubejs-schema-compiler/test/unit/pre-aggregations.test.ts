@@ -3,6 +3,7 @@ import path from 'path';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
+import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
 
 describe('pre-aggregations', () => {
   it('rollupJoin scheduledRefresh', async () => {
@@ -977,6 +978,84 @@ describe('pre-aggregations', () => {
       expect(originalSqlDesc.sql[0]).toMatch(/SELECT \* FROM public\.orders/);
       expect(originalSqlDesc.loadSql[0]).toMatch(/CREATE TABLE/);
       expect(originalSqlDesc.loadSql[0]).toMatch(/SELECT \* FROM public\.orders/);
+    });
+  });
+
+  // Regression for the pre-aggregation refresh/metadata path: it builds a query from a
+  // rolling pre-agg's references (rolling measure + a time dimension with granularity, but
+  // NO date range) just to find the matching pre-aggregation. Matching must succeed without
+  // building the outer query's rolling-window time series — which can't render without a date
+  // range on dialects that lack generated time series (e.g. Redshift). Pure matching, no DB.
+  describe('rolling pre-aggregation matching without a date range', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+      cube(\`visitors\`, {
+        sql: \`SELECT * FROM visitors\`,
+
+        measures: {
+          count: {
+            type: \`count\`,
+          },
+          rollingCount: {
+            type: \`count\`,
+            rollingWindow: {
+              trailing: \`unbounded\`,
+            },
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          source: {
+            sql: \`source\`,
+            type: \`string\`,
+          },
+          createdAt: {
+            sql: \`created_at\`,
+            type: \`time\`,
+          },
+        },
+
+        preAggregations: {
+          partitionedRolling: {
+            type: \`rollup\`,
+            measures: [CUBE.rollingCount],
+            dimensions: [CUBE.source],
+            timeDimension: CUBE.createdAt,
+            granularity: \`hour\`,
+            partitionGranularity: \`month\`,
+          },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    [PostgresQuery, RedshiftQuery].forEach((QueryClass) => {
+      it(`matches the rolling pre-aggregation (${QueryClass.name})`, async () => {
+        const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+          measures: ['visitors.rollingCount'],
+          dimensions: ['visitors.source'],
+          timeDimensions: [{
+            dimension: 'visitors.createdAt',
+            granularity: 'day',
+            // no dateRange — the shape the refresh/metadata path builds
+          }],
+          timezone: 'UTC',
+          preAggregationsSchema: '',
+        });
+
+        // Must not throw while determining the matching pre-aggregation.
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const ids = (preAggregationsDescription || []).map((d: any) => d.preAggregationId);
+        expect(ids).toContain('visitors.partitionedRolling');
+        expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+      });
     });
   });
 });

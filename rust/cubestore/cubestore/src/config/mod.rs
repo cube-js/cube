@@ -585,6 +585,23 @@ pub trait ConfigObj: DIService {
     /// streaming split never drops rows (the first child is the low catch-all, the last
     /// the high one), and the legacy per-chunk path performed no such metadata check.
     fn repartition_check_overlapping_children(&self) -> bool;
+    /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
+    /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
+    /// `k = limit + offset`. `0` disables the optimization.
+    fn group_by_limit_factor(&self) -> usize;
+
+    /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
+    /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
+    /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
+    /// partition ("under merge").
+    fn group_by_limit_per_partition(&self) -> bool;
+
+    /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
+    /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
+    fn coalesce_under_hash_aggregate(&self) -> bool;
+
+    /// Router-side merge strategy for distributed value-ordered top-k.
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
 
     fn allow_decimal128(&self) -> bool;
 
@@ -745,6 +762,10 @@ pub struct ConfigObjImpl {
     pub repartition_merge_max_input_files: usize,
     pub repartition_merge_max_rows: u64,
     pub repartition_check_overlapping_children: bool,
+    pub group_by_limit_factor: usize,
+    pub group_by_limit_per_partition: bool,
+    pub coalesce_under_hash_aggregate: bool,
+    pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -1087,6 +1108,22 @@ impl ConfigObj for ConfigObjImpl {
         self.repartition_check_overlapping_children
     }
 
+    fn group_by_limit_factor(&self) -> usize {
+        self.group_by_limit_factor
+    }
+
+    fn group_by_limit_per_partition(&self) -> bool {
+        self.group_by_limit_per_partition
+    }
+
+    fn coalesce_under_hash_aggregate(&self) -> bool {
+        self.coalesce_under_hash_aggregate
+    }
+
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy {
+        self.topk_aggregate_strategy
+    }
+
     fn allow_decimal128(&self) -> bool {
         self.allow_decimal128
     }
@@ -1262,6 +1299,43 @@ pub async fn init_test_logger() {
     }
 }
 
+/// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
+/// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopKAggregateStrategy {
+    /// Original streaming NRA merge with per-row state (default).
+    Streaming,
+    /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
+    VectorizedStreaming,
+    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
+    /// termination, so the router materializes every distinct group.
+    FullMerge,
+}
+
+/// Parses [`TopKAggregateStrategy`] from an env var. Lenient: an unset or unrecognized value falls
+/// back to the default (`Streaming`) with a warning rather than panicking -- a malformed perf toggle
+/// must never take a node down.
+fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
+    match env::var(name) {
+        Err(_) => TopKAggregateStrategy::Streaming,
+        Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
+            "" | "streaming" | "default" | "v1" => TopKAggregateStrategy::Streaming,
+            "vectorized" | "vectorized_streaming" | "v2" => {
+                TopKAggregateStrategy::VectorizedStreaming
+            }
+            "full_merge" | "full-merge" | "fullmerge" => TopKAggregateStrategy::FullMerge,
+            other => {
+                log::warn!(
+                    "unknown {} value '{}', using default (streaming)",
+                    name,
+                    other
+                );
+                TopKAggregateStrategy::Streaming
+            }
+        },
+    }
+}
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
@@ -1273,12 +1347,43 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+/// Lenient boolean env read for opt-in toggles: only `1`/`true` enable it, anything else (including a
+/// typo) is treated as off. Unlike [`env_bool`] it never panics -- a malformed value on a
+/// performance flag must not take a node down on startup.
+fn env_flag(name: &str) -> bool {
+    env::var(name).map_or(false, |v| v == "true" || v == "1")
+}
+
 pub fn env_parse<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
 {
     env_optparse(name).unwrap_or(default)
+}
+
+/// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
+/// falls back to the default instead of panicking, so a typo can't take a node down on startup.
+pub fn env_parse_lenient<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    match env::var(name) {
+        Ok(v) => match v.parse::<T>() {
+            Ok(n) => n,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring environment variable '{}' with '{}' value: {}; using default",
+                    name,
+                    v,
+                    e
+                );
+                default
+            }
+        },
+        Err(_) => default,
+    }
 }
 
 pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
@@ -1783,6 +1888,10 @@ impl Config {
                     "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
                     false,
                 ),
+                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
+                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
+                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
+                topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -2039,6 +2148,10 @@ impl Config {
                 repartition_merge_max_input_files: 50,
                 repartition_merge_max_rows: 4_000_000,
                 repartition_check_overlapping_children: false,
+                group_by_limit_factor: 2,
+                group_by_limit_per_partition: false,
+                coalesce_under_hash_aggregate: false,
+                topk_aggregate_strategy: TopKAggregateStrategy::Streaming,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -2734,10 +2847,6 @@ impl Config {
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
-                let push_partial_aggregate_below_merge = i
-                    .get_service_typed::<dyn ConfigObj>()
-                    .await
-                    .push_partial_aggregate_below_merge_enabled();
                 QueryExecutorImpl::new(
                     i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
                         .await
@@ -2745,7 +2854,7 @@ impl Config {
                         .clone(),
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    push_partial_aggregate_below_merge,
+                    i.get_service_typed::<dyn ConfigObj>().await,
                 )
             })
             .await;

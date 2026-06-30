@@ -3311,6 +3311,123 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn topk_full_merge() -> Result<(), CubeError> {
+        // The full-merge strategy replaces the streaming top-k node with a router-side
+        // re-aggregation + fetch-limited sort. Exercise it end-to-end (UNION -> multi-partition
+        // ClusterSend, which is what required the explicit CoalescePartitions fan-in) and check it
+        // returns the same top-k as the default streaming merge across Sum/Min/Max, both directions,
+        // and HAVING.
+        Config::test("topk_full_merge")
+            .update_config(|mut c| {
+                c.topk_aggregate_strategy = crate::config::TopKAggregateStrategy::FullMerge;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                fn url_hits(df: &crate::store::DataFrame) -> Vec<(String, i64)> {
+                    df.get_rows()
+                        .iter()
+                        .map(|r| {
+                            let url = match &r.values()[0] {
+                                TableValue::String(s) => s.clone(),
+                                v => panic!("unexpected url value: {:?}", v),
+                            };
+                            let hits = match &r.values()[1] {
+                                TableValue::Int(i) => *i,
+                                v => panic!("unexpected hits value: {:?}", v),
+                            };
+                            (url, hits)
+                        })
+                        .collect()
+                }
+
+                service.exec_query("CREATE SCHEMA s").await?.collect().await?;
+                service
+                    .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let union = "(SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) AS Data";
+
+                // SUM, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 52)]
+                );
+
+                // SUM, ascending.
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 ASC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("a".to_string(), 1), ("e".to_string(), 40), ("d".to_string(), 44)]
+                );
+
+                // MIN, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, MIN(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("e".to_string(), 5)]
+                );
+
+                // MAX, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, MAX(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 50)]
+                );
+
+                // HAVING (exercises the router-side FilterExec above the re-aggregate).
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 HAVING SUM(hits) > 50 ORDER BY 2 DESC LIMIT 5"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 52)]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn over_10k_join() -> Result<(), CubeError> {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
@@ -6487,7 +6604,9 @@ mod tests {
                                     }
                                 }
 
-                                // Test 4: ORDER BY 1 DESC with LIMIT on non-prefix column
+                                // Test 4: ORDER BY DESC + LIMIT on a non-prefix column, grouped by a
+                                // non-prefix column (hash aggregate). The hash path bounds the worker
+                                // output with the trimming aggregate, not a Sort.
                                 {
                                     let result = service
                                         .exec_query(
@@ -6503,9 +6622,14 @@ mod tests {
                                         TableValue::String(s) => s.clone(),
                                         _ => panic!("expected string"),
                                     };
+                                    // Pin that the trim is actually configured to bound (fetch k=2,
+                                    // factor>0), not merely that the node is present -- a factor of 0
+                                    // would leave it a passthrough and reintroduce the memory pressure
+                                    // this path exists to avoid.
                                     assert!(
-                                        worker_plan.contains("Sort, fetch: 2"),
-                                        "Worker should have Sort with fetch=2 for DESC. Plan: {}",
+                                        worker_plan.contains("GroupByLimitAggregate, k: 2, factor: 2"),
+                                        "Hash-aggregate worker should bound output with a configured \
+                                         GroupByLimitAggregate (k=2, factor=2). Plan: {}",
                                         worker_plan
                                     );
                                 }

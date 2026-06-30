@@ -42,7 +42,8 @@ use crate::metastore::multi_index::{
 };
 use crate::metastore::partition::PartitionIndexKey;
 use crate::metastore::replay_handle::{
-    ReplayHandle, ReplayHandleIndexKey, ReplayHandleRocksIndex, ReplayHandleRocksTable, SeqPointer,
+    validate_seq_pointers_by_location, ReplayHandle, ReplayHandleIndexKey, ReplayHandleRocksIndex,
+    ReplayHandleRocksTable, SeqPointer,
 };
 use crate::metastore::source::{
     Source, SourceCredentials, SourceIndexKey, SourceRocksIndex, SourceRocksTable,
@@ -4616,6 +4617,8 @@ impl MetaStore for RocksMetaStore {
         self.write_operation(
             "create_replay_handle_from_seq_pointers",
             move |db_ref, batch_pipe| {
+                let table = TableRocksTable::new(db_ref.clone()).get_row_or_not_found(table_id)?;
+                validate_seq_pointers_by_location(&table, &seq_pointers)?;
                 let handle = ReplayHandle::new_from_seq_pointers(table_id, seq_pointers);
                 Ok(ReplayHandleRocksTable::new(db_ref.clone()).insert(handle, batch_pipe)?)
             },
@@ -4691,7 +4694,7 @@ impl MetaStore for RocksMetaStore {
                 return Err(CubeError::internal("Can't merge empty replay handles list".to_string()));
             }
             let table = ReplayHandleRocksTable::new(db_ref.clone());
-            let chunks_table = ChunkRocksTable::new(db_ref);
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
             let mut replay_handles: Vec<IdRow<ReplayHandle>> = Vec::new();
             for id in old_ids.into_iter() {
                 let replay_handle = table.get_row_or_not_found(id)?;
@@ -4723,7 +4726,11 @@ impl MetaStore for RocksMetaStore {
                 replay_handles.push(replay_handle);
             }
             let new_handle = if let Some(_) = new_seq_pointer {
-                let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
+                let table_id = replay_handles[0].get_row().table_id();
+                let tables_table = TableRocksTable::new(db_ref.clone());
+                let tables_row = tables_table.get_row_or_not_found(table_id)?;
+                validate_seq_pointers_by_location(&tables_row, &new_seq_pointer)?;
+                let new_replay_handle = ReplayHandle::new_from_seq_pointers(table_id, new_seq_pointer);
                 Some(table.insert(new_replay_handle, batch_pipe)?)
 
             } else {
@@ -7855,6 +7862,81 @@ mod tests {
                 .await?
                 .is_some());
         }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn replay_handle_location_length_guard_test() -> Result<(), CubeError> {
+        let config = Config::test("replay_handle_location_length_guard_test");
+        let store_path = env::current_dir()?.join("rh-guard-local");
+        let remote_store_path = env::current_dir()?.join("rh-guard-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        let meta_store = RocksMetaStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+            config.config_obj(),
+        )?;
+
+        meta_store.create_schema("foo".to_string(), false).await?;
+        let mut columns = Vec::new();
+        columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
+
+        let locations = vec![
+            "stream://k/T/0".to_string(),
+            "stream://k/T/1".to_string(),
+            "stream://k/T/2".to_string(),
+        ];
+        let table = meta_store
+            .create_table(
+                "foo".to_string(),
+                "boo".to_string(),
+                columns.clone(),
+                Some(locations),
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await?;
+
+        let mismatching = Some(vec![Some(SeqPointer::new(Some(0), Some(1))); 6]);
+        assert!(meta_store
+            .create_replay_handle_from_seq_pointers(table.get_id(), mismatching)
+            .await
+            .is_err());
+        assert!(meta_store
+            .get_replay_handles_by_table(table.get_id())
+            .await?
+            .is_empty());
+
+        let matching = Some(vec![Some(SeqPointer::new(Some(0), Some(1))); 3]);
+        meta_store
+            .create_replay_handle_from_seq_pointers(table.get_id(), matching)
+            .await?;
+        assert_eq!(
+            meta_store
+                .get_replay_handles_by_table(table.get_id())
+                .await?
+                .len(),
+            1
+        );
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
