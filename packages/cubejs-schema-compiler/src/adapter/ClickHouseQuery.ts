@@ -273,6 +273,10 @@ export class ClickHouseQuery extends BaseQuery {
     templates.quotes.escape = '\\`';
     templates.types.boolean = 'BOOL';
     templates.types.timestamp = 'DATETIME';
+    // ClickHouse's string type is `String` (case-sensitive); the base `STRING` is invalid.
+    // The legacy planner avoids this via castToString(), but Tesseract renders the types.string
+    // template directly, so it must be overridden here. See cube-js/cube#10316.
+    templates.types.string = 'String';
     delete templates.types.time;
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
