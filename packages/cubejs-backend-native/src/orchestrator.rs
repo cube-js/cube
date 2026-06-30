@@ -132,7 +132,11 @@ impl ResultWrapper {
 fn db_primitive_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
     match value {
         DBResponsePrimitive::String(s) => FieldValue::String(Cow::Borrowed(s)),
-        DBResponsePrimitive::Number(n) => FieldValue::Number(*n),
+        DBResponsePrimitive::Int64(n) => FieldValue::Int64(*n),
+        DBResponsePrimitive::UInt64(n) => FieldValue::UInt64(*n),
+        DBResponsePrimitive::Float64(n) => FieldValue::Float64(*n),
+        DBResponsePrimitive::Int128(s) => FieldValue::String(Cow::Borrowed(s)),
+        DBResponsePrimitive::UInt128(s) => FieldValue::String(Cow::Borrowed(s)),
         DBResponsePrimitive::Boolean(b) => FieldValue::Bool(*b),
         DBResponsePrimitive::Uncommon(v) => FieldValue::String(Cow::Owned(
             serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
