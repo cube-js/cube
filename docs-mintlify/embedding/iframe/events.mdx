@@ -3,9 +3,11 @@ title: Events & actions
 description: Listen to user-interaction events from an embedded Cube iframe and send actions back into it, over the browser postMessage API.
 ---
 
-<Info>
-  Iframe embedding is available on [Premium and Enterprise plans](https://cube.dev/pricing).
-</Info>
+<Note>
+
+Available on [Premium and above plans](https://cube.dev/pricing).
+
+</Note>
 
 Embedded Cube surfaces communicate with your host page over the browser
 [`postMessage`](https://developer.mozilla.org/docs/Web/API/Window/postMessage)
@@ -32,7 +34,7 @@ Every message — in either direction — is a single object with the same shape
   type: string,                      // e.g. "cube:event:download" / "cube:action:set-filter"
   payload: object,                   // shape depends on `type` (see catalogs below)
   timestamp: number,                 // epoch milliseconds
-  surface?: "dashboard" | "app" | "chat" // present on every event
+  surface?: "dashboard" | "app" | "chat" // always on events; never on actions
 }
 ```
 
@@ -43,7 +45,7 @@ Every message — in either direction — is a single object with the same shape
 | `type` | The event or action name (see the catalogs below). |
 | `payload` | Event/action-specific data. |
 | `timestamp` | When the message was created, in epoch milliseconds. |
-| `surface` | Which embedded surface the event relates to. Present on every event. |
+| `surface` | Which embedded surface the message relates to. **Always present on events**; never sent on actions — so event listeners never need to handle a missing `surface`. |
 
 ## Listening to events
 
@@ -310,7 +312,7 @@ sendAction("cube:action:refresh");
 | Action | Effect | Payload |
 | --- | --- | --- |
 | [`cube:action:set-color-scheme`](#cube-action-set-color-scheme) | Switch light / dark / auto | `{ scheme }` |
-| [`cube:action:set-theme`](#cube-action-set-theme) | Apply a brand theme (colors, fonts) | `EmbedTheme` object |
+| [`cube:action:set-theme`](#cube-action-set-theme) | Apply a brand theme (colors, fonts) | `embedTheme` object |
 | [`cube:action:set-locale`](#cube-action-set-locale) | Switch the UI language | `{ locale }` |
 | [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard | `{ filterUrlParameter }` |
 | [`cube:action:navigate`](#cube-action-navigate) | Navigate the embed to a path | `{ path }` |
@@ -331,7 +333,10 @@ sendAction("cube:action:set-color-scheme", { scheme: "dark" });
 #### `cube:action:set-theme`
 
 Apply a brand theme (colors, fonts) to the embed at runtime. The payload is an
-[`embedTheme`](/embedding/iframe/customization#app-customization) object.
+`embedTheme` object — the same shape the [Generate Session API](/reference/embed-apis/generate-session)
+accepts. Common fields are `primaryColor`, `borderRadius`, and `font`; see
+[App customization](/embedding/iframe/customization#app-customization) for the
+full list.
 
 ```js
 sendAction("cube:action:set-theme", {
