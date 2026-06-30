@@ -967,8 +967,7 @@ export class BaseQuery {
     };
 
     try {
-      // Establish the current query context (as the legacy planner does via withQuery)
-      // so JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
+      // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
       // during the member-SQL callbacks the native planner makes back into JS.
       const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
 
@@ -4040,9 +4039,6 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    // Pre-aggregation partition ranges are computed eagerly by the native
-    // planner during matching; default to UTC when the query has no timezone
-    // so an unset timezone doesn't throw "Unknown timezone: undefined".
     return localTimestampToUtc(this.timezone || 'UTC', this.timestampFormat(), date);
   }
 
