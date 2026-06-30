@@ -6,7 +6,6 @@ use crate::cube_bridge::measure_definition::MeasureDefinition;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::cube_bridge::segment_definition::SegmentDefinition;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::mock_schema::MockSchema;
 use crate::test_fixtures::cube_bridge::{mock_compiled, MockJoinGraph};
 use cubenativeutils::CubeError;

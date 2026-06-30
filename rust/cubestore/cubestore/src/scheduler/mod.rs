@@ -6,7 +6,7 @@ use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::ReplayHandle;
 use crate::metastore::replay_handle::{
     subtract_from_right_seq_pointer_by_location, subtract_if_covers_seq_pointer_by_location,
-    union_seq_pointer_by_location, SeqPointerForLocation,
+    union_seq_pointer_by_location, SeqPointer, SeqPointerForLocation,
 };
 use crate::metastore::table::Table;
 use crate::metastore::{
@@ -512,67 +512,85 @@ impl SchedulerImpl {
             .into_iter()
             .chunk_by(|(h, _)| h.get_row().table_id())
         {
-            let mut seq_pointer_by_location = None;
-            let mut ids = Vec::new();
             let handles = handles.collect::<Vec<_>>();
-            for (handle, _) in handles
-                .iter()
-                .filter(|(handle, no_active_chunks)| !is_newest_handle(handle) && *no_active_chunks)
-            {
-                union_seq_pointer_by_location(
-                    &mut seq_pointer_by_location,
-                    handle.get_row().seq_pointers_by_location(),
-                )?;
-                ids.push(handle.get_id());
-            }
             let empty_vec = Vec::new();
             let failed = table_to_failed.get(&table_id).unwrap_or(&empty_vec);
 
-            for (failed_handle, no_active_chunks) in failed.iter() {
-                let mut failed_seq_pointers =
-                    failed_handle.get_row().seq_pointers_by_location().clone();
-                let mut replay_after_failed_union = None;
-                let replay_after_failed = handles
-                    .iter()
-                    .filter(|(h, _)| {
-                        h.get_id() > failed_handle.get_id()
-                            && !h.get_row().has_failed_to_persist_chunks()
-                    })
-                    .collect::<Vec<_>>();
-                for (replay, _) in replay_after_failed.iter() {
-                    union_seq_pointer_by_location(
-                        &mut replay_after_failed_union,
-                        replay.get_row().seq_pointers_by_location(),
-                    )?;
-                }
-                subtract_if_covers_seq_pointer_by_location(
-                    &mut failed_seq_pointers,
-                    &replay_after_failed_union,
-                )?;
-                let empty_seq_pointers = failed_seq_pointers
-                    .map(|p| {
-                        p.iter()
-                            .all(|p| p.as_ref().map(|p| p.is_empty()).unwrap_or(true))
-                    })
-                    .unwrap_or(true);
-                if empty_seq_pointers && *no_active_chunks {
-                    ids.push(failed_handle.get_id());
-                } else if !empty_seq_pointers {
-                    subtract_from_right_seq_pointer_by_location(
-                        &mut seq_pointer_by_location,
-                        failed_handle.get_row().seq_pointers_by_location(),
-                    )?;
+            // Isolate per-table merge: a corrupt handle (e.g. seq pointer / location
+            // length mismatch) must not abort merging of the remaining tables.
+            let table_merge =
+                (|| -> Result<(Vec<u64>, Option<Vec<Option<SeqPointer>>>), CubeError> {
+                    let mut seq_pointer_by_location = None;
+                    let mut ids = Vec::new();
+                    for (handle, _) in handles.iter().filter(|(handle, no_active_chunks)| {
+                        !is_newest_handle(handle) && *no_active_chunks
+                    }) {
+                        union_seq_pointer_by_location(
+                            &mut seq_pointer_by_location,
+                            handle.get_row().seq_pointers_by_location(),
+                        )?;
+                        ids.push(handle.get_id());
+                    }
+
+                    for (failed_handle, no_active_chunks) in failed.iter() {
+                        let mut failed_seq_pointers =
+                            failed_handle.get_row().seq_pointers_by_location().clone();
+                        let mut replay_after_failed_union = None;
+                        let replay_after_failed = handles
+                            .iter()
+                            .filter(|(h, _)| {
+                                h.get_id() > failed_handle.get_id()
+                                    && !h.get_row().has_failed_to_persist_chunks()
+                            })
+                            .collect::<Vec<_>>();
+                        for (replay, _) in replay_after_failed.iter() {
+                            union_seq_pointer_by_location(
+                                &mut replay_after_failed_union,
+                                replay.get_row().seq_pointers_by_location(),
+                            )?;
+                        }
+                        subtract_if_covers_seq_pointer_by_location(
+                            &mut failed_seq_pointers,
+                            &replay_after_failed_union,
+                        )?;
+                        let empty_seq_pointers = failed_seq_pointers
+                            .map(|p| {
+                                p.iter()
+                                    .all(|p| p.as_ref().map(|p| p.is_empty()).unwrap_or(true))
+                            })
+                            .unwrap_or(true);
+                        if empty_seq_pointers && *no_active_chunks {
+                            ids.push(failed_handle.get_id());
+                        } else if !empty_seq_pointers {
+                            subtract_from_right_seq_pointer_by_location(
+                                &mut seq_pointer_by_location,
+                                failed_handle.get_row().seq_pointers_by_location(),
+                            )?;
+                        }
+                    }
+
+                    Ok((ids, seq_pointer_by_location))
+                })();
+
+            match table_merge {
+                Ok(merge) => to_merge.push(merge),
+                Err(e) => {
+                    error!("Skipping replay handle merge for table {}: {}", table_id, e);
+                    continue;
                 }
             }
-
-            to_merge.push((ids, seq_pointer_by_location));
         }
 
         for (ids, seq_pointer_by_location) in to_merge.into_iter() {
             if !ids.is_empty() {
-                self.meta_store
+                if let Err(e) = self
+                    .meta_store
                     .replace_replay_handles(ids, seq_pointer_by_location)
-                    .await?;
+                    .await
+                {
+                    error!("Skipping replay handle merge: {}", e);
+                    continue;
+                }
             }
         }
 

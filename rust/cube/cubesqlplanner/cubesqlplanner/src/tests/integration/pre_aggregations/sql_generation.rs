@@ -15,37 +15,39 @@ use indoc::indoc;
 use std::rc::Rc;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_basic_pre_agg_sql() {
+async fn test_basic_pre_agg_sql() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml");
-    let test_context = TestContext::new(schema).unwrap();
+    let test_context = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
           - visitors.count
         dimensions:
           - visitors.source
+        order:
+          - id: visitors.source
     "};
 
-    let (_sql, pre_aggrs) = test_context
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .expect("Should generate SQL without pre-aggregations");
+    let (_sql, pre_aggrs) = test_context.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1, "Should use one pre-aggregation");
     assert_eq!(pre_aggrs[0].name(), "daily_rollup");
 
     if let Some(result) = test_context
-        .try_execute_pg(query_yaml, "pre_aggregation_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_tables.sql")
         .await
     {
-        insta::assert_snapshot!("basic_pre_agg_sql_pg_result", result);
+        insta::assert_snapshot!("basic_pre_agg_sql_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_full_match_main_rollup() {
+async fn test_full_match_main_rollup() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["main_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -54,56 +56,61 @@ async fn test_full_match_main_rollup() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("full_match_main_rollup_pg_result", result);
+        insta::assert_snapshot!("full_match_main_rollup_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_partial_match_main_rollup() {
+async fn test_partial_match_main_rollup() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["main_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
           - orders.count
         dimensions:
           - orders.status
+        order:
+          - id: orders.status
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("partial_match_main_rollup_pg_result", result);
+        insta::assert_snapshot!("partial_match_main_rollup_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_full_match_non_additive_measure() {
+async fn test_full_match_non_additive_measure() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["main_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -111,46 +118,49 @@ async fn test_full_match_non_additive_measure() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("full_match_non_additive_measure_pg_result", result);
+        insta::assert_snapshot!("full_match_non_additive_measure_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_no_match_non_additive_measure_partial() {
+fn test_no_match_non_additive_measure_partial() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["main_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.avg_amount
             dimensions:
               - orders.status
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_daily_rollup_full_match() {
+async fn test_daily_rollup_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["daily_countries_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -160,28 +170,31 @@ async fn test_daily_rollup_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.country
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("daily_rollup_full_match_pg_result", result);
+        insta::assert_snapshot!("daily_rollup_full_match_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_daily_rollup_coarser_granularity() {
+async fn test_daily_rollup_coarser_granularity() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["daily_countries_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -191,31 +204,33 @@ async fn test_daily_rollup_coarser_granularity() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: month
+        order:
+          - id: orders.country
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("daily_rollup_coarser_granularity_pg_result", result);
+        insta::assert_snapshot!("daily_rollup_coarser_granularity_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_daily_rollup_finer_granularity_no_match() {
+fn test_daily_rollup_finer_granularity_no_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["daily_countries_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.count
             dimensions:
@@ -223,17 +238,18 @@ fn test_daily_rollup_finer_granularity_no_match() {
             time_dimensions:
               - dimension: orders.created_at
                 granularity: hour
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_daily_rollup_non_additive_full_match() {
+async fn test_daily_rollup_non_additive_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["daily_countries_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -243,31 +259,36 @@ async fn test_daily_rollup_non_additive_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.country
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("daily_rollup_non_additive_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "daily_rollup_non_additive_full_match_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_daily_rollup_non_additive_coarser_granularity_no_match() {
+fn test_daily_rollup_non_additive_coarser_granularity_no_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["daily_countries_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.avg_amount
             dimensions:
@@ -275,19 +296,20 @@ fn test_daily_rollup_non_additive_coarser_granularity_no_match() {
             time_dimensions:
               - dimension: orders.created_at
                 granularity: month
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 // --- multi_level_measure across different pre-aggregations ---
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_level_all_base_measures_full_match() {
+async fn test_multi_level_all_base_measures_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["all_base_measures_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -295,77 +317,85 @@ async fn test_multi_level_all_base_measures_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_level_all_base_measures_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_level_all_base_measures_full_match_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_level_all_base_measures_partial_match() {
+async fn test_multi_level_all_base_measures_partial_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["all_base_measures_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
           - orders.multi_level_measure
         dimensions:
           - orders.status
+        order:
+          - id: orders.status
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "all_base_measures_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "multi_level_all_base_measures_partial_match_pg_result",
+            "multi_level_all_base_measures_partial_match_cubestore_result",
             result
         );
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_multi_level_calculated_measure_no_match() {
+fn test_multi_level_calculated_measure_no_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["calculated_measure_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.multi_level_measure
             dimensions:
               - orders.status
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_level_calculated_measure_full_match() {
+async fn test_multi_level_calculated_measure_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["calculated_measure_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -373,31 +403,34 @@ async fn test_multi_level_calculated_measure_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "calculated_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "multi_level_calculated_measure_full_match_pg_result",
+            "multi_level_calculated_measure_full_match_cubestore_result",
             result
         );
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_level_mixed_measure_full_match() {
+async fn test_multi_level_mixed_measure_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["mixed_measure_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -405,46 +438,52 @@ async fn test_multi_level_mixed_measure_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "mixed_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_level_mixed_measure_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_level_mixed_measure_full_match_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_multi_level_mixed_measure_partial_no_match() {
+fn test_multi_level_mixed_measure_partial_no_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["mixed_measure_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.multi_level_measure
             dimensions:
               - orders.status
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_base_and_calculated_measure_full_match() {
+async fn test_base_and_calculated_measure_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["base_and_calculated_measure_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -452,52 +491,60 @@ async fn test_base_and_calculated_measure_full_match() {
         dimensions:
           - orders.status
           - orders.city
+        order:
+          - id: orders.status
+          - id: orders.city
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("base_and_calculated_measure_full_match_pg_result", result);
+        insta::assert_snapshot!(
+            "base_and_calculated_measure_full_match_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_base_and_calculated_measure_parital_match() {
+async fn test_base_and_calculated_measure_parital_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["base_and_calculated_measure_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
           - orders.amount_per_count
         dimensions:
           - orders.status
+        order:
+          - id: orders.status
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "base_and_calculated_measure_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "base_and_calculated_measure_parital_match_pg_result",
+            "base_and_calculated_measure_parital_match_cubestore_result",
             result
         );
     }
+
+    Ok(())
 }
 
 // --- Segment matching tests ---
@@ -508,10 +555,10 @@ async fn test_base_and_calculated_measure_parital_match() {
 // references no members (empty dependencies), so it's a constant filter on top
 // of the rollup and must not disqualify pre-aggregation matching.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_constant_member_expression_segment_keeps_pre_aggregation() {
+async fn test_constant_member_expression_segment_keeps_pre_aggregation() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["main_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -521,7 +568,7 @@ async fn test_constant_member_expression_segment_keeps_pre_aggregation() {
     "};
 
     let access_denied_segment = {
-        let sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new("1 = 0").unwrap());
+        let sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new("1 = 0")?);
         let expr = MockMemberExpressionDefinition::builder()
             .expression_name(Some("rlsAccessDenied".to_string()))
             .cube_name(Some("orders".to_string()))
@@ -530,9 +577,10 @@ async fn test_constant_member_expression_segment_keeps_pre_aggregation() {
         OptionsMember::MemberExpression(Rc::new(expr))
     };
 
-    let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations_with_segments(query_yaml, vec![access_denied_segment])
-        .unwrap();
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations_with_segments(
+        query_yaml,
+        vec![access_denied_segment],
+    )?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_rollup");
@@ -540,13 +588,15 @@ async fn test_constant_member_expression_segment_keeps_pre_aggregation() {
         sql.contains("1 = 0"),
         "expected the constant access-denied segment in SQL, got:\n{sql}"
     );
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_segment_full_match() {
+async fn test_segment_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["segment_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -558,28 +608,31 @@ async fn test_segment_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("segment_full_match_pg_result", result);
+        insta::assert_snapshot!("segment_full_match_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_segment_partial_match_unused_segment() {
+async fn test_segment_partial_match_unused_segment() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["segment_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -589,31 +642,36 @@ async fn test_segment_partial_match_unused_segment() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: day
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("segment_partial_match_unused_segment_pg_result", result);
+        insta::assert_snapshot!(
+            "segment_partial_match_unused_segment_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_segment_no_match_missing_in_pre_agg() {
+fn test_segment_no_match_missing_in_pre_agg() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["main_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.count
             dimensions:
@@ -621,19 +679,20 @@ fn test_segment_no_match_missing_in_pre_agg() {
               - orders.city
             segments:
               - orders.high_priority
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 // --- Custom granularity pre-aggregation tests ---
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_custom_granularity_full_match() {
+async fn test_custom_granularity_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -643,28 +702,31 @@ async fn test_custom_granularity_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("custom_granularity_full_match_pg_result", result);
+        insta::assert_snapshot!("custom_granularity_full_match_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_standard_pre_agg_coarser_custom_query() {
+async fn test_standard_pre_agg_coarser_custom_query() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["daily_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -674,31 +736,36 @@ async fn test_standard_pre_agg_coarser_custom_query() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "daily_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("standard_pre_agg_coarser_custom_query_pg_result", result);
+        insta::assert_snapshot!(
+            "standard_pre_agg_coarser_custom_query_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_custom_pre_agg_finer_query_no_match() {
+fn test_custom_pre_agg_finer_query_no_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.count
             dimensions:
@@ -706,20 +773,20 @@ fn test_custom_pre_agg_finer_query_no_match() {
             time_dimensions:
               - dimension: orders.created_at
                 granularity: day
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 #[test]
-fn test_custom_pre_agg_finer_standard_query_no_match() {
+fn test_custom_pre_agg_finer_standard_query_no_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.count
             dimensions:
@@ -727,17 +794,18 @@ fn test_custom_pre_agg_finer_standard_query_no_match() {
             time_dimensions:
               - dimension: orders.created_at
                 granularity: month
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_custom_granularity_non_additive_full_match() {
+async fn test_custom_granularity_non_additive_full_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -747,34 +815,36 @@ async fn test_custom_granularity_non_additive_full_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "custom_granularity_non_additive_full_match_pg_result",
+            "custom_granularity_non_additive_full_match_cubestore_result",
             result
         );
     }
+
+    Ok(())
 }
 
 #[test]
-fn test_custom_granularity_non_additive_coarser_no_match() {
+fn test_custom_granularity_non_additive_coarser_no_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["daily_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - orders.avg_amount
             dimensions:
@@ -782,17 +852,18 @@ fn test_custom_granularity_non_additive_coarser_no_match() {
             time_dimensions:
               - dimension: orders.created_at
                 granularity: half_year
-        "})
-        .unwrap();
+        "})?;
 
     assert!(pre_aggrs.is_empty());
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_custom_granularity_non_strict_self_match() {
+async fn test_custom_granularity_non_strict_self_match() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/custom_granularity_test.yaml")
         .only_pre_aggregations(&["custom_half_year_non_strict"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -800,28 +871,33 @@ async fn test_custom_granularity_non_strict_self_match() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: half_year
+        order:
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "custom_half_year_non_strict");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("custom_granularity_non_strict_self_match_pg_result", result);
+        insta::assert_snapshot!(
+            "custom_granularity_non_strict_self_match_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_segment_with_coarser_granularity() {
+async fn test_segment_with_coarser_granularity() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["segment_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -833,29 +909,33 @@ async fn test_segment_with_coarser_granularity() {
         time_dimensions:
           - dimension: orders.created_at
             granularity: month
+        order:
+          - id: orders.status
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "segment_rollup");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "pre_aggregation_matching_tables.sql")
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
         .await
     {
-        insta::assert_snapshot!("segment_with_coarser_granularity_pg_result", result);
+        insta::assert_snapshot!("segment_with_coarser_granularity_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 // --- Multi-stage count_distinct sum by quarter with pre-aggregation ---
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_stage_count_distinct_sum_by_quarter_with_pre_aggregation() {
+async fn test_multi_stage_count_distinct_sum_by_quarter_with_pre_aggregation(
+) -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/multi_stage_sum_by_quarter_test.yaml");
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -863,30 +943,30 @@ async fn test_multi_stage_count_distinct_sum_by_quarter_with_pre_aggregation() {
         cubestoreSupportMultistage: true
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main");
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "multi_stage_sum_by_quarter_tables.sql")
+        .try_execute(query_yaml, "multi_stage_sum_by_quarter_tables.sql")
         .await
     {
         insta::assert_snapshot!(
-            "multi_stage_count_distinct_sum_by_quarter_with_pre_agg_pg_result",
+            "multi_stage_count_distinct_sum_by_quarter_with_pre_agg_cubestore_result",
             result
         );
     }
+
+    Ok(())
 }
 
 // --- Multi-stage with separate pre-aggregations ---
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_stage_separate_pre_aggregations() {
+async fn test_multi_stage_separate_pre_aggregations() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/multi_stage_separate_pre_aggs_test.yaml");
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -895,9 +975,7 @@ async fn test_multi_stage_separate_pre_aggregations() {
         cubestoreSupportMultistage: true
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 2, "Expected 2 pre-aggregation usages");
 
@@ -917,19 +995,21 @@ async fn test_multi_stage_separate_pre_aggregations() {
     );
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "multi_stage_separate_pre_aggs_tables.sql")
+        .try_execute(query_yaml, "multi_stage_separate_pre_aggs_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_stage_separate_pre_aggs_pg_result", result);
+        insta::assert_snapshot!("multi_stage_separate_pre_aggs_cubestore_result", result);
     }
+
+    Ok(())
 }
 
 // --- Multi-stage with separate pre-aggregations and time shift ---
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
+async fn test_multi_stage_separate_pre_aggs_with_time_shift() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/multi_stage_pre_agg_time_shift_test.yaml");
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -942,11 +1022,11 @@ async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
               - \"2025-01-01\"
               - \"2025-03-31\"
         cubestoreSupportMultistage: true
+        order:
+          - id: orders.created_at
     "};
 
-    let (_sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 2, "Expected 2 pre-aggregation usages");
 
@@ -981,29 +1061,32 @@ async fn test_multi_stage_separate_pre_aggs_with_time_shift() {
     );
 
     if let Some(result) = ctx
-        .try_execute_pg(query_yaml, "multi_stage_pre_agg_time_shift_tables.sql")
+        .try_execute(query_yaml, "multi_stage_pre_agg_time_shift_tables.sql")
         .await
     {
-        insta::assert_snapshot!("multi_stage_separate_pre_aggs_time_shift_pg_result", result);
+        insta::assert_snapshot!(
+            "multi_stage_separate_pre_aggs_time_shift_cubestore_result",
+            result
+        );
     }
+
+    Ok(())
 }
 
 // --- rollupJoin with calculated measures through view ---
 
 #[test]
-fn test_rollup_join_calculated_measures_through_view() {
+fn test_rollup_join_calculated_measures_through_view() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/rollup_join_calculated_measures.yaml");
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
-    let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(indoc! {"
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
             measures:
               - my_view.facts_avg_cost
             time_dimensions:
               - dimension: my_view.facts_day
                 granularity: day
-        "})
-        .unwrap();
+        "})?;
 
     let pre_agg_names: Vec<_> = pre_aggrs
         .iter()
@@ -1032,6 +1115,8 @@ fn test_rollup_join_calculated_measures_through_view() {
         "SQL should reference li_rollup, got:\n{}",
         sql
     );
+
+    Ok(())
 }
 
 // A rolling-window count_distinct_approx whose pre-aggregation stores the
@@ -1040,11 +1125,10 @@ fn test_rollup_join_calculated_measures_through_view() {
 // across the window and finalize to a cardinality. This pins the state
 // branch — the read must NOT collapse the state to a cardinality too early.
 #[test]
-fn test_count_distinct_approx_rolling_pre_agg_keeps_state() {
+fn test_count_distinct_approx_rolling_pre_agg_keeps_state() -> Result<(), CubeError> {
     let ctx = TestContext::new(MockSchema::from_yaml_file(
         "common/integration_rolling_window.yaml",
-    ))
-    .unwrap();
+    ))?;
 
     let query = indoc! {r#"
         measures:
@@ -1060,7 +1144,7 @@ fn test_count_distinct_approx_rolling_pre_agg_keeps_state() {
         cubestoreSupportMultistage: true
     "#};
 
-    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "approx_rolling");
@@ -1077,6 +1161,8 @@ fn test_count_distinct_approx_rolling_pre_agg_keeps_state() {
         "Rolling window should finalize merged states to a cardinality, got:\n{}",
         sql
     );
+
+    Ok(())
 }
 
 // --- HLL count_distinct_approx through a pre-aggregation ---
@@ -1094,10 +1180,10 @@ fn test_count_distinct_approx_rolling_pre_agg_keeps_state() {
 //   count_distinct_approx  -> round(hll_cardinality(hll_add_agg(hll_hash_any(x))))
 
 #[test]
-fn test_count_distinct_approx_pre_agg_read_merges_state() {
+fn test_count_distinct_approx_pre_agg_read_merges_state() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["approx_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -1107,9 +1193,7 @@ fn test_count_distinct_approx_pre_agg_read_merges_state() {
           - orders.city
     "};
 
-    let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "approx_rollup");
@@ -1127,13 +1211,15 @@ fn test_count_distinct_approx_pre_agg_read_merges_state() {
         "Read query should not re-init HLL from the state column, got:\n{}",
         sql
     );
+
+    Ok(())
 }
 
 #[test]
-fn test_count_distinct_approx_pre_agg_build_emits_state() {
+fn test_count_distinct_approx_pre_agg_build_emits_state() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
         .only_pre_aggregations(&["approx_rollup"]);
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     // pre_aggregation_query: true renders the rollup build (load) SQL.
     let query_yaml = indoc! {"
@@ -1145,7 +1231,7 @@ fn test_count_distinct_approx_pre_agg_build_emits_state() {
         pre_aggregation_query: true
     "};
 
-    let sql = ctx.build_sql(query_yaml).unwrap();
+    let sql = ctx.build_sql(query_yaml)?;
 
     // The build must serialize the HLL state (hll_init) without merging
     // or taking its cardinality — that happens only on read.
@@ -1164,6 +1250,8 @@ fn test_count_distinct_approx_pre_agg_build_emits_state() {
         "Build SQL should not merge states, got:\n{}",
         sql
     );
+
+    Ok(())
 }
 
 // A multi-stage measure that sums a count_distinct_approx must read the
@@ -1171,9 +1259,9 @@ fn test_count_distinct_approx_pre_agg_build_emits_state() {
 // pre-aggregation — the outer `sum` aggregates counts, not raw HLL states.
 // This pins that the pre-agg read does not leak a bare merged state here.
 #[test]
-fn test_count_distinct_approx_multistage_pre_agg_reads_cardinality() {
+fn test_count_distinct_approx_multistage_pre_agg_reads_cardinality() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/multi_stage_sum_by_quarter_test.yaml");
-    let ctx = TestContext::new(schema).unwrap();
+    let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
@@ -1181,9 +1269,7 @@ fn test_count_distinct_approx_multistage_pre_agg_reads_cardinality() {
         cubestoreSupportMultistage: true
     "};
 
-    let (sql, pre_aggrs) = ctx
-        .build_sql_with_used_pre_aggregations(query_yaml)
-        .unwrap();
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "main_approx");
@@ -1195,6 +1281,8 @@ fn test_count_distinct_approx_multistage_pre_agg_reads_cardinality() {
         "Multi-stage leaf should finalize HLL to cardinality, got:\n{}",
         sql
     );
+
+    Ok(())
 }
 
 // A cube `foo` whose `originalSql` pre-aggregation (`main`) materializes its base
@@ -1285,5 +1373,62 @@ fn test_rollup_build_without_use_original_sql_pre_aggregations_in_pre_aggregatio
         "Build SQL should not source from the originalSql pre-agg table without the flag, got:\n{}",
         sql
     );
+    Ok(())
+}
+
+// A measure referenced only in ORDER BY (not in the selected measures) is dropped
+// from the ORDER BY when reading a pre-aggregation. CubeStore cannot ORDER BY an
+// aggregate of a rollup column that isn't projected, and the legacy planner
+// likewise ignores such keys, so the remaining keys (here the time dimension and
+// the selected dimension) drive the order. Mirrors the driver-test "partitioned
+// pre-agg" queries that order by `created_at asc, <unselected measure> desc, <dim> asc`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_only_measure_dropped_from_pre_agg() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["daily_countries_rollup"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.country
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+        order:
+          - id: orders.created_at
+            desc: false
+          - id: orders.total_amount
+            desc: true
+          - id: orders.country
+            desc: false
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "daily_countries_rollup");
+    // total_amount is neither selected nor projected by the rollup read, so it must
+    // not appear in ORDER BY — neither as the base column nor the rollup column.
+    assert!(
+        !sql.contains("\"orders\".amount"),
+        "ORDER BY must not reference the base-table column, got:\n{sql}"
+    );
+    assert!(
+        !sql.contains("orders__total_amount"),
+        "order-by-only measure must be dropped, not reference the rollup column, got:\n{sql}"
+    );
+
+    if let Some(result) = ctx
+        .try_execute(query_yaml, "pre_aggregation_matching_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(
+            "order_by_only_measure_dropped_from_pre_agg_cubestore_result",
+            result
+        );
+    }
+
     Ok(())
 }

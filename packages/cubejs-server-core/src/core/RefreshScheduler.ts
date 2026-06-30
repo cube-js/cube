@@ -146,7 +146,7 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ): Promise<RefreshQueries> {
     const baseQuery = await this.baseQueryForPreAggregation(compilerApi, preAggregation, queryingOptions);
-    const baseQuerySql = await compilerApi.getSql(baseQuery);
+    const baseQuerySql = await compilerApi.getSql(baseQuery, { preAggregationsOnly: true });
     const preAggregationDescriptionList = baseQuerySql.preAggregations;
     const preAggregationDescription = preAggregationDescriptionList.find(p => p.preAggregationId === preAggregation.id);
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);

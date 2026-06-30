@@ -14,7 +14,7 @@ use super::operators::in_list::InListOp;
 use super::operators::like::LikeOp;
 use super::operators::measure_filter::MeasureFilterOp;
 use super::operators::nullability::NullabilityOp;
-use super::operators::rolling_window::RegularRollingWindowOp;
+use super::operators::rolling_window::{RegularRollingWindowOp, RollingWindowOffsetOp};
 use super::operators::to_date_rolling_window::ToDateRollingWindowOp;
 use super::FilterOperator;
 use crate::planner::GranularityHelper;
@@ -43,6 +43,7 @@ pub enum FilterOp {
     MeasureFilter(MeasureFilterOp),
     Nullability(NullabilityOp),
     RegularRollingWindow(RegularRollingWindowOp),
+    RollingWindowOffset(RollingWindowOffsetOp),
     ToDateRollingWindow(ToDateRollingWindowOp),
 }
 
@@ -157,7 +158,17 @@ impl TypedFilterBuilder {
         let symbol = resolve_base_symbol(member_evaluator);
         match symbol.as_ref() {
             MemberSymbol::Dimension(d) => Some(d.dimension_type().to_string()),
-            MemberSymbol::Measure(m) => Some(m.measure_type().to_string()),
+            // The cast type drives how a bound comparison value is wrapped.
+            // Aggregations (count, sum, ...) and number measures compare as
+            // numbers. String/time measures are non-numeric scalars and must
+            // not be coerced to a number; date comparisons take the dedicated
+            // date operators instead. min/max carry their operand type, which
+            // isn't known here, so they fall through to the numeric default.
+            MemberSymbol::Measure(m) => match m.measure_type() {
+                "boolean" => Some("boolean".to_string()),
+                "string" | "time" => None,
+                _ => Some("number".to_string()),
+            },
             _ => None,
         }
     }
@@ -274,6 +285,19 @@ impl TypedFilterBuilder {
                     let trailing = values.get(2).and_then(|v| v.to_param_string());
                     let leading = values.get(3).and_then(|v| v.to_param_string());
                     FilterOp::RegularRollingWindow(RegularRollingWindowOp::new(trailing, leading))
+                }
+                FilterOperator::RollingWindowOffsetDateRange => {
+                    let from = values.first().and_then(|v| v.to_param_string());
+                    let to = values.get(1).and_then(|v| v.to_param_string());
+                    let trailing = values.get(2).and_then(|v| v.to_param_string());
+                    let leading = values.get(3).and_then(|v| v.to_param_string());
+                    let offset = values
+                        .get(4)
+                        .and_then(|v| v.to_param_string())
+                        .unwrap_or_else(|| "end".to_string());
+                    FilterOp::RollingWindowOffset(RollingWindowOffsetOp::new(
+                        from, to, trailing, leading, offset,
+                    ))
                 }
                 FilterOperator::ToDateRollingWindowDateRange => {
                     let granularity_name = values

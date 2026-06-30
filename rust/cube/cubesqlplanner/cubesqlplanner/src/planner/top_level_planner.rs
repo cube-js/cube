@@ -43,6 +43,15 @@ impl TopLevelPlanner {
 
         let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
 
+        // Match-only mode (refresh/metadata path): the caller only needs the matched
+        // pre-aggregation(s), not the outer query SQL. Skip the physical build, which for a
+        // rolling-window measure would render a time series that requires a date range the
+        // refresh path doesn't provide (and which non-generated-time-series dialects can't
+        // build without one). The pre-agg's own load SQL is built separately on the JS side.
+        if self.request.is_pre_aggregations_match_only() {
+            return Ok((String::new(), usages));
+        }
+
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())
         } else {

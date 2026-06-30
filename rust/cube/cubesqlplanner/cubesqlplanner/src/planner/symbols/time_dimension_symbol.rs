@@ -22,6 +22,7 @@ pub struct TimeDimensionSymbol {
     granularity_obj: Option<Granularity>,
     date_range: Option<(String, String)>,
     alias_suffix: String,
+    alias_override: Option<String>,
 }
 
 impl TimeDimensionSymbol {
@@ -31,13 +32,34 @@ impl TimeDimensionSymbol {
         granularity_obj: Option<Granularity>,
         date_range: Option<(String, String)>,
     ) -> Rc<Self> {
+        Self::new_with_alias(base_symbol, granularity, granularity_obj, date_range, None)
+    }
+
+    /// Like [`Self::new`] but with an explicit alias override (e.g. the SQL
+    /// API's `memberToAlias` entry for the granularized member). When `None`,
+    /// the alias falls back to `{base alias}_{granularity}`.
+    pub fn new_with_alias(
+        base_symbol: Rc<MemberSymbol>,
+        granularity: Option<String>,
+        granularity_obj: Option<Granularity>,
+        date_range: Option<(String, String)>,
+        alias_override: Option<String>,
+    ) -> Rc<Self> {
         let name_suffix = if let Some(granularity) = &granularity {
             granularity.clone()
         } else {
             "day".to_string()
         };
+
+        assert!(!alias_override
+            .as_ref()
+            .map(|a| a.is_empty())
+            .unwrap_or(false));
+        let alias = alias_override
+            .clone()
+            .unwrap_or_else(|| format!("{}_{}", base_symbol.alias(), name_suffix));
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
-        let alias = format!("{}_{}", base_symbol.alias(), name_suffix);
+
         let compiled_path = CompiledMemberPath::new(
             base_symbol.compiled_path().cube().clone(),
             full_name,
@@ -52,6 +74,7 @@ impl TimeDimensionSymbol {
             granularity_obj,
             date_range,
             alias_suffix: name_suffix,
+            alias_override,
         })
     }
 
@@ -155,11 +178,12 @@ impl TimeDimensionSymbol {
             .map(|s| match s.as_ref() {
                 MemberSymbol::Dimension(dimension_symbol) => {
                     if dimension_symbol.is_time() {
-                        let result = Self::new(
+                        let result = Self::new_with_alias(
                             s.clone(),
                             self.granularity.clone(),
                             self.granularity_obj.clone(),
                             self.date_range.clone(),
+                            self.alias_override.clone(),
                         );
                         MemberSymbol::new_time_dimension(result)
                     } else {
@@ -240,11 +264,12 @@ impl TimeDimensionSymbol {
     /// range. `None` if the base is not a reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         if let Some(base_symbol) = self.base_symbol.clone().reference_member() {
-            let new_time_dim = Self::new(
+            let new_time_dim = Self::new_with_alias(
                 base_symbol,
                 self.granularity.clone(),
                 self.granularity_obj.clone(),
                 self.date_range.clone(),
+                self.alias_override.clone(),
             );
             Some(MemberSymbol::new_time_dimension(new_time_dim))
         } else {

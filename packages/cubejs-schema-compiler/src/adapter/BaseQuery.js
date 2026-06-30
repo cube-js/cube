@@ -1009,6 +1009,11 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      // We only consume the pre-aggregation match result here (sql/params are discarded
+      // below), so tell the native planner to skip building the outer query SQL. Otherwise
+      // a rolling-window measure without a date range would throw while rendering its time
+      // series, even though matching itself doesn't need it.
+      preAggregationsMatchOnly: true,
       preAggregationId: this.options.preAggregationId || null,
       securityContext: this.contextSymbols.securityContext,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),

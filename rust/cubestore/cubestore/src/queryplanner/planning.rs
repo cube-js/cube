@@ -33,6 +33,7 @@ use std::any::Any;
 use std::fmt::Formatter;
 
 use crate::cluster::{Cluster, WorkerPlanningParams};
+use crate::config::TopKAggregateStrategy;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
@@ -618,7 +619,7 @@ impl PlanRewriter for CollectConstraints {
                 })
             }
             LogicalPlan::Sort(Sort { expr, input, .. }) => {
-                let (names, _) = sort_to_column_names(expr, input);
+                let (names, _, _) = sort_to_column_names(expr, input);
 
                 if !names.is_empty() {
                     Some(current_context.update_order_col_names(names))
@@ -740,13 +741,26 @@ fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
     }
 }
 
-fn sort_to_column_names(sort_exprs: &Vec<SortExpr>, input: &LogicalPlan) -> (Vec<String>, bool) {
+/// Returns the ORDER BY column names, whether the (uniform) direction is ascending, and the
+/// per-column `nulls_first` (parallel to the names). Empty names signals an unusable sort (a
+/// non-column expr or mixed asc/desc). The real `nulls_first` is carried through so the worker
+/// top-k cut honors the query's explicit `NULLS FIRST/LAST` instead of re-deriving it from the
+/// sort direction (which would disagree with the router select and drop groups at the limit).
+fn sort_to_column_names(
+    sort_exprs: &Vec<SortExpr>,
+    input: &LogicalPlan,
+) -> (Vec<String>, bool, Vec<bool>) {
     let mut res = Vec::new();
+    let mut nulls_first = Vec::new();
     let mut has_desc = false;
     let mut has_asc = false;
     for sexpr in sort_exprs.iter() {
         match sexpr {
-            SortExpr { expr, asc, .. } => {
+            SortExpr {
+                expr,
+                asc,
+                nulls_first: nf,
+            } => {
                 if *asc {
                     has_asc = true;
                 } else {
@@ -755,18 +769,19 @@ fn sort_to_column_names(sort_exprs: &Vec<SortExpr>, input: &LogicalPlan) -> (Vec
                 match expr {
                     Expr::Column(c) => {
                         res.push(get_original_name(&c.name, input));
+                        nulls_first.push(*nf);
                     }
                     _ => {
-                        return (Vec::new(), true);
+                        return (Vec::new(), true, Vec::new());
                     }
                 }
             }
         }
     }
     if has_asc && has_desc {
-        (Vec::new(), true)
+        (Vec::new(), true, Vec::new())
     } else {
-        (res, has_asc)
+        (res, has_asc, nulls_first)
     }
 }
 
@@ -840,6 +855,9 @@ struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Option<Vec<String>>,
     sort_is_asc: bool,
+    /// Per-column `nulls_first` for the ORDER BY, parallel to [sort]. Carries the query's explicit
+    /// (or default) NULL placement so the worker top-k cut matches the router select.
+    sort_nulls_first: Vec<bool>,
     single_value_filtered_cols: HashSet<String>,
     /// Group-by key column names of the nearest aggregate above the scan, when all of them are
     /// plain columns. Lets a `GROUP BY ... LIMIT` without `ORDER BY` push the limit to workers.
@@ -864,10 +882,16 @@ impl ChooseIndexContext {
             ..self.clone()
         }
     }
-    fn update_sort(&self, names: Vec<String>, sort_is_asc: bool) -> Self {
+    fn update_sort(
+        &self,
+        names: Vec<String>,
+        sort_is_asc: bool,
+        sort_nulls_first: Vec<bool>,
+    ) -> Self {
         Self {
             sort: Some(names),
             sort_is_asc,
+            sort_nulls_first,
             ..self.clone()
         }
     }
@@ -979,10 +1003,10 @@ impl PlanRewriter for ChooseIndex<'_> {
                 expr, input, fetch, ..
             }) => {
                 let base = fetch.as_ref().map(|f| context.update_limit(Some(*f)));
-                let (names, sort_is_asc) = sort_to_column_names(expr, input);
+                let (names, sort_is_asc, sort_nulls_first) = sort_to_column_names(expr, input);
                 let base = base.as_ref().unwrap_or(context);
                 Some(if !names.is_empty() {
-                    base.update_sort(names, sort_is_asc)
+                    base.update_sort(names, sort_is_asc, sort_nulls_first)
                 } else {
                     base.mark_unusable_sort()
                 })
@@ -1143,24 +1167,37 @@ impl ChooseIndex<'_> {
             return None;
         }
         let limit = ctx.limit?;
-        let sort = ctx.sort.as_ref().filter(|s| !s.is_empty())?;
         let group_by = ctx.group_by.as_ref().filter(|g| !g.is_empty())?;
 
-        // Every ORDER BY column must be a group-by column; map it to its group-key position.
+        // Every ORDER BY column must be a group-by column; map it to its group-key position. A bare
+        // LIMIT (no ORDER BY) leaves the prefix empty, so the total order is the full group key in
+        // group-by order -- "any n groups" becomes "the n smallest by group key", still valid.
         let mut cols: Vec<(usize, bool, bool)> = Vec::with_capacity(group_by.len());
         let mut used = vec![false; group_by.len()];
-        for name in sort {
-            let idx = group_by.iter().position(|g| g == name)?;
-            if used[idx] {
-                continue;
+        if let Some(sort) = ctx.sort.as_ref().filter(|s| !s.is_empty()) {
+            for (i, name) in sort.iter().enumerate() {
+                let idx = group_by.iter().position(|g| g == name)?;
+                if used[idx] {
+                    continue;
+                }
+                used[idx] = true;
+                // Honor the query's explicit NULL placement; fall back to the asc-derived default
+                // only if it wasn't captured (it always is, alongside the name).
+                let nulls_first = ctx
+                    .sort_nulls_first
+                    .get(i)
+                    .copied()
+                    .unwrap_or(!ctx.sort_is_asc);
+                cols.push((idx, ctx.sort_is_asc, nulls_first));
             }
-            used[idx] = true;
-            cols.push((idx, ctx.sort_is_asc, !ctx.sort_is_asc));
         }
-        // Extend with the remaining group keys to make it a total order on the full group key.
+        // Extend with the remaining group keys to make it a total order on the full group key. Their
+        // NULL placement is arbitrary (these columns are not in the query's ORDER BY); use ascending
+        // nulls-first for a deterministic order. The worker cut and the router select both derive
+        // from this one descriptor, so they agree on the total order by construction.
         for (idx, is_used) in used.iter().enumerate() {
             if !is_used {
-                cols.push((idx, true, false));
+                cols.push((idx, true, true));
             }
         }
         Some((cols, limit))
@@ -1839,6 +1876,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             }
             let mut union_snapshots = Vec::new();
             let mut limits = Vec::new();
+            let mut worker_sort_and_limits = Vec::new();
             let mut id = 0;
             for i in inputs.into_iter() {
                 let send;
@@ -1854,6 +1892,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 }
                 union_snapshots.extend(send.snapshots.concat());
                 limits.push(send.limit_and_reverse);
+                worker_sort_and_limits.push(send.worker_sort_and_limit.clone());
                 *i = send.input.clone();
             }
             let limit = if limits.is_empty() || limits.iter().any(|l| l.is_none()) {
@@ -1863,8 +1902,23 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             } else {
                 limits[0]
             };
+            // The same group-by/limit context descends to every UNION branch, so the per-branch
+            // descriptors are identical and stay valid over the union (same schema, group columns by
+            // position). Keep it only when all branches agree; otherwise drop the pushdown.
+            let worker_sort_and_limit = if worker_sort_and_limits.is_empty()
+                || worker_sort_and_limits.iter().any(|w| w.is_none())
+                || worker_sort_and_limits
+                    .iter()
+                    .any(|w| w != &worker_sort_and_limits[0])
+            {
+                None
+            } else {
+                worker_sort_and_limits[0].clone()
+            };
             snapshots = vec![union_snapshots];
-            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
+            let mut new_send = ClusterSendNode::new(id, Arc::new(p), snapshots, limit);
+            new_send.worker_sort_and_limit = worker_sort_and_limit;
+            return Ok(new_send.into_plan());
         }
         LogicalPlan::Join(Join { left, right, .. }) => {
             let lsend;
@@ -1917,6 +1971,7 @@ pub struct CubeExtensionPlanner {
     // Set on the workers.
     pub worker_planning_params: Option<WorkerPlanningParams>,
     pub serialized_plan: Arc<PreSerializedPlan>,
+    pub topk_strategy: TopKAggregateStrategy,
 }
 
 #[async_trait]
