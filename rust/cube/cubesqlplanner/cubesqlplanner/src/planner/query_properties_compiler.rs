@@ -84,6 +84,10 @@ impl QueryPropertiesCompiler {
             .and_then(|v| v.parse::<usize>().ok());
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let pre_aggregations_match_only = options
+            .static_data()
+            .pre_aggregations_match_only
+            .unwrap_or(false);
         let use_original_sql_pre_aggregations_in_pre_aggregation = options
             .static_data()
             .use_original_sql_pre_aggregations_in_pre_aggregation
@@ -113,6 +117,7 @@ impl QueryPropertiesCompiler {
             .offset(offset)
             .ungrouped(ungrouped)
             .pre_aggregation_query(pre_aggregation_query)
+            .pre_aggregations_match_only(pre_aggregations_match_only)
             .use_original_sql_pre_aggregations_in_pre_aggregation(
                 use_original_sql_pre_aggregations_in_pre_aggregation,
             )
