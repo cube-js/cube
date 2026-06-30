@@ -29,9 +29,10 @@ impl VisitorContext {
             filter_params_columns: HashMap::new(),
             reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
         };
+        let node_processor = nodes_factory.default_node_processor(&query_tools);
         Self {
             query_tools,
-            node_processor: nodes_factory.default_node_processor(),
+            node_processor,
             cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters,
             filters_context,
@@ -48,9 +49,10 @@ impl VisitorContext {
             filter_params_columns,
             reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
         };
+        let node_processor = nodes_factory.default_node_processor(&query_tools);
         Self {
             query_tools,
-            node_processor: nodes_factory.default_node_processor(),
+            node_processor,
             cube_ref_evaluator: Rc::new(nodes_factory.cube_ref_evaluator()),
             all_filters: None,
             filters_context,
