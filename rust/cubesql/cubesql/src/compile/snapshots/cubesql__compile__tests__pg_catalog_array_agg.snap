@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"SELECT pg_catalog.array_agg(a) AS labels FROM (VALUES (1), (2), (3)) AS t(a)\"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------+
+| labels  |
++---------+
+| {1,2,3} |
++---------+
