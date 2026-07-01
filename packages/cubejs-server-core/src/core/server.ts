@@ -130,6 +130,15 @@ export class CubejsServerCore {
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
+  /**
+   * Concurrency limiters used to throttle the refresh-key dispatch fan-out of
+   * the scheduled refresh, keyed by orchestrator id. Sharing a single limiter
+   * per orchestrator id ensures that concurrent scheduled refresh runs that
+   * resolve to the same orchestrator (e.g. multiple security contexts) don't
+   * collectively flood the event loop with refresh-key queries.
+   */
+  protected readonly refreshKeysLimiters: Map<string, { concurrency: number, limiter: pLimit.Limit }> = new Map();
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
@@ -568,6 +577,26 @@ export class CubejsServerCore {
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
     this.startScheduledRefreshTimer();
+  }
+
+  /**
+   * Returns a concurrency limiter shared across scheduled refresh runs that
+   * resolve to the same orchestrator id. It is used to bound the refresh-key
+   * dispatch fan-out so that deployments with many cubes/timezones don't
+   * enqueue every refresh-key query at once.
+   */
+  public async getRefreshKeysLimiter(context: RequestContext, concurrency: number): Promise<pLimit.Limit> {
+    const orchestratorId = await this.contextToOrchestratorId(context);
+    const existing = this.refreshKeysLimiters.get(orchestratorId);
+
+    if (existing && existing.concurrency === concurrency) {
+      return existing.limiter;
+    }
+
+    const limiter = pLimit(concurrency);
+    this.refreshKeysLimiters.set(orchestratorId, { concurrency, limiter });
+
+    return limiter;
   }
 
   public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
