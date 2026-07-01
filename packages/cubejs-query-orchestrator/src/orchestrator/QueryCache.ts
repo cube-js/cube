@@ -33,6 +33,7 @@ export type CacheQueryResultOptions = {
   priority?: number,
   external?: boolean,
   requestId?: string,
+  queryMetadata?: Record<string, string>,
   dataSource: string,
   waitForRenew?: boolean,
   forceNoCache?: boolean,
@@ -87,6 +88,7 @@ export type QueryBody = {
   renewQuery?: boolean;
   cacheMode?: CacheMode;
   requestId?: string;
+  queryMetadata?: Record<string, string>;
   external?: boolean;
   isJob?: boolean;
   forceNoCache?: boolean;
@@ -261,6 +263,7 @@ export class QueryCache {
             priority: queuePriority,
             external: queryBody.external,
             requestId: queryBody.requestId,
+            queryMetadata: queryBody.queryMetadata,
             persistent: queryBody.persistent,
             dataSource: queryBody.dataSource,
             useCsvQuery: queryBody.useCsvQuery,
@@ -277,6 +280,7 @@ export class QueryCache {
               cacheKey: [query, values],
               external: queryBody.external,
               requestId: queryBody.requestId,
+              queryMetadata: queryBody.queryMetadata,
               dataSource: queryBody.dataSource,
               persistent: queryBody.persistent,
               inlineTables,
@@ -300,6 +304,7 @@ export class QueryCache {
           forceNoCache,
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryMetadata: queryBody.queryMetadata,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
           skipRefreshKeyWaitForRenew: true,
@@ -319,6 +324,7 @@ export class QueryCache {
           forceNoCache,
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryMetadata: queryBody.queryMetadata,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
           skipRefreshKeyWaitForRenew: true,
@@ -335,6 +341,7 @@ export class QueryCache {
         {
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryMetadata: queryBody.queryMetadata,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
         }
@@ -355,6 +362,7 @@ export class QueryCache {
         forceNoCache,
         external: queryBody.external,
         requestId: queryBody.requestId,
+        queryMetadata: queryBody.queryMetadata,
         dataSource: queryBody.dataSource,
         persistent: queryBody.persistent,
       }
@@ -371,6 +379,7 @@ export class QueryCache {
         {
           external: queryBody.external,
           requestId: queryBody.requestId,
+          queryMetadata: queryBody.queryMetadata,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
         }
@@ -464,6 +473,7 @@ export class QueryCache {
       external,
       priority,
       requestId,
+      queryMetadata,
       spanId,
       inlineTables,
       useCsvQuery,
@@ -476,6 +486,7 @@ export class QueryCache {
       external: boolean,
       priority?: number,
       requestId?: string,
+      queryMetadata?: Record<string, string>,
       spanId?: string,
       inlineTables?: InlineTables,
       useCsvQuery?: boolean,
@@ -493,6 +504,7 @@ export class QueryCache {
       query,
       values,
       requestId,
+      queryMetadata,
       inlineTables,
       useCsvQuery,
       lambdaTypes,
@@ -758,6 +770,7 @@ export class QueryCache {
     renewalThreshold: any,
     options: {
       requestId?: string,
+      queryMetadata?: Record<string, string>,
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
       dataSource: string,
@@ -793,6 +806,7 @@ export class QueryCache {
     renewalThreshold: any,
     options: {
       requestId?: string,
+      queryMetadata?: Record<string, string>,
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
       forceNoCache?: boolean,
@@ -832,6 +846,7 @@ export class QueryCache {
               forceNoCache: options.forceNoCache,
               external: options.external,
               requestId: options.requestId,
+              queryMetadata: options.queryMetadata,
               dataSource: options.dataSource,
               useCsvQuery: options.useCsvQuery,
               lambdaTypes: options.lambdaTypes,
@@ -912,6 +927,7 @@ export class QueryCache {
         priority: options.priority,
         external: options.external,
         requestId: options.requestId,
+        queryMetadata: options.queryMetadata,
         spanId,
         persistent: options.persistent,
         dataSource: options.dataSource,

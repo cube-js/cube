@@ -8,6 +8,7 @@
 import {
   QueryRewriteFn,
   ExtendContextFn,
+  QueryMetadataFn,
 } from './request';
 import {
   JWTOptions,
@@ -64,6 +65,7 @@ interface ApiGatewayOptions {
   scheduledRefreshTimeZones?: ScheduledRefreshTimeZonesFn;
   basePath: string;
   extendContext?: ExtendContextFn;
+  queryMetadata?: QueryMetadataFn;
   jwt?: JWTOptions;
   requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
   queryRewrite?: QueryRewriteFn;

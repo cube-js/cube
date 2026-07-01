@@ -92,6 +92,7 @@ const schemaOptions = Joi.object().keys({
   ),
   schemaVersion: Joi.func(),
   extendContext: Joi.func(),
+  queryMetadata: Joi.func(),
   // Scheduled refresh
   scheduledRefreshTimer: Joi.alternatives().try(
     Joi.boolean(),

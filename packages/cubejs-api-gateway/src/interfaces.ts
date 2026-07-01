@@ -41,6 +41,7 @@ import {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  QueryMetadataFn,
   ResponseResultFn,
   QueryRequest
 } from './types/request';
@@ -83,6 +84,7 @@ export {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  QueryMetadataFn,
   ResponseResultFn,
   QueryRequest,
   ContextToApiScopesFn,
