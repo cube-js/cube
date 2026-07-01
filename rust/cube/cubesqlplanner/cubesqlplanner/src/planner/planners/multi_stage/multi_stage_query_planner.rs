@@ -294,7 +294,7 @@ impl MultiStageQueryPlanner {
     ) -> Vec<Rc<MemberSymbol>> {
         let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &grain.exclude {
             dims.iter()
-                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| !exclude.iter().any(|m| d.matches_grain_reference(m)))
                 .cloned()
                 .collect()
         } else {
@@ -302,7 +302,7 @@ impl MultiStageQueryPlanner {
         };
         if let Some(keep_only) = &grain.keep_only {
             dims.into_iter()
-                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| keep_only.iter().any(|m| d.matches_grain_reference(m)))
                 .collect()
         } else {
             dims
