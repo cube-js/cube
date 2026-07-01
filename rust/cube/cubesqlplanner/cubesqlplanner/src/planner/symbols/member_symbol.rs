@@ -236,6 +236,23 @@ impl MemberSymbol {
         false
     }
 
+    /// Whether this projected member is targeted by a grain reference
+    /// (`reduce_by` / `group_by`). Behaves like `has_member_in_reference_chain`,
+    /// but a time dimension also matches through its underlying base dimension:
+    /// a projected time dimension carries a granularity suffix in its full name
+    /// (`created_at_month`) while grain references point at the bare dimension
+    /// (`created_at`), so a grain reference removes the time dimension from the
+    /// grain regardless of the granularity it is queried at.
+    pub fn matches_grain_reference(&self, member: &Rc<MemberSymbol>) -> bool {
+        if self.has_member_in_reference_chain(member) {
+            return true;
+        }
+        if let Self::TimeDimension(td) = self {
+            return td.base_symbol().has_member_in_reference_chain(member);
+        }
+        false
+    }
+
     /// Returns a copy of this symbol with the path reduced to just the owning cube,
     /// stripping any join chain prefix (e.g. from views or cross-cube references).
     pub fn with_stripped_join_prefix(&self) -> Rc<Self> {
