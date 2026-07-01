@@ -202,7 +202,7 @@ export class MysqlQuery extends BaseQuery {
     delete templates.join_types.full;
 
     templates.expressions.concat_strings = 'CONCAT({{ strings | join(\',\' ) }})';
-
+    templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value | replace("T", " ") | replace("Z", "") }}\')';  
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
 
