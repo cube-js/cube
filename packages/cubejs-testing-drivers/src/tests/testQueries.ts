@@ -2689,5 +2689,22 @@ from
       `);
       expect(res.rows).toMatchSnapshot();
     });
+
+    executePg('SQL API: Window function over measure (running total)', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('quarter', orderDate) AS "orderDateQ",
+          MEASURE(count) AS "count",
+          SUM(MEASURE(count)) OVER (
+            ORDER BY DATE_TRUNC('quarter', orderDate)
+            ROWS UNBOUNDED PRECEDING
+          ) AS "runningTotal"
+        FROM "BigECommerce"
+        WHERE DATE_TRUNC('year', orderDate) = CAST('2020-01-01' AS DATE)
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST;
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
   });
 }

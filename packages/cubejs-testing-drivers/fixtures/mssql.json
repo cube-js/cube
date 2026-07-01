@@ -197,6 +197,7 @@
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: Date/time comparison with SQL push down",
     "SQL API: Date/time comparison with date_trunc with SQL push down",
+    "SQL API: Window function over measure (running total)",
 
     "---------------------------------------",
     "Error during rewrite: Can't detect Cube query and it may be not supported yet.",
@@ -248,6 +249,7 @@
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: Date/time comparison with SQL push down",
     "SQL API: Date/time comparison with date_trunc with SQL push down",
+    "SQL API: Window function over measure (running total)",
 
     "---------------------------------------",
     "Error during rewrite: Can't detect Cube query and it may be not supported yet.",

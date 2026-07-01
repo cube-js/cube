@@ -207,7 +207,8 @@
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "SQL API: SQL push down push to cube quoted alias",
-    "SQL API: Date/time comparison with date_trunc with SQL push down"
+    "SQL API: Date/time comparison with date_trunc with SQL push down",
+    "SQL API: Window function over measure (running total)"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -240,6 +241,9 @@
 
     "---- CubeSQL can't rewrite this query shape (date_trunc compared to a cast); mysql/mssql skip it too ----",
     "SQL API: Date/time comparison with date_trunc with SQL push down",
+
+    "---- SQL API push down not yet supported on Oracle ----",
+    "SQL API: Window function over measure (running total)",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying BigECommerce: rolling window YTD (month + week)",
