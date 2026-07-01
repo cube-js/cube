@@ -386,6 +386,12 @@ date range. The values must be an array of timestamps in the [ISO 8601][wiki-iso
 format, for example `2025-01-02` or `2025-01-02T03:04:05.067Z`. If only one timestamp
 is specified, the filter would be set exactly to this timestamp.
 
+You may also pass a single-element array containing a [relative date range
+string][ref-relative-date-range] (for example, `["last 2 weeks"]`), using the
+same formats supported by `timeDimensions.dateRange`. Cube resolves the string
+to an absolute `[start, end]` range using the query timezone before generating
+SQL. This applies to every date operator on this page.
+
 There is a convenient way to use date filters with grouping -
 [learn more about the `timeDimensions` property here](#time-dimensions-format)
 
@@ -396,6 +402,14 @@ There is a convenient way to use date filters with grouping -
   "member": "posts.time",
   "operator": "inDateRange",
   "values": ["2015-01-01", "2015-12-31"]
+}
+```
+
+```json
+{
+  "member": "posts.time",
+  "operator": "inDateRange",
+  "values": ["last 2 weeks"]
 }
 ```
 
@@ -584,6 +598,57 @@ are translated to expressions in `WHERE` and `HAVING` clauses, respectively.
 In other words, dimension filters apply to raw (unaggregated) data and measure filters
 apply to aggregated data, so it's not possible to express such filters in SQL semantics.
 
+### Date filters in logical operators
+
+Date operators (`inDateRange`, `notInDateRange`, `beforeDate`, `beforeOrOnDate`,
+`afterDate`, `afterOrOnDate`, `onTheDate`) can be placed inside `or`/`and`
+logical operators. The date predicate is emitted inside the corresponding
+logical group, so you can express date constraints that apply to only one
+branch of an `or`:
+
+```json
+{
+  "filters": [{
+    "or": [
+      {
+        "member": "Orders.createdAt",
+        "operator": "inDateRange",
+        "values": ["last 2 weeks"]
+      },
+      {
+        "member": "Orders.status",
+        "operator": "equals",
+        "values": ["pending"]
+      }
+    ]
+  }]
+}
+```
+
+The resulting SQL has the date predicate inside the `OR`, not as a global `AND`:
+
+```sql
+WHERE (created_at >= ... AND created_at <= ...)
+   OR (status = 'pending')
+```
+
+<Warning>
+
+This differs from [`timeDimensions.dateRange`](#time-dimensions-format), which
+is always emitted as a global `AND` at the top of the `WHERE` clause and also
+drives granularity and pre-aggregation matching. Use a `filters` entry when
+you need the date constraint scoped to one branch of an `or`/`and` group;
+use `timeDimensions.dateRange` when you need a global date constraint that
+can match pre-aggregations.
+
+If you set both `timeDimensions.dateRange` and a date filter in `filters` on
+the same member, both predicates are emitted and `AND`-ed together — the
+`timeDimensions` range constrains the entire query, including every branch
+of any `or` group. This is rarely the intended behavior; prefer one path
+or the other.
+
+</Warning>
+
 ## Time Dimensions Format
 
 Since grouping and filtering by a time dimension is quite a common case, Cube
@@ -673,6 +738,11 @@ Cube uses the [Chrono][chrono-website] library to parse relative dates. Please
 refer to its documentation for more examples.
 
 </Info>
+
+The same relative-date strings are accepted in the `values` array of date
+filter operators (`inDateRange`, `notInDateRange`, `beforeDate`, etc.) when
+the array contains a single string. See [`inDateRange`](#indaterange) and
+[Date filters in logical operators](#date-filters-in-logical-operators).
 
 [ref-client-core-resultset-drilldown]: /reference/javascript-sdk/reference/cubejs-client-core#drilldown
 [ref-schema-ref-preaggs-refreshkey]: /reference/data-modeling/pre-aggregations#refresh_key
