@@ -10,7 +10,7 @@
     "directory": "packages/cubejs-server"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "index.js",
   "typings": "dist/src/index.d.ts",
@@ -68,7 +68,7 @@
     "@types/cors": "^2.8.8",
     "@types/express": "^4.17.21",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/semver": "^7.5.8",
     "@types/ws": "^7.2.9",
     "@types/yarnpkg__lockfile": "^1.1.4",

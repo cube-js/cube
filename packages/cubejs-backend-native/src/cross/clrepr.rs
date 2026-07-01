@@ -10,6 +10,8 @@ use neon::prelude::*;
 use neon::result::Throw;
 use neon::types::JsDate;
 #[cfg(feature = "python")]
+use pyo3::Python;
+#[cfg(feature = "python")]
 use std::cell::RefCell;
 use std::collections::hash_map::{IntoIter, Iter, Keys};
 use std::collections::HashMap;
@@ -96,9 +98,9 @@ pub enum StringType {
     Safe,
 }
 
-/// Cross language representation is abstraction to transfer values between
+/// Cross-language representation is an abstraction to transfer values between
 /// JavaScript and Python across Rust. Converting between two different languages requires
-/// to use Context which is available on the call (one for python and one for js), which result as
+/// using Context which is available on the call (one for python and one for js), which results as
 /// blocking.
 #[derive(Debug, Clone)]
 pub enum CLRepr {
@@ -240,7 +242,7 @@ impl CLRepr {
             #[cfg(feature = "python")]
             if from.is_a::<BoxedJsPyFunctionWrapper, _>(cx) {
                 let ref_wrap = from.downcast_or_throw::<BoxedJsPyFunctionWrapper, _>(cx)?;
-                let fun = ref_wrap.borrow().get_fun().clone();
+                let fun = Python::with_gil(|py| ref_wrap.borrow().get_fun().clone_ref(py));
 
                 return Ok(CLRepr::PythonRef(PythonRef::PyFunction(fun)));
             }

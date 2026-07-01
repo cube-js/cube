@@ -345,12 +345,10 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
-    if (this.useNativeSqlPlanner && !this.canUseNativeSqlPlannerPreAggregation && !this.neverUseSqlPlannerPreaggregation()) {
-      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
-
-      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
-    }
+    // Tesseract pre-aggregation planning always follows the SQL planner and can't be
+    // toggled independently. The neverUseSqlPlannerPreaggregation() guard still opts
+    // specific query types (e.g. CubeStoreQuery) out for correctness.
+    this.canUseNativeSqlPlannerPreAggregation = this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation();
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -1120,16 +1118,6 @@ export class BaseQuery {
       ...this.options,
       externalQueryClass: null
     });
-  }
-
-  runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
-        ]
-      );
   }
 
   rollingWindowToDateJoinCondition(granularity) {
@@ -3887,8 +3875,6 @@ export class BaseQuery {
         this.countDistinctApprox(evaluateSql);
     } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
       return `count(distinct ${evaluateSql})`;
-    } else if (symbol.type === 'runningTotal') {
-      return `sum(${evaluateSql})`; // TODO
     }
     if (multiplied) {
       if (symbol.type === 'number' && evaluateSql === 'count(*)') {

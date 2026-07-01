@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:22.22.0-bookworm-slim AS base
+FROM node:24.18.0-trixie-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -12,8 +12,8 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends libssl3 curl \
-       cmake python3 gcc g++ make cmake openjdk-17-jdk-headless unzip \
+    && apt-get install -y --no-install-recommends libssl3t64 curl \
+       cmake python3 gcc g++ make cmake openjdk-21-jdk-headless unzip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
@@ -46,7 +46,6 @@ COPY packages/cubejs-crate-driver/package.json packages/cubejs-crate-driver/pack
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
 COPY packages/cubejs-duckdb-driver/package.json packages/cubejs-duckdb-driver/package.json
-COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
 COPY packages/cubejs-firebolt-driver/package.json packages/cubejs-firebolt-driver/package.json
 COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/package.json
 COPY packages/cubejs-mongobi-driver/package.json packages/cubejs-mongobi-driver/package.json
@@ -121,7 +120,6 @@ COPY packages/cubejs-crate-driver/ packages/cubejs-crate-driver/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
 COPY packages/cubejs-duckdb-driver/ packages/cubejs-duckdb-driver/
-COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
 COPY packages/cubejs-firebolt-driver/ packages/cubejs-firebolt-driver/
 COPY packages/cubejs-hive-driver/ packages/cubejs-hive-driver/
 COPY packages/cubejs-mongobi-driver/ packages/cubejs-mongobi-driver/
@@ -169,7 +167,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
+    && apt-get install -y ca-certificates python3.13 libpython3.13-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .

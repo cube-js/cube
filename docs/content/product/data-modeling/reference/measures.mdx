@@ -396,9 +396,7 @@ with a provided date range. It is used to calculate the minimum and maximum valu
 for the series of time windows.
 
 With Tesseract, the [next-generation data modeling engine][link-tesseract],
-rolling window calculations don't require the date range for the time dimension.
-Tesseract is currently in preview. Use the <EnvVar>CUBEJS_TESSERACT_SQL_PLANNER</EnvVar>
-environment variable to enable it.
+rolling window calculations don't require the date range for the time dimension. In versions before v1.7.0, Tesseract was not enabled by default.
 
 </WarningBox>
 
@@ -1056,8 +1054,7 @@ calculated based on the value of a [`switch` dimension][ref-switch-dimensions].
 <WarningBox>
 
 `case` measures are powered by Tesseract, the [next-generation data modeling
-engine][link-tesseract]. Tesseract is currently in preview. Use the
-<EnvVar>CUBEJS_TESSERACT_SQL_PLANNER</EnvVar> environment variable to enable it.
+engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </WarningBox>
 

@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22.x]
+        node-version: [24.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,10 +106,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Node.js 22.x
+      - name: Install Node.js 24.x
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
       - name: Restore lerna
         uses: actions/cache@v4
         with:
@@ -170,10 +170,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Node.js 22.x
+      - name: Install Node.js 24.x
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
       - name: Restore lerna
         uses: actions/cache@v4
         with:

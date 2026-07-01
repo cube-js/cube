@@ -154,12 +154,6 @@ it should be adjusted accordingly.
 | ------------------------------------ | ---------------------- | --------------------- |
 | A valid number of concurrent queries | 10                     | 10                    |
 
-<Info>
-
-Previously, this environment variable was named `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`.
-
-</Info>
-
 ## `CUBEJS_CUBESTORE_HOST`
 
 The hostname of the Cube Store deployment
@@ -429,42 +423,6 @@ A flag to use credentials chain for secrets for S3 connections.
 | Possible Values                                       | Default in Development | Default in Production |
 | ----------------------------------------------------- | ---------------------- | --------------------- |
 | `true`, `false`                                       | `false`                | `false`               |
-
-## `CUBEJS_DB_ELASTIC_APIKEY_ID`
-
-The [ID of the API key from elastic.co][elastic-docs-api-keys]. Required when
-using Elastic Cloud.
-
-| Possible Values               | Default in Development | Default in Production |
-| ----------------------------- | ---------------------- | --------------------- |
-| A valid Elastic.co API key ID | N/A                    | N/A                   |
-
-## `CUBEJS_DB_ELASTIC_APIKEY_KEY`
-
-The [API key from elastic.co][elastic-docs-api-keys]. Required when using
-Elastic Cloud.
-
-| Possible Values            | Default in Development | Default in Production |
-| -------------------------- | ---------------------- | --------------------- |
-| A valid Elastic.co API key | N/A                    | N/A                   |
-
-## `CUBEJS_DB_ELASTIC_OPENDISTRO`
-
-If `true`, then use the Open Distro for Elasticsearch.
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | N/A                    | N/A                   |
-
-## `CUBEJS_DB_ELASTIC_QUERY_FORMAT`
-
-By default, queries return data in JDBC format, but you can also return data in
-standard Elasticsearch JDBC, JSON, CSV, YAML or raw formats (only JSON and JDBC
-are currently supported).
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `json`, `jdbc`  | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_EXPORT_BUCKET`
 
@@ -1709,18 +1667,18 @@ If `true`, then use WebSocket for data fetching.
 
 ## `CUBEJS_TESSERACT_SQL_PLANNER`
 
-If `true`, enables Tesseract, the [next-generation data modeling engine][link-tesseract].
-Tesseract powers [multi-stage calculations][ref-multi-stage-calculations].
+Enables Tesseract, the [next-generation data modeling engine][link-tesseract],
+which is the default SQL planner and powers
+[multi-stage calculations][ref-multi-stage-calculations]. In versions before v1.7.0,
+Tesseract was not enabled by default. Set to `false` to fall back to the legacy
+planner, which is deprecated and will be removed in the near future.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                 | `false`                |
+| `true`, `false` | `true`                 | `true`                |
 
-<Warning>
-
-Tesseract is currently in preview.
-
-</Warning>
+Tesseract-based pre-aggregation matching and planning follows this flag and cannot be
+toggled independently.
 
 ## `CUBESTORE_AWS_ACCESS_KEY_ID`
 
@@ -2122,8 +2080,6 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.databricks.com/data/databricks-file-system.html#mount-object-storage-to-dbfs
 [databricks-docs-pat]:
   https://docs.databricks.com/dev-tools/api/latest/authentication.html#token-management
-[elastic-docs-api-keys]:
-  https://www.elastic.co/guide/en/kibana/master/api-keys.html#create-api-key
 [firebolt-docs-account-name]:
   https://docs.firebolt.io/managing-your-account/concepts-and-terminology.html#firebolt-account
 [firebolt-docs-engine-name]:

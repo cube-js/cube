@@ -1235,11 +1235,6 @@
     "permanent": true
   },
   {
-    "source": "/config/databases/elasticsearch",
-    "destination": "/product/configuration/data-sources/elasticsearch",
-    "permanent": true
-  },
-  {
     "source": "/config/databases/druid",
     "destination": "/product/configuration/data-sources/druid",
     "permanent": true
