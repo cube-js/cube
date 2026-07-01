@@ -34,7 +34,7 @@ const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
 
 /**
  * MySQL Native types -> SQL type
- * @link https://github.com/mysqljs/mysql/blob/master/lib/protocol/constants/types.js#L9
+ * @link https://github.com/sidorares/node-mysql2/blob/master/lib/constants/types.js
  */
 const MySqlNativeToMySqlType = {
   [mysql.Types.DECIMAL]: 'decimal',
@@ -147,7 +147,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       timezone: 'Z',
       ssl: this.getSslOptions(dataSource, preAggregations) as any,
       dateStrings: true,
-      decimalNumbers: true,
+      decimalNumbers: false,
       readOnly: readOnly !== undefined ? readOnly : true,
       ...restConfig,
     };
