@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
+
+**Note:** Version bump only for package @cubejs-backend/mysql-aurora-serverless-driver
+
 ## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
 
 **Note:** Version bump only for package @cubejs-backend/mysql-aurora-serverless-driver

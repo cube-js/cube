@@ -1,6 +1,5 @@
 use crate::cube_bridge::join_item::{JoinItem, JoinItemStatic};
 use crate::cube_bridge::join_item_definition::JoinItemDefinition;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::MockJoinItemDefinition;
 use cubenativeutils::CubeError;
 use std::any::Any;

@@ -1,5 +1,8 @@
+use crate::config::TopKAggregateStrategy;
 use crate::queryplanner::planning::{ClusterSendNode, CubeExtensionPlanner};
-use crate::queryplanner::topk::execute::{AggregateTopKExec, TopKAggregateFunction};
+use crate::queryplanner::topk::execute::{
+    AggregateTopKExec, TopKAggregateFunction, TopKMergeVersion,
+};
 use crate::queryplanner::topk::{
     ClusterAggregateTopKLower, ClusterAggregateTopKUpper, SortColumn, MIN_TOPK_STREAM_ROWS,
 };
@@ -15,7 +18,9 @@ use datafusion::physical_expr::{
     LexOrdering, LexRequirement, PhysicalSortRequirement, ScalarFunctionExpr,
 };
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
+use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
@@ -608,6 +613,26 @@ pub fn plan_topk(
         .map(|e| extract_aggregate_fun(e).unwrap())
         .collect_vec();
 
+    // Full-merge strategy: workers send their groups unsorted, the router re-aggregates with one
+    // vectorized hash aggregate and takes the top-k with a fetch-limited sort. Drops early
+    // termination (so the router materializes every distinct group), so it is opt-in and skips HLL.
+    if ext_planner.topk_strategy == TopKAggregateStrategy::FullMerge
+        && agg_fun
+            .iter()
+            .all(|(f, _)| *f != TopKAggregateFunction::Merge)
+    {
+        return plan_topk_full_merge(
+            planner,
+            ext_planner,
+            upper_node,
+            lower_node,
+            aggregate,
+            group_expr_len,
+            &agg_fun,
+            ctx,
+        );
+    }
+
     // Sort on workers.
     let sort_expr = upper_node
         .order_by
@@ -654,6 +679,14 @@ pub fn plan_topk(
         None
     };
 
+    let merge_version = if ext_planner.topk_strategy == TopKAggregateStrategy::VectorizedStreaming
+        && topk_v2_supported(lower_node, group_expr_len, agg_fun.as_slice())
+    {
+        TopKMergeVersion::V2
+    } else {
+        TopKMergeVersion::V1
+    };
+
     let topk_exec: Arc<AggregateTopKExec> = Arc::new(AggregateTopKExec::new(
         upper_node.limit,
         group_expr_len,
@@ -667,8 +700,176 @@ pub fn plan_topk(
         cluster,
         schema,
         sort_requirement,
+        merge_version,
     ));
     Ok(topk_exec)
+}
+
+/// Whether the V2 router merge can handle this top-k. V2 uses an arrow `RowConverter` for group keys
+/// and typed `ScalarValue` arithmetic for the aggregates, so it falls back to V1 for:
+/// - HLL `Merge` (no typed combine),
+/// - key types the `RowConverter` does not round-trip to the same arrow type (Dictionary, nested),
+/// - aggregate value types outside the typed combine set (e.g. Float16, Boolean, Binary).
+fn topk_v2_supported(
+    lower_node: &ClusterAggregateTopKLower,
+    group_expr_len: usize,
+    agg_fun: &[(TopKAggregateFunction, &Vec<Expr>)],
+) -> bool {
+    if agg_fun
+        .iter()
+        .any(|(f, _)| *f == TopKAggregateFunction::Merge)
+    {
+        return false;
+    }
+    let fields = lower_node.schema.fields();
+    for f in &fields[0..group_expr_len] {
+        match f.data_type() {
+            DataType::Dictionary(_, _)
+            | DataType::List(_)
+            | DataType::LargeList(_)
+            | DataType::FixedSizeList(_, _)
+            | DataType::Struct(_)
+            | DataType::Map(_, _) => return false,
+            _ => {}
+        }
+    }
+    for f in &fields[group_expr_len..] {
+        match f.data_type() {
+            DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+            | DataType::Float32
+            | DataType::Float64
+            | DataType::Decimal128(_, _)
+            | DataType::Decimal256(_, _) => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Builds the full-merge (ClickHouse-style) router plan: the unsorted worker aggregate goes through
+/// a ClusterSend, then a single vectorized re-aggregation by key, an optional HAVING filter, and a
+/// fetch-limited sort for the top-k. Selected by `CUBESTORE_TOPK_STRATEGY=full_merge`.
+fn plan_topk_full_merge(
+    planner: &dyn PhysicalPlanner,
+    ext_planner: &CubeExtensionPlanner,
+    upper_node: &ClusterAggregateTopKUpper,
+    lower_node: &ClusterAggregateTopKLower,
+    aggregate: Arc<dyn ExecutionPlan>,
+    group_expr_len: usize,
+    agg_fun: &[(TopKAggregateFunction, &Vec<Expr>)],
+    ctx: &SessionState,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    // Workers run the (unsorted) aggregate; the router re-aggregates above the cluster send.
+    let cluster = ext_planner.plan_cluster_send(
+        aggregate,
+        &lower_node.snapshots,
+        /*use_streaming*/ true,
+        /*max_batch_rows*/ MIN_TOPK_STREAM_ROWS,
+        None,
+        /*worker_sort_and_limit*/ None,
+        None,
+        /*required_input_ordering*/ None,
+    )?;
+    let cluster_schema = cluster.schema();
+    let cluster_dfschema = DFSchema::try_from(cluster_schema.as_ref().clone())?;
+
+    // Group by the key columns of the cluster output.
+    let reagg_group = PhysicalGroupBy::new_single(
+        (0..group_expr_len)
+            .map(|i| {
+                let name = cluster_schema.field(i).name();
+                (
+                    Arc::new(Column::new(name, i)) as Arc<dyn PhysicalExpr>,
+                    name.clone(),
+                )
+            })
+            .collect(),
+    );
+
+    // Re-aggregate each value column with its own function: the worker emits final values, and
+    // sum-of-sum / min-of-min / max-of-max reproduces the global aggregate. Reuse the original
+    // aggregate UDFs, just repointed at the corresponding cluster output column.
+    let reagg_logical = lower_node
+        .aggregate_expr
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let mut af = e.clone();
+            if let Expr::AggregateFunction(AggregateFunction { params, .. }) = &mut af {
+                let col_name = cluster_schema.field(group_expr_len + i).name().clone();
+                params.args = vec![Expr::Column(datafusion::common::Column::new(
+                    None::<TableReference>,
+                    col_name,
+                ))];
+            }
+            // Keep the original aggregate's output name so the physical schema matches the logical
+            // ClusterAggregateTopKUpper schema (else DF rejects the extension plan).
+            let out_name = lower_node.schema.field(group_expr_len + i).name().clone();
+            af.alias(out_name)
+        })
+        .collect_vec();
+    let reagg_exprs = reagg_logical
+        .iter()
+        .map(|e| {
+            create_aggregate_expr_and_maybe_filter(
+                e,
+                &cluster_dfschema,
+                &cluster_schema,
+                ctx.execution_props(),
+            )
+            .map(|(expr, _, _)| expr)
+        })
+        .collect::<Result<Vec<_>, DataFusionError>>()?;
+
+    // The Single-mode re-aggregate requires a single input partition. ClusterSend produces N>1
+    // partitions and EnforceDistribution is disabled in CubeStore, so fan the workers in explicitly
+    // (otherwise SanityCheckPlan rejects the plan with a SinglePartition distribution error).
+    let coalesced = Arc::new(CoalescePartitionsExec::new(cluster));
+    let reagg = Arc::new(AggregateExec::try_new(
+        AggregateMode::Single,
+        reagg_group,
+        reagg_exprs,
+        vec![None; agg_fun.len()],
+        coalesced,
+        cluster_schema.clone(),
+    )?);
+    let reagg_schema = reagg.schema();
+
+    let after_having: Arc<dyn ExecutionPlan> = if let Some(predicate) = &upper_node.having_expr {
+        let having = planner.create_physical_expr(predicate, &lower_node.schema, ctx)?;
+        Arc::new(FilterExec::try_new(having, reagg)?)
+    } else {
+        reagg
+    };
+
+    // Fetch-limited sort = DataFusion's bounded top-k heap.
+    let sort_expr = upper_node
+        .order_by
+        .iter()
+        .map(|c| {
+            let i = group_expr_len + c.agg_index;
+            PhysicalSortExpr {
+                expr: make_sort_expr(
+                    &agg_fun[c.agg_index].0,
+                    Arc::new(Column::new(reagg_schema.field(i).name(), i)),
+                ),
+                options: SortOptions {
+                    descending: !c.asc,
+                    nulls_first: c.nulls_first,
+                },
+            }
+        })
+        .collect_vec();
+    let sort =
+        SortExec::new(LexOrdering::new(sort_expr), after_having).with_fetch(Some(upper_node.limit));
+    Ok(Arc::new(sort))
 }
 
 pub fn make_sort_expr(

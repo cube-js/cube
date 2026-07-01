@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
+
+### Bug Fixes
+
+- **tesseract:** match rolling pre-aggregations without a date range via match-only mode ([#11178](https://github.com/cube-js/cube/issues/11178)) ([b3448e9](https://github.com/cube-js/cube/commit/b3448e9fa1e70c6ce53b63a96cada4c8d9c333a6))
+
 ## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
 
 **Note:** Version bump only for package @cubejs-backend/native

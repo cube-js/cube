@@ -1,5 +1,6 @@
 use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::check_memory::CheckMemoryExec;
+use crate::queryplanner::group_by_limit_aggregate::GroupByLimitAggregateExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
@@ -130,30 +131,31 @@ pub fn push_aggregate_to_workers(
     )?))
 }
 
-/// A global (no GROUP BY) aggregate doesn't use the input ordering, but the scan still merges
-/// its partitions with a SortPreservingMergeExec when the index has a sort key (e.g. picked
-/// from the filters for partition pruning). Replace such merges under the aggregate with plain
-/// partition coalescing: the per-row key comparisons are pure waste there, and particularly
-/// bad when the filters above make the merge keys constant, turning every comparison into a
-/// full-length tie.
+/// A Linear aggregate doesn't use input ordering, but the scan still merges its partitions with a
+/// SortPreservingMergeExec when the index has a sort key (e.g. picked from the filters for partition
+/// pruning). Replace such merges under the aggregate with plain partition coalescing: the per-row
+/// key comparisons are pure waste there, and particularly bad when the leading sort columns are
+/// constant (low-cardinality / NULL-heavy), turning every comparison into a full-length tie.
 ///
-/// Restricted to aggregates without group expressions: those hold a single accumulator set per
-/// partition even when later optimizations make them run per partition. A grouped hash
-/// aggregate over unmerged partitions could end up with a hash table per partition,
-/// multiplying its memory by the partition count.
+/// Always applied to global (no GROUP BY) aggregates. A grouped hash aggregate is equally safe --
+/// CoalescePartitions still yields a single output partition, hence one hash table and no
+/// per-partition memory blowup -- but it is gated behind `coalesce_grouped_hash` while the win is
+/// validated.
 pub fn drop_sort_merge_under_global_aggregate(
     p: Arc<dyn ExecutionPlan>,
+    coalesce_grouped_hash: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let Some(agg) = p.as_any().downcast_ref::<AggregateExec>() else {
         return Ok(p);
     };
-    if !matches!(agg.input_order_mode(), InputOrderMode::Linear)
-        || !agg.group_expr().expr().is_empty()
-    {
+    if !matches!(agg.input_order_mode(), InputOrderMode::Linear) {
         return Ok(p);
     }
-    // Order-sensitive aggregates (first_value, array_agg(ORDER BY), ...) stay Linear with an
-    // empty GROUP BY but still need their input ordered
+    if !agg.group_expr().expr().is_empty() && !coalesce_grouped_hash {
+        return Ok(p);
+    }
+    // Order-sensitive aggregates (first_value, array_agg(ORDER BY), ...) stay Linear but still
+    // require their input ordered -- leave their merge in place.
     if agg.required_input_ordering()[0].is_some() {
         return Ok(p);
     }
@@ -286,13 +288,24 @@ pub fn push_sorted_partial_aggregate_below_merge(
 /// key) would drop partial states of tied groups.
 pub fn push_worker_sort_and_limit(
     p: Arc<dyn ExecutionPlan>,
+    group_by_limit_factor: usize,
+    group_by_limit_per_partition: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    // Worker side: wrap the partial aggregate with a per-partition bounded sort.
+    // Worker side: bound the partial aggregate's output. A hash aggregate uses the trimming top-k
+    // when factor > 0, otherwise (and for the sorted/inline aggregate, whose group count is unknown)
+    // it is bounded with a per-partition Sort(fetch). `resort_worker_subtree` returns None only when
+    // there is no locatable partial aggregate, leaving the plan as planned.
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
         let Some((cols, fetch)) = w.worker_sort_and_limit.clone() else {
             return Ok(p);
         };
-        let Some(new_input) = resort_worker_subtree(&w.input, &cols, fetch) else {
+        let Some((new_input, _is_hash)) = resort_worker_subtree(
+            &w.input,
+            &cols,
+            fetch,
+            group_by_limit_factor,
+            group_by_limit_per_partition,
+        ) else {
             return Ok(p);
         };
         return Ok(Arc::new(WorkerExec::new(
@@ -307,10 +320,8 @@ pub fn push_worker_sort_and_limit(
         )));
     }
 
-    // Router side: rebuild the final aggregate over a sort-preserving merge in `worker_order`, and
-    // reorder the (optimization-only) worker subtree to match. Same keys are adjacent in
-    // `worker_order`, so the sorted final combines them; its output is `worker_order`-sorted (whose
-    // prefix is the query's ORDER BY), so the limit above stays correct.
+    // Router side: combine the workers' top-k with a hash final aggregate, then re-apply the top-k
+    // sort by `worker_order` (the total order T).
     let Some(final_agg) = FinalAggregateInfo::extract(&p) else {
         return Ok(p);
     };
@@ -324,23 +335,64 @@ pub fn push_worker_sort_and_limit(
     let Some((cols, fetch)) = cs.worker_sort_and_limit.clone() else {
         return Ok(p);
     };
-    let Some(new_worker_subtree) = resort_worker_subtree(&cs.input_for_optimizations, &cols, fetch)
-    else {
+    // `resort_worker_subtree` reports `is_hash` from the same descent it already does, so we don't
+    // walk to the partial aggregate twice. The hash aggregate emits unordered trimmed groups
+    // (combined by a hash final + re-sort); the sorted/inline aggregate emits bounded sorted streams
+    // (combined by a sort-preserving merge + sorted final).
+    let Some((new_worker_subtree, is_hash)) = resort_worker_subtree(
+        &cs.input_for_optimizations,
+        &cols,
+        fetch,
+        group_by_limit_factor,
+        group_by_limit_per_partition,
+    ) else {
         return Ok(p);
     };
     let new_cs: Arc<dyn ExecutionPlan> =
         Arc::new(cs.with_changed_schema(new_worker_subtree, cs.required_input_ordering.clone()));
     let worker_order = worker_ordering(&final_agg.group_expr, &cols)?;
-    let merged: Arc<dyn ExecutionPlan> =
-        Arc::new(SortPreservingMergeExec::new(worker_order, new_cs));
-    Ok(Arc::new(AggregateExec::try_new(
-        AggregateMode::Final,
-        final_agg.group_expr,
-        final_agg.aggr_expr,
-        final_agg.filter_expr,
-        merged,
-        final_agg.input_schema,
-    )?))
+
+    if is_hash {
+        // Hash final over coalesced (unordered) streams, then re-apply the top-k sort by the total
+        // order T. The Sort(fetch) is required even for a bare LIMIT: it keeps the k smallest by T --
+        // exactly the groups every worker kept and fully combined here -- where a plain limit could
+        // take a group only one worker kept (undercounted). The coalesce drains the workers in
+        // parallel.
+        let coalesced: Arc<dyn ExecutionPlan> = Arc::new(CoalescePartitionsExec::new(new_cs));
+        let final_hash: Arc<dyn ExecutionPlan> = Arc::new(AggregateExec::try_new(
+            AggregateMode::Final,
+            final_agg.group_expr,
+            final_agg.aggr_expr,
+            final_agg.filter_expr,
+            coalesced,
+            final_agg.input_schema,
+        )?);
+        Ok(Arc::new(
+            SortExec::new(worker_order, final_hash).with_fetch(Some(fetch)),
+        ))
+    } else {
+        // Sorted final over a sort-preserving merge in worker_order: equal keys are adjacent so the
+        // sorted final combines them, and its output stays worker_order-sorted (whose prefix is the
+        // query's ORDER BY), so the query's limit above stays correct -- no extra Sort needed.
+        let merged: Arc<dyn ExecutionPlan> =
+            Arc::new(SortPreservingMergeExec::new(worker_order, new_cs));
+        Ok(Arc::new(AggregateExec::try_new(
+            AggregateMode::Final,
+            final_agg.group_expr,
+            final_agg.aggr_expr,
+            final_agg.filter_expr,
+            merged,
+            final_agg.input_schema,
+        )?))
+    }
+}
+
+/// The `SortOptions` a `worker_sort_and_limit` descriptor entry `(asc, nulls_first)` maps to.
+fn descriptor_sort_options(asc: bool, nulls_first: bool) -> SortOptions {
+    SortOptions {
+        descending: !asc,
+        nulls_first,
+    }
 }
 
 /// Builds the `worker_order` LexOrdering over an aggregate's group columns from the descriptor.
@@ -356,51 +408,123 @@ fn worker_ordering(
         })?;
         exprs.push(PhysicalSortExpr {
             expr: Arc::new(Column::new(name, *idx)),
-            options: SortOptions {
-                descending: !asc,
-                nulls_first: *nulls_first,
-            },
+            options: descriptor_sort_options(*asc, *nulls_first),
         });
     }
     Ok(LexOrdering::new(exprs))
 }
 
-/// Rebuilds a worker subtree as `SortPreservingMerge(worker_order) <- Sort(worker_order, fetch, per
-/// partition) <- partial`. Returns `None` for an unrecognized or already-rewritten subtree, which
-/// keeps [push_worker_sort_and_limit] idempotent.
+/// Rebuilds a worker subtree to bound its output to the top `fetch` groups by the total order in
+/// `cols`. Two shapes:
+/// - hash (`AggregateExec`) with `factor > 0`: `CoalescePartitions <- GroupByLimitAggregate` --
+///   trim during aggregation, emitted unsorted for the router's hash final.
+/// - sorted/inline, and hash with `factor == 0`:
+///   `SortPreservingMerge(T) <- Sort(T, fetch, per partition) <- PartialAggregate` -- bound each
+///   partition with a sort. For hash this is the pre-trim behavior, kept as the `factor == 0`
+///   fallback so disabling the trim still bounds the worker rather than leaving it unbounded.
 ///
-/// The per-partition `Sort` does the bounding (a bounded heap, O(fetch) memory); the merge above it
-/// carries no fetch. Because this pass runs last, `replace_suboptimal_merge_sorts` has already run
-/// and won't push the query's row limit into the merge -- which would cut the merged stream of
-/// (still uncombined) partial rows by rows and undercount groups split across partitions.
+/// Returns `None` for an unrecognized subtree (no locatable partial aggregate), otherwise the
+/// rebuilt subtree paired with `is_hash` (true for the hash path) so the caller doesn't have to
+/// walk down to the partial aggregate a second time to decide the router shape.
 fn resort_worker_subtree(
     worker_subtree: &Arc<dyn ExecutionPlan>,
     cols: &[(usize, bool, bool)],
     fetch: usize,
-) -> Option<Arc<dyn ExecutionPlan>> {
+    group_by_limit_factor: usize,
+    group_by_limit_per_partition: bool,
+) -> Option<(Arc<dyn ExecutionPlan>, bool)> {
     let partial = locate_partial_aggregate(worker_subtree)?;
-    let schema = partial.schema();
-    let mut exprs = Vec::with_capacity(cols.len());
-    for (idx, asc, nulls_first) in cols {
-        let field = schema.fields().get(*idx)?;
-        exprs.push(PhysicalSortExpr {
-            expr: Arc::new(Column::new(field.name(), *idx)),
-            options: SortOptions {
-                descending: !asc,
-                nulls_first: *nulls_first,
+
+    // Hash path: trim during aggregation, emit unsorted for the router's hash final. Engaged only
+    // when factor > 0; with it off, the hash aggregate falls through to the sorted-bounding path
+    // below (a per-partition Sort(fetch) + merge), which is the pre-trim behavior -- so disabling
+    // the trim bounds the worker exactly as before, not leaving it unbounded.
+    if partial.as_any().is::<AggregateExec>() && group_by_limit_factor > 0 {
+        // CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION decides where the worker's hash table lives:
+        //  - off (default): coalesce the aggregate's input to a single partition, so the worker
+        //    builds ONE hash table over the merged partitions ("over merge"). Peak memory ~k, no
+        //    intra-worker parallelism on the aggregation.
+        //  - on: keep the raw multi-partition input, so the aggregate runs once per partition
+        //    ("under merge"): N parallel hash tables -- more parallelism, peak ~N*k. The trim keeps
+        //    each per-partition output to ~factor*k, and the global top-k argument (full group key)
+        //    guarantees a surviving group stays within every partition's local top-k.
+        let partial = if group_by_limit_per_partition {
+            partial
+        } else {
+            partial
+                .as_any()
+                .downcast_ref::<AggregateExec>()
+                .and_then(|agg| {
+                    if agg.input().output_partitioning().partition_count() <= 1 {
+                        return None;
+                    }
+                    let merged: Arc<dyn ExecutionPlan> =
+                        Arc::new(CoalescePartitionsExec::new(agg.input().clone()));
+                    partial.clone().with_new_children(vec![merged]).ok()
+                })
+                .unwrap_or(partial)
+        };
+
+        let order: Vec<(usize, SortOptions)> = cols
+            .iter()
+            .map(|(idx, asc, nulls_first)| (*idx, descriptor_sort_options(*asc, *nulls_first)))
+            .collect();
+        let trimmed: Arc<dyn ExecutionPlan> = match partial.as_any().downcast_ref::<AggregateExec>()
+        {
+            Some(agg) => match GroupByLimitAggregateExec::try_new_from_partial(
+                agg,
+                fetch,
+                group_by_limit_factor,
+                order,
+            ) {
+                Some(e) => Arc::new(e),
+                None => partial,
             },
-        });
+            None => partial,
+        };
+
+        // Emit the trimmed top-k unsorted, coalesced to one stream for the ClusterSend. The router
+        // hash-combines and re-applies the top-k sort, so no worker-side sort/merge holds the whole
+        // result. Under "over merge" the trimmed agg is already single-partition and this coalesce is
+        // a passthrough; under "under merge" it drains the per-partition aggregates concurrently.
+        return Some((Arc::new(CoalescePartitionsExec::new(trimmed)), true));
     }
-    let worker_order = LexOrdering::new(exprs);
+
+    // Sorted/inline path (and the factor == 0 fallback for hash aggregates): bound each partition
+    // with Sort(fetch) and merge in the total order. The per-partition `fetch` is sound because the
+    // key is the full group key: a globally top-`fetch` group stays within every partition's first
+    // `fetch`, so the router's sorted final still sees all its partial states (see this function's
+    // doc and the module note on the total order).
+    let worker_order = lex_ordering_from_cols(cols, &partial.schema())?;
     let per_partition_sort: Arc<dyn ExecutionPlan> = Arc::new(
         SortExec::new(worker_order.clone(), partial)
             .with_fetch(Some(fetch))
             .with_preserve_partitioning(true),
     );
-    Some(Arc::new(SortPreservingMergeExec::new(
-        worker_order,
-        per_partition_sort,
-    )))
+    Some((
+        Arc::new(SortPreservingMergeExec::new(
+            worker_order,
+            per_partition_sort,
+        )),
+        false,
+    ))
+}
+
+/// Build a `LexOrdering` over the partial aggregate's group columns from the descriptor (indices
+/// into the partial output schema). Returns `None` if a column index is out of range.
+fn lex_ordering_from_cols(
+    cols: &[(usize, bool, bool)],
+    schema: &datafusion::arrow::datatypes::SchemaRef,
+) -> Option<LexOrdering> {
+    let mut exprs = Vec::with_capacity(cols.len());
+    for (idx, asc, nulls_first) in cols {
+        let field = schema.fields().get(*idx)?;
+        exprs.push(PhysicalSortExpr {
+            expr: Arc::new(Column::new(field.name(), *idx)),
+            options: descriptor_sort_options(*asc, *nulls_first),
+        });
+    }
+    Some(LexOrdering::new(exprs))
 }
 
 /// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in
@@ -1310,7 +1434,7 @@ mod tests {
         );
         let original = global_sum_aggregate(filter);
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
 
         let agg = rewritten.as_any().downcast_ref::<AggregateExec>().unwrap();
         let filter = agg
@@ -1365,7 +1489,7 @@ mod tests {
             .required_input_ordering()[0]
             .is_some());
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
         assert!(Arc::ptr_eq(&rewritten, &original));
     }
 
@@ -1398,8 +1522,39 @@ mod tests {
             InputOrderMode::Linear
         ));
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
         assert!(Arc::ptr_eq(&rewritten, &original));
+    }
+
+    /// With the flag on, the same grouped hash aggregate's under-scan merge is replaced by plain
+    /// partition coalescing (single output partition -> one hash table), dropping the useless sort.
+    #[test]
+    fn coalesces_sort_merge_under_grouped_hash_aggregate_when_enabled() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, false),
+            Field::new("g", DataType::Int64, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2])),
+                Arc::new(Int64Array::from(vec![5, 4])),
+                Arc::new(Int64Array::from(vec![10, 20])),
+            ],
+        )
+        .unwrap();
+        let source = sorted_source(&schema, vec![vec![batch.clone()], vec![batch]]);
+        let original = sum_aggregate(AggregateMode::Partial, "g", merge_by_k(source));
+
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), true).unwrap();
+        // The aggregate stays grouped, but its input merge becomes a plain CoalescePartitionsExec
+        // (still a single output partition -> one hash table).
+        assert!(!Arc::ptr_eq(&rewritten, &original));
+        assert!(rewritten.as_any().is::<AggregateExec>());
+        assert!(rewritten.children()[0]
+            .as_any()
+            .is::<CoalescePartitionsExec>());
     }
 
     fn global_sum_aggregate(input: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
@@ -1446,7 +1601,7 @@ mod tests {
         let source = two_partition_source(&schema);
         let original = sum_aggregate(AggregateMode::Partial, "k", merge_by_k(source));
 
-        let rewritten = drop_sort_merge_under_global_aggregate(original.clone()).unwrap();
+        let rewritten = drop_sort_merge_under_global_aggregate(original.clone(), false).unwrap();
         assert!(Arc::ptr_eq(&rewritten, &original));
     }
 

@@ -1106,6 +1106,20 @@ describe('SQL Generation', () => {
       );
     });
 
+    it('CORE-541: measure filter casts bound param - bigquery tesseract planner', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BigqueryQuery(compilers, {
+        measures: ['cards.count'],
+        filters: [
+          { member: 'cards.count', operator: 'gt', values: ['10'] }
+        ],
+        useNativeSqlPlanner: true,
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('CAST(? AS FLOAT64)');
+    });
+
     it('Test time series with different granularity - postgres', async () => {
       await compilers.compiler.compile();
 

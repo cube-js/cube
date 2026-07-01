@@ -956,8 +956,9 @@ impl MultiStageQueryPlanner {
     }
 
     /// Adjust date range filters for rolling window when there's no granularity.
-    /// Without granularity there's no time_series CTE, so we replace InDateRange
-    /// with BeforeOrOnDate/AfterOrOnDate that use parameters directly.
+    /// Without granularity there's no time_series CTE, so the InDateRange filter
+    /// is rewritten into the rolling-window bounds (anchored by the window offset)
+    /// applied directly to the base measure.
     fn replace_date_range_for_rolling_window(
         &self,
         rolling_window: &RollingWindow,
@@ -971,6 +972,7 @@ impl MultiStageQueryPlanner {
                         &filter.member_name(),
                         &rolling_window.trailing,
                         &rolling_window.leading,
+                        rolling_window.offset.as_deref().unwrap_or("end"),
                     )?;
                 }
             }

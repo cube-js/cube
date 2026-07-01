@@ -160,6 +160,13 @@ export async function runEnvironment(
   if (type === 'clickhouse') {
     compose.withWaitStrategy('data', Wait.forHealthCheck());
   }
+  // Oracle takes noticeably longer to become ready than the global startup
+  // timeout allows, and it only registers the FREEPDB1 service once fully up,
+  // so wait on the container HEALTHCHECK (defined in the oracle fixture) with
+  // an extended timeout before connecting.
+  if (type === 'oracle') {
+    compose.withWaitStrategy('data', Wait.forHealthCheck().withStartupTimeout(240 * 1000));
+  }
 
   const environment = await compose.up();
 

@@ -1,7 +1,6 @@
 use crate::cube_bridge::cube_definition::{CubeDefinition, CubeDefinitionStatic};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::{
     MockJoinItemDefinition, MockMemberSql, MockViewFilterDefinition,
 };

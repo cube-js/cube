@@ -84,6 +84,10 @@ impl QueryPropertiesCompiler {
             .and_then(|v| v.parse::<usize>().ok());
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let pre_aggregations_match_only = options
+            .static_data()
+            .pre_aggregations_match_only
+            .unwrap_or(false);
         let use_original_sql_pre_aggregations_in_pre_aggregation = options
             .static_data()
             .use_original_sql_pre_aggregations_in_pre_aggregation
@@ -113,6 +117,7 @@ impl QueryPropertiesCompiler {
             .offset(offset)
             .ungrouped(ungrouped)
             .pre_aggregation_query(pre_aggregation_query)
+            .pre_aggregations_match_only(pre_aggregations_match_only)
             .use_original_sql_pre_aggregations_in_pre_aggregation(
                 use_original_sql_pre_aggregations_in_pre_aggregation,
             )
@@ -253,12 +258,26 @@ impl QueryPropertiesCompiler {
                 } else {
                     None
                 };
-                Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                    base_symbol,
-                    d.granularity.clone(),
-                    granularity_obj,
-                    date_range_tuple,
-                )))
+                // Honor an explicit `memberToAlias` override for the granularized
+                // member. The SQL API (cubesql) keys it `{member}.{granularity}`
+                // (dotted) and references the CubeScan column by that alias; the
+                // default `{base alias}_{granularity}` would otherwise mismatch.
+                let alias_override = d.granularity.as_ref().and_then(|granularity| {
+                    evaluator_compiler.alias_for_member(&format!(
+                        "{}.{}",
+                        base_symbol.full_name(),
+                        granularity
+                    ))
+                });
+                Ok(MemberSymbol::new_time_dimension(
+                    TimeDimensionSymbol::new_with_alias(
+                        base_symbol,
+                        d.granularity.clone(),
+                        granularity_obj,
+                        date_range_tuple,
+                        alias_override,
+                    ),
+                ))
             })
             .collect()
     }
