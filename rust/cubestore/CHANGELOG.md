@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
+
+### Bug Fixes
+
+- **cubestore:** add statsd metrics bind address ENV VAR ([#9922](https://github.com/cube-js/cube/issues/9922)) ([6b98135](https://github.com/cube-js/cube/commit/6b98135acd24e499c874f53653e9d4621cb4fb08))
+- **cubestore:** guard replay handle seq pointer / location length mismatch ([#11093](https://github.com/cube-js/cube/issues/11093)) ([d257168](https://github.com/cube-js/cube/commit/d257168d4674fa37b874e6d753bfd841a94914ef))
+
+### Features
+
+- **cubestore:** top-k merge strategies via CUBESTORE_TOPK_STRATEGY ([#11152](https://github.com/cube-js/cube/issues/11152)) ([0c8cd24](https://github.com/cube-js/cube/commit/0c8cd244113ba611802b870e7ec731fc0af7f349))
+
+### Performance Improvements
+
+- **cubestore:** worker-side group-by-limit hash-aggregate trim ([#11144](https://github.com/cube-js/cube/issues/11144)) ([dc7fba9](https://github.com/cube-js/cube/commit/dc7fba933de93eac6c4fb31571ca3ddb3800b582))
+
 ## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
 
 ### Bug Fixes

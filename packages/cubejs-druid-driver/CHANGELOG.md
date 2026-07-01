@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
+
+### Bug Fixes
+
+- **druid-driver:** Emulate ILIKE for Tesseract and SQL API push down ([#11164](https://github.com/cube-js/cube/issues/11164)) ([ff3f5c9](https://github.com/cube-js/cube/commit/ff3f5c9c1236bdc929e69554fb40c4aef39a3db3))
+
 ## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver

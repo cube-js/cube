@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
+
+### Features
+
+- **oracle-driver:** Improvements & fixes, fix [#10834](https://github.com/cube-js/cube/issues/10834) ([#11174](https://github.com/cube-js/cube/issues/11174)) ([9da8e07](https://github.com/cube-js/cube/commit/9da8e076897071f204711456b92ff69150547d9c))
+
 ## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
 
 **Note:** Version bump only for package @cubejs-backend/testing

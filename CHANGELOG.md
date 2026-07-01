@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
+
+### Bug Fixes
+
+- **cubestore:** add statsd metrics bind address ENV VAR ([#9922](https://github.com/cube-js/cube/issues/9922)) ([6b98135](https://github.com/cube-js/cube/commit/6b98135acd24e499c874f53653e9d4621cb4fb08))
+- **cubestore:** guard replay handle seq pointer / location length mismatch ([#11093](https://github.com/cube-js/cube/issues/11093)) ([d257168](https://github.com/cube-js/cube/commit/d257168d4674fa37b874e6d753bfd841a94914ef))
+- **druid-driver:** Emulate ILIKE for Tesseract and SQL API push down ([#11164](https://github.com/cube-js/cube/issues/11164)) ([ff3f5c9](https://github.com/cube-js/cube/commit/ff3f5c9c1236bdc929e69554fb40c4aef39a3db3))
+- **tesseract:** cast bound param on measure filters ([#11176](https://github.com/cube-js/cube/issues/11176)) ([28e91ed](https://github.com/cube-js/cube/commit/28e91edeae265d42dad24deaaf6b5f97ad0593d2))
+- **tesseract:** Drop order-by-only measures from pre-aggregation reads ([#11179](https://github.com/cube-js/cube/issues/11179)) ([30bdcbb](https://github.com/cube-js/cube/commit/30bdcbbd5141e98997e396ac648e66dd8f7596b2))
+- **tesseract:** Honor memberToAlias for granularized time dimensions ([#11142](https://github.com/cube-js/cube/issues/11142)) ([96a6f28](https://github.com/cube-js/cube/commit/96a6f28369b742322329e829bd080acc2598abfd))
+- **tesseract:** honor rolling window offset without granularity ([#11169](https://github.com/cube-js/cube/issues/11169)) ([9b6a960](https://github.com/cube-js/cube/commit/9b6a9602fffbf960982397a38b6b941b34db7c92))
+- **tesseract:** Incorrect measure for ungrouped rollup pre-aggregation ([#11181](https://github.com/cube-js/cube/issues/11181)) ([45fac55](https://github.com/cube-js/cube/commit/45fac55edaf986b6109802706fa893bedf8bcd9d))
+- **tesseract:** match rolling pre-aggregations without a date range via match-only mode ([#11178](https://github.com/cube-js/cube/issues/11178)) ([b3448e9](https://github.com/cube-js/cube/commit/b3448e9fa1e70c6ce53b63a96cada4c8d9c333a6))
+- **tesseract:** Per branch aliases in rollupLambda unions ([#11184](https://github.com/cube-js/cube/issues/11184)) ([6e5c98f](https://github.com/cube-js/cube/commit/6e5c98f1a1cd88ddd1ae42dfce06f33bc0e5fa33))
+- **tesseract:** preserve FILTER_PARAMS pushdown with segments ([#11182](https://github.com/cube-js/cube/issues/11182)) ([c27af09](https://github.com/cube-js/cube/commit/c27af09bba7c473c1a9a460f671f54db2a5d0787))
+- **tesseract:** Reject pre-agg when a measure is multiplied only in t… ([#11173](https://github.com/cube-js/cube/issues/11173)) ([660c0a2](https://github.com/cube-js/cube/commit/660c0a2511e25bb63981538488db326e56deee0a)), closes [#9541](https://github.com/cube-js/cube/issues/9541)
+- **tesseract:** Render dimension mask filters on grouped masked measures ([#11177](https://github.com/cube-js/cube/issues/11177)) ([f0569ad](https://github.com/cube-js/cube/commit/f0569adc67080a409f605cf0cd42f58ee5375ce2))
+
+### Features
+
+- **cubestore:** top-k merge strategies via CUBESTORE_TOPK_STRATEGY ([#11152](https://github.com/cube-js/cube/issues/11152)) ([0c8cd24](https://github.com/cube-js/cube/commit/0c8cd244113ba611802b870e7ec731fc0af7f349))
+- **oracle-driver:** Improvements & fixes, fix [#10834](https://github.com/cube-js/cube/issues/10834) ([#11174](https://github.com/cube-js/cube/issues/11174)) ([9da8e07](https://github.com/cube-js/cube/commit/9da8e076897071f204711456b92ff69150547d9c))
+- **tesseract:** Support Funnels extension ([#11187](https://github.com/cube-js/cube/issues/11187)) ([183cd6e](https://github.com/cube-js/cube/commit/183cd6e4e34db8b15011a86c5b73358c0ae0cb4d))
+
+### Performance Improvements
+
+- **cubestore:** worker-side group-by-limit hash-aggregate trim ([#11144](https://github.com/cube-js/cube/issues/11144)) ([dc7fba9](https://github.com/cube-js/cube/commit/dc7fba933de93eac6c4fb31571ca3ddb3800b582))
+
 ## [1.6.64](https://github.com/cube-js/cube/compare/v1.6.63...v1.6.64) (2026-06-25)
 
 ### Bug Fixes
