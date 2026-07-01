@@ -5770,4 +5770,62 @@ cubes:
       },
     ]);
   });
+
+  if (getEnv('nativeSqlPlanner')) {
+    describe('FILTER_PARAMS with segments under Tesseract', () => {
+      const fpCompilers = prepareJsCompiler(`
+        cube('orders_fp', {
+          sql: \`
+            SELECT * FROM orders
+            WHERE \${FILTER_PARAMS.orders_fp.created_at.filter('created_at')}
+              AND \${FILTER_PARAMS.orders_fp.status.filter('status')}
+          \`,
+          measures: {
+            count: { type: 'count' },
+          },
+          dimensions: {
+            id: { sql: 'id', type: 'number', primaryKey: true },
+            status: { sql: 'status', type: 'string' },
+            created_at: { sql: 'created_at', type: 'time' },
+          },
+          segments: {
+            completed: { sql: \`\${CUBE}.status = 'completed'\` },
+          },
+        });
+      `);
+
+      it('FILTER_PARAMS pushdown is preserved when a segment is present', async () => {
+        await fpCompilers.compiler.compile();
+        const query = new PostgresQuery(fpCompilers, {
+          measures: ['orders_fp.count'],
+          segments: ['orders_fp.completed'],
+          filters: [
+            { member: 'orders_fp.status', operator: 'equals', values: ['completed'] },
+          ],
+          timeDimensions: [{
+            dimension: 'orders_fp.created_at',
+            dateRange: ['2024-01-01', '2024-01-31'],
+          }],
+          timezone: 'UTC',
+        });
+
+        const [sql] = query.buildSqlAndParams();
+
+        // A dropped FILTER_PARAMS renders as `1 = 1` (always_true). The segment
+        // and the outer filters always render real predicates, so `1 = 1` can
+        // only come from a FILTER_PARAMS that failed to push down. Its absence
+        // proves both placeholders received their predicates (full or partial
+        // loss would leave at least one `1 = 1`).
+        expect(sql).not.toMatch(/1\s*=\s*1/);
+
+        // The predicates must land inside the cube's base subquery
+        // (`FROM orders WHERE ...`), before it is aliased as the cube — not
+        // only on the outer query, where they appear regardless of pushdown.
+        const innerStart = sql.indexOf('FROM orders');
+        const innerSql = sql.slice(innerStart, sql.indexOf('orders_fp', innerStart));
+        expect(innerSql).toMatch(/created_at\s*>=/);
+        expect(innerSql).toMatch(/status\s*=/);
+      });
+    });
+  }
 });

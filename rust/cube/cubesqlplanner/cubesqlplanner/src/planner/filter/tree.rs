@@ -42,6 +42,10 @@ pub enum FilterItem {
     Segment(Rc<BaseSegment>),
 }
 
+/// Whether a recursive `find_subtree_for_members` call matched every node
+/// without pruning anything (segments, non-matching items, etc.).
+type FullMatch = bool;
+
 /// Top-level filter tree of a query — its `items` are implicitly
 /// AND-joined.
 #[derive(Clone)]
@@ -105,39 +109,23 @@ impl FilterItem {
         }
     }
 
-    // Extracts all member symbols from this filter tree.
-    // Returns None when the tree is invalid (e.g. an empty group, or
-    // anything below a Segment item), Some(members) otherwise.
-    fn extract_filter_members(&self) -> Option<Vec<Rc<MemberSymbol>>> {
-        match self {
-            FilterItem::Group(group) => {
-                // Empty groups are considered invalid
-                if group.items.is_empty() {
-                    return None;
-                }
-
-                let mut all_members = Vec::new();
-
-                // Recursively extract from all children
-                for child in &group.items {
-                    match child.extract_filter_members() {
-                        None => return None, // If any child is invalid, entire tree is invalid
-                        Some(mut members) => all_members.append(&mut members),
-                    }
-                }
-
-                Some(all_members)
-            }
-            FilterItem::Item(item) => Some(vec![item.member_evaluator().clone()]),
-            FilterItem::Segment(_) => None,
-        }
+    /// Returns the largest subtree that only references the given
+    /// `target_members`, or `None` if no such subtree exists.
+    ///
+    /// Partial matching is only supported for AND groups. OR groups are
+    /// preserved only when all of their children match the target members.
+    ///
+    /// `Segment` nodes are skipped during extraction — they do not prevent
+    /// sibling member filters from being collected in AND groups.
+    pub fn find_subtree_for_members(&self, target_members: &[&String]) -> Option<FilterItem> {
+        self.find_subtree_for_members_inner(target_members)
+            .map(|(filter_item, _)| filter_item)
     }
 
-    /// Returns the largest subtree that only references the given
-    /// `target_members`, or `None` if no such subtree exists. Only
-    /// AND groups are traversed for partial matching — OR groups
-    /// either match as a whole or are dropped.
-    pub fn find_subtree_for_members(&self, target_members: &[&String]) -> Option<FilterItem> {
+    fn find_subtree_for_members_inner(
+        &self,
+        target_members: &[&String],
+    ) -> Option<(FilterItem, FullMatch)> {
         match self {
             FilterItem::Group(group) => {
                 // Empty groups return None
@@ -145,47 +133,57 @@ impl FilterItem {
                     return None;
                 }
 
-                // Extract all members from this filter subtree
-                let filter_members = self.extract_filter_members()?;
+                match group.operator {
+                    FilterGroupOperator::And => {
+                        let mut matching_children = Vec::new();
+                        let mut all_children_fully_match = true;
 
-                // Check if all members in this filter are in the target set
-                let all_members_match = filter_members.iter().all(|member| {
-                    target_members.iter().any(|target| {
-                        &&member.clone().resolve_reference_chain().full_name() == target
-                    })
-                });
+                        for child in &group.items {
+                            match child.find_subtree_for_members_inner(target_members) {
+                                Some((matching_child, child_fully_matched)) => {
+                                    matching_children.push(matching_child);
+                                    all_children_fully_match &= child_fully_matched;
+                                }
+                                None => all_children_fully_match = false,
+                            }
+                        }
 
-                if all_members_match {
-                    // All members match - return this entire filter subtree
-                    return Some(self.clone());
-                }
+                        if matching_children.is_empty() {
+                            return None;
+                        }
 
-                // Only process AND groups for partial matching
-                if group.operator == FilterGroupOperator::And {
-                    let matching_children: Vec<FilterItem> = group
-                        .items
-                        .iter()
-                        .filter_map(|child| child.find_subtree_for_members(target_members))
-                        .collect();
+                        if all_children_fully_match {
+                            // Every child matches, so preserve the original group shape.
+                            return Some((self.clone(), true));
+                        }
 
-                    if matching_children.is_empty() {
-                        return None;
+                        if matching_children.len() == 1 {
+                            // Single match - return it directly without wrapping.
+                            return Some((matching_children.into_iter().next().unwrap(), false));
+                        }
+
+                        // Multiple matches - wrap in a new AND group.
+                        Some((
+                            FilterItem::Group(Rc::new(FilterGroup::new(
+                                FilterGroupOperator::And,
+                                matching_children,
+                            ))),
+                            false,
+                        ))
                     }
+                    FilterGroupOperator::Or => {
+                        // OR groups can only be preserved if every child matches.
+                        for child in &group.items {
+                            let (_, child_fully_matched) =
+                                child.find_subtree_for_members_inner(target_members)?;
+                            if !child_fully_matched {
+                                return None;
+                            }
+                        }
 
-                    if matching_children.len() == 1 {
-                        // Single match - return it directly without wrapping
-                        return Some(matching_children.into_iter().next().unwrap());
+                        Some((self.clone(), true))
                     }
-
-                    // Multiple matches - wrap in new AND group
-                    return Some(FilterItem::Group(Rc::new(FilterGroup::new(
-                        FilterGroupOperator::And,
-                        matching_children,
-                    ))));
                 }
-
-                // OR groups are not supported
-                None
             }
             FilterItem::Item(item) => {
                 let member = item.member_evaluator();
@@ -195,7 +193,7 @@ impl FilterItem {
                     .iter()
                     .any(|target| &&member.clone().resolve_reference_chain().full_name() == target)
                 {
-                    Some(self.clone())
+                    Some((self.clone(), true))
                 } else {
                     None
                 }
