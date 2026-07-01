@@ -7,6 +7,7 @@ use crate::logical_plan::PreAggregationJoin;
 use crate::logical_plan::PreAggregationJoinItem;
 use crate::logical_plan::PreAggregationTable;
 use crate::logical_plan::PreAggregationUnion;
+use crate::logical_plan::PreAggregationUnionItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::JoinPlanner;
@@ -302,13 +303,22 @@ impl PreAggregationsCompiler {
         for (i, rollup) in pre_aggrs_for_lambda.clone().iter().enumerate() {
             match rollup.source.as_ref() {
                 PreAggregationSource::Single(table) => {
-                    sources.push(Rc::new(table.clone()));
+                    // Carry this branch's own symbols: each member rollup stores its
+                    // columns under its own cube aliases, while the lambda exposes the
+                    // first rollup's symbols. The physical builder maps lambda members
+                    // to each branch's stored column through these.
+                    sources.push(PreAggregationUnionItem {
+                        table: Rc::new(table.clone()),
+                        measures: rollup.measures.clone(),
+                        dimensions: rollup.dimensions.clone(),
+                        time_dimensions: rollup.time_dimensions.clone(),
+                    });
                 }
                 _ => {
                     return Err(CubeError::user(format!("Rollup lambda can't be nested")));
                 }
             }
-            if i > 1 {
+            if i >= 1 {
                 Self::match_symbols(&rollup.measures, &pre_aggrs_for_lambda[0].measures)?;
                 Self::match_symbols(&rollup.dimensions, &pre_aggrs_for_lambda[0].dimensions)?;
                 Self::match_time_dimensions(

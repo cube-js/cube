@@ -58,6 +58,11 @@ export interface GetSqlOptions {
   includeDebugInfo?: boolean;
   exportAnnotatedSql?: boolean;
   requestId?: string;
+  // Build only the pre-aggregation descriptions, skipping the outer query SQL.
+  // Used by the refresh/metadata path, which consumes `preAggregations` but not `sql`.
+  // Avoids building a rolling-window time series that would require a date range the
+  // refresh path doesn't provide.
+  preAggregationsOnly?: boolean;
 }
 
 export interface SqlResult {
@@ -347,13 +352,13 @@ export class CompilerApi {
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
-    const { includeDebugInfo, exportAnnotatedSql } = options;
+    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
-      sql: sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
-      lambdaQueries: sqlGenerator.buildLambdaQuery(),
+      sql: preAggregationsOnly ? null : sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
+      lambdaQueries: preAggregationsOnly ? [] : sqlGenerator.buildLambdaQuery(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
       order: sqlGenerator.order,

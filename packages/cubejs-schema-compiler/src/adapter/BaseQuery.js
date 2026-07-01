@@ -967,7 +967,9 @@ export class BaseQuery {
     };
 
     try {
-      const buildResult = nativeBuildSqlAndParams(queryParams);
+      // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
+      // during the member-SQL callbacks the native planner makes back into JS.
+      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -1009,6 +1011,11 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      // We only consume the pre-aggregation match result here (sql/params are discarded
+      // below), so tell the native planner to skip building the outer query SQL. Otherwise
+      // a rolling-window measure without a date range would throw while rendering its time
+      // series, even though matching itself doesn't need it.
+      preAggregationsMatchOnly: true,
       preAggregationId: this.options.preAggregationId || null,
       securityContext: this.contextSymbols.securityContext,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
@@ -4032,7 +4039,7 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    return localTimestampToUtc(this.timezone, this.timestampFormat(), date);
+    return localTimestampToUtc(this.timezone || 'UTC', this.timestampFormat(), date);
   }
 
   /**

@@ -414,11 +414,14 @@ impl PreAggregationOptimizer {
                 let items = union
                     .items
                     .iter()
-                    .map(|t| {
-                        Rc::new(PreAggregationTable {
+                    .map(|item| PreAggregationUnionItem {
+                        table: Rc::new(PreAggregationTable {
                             usage_index: Some(usage_index),
-                            ..t.as_ref().clone()
-                        })
+                            ..item.table.as_ref().clone()
+                        }),
+                        measures: item.measures.clone(),
+                        dimensions: item.dimensions.clone(),
+                        time_dimensions: item.time_dimensions.clone(),
                     })
                     .collect();
                 Rc::new(PreAggregationSource::Union(PreAggregationUnion { items }))

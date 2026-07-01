@@ -1,0 +1,90 @@
+---
+title: Localization
+description: Set the language for embedded Cube surfaces — account-wide, per embed via URL, or at runtime.
+---
+
+Embedded Cube surfaces — dashboards, [Analytics Chat](/embedding/iframe/analytics-chat),
+and the full app in [Creator Mode](/embedding/iframe/creator-mode) — can render their
+UI in any of the supported languages. You can set a default language for the whole
+account, override it per embed with a URL parameter, or switch it at runtime from the
+host page.
+
+<Note>
+  Available on [Premium and Enterprise plans](https://cube.dev/pricing).
+</Note>
+
+## Supported languages
+
+| Language                   | Locale code |
+| -------------------------- | ----------- |
+| English (US)               | `en-US`     |
+| Deutsch (Deutschland)      | `de-DE`     |
+| Español (España)           | `es-ES`     |
+| Español (Latinoamérica)    | `es-MX`     |
+| Français (France)          | `fr-FR`     |
+| Italiano (Italia)          | `it-IT`     |
+| 日本語 (日本)               | `ja-JP`     |
+| Norsk bokmål (Norge)       | `nb-NO`     |
+| Português (Brasil)         | `pt-BR`     |
+| Português (Portugal)       | `pt-PT`     |
+| Svenska (Sverige)          | `sv-SE`     |
+| Tiếng Việt (Việt Nam)      | `vi-VN`     |
+
+English (`en-US`) is the default and the fallback when no language is configured.
+
+A locale value can be a full code (`es-ES`), a short language code (`es`), or a regional
+variant that isn't shipped (`es-AR`). Short codes and unsupported regional variants
+resolve to the first supported locale for that language — for example, both `es` and
+`es-AR` resolve to `es-ES`. A value that doesn't match any supported language is ignored.
+
+## How the language is resolved
+
+The language of an embedded surface is resolved from the following sources, highest
+priority first:
+
+1. **Runtime override** — a [`cube:action:set-locale`](/embedding/iframe/events#cube-action-set-locale)
+   message sent from the host page (see [At runtime](#at-runtime)).
+2. **URL parameter** — the `?locale=` query parameter on the embed URL (see
+   [Per embed via URL](#per-embed-via-url)).
+3. **Account default** — the language configured in **Embed → Settings** (see
+   [Account-wide default](#account-wide-default)).
+4. **Fallback** — `en-US`.
+
+## Account-wide default
+
+Set a default language for all embedded surfaces from the Cube Cloud console:
+
+1. Go to **Embed → Settings**.
+2. In the **Language** card, pick a language from the dropdown.
+
+The selected language applies to every embedded surface across the account, unless a
+specific embed overrides it with a `?locale=` URL parameter or a runtime
+`cube:action:set-locale` message.
+
+Clearing the setting removes the stored default, and embeds fall back to `en-US` (or to
+whatever a per-embed override specifies).
+
+## Per embed via URL
+
+Override the account default for an individual embed by adding the `?locale=` query
+parameter to the embed URL:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&locale=es-MX
+```
+
+The parameter is read once when the embed loads and pinned for the session, so in-app
+navigation won't drop it.
+
+## At runtime
+
+Switch the language after the embed has loaded by sending a
+[`cube:action:set-locale`](/embedding/iframe/events#cube-action-set-locale) message from
+the host page. This takes precedence over both the URL parameter and the account default:
+
+```js
+sendAction("cube:action:set-locale", { locale: "es" });
+```
+
+See [Events and actions](/embedding/iframe/events) for the full host ↔ embed messaging
+contract.
