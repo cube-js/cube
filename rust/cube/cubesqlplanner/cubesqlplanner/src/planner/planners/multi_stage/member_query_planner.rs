@@ -542,7 +542,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(exclude) = &grain.exclude {
             dimensions
                 .into_iter()
-                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| !exclude.iter().any(|m| d.matches_grain_reference(m)))
                 .collect_vec()
         } else {
             dimensions
@@ -550,7 +550,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(keep_only) = &grain.keep_only {
             dimensions
                 .into_iter()
-                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| keep_only.iter().any(|m| d.matches_grain_reference(m)))
                 .collect_vec()
         } else {
             dimensions
