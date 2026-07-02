@@ -192,6 +192,36 @@ Use the three-dot menu in the Colors section to **reset to defaults** or **copy 
 {"header":{"fontColor":"#fefefe","backgroundColor":"#5339CF"},"banding":{"backgroundColor":"#f5f3ff"}}
 ```
 
+### Borders
+
+The **Borders** section of the **Style** tab controls which table borders are drawn. Five borders are configurable, each with its own toggle, color, and width (1–10 pixels):
+
+| Border | Description | Default |
+|---|---|---|
+| **Horizontal borders** | Lines between value rows | On |
+| **Vertical borders** | Lines between columns, running through the header, values, and totals | Off |
+| **Header border** | The line under the header row | On |
+| **Totals border** | The line above the totals row | On |
+| **Outer border** | The frame around the whole table | Off |
+
+Each border is a row in the section: click the **icon button** to toggle the border on or off, and use the **color** swatch and **width** input next to it to style it. Color and width are only available while the border is on. When you don't pick a color, the border uses the theme's default border color, which adapts to light and dark mode automatically.
+
+Because every border has its own color and width, styles like a financial report — a thick line under the header, above the totals, and around the table, with thin lines between value rows — are a few clicks away. Or one: see presets below.
+
+{/* TODO screenshot: Borders section with the accounting preset applied (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+#### Border presets
+
+Open the menu in the corner of the Borders section to apply a preset — a one-shot configuration of all five borders that you can tweak further afterwards:
+
+- **Rows (default)** — horizontal row lines with header and totals separators; the standard look.
+- **Full grid** — all borders on; a spreadsheet look.
+- **Minimal** — only a dark line under the header.
+- **Accounting** — thin light row lines with a thick dark header separator, totals separator, and outer frame; a financial-statement look.
+- **None** — no borders at all.
+
+Use **Reset to default** at the bottom of the section to clear all border settings.
+
 ## Conditional formatting
 
 The **Conditional formatting** tab applies cell or row styling based on conditions you define. Configure:
