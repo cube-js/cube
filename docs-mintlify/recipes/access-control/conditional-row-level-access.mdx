@@ -39,7 +39,7 @@ cubes:
     access_policy:
       - group: analyst
         conditions:
-          - if: "{ security_context.groups and 'emea' in security_context.groups }"
+          - if: "{ security_context.groups and security_context.groups.includes('emea') }"
         row_level:
           filters:
             - member: region
@@ -48,7 +48,7 @@ cubes:
 
       - group: analyst
         conditions:
-          - if: "{ security_context.groups and 'amer' in security_context.groups }"
+          - if: "{ security_context.groups and security_context.groups.includes('amer') }"
         row_level:
           filters:
             - member: region
@@ -97,28 +97,9 @@ cube(`orders`, {
 
 </CodeGroup>
 
-In JavaScript, you can also express the same pattern by making `row_level`
-itself a function of `securityContext` and returning different filters
-depending on the caller:
-
-<CodeGroup>
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    # ...
-
-    access_policy:
-      - group: analyst
-        conditions:
-          - if: "{ security_context.groups and ('emea' in security_context.groups or 'amer' in security_context.groups) }"
-        row_level:
-          filters:
-            - member: region
-              operator: equals
-              values:
-                - "{ 'EMEA' if 'emea' in security_context.groups else 'AMER' }"
-```
+In JavaScript, you can collapse the two policies into one by computing the
+filter `values` from `securityContext` at evaluation time — the `values` array
+is evaluated per request, so a ternary can pick the region for the caller:
 
 ```javascript title="JavaScript"
 cube(`orders`, {
@@ -145,7 +126,14 @@ cube(`orders`, {
 })
 ```
 
-</CodeGroup>
+<Note>
+This single-policy form is JavaScript-only. YAML `{ ... }` expressions don't
+support inline conditionals (Python `if`/`else`) or comparison operators, so in
+YAML use one policy per region as shown above. Note that `row_level` itself is
+always a static object — only the `member` and `values` inside a filter are
+evaluated against `securityContext`; you can't replace `row_level` with a
+function.
+</Note>
 
 ### Admin override with `allow_all`
 
@@ -215,16 +203,16 @@ cube(`orders`, {
 
 ### Composing boolean logic with `conditions`
 
-`conditions` accept full boolean logic, so you can switch which `row_level`
+`conditions` accept boolean logic, so you can switch which `row_level`
 applies based on combined checks against the security context and user
 attributes. In YAML, use `and`, `or`, `not`, and parentheses inside
 `{ ... }`. In JavaScript, use `&&`, `||`, and `!`. Multiple `conditions`
 entries on a single policy are combined with _AND_ semantics; multiple
 matching policies are combined with _OR_ semantics.
 
-In the following example, full-time analysts who are _either_ admins _or_
-owners and are _not_ contractors get unrestricted row access; everyone else
-in the `analyst` group falls back to the region-restricted policy above.
+In the following example, full-time senior analysts who are _either_ admins
+_or_ owners and are _not_ contractors get unrestricted row access; everyone
+else in the `analyst` group falls back to the region-restricted policy above.
 
 <CodeGroup>
 
@@ -236,9 +224,9 @@ cubes:
     access_policy:
       - group: analyst
         conditions:
-          - if: "{ user_attributes.is_full_time_employee and user_attributes.tenure_years >= 2 }"
+          - if: "{ user_attributes.is_full_time_employee and user_attributes.is_senior }"
           - if: "{ user_attributes.is_admin or user_attributes.is_owner }"
-          - if: "{ not (security_context.groups and 'contractors' in security_context.groups) }"
+          - if: "{ not (security_context.groups and security_context.groups.includes('contractors')) }"
         row_level:
           allow_all: true
 ```
@@ -251,7 +239,7 @@ cube(`orders`, {
     {
       group: `analyst`,
       conditions: [
-        { if: userAttributes.is_full_time_employee && userAttributes.tenure_years >= 2 },
+        { if: userAttributes.is_full_time_employee && userAttributes.is_senior },
         { if: userAttributes.is_admin || userAttributes.is_owner },
         { if: !(securityContext.groups && securityContext.groups.includes(`contractors`)) }
       ],
@@ -264,6 +252,14 @@ cube(`orders`, {
 ```
 
 </CodeGroup>
+
+<Note>
+YAML `{ ... }` expressions are parsed as Python and support `and`, `or`, `not`,
+parentheses, member access, and method calls like `.includes(...)`. They do
+**not** support comparison operators (`==`, `>=`, `in`) or inline `if`/`else`
+conditionals — use boolean [user attributes][ref-sec-ctx] or method calls
+instead. The JavaScript form has no such restriction.
+</Note>
 
 ## Result
 
@@ -280,5 +276,5 @@ combines with the regional policy via _OR_ semantics.
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
 [ref-ref-dap-conditions]: /reference/data-modeling/data-access-policies#conditions
 [ref-ref-dap-row-level]: /reference/data-modeling/data-access-policies#row-level
-[ref-dap-rls]: /docs/data-modeling/access-control/data-access-policies#row-level-access
+[ref-dap-rls]: /docs/data-modeling/data-access-policies#row-level-access
 [ref-sec-ctx]: /docs/data-modeling/access-control/context

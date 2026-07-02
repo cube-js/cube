@@ -210,12 +210,16 @@ cube(`orders`, {
 
 #### Boolean logic in `if` expressions
 
-`if` expressions support full boolean logic so you can compose checks against
+`if` expressions support boolean logic so you can compose checks against
 the [security context][ref-sec-ctx] and user attributes:
 
-- In YAML, expressions inside `{ ... }` use Jinja-style operators: `and`, `or`,
-`not`, and parentheses for grouping.
-- In JavaScript, expressions use native operators: `&&`, `||`, and `!`.
+- In YAML, expressions inside `{ ... }` are parsed as Python and support the
+`and`, `or`, and `not` operators, parentheses for grouping, member access, and
+method calls such as `.includes(...)`. Comparison operators (`==`, `>=`, `in`)
+and inline `if`/`else` conditionals are **not** supported — use boolean user
+attributes or method calls instead.
+- In JavaScript, expressions use native operators: `&&`, `||`, `!`, and any
+valid JavaScript expression.
 - Multiple `conditions` entries on a single policy are combined with _AND_
 semantics — every entry must evaluate to `true` for the policy to take effect.
 - Multiple policies that match the same group are combined with _OR_ semantics —
@@ -234,9 +238,9 @@ cubes:
     access_policy:
       - group: manager
         conditions:
-          - if: "{ user_attributes.is_full_time_employee and user_attributes.tenure_years >= 2 }"
+          - if: "{ user_attributes.is_full_time_employee and user_attributes.is_senior }"
           - if: "{ user_attributes.is_admin or user_attributes.is_owner }"
-          - if: "{ not (security_context.groups and 'contractors' in security_context.groups) }"
+          - if: "{ not (security_context.groups and security_context.groups.includes('contractors')) }"
         member_level:
           includes: "*"
 ```
@@ -249,7 +253,7 @@ cube(`orders`, {
     {
       group: `manager`,
       conditions: [
-        { if: userAttributes.is_full_time_employee && userAttributes.tenure_years >= 2 },
+        { if: userAttributes.is_full_time_employee && userAttributes.is_senior },
         { if: userAttributes.is_admin || userAttributes.is_owner },
         { if: !(securityContext.groups && securityContext.groups.includes(`contractors`)) }
       ],
@@ -509,14 +513,17 @@ You can also use `and` and `or` parameters to combine multiple filters into
 
 #### `allow_all`
 
-Use the `allow_all` parameter to make the row-level intent of a policy explicit
-without listing any filters:
+Use `allow_all: true` to make the row-level intent of a policy explicit without
+listing any filters. It grants the policy access to all rows and is equivalent
+to omitting `row_level` from the policy — useful when you want the policy to
+clearly state that no row-level restriction applies, or as an admin override
+that combines with more restrictive policies via [_OR_ semantics][ref-dap-rls].
 
-- `allow_all: true` grants the policy access to all rows. It is equivalent to
-omitting `row_level` (or omitting `filters`) and is useful when you want the
-policy to clearly state that no row-level restriction applies.
-- `allow_all: false` denies the policy access to all rows. Other matching
-policies (if any) still apply on top — see [row-level access][ref-dap-rls].
+A `row_level` block must contain either `filters` or `allow_all` — the two are
+mutually exclusive. `allow_all` only accepts `true`; `allow_all: false` is not a
+valid value. To deny a group all rows, don't grant it a matching policy: access
+policies are deny-by-default, so any member not granted by a matching policy is
+inaccessible.
 
 <CodeGroup>
 
@@ -529,10 +536,6 @@ cubes:
       - group: admin
         row_level:
           allow_all: true
-
-      - group: guest
-        row_level:
-          allow_all: false
 ```
 
 ```javascript title="JavaScript"
@@ -545,12 +548,6 @@ cube(`orders`, {
       row_level: {
         allow_all: true
       }
-    },
-    {
-      group: `guest`,
-      row_level: {
-        allow_all: false
-      }
     }
   ]
 })
@@ -561,13 +558,15 @@ cube(`orders`, {
 #### Conditional `row_level`
 
 You can make `row_level` conditional so that different filters apply depending
-on the [security context][ref-sec-ctx] or user attributes. In YAML, attach
+on the [security context][ref-sec-ctx] or user attributes. Attach
 [`conditions`](#conditions) to a policy so its `row_level` is skipped when the
-conditions don't match. In JavaScript, you can additionally make `row_level` a
-function of `securityContext` and return different filters at evaluation time.
-When a policy's `row_level` is skipped, other matching policies still apply;
-if no policy matches, access is denied by default. See the [conditional
-row-level access recipe][ref-recipe-conditional-row-level] for worked examples.
+conditions don't match, and define separate policies for the different filters
+you want to apply. In JavaScript, you can additionally compute a filter's
+`member` or `values` from `securityContext` at evaluation time (for example,
+with a ternary), which lets a single policy vary its filter per request. When a
+policy's `row_level` is skipped, other matching policies still apply; if no
+policy matches, access is denied by default. See the [conditional row-level
+access recipe][ref-recipe-conditional-row-level] for worked examples.
 
 Note that access policies also respect [row-level security][ref-rls] restrictions
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
