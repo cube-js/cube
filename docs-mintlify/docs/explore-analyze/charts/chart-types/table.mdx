@@ -32,22 +32,58 @@ The **Table** tab in the configuration panel controls layout and display setting
 
 | Option | Description |
 |---|---|
-| **Column width** | **Stretch** fills the full table width; **Fixed** keeps column widths constant regardless of tile size |
 | **Header text** | Controls whether long column headers **truncate** or **wrap** to the next line |
 | **View names** | When enabled, the view/cube name is shown in the column header |
 | **Row numbers** | Adds a row number column on the left |
 | **Group dimensions** | Groups multiple dimensions per row into a collapsible section for subtotaling |
 
+Column widths are configured **per column** — see [Column width](#column-width) below.
+
 ## Column field options
 
-Click the dropdown arrow on any field in the **Fields** section to configure it:
+Configure individual columns in the **Columns** section of the **Style** tab (or via the dropdown arrow on a field in the **Fields** section):
 
 | Option | Description |
 |---|---|
 | **Label** | Override the column header text |
 | **Alignment** | Left, center, or right |
 | **Word wrap** | Allow cell content to wrap to multiple lines |
+| **Width** | **Flexible** (a weight) or **Fixed** (pixels) — see [Column width](#column-width) |
 | **Hide** | Show or hide the column |
+
+## Column width
+
+Each column's width is set independently in the **Columns** section of the **Style** tab. A column is in one of two modes:
+
+- **Flexible** (the default) — the column shares the table's available width with the other flexible columns, in proportion to its **weight**. A column with weight `2` is twice as wide as a column with weight `1`. New columns start at weight `1`, so by default all columns share the width equally and the table stretches to fill its tile.
+- **Fixed** — the column is locked to an exact pixel width and no longer participates in the weight-based distribution. Fixed columns keep their width regardless of the tile size; if the fixed columns don't fill the tile, the remaining space is left blank.
+
+You can mix the two: give a label column a fixed width and let the metric columns flex to share the rest.
+
+### Setting widths
+
+- **In the panel** — pick **Flexible** or **Fixed** for a column and enter its weight or pixel value.
+- **By dragging** — drag the border between two column headers on the table. The change is saved into the column's current mode (a flexible column keeps flexing at its new relative size; a fixed column updates its pixel width).
+- **Auto-fit** — the **auto-fit** button next to a column's width sizes it to its content and switches it to **Fixed** at that width.
+
+  <Note>
+
+  Auto-fit measures the rows currently rendered on screen. If a wider value is further down a long, scrolled table, auto-fit again after scrolling to it.
+
+  </Note>
+
+### Bulk controls
+
+At the top of the **Columns** section:
+
+- **All flexible** — converts every column to flexible, deriving each weight from its current width (so the layout doesn't jump).
+- **All fixed** — freezes every column at its current rendered pixel width.
+
+<Note>
+
+Under a column pivot, a width set on a measure applies to every column generated for that measure.
+
+</Note>
 
 ## Display tab — showing columns as links, images, bars, or sparklines
 
