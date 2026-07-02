@@ -480,7 +480,8 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait, req.context?.requestId);
+          const disablePostProcessing = req.body.disable_post_processing ?? getEnv('disablePostProcessing');
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone, req.body.throwContinueWait, req.context?.requestId, disablePostProcessing);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because

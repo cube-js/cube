@@ -241,6 +241,52 @@ describe('SQL API', () => {
       ]);
     });
 
+    describe('disable_post_processing on /v1/cubesql', () => {
+      async function execCubeSql(query: string, disablePostProcessing: boolean = false) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+          },
+          body: JSON.stringify({
+            query,
+            disable_post_processing: disablePostProcessing,
+          }),
+        });
+        const { status } = response;
+        const text = await response.text();
+        // Error responses are plain JSON; streaming success responses are newline-delimited JSON.
+        const firstLine = text.split('\n').find(l => l.trim()) ?? '{}';
+        const parsed = JSON.parse(firstLine);
+        return { status, body: parsed };
+      }
+
+      it('errors when a post-processing plan is required and disable_post_processing is true', async () => {
+        // SELECT version() compiles to a DataFusion plan with no CubeScan root, i.e. it
+        // requires post-processing. /v1/cubesql is a streaming endpoint: errors are delivered
+        // in the (chunked) response body with HTTP 200, not via the status code. The guard
+        // must surface the post-processing error instead of streaming (possibly truncated) data.
+        const { status, body } = await execCubeSql('SELECT version();', true);
+        expect(status).toBe(200);
+        expect(body.error).toMatch(/post-processing/i);
+        expect(body.schema).toBeUndefined();
+      });
+
+      it('succeeds for a push-down query with disable_post_processing true', async () => {
+        // Simple aggregate maps to a CubeScanNode/CubeScanWrappedSqlNode — no post-processing.
+        const { status, body } = await execCubeSql('SELECT SUM(totalAmount) AS total FROM Orders;', true);
+        expect(status).toBe(200);
+        expect(body.schema).toBeDefined();
+      });
+
+      it('executes a post-processing query normally when disable_post_processing is false', async () => {
+        // Confirms the flag is off-by-default and does not change existing behaviour.
+        const { status } = await execCubeSql('SELECT version();', false);
+        expect(status).toBe(200);
+      });
+    });
+
     describe('sql4sql', () => {
       async function generateSql(query: string, disablePostPprocessing: boolean = false) {
         const response = await fetch(`${birdbox.configuration.apiUrl}/sql`, {
