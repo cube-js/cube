@@ -65,5 +65,8 @@ cubes:
         orders__revenue_1_y_ago: '100',
       },
     ], { compiler, joinGraph, cubeEvaluator }));
+  } else {
+    // This test is working only in tesseract
+    test.skip('prior-year time_shift measure is not emptied by FILTER_PARAMS', () => { expect(1).toBe(1); });
   }
 });
