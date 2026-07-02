@@ -141,6 +141,9 @@ export class PinotQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    // NOW() returns the current epoch millis (inherently UTC), matching the
+    // epoch-millis representation produced by the timestamp_literal template
+    templates.functions.UTCTIMESTAMP = 'NOW()';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.statements.select = 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
