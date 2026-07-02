@@ -14,8 +14,8 @@ on:
 
 concurrency:
   # PR number lives in different fields depending on entry point — coalesce so
-  # the same PR shares a group regardless of whether we got here via push or
-  # via the /bot-review proxy.
+  # the same PR shares a group regardless of whether we got here via
+  # pull_request or via the /bot-review proxy.
   group: claude-code-review-${{ inputs.pr_number || github.event.pull_request.number }}-${{ github.event.action || 'manual' }}
   cancel-in-progress: true
 
@@ -32,29 +32,11 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
+    env:
+      # Same coalesce as the concurrency group above (which can't read `env`,
+      # so the expression appears twice).
+      PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
     steps:
-      - name: Resolve PR ref
-        id: pr
-        env:
-          GH_TOKEN: ${{ github.token }}
-          # Pull all event-controlled inputs through env vars instead of
-          # interpolating directly into the script — branch names are
-          # attacker-controlled and could carry shell metacharacters.
-          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
-          PR_NUMBER_FROM_EVENT: ${{ github.event.pull_request.number }}
-          PR_HEAD_REF_FROM_EVENT: ${{ github.event.pull_request.head.ref }}
-          REPO: ${{ github.repository }}
-        run: |
-          if [ -n "$INPUT_PR_NUMBER" ]; then
-            number="$INPUT_PR_NUMBER"
-            ref=$(gh pr view "$number" --repo "$REPO" --json headRefName --jq .headRefName)
-          else
-            number="$PR_NUMBER_FROM_EVENT"
-            ref="$PR_HEAD_REF_FROM_EVENT"
-          fi
-          echo "number=$number" >> "$GITHUB_OUTPUT"
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-
       - name: React to trigger comment
         # Quick ACK so the user who typed /bot-review or /bot-deep-review sees
         # the bot picked up the command — actual review takes a few minutes.
@@ -72,8 +54,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ steps.pr.outputs.ref }}
+          # A fork PR's head branch doesn't exist in the base repo, so checking it
+          # out by branch name fails. GitHub mirrors every PR head into the base
+          # repo as refs/pull/<N>/head — readable with the workflow token
+          ref: refs/pull/${{ env.PR_NUMBER }}/head
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Configure gh aliases for review-thread operations
         run: bash .github/actions/setup-claude-code-review.sh
@@ -88,7 +74,7 @@ jobs:
           allowed_bots: "cursor[bot]"
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ steps.pr.outputs.number }}
+            PR NUMBER: ${{ env.PR_NUMBER }}
 
             Perform a comprehensive code review with the following focus areas:
 
@@ -142,7 +128,7 @@ jobs:
             Before posting new comments, list existing review threads on this PR using the
             preconfigured alias:
 
-              gh list-review-threads ${{ github.repository_owner }} ${{ github.event.repository.name }} ${{ steps.pr.outputs.number }}
+              gh list-review-threads ${{ github.repository_owner }} ${{ github.event.repository.name }} ${{ env.PR_NUMBER }}
 
             For each thread where ALL of the following hold:
               - `isResolved` is false
