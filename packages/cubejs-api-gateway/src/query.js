@@ -245,7 +245,15 @@ export const preAggsJobsRequestSchema = Joi.object({
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 const DATE_RANGE_OPERATORS = ['inDateRange', 'notInDateRange'];
-const SINGLE_DATE_OPERATORS = ['onTheDate', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate'];
+// Mirrors Tesseract's date_single.rs boundary semantics:
+// Before → < start, AfterOrOn → >= start
+const START_DATE_OPERATORS = ['beforeDate', 'afterOrOnDate'];
+// BeforeOrOn → <= end, After → > end
+const END_DATE_OPERATORS = ['beforeOrOnDate', 'afterDate'];
+
+// Absolute values must pass through byte-exact: bare dates keep each planner's
+// own day-boundary handling, timestamps keep their time component
+const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?)?$/;
 
 // Resolve a dateRange input — a relative string ("last 2 weeks"), a single
 // absolute date, or a 2-element array — to a normalized [startISO, endISO]
@@ -275,17 +283,53 @@ export const resolveDateRange = (input, timezone) => {
 // Reuses resolveDateRange so both paths produce identical output. Non-date
 // operators and already-absolute values pass through unchanged.
 export const normalizeDateFilterValues = (filter, timezone) => {
-  if (!filter || !filter.operator || !Array.isArray(filter.values) || filter.values.length !== 1) {
+  if (!filter || !filter.operator || !Array.isArray(filter.values)) {
     return filter;
   }
 
-  if (DATE_RANGE_OPERATORS.includes(filter.operator)) {
-    return { ...filter, values: resolveDateRange(filter.values[0], timezone) };
+  // Fail fast at the gateway if a range operator is given a multi-element
+  // `values` array that contains a relative-date string. This shape falls
+  // through the resolver (which only handles single-element values) and
+  // would otherwise error deep in query execution with an opaque message. This
+  // surfaces the failure at the API boundary instead.
+  if (
+    (DATE_RANGE_OPERATORS.includes(filter.operator) || filter.operator === 'onTheDate') &&
+    filter.values.length > 1 &&
+    filter.values.some(v => typeof v === 'string' && !AbsoluteDateTimeRegex.test(v))
+  ) {
+    throw new UserError(
+      `Relative-date strings are only supported when \`values\` has a single element for operator \`${filter.operator}\`. Pass an absolute two-element [start, end] pair, or a single relative string like ["last 2 weeks"]. Got: ${JSON.stringify(filter.values)}`
+    );
   }
 
-  if (SINGLE_DATE_OPERATORS.includes(filter.operator)) {
-    const [start] = resolveDateRange(filter.values[0], timezone);
+  if (filter.values.length !== 1) {
+    return filter;
+  }
+
+  const value = filter.values[0];
+  if (typeof value !== 'string') {
+    return filter;
+  }
+
+  if (DATE_RANGE_OPERATORS.includes(filter.operator) || filter.operator === 'onTheDate') {
+    // onTheDate resolves to a two-sided range: legacy onTheDateWhere reads
+    // values[0]/values[1], and Tesseract maps onTheDate to InDateRange which
+    // requires exactly 2 values.
+    return { ...filter, values: resolveDateRange(value, timezone) };
+  }
+
+  if (AbsoluteDateTimeRegex.test(value)) {
+    return filter;
+  }
+
+  if (START_DATE_OPERATORS.includes(filter.operator)) {
+    const [start] = resolveDateRange(value, timezone);
     return { ...filter, values: [start] };
+  }
+
+  if (END_DATE_OPERATORS.includes(filter.operator)) {
+    const [, end] = resolveDateRange(value, timezone);
+    return { ...filter, values: [end] };
   }
 
   return filter;

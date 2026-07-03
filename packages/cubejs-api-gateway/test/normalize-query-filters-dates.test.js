@@ -64,9 +64,10 @@ describe('normalizeDateFilterValues', () => {
     expect(result.values).toEqual(['2026-01-01', '2026-01-31']);
   });
 
-  test('beforeDate with relative string resolves to a single absolute datetime', () => {
-    // Why: single-date operators take one value, not a range. Returning a
-    // 2-element array would change BaseFilter semantics.
+  test('beforeDate with relative string resolves to start-of-day', () => {
+    // Why: mirrors Tesseract's date_single.rs — `beforeDate` compares
+    // `< startOfDay`. Using end-of-day here would include the whole day
+    // instead of excluding it.
     const result = normalizeDateFilterValues(
       { member: 'Orders.createdAt', operator: 'beforeDate', values: ['yesterday'] },
       'UTC'
@@ -74,6 +75,101 @@ describe('normalizeDateFilterValues', () => {
 
     expect(result.values).toHaveLength(1);
     expect(result.values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00\.000$/);
+  });
+
+  test('afterOrOnDate with relative string resolves to start-of-day', () => {
+    // Why: mirrors Tesseract's `>= startOfDay` — the operator's inclusive
+    // lower boundary must land at the start of the target day.
+    const result = normalizeDateFilterValues(
+      { member: 'Orders.createdAt', operator: 'afterOrOnDate', values: ['yesterday'] },
+      'UTC'
+    );
+
+    expect(result.values).toHaveLength(1);
+    expect(result.values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00\.000$/);
+  });
+
+  test('beforeOrOnDate with relative string resolves to end-of-day', () => {
+    // Why: mirrors Tesseract's `<= endOfDay`. Using start-of-day here (as
+    // the pre-fix code did) would exclude almost the entire target day.
+    const result = normalizeDateFilterValues(
+      { member: 'Orders.createdAt', operator: 'beforeOrOnDate', values: ['yesterday'] },
+      'UTC'
+    );
+
+    expect(result.values).toHaveLength(1);
+    expect(result.values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T23:59:59\.999$/);
+  });
+
+  test('afterDate with relative string resolves to end-of-day', () => {
+    // Why: mirrors Tesseract's `> endOfDay`. Using start-of-day would let
+    // "after yesterday" still match rows from within yesterday.
+    const result = normalizeDateFilterValues(
+      { member: 'Orders.createdAt', operator: 'afterDate', values: ['yesterday'] },
+      'UTC'
+    );
+
+    expect(result.values).toHaveLength(1);
+    expect(result.values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T23:59:59\.999$/);
+  });
+
+  test('onTheDate with relative string resolves to a two-value range', () => {
+    // Why: onTheDate is broken in both planners today with a single value —
+    // legacy `onTheDateWhere` reads values[0]/values[1] and Tesseract maps
+    // onTheDate to InDateRange which strictly requires 2 args. Resolving here
+    // to [start, end] fixes the operator in both planners simultaneously.
+    const result = normalizeDateFilterValues(
+      { member: 'Orders.createdAt', operator: 'onTheDate', values: ['yesterday'] },
+      'UTC'
+    );
+
+    expect(result.values).toHaveLength(2);
+    expect(result.values[0]).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00\.000$/);
+    expect(result.values[1]).toMatch(/^\d{4}-\d{2}-\d{2}T23:59:59\.999$/);
+  });
+
+  test('single-date operator with absolute bare date is passed through byte-exact', () => {
+    // Why: pre-PR the gateway didn't touch filter values, so `beforeOrOnDate:
+    // ["2024-01-15"]` reached Tesseract's format_to_date which padded it to
+    // end-of-day. Resolving here would rewrite it to T00:00:00.000, silently
+    // excluding all of Jan 15 — a data-correctness regression under the
+    // default planner. Absolute strings must round-trip unchanged.
+    const filter = {
+      member: 'Orders.createdAt',
+      operator: 'beforeOrOnDate',
+      values: ['2024-01-15'],
+    };
+
+    const result = normalizeDateFilterValues(filter, 'UTC');
+
+    expect(result.values).toEqual(['2024-01-15']);
+  });
+
+  test('single-date operator with absolute timestamp is passed through byte-exact', () => {
+    // Why: dateParser truncates every string to day granularity via chrono's
+    // startOf('day'). A user passing "2024-01-15T10:30:00.000" would silently
+    // lose the time component under the pre-fix path. Absolute timestamps
+    // must not be re-parsed.
+    const filter = {
+      member: 'Orders.createdAt',
+      operator: 'afterDate',
+      values: ['2024-01-15T10:30:00.000'],
+    };
+
+    const result = normalizeDateFilterValues(filter, 'UTC');
+
+    expect(result.values).toEqual(['2024-01-15T10:30:00.000']);
+  });
+
+  test('non-string value is passed through unchanged', () => {
+    // Why: numeric or boolean values in `values` cannot be date strings, so
+    // dispatching them into dateParser would raise an opaque error. The
+    // typeof guard is what keeps the helper safe for those callers.
+    const filter = { member: 'Orders.count', operator: 'gt', values: [10] };
+
+    const result = normalizeDateFilterValues(filter, 'UTC');
+
+    expect(result).toBe(filter);
   });
 
   test('non-date operator (equals) is returned unchanged', () => {
@@ -93,6 +189,50 @@ describe('normalizeDateFilterValues', () => {
     const result = normalizeDateFilterValues(groupFilter, 'UTC');
 
     expect(result).toBe(groupFilter);
+  });
+
+  test('inDateRange with two relative strings raises UserError at the boundary', () => {
+    // Why: pre-fix, `values: ["last week", "this week"]` bypassed the
+    // resolver (which only handles single-element values) and failed deep in
+    // query execution with an opaque error. Users should get a clear API-
+    // boundary error explaining the supported shapes.
+    expect(() => normalizeDateFilterValues(
+      { member: 'Orders.createdAt', operator: 'inDateRange', values: ['last week', 'this week'] },
+      'UTC'
+    )).toThrow(/Relative-date strings are only supported/);
+  });
+
+  test('inDateRange with mixed relative + absolute strings raises UserError', () => {
+    // Why: even one relative element in a multi-value array is unsupported —
+    // the resolver has no way to reconcile a relative range with an absolute
+    // endpoint. Reject at the boundary.
+    expect(() => normalizeDateFilterValues(
+      { member: 'Orders.createdAt', operator: 'inDateRange', values: ['last week', '2024-01-31'] },
+      'UTC'
+    )).toThrow(/Relative-date strings are only supported/);
+  });
+
+  test('notInDateRange with two relative strings raises UserError', () => {
+    // Why: parity — both range operators must fail the same way for the
+    // same shape.
+    expect(() => normalizeDateFilterValues(
+      { member: 'Orders.createdAt', operator: 'notInDateRange', values: ['last week', 'this week'] },
+      'UTC'
+    )).toThrow(/Relative-date strings are only supported/);
+  });
+
+  test('inDateRange with two absolute strings passes through unchanged', () => {
+    // Why: regression guard — the pre-existing absolute two-element form is
+    // the canonical shape and must not trigger the new UserError.
+    const filter = {
+      member: 'Orders.createdAt',
+      operator: 'inDateRange',
+      values: ['2024-01-01', '2024-01-31'],
+    };
+
+    const result = normalizeDateFilterValues(filter, 'UTC');
+
+    expect(result).toBe(filter);
   });
 
   test('invalid relative date string raises UserError', () => {
