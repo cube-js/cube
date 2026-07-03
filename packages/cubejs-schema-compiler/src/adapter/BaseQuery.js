@@ -5404,7 +5404,25 @@ export class BaseQuery {
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
-          { aliasGathering: true }
+          {
+            aliasGathering: true,
+            // Alias gathering may be triggered in the middle of some collection
+            // (e.g. join hints collection for a member whose sql uses FILTER_PARAMS).
+            // Inherited collectors must be shadowed here, otherwise members of the
+            // current query traversed during alias gathering leak into the outer
+            // collection result. Some of those results are cached in the long-lived
+            // compilerCache and would poison unrelated queries (e.g. with extra joins).
+            cubeNames: undefined,
+            joinHints: undefined,
+            memberNames: undefined,
+            subQueryDimensions: undefined,
+            leafMeasures: undefined,
+            compositeCubeMeasures: undefined,
+            foundCompositeCubeMeasures: undefined,
+            memberChildren: undefined,
+            inlineWhereConditions: undefined,
+            collectOriginalSqlPreAggregations: undefined,
+          }
         );
         const memberPath = member.expressionPath();
         let nonAliasSeen = false;
