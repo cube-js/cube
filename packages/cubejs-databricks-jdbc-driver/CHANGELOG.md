@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
+
+### Features
+
+- **databricks-jdbc-driver:** Upgrade driver to 1.0.11 (to fix out of sequence response: expected N but got N-1) ([#11198](https://github.com/cube-js/cube/issues/11198)) ([8a4a054](https://github.com/cube-js/cube/commit/8a4a054081cdb850b1d8ad7b82bed54c7162f505))
+
 ## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

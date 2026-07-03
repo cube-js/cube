@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
+
+### Bug Fixes
+
+- **cubestore:** Force standard Decimal128 bitWidth in Arrow response ([#11200](https://github.com/cube-js/cube/issues/11200)) ([c4c3594](https://github.com/cube-js/cube/commit/c4c3594bfad1055877bc7838dea36584e41e62b2)), closes [cube-js/arrow-rs#48](https://github.com/cube-js/arrow-rs/issues/48)
+- **tesseract:** apply time_shift to FILTER_PARAMS column in shifted CTEs ([#11191](https://github.com/cube-js/cube/issues/11191)) ([f9398ab](https://github.com/cube-js/cube/commit/f9398ab78ac96af2541ca450633f792505f5fede))
+- **tesseract:** reduce_by/grain matches time dimensions regardless of granularity ([#11188](https://github.com/cube-js/cube/issues/11188)) ([b99d546](https://github.com/cube-js/cube/commit/b99d54617e6f3af7b7df812fc27285892a2bcb59))
+- **tesseract:** resolve FILTER_PARAMS callback-column placeholders in segments ([#11189](https://github.com/cube-js/cube/issues/11189)) ([5b96418](https://github.com/cube-js/cube/commit/5b964187c42b21ebeaf093e34da5d29ed68492f0))
+
+### Features
+
+- **databricks-jdbc-driver:** Upgrade driver to 1.0.11 (to fix out of sequence response: expected N but got N-1) ([#11198](https://github.com/cube-js/cube/issues/11198)) ([8a4a054](https://github.com/cube-js/cube/commit/8a4a054081cdb850b1d8ad7b82bed54c7162f505))
+
 ## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
 
 ### Bug Fixes

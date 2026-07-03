@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
+
+### Bug Fixes
+
+- **tesseract:** apply time_shift to FILTER_PARAMS column in shifted CTEs ([#11191](https://github.com/cube-js/cube/issues/11191)) ([f9398ab](https://github.com/cube-js/cube/commit/f9398ab78ac96af2541ca450633f792505f5fede))
+
 ## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
 
 ### Bug Fixes

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
+
+### Bug Fixes
+
+- **cubestore:** Force standard Decimal128 bitWidth in Arrow response ([#11200](https://github.com/cube-js/cube/issues/11200)) ([c4c3594](https://github.com/cube-js/cube/commit/c4c3594bfad1055877bc7838dea36584e41e62b2)), closes [cube-js/arrow-rs#48](https://github.com/cube-js/arrow-rs/issues/48)
+
 ## [1.6.65](https://github.com/cube-js/cube/compare/v1.6.64...v1.6.65) (2026-07-01)
 
 ### Bug Fixes
