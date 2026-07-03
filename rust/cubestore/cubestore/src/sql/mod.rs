@@ -2046,6 +2046,7 @@ mod tests {
             .next()
             .transpose()?
             .ok_or_else(|| CubeError::internal("Empty IPC stream".to_string()))?;
+
         let column = batch
             .column(1)
             .as_any()
@@ -2056,6 +2057,7 @@ mod tests {
                     batch.column(1).data_type()
                 ))
             })?;
+
         assert_eq!(column.data_type(), &DataType::Decimal128(18, 2));
         assert!(column.is_null(0));
         assert_eq!(column.value(1), 239996);
@@ -2064,9 +2066,6 @@ mod tests {
         Ok(())
     }
 
-    /// Same as above for the streaming variant, in the precision range 19..=27
-    /// where the fork advertises bitWidth 96 — upstream arrow rejects that
-    /// outright ("Unexpected decimal bit width").
     #[tokio::test]
     async fn arrow_ipc_stream_advertises_standard_decimal_bit_width_for_batches(
     ) -> Result<(), CubeError> {
