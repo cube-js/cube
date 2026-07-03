@@ -1447,6 +1447,79 @@ async fn test_grouped_join_wrapper_full_outer_cross_cube() {
     );
 }
 
+/// LEFT JOIN between grouped CTEs from two *different* cubes (no join relationship
+/// defined between them), joined on multiple dimensions sharing the same output names.
+#[tokio::test]
+async fn test_grouped_join_wrapper_left_cross_cube_multi_condition() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH m1 AS (
+            SELECT
+                customer_gender,
+                notes,
+                sum(sumPrice) AS sum_price
+            FROM KibanaSampleDataEcommerce
+            WHERE
+                has_subscription = true
+                AND customer_gender IS NOT NULL
+                AND order_date BETWEEN '2024-01-01T00:00:00.000' AND '2024-01-31T23:59:59.999'
+            GROUP BY 1, 2
+        ),
+        m2 AS (
+            SELECT
+                dim0 AS customer_gender,
+                dim1 AS notes,
+                MEASURE(WideCube.count) AS cnt
+            FROM WideCube
+            WHERE
+                dim2 IN ('female')
+                AND dim3 IS NOT NULL
+            GROUP BY 1, 2
+        )
+        SELECT
+            COALESCE(m1.customer_gender, m2.customer_gender) AS customer_gender,
+            COALESCE(m1.notes, m2.notes) AS notes,
+            m1.sum_price,
+            m2.cnt
+        FROM m1
+        LEFT JOIN m2 ON m1.customer_gender = m2.customer_gender AND m1.notes = m2.notes
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a LEFT JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("LEFT JOIN"),
+        "wrapped SQL is missing LEFT JOIN:\n{}",
+        sql
+    );
+    // Same-named columns from both join sides must keep distinct aliases in the outer
+    // projection: COALESCE over both sides must not reference the same (right-side) column
+    // twice, or LEFT JOIN rows without a match would coalesce to NULL.
+    assert!(
+        sql.contains(r#"COALESCE("m1"."customer_gender", "m1"."customer_gender_1")"#),
+        "left side of COALESCE was remapped to the right-side column:\n{}",
+        sql
+    );
+    assert!(
+        sql.contains(r#"COALESCE("m1"."notes", "m1"."notes_1")"#),
+        "left side of COALESCE was remapped to the right-side column:\n{}",
+        sql
+    );
+}
+
 /// Regression test for smoke test "select __user and literal grouped under wrapper".
 /// Inner CTE has unaliased DATE_TRUNC expressions; outer query references those columns
 /// through the SubqueryAlias qualifier (`cube_scan_subq`). The CTE-level Remapper must

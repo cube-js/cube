@@ -575,18 +575,29 @@ impl Remapper {
         }
 
         if let Some(from_alias) = &self.from_alias {
-            // Always map the column under the new from_alias so plans above (which see
-            // this remapper's output through `from_alias`) can resolve it. When the
-            // source column already had a different relation, also keep a mapping under
-            // that original relation, so plans that still reference the inner qualifier
-            // continue to resolve.
-            self.remapping.insert(
-                Column {
-                    name: original_column.name.clone(),
-                    relation: Some(from_alias.clone()),
-                },
-                target_column.clone(),
-            );
+            // Map the column under the new from_alias so plans above (which see
+            // this remapper's output through `from_alias`) can resolve it. When join sides
+            // project colliding column names, the column actually qualified with `from_alias`
+            // owns this mapping; a column from another relation only fills a vacancy, so it
+            // cannot clobber the from-side column's mapping. When the source column has a
+            // different relation, also keep a mapping under that original relation, so plans
+            // that still reference the inner qualifier continue to resolve.
+            //
+            // NOTE: this relies on the from-side column being added before a colliding
+            // column from another relation. If the other side is added first, its vacancy
+            // fill maps `{from_alias}.{name}` to its own target, and a later add of the
+            // actual from-side column short-circuits on that entry in `add_column`/`add_expr`,
+            // returning the other side's alias. Callers iterate the from side's columns
+            // before joined sides' ones, preserving this invariant.
+            let from_alias_column = Column {
+                name: original_column.name.clone(),
+                relation: Some(from_alias.clone()),
+            };
+            let original_is_from_side = original_column.relation.as_ref() == Some(from_alias);
+            if original_is_from_side || !self.remapping.contains_key(&from_alias_column) {
+                self.remapping
+                    .insert(from_alias_column, target_column.clone());
+            }
             if let Some(original_relation) = &original_column.relation {
                 if original_relation != from_alias {
                     self.remapping
