@@ -7,6 +7,7 @@ use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedF
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
+use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -48,6 +49,7 @@ impl TypedFilter {
     pub fn to_sql_for_filter_params(
         &self,
         column: &FilterParamsColumn,
+        time_shift: Option<&SqlInterval>,
         query_tools: &Rc<QueryTools>,
         plan_templates: &PlanSqlTemplates,
         filters_context: &FiltersContext,
@@ -56,8 +58,23 @@ impl TypedFilter {
 
         match column {
             FilterParamsColumn::String(column_sql) => {
+                // Inside a time-shifted CTE the FILTER_PARAMS column must carry the
+                // same shift as the regular time-dimension filter, otherwise its
+                // current-period bounds contradict the shifted predicate and empty
+                // the CTE.
+                let shifted_column;
+                let member_sql = if let Some(interval) = time_shift {
+                    shifted_column = format!(
+                        "({})",
+                        plan_templates
+                            .add_timestamp_interval(column_sql.clone(), interval.to_sql())?
+                    );
+                    shifted_column.as_str()
+                } else {
+                    column_sql.as_str()
+                };
                 let ctx = FilterSqlContext {
-                    member_sql: column_sql,
+                    member_sql,
                     query_tools,
                     plan_templates,
                     use_db_time_zone,
@@ -66,6 +83,8 @@ impl TypedFilter {
                 dispatch_to_sql(self.operation(), &ctx)
             }
             FilterParamsColumn::Callback(callback) => {
+                // A callback column is opaque SQL produced by user code, so a
+                // time shift can't be wrapped around it; it is rendered as-is.
                 let args = match self.operation() {
                     // RollingWindowOffset carries [from, to, trailing, leading, offset];
                     // only the from/to dates are filter-param args for the callback.

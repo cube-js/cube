@@ -186,6 +186,17 @@ cubes:
             reduce_by:
                 - orders.status
 
+          # reduce_by targets the time dimension itself (bare, no
+          # granularity). When the query selects created_at at some
+          # granularity, that granular dimension must be dropped from the
+          # partition regardless of its granularity suffix (CORE-550).
+          - name: amount_reduce_time
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+
           - name: amount_reduce_all
             type: sum
             sql: "{CUBE.total_amount}"
@@ -286,6 +297,20 @@ cubes:
             multi_stage: true
             reduce_by:
                 - orders.status
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+
+          # Rank reduced by the time dimension (bare) while ordered by a
+          # measure. With created_at selected at a granularity the partition
+          # must be "all outer dims except created_at" (CORE-550); the buggy
+          # planner left created_at_<gran> in PARTITION BY so every partition
+          # held one row and all ranks collapsed to 1.
+          - name: amount_rank_reduce_time
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
             order_by:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
@@ -533,3 +558,5 @@ views:
                 - total_amount
                 - amount_prev_month
                 - mom_growth
+                - amount_reduce_time
+                - amount_rank_reduce_time

@@ -27,6 +27,18 @@ fn assert_no_window(sql: &str) {
     );
 }
 
+/// PARTITION BY clause bodies (text between `PARTITION BY` and the following
+/// `ORDER BY`) of every window function in `sql`.
+fn partition_by_clauses(sql: &str) -> Vec<String> {
+    sql.match_indices("PARTITION BY")
+        .map(|(i, _)| {
+            let rest = &sql[i + "PARTITION BY".len()..];
+            let end = rest.find("ORDER BY").unwrap_or(rest.len());
+            rest[..end].to_string()
+        })
+        .collect()
+}
+
 // add_group_by + reduce_by together: leaf grain extends with customer_id
 // while partition grain shrinks by removing category. Three distinct grains:
 //   leaf       = (status, category, customer_id)  ← per-customer sum(amount)
@@ -311,6 +323,57 @@ async fn test_reduce_by_count_distinct() {
 
     let sql = ctx.build_sql(query).unwrap();
     assert_no_window(&sql);
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// CORE-550: reduce_by a bare time dimension must drop it from the window's
+// PARTITION BY even when the query selects that dimension at a granularity
+// (auto-suffixed `_month`). The buggy planner matched reduce_by references by
+// full_name, so `orders.created_at` never matched the granular
+// `orders.created_at_month`; created_at stayed in the partition, the window
+// collapsed to plain group-by and the "reduced" value equalled total_amount.
+// Correct: partition = [status] → per-status total broadcast across months
+// (completed=1400, pending=650, cancelled=200).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reduce_by_time_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_reduce_time
+        dimensions:
+          - orders.status
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.status
+          - id: orders.created_at
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_uses_window(&sql);
+    for clause in partition_by_clauses(&sql) {
+        assert!(
+            !clause.contains("created_at"),
+            "reduce_by(created_at) must drop the time dimension from PARTITION BY,\n\
+             partition clause was: {}\nfull SQL:\n{}",
+            clause,
+            sql,
+        );
+        assert!(
+            clause.contains("status"),
+            "status must remain in PARTITION BY, partition clause was: {}",
+            clause,
+        );
+    }
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);

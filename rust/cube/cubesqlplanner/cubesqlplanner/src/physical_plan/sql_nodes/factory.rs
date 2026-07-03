@@ -52,6 +52,10 @@ impl SqlNodesFactory {
         self.time_shifts = time_shifts;
     }
 
+    pub fn time_shifts(&self) -> &TimeShiftState {
+        &self.time_shifts
+    }
+
     pub fn set_calendar_time_shifts(
         &mut self,
         calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
