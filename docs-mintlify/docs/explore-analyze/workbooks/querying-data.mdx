@@ -110,6 +110,40 @@ change the sort order for any member. Drag and drop members within the sorting c
 
 When a [pivot](#pivoting) is applied, an additional section with pivot dimensions appears.
 
+## Filling in missing rows
+
+A time-series query only returns rows for date buckets that actually contain
+data. If no orders were created in a given month, that month is simply absent
+from the result — which reads as a misleading gap in tables and charts. Fill
+in missing rows densifies the result so every date bucket in the range is
+present.
+
+To apply it, hover over the header of a time dimension column in the results
+table, expand the context menu, and select **Fill in missing rows**. To turn
+it off, select **Stop filling missing rows** from the same menu. While the
+fill is active, an icon on the column header indicates it.
+
+<Frame>
+  <img src="https://ucarecdn.com/f32deed8-ae99-4582-820e-6d5742330a9e/55f9deba-light.png" alt="Results table column menu with the Fill in missing rows action" />
+</Frame>
+
+The fill works on time dimensions with a year, quarter, month, week, or day
+granularity. The date range comes from the date filters on that dimension, or
+from the earliest and latest dates in the data. In added rows, additive
+measures such as counts and sums are set to `0`; other measures are left
+empty.
+
+The fill doesn't change the query or the generated SQL — the missing rows are
+added when the report is rendered. It is saved with the report and applies
+everywhere it appears, including [dashboards][ref-dashboards].
+
+<Info>
+
+The fill is skipped when it would produce more than 10,000 rows. When that
+happens, the column header indicator warns you.
+
+</Info>
+
 ## Inspecting queries
 
 Every query in the Semantic Query tab can be inspected as code. Open the SQL panel via the **SQL** button in the top-right toolbar to see the query that the workbook generates, switch between representations, and copy it for use elsewhere.
@@ -222,6 +256,7 @@ behaves as intended.
 [ref-configuration]: /docs/data-modeling/configuration
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
+[ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
