@@ -127,36 +127,20 @@ fill is active, an icon on the column header indicates it.
   <img src="https://ucarecdn.com/f32deed8-ae99-4582-820e-6d5742330a9e/55f9deba-light.png" alt="Results table column menu with the Fill in missing rows action" />
 </Frame>
 
-How the fill works:
+The fill works on time dimensions with a year, quarter, month, week, or day
+granularity. The date range comes from the date filters on that dimension, or
+from the earliest and latest dates in the data. In added rows, additive
+measures such as counts and sums are set to `0`; other measures are left
+empty.
 
-- It is available on time dimensions with a year, quarter, month, week, or
-  day granularity. Sub-day granularities (hour, minute, second) are not
-  supported.
-- The date range to fill comes from the date filters on that dimension —
-  including relative ranges like "this month" or "3 months ago", and
-  dashboard filters when the report is placed on a dashboard. Without a date
-  filter, the range spans from the earliest to the latest date present in
-  the data.
-- If the query includes other dimensions, each combination of their values
-  gets a complete series: rows are added for every combination × missing
-  date bucket.
-- In added rows, additive measures such as counts and sums are set to `0` —
-  a missing bucket genuinely means zero. Non-additive measures (averages,
-  distinct counts) are left empty.
-
-The fill is a display-time transform: it doesn't change the generated SQL or
-the underlying query result — the missing rows are synthesized when the
-report is rendered. It applies consistently everywhere the report appears:
-the results table, the chart, dashboards, and embedded content.
-
-The setting is saved with the report, so a filled report keeps its continuous
-time series when placed on a [dashboard][ref-dashboards].
+The fill doesn't change the query or the generated SQL — the missing rows are
+added when the report is rendered. It is saved with the report and applies
+everywhere it appears, including [dashboards][ref-dashboards].
 
 <Info>
 
-To keep results manageable, the fill is skipped when it would produce more
-than 10,000 rows. When that happens, the column header indicator warns you
-that missing rows were not filled.
+The fill is skipped when it would produce more than 10,000 rows. When that
+happens, the column header indicator warns you.
 
 </Info>
 
