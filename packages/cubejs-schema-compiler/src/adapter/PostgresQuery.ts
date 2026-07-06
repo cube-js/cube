@@ -86,6 +86,7 @@ export class PostgresQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.NOW = 'NOW({{ args_concat }})';
+    templates.functions.UTCTIMESTAMP = '(NOW() AT TIME ZONE \'UTC\')';
     // DATEADD is being rewritten to DATE_ADD
     // templates.functions.DATEADD = '({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)';
     // TODO: is DATEDIFF expr worth documenting?

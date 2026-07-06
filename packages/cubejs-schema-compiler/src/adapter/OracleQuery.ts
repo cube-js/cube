@@ -215,6 +215,7 @@ export class OracleQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.UTCTIMESTAMP = 'SYS_EXTRACT_UTC(SYSTIMESTAMP)';
     // Oracle forbids `AS` before a table/subquery alias.
     templates.expressions.query_aliased = '{{ query }} {{ quoted_alias }}';
     // Oracle does not support positional GROUP BY — group by expressions.

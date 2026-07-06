@@ -108,6 +108,7 @@ export class SnowflakeQuery extends BaseQuery {
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.NOW = 'CURRENT_TIMESTAMP';
+    templates.functions.UTCTIMESTAMP = 'SYSDATE()';
     templates.functions.LOG = 'LOG({% if args[1] is undefined %}10, {% endif %}{{ args_concat }})';
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
     templates.functions.CHARACTERLENGTH = 'LENGTH({{ args[0] }})';

@@ -545,6 +545,14 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) current_timestamp subquery filter push down: current_timestamp_push_down 1`] = `
+Array [
+  Object {
+    "cn": "5",
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) date/string measures in view: date case 1`] = `
 Array [
   Object {

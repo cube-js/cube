@@ -286,6 +286,32 @@ async fn test_simple_subquery_wrapper_filter_empty_source() {
 }
 
 #[tokio::test]
+async fn test_wrapper_filter_subquery_current_timestamp() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT customer_gender, AVG(avgPrice) mp
+        FROM KibanaSampleDataEcommerce a
+        WHERE order_date >= (SELECT DATE_TRUNC('year', DATE_TRUNC('day', CURRENT_TIMESTAMP)))
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("NOW() AT TIME ZONE 'UTC'"));
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
+#[tokio::test]
 async fn test_simple_subquery_wrapper_projection_aggregate_empty_source() {
     if !Rewriter::sql_push_down_enabled() {
         return;
