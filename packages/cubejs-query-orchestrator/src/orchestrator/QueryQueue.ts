@@ -112,7 +112,7 @@ export class QueryQueue {
       options: QueryQueueOptions
   ) {
     this.concurrency = options.concurrency || 2;
-    this.continueWaitTimeout = options.continueWaitTimeout || 5;
+    this.continueWaitTimeout = options.continueWaitTimeout || 10;
     this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
