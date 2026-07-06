@@ -235,6 +235,34 @@ describe('normalizeDateFilterValues', () => {
     expect(result).toBe(filter);
   });
 
+  test('inDateRange with two absolute UTC-suffixed timestamps passes through unchanged', () => {
+    // Why: regression guard — the SQL API push-down produces ISO timestamps
+    // with a `Z` designator (e.g. "1999-12-30T00:00:00.000Z"). These are
+    // absolute values and must not be mistaken for relative-date strings.
+    const filter = {
+      member: 'Orders.createdAt',
+      operator: 'inDateRange',
+      values: ['1999-12-30T00:00:00.000Z', '1999-12-30T23:59:59.999Z'],
+    };
+
+    const result = normalizeDateFilterValues(filter, 'UTC');
+
+    expect(result).toBe(filter);
+  });
+
+  test('inDateRange with two absolute offset timestamps passes through unchanged', () => {
+    // Why: numeric UTC offsets are as absolute as `Z` and must be accepted.
+    const filter = {
+      member: 'Orders.createdAt',
+      operator: 'inDateRange',
+      values: ['2024-01-01T00:00:00+02:00', '2024-01-31T23:59:59-05:00'],
+    };
+
+    const result = normalizeDateFilterValues(filter, 'UTC');
+
+    expect(result).toBe(filter);
+  });
+
   test('invalid relative date string raises UserError', () => {
     // Why: failure must surface at the API boundary with a clear HTTP 400,
     // not as an opaque SQL error after the query reaches the database.
