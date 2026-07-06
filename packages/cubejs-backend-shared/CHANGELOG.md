@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+- feat(api-gateway)!: Remove deprecated renewQuery parameter (#11050) ([c2b8888](https://github.com/cube-js/cube/commit/c2b888885d6640c5a14ee49f1057fefdf703ead3)), closes [#11050](https://github.com/cube-js/cube/issues/11050)
+- feat!: Remove deprecated CUBEJS_SCHEDULED_REFRESH_CONCURRENCY env variable (#11048) ([44fee72](https://github.com/cube-js/cube/commit/44fee72ac84f630427e4a2038797fec20b8d018c)), closes [#11048](https://github.com/cube-js/cube/issues/11048)
+- feat!: remove deprecated Elasticsearch driver ([99c98ad](https://github.com/cube-js/cube/commit/99c98adb8f94d78b7add5f36c4f2dfc684876831))
+
+### BREAKING CHANGES
+
+- The `renewQuery` parameter of the `/v1/load` REST endpoint and the GraphQL `cube` query has been removed. Use the `cache` parameter instead: `cache: 'must-revalidate'` replaces `renewQuery: true`, and the default `stale-if-slow` replaces `renewQuery: false`.
+- The CUBEJS_SCHEDULED_REFRESH_CONCURRENCY environment variable has been removed. It was deprecated in v1.2.7. Use CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID instead.
+- The Elasticsearch driver has been removed. It was deprecated in v1.6.0. There is no drop-in replacement.
+
 ## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
 
 **Note:** Version bump only for package @cubejs-backend/shared

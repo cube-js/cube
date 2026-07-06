@@ -3,6 +3,55 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+### Bug Fixes
+
+- **mysql-driver:** Use string for decimal values ([4f2d3b9](https://github.com/cube-js/cube/commit/4f2d3b9416834ab87dbf84b24bed1e132bf2e512))
+
+- feat(query-orchestrator)!: Increase default continueWaitTimeout from 5s to 10s ([4625173](https://github.com/cube-js/cube/commit/462517392432a2e5c244af73c305fbb2bc543f4f))
+- fix(cubeorchestrator)!: Serialize all numeric query results as JSON strings, fix #1879 ([bd88651](https://github.com/cube-js/cube/commit/bd8865113889b5153ed837c3dc51bc6bca5d3585)), closes [#1879](https://github.com/cube-js/cube/issues/1879)
+- feat(docker)!: Upgrade OpenJDK from 17 to 21 ([9d00c83](https://github.com/cube-js/cube/commit/9d00c83b4af7f749dfb5329d93fe8b2f165edcda))
+- feat(docker)!: Upgrade Python from 3.11 to 3.13 ([f3875ec](https://github.com/cube-js/cube/commit/f3875ec1826dcae4c489c68a6e3b7a2f06569200))
+- feat(server-core)!: Remove deprecated dbType option (#11045) ([08a2a6b](https://github.com/cube-js/cube/commit/08a2a6b37efb450377383fbb0e5041fff106cff2)), closes [#11045](https://github.com/cube-js/cube/issues/11045)
+- feat!: Remove deprecated context_to_roles configuration option (#11055) ([41d42d6](https://github.com/cube-js/cube/commit/41d42d669486e763ad984fda5e64e33438baa5a4)), closes [#11055](https://github.com/cube-js/cube/issues/11055)
+- feat(api-gateway)!: Remove deprecated renewQuery parameter (#11050) ([c2b8888](https://github.com/cube-js/cube/commit/c2b888885d6640c5a14ee49f1057fefdf703ead3)), closes [#11050](https://github.com/cube-js/cube/issues/11050)
+- feat!: Remove deprecated CUBEJS_SCHEDULED_REFRESH_CONCURRENCY env variable (#11048) ([44fee72](https://github.com/cube-js/cube/commit/44fee72ac84f630427e4a2038797fec20b8d018c)), closes [#11048](https://github.com/cube-js/cube/issues/11048)
+- feat(schema-compiler)!: Remove deprecated running_total measure type (#11044) ([f45ea45](https://github.com/cube-js/cube/commit/f45ea456e4c3bfdc3663f8c992c911fdc9ed3730)), closes [#11044](https://github.com/cube-js/cube/issues/11044)
+- feat!: remove deprecated Elasticsearch driver ([99c98ad](https://github.com/cube-js/cube/commit/99c98adb8f94d78b7add5f36c4f2dfc684876831))
+
+### Features
+
+- **cubeorchestrator:** Use Arrow format for CubeStore response format ([78ddac2](https://github.com/cube-js/cube/commit/78ddac22db3258f2f2cf60bb772ae90aa1cb0282)), closes [#1705](https://github.com/cube-js/cube/issues/1705)
+- **cubestore:** Upgrade docker image to Debian trixie and LLVM 22 ([1cb96ce](https://github.com/cube-js/cube/commit/1cb96ce2c788bd416c50bf6476c5533b403a44fa))
+- **docker:** Upgrade Debian to Trixie ([45b2967](https://github.com/cube-js/cube/commit/45b2967499c5323d6164ab3915c2ede69185e55a))
+- **docker:** Upgrade Node.js to v24 (24.18.0) ([93ff587](https://github.com/cube-js/cube/commit/93ff587457dba70801d84051b5c26efc44dfbd96))
+- **mysql-driver:** Migrate driver to mysql2 library, thanks [@nathanfallet](https://github.com/nathanfallet) ([553b7ef](https://github.com/cube-js/cube/commit/553b7ef98f1fdf050013aaa81ab629bcc3bbeddc))
+- **native:** Initial support for Python 3.13 ([#9930](https://github.com/cube-js/cube/issues/9930)) ([f91a237](https://github.com/cube-js/cube/commit/f91a23728614dde9b9dc28b4e2a4662439670428))
+
+### BREAKING CHANGES
+
+- The default `continueWaitTimeout` changes from 5 to 10
+  seconds. Deployments relying on the previous 5s default will now wait up
+  to 10s before returning `Continue wait`. Set `continueWaitTimeout: 5`
+  explicitly in orchestratorOptions/queueOptions to keep the old behavior.
+- All numeric values in query results are now serialized
+  as JSON strings regardless of the data source driver. Previously the
+  JSON type of numeric values varied by driver (string or number).
+  Clients that relied on receiving JSON numbers must parse the string
+  values instead.
+- The -jdk image now runs Java 21. JDBC drivers and custom JARs
+  must be compatible with OpenJDK 21.
+- Users who install custom Python packages into the Cube image
+  (e.g. for Python/Jinja data models) must target Python 3.13. Packages built for
+  3.11 will not load.
+- CreateOptions.dbType has been removed. Use driverFactory instead.
+- The context_to_roles (contextToRoles) configuration option has been removed. It was deprecated in v1.6.4. Use context_to_groups (contextToGroups) instead.
+- The `renewQuery` parameter of the `/v1/load` REST endpoint and the GraphQL `cube` query has been removed. Use the `cache` parameter instead: `cache: 'must-revalidate'` replaces `renewQuery: true`, and the default `stale-if-slow` replaces `renewQuery: false`.
+- The CUBEJS_SCHEDULED_REFRESH_CONCURRENCY environment variable has been removed. It was deprecated in v1.2.7. Use CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID instead.
+- The running_total measure type has been removed. Data models that use `type: running_total` will now fail validation. Replace them with a rolling_window measure using an unbounded trailing window.
+- The Elasticsearch driver has been removed. It was deprecated in v1.6.0. There is no drop-in replacement.
+
 ## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
 
 ### Bug Fixes

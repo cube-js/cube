@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+### Features
+
+- **mysql-driver:** Migrate driver to mysql2 library, thanks [@nathanfallet](https://github.com/nathanfallet) ([553b7ef](https://github.com/cube-js/cube/commit/553b7ef98f1fdf050013aaa81ab629bcc3bbeddc))
+
 ## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
 
 **Note:** Version bump only for package @cubejs-backend/testing-shared

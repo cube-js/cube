@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+- feat(docker)!: Upgrade OpenJDK from 17 to 21 ([9d00c83](https://github.com/cube-js/cube/commit/9d00c83b4af7f749dfb5329d93fe8b2f165edcda))
+- feat(docker)!: Upgrade Python from 3.11 to 3.13 ([f3875ec](https://github.com/cube-js/cube/commit/f3875ec1826dcae4c489c68a6e3b7a2f06569200))
+- feat!: remove deprecated Elasticsearch driver ([99c98ad](https://github.com/cube-js/cube/commit/99c98adb8f94d78b7add5f36c4f2dfc684876831))
+
+### Features
+
+- **docker:** Upgrade Debian to Trixie ([45b2967](https://github.com/cube-js/cube/commit/45b2967499c5323d6164ab3915c2ede69185e55a))
+- **docker:** Upgrade Node.js to v24 (24.18.0) ([93ff587](https://github.com/cube-js/cube/commit/93ff587457dba70801d84051b5c26efc44dfbd96))
+
+### BREAKING CHANGES
+
+- The -jdk image now runs Java 21. JDBC drivers and custom JARs
+  must be compatible with OpenJDK 21.
+- Users who install custom Python packages into the Cube image
+  (e.g. for Python/Jinja data models) must target Python 3.13. Packages built for
+  3.11 will not load.
+- The Elasticsearch driver has been removed. It was deprecated in v1.6.0. There is no drop-in replacement.
+
 ## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
 
 **Note:** Version bump only for package @cubejs-backend/docker
