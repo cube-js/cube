@@ -182,9 +182,12 @@ impl MemberExpressionSymbol {
         if childs.iter().any(|s| !s.is_dimension()) {
             Ok(None)
         } else {
+            // Single member expression can reference multiple dimensions from
+            // the same cube
             let cube_names = childs
                 .into_iter()
                 .map(|child| child.cube_name())
+                .unique()
                 .collect_vec();
             Ok(Some(cube_names))
         }
