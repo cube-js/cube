@@ -17277,6 +17277,21 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_pg_catalog_array_agg() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_catalog_array_agg",
+            execute_query(
+                r#"SELECT pg_catalog.array_agg(a) AS labels FROM (VALUES (1), (2), (3)) AS t(a)"#
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_format_function() -> Result<(), CubeError> {
         // Test: Basic usage with a single string
         let result = execute_query(
