@@ -19,8 +19,8 @@ agent, or uploading a file.
 
 ### Searching and browsing
 
-A search box sits at the top of the launchpad. Typing filters every category at once, and the
-count next to each category updates to the number of matches.
+A search box sits at the top of the launchpad. Typing filters every category at once; categories
+with no matches appear disabled, so you can tell at a glance which ones hold results.
 
 The category selector lets you switch between starting-point types:
 
@@ -28,7 +28,9 @@ The category selector lets you switch between starting-point types:
   into a group reveals its sub-groups and views.
 - **Views** — every [view](/docs/data-modeling/views) in the model. Search also matches a view's
   measures and dimensions; when a view matches through a member, the row notes which one.
-- **Workbooks** — existing workbooks you can open as a starting point.
+- **Workbooks** — drill into an existing workbook and pick one of its reports to reuse its query
+  as the starting point for the new report. The workbook you are currently in and empty tabs
+  (which have no query to reuse) appear disabled.
 - **Source tables** — raw tables from your connected
   [data sources](/admin/connect-to-data/data-sources/index), browsable by data source and schema.
 
