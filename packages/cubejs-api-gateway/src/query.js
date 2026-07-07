@@ -252,8 +252,9 @@ const START_DATE_OPERATORS = ['beforeDate', 'afterOrOnDate'];
 const END_DATE_OPERATORS = ['beforeOrOnDate', 'afterDate'];
 
 // Absolute values must pass through byte-exact: bare dates keep each planner's
-// own day-boundary handling, timestamps keep their time component
-const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?)?$/;
+// own day-boundary handling, timestamps keep their time component. Timestamps
+// may carry a UTC designator or offset (e.g. from the SQL API push-down).
+const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/;
 
 // Resolve a dateRange input — a relative string ("last 2 weeks"), a single
 // absolute date, or a 2-element array — to a normalized [startISO, endISO]
