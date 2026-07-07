@@ -43,15 +43,24 @@ views:
 
     meta:
       default_ui_filters:
+        - member: created_at
+          operator: between
+          values: ["7 days ago", "today"]
         - member: status
           operator: equals
-          values:
-            - completed
+          values: ["completed"]
 ```
 
 When you select such a view in a new tab, those filters are added to the query
 automatically. They behave exactly like filters you add yourself: you can
 change their values, switch operators, or remove them.
+
+Date range filters can use relative bounds like `7 days ago` or `this month`.
+A relative range resolves each time the query runs, so the window rolls
+forward day over day, and the filter's date editor opens on the **Relative**
+tab showing its bounds. See
+[`default_ui_filters`][ref-default-ui-filters] for the full list of accepted
+operators and values.
 
 Resetting the tab or going back to the view list clears default filters
 along with the rest of the query; they are seeded again the next time you
