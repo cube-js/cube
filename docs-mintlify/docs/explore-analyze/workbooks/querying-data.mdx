@@ -72,6 +72,46 @@ You can add dimensions to the pivot by right-clicking on the left pane or in the
 
 Note that chart tables are different from results tables. You can configure pivots in chart tables separately.
 
+## Totals
+
+The totals menu (the **Σ** button) in the results toolbar adds summary rows
+and columns to the results table: **Column Totals** (a pinned row at the
+bottom with a total for each measure column), **Row Totals** (a total for
+each row across the pivoted columns), and **Subtotals** (see below). All
+three can be enabled at once; each setting is saved with the report and
+carries over when you switch the chart type to [Table][ref-table-chart].
+
+### Subtotals
+
+When the table is [pivoted](#pivoting) by two or more dimensions,
+**Subtotals** appends a bold **Total for ‹value›** column after each pivot
+group's columns, at every nesting level — for example, pivoting by year and
+then status adds a **Total for 2024** column after 2024's status columns.
+With fewer than two pivot dimensions the menu item is disabled, and if the
+query changes so the pivot no longer qualifies, subtotals switch off
+automatically.
+
+<Frame>
+  <img src="https://ucarecdn.com/61d36ecc-020f-4d04-b449-b7c983e269ea/92a1bd7f-light.png" alt="Pivoted results table with subtotal columns" />
+</Frame>
+
+Subtotal values are computed by the database — one extra query per pivot
+level — rather than by summing the visible cells, so they are correct for
+non-additive measures such as counts of distinct values and averages, and
+when the [row limit](#limiting) truncates the table. With **Column Totals**
+also enabled, the pinned totals row shows a grand total for each pivot group.
+
+<Note>
+
+- The toggle adds subtotals for all pivot levels at once; there is no
+  per-group control.
+- Subtotals are not available for flat (non-pivoted) tables or in the
+  values-as-rows table layout.
+- [Calculations][ref-calculated-fields] based on window functions, such as
+  **Running total**, are excluded — same as for row and column totals.
+
+</Note>
+
 ## Limiting
 
 Every query in a workbook returns at most a fixed number of rows. By
@@ -269,5 +309,7 @@ behaves as intended.
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
+[ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
+[ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 
