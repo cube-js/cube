@@ -554,8 +554,14 @@ views:
           - join_path: orders
             includes:
                 - status
+                - category
                 - created_at
+                - completed_orders
                 - total_amount
+                - amount_exclude_status
+                - amount_keep_only_status
+                - amount_exclude_segment
+                - amount_keep_only_segment
                 - amount_prev_month
                 - mom_growth
                 - amount_reduce_time
