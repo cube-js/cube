@@ -475,10 +475,14 @@ impl MultiStageQueryPlanner {
         };
 
         let member_name = member.full_name();
-        if let Some(exists) = descriptions
-            .iter()
-            .find(|q| q.is_match_member_and_state(&member, &state))
-        {
+        // Skip without-member leaves: they carry the rank/similar member's
+        // own name only to select its dimension grid, so `(member, state)`
+        // alone can't tell them apart from the member's real inode CTE. A
+        // `{member}` reference must always resolve to the computing inode,
+        // never to the bare-grid leaf.
+        if let Some(exists) = descriptions.iter().find(|q| {
+            !q.member().is_without_member_leaf() && q.is_match_member_and_state(&member, &state)
+        }) {
             return Ok(exists.clone());
         };
 
