@@ -150,3 +150,111 @@ async fn test_view_with_filter() {
         insta::assert_snapshot!(result);
     }
 }
+
+// CORE-549: a rank measure whose `order_by` references a member the view does
+// not expose (`avg_amount`). On the base cube the order_by resolves in the
+// owning cube's context and planning succeeds; through orders_ms_view the
+// order_by SqlCall was compiled against the view's cube context, where
+// `avg_amount` is not a member, so planning failed with
+// "Cannot resolve: avg_amount". Both queries must build and use a window fn.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_order_by_hidden_member() {
+    let ctx = create_context();
+
+    // Control: the base cube resolves the order_by member and plans fine.
+    let base_query = indoc! {r#"
+        measures:
+          - orders.amount_rank_order_by_hidden
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+    // reduce_by(status) empties the partition (status is the only selected
+    // dim), so the window is `rank() OVER (ORDER BY ...)` with no PARTITION BY.
+    let base_sql = ctx.build_sql(base_query).unwrap();
+    assert!(
+        base_sql.contains("rank() OVER ("),
+        "expected a rank window function, got:\n{}",
+        base_sql,
+    );
+
+    // Repro: the same measure through the view that does not expose avg_amount.
+    let view_query = indoc! {r#"
+        measures:
+          - orders_ms_view.amount_rank_order_by_hidden
+        dimensions:
+          - orders_ms_view.status
+        order:
+          - id: orders_ms_view.status
+    "#};
+    let view_sql = ctx.build_sql(view_query).unwrap();
+    assert!(
+        view_sql.contains("rank() OVER ("),
+        "expected a rank window function, got:\n{}",
+        view_sql,
+    );
+
+    if let Some(result) = ctx.try_execute_pg(view_query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// CORE-549 neighbors: `filters` and `case` reference members the same way
+// `order_by` does, but they are NOT re-exported onto the view member — they
+// stay on the base measure/dimension and are reached through the view
+// member's direct sql reference. So a filtered measure / case dimension whose
+// template references a member the view does not expose (`category`) must keep
+// building through the view. These guard that the neighbors don't regress into
+// the order_by failure mode.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_filtered_measure_hidden_ref() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders_ms_view.amount_filtered_hidden
+        dimensions:
+          - orders_ms_view.status
+        order:
+          - id: orders_ms_view.status
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains("category"),
+        "expected the measure filter on category to survive through the view,\n\
+         got:\n{}",
+        sql,
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_case_dimension_hidden_ref() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders_ms_view.total_amount
+        dimensions:
+          - orders_ms_view.category_label
+        order:
+          - id: orders_ms_view.category_label
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains("CASE") && sql.contains("category"),
+        "expected the dimension CASE referencing category to survive through the view,\n\
+         got:\n{}",
+        sql,
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
