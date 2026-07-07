@@ -358,6 +358,45 @@ cubes:
             add_group_by:
                 - orders.created_at
 
+          # CORE-602: end-of-period rank shared by two sibling consumers.
+          # `eop_rank` keeps the last snapshot per status; both consumers
+          # filter on `{eop_rank} = 1`, so a query selecting both must plan
+          # the rank stage once and join both consumers to it.
+          - name: eop_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.created_at}"
+                  dir: desc
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+                keep_only:
+                    - orders.status
+
+          - name: balance_eop_a
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.total_amount}"
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+            filters:
+                - sql: "{CUBE.eop_rank} = 1"
+
+          - name: balance_eop_b
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.total_amount}"
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+            filters:
+                - sql: "{CUBE.eop_rank} = 1"
+
           - name: status_weighted_amount
             type: sum
             multi_stage: true
