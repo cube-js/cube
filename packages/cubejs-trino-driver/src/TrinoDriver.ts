@@ -1,4 +1,5 @@
-import fetch from 'node-fetch';
+import fetch, { RequestInit } from 'node-fetch';
+import { Agent as HttpsAgent } from 'https';
 import { PrestoDriver, PrestoDriverConfiguration } from '@cubejs-backend/prestodb-driver';
 import { PrestodbQuery } from '@cubejs-backend/schema-compiler';
 
@@ -32,7 +33,13 @@ export class TrinoDriver extends PrestoDriver {
       headers.Authorization = `Basic ${encoded}`;
     }
 
-    const response = await fetch(url, { method: 'GET', headers });
+    const requestInit: RequestInit = { method: 'GET', headers };
+
+    if (ssl) {
+      requestInit.agent = new HttpsAgent({ ...ssl });
+    }
+
+    const response = await fetch(url, requestInit);
 
     if (!response.ok) {
       const text = await response.text();
