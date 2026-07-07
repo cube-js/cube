@@ -68,6 +68,20 @@ cubes:
             type: time
             sql: updated_at
 
+          # CORE-549 neighbor: a dimension `case` referencing a member
+          # (category) not exposed by orders_ms_view. Unlike order_by, `case`
+          # is not re-exported onto the view member, so it is reached through
+          # the view member's direct sql reference and resolves against the
+          # owning cube — it must keep building through the view.
+          - name: category_label
+            type: string
+            case:
+                when:
+                    - sql: "{CUBE.category} = 'books'"
+                      label: Literature
+                else:
+                    label: Other
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -300,6 +314,30 @@ cubes:
             order_by:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
+
+          # CORE-549: order_by references a measure (avg_amount) that
+          # orders_ms_view does not expose. Through the view the order_by
+          # SqlCall must resolve against the owning cube (orders), not the
+          # view — otherwise planning fails with "Cannot resolve: avg_amount".
+          - name: amount_rank_order_by_hidden
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.status
+            order_by:
+                - sql: "{CUBE.avg_amount}"
+                  dir: desc
+
+          # CORE-549 neighbor: a measure `filters` referencing a member
+          # (category) not exposed by orders_ms_view. `filters` is not
+          # re-exported onto the view member, so it is reached through the
+          # view member's direct sql reference and resolves against the
+          # owning cube — it must keep building through the view.
+          - name: amount_filtered_hidden
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE.category} = 'books'"
 
           # Rank reduced by the time dimension (bare) while ordered by a
           # measure. With created_at selected at a granularity the partition
@@ -605,3 +643,6 @@ views:
                 - mom_growth
                 - amount_reduce_time
                 - amount_rank_reduce_time
+                - amount_rank_order_by_hidden
+                - amount_filtered_hidden
+                - category_label
