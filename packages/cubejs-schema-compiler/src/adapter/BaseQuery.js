@@ -1016,6 +1016,7 @@ export class BaseQuery {
       preAggregationsMatchOnly: true,
       preAggregationId: this.options.preAggregationId || null,
       securityContext: this.contextSymbols.securityContext,
+      joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       subqueryJoins: this.options.subqueryJoins,
