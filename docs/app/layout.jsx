@@ -116,6 +116,9 @@ export default async function RootLayout({ children }) {
             })(window,document,'script','dataLayer','GTM-52W7VM2');
           `}} />
         )}
+        {process.env.NODE_ENV === 'production' && (
+          <script async src="https://static.claydar.com/init.v1.js?id=c2dQN6r6rp" />
+        )}
       </Head>
       <body>
         <SearchProviderWrapper>
