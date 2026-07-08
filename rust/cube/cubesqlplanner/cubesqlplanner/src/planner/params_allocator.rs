@@ -116,12 +116,19 @@ impl ParamsAllocator {
             Ok((sql.to_string(), self.params.clone()))
         } else {
             let mut result_params = self.params.clone();
+            // Occurrences of the same native param index must map to the same
+            // internal param: databases like Postgres require expressions in
+            // GROUP BY and window PARTITION BY/ORDER BY to be strictly equal,
+            // and that includes param placeholders
+            let mut native_index_map: HashMap<usize, usize> = HashMap::new();
             let sql = NATIVE_PARAMS_MATCH_RE
                 .replace_all(sql, |caps: &Captures| {
                     let ind: usize = caps[1].to_string().parse().unwrap();
-                    let param = native_allocated_params[ind].clone();
-                    result_params.push(param);
-                    self.make_placeholder(result_params.len() - 1)
+                    let internal_ind = *native_index_map.entry(ind).or_insert_with(|| {
+                        result_params.push(native_allocated_params[ind].clone());
+                        result_params.len() - 1
+                    });
+                    self.make_placeholder(internal_ind)
                 })
                 .to_string();
             Ok((sql, result_params))
@@ -181,6 +188,37 @@ mod tests {
                 FilterValue::Null,
                 FilterValue::Num(42.0),
                 FilterValue::Bool(true),
+            ]
+        );
+    }
+
+    #[test]
+    fn repeated_native_param_maps_to_single_internal_param() {
+        let allocator = ParamsAllocator::new(false);
+
+        // The same native param referenced from several member expressions
+        // (e.g. a dimension and window function PARTITION BY inside a measure)
+        // must stay a single param, otherwise Postgres rejects the query with
+        // "must appear in the GROUP BY clause" as the expressions stop being equal.
+        let sql = "SELECT TO_CHAR(d, $0$) x, LAG(m) OVER (PARTITION BY TO_CHAR(d, $0$)), $1$";
+        let native = vec![
+            FilterValue::Str("month".to_string()),
+            FilterValue::Str("other".to_string()),
+        ];
+
+        let (rewritten_sql, params) = allocator
+            .add_native_allocated_params(sql, &native)
+            .expect("merge should succeed");
+
+        assert_eq!(
+            rewritten_sql,
+            "SELECT TO_CHAR(d, $_0_$) x, LAG(m) OVER (PARTITION BY TO_CHAR(d, $_0_$)), $_1_$"
+        );
+        assert_eq!(
+            params,
+            vec![
+                FilterValue::Str("month".to_string()),
+                FilterValue::Str("other".to_string()),
             ]
         );
     }
