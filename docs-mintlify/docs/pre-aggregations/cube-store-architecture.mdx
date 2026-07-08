@@ -130,10 +130,49 @@ Workers reach the metastore over the network and cache metadata locally.
 ## Indexes are sorted copies
 
 Every index in Cube Store is a **sorted copy** of the table data. Sorting is
-the most efficient way to compress columnar data: sorted columns produce long
-runs of identical or sequential values, which compress extremely well under
-dictionary and run-length encoding. Sorting is also optimal for filtering —
-range predicates can skip entire blocks of data using min-max statistics.
+the most efficient way to compress columnar data, and it is optimal for
+filtering — range predicates can skip entire blocks of data using min-max
+statistics.
+
+### How sorting affects columnar compression
+
+In a columnar format, values of one column are stored next to each other,
+and encoders exploit *local redundancy*: repeated or slowly changing
+neighboring values encode into far fewer bits. Sorting is what creates that
+redundancy. Consider a column of product categories in arrival order versus
+sorted order:
+
+```text
+Unsorted:  books, toys, books, garden, toys, books, garden, toys, ...
+Sorted:    books, books, books, garden, garden, toys, toys, toys, ...
+```
+
+The unsorted column has to be stored more or less value by value. The
+sorted column collapses into a handful of runs — effectively
+`books×3, garden×2, toys×3` — regardless of how many million rows it spans.
+Concretely, sorting feeds each of the standard columnar encodings:
+
+- **Run-length encoding (RLE).** Sorted low-cardinality columns become a
+  short list of `(value, count)` pairs. A column with 20 distinct values
+  across a billion rows compresses to almost nothing.
+- **Dictionary encoding.** Values are replaced by small integer codes into
+  a dictionary. Sorting makes the code sequence itself highly repetitive,
+  so the RLE applied on top of the codes compresses further.
+- **Delta encoding.** A sorted numeric or timestamp column is
+  monotonically non-decreasing, so storing differences between neighbors
+  yields tiny, similar numbers that pack into a few bits each.
+
+The effect cascades down the sort key: the first key column is perfectly
+sorted, and within each of its runs the second column is sorted too, and so
+on. Columns *not* in the sort key still benefit whenever they correlate
+with key columns (for example, `city` correlating with `country`).
+
+Smaller files are not just a storage win — they are a latency win. Scan
+speed is bounded by bytes read, and general-purpose compression applied on
+top works better on already-regular data. The same property also tightens
+min-max statistics: in sorted data, each block covers a narrow, mostly
+disjoint slice of the key space, so pruning can rule blocks out with
+precision instead of finding every block's range overlapping every query.
 
 Because all data is sorted, every operation in the engine can be
 merge-based: merge sort, merge join, and merge aggregation all work
@@ -147,24 +186,148 @@ the index whose sort key best matches the filtered columns. This is why
 your query patterns is the single most effective pre-aggregation
 optimization.
 
+### Aggregating indexes
+
+Cube Store supports two index types: **regular** and **aggregating**.
+
+A regular index is a sorted copy of every row in the table. An
+[aggregating index](/docs/pre-aggregations/using-pre-aggregations#aggregating-indexes)
+goes further: it stores only the dimensions listed in its definition plus
+pre-aggregated measures, rolling the data up over every dimension that is
+*not* in the index. It is effectively a rollup of the rollup, maintained
+incrementally by the storage engine itself.
+
+Each measure column in an aggregating index carries an aggregate function
+that defines how rows with the same sort key combine:
+
+| Function | Used for |
+|----------|----------|
+| `SUM` | Additive measures (`sum`, `count`) |
+| `MIN` / `MAX` | Minimum / maximum measures |
+| `MERGE` | HyperLogLog sketches (`count_distinct_approx`) |
+
+The rollup does not happen at query time. Whenever chunks are merged
+during compaction, Cube Store runs the merged, sorted stream through a
+group-by on the index's sort key and applies the aggregate functions —
+rows with equal dimension values collapse into one. Because the data is
+already sorted by the grouping columns, this aggregation is a cheap,
+streaming merge rather than a hash aggregation.
+
+The result: a query that matches an aggregating index reads a table that is
+often orders of magnitude smaller than the parent pre-aggregation, and the
+aggregation work has already been paid for at ingestion time.
+
+Note that this is also why aggregating indexes only support additive
+aggregate functions — a non-additive measure (such as an exact distinct
+count) cannot be combined incrementally from partial rollups.
+
 ## Auto-partitioning
 
-Each index is split into partitions — contiguous ranges of the sort key.
-Cube Store keeps all partitions roughly the same size by splitting them
-automatically during compaction. Because data is sorted, choosing a split
-point is trivial: the midpoint of the sort key range.
+### Partition key space and ranges
+
+An index's sort key defines a totally ordered **key space**, and each
+partition owns a contiguous range of it. A partition's range is described
+by two bounds, where an absent bound means "unbounded":
 
 ```text
-Before compaction:                After split at compaction:
+Key space of an index sorted by (created_at, user_id):
 
-  Partition A (too large)           Partition A'      Partition A''
-  ┌─────────────────────┐           ┌──────────┐      ┌──────────┐
-  │ sorted data         │    ──►    │ 1st half │      │ 2nd half │
-  └─────────────────────┘           └──────────┘      └──────────┘
+  ├────────────────┼────────────────┼────────────────┤
+  Partition 1       Partition 2      Partition 3
+  (−∞ .. K₁)        [K₁ .. K₂)       [K₂ .. +∞)
 ```
+
+Two properties of ranges matter in practice:
+
+- **Range bounds vs. data bounds.** Alongside its range (the keys it *may*
+  contain), each partition tracks the actual minimum and maximum key
+  present in its data. Pruning uses the tighter of the two, so a partition
+  with a wide range but sparse data is still skipped effectively.
+- **The partition split key.** Ranges are defined over a *prefix* of the
+  sort key, called the split key. Rows that share the same split key value
+  are guaranteed to land in the same partition — they are never spread
+  across two partitions. This keeps range boundaries clean and lets the
+  engine reason about a partition as a self-contained unit of work.
+
+A freshly created table starts with a single partition covering the entire
+key space (both bounds unbounded). Partitions never split on ingestion —
+splitting is deferred to compaction, when the data is being rewritten
+anyway.
+
+### Partition splits
+
+During compaction, Cube Store checks whether the partition has outgrown its
+split threshold and, if so, writes the merged output into several new
+partitions instead of one:
+
+```text
+Before compaction:                    After split at compaction:
+
+  Partition [K₁ .. K₂)                Partition [K₁ .. S₁)
+  ┌───────────────────────┐           Partition [S₁ .. S₂)
+  │ main file + N chunks  │    ──►    Partition [S₂ .. K₂)
+  └───────────────────────┘
+```
+
+The number of child partitions is computed from both row count and file
+size:
+
+- **By rows:** total pending rows divided by the split threshold
+  (`CUBESTORE_PARTITION_SPLIT_THRESHOLD`, default 2,097,152 rows; can also
+  be set per pre-aggregation).
+- **By size:** the partition's file size divided by the size threshold
+  (`CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD`, default 100 MB).
+
+The larger of the two wins, capped at 16 children per compaction pass to
+bound write amplification. Because the merged output is sorted, the split
+points fall out naturally: the writer streams rows into the first file
+until it reaches its row budget, closes it at the next split-key boundary,
+and moves on. Each child's range bounds are derived from the actual first
+and last keys written to it.
 
 Uniform partition sizes keep query work evenly distributed across workers
 and make partition pruning predictable.
+
+## Partition pruning
+
+Partition pruning happens on the router at planning time, before any work
+is distributed. The goal is to touch only the partitions whose key ranges
+can possibly satisfy the query.
+
+The planner converts the query's `WHERE` clause into a set of **min-max
+conditions** over the index's sort key columns. Each condition is a pair of
+per-column lower and upper bounds; the whole filter is a union of such
+conditions (an OR across them). The extraction understands:
+
+- Comparison operators: `=`, `<`, `<=`, `>`, `>=`
+- `IN` lists (each value becomes its own condition)
+- `AND` / `OR` combinations of the above
+- Boolean columns used directly in predicates
+
+Anything the extractor cannot represent as a range over sort key columns —
+functions on columns, predicates on non-key columns, and so on — is simply
+left out. That is always safe: pruning may only ever *over*-include
+partitions, never skip one that holds matching rows. The remaining
+predicates are still applied during the scan.
+
+Each partition's `[min, max]` key interval is then checked against the
+conditions with a lexicographic comparison, mirroring how the data is
+sorted. If no condition can intersect the partition's interval, the
+partition is dropped from the plan — its worker never sees it, and its
+files are never opened.
+
+Pruning applies at three successively finer levels:
+
+1. **Partitions** are pruned on the router at planning time, using
+   metastore-tracked min/max keys.
+2. **Chunks** within a surviving partition are pruned the same way, using
+   per-chunk min/max keys.
+3. **Row groups** within a Parquet file are pruned at scan time on the
+   worker, using Parquet's per-row-group min-max statistics.
+
+Combined with sorted data — which makes ranges tight and non-overlapping —
+this typically eliminates the vast majority of data for selective queries
+before a single byte is read.
 
 ## Parquet as the storage format
 
@@ -259,7 +422,8 @@ In-memory chunks are compacted into persisted Parquet partitions at roughly
 one-minute intervals, or sooner when count or size thresholds are exceeded.
 During compaction, Cube Store sorts the data, deduplicates rows by unique
 key, and evaluates aggregate columns — so unique-key semantics hold across
-batch and streaming data alike.
+batch and streaming data alike. See
+[Compaction in detail](#compaction-in-detail) for the full process.
 
 ## Query lifecycle
 
@@ -270,7 +434,7 @@ Putting it all together, a query to Cube Store goes through these stages:
 2. **Index selection.** The planner collects constraints from the `WHERE`
    clause and picks the best-matching sorted index for each table.
 3. **Partition pruning.** Partitions whose min-max ranges cannot match the
-   filters are eliminated.
+   filters are eliminated (see [Partition pruning](#partition-pruning)).
 4. **Distribution.** The plan is split at the cluster boundary: partial
    aggregation, filtering, and top-k selection are pushed down to workers;
    the surviving partitions are assigned to their owner workers.
@@ -280,15 +444,62 @@ Putting it all together, a query to Cube Store goes through these stages:
 6. **Merge.** The router merges the sorted partial results, finalizes
    aggregation, applies `LIMIT`/`OFFSET`, and returns the result.
 
-## Background compaction
+## Compaction in detail
 
-A background compaction service continuously reorganizes data for read
-performance:
+Ingestion optimizes for write latency: every batch or streaming buffer
+becomes a new **chunk** — a small, independently sorted file (or in-memory
+buffer) attached to a partition. Queries, however, want few large sorted
+files. Compaction is the background process that continuously converts the
+former into the latter. It runs at two levels.
 
-- **Chunk compaction** merges many small chunks (produced by frequent
-  ingestion) into fewer, larger, sorted Parquet files.
-- **Partition splits** keep partitions uniformly sized as data grows.
+### In-memory chunk compaction
 
-Compaction swaps are atomic: old chunks are deactivated and new ones
-activated in a single metastore transaction, so queries always see a
-consistent view.
+Streaming ingestion produces many tiny in-memory chunks. A scheduled job
+checks each partition and compacts its in-memory chunks when either:
+
+- the number of in-memory chunks exceeds a count threshold, or
+- the oldest buffered row exceeds a lifetime threshold
+  (`CUBESTORE_IN_MEMORY_CHUNKS_MAX_LIFETIME_THRESHOLD`, default 60
+  seconds).
+
+Chunks that are still small and young are merged into a single larger
+in-memory chunk (staying queryable in RAM); chunks that have grown past the
+size limit or aged past the lifetime threshold are merged and written out
+as persistent Parquet chunks. This is the ~1-minute cadence at which
+streaming data flows from memory into durable storage.
+
+### Persistent chunk compaction
+
+A per-partition compaction job merges accumulated Parquet chunks into the
+partition's main file:
+
+1. **Select chunks.** Pending chunks are taken smallest-first, up to a
+   total row budget (`CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD`, default
+   2,097,152 rows) and an on-disk byte budget. Taking the smallest chunks
+   first maximizes the reduction in file count per unit of work.
+2. **Merge as sorted streams.** The partition's main file and every
+   selected chunk are each already sorted, so they are merged with a
+   streaming k-way merge — no re-sorting, no materializing the inputs in
+   memory. Compaction cost is proportional to bytes streamed.
+3. **Deduplicate or aggregate.** On the merged stream:
+   - For tables with a unique key, only the **last row per unique key** is
+     kept — this is how upserts and streaming updates resolve, with later
+     ingestion winning.
+   - For aggregating indexes, rows are grouped by the sort key and the
+     aggregate functions (`SUM`, `MIN`, `MAX`, `MERGE`) combine matching
+     rows — this is where the incremental rollup happens.
+4. **Split if needed.** If the partition has outgrown its thresholds, the
+   output is written into several child partitions
+   (see [Partition splits](#partition-splits)); otherwise into a single
+   rewritten main file. Writers cut files only at split-key boundaries.
+5. **Upload and swap atomically.** New files are uploaded to the object
+   store, then a single metastore transaction deactivates the parent
+   partition and consumed chunks and activates the children with their
+   computed key ranges. Any query planned before the swap still sees the
+   old files; any query planned after sees the new ones. There is no
+   window of inconsistency, and old files are garbage-collected later.
+
+If data arrives faster than one compaction pass can absorb, the cycle
+simply repeats: each pass halves the file count or splits the partition
+further, converging toward a small number of large, sorted,
+uniformly-sized files per partition.
