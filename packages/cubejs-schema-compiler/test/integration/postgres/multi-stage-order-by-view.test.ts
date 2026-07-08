@@ -73,6 +73,17 @@ views:
           - created_at
           - volume_by_day_rank
           # num_parcels deliberately NOT exposed
+
+  - name: orders_view_alias
+    cubes:
+      - join_path: orders
+        includes:
+          - created_at
+          - volume_by_day_rank
+          # num_parcels exposed, but only under an alias, so the order_by
+          # template's bare {num_parcels} still does not resolve in the view.
+          - name: num_parcels
+            alias: total_parcels
     `);
 
   if (getEnv('nativeSqlPlanner')) {
@@ -102,9 +113,24 @@ views:
       { orders_view__created_at_day: '2024-01-01T00:00:00.000Z', orders_view__volume_by_day_rank: '2' },
       { orders_view__created_at_day: '2024-01-02T00:00:00.000Z', orders_view__volume_by_day_rank: '1' },
     ], { joinGraph, cubeEvaluator, compiler }));
+
+    // Repro: the same measure through a view that exposes num_parcels only under
+    // an alias (the order_by template still references it by its bare name).
+    it('view: rank order_by references a member exposed only under an alias', async () => dbRunner.runQueryTest({
+      measures: ['orders_view_alias.volume_by_day_rank'],
+      timeDimensions: [
+        { dimension: 'orders_view_alias.created_at', granularity: 'day' }
+      ],
+      order: [{ id: 'orders_view_alias.created_at' }],
+      timezone: 'UTC',
+    }, [
+      { orders_view_alias__created_at_day: '2024-01-01T00:00:00.000Z', orders_view_alias__volume_by_day_rank: '2' },
+      { orders_view_alias__created_at_day: '2024-01-02T00:00:00.000Z', orders_view_alias__volume_by_day_rank: '1' },
+    ], { joinGraph, cubeEvaluator, compiler }));
   } else {
     // Multi-stage rank is Tesseract-only.
     test.skip('base cube: rank order_by references a non-selected member', () => { expect(1).toBe(1); });
     test.skip('view: rank order_by references a member not exposed by the view', () => { expect(1).toBe(1); });
+    test.skip('view: rank order_by references a member exposed only under an alias', () => { expect(1).toBe(1); });
   }
 });
