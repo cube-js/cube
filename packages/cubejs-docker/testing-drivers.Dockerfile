@@ -13,7 +13,9 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends libssl3t64 curl \
-       cmake python3 gcc g++ make cmake openjdk-21-jdk-headless unzip \
+       cmake python3.13 gcc g++ make cmake openjdk-21-jdk-headless unzip \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
@@ -168,6 +170,8 @@ FROM base AS final
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y ca-certificates python3.13 libpython3.13-dev \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && apt-get clean
 
 COPY --from=build /cubejs .
