@@ -227,8 +227,7 @@ GROUP BY 1
 ```
 
 The `JOIN` type (`INNER`, `LEFT`, `RIGHT`, `FULL`) controls which keys are
-kept. This requires the [Tesseract SQL planner][ref-tesseract-env] and only
-applies to grouped queries whose `GROUP BY` is the join key. See
+kept. This only applies to grouped queries whose `GROUP BY` is the join key. See
 [multi-fact views][ref-multi-fact-views] for the full explanation.
 
 
@@ -236,4 +235,3 @@ applies to grouped queries whose `GROUP BY` is the join key. See
 [ref-join-paths]: /docs/data-modeling/joins#join-paths
 [ref-join-hints]: /docs/data-modeling/joins#join-hints
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
-[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner

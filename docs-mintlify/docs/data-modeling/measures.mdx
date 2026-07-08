@@ -361,13 +361,6 @@ measures:
     format: percent
 ```
 
-<Note>
-
-The `filter` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
-(`CUBEJS_TESSERACT_SQL_PLANNER=true`).
-
-</Note>
-
 ### Nested aggregates
 
 Use the [`grain`][ref-grain] parameter with `include` to compute an aggregate
@@ -477,7 +470,6 @@ measures:
 [ref-filter]: /reference/data-modeling/measures#filter
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type
-[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-pop-recipe]: /recipes/data-modeling/period-over-period
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
