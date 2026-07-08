@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **api-gateway:** Accept timezone-suffixed timestamps in date filters, fix [#11213](https://github.com/cube-js/cube/issues/11213) ([#11208](https://github.com/cube-js/cube/issues/11208)) ([3a67f7d](https://github.com/cube-js/cube/commit/3a67f7dc4aa0e49ab6bc0e831ff079e8c8d03810))
+- **cubesql:** Push down `UTCTIMESTAMP` (`CURRENT_TIMESTAMP`) ([#11195](https://github.com/cube-js/cube/issues/11195)) ([cde0cca](https://github.com/cube-js/cube/commit/cde0ccaa79fa592c881f3df551b9963232ec9428))
+- **cubesql:** Resolve schema-qualified `pg_catalog` functions ([#11190](https://github.com/cube-js/cube/issues/11190)) ([fc0d82b](https://github.com/cube-js/cube/commit/fc0d82b7eb81559e0b2344ff721abfaae91cc76c))
+- **tesseract:** Apply multi-stage filter directive through views (CORE-606) ([#11210](https://github.com/cube-js/cube/issues/11210)) ([75d607a](https://github.com/cube-js/cube/commit/75d607a97621810beec0198a8fa668b2ee1284b0))
+- **tesseract:** Deduplicate cube names for dimension-only measure expressions ([#11207](https://github.com/cube-js/cube/issues/11207)) ([e79ad48](https://github.com/cube-js/cube/commit/e79ad484d6df099fe4dc8269e4d59580e501a86a))
+- **tesseract:** resolve multi_stage order_by against owning cube through views ([#11214](https://github.com/cube-js/cube/issues/11214)) ([6483015](https://github.com/cube-js/cube/commit/64830152010b063838d22598b91a9d635f002988))
+- **tesseract:** resolve shared rank reference to its inode, not the bare-grid leaf ([#11211](https://github.com/cube-js/cube/issues/11211)) ([3e755d6](https://github.com/cube-js/cube/commit/3e755d6de817d8ae9c23e9a98c8ab4e5e48e3314))
+- **trino-driver:** Use SSL options in testConnection ([#11217](https://github.com/cube-js/cube/issues/11217)) ([59c6286](https://github.com/cube-js/cube/commit/59c62863a02d2f5343751611a6f7b0813ef17217))
+
 # [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
 
 ### Bug Fixes

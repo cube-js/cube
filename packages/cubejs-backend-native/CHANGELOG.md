@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **cubesql:** Resolve schema-qualified `pg_catalog` functions ([#11190](https://github.com/cube-js/cube/issues/11190)) ([fc0d82b](https://github.com/cube-js/cube/commit/fc0d82b7eb81559e0b2344ff721abfaae91cc76c))
+
 # [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
 
 - feat(server-core)!: Remove deprecated dbType option (#11045) ([08a2a6b](https://github.com/cube-js/cube/commit/08a2a6b37efb450377383fbb0e5041fff106cff2)), closes [#11045](https://github.com/cube-js/cube/issues/11045)

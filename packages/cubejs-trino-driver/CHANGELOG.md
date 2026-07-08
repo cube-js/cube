@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **trino-driver:** Use SSL options in testConnection ([#11217](https://github.com/cube-js/cube/issues/11217)) ([59c6286](https://github.com/cube-js/cube/commit/59c62863a02d2f5343751611a6f7b0813ef17217))
+
 # [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
 
 **Note:** Version bump only for package @cubejs-backend/trino-driver

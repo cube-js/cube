@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **cubesql:** Push down `UTCTIMESTAMP` (`CURRENT_TIMESTAMP`) ([#11195](https://github.com/cube-js/cube/issues/11195)) ([cde0cca](https://github.com/cube-js/cube/commit/cde0ccaa79fa592c881f3df551b9963232ec9428))
+- **tesseract:** Deduplicate cube names for dimension-only measure expressions ([#11207](https://github.com/cube-js/cube/issues/11207)) ([e79ad48](https://github.com/cube-js/cube/commit/e79ad484d6df099fe4dc8269e4d59580e501a86a))
+- **tesseract:** resolve multi_stage order_by against owning cube through views ([#11214](https://github.com/cube-js/cube/issues/11214)) ([6483015](https://github.com/cube-js/cube/commit/64830152010b063838d22598b91a9d635f002988))
+
 # [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
 
 - feat!: Remove deprecated context_to_roles configuration option (#11055) ([41d42d6](https://github.com/cube-js/cube/commit/41d42d669486e763ad984fda5e64e33438baa5a4)), closes [#11055](https://github.com/cube-js/cube/issues/11055)

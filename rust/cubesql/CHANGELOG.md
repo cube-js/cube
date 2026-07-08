@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **cubesql:** Push down `UTCTIMESTAMP` (`CURRENT_TIMESTAMP`) ([#11195](https://github.com/cube-js/cube/issues/11195)) ([cde0cca](https://github.com/cube-js/cube/commit/cde0ccaa79fa592c881f3df551b9963232ec9428))
+- **cubesql:** Resolve schema-qualified `pg_catalog` functions ([#11190](https://github.com/cube-js/cube/issues/11190)) ([fc0d82b](https://github.com/cube-js/cube/commit/fc0d82b7eb81559e0b2344ff721abfaae91cc76c))
+
 # [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
 
 - feat(schema-compiler)!: Remove deprecated running_total measure type (#11044) ([f45ea45](https://github.com/cube-js/cube/commit/f45ea456e4c3bfdc3663f8c992c911fdc9ed3730)), closes [#11044](https://github.com/cube-js/cube/issues/11044)

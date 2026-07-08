@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **api-gateway:** Accept timezone-suffixed timestamps in date filters, fix [#11213](https://github.com/cube-js/cube/issues/11213) ([#11208](https://github.com/cube-js/cube/issues/11208)) ([3a67f7d](https://github.com/cube-js/cube/commit/3a67f7dc4aa0e49ab6bc0e831ff079e8c8d03810))
+
 # [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
 
 - fix(cubeorchestrator)!: Serialize all numeric query results as JSON strings, fix #1879 ([bd88651](https://github.com/cube-js/cube/commit/bd8865113889b5153ed837c3dc51bc6bca5d3585)), closes [#1879](https://github.com/cube-js/cube/issues/1879)
