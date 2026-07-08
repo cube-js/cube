@@ -1058,4 +1058,101 @@ describe('pre-aggregations', () => {
       });
     });
   });
+
+  // Regression: the SQL API sends query-level joinHints when the queried members alone
+  // don't determine the join root (e.g. dimensions from `products` and a filter on
+  // `customers`, both reachable only through `orders`). Native pre-aggregation matching
+  // re-plans the query and must receive those hints too — without them it fails with
+  // "Can't find join path to join 'products', 'customers'".
+  describe('pre-aggregation matching with query-level join hints', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+      cube(\`orders\`, {
+        sql: \`SELECT * FROM orders\`,
+
+        joins: {
+          customers: {
+            relationship: \`many_to_one\`,
+            sql: \`\${CUBE.customerId} = \${customers.id}\`,
+          },
+          products: {
+            relationship: \`many_to_one\`,
+            sql: \`\${CUBE.productId} = \${products.id}\`,
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          customerId: {
+            sql: \`customer_id\`,
+            type: \`number\`,
+          },
+          productId: {
+            sql: \`product_id\`,
+            type: \`number\`,
+          },
+        },
+      });
+
+      cube(\`customers\`, {
+        sql: \`SELECT * FROM customers\`,
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          state: {
+            sql: \`state\`,
+            type: \`string\`,
+          },
+        },
+      });
+
+      cube(\`products\`, {
+        sql: \`SELECT * FROM products\`,
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          name: {
+            sql: \`name\`,
+            type: \`string\`,
+          },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it('matching does not lose query-level join hints', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: ['products.name'],
+        filters: [{
+          member: 'customers.state',
+          operator: 'set',
+        }],
+        joinHints: [
+          ['orders', 'products'],
+          ['orders', 'customers'],
+        ],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+      });
+
+      // Must not throw while determining the matching pre-aggregation.
+      expect(query.preAggregations?.preAggregationsDescription()).toEqual([]);
+      expect(query.buildSqlAndParams()[0]).toMatch(/orders/);
+    });
+  });
 });
