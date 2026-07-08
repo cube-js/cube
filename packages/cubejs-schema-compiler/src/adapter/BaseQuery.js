@@ -3366,7 +3366,12 @@ export class BaseQuery {
           }
         }
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+        // order_by templates reference members of the measure's owning cube. When
+        // the measure is exposed through a view, those members may be absent or
+        // exposed only under an alias, so resolve them against the owning cube
+        // (from aliasMember, the underlying reference) instead of the view.
+        const orderByCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(orderByCubeName, o.sql), dir: o.dir }));
         let sql;
         let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
