@@ -194,7 +194,8 @@
               "docs/pre-aggregations/using-pre-aggregations",
               "docs/pre-aggregations/matching-pre-aggregations",
               "docs/pre-aggregations/refreshing-pre-aggregations",
-              "docs/pre-aggregations/lambda-pre-aggregations"
+              "docs/pre-aggregations/lambda-pre-aggregations",
+              "docs/pre-aggregations/cube-store-architecture"
             ]
           },
           {

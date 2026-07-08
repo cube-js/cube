@@ -59,18 +59,20 @@ compute nodes are disposable and interchangeable.
 
 ## Design Decisions
 
-Each design decision maps to one or more of the requirements above.
+Each design decision maps to one or more of the requirements above:
 
-| Decision | Billions of rows | Sub-second latency | High concurrency | Unique keys | Batch + streaming | Joins |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| High-throughput MetaStore | | | | | | |
-| Indexes are sorted copies | | | | | | |
-| Auto-partitioning | | | | | | |
-| Parquet format | | | | | | |
-| Distributed FS | | | | | | |
-| Shared-nothing architecture | | | | | | |
-| Collocated join indexes | | | | | | |
-| Real-time in-memory chunks | | | | | | |
+- **High-throughput MetaStore** — supports metadata for billions of rows at
+  high query concurrency
+- **Indexes are sorted copies** — sub-second latency via optimal compression
+  and filtering; merge-based joins
+- **Auto-partitioning** — scales to billions of rows with uniform partition
+  sizes
+- **Parquet format** — fast scans with min/max statistics for filter pushdown
+- **Distributed FS** — unlimited data size, disposable compute
+- **Shared-nothing architecture** — high query concurrency, horizontal scaling
+- **Collocated join indexes** — scalable joins between data sources
+- **Real-time in-memory chunks** — low-latency streaming ingestion alongside
+  batch
 
 The sections below describe each decision in detail.
 

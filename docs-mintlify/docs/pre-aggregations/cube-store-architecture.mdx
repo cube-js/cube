@@ -1,0 +1,294 @@
+---
+title: Cube Store architecture
+description: How Cube Store, the distributed OLAP engine behind pre-aggregations, stores data and executes queries with sub-second latency at high concurrency.
+---
+
+Cube Store is the purpose-built storage and query engine that serves
+[pre-aggregations](/docs/pre-aggregations). It ingests pre-aggregation data
+built from your data sources, stores it in a columnar format optimized for
+analytical queries, and answers queries with sub-second latency at high
+concurrency.
+
+This page explains how Cube Store works under the hood: the design decisions
+behind it, how data is stored and partitioned, and how queries are executed
+across a cluster.
+
+## Why Cube Store exists
+
+Cloud data warehouses are excellent at storing and transforming large volumes
+of data at low maintenance cost, but they are not designed to serve
+user-facing analytics directly. They typically fall short on:
+
+- **Sub-second query latency** — warehouse queries take seconds to minutes.
+- **High query concurrency** — most warehouses throttle at dozens of
+  concurrent queries, while user-facing applications need 1000+ queries per
+  second.
+- **Low ingestion latency** — freshly loaded data is not immediately
+  queryable at interactive speed.
+
+Cube Store closes this gap. It sits between your data sources and your
+applications, turning warehouse output into a query-optimized store that
+delivers the latency and concurrency of a dedicated OLAP database while
+preserving the warehouse's ease of use.
+
+It was designed against the following requirements:
+
+- Billions of rows as input
+- Sub-second response time
+- High query concurrency
+- Input data always has a unique primary key
+- Sources are both batch and real-time streaming
+- Joins between data sources
+
+**Technology stack:** Rust, Apache Arrow, DataFusion, Parquet, RocksDB.
+
+## High-level architecture
+
+```text
+                        ┌──────────────┐
+                        │   Cube API   │
+                        └──────┬───────┘
+                               │ queries
+                               ▼
+                        ┌──────────────┐
+                        │    Router    │
+                        │  (metastore) │
+                        └──┬───┬───┬──┘
+                           │   │   │
+                    ┌──────┘   │   └──────┐
+                    ▼          ▼          ▼
+              ┌──────────┐┌──────────┐┌──────────┐
+              │ Worker 1 ││ Worker 2 ││ Worker N │
+              └────┬─────┘└────┬─────┘└────┬─────┘
+                   │           │           │
+                   └─────┬─────┴─────┬─────┘
+                         ▼           ▼
+                  ┌────────────────────────┐
+                  │   Cloud object store   │
+                  │   (S3 / GCS / MinIO)   │
+                  └────────────────────────┘
+```
+
+A Cube Store cluster consists of a **router** and one or more **workers**:
+
+- The **router** owns the metastore, plans queries, distributes work to
+  workers, and merges their results.
+- **Workers** execute partial queries on the partitions they own and return
+  results to the router.
+- All persistent data lives in a **cloud object store**. Compute nodes are
+  disposable and interchangeable — any worker can download the partitions it
+  needs and start serving queries.
+
+In development mode, a single process plays all roles. See
+[Running in production](/cube-core/running-in-production) for cluster
+deployment.
+
+## Design decisions
+
+Cube Store's architecture follows from seven key design decisions, each
+serving one or more of the requirements above:
+
+1. **High-throughput metastore** — metadata is the most accessed data in the
+   system and gets its own optimized store.
+2. **Indexes are sorted copies** — sorting is the most efficient way to
+   compress and filter columnar data.
+3. **Auto-partitioning** — partitions split automatically to stay uniformly
+   sized.
+4. **Parquet as the storage format** — the industry-standard columnar format
+   with min-max statistics for filter pushdown.
+5. **Distributed file system as the storage layer** — storage-compute
+   separation makes compute nodes disposable.
+6. **Shared-nothing architecture** — workers never talk to each other, which
+   removes coordination overhead and scales concurrency.
+7. **Real-time in-memory chunks** — streaming rows are buffered in memory
+   instead of being written to Parquet one at a time.
+
+The following sections describe each decision.
+
+## High-throughput metastore
+
+The metastore holds all metadata: schemas, tables, indexes, partitions,
+chunks, and background jobs. It is the most frequently accessed component in
+Cube Store — small relative to the data it describes, but still reaching
+tens of millions of rows, with strong read-after-write consistency
+requirements and heavy read traffic alongside significant write concurrency.
+
+RocksDB backs the metastore. Metadata entities form a hierarchy:
+
+```text
+Schema
+  └─ Table
+       └─ Index (one or more per table)
+            └─ Partition (a sorted range of the index)
+                 └─ Chunk (a fragment of a partition:
+                           a Parquet file or an in-memory buffer)
+```
+
+All metadata mutations go through the router to maintain consistency.
+Workers reach the metastore over the network and cache metadata locally.
+
+## Indexes are sorted copies
+
+Every index in Cube Store is a **sorted copy** of the table data. Sorting is
+the most efficient way to compress columnar data: sorted columns produce long
+runs of identical or sequential values, which compress extremely well under
+dictionary and run-length encoding. Sorting is also optimal for filtering —
+range predicates can skip entire blocks of data using min-max statistics.
+
+Because all data is sorted, every operation in the engine can be
+merge-based: merge sort, merge join, and merge aggregation all work
+naturally on pre-sorted inputs without expensive hash tables or shuffles.
+
+Cube Store deliberately pays **write amplification** (maintaining several
+sorted copies of the same data) to buy read speed. Indexes are selected
+based on query filters: the planner examines the `WHERE` clause and picks
+the index whose sort key best matches the filtered columns. This is why
+[defining indexes](/docs/pre-aggregations/using-pre-aggregations) that match
+your query patterns is the single most effective pre-aggregation
+optimization.
+
+## Auto-partitioning
+
+Each index is split into partitions — contiguous ranges of the sort key.
+Cube Store keeps all partitions roughly the same size by splitting them
+automatically during compaction. Because data is sorted, choosing a split
+point is trivial: the midpoint of the sort key range.
+
+```text
+Before compaction:                After split at compaction:
+
+  Partition A (too large)           Partition A'      Partition A''
+  ┌─────────────────────┐           ┌──────────┐      ┌──────────┐
+  │ sorted data         │    ──►    │ 1st half │      │ 2nd half │
+  └─────────────────────┘           └──────────┘      └──────────┘
+```
+
+Uniform partition sizes keep query work evenly distributed across workers
+and make partition pruning predictable.
+
+## Parquet as the storage format
+
+All persistent data is stored as Parquet files. Parquet implements the PAX
+(Partition Attributes Across) layout: rows are grouped into row groups, and
+values within a row group are stored column by column. This gives columnar
+compression and scan speed while preserving efficient row reconstruction.
+
+Cube Store leans on Parquet's **min-max statistics**: every row group
+records the minimum and maximum value of each column. Combined with sorted
+data, this lets the query planner skip partitions — and row groups within
+partitions — whose ranges cannot match the query's filters, often
+eliminating most of the data before reading a single byte.
+
+## Distributed file system as the storage layer
+
+Cube Store separates storage from compute. All Parquet files live in a
+cloud object store (S3, GCS, MinIO, or a local directory in development),
+and workers keep local copies only as a cache.
+
+This has several consequences:
+
+- **Workers are disposable.** A worker that dies is replaced by a new one
+  that downloads the same partitions and continues serving.
+- **Replication is simple.** The object store is the single source of truth.
+- **Scaling is elastic.** Adding workers redistributes partitions without
+  moving the underlying data.
+
+To avoid download latency on the query path, Cube Store performs a
+**partition warmup**: before a table comes online, every worker downloads
+the partitions assigned to it. Queries never wait for a cold download.
+
+## Shared-nothing architecture
+
+Worker nodes never communicate with each other. Each worker owns a set of
+partitions, assigned deterministically by consistent hashing over the
+partition's range and index. Every node computes the same assignment
+independently — no coordination service is needed.
+
+A query executes as follows:
+
+```text
+                    Router
+                      │  distribute plan
+          ┌───────────┼───────────┐
+          ▼           ▼           ▼
+       Worker 1    Worker 2    Worker N
+       ┌───────┐   ┌───────┐   ┌───────┐
+       │Parquet│   │Parquet│   │Parquet│   ← persisted data
+       ├───────┤   ├───────┤   ├───────┤
+       │Memory │   │Memory │   │Memory │   ← real-time data
+       │chunks │   │chunks │   │chunks │
+       └───┬───┘   └───┬───┘   └───┬───┘
+           │  partial   │  partial │
+           │  results   │  results │
+           └──────┬─────┴─────┬────┘
+                  ▼           ▼
+             ┌──────────────────────┐
+             │ Router: merge sorted │
+             │ streams, finalize    │
+             │ aggregation, LIMIT   │
+             └──────────────────────┘
+```
+
+Workers do as much as possible locally: they prune partitions with min-max
+statistics, scan Parquet and in-memory chunks, and compute **partial
+aggregations**. The router receives already-aggregated partial results and
+only needs to merge them — merging sorted streams is cheap, so the router
+never becomes a data-processing bottleneck.
+
+This is also how [lambda pre-aggregations](/docs/pre-aggregations/lambda-pre-aggregations)
+work: a single query transparently combines persisted Parquet data with
+fresh streaming data held in memory on the same workers.
+
+## Real-time in-memory chunks
+
+Streaming sources (such as Kafka) deliver rows continuously, but writing
+single rows to Parquet would be prohibitively expensive. Instead, incoming
+rows are routed to the worker that owns the target partition and buffered
+there as **in-memory chunks** — columnar Arrow buffers that are immediately
+queryable.
+
+```text
+Streaming source ──► Router ──► partition owner worker
+                                      │  in-memory chunks
+                                      │  (queryable immediately)
+                                      ▼  compacted at ~1-minute intervals
+                                 Parquet partition in object store
+```
+
+In-memory chunks are compacted into persisted Parquet partitions at roughly
+one-minute intervals, or sooner when count or size thresholds are exceeded.
+During compaction, Cube Store sorts the data, deduplicates rows by unique
+key, and evaluates aggregate columns — so unique-key semantics hold across
+batch and streaming data alike.
+
+## Query lifecycle
+
+Putting it all together, a query to Cube Store goes through these stages:
+
+1. **Parse and plan.** The SQL query is parsed and turned into a logical
+   plan using DataFusion.
+2. **Index selection.** The planner collects constraints from the `WHERE`
+   clause and picks the best-matching sorted index for each table.
+3. **Partition pruning.** Partitions whose min-max ranges cannot match the
+   filters are eliminated.
+4. **Distribution.** The plan is split at the cluster boundary: partial
+   aggregation, filtering, and top-k selection are pushed down to workers;
+   the surviving partitions are assigned to their owner workers.
+5. **Worker execution.** Each worker scans its local Parquet files and
+   in-memory chunks (pruning row groups via min-max statistics), computes
+   partial aggregates, and streams results back.
+6. **Merge.** The router merges the sorted partial results, finalizes
+   aggregation, applies `LIMIT`/`OFFSET`, and returns the result.
+
+## Background compaction
+
+A background compaction service continuously reorganizes data for read
+performance:
+
+- **Chunk compaction** merges many small chunks (produced by frequent
+  ingestion) into fewer, larger, sorted Parquet files.
+- **Partition splits** keep partitions uniformly sized as data grows.
+
+Compaction swaps are atomic: old chunks are deactivated and new ones
+activated in a single metastore transaction, so queries always see a
+consistent view.
