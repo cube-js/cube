@@ -425,24 +425,123 @@ key, and evaluates aggregate columns — so unique-key semantics hold across
 batch and streaming data alike. See
 [Compaction in detail](#compaction-in-detail) for the full process.
 
-## Query lifecycle
+## Query planning
 
-Putting it all together, a query to Cube Store goes through these stages:
+Cube Store builds on [DataFusion](https://datafusion.apache.org), the
+Arrow-native query engine, and extends it with distribution-aware planning.
+All planning happens on the router; the outcome is a plan split into a
+router part and a worker part at an explicit cluster boundary.
 
-1. **Parse and plan.** The SQL query is parsed and turned into a logical
-   plan using DataFusion.
-2. **Index selection.** The planner collects constraints from the `WHERE`
-   clause and picks the best-matching sorted index for each table.
-3. **Partition pruning.** Partitions whose min-max ranges cannot match the
-   filters are eliminated (see [Partition pruning](#partition-pruning)).
-4. **Distribution.** The plan is split at the cluster boundary: partial
-   aggregation, filtering, and top-k selection are pushed down to workers;
-   the surviving partitions are assigned to their owner workers.
-5. **Worker execution.** Each worker scans its local Parquet files and
-   in-memory chunks (pruning row groups via min-max statistics), computes
-   partial aggregates, and streams results back.
-6. **Merge.** The router merges the sorted partial results, finalizes
-   aggregation, applies `LIMIT`/`OFFSET`, and returns the result.
+### From SQL to a logical plan
+
+The SQL text is parsed into an abstract syntax tree and converted into a
+DataFusion logical plan — a tree of relational operators (scan, filter,
+project, aggregate, sort, limit). At this stage, table scans are
+placeholders: no index has been chosen and no partitions are attached yet.
+DataFusion's standard logical optimizations run here, most importantly
+pushing filters and projections down toward the scans, which sets up the
+constraint collection that follows.
+
+### Index selection
+
+The planner walks the optimized plan and collects, for every scanned
+table, the constraints relevant to choosing an index:
+
+- filter predicates that reached the scan,
+- the set of projected columns,
+- the aggregates being computed,
+- sort requirements imposed by joins or `GROUP BY`.
+
+It then fetches all candidate indexes for all referenced tables from the
+metastore in a single round trip and picks the winner per table:
+
+1. **Eligibility.** For joins, an index qualifies only if the join columns
+   form a prefix of its sort key — that is what makes a merge join
+   possible. An [aggregating index](#aggregating-indexes) qualifies only
+   if it covers every projected column, every filtered column, and every
+   requested aggregate; otherwise it cannot answer the query at all.
+2. **Scoring.** Among eligible indexes, an aggregating index always beats
+   a regular one (it is strictly smaller). Ties are broken by how early
+   the query's filter columns appear in the index sort key, then by how
+   early the projected columns appear. Earlier is better: a filter on the
+   leading sort key column narrows the scan to a contiguous range, while
+   the same filter on a trailing column cannot skip anything.
+3. **Joins.** When all joined tables share a partitioned index over the
+   join key, the planner picks it so each worker can join its partitions
+   locally. If no suitable index exists for a join, planning fails with an
+   error that includes the exact `CREATE INDEX` statement to fix it —
+   distributed joins without a matching index would require a data
+   shuffle, which Cube Store deliberately does not do.
+
+With indexes chosen, the planner attaches the concrete partition list to
+each scan, applying [partition pruning](#partition-pruning) as it goes, and
+inserts a **cluster send** node into the plan above the scans. That node
+marks the boundary: everything below it will run on workers, everything
+above it on the router.
+
+### Distribution-aware rewrites
+
+Before the plan is finalized, Cube Store rewrites it so that as much work
+as possible lands below the cluster boundary:
+
+- **Aggregate pushdown.** An aggregation above the boundary is split into
+  a *partial* aggregation on the workers and a *final* aggregation on the
+  router. Workers send compact partial states (for example, per-group sums
+  and counts) instead of raw rows.
+- **Top-k pushdown.** The `GROUP BY … ORDER BY … LIMIT n` pattern is
+  rewritten into a distributed top-k: each worker computes its local
+  candidates and the router merges them, instead of materializing the full
+  grouped result.
+- **Limit pushdown.** Plain limits propagate to workers so they stop
+  producing rows early.
+- **Sorted (streaming) aggregation.** Where the chosen index's sort order
+  matches the grouping columns, hash aggregation is replaced with a
+  streaming merge aggregation that emits groups as it goes and needs no
+  hash table.
+
+### One plan, two physical plans
+
+The rewritten logical plan — along with the chosen index snapshots and
+partition lists — is serialized once and shipped to every participating
+worker. Each side then builds its own physical plan from it:
+
+- The **router** plans the part above the cluster boundary: receiving
+  worker streams, merging them (sort-preserving where order matters),
+  final aggregation, and the final limit.
+- Each **worker** plans the part below the boundary for *its* subset of
+  partitions: scanning local Parquet files and in-memory chunks, applying
+  remaining filters, and computing partial aggregates.
+
+Workers are assigned their partition subsets by the same consistent
+hashing that governs data placement, so the plan always executes where the
+data already lives. Execution streams Arrow record batches from workers to
+the router, which merges and returns the result.
+
+### Planning walkthrough
+
+Putting it all together for a typical query:
+
+```sql
+SELECT product_category, SUM(order_total)
+FROM orders_rollup
+WHERE created_at >= '2026-01-01'
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 10
+```
+
+1. Parse and build the logical plan; push the `created_at` filter down to
+   the scan.
+2. Collect constraints and pick the best index — say, an aggregating index
+   sorted by `(created_at, product_category)`.
+3. Prune partitions to those whose key ranges intersect
+   `created_at >= '2026-01-01'`.
+4. Insert the cluster boundary; rewrite the aggregation + sort + limit
+   into a distributed top-k.
+5. Ship the serialized plan; each worker scans its surviving partitions,
+   aggregates partially, and returns its top candidates.
+6. The router merges the candidates, finalizes the aggregation, applies
+   `LIMIT 10`, and returns the result.
 
 ## Compaction in detail
 
