@@ -722,13 +722,6 @@ This is commonly used for "share of total" calculations where the denominator
 must ignore a filter applied by the query — for example, computing each status's
 share of the per-category total while the query is filtered to a single status.
 
-<Note>
-
-The `filter` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
-(`CUBEJS_TESSERACT_SQL_PLANNER=true`).
-
-</Note>
-
 <CodeGroup>
 
 ```yaml title="YAML"
@@ -1498,7 +1491,6 @@ cube(`orders`, {
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
-[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
 [ref-filters-query]: /reference/core-data-apis/rest-api/query-format#filters-format
 [ref-data-masking]: /docs/data-modeling/data-access-policies#data-masking
 [link-d3-format]: https://d3js.org/d3-format
