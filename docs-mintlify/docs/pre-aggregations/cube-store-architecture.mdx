@@ -393,6 +393,88 @@ key, and evaluates aggregate columns — so unique-key semantics hold across
 batch and streaming data alike. See
 [Compaction in detail](#compaction-in-detail) for the full process.
 
+## Real-time deduplication by unique key
+
+One of Cube Store's founding requirements is that input data always has a
+unique primary key. Streaming sources exploit this: an update to a row
+arrives simply as a *new version* of the same key. Cube Store never updates
+data in place — chunks and partitions are immutable — so upsert semantics
+are implemented as **last row by unique key**: among all stored versions of
+a key, the newest one wins. Deduplication happens twice: logically on every
+read, and physically at compaction.
+
+### Version ordering with the sequence column
+
+Tables with a unique key carry a hidden, monotonically increasing sequence
+column, `__seq`. For streaming tables it is derived from the source's own
+ordering (such as Kafka offsets), so "newest" reflects the order in which
+the source emitted the versions.
+
+Two structural guarantees make deduplication cheap:
+
+- **Every index sort key ends with the unique key and `__seq`.** When an
+  index is created on a unique-key table, any unique key columns missing
+  from its definition are appended to the sort key, followed by `__seq` as
+  the final sort column. All versions of a key are therefore physically
+  adjacent in every sorted file, with the newest version last.
+- **`__seq` is excluded from the partition split key.** Partitions may
+  split on the unique key, but never *between* versions of the same key —
+  all versions of a key always live in the same partition, and therefore
+  on the same worker. Deduplication never requires cross-worker
+  coordination, preserving the shared-nothing model.
+
+### How it is read
+
+A query against a unique-key table dedupes on the fly, seeing streamed
+updates the moment they arrive:
+
+1. **The scan projection is widened.** Even if the query only asks for a
+   measure, the scan also reads the unique key columns and `__seq` — they
+   are needed to decide which version of each row survives.
+2. **Only dedup-safe filters are pushed below deduplication.** A predicate
+   that references unique key columns exclusively can be applied early to
+   each stream: it eliminates a key with *all* of its versions. A
+   predicate on any other column cannot — filtering on a measure value
+   before deduplication could drop the newest version and resurrect an
+   overwritten one. Non-key predicates are applied after deduplication.
+3. **All sources merge into one sorted stream.** The partition's main
+   Parquet file, its persisted chunks, and its in-memory chunks are each
+   already sorted; a k-way merge combines them, ordered by the sort key
+   with `__seq` last. Versions of the same key from different sources —
+   an old version in Parquet, a fresh update in memory — end up adjacent,
+   newest last.
+4. **A streaming last-row filter drops stale versions.** The operator
+   walks the merged stream and keeps a row only if the next row has a
+   different key (comparing across batch boundaries as well). Since
+   versions are adjacent and the newest sorts last, this keeps exactly the
+   latest version of every key, in a single pass with no hash table.
+
+The plan then re-projects to the columns the query actually asked for.
+The extra cost over a plain scan is modest: the merge was needed anyway,
+and the last-row filter is a linear scan over already-sorted data.
+
+### How it is compacted
+
+Compaction runs the very same merge-plus-last-row pipeline (see
+[Compaction in detail](#compaction-in-detail)): chunks and the main file
+are merged in sort order, the last-row filter keeps only the newest
+version of each key, and the result is written out. The difference is
+what happens to the output — it *replaces* the inputs, so superseded
+versions are physically deleted.
+
+This division of labor keeps read-time deduplication bounded. At any
+moment, a key has at most one version in the compacted main file plus
+however many updates arrived since the last compaction — and compaction
+continuously folds those in. Read-time dedup only ever pays for the
+recent, not-yet-compacted tail, while storage converges toward exactly
+one row per key.
+
+Note that unique-key deduplication and
+[aggregating indexes](#aggregating-indexes) are mutually exclusive ways of
+merging rows: a regular index on a unique-key table keeps the last version
+per key, while an aggregating index combines rows with aggregate
+functions.
+
 ## Query planning
 
 Cube Store builds on [DataFusion](https://datafusion.apache.org), the
@@ -592,7 +674,8 @@ partition's main file:
 3. **Deduplicate or aggregate.** On the merged stream:
    - For tables with a unique key, only the **last row per unique key** is
      kept — this is how upserts and streaming updates resolve, with later
-     ingestion winning.
+     ingestion winning (see
+     [Real-time deduplication by unique key](#real-time-deduplication-by-unique-key)).
    - For aggregating indexes, rows are grouped by the sort key and the
      aggregate functions (`SUM`, `MIN`, `MAX`, `MERGE`) combine matching
      rows — this is where the incremental rollup happens.
