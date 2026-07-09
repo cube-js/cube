@@ -10,6 +10,20 @@ description: Give Cube IAM access to Athena, an S3 query-results path, region an
 - [The AWS region][aws-docs-regions]
 - [The S3 bucket][aws-s3] on AWS to [store query results][aws-docs-athena-query]
 
+<Info>
+
+**Read-only access to your source data is sufficient.** Cube reads it with
+`athena:*QueryExecution`/`GetQueryResults`/`GetWorkGroup`, `glue:Get*` metadata,
+and `s3:GetObject`/`ListBucket`. Athena also **always** writes query results to
+[`CUBEJS_AWS_S3_OUTPUT_LOCATION`](#environment-variables) — even for `SELECT`s —
+so that location needs `s3:PutObject` (plus the multipart actions), but this is
+Athena's own staging bucket, not your source data. Writes to source data are
+only needed for [pre-aggregations](#pre-aggregation-build-strategies) built
+inside Athena. For a ready-to-use IAM policy, see the
+[AWS OIDC guide][ref-oidc-aws-athena].
+
+</Info>
+
 ## Setup
 
 ### Manual
@@ -139,6 +153,14 @@ build pre-aggregations.
 
 No extra configuration is required to configure batching for AWS Athena.
 
+<Info>
+
+Batching builds pre-aggregations inside Athena via `CREATE TABLE AS SELECT`, the
+only case needing more than read-only access: `glue:CreateTable` on the
+pre-aggregations schema plus `s3:PutObject` on its S3 location.
+
+</Info>
+
 ### Export Bucket
 
 <Warning>
@@ -157,6 +179,10 @@ configuring Cube with the following environment variables:
 
 Ensure the AWS credentials are correctly configured in IAM to allow reads and
 writes to the export bucket in S3.
+
+The export bucket strategy uses Athena's `UNLOAD` to write directly to the
+bucket — no temporary tables, no Glue Data Catalog writes. The only extra
+permission beyond read-only querying is `s3:PutObject` on the export bucket.
 
 </Info>
 

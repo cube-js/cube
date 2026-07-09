@@ -10,15 +10,20 @@ description: "Snowflake is a popular cloud-based data platform."
 <Info>
 
 In order to connect Cube to Snowflake, you need to grant certain permissions to the Snowflake role
-used by Cube. Cube requires the role to have `USAGE` on databases and schemas
-and `SELECT` on tables. An example configuration:
+used by Cube. **Read-only access is sufficient to query data.** Cube requires the role to have
+`USAGE` on the warehouse, databases, and schemas, and `SELECT` on tables. An example configuration:
 ```sql
+GRANT USAGE ON WAREHOUSE MY_WAREHOUSE TO ROLE XYZ;
 GRANT USAGE ON DATABASE ABC TO ROLE XYZ;
 GRANT USAGE ON ALL SCHEMAS IN DATABASE ABC TO ROLE XYZ;
 GRANT USAGE ON FUTURE SCHEMAS IN DATABASE ABC TO ROLE XYZ;
 GRANT SELECT ON ALL TABLES IN DATABASE ABC TO ROLE XYZ;
 GRANT SELECT ON FUTURE TABLES IN DATABASE ABC TO ROLE XYZ;
 ```
+
+Write access is only needed for [pre-aggregations](#pre-aggregation-build-strategies) built inside
+Snowflake with the default [batching](#batching) strategy (`CREATE TABLE` on the pre-aggregations
+schema). The [export bucket](#export-bucket) strategy writes to the bucket, not the source.
 
 </Info>
 
@@ -263,6 +268,14 @@ No extra configuration is required to configure batching for Snowflake.
 
 Snowflake supports using both [AWS S3][aws-s3] and [Google Cloud
 Storage][google-cloud-storage] for export bucket functionality.
+
+<Info>
+
+The export bucket strategy unloads with `COPY INTO` directly from the query — no
+temporary tables. The role only needs the read-only grants above plus `USAGE` on
+the storage integration.
+
+</Info>
 
 #### AWS S3
 
