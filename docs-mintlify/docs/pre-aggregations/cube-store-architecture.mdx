@@ -72,7 +72,9 @@ It was designed against the following requirements:
 A Cube Store cluster consists of a **router** and one or more **workers**:
 
 - The **router** owns the metastore, plans queries, distributes work to
-  workers, and merges their results.
+  workers, and merges their results. It also hosts the
+  [cache and queue store](#cache-and-queue-store) used by Cube for query
+  result caching and query queue coordination.
 - **Workers** execute partial queries on the partitions they own and return
   results to the router.
 - All persistent data lives in a **cloud object store**. Compute nodes are
@@ -602,3 +604,85 @@ If data arrives faster than one compaction pass can absorb, the cycle
 simply repeats: each pass halves the file count or splits the partition
 further, converging toward a small number of large, sorted,
 uniformly-sized files per partition.
+
+## Cache and queue store
+
+Beyond storing pre-aggregations, Cube Store hosts a second, independent
+subsystem: the **cache and queue store**. It is the engine behind Cube's
+in-memory cache (query result caching, refresh keys) and the **query
+queue** that coordinates query execution across Cube nodes. Historically
+these roles were played by Redis; Cube Store replaced it, removing an
+entire moving part from the deployment.
+
+The cache and queue store lives on the router node and is backed by its own
+RocksDB instance, fully separate from the metastore. Hot entries are served
+from memory (RocksDB memtables and block cache), while the disk backing
+means the cache and any in-flight queue state survive a router restart.
+Cube talks to it over the same SQL interface as everything else, using
+dedicated `CACHE` and `QUEUE` command families.
+
+### Cache
+
+The cache is a Redis-style key-value store. Each entry has:
+
+- a path of the form `prefix:key`, so related entries (for example, all
+  refresh keys of one deployment) can be listed and truncated by prefix,
+- a string value,
+- an optional TTL, after which the entry expires.
+
+Because unbounded caches eventually eat their host, a background eviction
+manager enforces two budgets: a total size limit
+(`CUBESTORE_CACHE_MAX_SIZE`, default 4 GB) and a key count limit
+(`CUBESTORE_CACHE_MAX_KEYS`, default 100,000). When a budget is exceeded,
+it evicts entries according to a configurable policy
+(`CUBESTORE_CACHE_POLICY`):
+
+| Policy | Keeps |
+|--------|-------|
+| `allkeys-lru` (default) | Most recently used entries |
+| `allkeys-lfu` | Most frequently used entries |
+| `allkeys-ttl` | Entries with the most remaining time-to-live |
+| `sampled-lru` / `sampled-lfu` / `sampled-ttl` | Same criteria, evaluated on a sample for speed |
+
+To support this, every entry tracks a last-access timestamp and an access
+frequency counter. Expired entries are also collected proactively in the
+background rather than only on access.
+
+### Query queue
+
+The query queue is how Cube serializes and prioritizes expensive work —
+data source queries and pre-aggregation builds — across any number of API
+instances and refresh workers. Centralizing the queue in Cube Store is what
+makes those nodes stateless and horizontally scalable: any node can add
+work, process work, or pick up results, because the queue state lives in
+one place.
+
+Each queue item carries a key, a payload, a priority, and a status that
+moves through a simple lifecycle:
+
+```text
+  Pending ──► Active ──► Finished
+     (added)    (claimed by a          (acknowledged with
+                 processing node)       a result)
+```
+
+- **Ordering.** Pending items are picked by priority, with older items
+  winning ties — a priority queue with FIFO fairness.
+- **Heartbeats.** The node processing an item periodically heartbeats it.
+  If heartbeats stop — a crashed worker, a killed pod — the item is
+  flagged as orphaned and can be reclaimed or cancelled, so a dying node
+  never strands a query.
+- **Result delivery.** When processing completes, the processor
+  acknowledges the item with its result. Consumers waiting on that result
+  use a blocking call that subscribes to the acknowledgment event and
+  returns the moment it fires — no polling loop, no polling latency.
+  Delivered results are garbage-collected after a configurable expiry.
+
+### Why it lives in Cube Store
+
+Folding the cache and queue into Cube Store is itself a design decision in
+the spirit of the rest of the system: one storage engine, one deployment
+unit, one consistency model. The queue benefits directly from RocksDB's
+write durability (in-flight queue state survives restarts), and the
+event-driven blocking reads give lower-latency result delivery than the
+polling patterns typical of external queue stores.
