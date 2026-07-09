@@ -664,8 +664,13 @@ makes those nodes stateless and horizontally scalable: any node can add
 work, process work, or pick up results, because the queue state lives in
 one place.
 
-Each queue item carries a key, a payload, a priority, and a status that
-moves through a simple lifecycle:
+There is not one global queue but one queue per workload, separated by key
+prefix: each data source gets its own query queue, and pre-aggregation
+builds run through their own queue. Each queue has its own concurrency
+budget and its own ordering.
+
+Every queue item carries a key, a payload (the serialized query), a
+priority, and a status that moves through a simple lifecycle:
 
 ```text
   Pending ──► Active ──► Finished
@@ -673,17 +678,118 @@ moves through a simple lifecycle:
                  processing node)       a result)
 ```
 
-- **Ordering.** Pending items are picked by priority, with older items
-  winning ties — a priority queue with FIFO fairness.
-- **Heartbeats.** The node processing an item periodically heartbeats it.
-  If heartbeats stop — a crashed worker, a killed pod — the item is
-  flagged as orphaned and can be reclaimed or cancelled, so a dying node
-  never strands a query.
-- **Result delivery.** When processing completes, the processor
-  acknowledges the item with its result. Consumers waiting on that result
-  use a blocking call that subscribes to the acknowledgment event and
-  returns the moment it fires — no polling loop, no polling latency.
-  Delivered results are garbage-collected after a configurable expiry.
+Pending items are picked by priority (from `-10000` to `10000`, higher
+first), with older items winning ties — a priority queue with FIFO
+fairness.
+
+#### Idempotency
+
+A queue item's key is a deterministic hash of the query itself — the SQL,
+its parameters, and the security context that shapes it. Identical queries
+always hash to the same key, and adding to the queue is an atomic
+*insert-if-absent* on that key: the first request creates the item, and
+every subsequent identical request — from the same API instance or any
+other — matches the existing item instead. Cube Store reports back whether
+the item was actually created, so the orchestrator knows whether it is the
+originator or just another waiter.
+
+The result path is deduplicated the same way. Before adding to the queue at
+all, an API instance checks whether a result for that key is already
+available from a just-finished execution. After adding, all waiters —
+however many instances they are spread across — block on the same key and
+wake on the same result.
+
+The net effect: a dashboard fanning the same expensive query out through a
+dozen concurrent requests costs exactly one data source execution.
+
+#### How API instances coordinate scheduling
+
+There is no dedicated scheduler node. Every API instance and refresh worker
+runs the same **reconciliation loop** against the shared queue — after
+adding an item, when a blocked wait times out, and on a background
+interval. Reconciliation does two things:
+
+1. **Cancel dead work** — query stalled and orphaned items (see below) and
+   cancel them.
+2. **Start new work** — read the queue's active and pending lists, compute
+   how many more items may run (the concurrency budget minus currently
+   active items), and attempt to claim that many pending items, in
+   priority order.
+
+Because many instances reconcile the same queue concurrently, several of
+them may attempt to claim the same pending item at once. The claim itself —
+`QUEUE RETRIEVE` — is an atomic compare-and-act inside Cube Store: it
+re-checks the concurrency budget and flips the item from `Pending` to
+`Active` in a single serialized write. Exactly one instance wins the race
+and receives the payload; the others get a "not enough concurrency" or
+"already taken" response and simply move on. Coordination requires no
+locks, no leader election, and no scheduler — the queue itself is the
+synchronization point.
+
+When a queue is already saturated (active count at the concurrency limit),
+reconciling instances limit themselves to a single claim attempt rather
+than trying to grab a full budget's worth — this keeps a large cluster from
+stampeding the queue with doomed claim attempts.
+
+#### What the concurrency number actually means
+
+The `concurrency` you configure for a data source is a **cluster-wide cap
+on simultaneously executing queries for that queue** — not a per-node
+setting. If concurrency is 4 and you scale from one API instance to ten,
+at most 4 queries run against the data source at any moment; the ten
+instances merely compete to be among the claimants. The cap is enforced
+atomically at claim time inside Cube Store — an item is only flipped to
+`Active` if the queue's active count is below the cap — so it cannot be
+overshot by racing nodes.
+
+This is exactly the semantics you want for protecting a data source with
+a connection or workload limit: scaling out the Cube tier never multiplies
+the pressure on the warehouse behind it.
+
+#### Execution, heartbeats, and results
+
+The instance that wins a claim executes the query — dispatching it to the
+data source or running the pre-aggregation build. While the query runs,
+the processor **heartbeats** the queue item on a fixed interval (30 seconds
+by default), continuously proving that the work is still alive.
+
+On completion, the processor **acknowledges** the item with its serialized
+result. The acknowledgment atomically stores the result, finishes the
+item, and fires an event. Waiters use a blocking read (`QUEUE
+RESULT_BLOCKING`) that subscribes to that event: they wake the moment the
+result lands, with no polling interval to pay for.
+
+A blocking wait does not hold an API request open forever. If the result
+does not arrive within the continue-wait window (10 seconds by default),
+the API responds with `Continue wait` and the client re-requests; the
+re-request finds the queue item already present (idempotency again) and
+resumes waiting. Long-running queries thus survive any number of HTTP
+request cycles without ever being re-executed. Delivered results are
+garbage-collected after a configurable expiry.
+
+#### Stalled and orphaned queries
+
+Two failure modes are handled by reconciliation, both detected from
+timestamps Cube Store keeps on each item:
+
+- **Stalled queries** are `Active` items whose heartbeat has gone quiet
+  for longer than the heartbeat timeout (4× the heartbeat interval — two
+  minutes by default). This means the node that claimed the query died
+  mid-execution: a crashed process, a killed pod, a network partition.
+- **Orphaned queries** are `Pending` items that outlived their orphaned
+  deadline (set when the item is added; 120 seconds by default). This
+  typically means everyone who cared about the result has gone away —
+  clients disconnected and stopped re-requesting — so executing the query
+  would be wasted work.
+
+Any reconciling instance can collect both kinds via a single queue call,
+remove them, and invoke the registered cancel handlers — which, for a
+stalled data source query, also issues the kill/cancel against the
+warehouse so a dead node's query does not keep burning warehouse compute.
+
+Because detection is timestamp-based and cancellation is idempotent, it
+does not matter which instance notices first: recovery works even if the
+failed node never comes back.
 
 ### Why it lives in Cube Store
 
