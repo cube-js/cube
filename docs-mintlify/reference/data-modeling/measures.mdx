@@ -686,6 +686,11 @@ measures: {
 | `exclude` | Query dimensions minus listed | Query dimensions |
 | `include` | Query dimensions plus listed | Query dimensions |
 
+`grain` applies to the measure it's declared on and does not expose the added
+dimension to a measure built on top of it. When a measure combines several
+other multi-stage measures at a shared grain, declare `grain` on the
+combining measure — see [nested aggregates][ref-nested-aggregate].
+
 <Note>
 
 `grain` replaces the standalone `group_by`, `reduce_by`, and `add_group_by` parameters,
