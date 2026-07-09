@@ -9,9 +9,16 @@ built from your data sources, stores it in a columnar format optimized for
 analytical queries, and answers queries with sub-second latency at high
 concurrency.
 
+Cube Store also plays a second role: it hosts Cube's
+[cache and queue store](#cache-and-queue-store) — the in-memory cache used
+for query result caching and refresh keys, and the query queue that
+coordinates work across API instances and refresh workers. Both roles were
+historically served by Redis; Cube Store replaced it, so a Cube deployment
+needs no external cache or queue infrastructure.
+
 This page explains how Cube Store works under the hood: the design decisions
-behind it, how data is stored and partitioned, and how queries are executed
-across a cluster.
+behind it, how data is stored and partitioned, how queries are executed
+across a cluster, and how the cache and queue store works.
 
 ## Why Cube Store exists
 
