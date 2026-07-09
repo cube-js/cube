@@ -396,6 +396,8 @@ measures:
     sql: id
     type: count
 
+  # Intermediate multi-stage measures — the grain is set on the combining
+  # measure below, so these inherit it and are joined on the shared grain.
   - name: daily_amount
     multi_stage: true
     sql: "{total_amount}"
