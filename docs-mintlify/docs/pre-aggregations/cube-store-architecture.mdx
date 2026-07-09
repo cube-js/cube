@@ -288,47 +288,6 @@ and last keys written to it.
 Uniform partition sizes keep query work evenly distributed across workers
 and make partition pruning predictable.
 
-## Partition pruning
-
-Partition pruning happens on the router at planning time, before any work
-is distributed. The goal is to touch only the partitions whose key ranges
-can possibly satisfy the query.
-
-The planner converts the query's `WHERE` clause into a set of **min-max
-conditions** over the index's sort key columns. Each condition is a pair of
-per-column lower and upper bounds; the whole filter is a union of such
-conditions (an OR across them). The extraction understands:
-
-- Comparison operators: `=`, `<`, `<=`, `>`, `>=`
-- `IN` lists (each value becomes its own condition)
-- `AND` / `OR` combinations of the above
-- Boolean columns used directly in predicates
-
-Anything the extractor cannot represent as a range over sort key columns —
-functions on columns, predicates on non-key columns, and so on — is simply
-left out. That is always safe: pruning may only ever *over*-include
-partitions, never skip one that holds matching rows. The remaining
-predicates are still applied during the scan.
-
-Each partition's `[min, max]` key interval is then checked against the
-conditions with a lexicographic comparison, mirroring how the data is
-sorted. If no condition can intersect the partition's interval, the
-partition is dropped from the plan — its worker never sees it, and its
-files are never opened.
-
-Pruning applies at three successively finer levels:
-
-1. **Partitions** are pruned on the router at planning time, using
-   metastore-tracked min/max keys.
-2. **Chunks** within a surviving partition are pruned the same way, using
-   per-chunk min/max keys.
-3. **Row groups** within a Parquet file are pruned at scan time on the
-   worker, using Parquet's per-row-group min-max statistics.
-
-Combined with sorted data — which makes ranges tight and non-overlapping —
-this typically eliminates the vast majority of data for selective queries
-before a single byte is read.
-
 ## Parquet as the storage format
 
 All persistent data is stored as Parquet files. Parquet implements the PAX
@@ -474,10 +433,51 @@ metastore in a single round trip and picks the winner per table:
    shuffle, which Cube Store deliberately does not do.
 
 With indexes chosen, the planner attaches the concrete partition list to
-each scan, applying [partition pruning](#partition-pruning) as it goes, and
-inserts a **cluster send** node into the plan above the scans. That node
-marks the boundary: everything below it will run on workers, everything
-above it on the router.
+each scan, applying partition pruning as it goes, and inserts a
+**cluster send** node into the plan above the scans. That node marks the
+boundary: everything below it will run on workers, everything above it on
+the router.
+
+### Partition pruning
+
+Partition pruning happens on the router at planning time, before any work
+is distributed. The goal is to touch only the partitions whose key ranges
+can possibly satisfy the query.
+
+The planner converts the query's `WHERE` clause into a set of **min-max
+conditions** over the index's sort key columns. Each condition is a pair of
+per-column lower and upper bounds; the whole filter is a union of such
+conditions (an OR across them). The extraction understands:
+
+- Comparison operators: `=`, `<`, `<=`, `>`, `>=`
+- `IN` lists (each value becomes its own condition)
+- `AND` / `OR` combinations of the above
+- Boolean columns used directly in predicates
+
+Anything the extractor cannot represent as a range over sort key columns —
+functions on columns, predicates on non-key columns, and so on — is simply
+left out. That is always safe: pruning may only ever *over*-include
+partitions, never skip one that holds matching rows. The remaining
+predicates are still applied during the scan.
+
+Each partition's `[min, max]` key interval is then checked against the
+conditions with a lexicographic comparison, mirroring how the data is
+sorted. If no condition can intersect the partition's interval, the
+partition is dropped from the plan — its worker never sees it, and its
+files are never opened.
+
+Pruning applies at three successively finer levels:
+
+1. **Partitions** are pruned on the router at planning time, using
+   metastore-tracked min/max keys.
+2. **Chunks** within a surviving partition are pruned the same way, using
+   per-chunk min/max keys.
+3. **Row groups** within a Parquet file are pruned at scan time on the
+   worker, using Parquet's per-row-group min-max statistics.
+
+Combined with sorted data — which makes ranges tight and non-overlapping —
+this typically eliminates the vast majority of data for selective queries
+before a single byte is read.
 
 ### Distribution-aware rewrites
 
