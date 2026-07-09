@@ -521,7 +521,8 @@ metastore in a single round trip and picks the winner per table:
    locally. If no suitable index exists for a join, planning fails with an
    error that includes the exact `CREATE INDEX` statement to fix it —
    distributed joins without a matching index would require a data
-   shuffle, which Cube Store deliberately does not do.
+   shuffle, which Cube Store deliberately does not do. See
+   [Distributed joins](#distributed-joins) for the full mechanics.
 
 With indexes chosen, the planner attaches the concrete partition list to
 each scan, applying partition pruning as it goes, and inserts a
@@ -633,6 +634,74 @@ LIMIT 10
    aggregates partially, and returns its top candidates.
 6. The router merges the candidates, finalizes the aggregation, applies
    `LIMIT 10`, and returns the result.
+
+## Distributed joins
+
+Cube Store supports joins between tables, with two properties that follow
+directly from its merge-based, shared-nothing design: every joined table
+must have an index on the join key, and the join is distributed so that
+workers execute it locally.
+
+### Joins require an index on the join key
+
+Cube Store executes joins exclusively as **merge joins** — hash joins are
+disabled. A merge join consumes two streams that are both sorted by the
+join key and zips them together in a single linear pass, with no hash
+table to build and no memory proportional to the input size. This is the
+same principle that runs through the whole engine: every operation is
+merge-based over sorted data.
+
+The sorted inputs have to come from somewhere, and re-sorting billions of
+rows at query time would defeat the purpose. So the planner requires each
+side of a join to be scanned through an index whose **sort key starts with
+the join columns** — the join columns must form a prefix of the index sort
+key, in order. Such a scan produces join-key-ordered output for free, and
+the merge join can start streaming immediately.
+
+If no such index exists on one of the joined tables, planning fails
+immediately with an error that spells out the fix, including the exact
+`CREATE INDEX` statement to run. This is deliberate: the alternative —
+silently falling back to a sort or shuffle — would turn a sub-second query
+into a multi-second one, and Cube Store treats that as an error rather
+than a degradation.
+
+### How the join is distributed
+
+The join itself runs entirely on the workers, below the cluster boundary.
+When both sides of a join resolve to worker-bound scans, the planner
+places the join *under* a single cluster-send node — so each worker joins
+its own data locally and the router merely merges already-joined results.
+What differs is how partitions are grouped into per-worker batches, and
+there are two modes:
+
+**Aligned partitions.** When all joined tables share the same *partitioned
+index* — a partitioning scheme defined over the join key and shared across
+tables — their partitions split at identical key boundaries. Each batch is
+then the set of partitions covering one key range, one from each table,
+and the batch is assigned to a worker as a unit. Rows that can possibly
+match sit in the same batch on the same worker by construction; nothing is
+duplicated, nothing moves over the network, and each worker merge-joins
+one narrow key range. This is the fastest path and scales with the number
+of partitions.
+
+**Ordinary partitions.** Without a shared partitioned index, the two
+tables' partition boundaries don't line up, so range-aligned batching is
+impossible. The planner falls back to batching by the left-most (root)
+table: the root table's partitions are split across batches, and **every
+right-side table is included in full in every batch**. Including the right
+side whole is required for correctness — batching a right table would make
+a `LEFT JOIN` produce spurious `NULL`s and duplicates — but it means the
+right side is effectively replicated into each batch. This works well when
+the right side is small (dimension tables joined to a large fact table)
+and poorly when both sides are large. A configurable guard
+(`CUBESTORE_MAX_JOINED_PARTITIONS`, default 5 partitions per batch) fails
+the query fast when the right side is too fragmented, rather than letting
+it fan out into an expensive execution.
+
+In both modes, each worker executes the same plan: scan its batch's
+partitions through the join-key indexes (each stream already sorted),
+merge-join them, apply whatever partial aggregation was pushed down, and
+stream results to the router.
 
 ## Compaction in detail
 
