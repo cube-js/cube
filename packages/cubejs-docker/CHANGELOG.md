@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.69](https://github.com/cube-js/cube/compare/v1.6.68...v1.6.69) (2026-07-10)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
 ## [1.6.68](https://github.com/cube-js/cube/compare/v1.6.67...v1.6.68) (2026-07-07)
 
 **Note:** Version bump only for package @cubejs-backend/docker
