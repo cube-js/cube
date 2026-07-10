@@ -310,6 +310,10 @@ impl TransportService for HttpTransport {
             },
         };
 
+        let mut query = query;
+        query.response_format =
+            Some(cubeclient::models::v1_load_request_query::ResponseFormat::Columnar);
+
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {
             query: Some(Box::new(query)),

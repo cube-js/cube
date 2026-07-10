@@ -1,5 +1,5 @@
 use cubesql::compile::engine::df::scan::{
-    transform_columnar_response, JsonColumnarValueObject, MemberField, RecordBatch, SchemaRef,
+    transform_response, JsonColumnarValueObject, MemberField, RecordBatch, SchemaRef,
 };
 
 use std::cell::RefCell;
@@ -269,14 +269,11 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             Ok(v) => v,
             Err(e) => return cx.throw_error(format!("Can't parse columnar chunk JSON: {}", e)),
         };
-    let value = match transform_columnar_response(
-        &mut value_object,
-        this.schema.clone(),
-        &this.member_fields,
-    ) {
-        Ok(value) => value,
-        Err(e) => return cx.throw_error(e.message),
-    };
+    let value =
+        match transform_response(&mut value_object, this.schema.clone(), &this.member_fields) {
+            Ok(value) => value,
+            Err(e) => return cx.throw_error(e.message),
+        };
 
     let future = this.push_chunk(value);
     wait_for_future_and_execute_callback(this.tokio_handle.clone(), cx.channel(), callback, future);

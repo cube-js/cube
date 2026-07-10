@@ -2,11 +2,10 @@ use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    DBResponsePrimitive, InternedKeyLookup, RequestResultData, RequestResultDataMulti,
-    TransformedData,
+    DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
 };
 use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
-use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue, ValueObject};
+use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue};
 use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::handle::Handle;
@@ -141,89 +140,6 @@ fn db_primitive_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
             serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
         )),
         DBResponsePrimitive::Null => FieldValue::Null,
-    }
-}
-
-impl ValueObject for ResultWrapper {
-    fn len(&mut self) -> Result<usize, CubeError> {
-        if self.transformed_data.is_none() {
-            self.transform_result()?;
-        }
-
-        let data = self.transformed_data.as_ref().unwrap();
-
-        match data {
-            TransformedData::Compact {
-                members: _members,
-                dataset,
-            } => Ok(dataset.len()),
-            TransformedData::Columnar {
-                members: _members,
-                columns,
-            } => Ok(columns.first().map(|c| c.len()).unwrap_or(0)),
-            TransformedData::Vanilla(dataset) => Ok(dataset.len()),
-        }
-    }
-
-    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue<'_>, CubeError> {
-        if self.transformed_data.is_none() {
-            self.transform_result()?;
-        }
-
-        let data = self.transformed_data.as_ref().unwrap();
-
-        let value = match data {
-            TransformedData::Compact { members, dataset } => {
-                let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::internal(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                let Some(member_index) = members.iter().position(|m| m == field_name) else {
-                    // Missing field → NULL, matching `Vanilla` semantics below.
-                    return Ok(FieldValue::Null);
-                };
-
-                row.get(member_index).unwrap_or(&DBResponsePrimitive::Null)
-            }
-            TransformedData::Columnar { members, columns } => {
-                let Some(member_index) = members.iter().position(|m| m == field_name) else {
-                    // Missing field → NULL, matching `Vanilla` semantics below.
-                    return Ok(FieldValue::Null);
-                };
-
-                let Some(column) = columns.get(member_index) else {
-                    return Err(CubeError::internal(format!(
-                        "Unexpected response from Cube, missing column for '{}'",
-                        field_name
-                    )));
-                };
-
-                let Some(value) = column.get(index) else {
-                    return Err(CubeError::user(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                value
-            }
-            TransformedData::Vanilla(dataset) => {
-                let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::internal(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                row.get(&InternedKeyLookup::new(field_name))
-                    .unwrap_or(&DBResponsePrimitive::Null)
-            }
-        };
-
-        Ok(db_primitive_to_field_value(value))
     }
 }
 
