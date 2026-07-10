@@ -146,13 +146,13 @@ Internally, sparklines are powered by additional queries grouped by time dimensi
 | **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
 | **Line color** / **Area color** | Stroke color for line and bar; fill color for area. |
 | **Line width** | Stroke width in pixels (Line and Area types). |
-| **Show value** | Show the most recent value as a headline number next to the sparkline. Turn it off for a chart-only cell. |
+| **Show value** | Show the measure's value for the row — the same number the cell would show without a sparkline — as a headline next to it. Turn it off for a chart-only cell. |
 
 A row needs at least two data points to draw a sparkline; cells with fewer fall back to the formatted value.
 
 <Note>
 
-A granularity that is too fine for the data's time span (e.g. by the second over several years) makes each background query return many rows, which can make a table with sparklines slow to load for end users. Pick the coarsest granularity that still shows the trend you need.
+Choose a reasonable granularity for the data's time span. An overly fine granularity (e.g. by the second over several years) makes the background queries return many rows and can compromise the chart's performance.
 
 </Note>
 
