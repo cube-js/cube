@@ -184,11 +184,162 @@ If you'd rather present clients a hostname inside your own domain (e.g.
 `cube.example.com`), stand up a customer-side proxy — typically an internal
 NLB with a TLS listener bound to a certificate you own, or any reverse proxy
 such as nginx, HAProxy, Envoy, or an ALB — that terminates TLS with your
-certificate and forwards traffic to the Cube HTTP VPC endpoint. Because
+certificate and **re-encrypts** traffic to the Cube HTTP VPC endpoint. Because
 Cube's ingress only has a cert for `*.cubecloudapp.dev`, the proxy must do
 its own TLS termination; it cannot pass-through your custom-domain TLS to
-Cube. Once your proxy is in place, configure its hostname in Cube's admin
-interface so generated links and SLS configs match.
+Cube.
+
+The rest of this section walks each step with both **AWS Console** and
+**AWS CLI** instructions. The CLI commands use AWS CLI v2 — run them with
+credentials for the account that holds the VPC endpoint, and set your region
+with `--region` or the `AWS_REGION` environment variable. If you front the
+endpoint with a different reverse proxy (nginx, Envoy, HAProxy, an ALB) instead
+of an NLB, the same two principles apply: terminate your own certificate at the
+proxy, and re-encrypt to the endpoint over TLS (HTTPS) on port 443 rather than
+forwarding plaintext.
+
+<Steps>
+  <Step title="Create a target group that points at the HTTP VPC endpoint">
+    Create a target group for the HTTP VPC endpoint with these settings:
+
+    - **Target type**: **IP addresses**. A target group cannot reference a VPC
+      endpoint service name directly, so you register the endpoint's private
+      IPs instead — one ENI per Availability Zone, so register the address from
+      every AZ. These IPs are stable for the lifetime of the endpoint.
+    - **Protocol / port**: **TLS / 443**. This must be TLS, not TCP — see the
+      callout below.
+    - **VPC**: the same VPC that holds your HTTP VPC endpoint.
+    - **Health check**: **TCP** on port 443 (a TLS health check works too).
+
+    **Console** — under **EC2 → Target groups → Create target group**, choose
+    the settings above, then register the endpoint ENI IPs on the **Register
+    targets** screen. Find the ENI IPs on the endpoint's **VPC → Endpoints →
+    (your endpoint) → Subnets** view, or via the CLI below.
+
+    **AWS CLI**:
+
+    ```bash
+    # Look up the endpoint's ENI private IPs (one per AZ)
+    ENIS=$(aws ec2 describe-vpc-endpoints --vpc-endpoint-ids <vpce-id> \
+      --query 'VpcEndpoints[0].NetworkInterfaceIds' --output text)
+    aws ec2 describe-network-interfaces --network-interface-ids $ENIS \
+      --query 'NetworkInterfaces[].PrivateIpAddress' --output text
+    # → one private IP per Availability Zone, e.g. 10.0.1.15   10.0.2.15
+
+    TG_ARN=$(aws elbv2 create-target-group \
+      --name cube-http-tg \
+      --protocol TLS --port 443 \
+      --vpc-id <vpc-id> \
+      --target-type ip \
+      --health-check-protocol TCP --health-check-port 443 \
+      --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+    aws elbv2 register-targets --target-group-arn "$TG_ARN" \
+      --targets Id=10.0.1.15,Port=443 Id=10.0.2.15,Port=443
+    ```
+  </Step>
+  <Step title="Create the internal NLB with a TLS listener">
+    Create an internal NLB with these settings:
+
+    - **Scheme**: **internal**.
+    - **VPC / subnets**: the same VPC, with subnets in the same Availability
+      Zones as the endpoint's ENIs (see [Availability Zone
+      alignment](#availability-zone-alignment)). Enable **cross-zone load
+      balancing** if you want an NLB node in one AZ to reach endpoint ENIs in
+      another.
+    - **Listener**: protocol **TLS**, port **443**, forwarding to the target
+      group from the previous step.
+    - **Default certificate**: your own [ACM certificate][aws-acm] covering the
+      hostname your clients will dial (e.g. `cube.example.com`).
+    - **Security policy**: a current TLS 1.2+ policy such as
+      `ELBSecurityPolicy-TLS13-1-2-2021-06`.
+
+    Also allow inbound **TCP/443** from the NLB's subnets on the HTTP VPC
+    endpoint's security group so the re-encrypted traffic can reach the
+    endpoint ENIs.
+
+    **Console** — under **EC2 → Load balancers → Create load balancer →
+    Network Load Balancer**, apply the settings above and add the **TLS**
+    listener; then add the endpoint security-group rule under **VPC → Security
+    groups**.
+
+    **AWS CLI**:
+
+    ```bash
+    NLB_ARN=$(aws elbv2 create-load-balancer \
+      --name cube-http-nlb \
+      --type network --scheme internal \
+      --subnets <subnet-az-a> <subnet-az-b> \
+      --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+    aws elbv2 wait load-balancer-available --load-balancer-arns "$NLB_ARN"
+
+    # Optional: let an NLB node reach endpoint ENIs in another AZ
+    aws elbv2 modify-load-balancer-attributes --load-balancer-arn "$NLB_ARN" \
+      --attributes Key=load_balancing.cross_zone.enabled,Value=true
+
+    # TLS listener on 443 with your ACM certificate, forwarding to the TG
+    aws elbv2 create-listener --load-balancer-arn "$NLB_ARN" \
+      --protocol TLS --port 443 \
+      --certificates CertificateArn=<acm-cert-arn> \
+      --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06 \
+      --default-actions Type=forward,TargetGroupArn="$TG_ARN"
+
+    # Allow re-encrypted traffic from the NLB subnets into the endpoint
+    aws ec2 authorize-security-group-ingress --group-id <endpoint-sg-id> \
+      --protocol tcp --port 443 --cidr <nlb-subnet-cidr>
+    ```
+  </Step>
+  <Step title="Bind your hostname to the NLB and set the domain override">
+    The NLB receives an internal DNS name of the form
+    `<name>-<hash>.elb.<region>.amazonaws.com`. Point your chosen hostname
+    (e.g. `cube.example.com`) at it with an `ALIAS`/`CNAME` record in a
+    [Route 53 private hosted zone][aws-route53-phz] or your corporate resolver,
+    resolvable from every network that reaches Cube (corporate VPN included).
+
+    **Console** — copy the NLB's DNS name from its detail page under **EC2 →
+    Load balancers**, then create the `ALIAS`/`CNAME` record under **Route 53 →
+    Hosted zones** (or in your corporate DNS).
+
+    **AWS CLI** (Route 53 private hosted zone):
+
+    ```bash
+    NLB_DNS=$(aws elbv2 describe-load-balancers --load-balancer-arns "$NLB_ARN" \
+      --query 'LoadBalancers[0].DNSName' --output text)
+
+    aws route53 change-resource-record-sets --hosted-zone-id <phz-id> \
+      --change-batch "{
+        \"Changes\": [{
+          \"Action\": \"UPSERT\",
+          \"ResourceRecordSet\": {
+            \"Name\": \"cube.example.com\",
+            \"Type\": \"CNAME\",
+            \"TTL\": 60,
+            \"ResourceRecords\": [{ \"Value\": \"$NLB_DNS\" }]
+          }
+        }]
+      }"
+    ```
+
+    Then set the same hostname as the domain override in Cube's admin panel so
+    generated UI links and SLS configs use it — see
+    [Configuring the private domain](#configuring-the-private-domain).
+  </Step>
+</Steps>
+
+<Warning>
+
+The target group's protocol must be **TLS**, not **TCP**. Cube's HTTP endpoint
+expects a TLS handshake on port 443, so the NLB has to **re-encrypt** on the
+upstream leg: with a [TLS target group][aws-nlb-tls] it terminates your
+listener's TLS and opens a fresh TLS connection to the endpoint, whereas a TCP
+target group would forward the already-decrypted bytes to a port that expects
+TLS — so requests never complete. AWS does **not** validate the backend
+certificate on a TLS target group, so Cube's `*.cubecloudapp.dev` certificate
+is accepted even though it does not match your custom hostname; it is used
+purely to encrypt the upstream hop, keeping traffic encrypted end-to-end across
+PrivateLink.
+
+</Warning>
 
 ## Reaching Cube from every client
 
@@ -435,5 +586,7 @@ hop is failing:
 [aws-endpoint-service]: https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html
 [aws-interface-endpoint]: https://docs.aws.amazon.com/vpc/latest/privatelink/create-interface-endpoint.html
 [aws-nlb]: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html
+[aws-nlb-tls]: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html
+[aws-acm]: https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html
 [aws-privatelink-az]: https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html#endpoint-service-availability-zones
 [aws-route53-phz]: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-private.html
