@@ -231,8 +231,9 @@ components:
       name: X-Cube-Auth-Token
       description: >-
         Cube token authentication. Send your deployment's own Cube token (JWT) in the
-        `X-Cube-Auth-Token` header. The token must be valid for the agent's deployment and carry
-        the `chat` scope. Disabled by default — enable it in your deployment settings.
+        `X-Cube-Auth-Token` header. The token must be valid for the agent's deployment, include
+        an `externalId` claim identifying the external user, and carry the `chat` scope.
+        Disabled by default — enable it in your deployment settings.
   schemas:
     ChatRequest:
       properties:

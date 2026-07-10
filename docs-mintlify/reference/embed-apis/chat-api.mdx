@@ -126,13 +126,18 @@ const response = await fetch(
 ```
 
 To be accepted by the Chat API, the token must be valid for the agent's
-deployment and carry the `chat` scope:
+deployment and include the following claims in its payload:
+
+- `externalId` (required) — unique identifier for the external user,
+  lowercase and without spaces.
+- `scopes` (required) — must include the `chat` scope.
 
 ```javascript
 const jwt = require("jsonwebtoken")
 
 const cubeToken = jwt.sign(
   {
+    externalId: "user@example.com",
     scopes: ["chat"],
     // Security context claims, e.g.:
     tenant_id: "acme"
@@ -144,14 +149,15 @@ const cubeToken = jwt.sign(
 
 When Cube token authentication is used:
 
-- The external user and their security context are resolved from the token
-  claims, so you don't need to pass identity fields in `sessionSettings` —
-  users are provisioned automatically from the token.
+- The external user is identified by the `externalId` claim, and their
+  security context is resolved from the token claims — so you don't need to
+  pass identity fields in `sessionSettings`; users are provisioned
+  automatically from the token.
 - The agent queries the deployment with the same token you sent, so
   row-level security and any other security-context-based access controls
   apply to the conversation exactly as they apply to your direct API queries.
-- Tokens that are invalid for the deployment or don't carry the `chat` scope
-  are rejected.
+- Tokens that are invalid for the deployment, miss the `externalId` claim,
+  or don't carry the `chat` scope are rejected.
 
 **Request Body Fields:**
 
