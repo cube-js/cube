@@ -204,8 +204,6 @@ fn bench_transform_response(c: &mut Criterion) {
                         })
                     },
                 );
-
-                drop(inputs);
             }
         }
     }
