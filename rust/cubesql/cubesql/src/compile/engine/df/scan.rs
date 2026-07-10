@@ -45,7 +45,7 @@ use datafusion::{
 };
 use futures::Stream;
 use log::warn;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 use std::{
@@ -380,6 +380,7 @@ impl ValueObject for JsonValueObject {
     }
 }
 
+#[derive(Deserialize)]
 pub struct JsonColumnarValueObject {
     members: Vec<String>,
     columns: Vec<Vec<Value>>,
