@@ -516,13 +516,13 @@ metastore in a single round trip and picks the winner per table:
    early the projected columns appear. Earlier is better: a filter on the
    leading sort key column narrows the scan to a contiguous range, while
    the same filter on a trailing column cannot skip anything.
-3. **Joins.** When all joined tables share a partitioned index over the
-   join key, the planner picks it so each worker can join its partitions
-   locally. If no suitable index exists for a join, planning fails with an
+3. **Joins.** Every joined table must have an index sorted by the join
+   key. If no suitable index exists for a join, planning fails with an
    error that includes the exact `CREATE INDEX` statement to fix it —
    distributed joins without a matching index would require a data
-   shuffle, which Cube Store deliberately does not do. See
-   [Distributed joins](#distributed-joins) for the full mechanics.
+   shuffle or a query-time sort, which Cube Store deliberately does not
+   do. See [Distributed joins](#distributed-joins) for the full
+   mechanics.
 
 With indexes chosen, the planner attaches the concrete partition list to
 each scan, applying partition pruning as it goes, and inserts a
@@ -671,22 +671,9 @@ The join itself runs entirely on the workers, below the cluster boundary.
 When both sides of a join resolve to worker-bound scans, the planner
 places the join *under* a single cluster-send node — so each worker joins
 its own data locally and the router merely merges already-joined results.
-What differs is how partitions are grouped into per-worker batches, and
-there are two modes:
 
-**Aligned partitions.** When all joined tables share the same *partitioned
-index* — a partitioning scheme defined over the join key and shared across
-tables — their partitions split at identical key boundaries. Each batch is
-then the set of partitions covering one key range, one from each table,
-and the batch is assigned to a worker as a unit. Rows that can possibly
-match sit in the same batch on the same worker by construction; nothing is
-duplicated, nothing moves over the network, and each worker merge-joins
-one narrow key range. This is the fastest path and scales with the number
-of partitions.
-
-**Ordinary partitions.** Without a shared partitioned index, the two
-tables' partition boundaries don't line up, so range-aligned batching is
-impossible. The planner falls back to batching by the left-most (root)
+Since the joined tables are partitioned independently, their partition
+boundaries don't line up, so work is batched by the left-most (root)
 table: the root table's partitions are split across batches, and **every
 right-side table is included in full in every batch**. Including the right
 side whole is required for correctness — batching a right table would make
@@ -698,10 +685,10 @@ and poorly when both sides are large. A configurable guard
 the query fast when the right side is too fragmented, rather than letting
 it fan out into an expensive execution.
 
-In both modes, each worker executes the same plan: scan its batch's
-partitions through the join-key indexes (each stream already sorted),
-merge-join them, apply whatever partial aggregation was pushed down, and
-stream results to the router.
+Each worker then executes the same plan: scan its batch's partitions
+through the join-key indexes (each stream already sorted), merge-join
+them, apply whatever partial aggregation was pushed down, and stream
+results to the router.
 
 ## Compaction in detail
 
