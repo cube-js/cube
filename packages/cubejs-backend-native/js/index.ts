@@ -4,7 +4,7 @@ import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
 import { CacheMode } from '@cubejs-backend/shared';
-import { NativeQueryResultRef, ResultWrapper, rowsToColumnar } from './ResultWrapper';
+import { NativeQueryResultRef, ResultWrapper, rowsToColumnarBuffer } from './ResultWrapper';
 
 export * from './ResultWrapper';
 
@@ -294,7 +294,7 @@ function wrapNativeFunctionWithStream(
             if (chunkBuffer.length < chunkLength) {
               callback(null);
             } else {
-              const toSend = Buffer.from(JSON.stringify(rowsToColumnar(chunkBuffer)));
+              const toSend = rowsToColumnarBuffer(chunkBuffer);
               chunkBuffer = [];
               writerOrChannel.chunk(toSend, callback);
             }
@@ -308,7 +308,7 @@ function wrapNativeFunctionWithStream(
               }
             };
             if (chunkBuffer.length > 0) {
-              const toSend = Buffer.from(JSON.stringify(rowsToColumnar(chunkBuffer)));
+              const toSend = rowsToColumnarBuffer(chunkBuffer);
               chunkBuffer = [];
               writerOrChannel.chunk(toSend, end);
             } else {
