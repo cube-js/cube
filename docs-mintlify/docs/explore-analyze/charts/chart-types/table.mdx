@@ -165,6 +165,32 @@ dimension](/docs/data-modeling/dimensions#links) — drill into another dashboar
 (`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, on
 measure cells that support it, **Drill down**.
 
+## Selecting and copying cells
+
+You can copy a single cell or a rectangular block of cells straight out of the
+table — copied values paste cleanly into a spreadsheet or text editor.
+
+### Copy a single cell
+
+Click the cell to select it, then press **Cmd/Ctrl+C** or choose **Copy value**
+from the [cell menu](#cell-menu). Either way copies that cell's raw
+(unformatted) value.
+
+### Select and copy a range
+
+- **Click and drag** across the cells to sweep out a rectangle, or **Shift+click**
+  a second cell to extend the selection from the first.
+- Press **Cmd/Ctrl+C** to copy the selected cells. When more than one cell is
+  selected, the cell menu also offers **Copy values** and **Copy values with headers** — the
+  latter prepends a row of column titles.
+
+Copied cells use the raw (unformatted) values. A range is joined by tabs across
+columns and newlines across rows, so it lands in a spreadsheet as a matching
+grid; a single cell copies as just its value.
+
+The same single-cell and range selection works in the **Results** table on the query
+panel, not just the table visualization.
+
 ## Style options
 
 The **Style** tab controls the visual appearance of the table:
