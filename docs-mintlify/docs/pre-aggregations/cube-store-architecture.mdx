@@ -89,9 +89,10 @@ A Cube Store cluster consists of a **router** and one or more **workers**:
   disposable and interchangeable — any worker can download the partitions it
   needs and start serving queries.
 
-In development mode, a single process plays all roles. See
-[Running in production](/cube-core/running-in-production) for cluster
-deployment.
+In a single-process deployment (the default in development), one process
+plays all roles. See
+[Running in production](/docs/pre-aggregations/running-in-production) for
+cluster deployment.
 
 ## Design decisions
 
@@ -286,7 +287,7 @@ size:
   (`CUBESTORE_PARTITION_SPLIT_THRESHOLD`, default 2,097,152 rows; can also
   be set per pre-aggregation).
 - **By size:** the partition's file size divided by the size threshold
-  (`CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD`, default 100 MB).
+  (`CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD`, default 100 MiB).
 
 The larger of the two wins, capped at 16 children per compaction pass to
 bound write amplification. Because the merged output is sorted, the split
@@ -843,7 +844,7 @@ The cache is a Redis-style key-value store. Each entry has:
 
 Because unbounded caches eventually eat their host, a background eviction
 manager enforces two budgets: a total size limit
-(`CUBESTORE_CACHE_MAX_SIZE`, default 4 GB) and a key count limit
+(`CUBESTORE_CACHE_MAX_SIZE`, default 4 GiB) and a key count limit
 (`CUBESTORE_CACHE_MAX_KEYS`, default 100,000). When a budget is exceeded,
 it evicts entries according to a configurable policy
 (`CUBESTORE_CACHE_POLICY`):
