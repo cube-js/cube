@@ -35,6 +35,13 @@ Accounts are limited to 10,000 non-ephemeral external users. To increase this li
 All users created using this API are ephemeral by default and will be removed after `sessionSettings.ephemeralTtlSeconds` (1 week by default). If users need to be persisted, pass `isEphemeral: false` in `sessionSettings`. Ephemeral users are guaranteed to not live longer than `sessionSettings.ephemeralTtlSeconds`.
 </Info>
 
+The Chat API supports two authentication methods:
+
+- [API key authentication](#api-key-authentication) — pass a Cube [API key][ref-api-keys] in the `Authorization` header.
+- [Cube token authentication](#cube-token-authentication) — pass your deployment's own [Cube token][ref-jwt-auth] (JWT) in the `X-Cube-Auth-Token` header.
+
+### API key authentication
+
 Pass your [API key][ref-api-keys] directly to the Chat API endpoint. The session will be created automatically based on the `externalId` provided:
 
 ```javascript
@@ -75,6 +82,77 @@ while (true) {
   console.log(decoder.decode(value));
 }
 ```
+
+### Cube token authentication
+
+<Note>
+
+Cube token authentication for the Chat API is disabled by default. Reach out
+to the [Cube support team](/admin/account-billing/support) to enable it for
+your deployment.
+
+</Note>
+
+Instead of an API key, the Chat API can authenticate requests with your
+deployment's own [Cube authentication][ref-jwt-auth] — the same JSON Web
+Tokens (JWTs) your application already uses with the Core Data APIs. Cube
+validates the token using the deployment's existing authentication
+configuration: the API secret, JWKS, or a custom
+[`check_auth`][ref-config-check-auth] implementation.
+
+This is useful for [headless embedding][ref-headless-embedding]: your
+application issues a single kind of token, and the same token works for both
+data queries and AI-powered conversations.
+
+Pass the token in the `X-Cube-Auth-Token` header instead of the
+`Authorization` header:
+
+```javascript
+// Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+const CHAT_API_URL = 'YOUR_CHAT_API_URL';
+
+const response = await fetch(
+  CHAT_API_URL,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Cube-Auth-Token': CUBE_TOKEN,
+    },
+    body: JSON.stringify({
+      input: 'What were the total sales last month?'
+    }),
+  }
+);
+```
+
+To be accepted by the Chat API, the token must be valid for the agent's
+deployment and carry the `chat` scope:
+
+```javascript
+const jwt = require("jsonwebtoken")
+
+const cubeToken = jwt.sign(
+  {
+    scopes: ["chat"],
+    // Security context claims, e.g.:
+    tenant_id: "acme"
+  },
+  process.env.CUBEJS_API_SECRET,
+  { expiresIn: "1h" }
+)
+```
+
+When Cube token authentication is used:
+
+- The external user and their security context are resolved from the token
+  claims, so you don't need to pass identity fields in `sessionSettings` —
+  users are provisioned automatically from the token.
+- The agent queries the deployment with the same token you sent, so
+  row-level security and any other security-context-based access controls
+  apply to the conversation exactly as they apply to your direct API queries.
+- Tokens that are invalid for the deployment or don't carry the `chat` scope
+  are rejected.
 
 **Request Body Fields:**
 
@@ -829,7 +907,9 @@ with `/abort`.
 
 ### Authentication
 
-Uses the same API key authentication as the Chat API.
+Supports the same authentication methods as the Chat API: an
+[API key](#api-key-authentication) or, when enabled for your deployment, a
+[Cube token](#cube-token-authentication).
 
 ### Request Body
 
@@ -1028,10 +1108,13 @@ while (true) {
 
 - **204 No Content**: (Abort endpoint only) Chat streaming was aborted successfully.
 - **400 Bad Request**: Invalid request body or parameters. Check required fields and data types.
-- **401 Unauthorized**: Invalid or missing API key. Verify your API key is correct and has the necessary permissions.
+- **401 Unauthorized**: Invalid or missing credentials. Verify your API key is correct and has the necessary permissions. For Cube token authentication, verify the token is valid for the agent's deployment and carries the `chat` scope.
 - **403 Forbidden**: (Abort endpoint only) The authenticated user does not own the specified chat thread.
 - **404 Not Found**: Agent, tenant, or chat thread not found. Verify the Chat API URL from your agent settings and the `chatId`.
 - **500 Internal Server Error**: Server processing error. Contact support if the issue persists.
 
 
 [ref-api-keys]: /admin/account-billing/api-keys
+[ref-jwt-auth]: /embedding/authentication/jwt
+[ref-config-check-auth]: /reference/configuration/config#check_auth
+[ref-headless-embedding]: /embedding#headless-embedding

@@ -23,6 +23,7 @@ servers:
         description: AI agent identifier (Admin → Agents)
 security:
   - apiKey: []
+  - cubeToken: []
 tags:
   - name: Chat
 paths:
@@ -213,6 +214,7 @@ paths:
             `Content-Type: application/json`). Each line is a JSON object of the schema below.
       security:
         - apiKey: []
+        - cubeToken: []
       summary: Stream chat state
       tags:
         - Chat
@@ -223,6 +225,15 @@ components:
       in: header
       name: Authorization
       description: 'API key authentication. Send `Authorization: Api-Key <YOUR_API_KEY>`.'
+    cubeToken:
+      type: apiKey
+      in: header
+      name: X-Cube-Auth-Token
+      description: >-
+        Cube token authentication. Send your deployment's own Cube token (JWT) in the
+        `X-Cube-Auth-Token` header. The token must be valid for the agent's deployment and carry
+        the `chat` scope. Disabled by default — contact Cube support to enable it for your
+        deployment.
   schemas:
     ChatRequest:
       properties:
