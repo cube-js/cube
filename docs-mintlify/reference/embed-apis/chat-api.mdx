@@ -88,7 +88,8 @@ while (true) {
 <Note>
 
 Cube token authentication for the Chat API is disabled by default. You can
-enable it in your deployment settings.
+enable it in your deployment settings: **Settings** → **Configuration** →
+**Use Cube authentication for Chat and embedding APIs**.
 
 </Note>
 
@@ -125,12 +126,23 @@ const response = await fetch(
 );
 ```
 
+<Warning>
+
+If the request also carries an `Authorization` header, it takes precedence
+and the `X-Cube-Auth-Token` header is ignored. Send exactly one of the two.
+
+</Warning>
+
 To be accepted by the Chat API, the token must be valid for the agent's
 deployment and include the following claims in its payload:
 
-- `externalId` (required) — unique identifier for the external user,
-  lowercase and without spaces.
-- `scopes` (required) — must include the `chat` scope.
+- `externalId` (required) — unique identifier for the external user.
+  Normalized to lowercase, so ids that differ only in casing map to the same
+  user. When `externalId` is not present, the standard JWT `sub` claim is
+  used instead.
+- `scope` (required) — an array of scopes that must include `chat`.
+- `email` (optional) — email address to store on the provisioned external
+  user.
 
 ```javascript
 const jwt = require("jsonwebtoken")
@@ -138,7 +150,7 @@ const jwt = require("jsonwebtoken")
 const cubeToken = jwt.sign(
   {
     externalId: "user@example.com",
-    scopes: ["chat"],
+    scope: ["chat"],
     // Security context claims, e.g.:
     tenant_id: "acme"
   },
@@ -147,17 +159,29 @@ const cubeToken = jwt.sign(
 )
 ```
 
+<Info>
+
+The `chat` scope is asserted on the token's *resolved security context*.
+With the default JWT authentication the security context is simply the
+token payload, so including `scope: ["chat"]` in the token is enough. If
+your deployment uses a custom [`check_auth`][ref-config-check-auth]
+implementation that rewrites the security context, make sure the resolved
+security context carries `scope: ["chat"]` for tokens that should be
+allowed to use the Chat API.
+
+</Info>
+
 When Cube token authentication is used:
 
-- The external user is identified by the `externalId` claim, and their
-  security context is resolved from the token claims — so you don't need to
-  pass identity fields in `sessionSettings`; users are provisioned
+- The external user is identified by the `externalId` (or `sub`) claim, and
+  their security context is resolved from the token claims — so you don't
+  need to pass identity fields in `sessionSettings`; users are provisioned
   automatically from the token.
 - The agent queries the deployment with the same token you sent, so
   row-level security and any other security-context-based access controls
   apply to the conversation exactly as they apply to your direct API queries.
-- Tokens that are invalid for the deployment, miss the `externalId` claim,
-  or don't carry the `chat` scope are rejected.
+- Tokens that are invalid for the deployment, miss the `externalId` (or
+  `sub`) claim, or don't carry the `chat` scope are rejected.
 
 **Request Body Fields:**
 
@@ -241,7 +265,9 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
 - **`input`** (string): User message or query to send to the AI agent, e.g. "What is our revenue last month?". If omitted, returns current state of thread with provided `chatId`.
 - **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
 - **`messageId`** (string): Client-provided identifier for the user message. Must match the format `<timestamp>-message` (a 13+ digit Unix timestamp in milliseconds followed by `-message`), e.g. `1717500000000-message`. Used to make requests idempotent — see [Idempotency](#idempotency).
-- **`sessionSettings`** (object, required): Session configuration for the user
+- **`sessionSettings`** (object, required for API key authentication; ignored
+  with Cube token authentication, where identity comes from the token claims):
+  Session configuration for the user
   - **`externalId`** (string): Unique identifier for the external user. Either `externalId` or `internalId` should be provided.
   - **`internalId`** (string): Email address of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
   - **`email`** (string): User's email address
@@ -1113,7 +1139,11 @@ while (true) {
 
 - **204 No Content**: (Abort endpoint only) Chat streaming was aborted successfully.
 - **400 Bad Request**: Invalid request body or parameters. Check required fields and data types.
-- **401 Unauthorized**: Invalid or missing credentials. Verify your API key is correct and has the necessary permissions. For Cube token authentication, verify the token is valid for the agent's deployment and carries the `chat` scope.
+- **Authentication errors**: Returned as a JSON-RPC error object in an HTTP 200
+  response. Verify your API key is correct and has the necessary permissions.
+  For Cube token authentication, verify the token is valid for the agent's
+  deployment, identifies a user via `externalId` (or `sub`), and carries the
+  `chat` scope.
 - **403 Forbidden**: (Abort endpoint only) The authenticated user does not own the specified chat thread.
 - **404 Not Found**: Agent, tenant, or chat thread not found. Verify the Chat API URL from your agent settings and the `chatId`.
 - **500 Internal Server Error**: Server processing error. Contact support if the issue persists.
