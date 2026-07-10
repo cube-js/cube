@@ -78,12 +78,13 @@ It was designed against the following requirements:
 
 A Cube Store cluster consists of a **router** and one or more **workers**:
 
-- The **router** owns the metastore, plans queries, distributes work to
-  workers, and merges their results. It also hosts the
+- The **router** owns the metastore and plans queries. It also hosts the
   [cache and queue store](#cache-and-queue-store) used by Cube for query
-  result caching and query queue coordination.
+  result caching and query queue coordination. Result merging is not done
+  on the router: for each query, it delegates execution to one of the
+  workers acting as the query's coordinator.
 - **Workers** execute partial queries on the partitions they own and return
-  results to the router.
+  results to the per-query coordinator worker.
 - All persistent data lives in a **cloud object store**. Compute nodes are
   disposable and interchangeable — any worker can download the partitions it
   needs and start serving queries.
@@ -354,17 +355,23 @@ A query executes as follows:
            └──────┬─────┴─────┬────┘
                   ▼           ▼
              ┌──────────────────────┐
-             │ Router: merge sorted │
-             │ streams, finalize    │
-             │ aggregation, LIMIT   │
+             │ Coordinator: merge   │
+             │ sorted streams,      │
+             │ finalize aggregation,│
+             │ LIMIT                │
              └──────────────────────┘
 ```
 
 Workers do as much as possible locally: they prune partitions with min-max
 statistics, scan Parquet and in-memory chunks, and compute **partial
-aggregations**. The router receives already-aggregated partial results and
-only needs to merge them — merging sorted streams is cheap, so the router
-never becomes a data-processing bottleneck.
+aggregations**. The coordinator receives already-aggregated partial
+results and only needs to merge them — merging sorted streams is cheap, so
+coordination never becomes a data-processing bottleneck.
+
+The coordinator here is itself one of the workers, chosen per query — not
+the router node that hosts the metastore, which only plans queries and
+relays results (see
+[One plan, two physical plans](#one-plan-two-physical-plans)).
 
 This is also how [lambda pre-aggregations](/docs/pre-aggregations/lambda-pre-aggregations)
 work: a single query transparently combines persisted Parquet data with
@@ -582,8 +589,8 @@ as possible lands below the cluster boundary:
   and counts) instead of raw rows.
 - **Top-k pushdown.** The `GROUP BY … ORDER BY … LIMIT n` pattern is
   rewritten into a distributed top-k: each worker computes its local
-  candidates and the router merges them, instead of materializing the full
-  grouped result.
+  candidates and the coordinator merges them, instead of materializing the
+  full grouped result.
 - **Limit pushdown.** Plain limits propagate to workers so they stop
   producing rows early.
 - **Sorted (streaming) aggregation.** Where the chosen index's sort order
@@ -597,17 +604,33 @@ The rewritten logical plan — along with the chosen index snapshots and
 partition lists — is serialized once and shipped to every participating
 worker. Each side then builds its own physical plan from it:
 
-- The **router** plans the part above the cluster boundary: receiving
+- The **router plan** is the part above the cluster boundary: receiving
   worker streams, merging them (sort-preserving where order matters),
   final aggregation, and the final limit.
-- Each **worker** plans the part below the boundary for *its* subset of
-  partitions: scanning local Parquet files and in-memory chunks, applying
-  remaining filters, and computing partial aggregates.
+- A **worker plan** is the part below the boundary for one worker's subset
+  of partitions: scanning local Parquet files and in-memory chunks,
+  applying remaining filters, and computing partial aggregates.
 
 Workers are assigned their partition subsets by the same consistent
 hashing that governs data placement, so the plan always executes where the
-data already lives. Execution streams Arrow record batches from workers to
-the router, which merges and returns the result.
+data already lives. Execution streams Arrow record batches from the
+workers to the node executing the router plan, which merges and returns
+the result.
+
+Importantly, "router plan" names a *role* in the plan, not the router
+node. In a multi-node cluster, the actual router node — the one hosting
+the metastore — does not execute the router plan itself. For each query,
+it picks one of the workers at random and delegates the router plan to
+it: that worker becomes the query's coordinator, fanning the worker plans
+out to its peers (including possibly itself), merging their streams, and
+running the final aggregation and limit. The true router only plans the
+query and passes the finished result through.
+
+This has two effects. The metastore node — a shared dependency of the
+whole cluster — is kept free of heavy data processing, so a large merge
+never degrades metadata operations for everyone else. And because the
+coordinator is re-picked per query, the merge workload itself is load
+balanced across the cluster rather than concentrating on a single node.
 
 ### Planning walkthrough
 
@@ -632,8 +655,49 @@ LIMIT 10
    into a distributed top-k.
 5. Ship the serialized plan; each worker scans its surviving partitions,
    aggregates partially, and returns its top candidates.
-6. The router merges the candidates, finalizes the aggregation, applies
-   `LIMIT 10`, and returns the result.
+6. The coordinating worker merges the candidates, finalizes the
+   aggregation, applies `LIMIT 10`, and returns the result.
+
+The resulting distributed physical plan looks like this (with the top-k
+rewrite left out for clarity — shown as a plain distributed aggregation
+over six surviving partitions and three workers):
+
+```text
+        Router node (metastore)
+        plans the query, picks Worker 2 as coordinator
+                           │
+                           ▼
+        Worker 2 — executes the router plan
+        ┌─────────────────────────────────────┐
+        │ Projection                          │
+        │  └─ InlineAggregate (Final)         │
+        │      └─ SortPreservingMerge         │
+        │          └─ ClusterSend             │
+        └────────┬──────────┬──────────┬──────┘
+                 │          │          │  worker plans
+                 ▼          ▼          ▼
+        ┌────────────┐ ┌────────────┐ ┌────────────┐
+        │  Worker 1  │ │  Worker 2  │ │  Worker 3  │
+        │            │ │            │ │            │
+        │ InlineAgg  │ │ InlineAgg  │ │ InlineAgg  │
+        │  (Partial) │ │  (Partial) │ │  (Partial) │
+        │ └─ Filter  │ │ └─ Filter  │ │ └─ Filter  │
+        │  └─ Merge  │ │  └─ Merge  │ │  └─ Merge  │
+        │   ├─ P1    │ │   ├─ P2    │ │   ├─ P3    │
+        │   ├─ P4    │ │   ├─ P5    │ │   ├─ P6    │
+        │   └─ mem   │ │   └─ mem   │ │   └─ mem   │
+        │     chunks │ │     chunks │ │     chunks │
+        └────────────┘ └────────────┘ └────────────┘
+          P1..P6 — pruned-in partitions, assigned to
+          workers by consistent hashing
+```
+
+Reading it bottom-up: each worker merges its partitions' sorted streams —
+Parquet files and in-memory chunks together (the lambda architecture
+query) — filters them, and computes a partial streaming aggregation. The
+coordinating worker (Worker 2 here, which also processes its own share of
+partitions) merges the three sorted partial streams, finalizes the
+aggregation, and returns the result through the router.
 
 ## Distributed joins
 
@@ -670,7 +734,8 @@ than a degradation.
 The join itself runs entirely on the workers, below the cluster boundary.
 When both sides of a join resolve to worker-bound scans, the planner
 places the join *under* a single cluster-send node — so each worker joins
-its own data locally and the router merely merges already-joined results.
+its own data locally and the coordinator merely merges already-joined
+results.
 
 Since the joined tables are partitioned independently, their partition
 boundaries don't line up, so work is batched by the left-most (root)
@@ -688,7 +753,7 @@ it fan out into an expensive execution.
 Each worker then executes the same plan: scan its batch's partitions
 through the join-key indexes (each stream already sorted), merge-join
 them, apply whatever partial aggregation was pushed down, and stream
-results to the router.
+results to the coordinator.
 
 ## Compaction in detail
 
