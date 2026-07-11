@@ -9,6 +9,14 @@ Often, there's a need to calculate a period-over-period change in a
 metric, e.g., week-over-week or month-over-month growth of clicks, orders,
 revenue, etc.
 
+<Note>
+
+This recipe compares against a single fixed interval. To let a data consumer choose the
+interval (and the rolling window) at query time, see [Configurable rolling
+windows](/recipes/data-modeling/dynamic-rolling-windows).
+
+</Note>
+
 ## Data modeling
 
 In Cube, calculating a period-over-period metric involves the following

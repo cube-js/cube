@@ -1,0 +1,432 @@
+---
+title: Configurable rolling windows and time shifts
+description: Let data consumers choose a measure's rolling-window and time-shift interval at query time, without defining a separate measure for every window.
+---
+
+## Use case
+
+Sometimes you want a measure to behave _dynamically_: its rolling window — and the
+prior-period shift you compare it against — should be chosen by the data consumer at
+query time rather than fixed in the data model. A common example is an embedded
+dashboard with a "window" dropdown (R3 / R6 / R9 / R12) where picking a value should
+change the query, not the data model.
+
+The window and the shift can't be passed as query parameters. Both
+[`rolling_window`][ref-rolling-window] and [`time_shift`][ref-time-shift] are
+properties of a measure _definition_, resolved when the model compiles — and a member
+must mean the same thing in every query, otherwise caching, pre-aggregation matching,
+and governance break.
+
+The trick is to move the _choice_ into the query instead. A [`switch`
+dimension][ref-switch] holds the set of allowed windows and acts as the query-time
+parameter, and [`case` measures][ref-case] dispatch to the matching rolling logic based
+on the selected value. Consumers only ever touch a small, fixed set of members, so
+those members stay well-defined and cacheable.
+
+## Data modeling
+
+Say you have monthly `gross_sales` and want trailing 3-, 6-, 9-, and 12-month totals,
+each compared to the immediately preceding window of the same length.
+
+The model has four parts:
+
+- A `growth_window` [`switch` dimension][ref-switch] whose `values` are the selectable
+  windows. This is the query-time parameter.
+- A [`rolling_window`][ref-rolling-window] measure per window (the _current period_).
+- A [`time_shift`][ref-time-shift] measure per window that shifts the current-period
+  measure back by the window's length (the _prior period_).
+- Four [`case` measures][ref-case] — `gross_sales_current`, `gross_sales_prior`,
+  `gross_sales_change`, and `gross_sales_growth_percentage` — that dispatch on
+  `growth_window`. Consumers query only these four, regardless of the selected window.
+
+The per-window measures are near-identical, so [Jinja][ref-jinja] generates them from a
+single list. Adding a window (say, R18) is a one-token change to `windows`, not a new
+measure by hand.
+
+<Warning>
+
+`switch` dimensions and `case` measures are powered by Tesseract, the
+[next-generation data modeling engine][link-tesseract]. In versions before v1.7.0, it
+was not enabled by default.
+
+</Warning>
+
+<CodeGroup>
+
+```yaml title="YAML"
+{%- set windows = [3, 6, 9, 12] -%}
+
+cubes:
+  - name: gross_sales
+    sql: |
+      SELECT '2023-01-01'::TIMESTAMP AS month, 100 AS amount UNION ALL
+      SELECT '2023-02-01'::TIMESTAMP AS month, 110 AS amount UNION ALL
+      SELECT '2023-03-01'::TIMESTAMP AS month, 120 AS amount UNION ALL
+      SELECT '2023-04-01'::TIMESTAMP AS month, 130 AS amount UNION ALL
+      SELECT '2023-05-01'::TIMESTAMP AS month, 140 AS amount UNION ALL
+      SELECT '2023-06-01'::TIMESTAMP AS month, 150 AS amount UNION ALL
+      SELECT '2023-07-01'::TIMESTAMP AS month, 160 AS amount UNION ALL
+      SELECT '2023-08-01'::TIMESTAMP AS month, 170 AS amount UNION ALL
+      SELECT '2023-09-01'::TIMESTAMP AS month, 180 AS amount UNION ALL
+      SELECT '2023-10-01'::TIMESTAMP AS month, 190 AS amount UNION ALL
+      SELECT '2023-11-01'::TIMESTAMP AS month, 200 AS amount UNION ALL
+      SELECT '2023-12-01'::TIMESTAMP AS month, 210 AS amount UNION ALL
+      SELECT '2024-01-01'::TIMESTAMP AS month, 220 AS amount UNION ALL
+      SELECT '2024-02-01'::TIMESTAMP AS month, 230 AS amount UNION ALL
+      SELECT '2024-03-01'::TIMESTAMP AS month, 240 AS amount UNION ALL
+      SELECT '2024-04-01'::TIMESTAMP AS month, 250 AS amount UNION ALL
+      SELECT '2024-05-01'::TIMESTAMP AS month, 260 AS amount UNION ALL
+      SELECT '2024-06-01'::TIMESTAMP AS month, 270 AS amount UNION ALL
+      SELECT '2024-07-01'::TIMESTAMP AS month, 280 AS amount UNION ALL
+      SELECT '2024-08-01'::TIMESTAMP AS month, 290 AS amount UNION ALL
+      SELECT '2024-09-01'::TIMESTAMP AS month, 300 AS amount UNION ALL
+      SELECT '2024-10-01'::TIMESTAMP AS month, 310 AS amount UNION ALL
+      SELECT '2024-11-01'::TIMESTAMP AS month, 320 AS amount UNION ALL
+      SELECT '2024-12-01'::TIMESTAMP AS month, 330 AS amount
+
+    dimensions:
+      - name: month
+        sql: month
+        type: time
+        primary_key: true
+
+      # The query-time parameter: the selected value chooses the window.
+      - name: growth_window
+        type: switch
+        values:
+        {%- for months in windows %}
+          - {{ months }}m
+        {%- endfor %}
+
+    measures:
+      - name: gross_sales
+        sql: amount
+        type: sum
+
+      # Trailing (current-period) totals, one per window.
+      {%- for months in windows %}
+      - name: r{{ months }}_gross_sales
+        sql: amount
+        type: sum
+        rolling_window:
+          trailing: {{ months }} month
+      {% endfor %}
+
+      # Prior-period counterparts, each shifted back by the window's length.
+      {%- for months in windows %}
+      - name: prev_r{{ months }}_gross_sales
+        multi_stage: true
+        sql: "{r{{ months }}_gross_sales}"
+        type: number
+        time_shift:
+          - interval: {{ months }} month
+            type: prior
+      {% endfor %}
+
+      # The members consumers query, dispatching on growth_window.
+      - name: gross_sales_current
+        multi_stage: true
+        case:
+          switch: "{CUBE.growth_window}"
+          when:
+          {%- for months in windows %}
+            - value: {{ months }}m
+              sql: "{CUBE.r{{ months }}_gross_sales}"
+          {%- endfor %}
+          else:
+            sql: "{CUBE.r{{ windows[0] }}_gross_sales}"
+        type: number
+
+      - name: gross_sales_prior
+        multi_stage: true
+        case:
+          switch: "{CUBE.growth_window}"
+          when:
+          {%- for months in windows %}
+            - value: {{ months }}m
+              sql: "{CUBE.prev_r{{ months }}_gross_sales}"
+          {%- endfor %}
+          else:
+            sql: "{CUBE.prev_r{{ windows[0] }}_gross_sales}"
+        type: number
+
+      - name: gross_sales_change
+        multi_stage: true
+        sql: "{gross_sales_current} - {gross_sales_prior}"
+        type: number
+
+      - name: gross_sales_growth_percentage
+        multi_stage: true
+        sql: "100.0 * ({gross_sales_current} - {gross_sales_prior}) / NULLIF({gross_sales_prior}, 0)"
+        type: number
+```
+
+```javascript title="JavaScript"
+const windows = [3, 6, 9, 12];
+
+cube(`gross_sales`, {
+  sql: `
+    SELECT '2023-01-01'::TIMESTAMP AS month, 100 AS amount UNION ALL
+    SELECT '2023-02-01'::TIMESTAMP AS month, 110 AS amount UNION ALL
+    SELECT '2023-03-01'::TIMESTAMP AS month, 120 AS amount UNION ALL
+    SELECT '2023-04-01'::TIMESTAMP AS month, 130 AS amount UNION ALL
+    SELECT '2023-05-01'::TIMESTAMP AS month, 140 AS amount UNION ALL
+    SELECT '2023-06-01'::TIMESTAMP AS month, 150 AS amount UNION ALL
+    SELECT '2023-07-01'::TIMESTAMP AS month, 160 AS amount UNION ALL
+    SELECT '2023-08-01'::TIMESTAMP AS month, 170 AS amount UNION ALL
+    SELECT '2023-09-01'::TIMESTAMP AS month, 180 AS amount UNION ALL
+    SELECT '2023-10-01'::TIMESTAMP AS month, 190 AS amount UNION ALL
+    SELECT '2023-11-01'::TIMESTAMP AS month, 200 AS amount UNION ALL
+    SELECT '2023-12-01'::TIMESTAMP AS month, 210 AS amount UNION ALL
+    SELECT '2024-01-01'::TIMESTAMP AS month, 220 AS amount UNION ALL
+    SELECT '2024-02-01'::TIMESTAMP AS month, 230 AS amount UNION ALL
+    SELECT '2024-03-01'::TIMESTAMP AS month, 240 AS amount UNION ALL
+    SELECT '2024-04-01'::TIMESTAMP AS month, 250 AS amount UNION ALL
+    SELECT '2024-05-01'::TIMESTAMP AS month, 260 AS amount UNION ALL
+    SELECT '2024-06-01'::TIMESTAMP AS month, 270 AS amount UNION ALL
+    SELECT '2024-07-01'::TIMESTAMP AS month, 280 AS amount UNION ALL
+    SELECT '2024-08-01'::TIMESTAMP AS month, 290 AS amount UNION ALL
+    SELECT '2024-09-01'::TIMESTAMP AS month, 300 AS amount UNION ALL
+    SELECT '2024-10-01'::TIMESTAMP AS month, 310 AS amount UNION ALL
+    SELECT '2024-11-01'::TIMESTAMP AS month, 320 AS amount UNION ALL
+    SELECT '2024-12-01'::TIMESTAMP AS month, 330 AS amount
+  `,
+
+  dimensions: {
+    month: {
+      sql: `month`,
+      type: `time`,
+      primary_key: true
+    },
+
+    // The query-time parameter: the selected value chooses the window.
+    growth_window: {
+      type: `switch`,
+      values: windows.map(months => `${months}m`)
+    }
+  },
+
+  measures: {
+    gross_sales: {
+      sql: `amount`,
+      type: `sum`
+    },
+
+    // Trailing (current-period) totals and their prior-period counterparts,
+    // one pair per window.
+    ...windows.reduce((members, months) => ({
+      ...members,
+
+      [`r${months}_gross_sales`]: {
+        sql: `amount`,
+        type: `sum`,
+        rolling_window: {
+          trailing: `${months} month`
+        }
+      },
+
+      [`prev_r${months}_gross_sales`]: {
+        multi_stage: true,
+        sql: `${CUBE[`r${months}_gross_sales`]}`,
+        type: `number`,
+        time_shift: [{
+          interval: `${months} month`,
+          type: `prior`
+        }]
+      }
+    }), {}),
+
+    // The members consumers query, dispatching on growth_window.
+    gross_sales_current: {
+      multi_stage: true,
+      case: {
+        switch: `${CUBE.growth_window}`,
+        when: windows.map(months => ({
+          value: `${months}m`,
+          sql: `${CUBE[`r${months}_gross_sales`]}`
+        })),
+        else: {
+          sql: `${CUBE[`r${windows[0]}_gross_sales`]}`
+        }
+      },
+      type: `number`
+    },
+
+    gross_sales_prior: {
+      multi_stage: true,
+      case: {
+        switch: `${CUBE.growth_window}`,
+        when: windows.map(months => ({
+          value: `${months}m`,
+          sql: `${CUBE[`prev_r${months}_gross_sales`]}`
+        })),
+        else: {
+          sql: `${CUBE[`prev_r${windows[0]}_gross_sales`]}`
+        }
+      },
+      type: `number`
+    },
+
+    gross_sales_change: {
+      multi_stage: true,
+      sql: `${gross_sales_current} - ${gross_sales_prior}`,
+      type: `number`
+    },
+
+    gross_sales_growth_percentage: {
+      multi_stage: true,
+      sql: `100.0 * (${gross_sales_current} - ${gross_sales_prior}) / NULLIF(${gross_sales_prior}, 0)`,
+      type: `number`
+    }
+  }
+});
+```
+
+</CodeGroup>
+
+<Note>
+
+Two requirements make `case` measures work:
+
+- **Every `case` measure needs an `else` branch.** It provides the value when the
+  selected `switch` value matches no `when` clause.
+- **Always include the `switch` dimension (`growth_window`) in the query.** The `case`
+  measures — and the calculated measures built on top of them — need it to dispatch. To
+  pin a single window, add a filter on it (see below); don't rely on the filter alone.
+
+</Note>
+
+To give consumers a sensible default window, expose the cube through a [view][ref-view]
+with a [`default_filters`][ref-default-filters] entry on `growth_window`. The `unless`
+clause releases the default as soon as the consumer filters on `growth_window`
+explicitly, so a query with no window filter gets the default, and a query that picks a
+window gets that one:
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: gross_sales_view
+    cubes:
+      - join_path: gross_sales
+        includes: "*"
+
+    default_filters:
+      - member: gross_sales.growth_window
+        operator: equals
+        values:
+          - 3m
+        unless:
+          - gross_sales.growth_window
+```
+
+```javascript title="JavaScript"
+view(`gross_sales_view`, {
+  cubes: [{
+    join_path: gross_sales,
+    includes: `*`
+  }],
+
+  defaultFilters: [{
+    member: `gross_sales.growth_window`,
+    operator: `equals`,
+    values: [`3m`],
+    unless: [`gross_sales.growth_window`]
+  }]
+});
+```
+
+</CodeGroup>
+
+## Result
+
+Query the view through the [SQL API][ref-sql-api], selecting `growth_window` and the four
+consumer measures. Wrap measures in `MEASURE()` and provide a date range for the rolling
+windows.
+
+With no filter on `growth_window`, the `default_filters` entry applies the default
+window (`3m`):
+
+```sql
+SELECT
+  growth_window,
+  MEASURE(gross_sales_current),
+  MEASURE(gross_sales_prior),
+  MEASURE(gross_sales_change),
+  MEASURE(gross_sales_growth_percentage)
+FROM gross_sales_view
+WHERE month >= '2024-12-01' AND month < '2025-01-01'
+GROUP BY 1;
+```
+
+| growth_window | gross_sales_current | gross_sales_prior | gross_sales_change | gross_sales_growth_percentage |
+|---------------|--------------------:|------------------:|-------------------:|------------------------------:|
+| 3m            |                 960 |               870 |                 90 |                         10.34 |
+
+Filtering on `growth_window` — what a "window" dropdown does — selects that window:
+
+```sql
+SELECT
+  growth_window,
+  MEASURE(gross_sales_current),
+  MEASURE(gross_sales_prior),
+  MEASURE(gross_sales_change),
+  MEASURE(gross_sales_growth_percentage)
+FROM gross_sales_view
+WHERE month >= '2024-12-01' AND month < '2025-01-01'
+  AND growth_window = '9m'
+GROUP BY 1;
+```
+
+| growth_window | gross_sales_current | gross_sales_prior | gross_sales_change | gross_sales_growth_percentage |
+|---------------|--------------------:|------------------:|-------------------:|------------------------------:|
+| 9m            |                2610 |              1800 |                810 |                            45 |
+
+Filtering on all values returns every window side by side, e.g. to render a comparison:
+
+```sql
+SELECT
+  growth_window,
+  MEASURE(gross_sales_current),
+  MEASURE(gross_sales_change)
+FROM gross_sales_view
+WHERE month >= '2024-12-01' AND month < '2025-01-01'
+  AND growth_window IN ('3m', '6m', '9m', '12m')
+GROUP BY 1
+ORDER BY 1;
+```
+
+| growth_window | gross_sales_current | gross_sales_change |
+|---------------|--------------------:|-------------------:|
+| 3m            |                 960 |                 90 |
+| 6m            |                1830 |                360 |
+| 9m            |                2610 |                810 |
+| 12m           |                3300 |               1440 |
+
+## Related recipes
+
+- If you need a single fixed window rather than a consumer-selectable one, see
+  [Active users (DAU, WAU, MAU)][ref-active-users] (fixed `rolling_window` measures) and
+  [Period-over-period changes][ref-period-over-period] (a fixed `time_shift` comparison).
+  This recipe generalizes both, making the window and shift selectable at query time.
+- [Passing dynamic parameters in a query][ref-dynamic-params] also lets a consumer choose
+  something at query time, but the choice there is a **data value** (e.g. a city) injected
+  into a calculation — not a **measure behavior** (the window length) as it is here.
+- [Generating the data model dynamically][ref-dynamic-measures] generates a family of
+  members from a list at model-build time; the consumer then picks by choosing which
+  member to query, rather than passing a query-time value.
+
+
+[ref-switch]: /reference/data-modeling/dimensions#type
+[ref-case]: /reference/data-modeling/measures#case
+[ref-rolling-window]: /reference/data-modeling/measures#rolling_window
+[ref-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-view]: /reference/data-modeling/view
+[ref-default-filters]: /reference/data-modeling/view#default_filters
+[ref-jinja]: /docs/data-modeling/dynamic/jinja
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-active-users]: /recipes/data-modeling/active-users
+[ref-period-over-period]: /recipes/data-modeling/period-over-period
+[ref-dynamic-params]: /recipes/data-modeling/passing-dynamic-parameters-in-a-query
+[ref-dynamic-measures]: /recipes/data-modeling/using-dynamic-measures
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
