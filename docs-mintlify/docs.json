@@ -617,27 +617,48 @@
               {
                 "group": "Data Modeling",
                 "pages": [
+                  {
+                    "group": "Calculations & Metrics",
+                    "pages": [
+                      "recipes/data-modeling/percentiles",
+                      "recipes/data-modeling/nested-aggregates",
+                      "recipes/data-modeling/filtered-aggregates",
+                      "recipes/data-modeling/share-of-total",
+                      "recipes/data-modeling/period-over-period"
+                    ]
+                  },
+                  {
+                    "group": "Query-time parameters",
+                    "pages": [
+                      "recipes/data-modeling/dynamic-rolling-windows",
+                      "recipes/data-modeling/passing-dynamic-parameters-in-a-query"
+                    ]
+                  },
+                  {
+                    "group": "Time Series & Calendars",
+                    "pages": [
+                      "recipes/data-modeling/string-time-dimensions",
+                      "recipes/data-modeling/custom-granularity",
+                      "recipes/data-modeling/custom-calendar",
+                      "recipes/data-modeling/snapshots"
+                    ]
+                  },
+                  {
+                    "group": "User & Event Analytics",
+                    "pages": [
+                      "recipes/data-modeling/active-users",
+                      "recipes/data-modeling/event-analytics",
+                      "recipes/data-modeling/cohort-retention"
+                    ]
+                  },
                   "recipes/data-modeling/style-guide",
                   "recipes/data-modeling/designing-metrics",
-                  "recipes/data-modeling/percentiles",
-                  "recipes/data-modeling/nested-aggregates",
-                  "recipes/data-modeling/filtered-aggregates",
-                  "recipes/data-modeling/share-of-total",
-                  "recipes/data-modeling/period-over-period",
-                  "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+                  "recipes/data-modeling/entity-attribute-value",
+                  "recipes/data-modeling/dbt",
                   "recipes/data-modeling/using-dynamic-measures",
                   "recipes/data-modeling/dynamic-union-tables",
-                  "recipes/data-modeling/string-time-dimensions",
-                  "recipes/data-modeling/custom-granularity",
-                  "recipes/data-modeling/custom-calendar",
-                  "recipes/data-modeling/entity-attribute-value",
-                  "recipes/data-modeling/snapshots",
-                  "recipes/data-modeling/active-users",
-                  "recipes/data-modeling/event-analytics",
-                  "recipes/data-modeling/cohort-retention",
-                  "recipes/data-modeling/dbt",
-                  "recipes/data-modeling/custom-order",
-                  "recipes/data-modeling/polymorphic-cubes"
+                  "recipes/data-modeling/polymorphic-cubes",
+                  "recipes/data-modeling/custom-order"
                 ]
               },
               {

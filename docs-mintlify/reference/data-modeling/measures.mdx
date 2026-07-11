@@ -1187,7 +1187,8 @@ engine][link-tesseract]. In versions before v1.7.0, it was not enabled by defaul
 
 You do not need to include the [`sql` parameter](#sql) if the `case` parameter is used.
 However, the [`multi_stage` parameter](#multi_stage) must be set to `true` for `case`
-measures.
+measures, and an `else` branch is required to provide the value when the `switch`
+dimension matches none of the `when` clauses.
 
 <CodeGroup>
 
