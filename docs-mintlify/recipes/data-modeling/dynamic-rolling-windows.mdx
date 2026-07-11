@@ -214,37 +214,41 @@ cube(`gross_sales`, {
 
     // Trailing (current-period) totals and their prior-period counterparts,
     // one pair per window.
-    ...windows.reduce((members, months) => ({
-      ...members,
+    ...windows.reduce((members, months) => {
+      const current = `r${months}_gross_sales`;
+      const prior = `prev_r${months}_gross_sales`;
+      return {
+        ...members,
 
-      [`r${months}_gross_sales`]: {
-        sql: `amount`,
-        type: `sum`,
-        rolling_window: {
-          trailing: `${months} month`
+        [current]: {
+          sql: `amount`,
+          type: `sum`,
+          rolling_window: {
+            trailing: `${months} month`
+          }
+        },
+
+        [prior]: {
+          multi_stage: true,
+          sql: `${CUBE[current]}`,
+          type: `number`,
+          time_shift: [{
+            interval: `${months} month`,
+            type: `prior`
+          }]
         }
-      },
-
-      [`prev_r${months}_gross_sales`]: {
-        multi_stage: true,
-        sql: `${CUBE[`r${months}_gross_sales`]}`,
-        type: `number`,
-        time_shift: [{
-          interval: `${months} month`,
-          type: `prior`
-        }]
-      }
-    }), {}),
+      };
+    }, {}),
 
     // The members consumers query, dispatching on growth_window.
     gross_sales_current: {
       multi_stage: true,
       case: {
         switch: `${CUBE.growth_window}`,
-        when: windows.map(months => ({
-          value: `${months}m`,
-          sql: `${CUBE[`r${months}_gross_sales`]}`
-        })),
+        when: windows.map(months => {
+          const current = `r${months}_gross_sales`;
+          return { value: `${months}m`, sql: `${CUBE[current]}` };
+        }),
         else: {
           sql: `${CUBE[`r${windows[0]}_gross_sales`]}`
         }
@@ -256,10 +260,10 @@ cube(`gross_sales`, {
       multi_stage: true,
       case: {
         switch: `${CUBE.growth_window}`,
-        when: windows.map(months => ({
-          value: `${months}m`,
-          sql: `${CUBE[`prev_r${months}_gross_sales`]}`
-        })),
+        when: windows.map(months => {
+          const prior = `prev_r${months}_gross_sales`;
+          return { value: `${months}m`, sql: `${CUBE[prior]}` };
+        }),
         else: {
           sql: `${CUBE[`prev_r${windows[0]}_gross_sales`]}`
         }
