@@ -188,6 +188,1479 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: contains + dimensions, first 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: contains + dimensions, second 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: contains + dimensions, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: endsWith filter + dimensions, first 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: endsWith filter + dimensions, second 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: endsWith filter + dimensions, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: notEndsWith filter + dimensions, first 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: notEndsWith filter + dimensions, second 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: notEndsWith filter + dimensions, third 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: notStartsWith + dimensions, first 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: notStartsWith + dimensions, second 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: notStartsWith + dimensions, third 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: startsWith + dimensions, first 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: startsWith + dimensions, second 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Customers: startsWith + dimensions, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: contains dimensions, first 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: contains dimensions, second 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: contains dimensions, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: endsWith + dimensions, first 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Marion",
+    "ECommerce.customerId": "MG-17650",
+    "ECommerce.customerName": "Customer 32",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-145660",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "ECommerce.profit": "1.7352",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "6205",
+    "ECommerce.sales": "7.712",
+    "ECommerce.subCategory": "Furnishings",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "Columbus",
+    "ECommerce.customerId": "JH-15430",
+    "ECommerce.customerName": "Customer 23",
+    "ECommerce.discount": "0.5",
+    "ECommerce.orderDate": "2020-12-25T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-105620",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "ECommerce.profit": "-7.2",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "8958",
+    "ECommerce.sales": "120",
+    "ECommerce.subCategory": "Machines",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: endsWith + dimensions, second 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Detroit",
+    "ECommerce.customerId": "MC-17605",
+    "ECommerce.customerName": "Customer 31",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-01-23T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-145142",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "ECommerce.profit": "21.098",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "523",
+    "ECommerce.sales": "210.98",
+    "ECommerce.subCategory": "Tables",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Vancouver",
+    "ECommerce.customerId": "JW-15220",
+    "ECommerce.customerName": "Customer 26",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-10-30T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-139661",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "ECommerce.profit": "3.6632",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "1494",
+    "ECommerce.sales": "9.64",
+    "ECommerce.subCategory": "Furnishings",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Columbus",
+    "ECommerce.customerId": "KN-16705",
+    "ECommerce.customerName": "Customer 28",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-09-23T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-138422",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "ECommerce.profit": "5.2026",
+    "ECommerce.quantity": "3",
+    "ECommerce.rowId": "2329",
+    "ECommerce.sales": "14.352",
+    "ECommerce.subCategory": "Envelopes",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "Columbus",
+    "ECommerce.customerId": "DG-13300",
+    "ECommerce.customerName": "Customer 16",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-11-28T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-123372",
+    "ECommerce.productName": "Google Nexus 5",
+    "ECommerce.profit": "494.9725",
+    "ECommerce.quantity": "11",
+    "ECommerce.rowId": "2661",
+    "ECommerce.sales": "1979.89",
+    "ECommerce.subCategory": "Phones",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.profit": "10.3904",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "3059",
+    "ECommerce.sales": "30.56",
+    "ECommerce.subCategory": "Furnishings",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.profit": "-3.3506",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "3060",
+    "ECommerce.sales": "24.368",
+    "ECommerce.subCategory": "Tables",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bakersfield",
+    "ECommerce.customerId": "AW-10840",
+    "ECommerce.customerName": "Customer 4",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-09-02T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-123001",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": "2.726",
+    "ECommerce.quantity": "5",
+    "ECommerce.rowId": "3934",
+    "ECommerce.sales": "9.4",
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.customerId": "CC-12475",
+    "ECommerce.customerName": "Customer 12",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-11-21T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-100811",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.profit": "3.9296",
+    "ECommerce.quantity": "4",
+    "ECommerce.rowId": "4012",
+    "ECommerce.sales": "39.296",
+    "ECommerce.subCategory": "Storage",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "Los Angeles",
+    "ECommerce.customerId": "SS-20140",
+    "ECommerce.customerName": "Customer 38",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-06-03T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-145772",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "ECommerce.profit": "8.5025",
+    "ECommerce.quantity": "5",
+    "ECommerce.rowId": "6125",
+    "ECommerce.sales": "44.75",
+    "ECommerce.subCategory": "Accessories",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Baltimore",
+    "ECommerce.customerId": "AJ-10780",
+    "ECommerce.customerName": "Customer 2",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-05-14T00:00:00.000",
+    "ECommerce.orderId": "US-2017-133361",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": "1.0904",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "6459",
+    "ECommerce.sales": "3.76",
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "New York City",
+    "ECommerce.customerId": "MM-18280",
+    "ECommerce.customerName": "Customer 34",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-06-10T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-112172",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.profit": "0.7065",
+    "ECommerce.quantity": "3",
+    "ECommerce.rowId": "7310",
+    "ECommerce.sales": "14.13",
+    "ECommerce.subCategory": "Fasteners",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Lakewood",
+    "ECommerce.customerId": "NP-18670",
+    "ECommerce.customerName": "Customer 35",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-10-12T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-150091",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "ECommerce.profit": "129.294",
+    "ECommerce.quantity": "5",
+    "ECommerce.rowId": "8425",
+    "ECommerce.sales": "2154.9",
+    "ECommerce.subCategory": "Bookcases",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: endsWith + dimensions, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: startsWith + dimensions, first 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: startsWith + dimensions, second 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering ECommerce: startsWith + dimensions, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: contains + dimensions + order, first 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: contains + dimensions + order, second 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: contains + dimensions + order, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: contains with special chars + dimensions 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: endsWith filter + dimensions + order, first 1`] = `
+Array [
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "DMI Eclipse Executive Suite Bookcases",
+    "Products.subCategory": "Bookcases",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "Products.subCategory": "Bookcases",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "Products.subCategory": "Tables",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Balt Solid Wood Rectangular Table",
+    "Products.subCategory": "Tables",
+  },
+  Object {
+    "Products.category": "Office Supplies",
+    "Products.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "Products.subCategory": "Envelopes",
+  },
+  Object {
+    "Products.category": "Office Supplies",
+    "Products.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "Products.subCategory": "Envelopes",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "Products.subCategory": "Machines",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Okidata C610n Printer",
+    "Products.subCategory": "Machines",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Google Nexus 5",
+    "Products.subCategory": "Phones",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Google Nexus 6",
+    "Products.subCategory": "Phones",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Google Nexus 7",
+    "Products.subCategory": "Phones",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "HTC One",
+    "Products.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: endsWith filter + dimensions + order, second 1`] = `
+Array [
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "DMI Eclipse Executive Suite Bookcases",
+    "Products.subCategory": "Bookcases",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "Products.subCategory": "Bookcases",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Linden 10 Round Wall Clock, Black",
+    "Products.subCategory": "Furnishings",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Magna Visual Magnetic Picture Hangers",
+    "Products.subCategory": "Furnishings",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "Products.subCategory": "Tables",
+  },
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Balt Solid Wood Rectangular Table",
+    "Products.subCategory": "Tables",
+  },
+  Object {
+    "Products.category": "Office Supplies",
+    "Products.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "Products.subCategory": "Envelopes",
+  },
+  Object {
+    "Products.category": "Office Supplies",
+    "Products.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "Products.subCategory": "Envelopes",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
+    "Products.subCategory": "Accessories",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "Products.subCategory": "Machines",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Okidata C610n Printer",
+    "Products.subCategory": "Machines",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Google Nexus 5",
+    "Products.subCategory": "Phones",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Google Nexus 6",
+    "Products.subCategory": "Phones",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "Google Nexus 7",
+    "Products.subCategory": "Phones",
+  },
+  Object {
+    "Products.category": "Technology",
+    "Products.productName": "HTC One",
+    "Products.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: endsWith filter + dimensions + order, third 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: startsWith filter + dimensions + order, first 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: startsWith filter + dimensions + order, second 1`] = `
+Array [
+  Object {
+    "Products.category": "Furniture",
+    "Products.productName": "Linden 10 Round Wall Clock, Black",
+    "Products.subCategory": "Furnishings",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver filtering Products: startsWith filter + dimensions + order, third 1`] = `Array []`;
+
 exports[`Queries with the @cubejs-backend/pinot-driver pre-aggregations Customers: running total without time dimension 1`] = `
 Array [
   Object {
@@ -841,6 +2314,1581 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window YTD (month + week + day + no gran) 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-02T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-03T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-04T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-04T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-05T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-05T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-06T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-07T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-08T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-08T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-09T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-10T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-11T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-11T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-12T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-12T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-13T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-14T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-15T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-15T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-16T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-17T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-18T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-18T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-19T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-19T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-20T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-21T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-22T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-22T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-23T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-24T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-25T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-25T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-26T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-26T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-27T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-28T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-29T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-29T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-30T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-31T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-31T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-02T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-03T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-04T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-04T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-05T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-05T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-06T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-07T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-08T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-08T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-09T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-10T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-11T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-11T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-12T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-12T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-13T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-14T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-15T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-15T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-16T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-17T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-18T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-18T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-19T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-19T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-20T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-21T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-22T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-22T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-23T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-24T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-25T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-25T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-26T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-26T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-27T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-28T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-29T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-29T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window YTD (month + week + day) 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-02T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-03T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-04T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-04T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-05T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-05T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-06T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-07T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-08T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-08T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-09T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-10T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-11T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-11T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-12T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-12T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-13T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-14T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-15T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-15T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-16T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-17T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-18T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-18T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-19T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-19T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-20T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-21T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-22T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-22T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-23T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-24T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-25T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-25T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-26T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-26T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-27T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-28T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-29T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-29T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-30T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-31T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-31T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-02T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-03T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-04T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-04T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-05T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-05T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-06T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-07T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-08T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-08T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-09T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-10T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-11T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-11T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-12T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-12T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-13T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-14T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-15T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-15T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-16T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-17T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-18T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-18T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-19T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-19T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-20T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-21T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-22T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-22T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-23T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-24T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-25T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-25T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-26T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-26T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-27T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-28T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-29T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-29T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window YTD (month + week + no gran) 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2019-12-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2019-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-02T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-09T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-16T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-23T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-04T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-04T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-11T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-11T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "8",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-18T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-18T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "8",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-25T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-25T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "10",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "11",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-08T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-08T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "13",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-15T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-15T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "15",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-22T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-22T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-29T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-29T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-31T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-31T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "19",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-07T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "20",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-14T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "22",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-21T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "23",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-28T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "23",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-05T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-05T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "23",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-12T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-12T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "24",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-19T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "26",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-26T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-26T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "27",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-02T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "30",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-09T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "32",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-16T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "35",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-23T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "36",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "39",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-07T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "39",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-14T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "41",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-21T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "43",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-28T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "43",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window YTD (month + week) 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2019-12-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2019-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2019-12-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-01-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-02-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-02T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-09T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-16T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-23T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-03-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-04-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-04T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-04T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-11T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-11T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "8",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-18T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-18T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "8",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-25T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-05-25T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "10",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "11",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-08T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-08T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "13",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-15T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-15T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "15",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-22T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-22T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-29T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-06-29T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-06T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-06T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-13T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-13T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-20T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-20T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-27T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-07-27T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-03T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-03T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-10T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-10T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-17T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-17T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-24T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-24T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "17",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-31T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-08-31T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "19",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-07T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "20",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-14T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "22",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-21T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "23",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-09-28T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "23",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-05T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-05T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "23",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-12T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-12T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "24",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-19T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "26",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-26T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-10-26T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "27",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-02T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-02T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "30",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-09T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-09T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "32",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-16T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "35",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-23T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-23T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "36",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-30T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-11-30T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "39",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-07T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-07T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "39",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-14T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-14T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "41",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-21T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-21T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "43",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-28T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.week": "2020-12-28T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "43",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window YTD (month) 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "11",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "24",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "28",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "37",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "44",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window YTD without granularity 1`] = `
 Array [
   Object {
@@ -849,7 +3897,265 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window by 2 day 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window by 2 month 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "12",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "7",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "10",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "13",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "16",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: rolling window by 2 week 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": "2",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: time series in rolling window 1`] = `
+Array [
+  Object {
+    "BigECommerce.customersCountPrev1Month": null,
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "2",
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "1",
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "2",
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "1",
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "5",
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "7",
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": null,
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": null,
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "6",
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "4",
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "9",
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+  },
+]
+`;
 
 exports[`Queries with the @cubejs-backend/pinot-driver querying BigECommerce: two multi-stage branches sharing one pre-aggregation 1`] = `
 Array [
@@ -961,6 +4267,51 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/pinot-driver querying Customers: dimensions + order + limit + total + offset 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/pinot-driver querying Customers: dimensions + order + limit + total 1`] = `
 Array [
   Object {
@@ -1002,6 +4353,15 @@ Array [
   Object {
     "Customers.customerId": "EM-14140",
     "Customers.customerName": "Customer 18",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying Customers: dimensions + order + total + offset 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
   },
 ]
 `;
@@ -1832,6 +5192,161 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/pinot-driver querying ECommerce: dimensions + order + limit + total + offset 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Glendale",
+    "ECommerce.customerId": "EM-14140",
+    "ECommerce.customerName": "Customer 18",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-11-12T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-134915",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.profit": "9.9652",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "2952",
+    "ECommerce.sales": "113.888",
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.profit": "10.3904",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "3059",
+    "ECommerce.sales": "30.56",
+    "ECommerce.subCategory": "Furnishings",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.profit": "-3.3506",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "3060",
+    "ECommerce.sales": "24.368",
+    "ECommerce.subCategory": "Tables",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "Louisville",
+    "ECommerce.customerId": "DW-13480",
+    "ECommerce.customerName": "Customer 17",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-05-27T00:00:00.000",
+    "ECommerce.orderId": "US-2017-132297",
+    "ECommerce.productName": "Google Nexus 6",
+    "ECommerce.profit": "134.9925",
+    "ECommerce.quantity": "3",
+    "ECommerce.rowId": "3083",
+    "ECommerce.sales": "539.97",
+    "ECommerce.subCategory": "Phones",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Auburn",
+    "ECommerce.customerId": "KN-16705",
+    "ECommerce.customerName": "Customer 28",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-06-11T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-102554",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": "1.0904",
+    "ECommerce.quantity": "2",
+    "ECommerce.rowId": "3448",
+    "ECommerce.sales": "3.76",
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Omaha",
+    "ECommerce.customerId": "JO-15550",
+    "ECommerce.customerName": "Customer 24",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-05-29T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-144568",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.profit": "1.1775",
+    "ECommerce.quantity": "5",
+    "ECommerce.rowId": "3717",
+    "ECommerce.sales": "23.55",
+    "ECommerce.subCategory": "Fasteners",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bakersfield",
+    "ECommerce.customerId": "AW-10840",
+    "ECommerce.customerName": "Customer 4",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-09-02T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-123001",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": "2.726",
+    "ECommerce.quantity": "5",
+    "ECommerce.rowId": "3934",
+    "ECommerce.sales": "9.4",
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.customerId": "CC-12475",
+    "ECommerce.customerName": "Customer 12",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-11-21T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-100811",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.profit": "3.9296",
+    "ECommerce.quantity": "4",
+    "ECommerce.rowId": "4012",
+    "ECommerce.sales": "39.296",
+    "ECommerce.subCategory": "Storage",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Lafayette",
+    "ECommerce.customerId": "CS-12355",
+    "ECommerce.customerName": "Customer 14",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-12-24T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-124296",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "ECommerce.profit": "60.5488",
+    "ECommerce.quantity": "4",
+    "ECommerce.rowId": "4031",
+    "ECommerce.sales": "232.88",
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "New York City",
+    "ECommerce.customerId": "AH-10465",
+    "ECommerce.customerName": "Customer 1",
+    "ECommerce.discount": "0",
+    "ECommerce.orderDate": "2020-05-14T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-115546",
+    "ECommerce.productName": "Google Nexus 7",
+    "ECommerce.profit": "134.9925",
+    "ECommerce.quantity": "3",
+    "ECommerce.rowId": "4161",
+    "ECommerce.sales": "539.97",
+    "ECommerce.subCategory": "Phones",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/pinot-driver querying ECommerce: dimensions + order + limit + total 1`] = `
 Array [
   Object {
@@ -1983,6 +5498,26 @@ Array [
     "ECommerce.rowId": "2661",
     "ECommerce.sales": "1979.89",
     "ECommerce.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/pinot-driver querying ECommerce: dimensions + order + total + offset 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bowling",
+    "ECommerce.customerId": "BS-11380",
+    "ECommerce.customerName": "Customer 9",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-160633",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.profit": "5.397",
+    "ECommerce.quantity": "3",
+    "ECommerce.rowId": "9619",
+    "ECommerce.sales": "86.352",
+    "ECommerce.subCategory": "Art",
   },
 ]
 `;

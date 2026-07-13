@@ -7,7 +7,7 @@ import {
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
-  assertDataSource,
+  assertDataSource, Required,
 } from '@cubejs-backend/shared';
 
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
@@ -82,7 +82,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return 10;
   }
 
-  protected readonly config: PinotDriverConfiguration;
+  protected readonly config: Required<PinotDriverConfiguration, 'queryTimeout'>;
 
   protected readonly url: string;
 
@@ -183,7 +183,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       }),
       body: JSON.stringify({
         sql: query,
-        queryOptions: `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout}`
+        queryOptions: `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout * 1000}`
       })
     });
 

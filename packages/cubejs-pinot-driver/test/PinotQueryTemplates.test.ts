@@ -36,7 +36,7 @@ describe('PinotQuery SQL templates', () => {
       measures: ['orders.count'],
       timeDimensions: [],
       filters: [],
-      limit: 10,
+      rowLimit: 10,
       offset: 5,
       useNativeSqlPlanner: true,
     });
@@ -45,7 +45,8 @@ describe('PinotQuery SQL templates', () => {
 
     expect(sql).toMatch(/FROM\s+orders\b/);
     expect(sql).not.toMatch(/FROM\s*\(\s*\)\s+AS\b/);
-    expect(sql.indexOf('OFFSET 5')).toBeGreaterThan(-1);
-    expect(sql.indexOf('OFFSET 5')).toBeLessThan(sql.indexOf('LIMIT 10'));
+    expect(sql.indexOf('LIMIT 10')).toBeGreaterThan(-1);
+    // Pinot expects LIMIT before OFFSET.
+    expect(sql.indexOf('LIMIT 10')).toBeLessThan(sql.indexOf('OFFSET 5'));
   });
 });
