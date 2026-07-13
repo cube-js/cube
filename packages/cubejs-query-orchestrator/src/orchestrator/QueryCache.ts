@@ -663,7 +663,10 @@ export class QueryCache {
           let logged = false;
           Promise
             .all([clientFactory()])
-            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
+            // This handler is the cubesql SQL-API streaming path, which consumes columnar
+            // batches natively — ask the driver to emit them (drivers that don't support it
+            // fall back to row objects).
+            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), columnar: true }))
             .then((source) => {
               const cleanup = async (error) => {
                 if (source.release) {

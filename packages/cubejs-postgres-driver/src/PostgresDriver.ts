@@ -10,6 +10,7 @@ import { types, FieldDef } from 'pg';
 import { TypeId, TypeFormat } from 'pg-types';
 import {
   BaseDriver,
+  ColumnarResponse,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
@@ -353,7 +354,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   public async stream(
     query: string,
     values: unknown[],
-    { highWaterMark }: StreamOptions
+    { highWaterMark, columnar }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
     PostgresDriver.checkValuesLimit(values);
 
@@ -366,17 +367,38 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         types: {
           getTypeParser: this.getTypeParser,
         },
-        highWaterMark
-      });
+        highWaterMark,
+        // In columnar mode read rows as positional arrays instead of per-row objects, so
+        // `ColumnarResponse` can bucket cells into columns without any object allocation.
+        // @types/pg-query-stream (1.0.3) does not declare `rowMode`, hence the cast.
+        ...(columnar ? { rowMode: 'array' } : {}),
+      } as any);
       const rowStream: QueryStream = await conn.query(queryStream);
       const fields = await rowStream.fields();
+      const mappedTypes = this.mapFields(fields);
+      const release = async () => {
+        await this.pool.release(conn);
+      };
+
+      if (columnar) {
+        const members = fields.map((f) => f.name);
+        const columnarStream = new ColumnarResponse({ members, batchSize: highWaterMark });
+        // `pipe()` does not forward errors — propagate manually so the consumer sees the
+        // failure and `release()` still runs during cleanup.
+        rowStream.once('error', (e) => columnarStream.destroy(e));
+        rowStream.pipe(columnarStream);
+
+        return {
+          rowStream: columnarStream,
+          types: mappedTypes,
+          release,
+        };
+      }
 
       return {
         rowStream,
-        types: this.mapFields(fields),
-        release: async () => {
-          await this.pool.release(conn);
-        }
+        types: mappedTypes,
+        release,
       };
     } catch (e) {
       await this.pool.release(conn);

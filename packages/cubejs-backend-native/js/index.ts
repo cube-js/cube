@@ -290,6 +290,14 @@ function wrapNativeFunctionWithStream(
           objectMode: true,
           highWaterMark: chunkLength,
           write(row: any, encoding: BufferEncoding, callback: (error?: (Error | null)) => void) {
+            // Columnar batch produced by a driver (base-driver `ColumnarResponse`,
+            // marker `COLUMNAR_RESPONSE_TYPE`): already `{ members, columns }`, so send it
+            // straight through without row accumulation or the row→columnar transpose.
+            if (row && row.$type === 'ColumnarResponse') {
+              const toSend = Buffer.from(JSON.stringify({ members: row.members, columns: row.columns }));
+              writerOrChannel.chunk(toSend, callback);
+              return;
+            }
             chunkBuffer.push(row);
             if (chunkBuffer.length < chunkLength) {
               callback(null);
