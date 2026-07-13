@@ -45,7 +45,7 @@ use datafusion::{
 };
 use futures::Stream;
 use log::warn;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 use std::{
@@ -310,16 +310,6 @@ pub enum FieldValue<'a> {
     Null,
 }
 
-pub trait ValueObject {
-    fn len(&mut self) -> std::result::Result<usize, CubeError>;
-
-    fn get(
-        &mut self,
-        index: usize,
-        field_name: &str,
-    ) -> std::result::Result<FieldValue<'_>, CubeError>;
-}
-
 pub trait ColumnarValueObject {
     fn len(&mut self) -> std::result::Result<usize, CubeError>;
 
@@ -330,16 +320,6 @@ pub trait ColumnarValueObject {
         Box<dyn Iterator<Item = std::result::Result<FieldValue<'a>, CubeError>> + 'a>,
         CubeError,
     >;
-}
-
-pub struct JsonValueObject {
-    rows: Vec<Value>,
-}
-
-impl JsonValueObject {
-    pub fn new(rows: Vec<Value>) -> Self {
-        JsonValueObject { rows }
-    }
 }
 
 fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_>, CubeError> {
@@ -358,28 +338,7 @@ fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_
     })
 }
 
-impl ValueObject for JsonValueObject {
-    fn len(&mut self) -> std::result::Result<usize, CubeError> {
-        Ok(self.rows.len())
-    }
-
-    fn get(
-        &mut self,
-        index: usize,
-        field_name: &str,
-    ) -> std::result::Result<FieldValue<'_>, CubeError> {
-        let Some(as_object) = self.rows[index].as_object() else {
-            return Err(CubeError::internal(format!(
-                "Unexpected response from Cube, row is not an object: {:?}",
-                self.rows[index]
-            )));
-        };
-
-        let value = as_object.get(field_name).unwrap_or(&Value::Null);
-        json_value_to_field_value(value)
-    }
-}
-
+#[derive(Deserialize)]
 pub struct JsonColumnarValueObject {
     members: Vec<String>,
     columns: Vec<Vec<Value>>,
@@ -409,8 +368,7 @@ impl ColumnarValueObject for JsonColumnarValueObject {
         CubeError,
     > {
         let Some(idx) = self.members.iter().position(|m| m == field_name) else {
-            // Match the row-mode `JsonValueObject::get` semantics: a missing field
-            // is treated as a column of NULLs.
+            // A missing field is treated as a column of NULLs.
             let len = self.columns.first().map(|c| c.len()).unwrap_or(0);
             return Ok(Box::new((0..len).map(|_| Ok(FieldValue::Null))));
         };
@@ -426,39 +384,46 @@ impl ColumnarValueObject for JsonColumnarValueObject {
     }
 }
 
-// `$mode` is one of `row` or `columnar`. The `row` arm calls `$response.get(i, field_name)?`
-// per cell; the `columnar` arm fetches the entire column slice once via
-// `$response.column(field_name)?` and iterates it.
-macro_rules! build_column_iter_loop {
-    (row, $response:expr, $len:expr, $field_name:expr, $value:ident, $body:block) => {{
-        for i in 0..$len {
-            let $value = $response.get(i, $field_name)?;
-            $body
-        }
-    }};
-    (columnar, $response:expr, $len:expr, $field_name:expr, $value:ident, $body:block) => {{
-        for cell in $response.column($field_name)? {
-            let $value = cell?;
-            $body
-        }
-    }};
+/// A columnar value object with no data columns, representing `row_count` rows of a
+/// literal-only projection (the `no_members_query` shortcut). Every schema field is a
+/// `MemberField::Literal`, so `column()` is never actually invoked — only `len()` matters.
+struct LiteralRowsValueObject {
+    row_count: usize,
+}
+
+impl ColumnarValueObject for LiteralRowsValueObject {
+    fn len(&mut self) -> std::result::Result<usize, CubeError> {
+        Ok(self.row_count)
+    }
+
+    fn column<'a>(
+        &'a mut self,
+        _field_name: &str,
+    ) -> std::result::Result<
+        Box<dyn Iterator<Item = std::result::Result<FieldValue<'a>, CubeError>> + 'a>,
+        CubeError,
+    > {
+        let row_count = self.row_count;
+        Ok(Box::new((0..row_count).map(|_| Ok(FieldValue::Null))))
+    }
 }
 
 macro_rules! build_column {
-    ($data_type:expr, $builder_ty:ty, $mode:tt, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
+    ($data_type:expr, $builder_ty:ty, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         let len = $response.len()?;
         let mut builder = <$builder_ty>::new(len);
 
-        build_column_custom_builder!($data_type, $mode, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
+        build_column_custom_builder!($data_type, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
     }}
 }
 
 macro_rules! build_column_custom_builder {
-    ($data_type:expr, $mode:tt, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
+    ($data_type:expr, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         match $field_name {
             MemberField::Member(member) => {
                 let field_name = &member.field_name;
-                build_column_iter_loop!($mode, $response, $len, &field_name, value, {
+                for cell in $response.column(&field_name)? {
+                    let value = cell?;
                     match (value, &mut $builder) {
                         (FieldValue::Null, builder) => builder.append_null()?,
                         $($builder_block)*
@@ -471,7 +436,7 @@ macro_rules! build_column_custom_builder {
                             )));
                         }
                     };
-                });
+                }
             }
             MemberField::Literal(value) => {
                 for _ in 0..$len {
@@ -793,13 +758,10 @@ async fn load_data(
 
     let result = if no_members_query {
         let limit = request.limit.unwrap_or(1);
-        let mut data = Vec::new();
 
-        for _ in 0..limit {
-            data.push(serde_json::Value::Null)
-        }
-
-        let mut response = JsonValueObject::new(data);
+        let mut response = LiteralRowsValueObject {
+            row_count: limit as usize,
+        };
         let rec = transform_response(&mut response, schema.clone(), &member_fields)
             .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
 
@@ -896,12 +858,10 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     Ok(())
 }
 
-// Body of `transform_response` / `transform_columnar_response`. The two functions differ
-// only in how they iterate per-cell values: row-major (`$mode = row`) goes through
-// `ValueObject::get` per cell, columnar (`$mode = columnar`) fetches the whole column once
-// via `ColumnarValueObject::column`. Per-`DataType` coercion arms are shared.
+// Body of `transform_response`: builds one Arrow column per schema field from a
+// `ColumnarValueObject`, fetching each column once via `ColumnarValueObject::column`.
 macro_rules! transform_response_body {
-    ($mode:tt, $response:expr, $schema:expr, $member_fields:expr) => {{
+    ($response:expr, $schema:expr, $member_fields:expr) => {{
         let mut columns = vec![];
 
         for (i, schema_field) in $schema.fields().iter().enumerate() {
@@ -911,7 +871,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Utf8,
                         StringBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -928,7 +887,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Int16,
                         Int16Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -954,7 +912,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Int32,
                         Int32Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -980,7 +937,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Int64,
                         Int64Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1006,7 +962,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Float32,
                         Float32Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1032,7 +987,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Float64,
                         Float64Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1058,7 +1012,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Boolean,
                         BooleanBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1082,7 +1035,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Timestamp(TimeUnit::Nanosecond, None),
                         TimestampNanosecondBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1109,7 +1061,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Timestamp(TimeUnit::Millisecond, None),
                         TimestampMillisecondBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1127,7 +1078,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Date32,
                         Date32Builder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1160,7 +1110,6 @@ macro_rules! transform_response_body {
 
                     build_column_custom_builder!(
                         DataType::Decimal(*precision, *scale),
-                        $mode,
                         len,
                         builder,
                         $response,
@@ -1207,7 +1156,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Interval(IntervalUnit::YearMonth),
                         IntervalYearMonthBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1222,7 +1170,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Interval(IntervalUnit::DayTime),
                         IntervalDayTimeBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1237,7 +1184,6 @@ macro_rules! transform_response_body {
                     build_column!(
                         DataType::Interval(IntervalUnit::MonthDayNano),
                         IntervalMonthDayNanoBuilder,
-                        $mode,
                         $response,
                         field_name,
                         {
@@ -1268,20 +1214,12 @@ macro_rules! transform_response_body {
     }};
 }
 
-pub fn transform_response<V: ValueObject>(
-    response: &mut V,
-    schema: SchemaRef,
-    member_fields: &Vec<MemberField>,
-) -> std::result::Result<RecordBatch, CubeError> {
-    transform_response_body!(row, response, schema, member_fields)
-}
-
-pub fn transform_columnar_response<C: ColumnarValueObject>(
+pub fn transform_response<C: ColumnarValueObject>(
     response: &mut C,
     schema: SchemaRef,
     member_fields: &Vec<MemberField>,
 ) -> std::result::Result<RecordBatch, CubeError> {
-    transform_response_body!(columnar, response, schema, member_fields)
+    transform_response_body!(response, schema, member_fields)
 }
 
 /// Builds a schema with `lastRefreshTime` / `external` metadata.
@@ -1316,31 +1254,6 @@ pub fn build_response_schema(
 }
 
 pub fn convert_transport_response(
-    response: V1LoadResponse,
-    schema: SchemaRef,
-    member_fields: Vec<MemberField>,
-) -> std::result::Result<Vec<RecordBatch>, CubeError> {
-    response
-        .results
-        .into_iter()
-        .map(|result| {
-            let V1LoadResult {
-                data,
-                last_refresh_time,
-                external,
-                ..
-            } = result;
-
-            let mut response = JsonValueObject::new(data);
-            let updated_schema =
-                build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
-
-            transform_response(&mut response, updated_schema, &member_fields)
-        })
-        .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
-}
-
-pub fn convert_transport_response_columnar(
     response: V1LoadResponse<V1LoadResultDataColumnar>,
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
@@ -1361,7 +1274,7 @@ pub fn convert_transport_response_columnar(
             let updated_schema =
                 build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
 
-            transform_columnar_response(&mut response, updated_schema, &member_fields)
+            transform_response(&mut response, updated_schema, &member_fields)
         })
         .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
 }
@@ -1375,7 +1288,7 @@ mod tests {
         transport::{MetaContext, SqlResponse},
         CubeError,
     };
-    use cubeclient::models::V1LoadResponse;
+    use cubeclient::models::{V1LoadResponse, V1LoadResultDataColumnar};
     use datafusion::{
         arrow::{
             array::{
@@ -1446,11 +1359,10 @@ mod tests {
 
     #[test]
     fn convert_transport_response_threads_external_flag_into_schema_metadata() {
-        // End-to-end coverage of the row-format `convert_transport_response`
-        // path: a V1LoadResponse with `external: true` and a
-        // `lastRefreshTime` should produce a RecordBatch whose schema
-        // metadata has the `external` marker set and `lastRefreshTime`
-        // passed through unchanged.
+        // End-to-end coverage of `convert_transport_response`: a columnar
+        // V1LoadResponse with `external: true` and a `lastRefreshTime` should
+        // produce a RecordBatch whose schema metadata has the `external` marker
+        // set and `lastRefreshTime` passed through unchanged.
         let raw = r#"
             {
                 "results": [{
@@ -1460,13 +1372,13 @@ mod tests {
                         "segments": [],
                         "timeDimensions": []
                     },
-                    "data": [{"c": 1}],
+                    "data": {"members": ["c"], "columns": [[1]]},
                     "lastRefreshTime": "2000-01-01T00:00:00.000Z",
                     "external": true
                 }]
             }
         "#;
-        let response: V1LoadResponse = serde_json::from_str(raw).unwrap();
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
         let schema = build_schema();
         let member_fields = vec![MemberField::regular("c".to_string())];
         let batches = convert_transport_response(response, schema, member_fields).unwrap();
@@ -1490,14 +1402,17 @@ mod tests {
                         "segments": [],
                         "timeDimensions": []
                     },
-                    "data": [
-                        {"c": ["a", "b"], "d": {"k": 1}},
-                        {"c": null, "d": "plain"}
-                    ]
+                    "data": {
+                        "members": ["c", "d"],
+                        "columns": [
+                            [["a", "b"], null],
+                            [{"k": 1}, "plain"]
+                        ]
+                    }
                 }]
             }
         "#;
-        let response: V1LoadResponse = serde_json::from_str(raw).unwrap();
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
         let schema = Arc::new(Schema::new(vec![
             Field::new("c", DataType::Utf8, true),
             Field::new("d", DataType::Utf8, true),
@@ -1578,18 +1493,30 @@ mod tests {
                             "segments": [],
                             "timeDimensions": []
                         },
-                        "data": [
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
-                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderTimestamp": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2022-01-01", "KibanaSampleDataEcommerce.city": "City 2"},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderTimestamp": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "2023-01-01", "KibanaSampleDataEcommerce.city": "City 3"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderTimestamp": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.orderDate": "9999-12-31", "KibanaSampleDataEcommerce.city": "City 4"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderTimestamp": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
-                        ]
+                        "data": {
+                            "members": [
+                                "KibanaSampleDataEcommerce.count",
+                                "KibanaSampleDataEcommerce.maxPrice",
+                                "KibanaSampleDataEcommerce.isBool",
+                                "KibanaSampleDataEcommerce.orderTimestamp",
+                                "KibanaSampleDataEcommerce.orderDate",
+                                "KibanaSampleDataEcommerce.city"
+                            ],
+                            "columns": [
+                                [null, 5, "5", null, null],
+                                [null, 5.05, "5.05", null, null],
+                                [null, true, false, "true", "false"],
+                                [null, "2022-01-01 00:00:00.000", "2023-01-01 00:00:00.000", "9999-12-31 00:00:00.000", null],
+                                [null, "2022-01-01", "2023-01-01", "9999-12-31", null],
+                                ["City 1", "City 2", "City 3", "City 4", null]
+                            ]
+                        }
                     }]
                 }
                 "#;
 
-                let result: V1LoadResponse = serde_json::from_str(response).unwrap();
+                let result: V1LoadResponse<V1LoadResultDataColumnar> =
+                    serde_json::from_str(response).unwrap();
                 convert_transport_response(result, schema.clone(), member_fields)
             }
 

@@ -14,7 +14,7 @@ use crate::{
     transport::{
         CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
         CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
-        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponse, TransportService,
+        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponseColumnar, TransportService,
     },
     CubeError, CubeErrorCauseType,
 };
@@ -917,7 +917,7 @@ pub struct TestTransportLoadCall {
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
-    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponse)>>,
+    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponseColumnar)>>,
     load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
 }
 
@@ -937,7 +937,7 @@ impl TestConnectionTransport {
     pub async fn add_cube_load_mock(
         &self,
         req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         self.load_mocks.lock().await.push((req, res));
     }
@@ -1147,7 +1147,7 @@ impl TestContext {
     pub async fn add_cube_load_mock(
         &self,
         mut req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         // Fill in default limit to simplify passing queries as they were in logical plan
         let config_limit = self.config_obj.non_streaming_query_max_row_limit();

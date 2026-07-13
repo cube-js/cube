@@ -282,7 +282,7 @@ impl TransportService for HttpTransport {
     async fn load(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        query: TransportLoadRequestQuery,
+        mut query: TransportLoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
@@ -309,6 +309,9 @@ impl TransportService for HttpTransport {
                 CacheMode::NoCache => Some(TransportLoadRequestCacheMode::NoCache),
             },
         };
+
+        query.response_format =
+            Some(cubeclient::models::v1_load_request_query::ResponseFormat::Columnar);
 
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {

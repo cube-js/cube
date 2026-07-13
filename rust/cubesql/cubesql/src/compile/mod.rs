@@ -46,7 +46,7 @@ mod tests {
     use chrono::{Datelike, Duration, Utc};
     use cubeclient::models::{
         V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
-        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
+        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation, V1LoadResultDataColumnar,
     };
     use datafusion::{arrow::datatypes::DataType, physical_plan::displayable};
     use itertools::Itertools;
@@ -13921,8 +13921,30 @@ ORDER BY "source"."str0" ASC
         V1LoadResultAnnotation::new(json!([]), json!([]), json!([]), json!([]))
     }
 
-    pub(crate) fn simple_load_response(data: Vec<serde_json::Value>) -> V1LoadResponse {
-        V1LoadResponse::new(vec![V1LoadResult::new(empty_annotation(), data)])
+    // Transpose row-shaped `json!({...})` fixtures into the columnar
+    // `{ members, columns }` wire format the transport now consumes. Keeping the
+    // call sites row-shaped keeps the mocks readable.
+    pub(crate) fn simple_load_response(
+        data: Vec<serde_json::Value>,
+    ) -> V1LoadResponse<V1LoadResultDataColumnar> {
+        let members: Vec<String> = data
+            .first()
+            .and_then(|row| row.as_object())
+            .map(|row| row.keys().cloned().collect())
+            .unwrap_or_default();
+        let columns = members
+            .iter()
+            .map(|member| {
+                data.iter()
+                    .map(|row| row.get(member).cloned().unwrap_or(serde_json::Value::Null))
+                    .collect()
+            })
+            .collect();
+
+        V1LoadResponse::new(vec![V1LoadResult::new(
+            empty_annotation(),
+            V1LoadResultDataColumnar::new(members, columns),
+        )])
     }
 
     #[tokio::test]

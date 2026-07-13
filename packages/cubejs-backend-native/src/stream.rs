@@ -1,7 +1,6 @@
 use cubesql::compile::engine::df::scan::{
-    transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
+    transform_response, JsonColumnarValueObject, MemberField, RecordBatch, SchemaRef,
 };
-use std::borrow::Cow;
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -15,12 +14,11 @@ use crate::channel::call_js_fn;
 use cubesql::CubeError;
 
 use neon::prelude::*;
+use neon::types::buffer::TypedArray;
 use tokio::sync::{oneshot, Semaphore};
 
 #[cfg(feature = "neon-debug")]
 use log::trace;
-
-use neon::types::JsDate;
 
 use crate::utils::bind_method;
 
@@ -256,83 +254,6 @@ fn wait_for_future_and_execute_callback(
     });
 }
 
-pub struct JsValueObject<'a> {
-    pub cx: FunctionContext<'a>,
-    pub handle: Handle<'a, JsArray>,
-}
-
-fn js_value_to_json_string<'a, C: Context<'a>>(
-    cx: &mut C,
-    value: Handle<'a, JsValue>,
-) -> Result<String, CubeError> {
-    let global = cx.global_object();
-    let json = global
-        .get::<JsObject, _, _>(cx, "JSON")
-        .map_err(|e| CubeError::internal(format!("Can't get JSON global: {}", e)))?;
-    let stringify = json
-        .get::<JsFunction, _, _>(cx, "stringify")
-        .map_err(|e| CubeError::internal(format!("Can't get JSON.stringify: {}", e)))?;
-    let undefined = cx.undefined().upcast::<JsValue>();
-    let result = stringify
-        .call(cx, undefined, [value])
-        .map_err(|e| CubeError::internal(format!("JSON.stringify failed: {}", e)))?;
-    let s = result.downcast::<JsString, _>(cx).map_err(|e| {
-        CubeError::internal(format!("JSON.stringify did not return a string: {}", e))
-    })?;
-    Ok(s.value(cx))
-}
-
-impl ValueObject for JsValueObject<'_> {
-    fn len(&mut self) -> Result<usize, CubeError> {
-        Ok(self.handle.len(&mut self.cx) as usize)
-    }
-
-    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue<'_>, CubeError> {
-        let value = self
-            .handle
-            .get::<JsObject, _, _>(&mut self.cx, index as u32)
-            .map_err(|e| {
-                CubeError::internal(format!("Can't get object at array index {}: {}", index, e))
-            })?
-            .get::<JsValue, _, _>(&mut self.cx, field_name)
-            .map_err(|e| {
-                CubeError::internal(format!("Can't get '{}' field value: {}", field_name, e))
-            })?;
-        if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
-            Ok(FieldValue::String(Cow::Owned(s.value(&mut self.cx))))
-        } else if let Ok(n) = value.downcast::<JsNumber, _>(&mut self.cx) {
-            Ok(FieldValue::Number(n.value(&mut self.cx)))
-        } else if let Ok(b) = value.downcast::<JsBoolean, _>(&mut self.cx) {
-            Ok(FieldValue::Bool(b.value(&mut self.cx)))
-        } else if value.downcast::<JsUndefined, _>(&mut self.cx).is_ok()
-            || value.downcast::<JsNull, _>(&mut self.cx).is_ok()
-        {
-            Ok(FieldValue::Null)
-        } else if value.is_a::<JsArray, _>(&mut self.cx) {
-            Ok(FieldValue::String(Cow::Owned(js_value_to_json_string(
-                &mut self.cx,
-                value,
-            )?)))
-        } else if let Ok(b) = value.downcast::<JsDate, _>(&mut self.cx) {
-            // TODO: Support it?
-            Err(CubeError::internal(format!(
-                "Expected primitive value but found JsDate({:?})",
-                b
-            )))
-        } else if value.is_a::<JsObject, _>(&mut self.cx) {
-            Ok(FieldValue::String(Cow::Owned(js_value_to_json_string(
-                &mut self.cx,
-                value,
-            )?)))
-        } else {
-            Err(CubeError::internal(format!(
-                "Expected primitive value but found: {:?}",
-                value
-            )))
-        }
-    }
-}
-
 fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.push_chunk");
@@ -340,26 +261,24 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let this = cx
         .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
-    let chunk_array = cx.argument::<JsArray>(0)?;
     let callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
-    let mut value_object = JsValueObject {
-        cx,
-        handle: chunk_array,
-    };
+
+    let chunk_buffer = cx.argument::<JsBuffer>(0)?;
+    let mut value_object =
+        match serde_json::from_slice::<JsonColumnarValueObject>(chunk_buffer.as_slice(&cx)) {
+            Ok(v) => v,
+            Err(e) => return cx.throw_error(format!("Can't parse columnar chunk JSON: {}", e)),
+        };
     let value =
         match transform_response(&mut value_object, this.schema.clone(), &this.member_fields) {
             Ok(value) => value,
-            Err(e) => return value_object.cx.throw_error(e.message),
+            Err(e) => return cx.throw_error(e.message),
         };
-    let future = this.push_chunk(value);
-    wait_for_future_and_execute_callback(
-        this.tokio_handle.clone(),
-        value_object.cx.channel(),
-        callback,
-        future,
-    );
 
-    Ok(value_object.cx.undefined())
+    let future = this.push_chunk(value);
+    wait_for_future_and_execute_callback(this.tokio_handle.clone(), cx.channel(), callback, future);
+
+    Ok(cx.undefined())
 }
 
 fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
