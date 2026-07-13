@@ -6431,24 +6431,18 @@ ORDER BY
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-01-01T00:00:00",
-                        "MultiTypeCube.count": "3",
-                    }),
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-02-01T00:00:00",
-                        "MultiTypeCube.count": "2",
-                    }),
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-03-01T00:00:00",
-                        "MultiTypeCube.count": "1",
-                    }),
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-04-01T00:00:00",
-                        "MultiTypeCube.count": "10",
-                    }),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_date0.month", "MultiTypeCube.count"],
+                    vec![
+                        vec![
+                            json!("2024-01-01T00:00:00"),
+                            json!("2024-02-01T00:00:00"),
+                            json!("2024-03-01T00:00:00"),
+                            json!("2024-04-01T00:00:00"),
+                        ],
+                        vec![json!("3"), json!("2"), json!("1"), json!("10")],
+                    ],
+                ),
             )
             .await;
 
@@ -13586,9 +13580,10 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({"MultiTypeCube.dim_date0": "2024-12-31T01:02:03.500"}),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_date0"],
+                    vec![vec![json!("2024-12-31T01:02:03.500")]],
+                ),
             )
             .await;
 
@@ -13668,9 +13663,10 @@ ORDER BY "source"."str0" ASC
             context
                 .add_cube_load_mock(
                     expected_cube_scan.clone(),
-                    simple_load_response(vec![
-                        json!({format!("MultiTypeCube.dim_date0.{expected_granularity}"): base_date}),
-                    ]),
+                    simple_load_response(
+                        vec![format!("MultiTypeCube.dim_date0.{expected_granularity}")],
+                        vec![vec![json!(base_date)]],
+                    ),
                 )
                 .await;
 
@@ -13714,9 +13710,10 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({"MultiTypeCube.dim_date0": "2024-12-31T01:02:03.500"}),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_date0"],
+                    vec![vec![json!("2024-12-31T01:02:03.500")]],
+                ),
             )
             .await;
 
@@ -13795,9 +13792,10 @@ ORDER BY "source"."str0" ASC
             context
                 .add_cube_load_mock(
                     expected_cube_scan.clone(),
-                    simple_load_response(vec![
-                        json!({format!("MultiTypeCube.dim_date0.{expected_granularity}"): base_date}),
-                    ]),
+                    simple_load_response(
+                        vec![format!("MultiTypeCube.dim_date0.{expected_granularity}")],
+                        vec![vec![json!(base_date)]],
+                    ),
                 )
                 .await;
 
@@ -13841,13 +13839,16 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({"MultiTypeCube.dim_str0": "foo"}),
-                    json!({"MultiTypeCube.dim_str0": null}),
-                    json!({"MultiTypeCube.dim_str0": "(none)"}),
-                    json!({"MultiTypeCube.dim_str0": "abcd"}),
-                    json!({"MultiTypeCube.dim_str0": "ab__cd"}),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_str0"],
+                    vec![vec![
+                        json!("foo"),
+                        json!(null),
+                        json!("(none)"),
+                        json!("abcd"),
+                        json!("ab__cd"),
+                    ]],
+                ),
             )
             .await;
 
@@ -13921,25 +13922,14 @@ ORDER BY "source"."str0" ASC
         V1LoadResultAnnotation::new(json!([]), json!([]), json!([]), json!([]))
     }
 
-    // Transpose row-shaped `json!({...})` fixtures into the columnar
-    // `{ members, columns }` wire format the transport now consumes. Keeping the
-    // call sites row-shaped keeps the mocks readable.
-    pub(crate) fn simple_load_response(
-        data: Vec<serde_json::Value>,
+    // Build a columnar `{ members, columns }` load response from the mock's members
+    // and one primitive array per member, matching the wire format the transport
+    // consumes.
+    pub(crate) fn simple_load_response<M: Into<String>>(
+        members: Vec<M>,
+        columns: Vec<Vec<serde_json::Value>>,
     ) -> V1LoadResponse<V1LoadResultDataColumnar> {
-        let members: Vec<String> = data
-            .first()
-            .and_then(|row| row.as_object())
-            .map(|row| row.keys().cloned().collect())
-            .unwrap_or_default();
-        let columns = members
-            .iter()
-            .map(|member| {
-                data.iter()
-                    .map(|row| row.get(member).cloned().unwrap_or(serde_json::Value::Null))
-                    .collect()
-            })
-            .collect();
+        let members = members.into_iter().map(Into::into).collect();
 
         V1LoadResponse::new(vec![V1LoadResult::new(
             empty_annotation(),
@@ -13982,7 +13972,7 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan,
-                simple_load_response(vec![json!({"MultiTypeCube.dim_str0": "foo"})]),
+                simple_load_response(vec!["MultiTypeCube.dim_str0"], vec![vec![json!("foo")]]),
             )
             .await;
 
