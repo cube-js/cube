@@ -11,6 +11,7 @@ import { getComposePath } from './getComposePath';
 import { getCubeJsPath } from './getCubeJsPath';
 import { getPackageJsonPath } from './getPackageJsonPath';
 import { getSchemaPath } from './getSchemaPath';
+import { seedPinot } from './seedPinot';
 import { Environment } from '../types/Environment';
 
 interface CubeEnvironment {
@@ -167,6 +168,11 @@ export async function runEnvironment(
   if (type === 'oracle') {
     compose.withWaitStrategy('data', Wait.forHealthCheck().withStartupTimeout(240 * 1000));
   }
+  // Pinot is a 4-container cluster (zookeeper/controller/broker/server). Wait on the
+  // server HEALTHCHECK (last in the dependency chain) before seeding/connecting.
+  if (type === 'pinot') {
+    compose.withWaitStrategy('pinot-server', Wait.forHealthCheck().withStartupTimeout(180 * 1000));
+  }
 
   const environment = await compose.up();
 
@@ -175,10 +181,24 @@ export async function runEnvironment(
     logs: await environment.getContainer('store').logs(),
   };
 
+  // Pinot has no SQL DDL: register tables + ingest CSV via the controller before
+  // anything queries, and expose the broker as the driver connection endpoint.
+  let data: Environment['data'];
+  if (type === 'pinot') {
+    await seedPinot(environment);
+    data = {
+      port: environment.getContainer('pinot-broker').getMappedPort(8099),
+      logs: await environment.getContainer('pinot-broker').logs(),
+    };
+  }
+
   const cliEnv = isLocal ? new CubeCliEnvironment(composePath) : null;
-  const mappedDataPort = fixture.data ? environment.getContainer('data').getMappedPort(
-    parseInt(fixture.data.ports[0], 10),
-  ) : null;
+  let mappedDataPort: number | null = null;
+  if (fixture.data) {
+    mappedDataPort = environment.getContainer('data').getMappedPort(parseInt(fixture.data.ports[0], 10));
+  } else if (data) {
+    mappedDataPort = data.port;
+  }
   if (cliEnv) {
     cliEnv.withEnvironment({
       CUBEJS_CUBESTORE_HOST: '127.0.0.1',
@@ -213,25 +233,16 @@ export async function runEnvironment(
   };
 
   if (fixture.data) {
-    const data = {
+    data = {
       port: mappedDataPort!,
       logs: await environment.getContainer('data').logs(),
     };
-    return {
-      cube,
-      store,
-      data,
-      stop: async () => {
-        await environment.down({ timeout: 30 * 1000 });
-        if (cliEnv) {
-          await cliEnv.down();
-        }
-      },
-    };
   }
+
   return {
     cube,
     store,
+    ...(data ? { data } : {}),
     stop: async () => {
       await environment.down({ timeout: 30 * 1000 });
       if (cliEnv) {

@@ -113,7 +113,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = randomBytes(8).toString('hex');
+    // Pinot uses a fixed suffix so the model lines up with the committed
+    // `<table>_pinot` resources; every other driver isolates runs with random hex.
+    const suffix = type === 'pinot' ? 'pinot' : randomBytes(8).toString('hex');
     const tables = Object
       .keys(fixtures.tables)
       .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
@@ -127,36 +129,44 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       process.env.CUBEJS_CUBESTORE_PASS = 'root';
       process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER = 'cubestore'; // memory
       if (env.data) {
-        process.env.CUBEJS_DB_HOST = '127.0.0.1';
+        process.env.CUBEJS_DB_HOST = type === 'pinot' ? 'http://127.0.0.1' : '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
       }
       client = cubejs(apiToken, {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
       driver = (await getDriver(type)).source;
-      queries = getCreateQueries(type, suffix);
-      console.log(`Creating ${queries.length} fixture tables`);
-      try {
-        for (const q of queries) {
-          await driver.createTableRaw(q);
-          if (type.includes('redshift')) {
-            await delay(10 * OP_DELAY);
+
+      // Pinot has no SQL DDL — runEnvironment already ingested the fixture tables
+      // via the controller. Every other driver seeds via CREATE TABLE here.
+      if (type !== 'pinot') {
+        queries = getCreateQueries(type, suffix);
+        console.log(`Creating ${queries.length} fixture tables`);
+        try {
+          for (const q of queries) {
+            await driver.createTableRaw(q);
+            if (type.includes('redshift')) {
+              await delay(10 * OP_DELAY);
+            }
           }
+          console.log(`Creating ${queries.length} fixture tables completed`);
+        } catch (e: any) {
+          console.log('Error creating fixtures', e.stack);
+          throw e;
         }
-        console.log(`Creating ${queries.length} fixture tables completed`);
-      } catch (e: any) {
-        console.log('Error creating fixtures', e.stack);
-        throw e;
       }
     });
 
     afterAll(async () => {
       try {
-        console.log(`Dropping ${tables.length} fixture tables`);
-        for (const t of tables) {
-          await driver.dropTable(t);
+        // Pinot has no dropTable; the cluster is torn down with the environment.
+        if (type !== 'pinot') {
+          console.log(`Dropping ${tables.length} fixture tables`);
+          for (const t of tables) {
+            await driver.dropTable(t);
+          }
+          console.log(`Dropping ${tables.length} fixture tables completed`);
         }
-        console.log(`Dropping ${tables.length} fixture tables completed`);
       } finally {
         await driver.release();
         await env.stop();
