@@ -283,19 +283,9 @@
     "SQL API: Complex Rollup",
     "SQL API: Rollup with aliases",
     "SQL API: Rollup over exprs",
-    "SQL API: Nested Rollup",
-    "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Extended nested Rollup over asterisk",
     "SQL API: SQL push down push to cube quoted alias",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
-    "SQL API: Window function over measure (running total)",
-
-    "---------------------------------------",
-    "SQL API push-down over a pre-aggregation not supported on Pinot yet.",
-    "---------------------------------------",
-    "SQL API: ungrouped pre-agg",
 
     "---------------------------------------",
     "Additional advanced-query dialect gaps surfaced under Tesseract on Pinot.",
@@ -304,9 +294,6 @@
     "querying BigECommerce: null sum",
     "querying BigECommerce: multi-stage group by time dimension",
     "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
-    "SQL API: post-aggregate percentage of total",
-    "SQL API: reuse params",
-    "SQL API: metabase count cast to float32 from push down",
     "Tesseract: SQL API: Timeshift measure from cube"
   ]
 }

@@ -235,7 +235,7 @@ export class PinotQuery extends BaseQuery {
       '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}' +
       '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
-    templates.expressions.timestamp_literal = `fromDateTime('{{ value }}', ${DATE_TIME_FORMAT})`;
+    templates.expressions.timestamp_literal = 'fromDateTime(\'{{ value }}\', \'yyyy-MM-dd\'\'T\'\'HH:mm:ss.SSS\'\'Z\'\'\')';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
