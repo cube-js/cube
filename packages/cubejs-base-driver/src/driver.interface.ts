@@ -131,6 +131,12 @@ export interface DriverCapabilities extends ExternalDriverCompatibilities {
 
 export type StreamOptions = {
   highWaterMark: number;
+  /**
+   * When set, the driver is asked to emit columnar batches (see `ColumnarResponse`)
+   * instead of row objects. It is a hint: drivers that don't support it keep emitting
+   * rows. Currently set to `true` only for the cubesql SQL-API streaming path.
+   */
+  columnar?: boolean;
 };
 
 export type StreamingSourceOptions = {

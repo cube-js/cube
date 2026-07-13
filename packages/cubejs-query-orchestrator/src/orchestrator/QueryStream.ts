@@ -1,5 +1,6 @@
 import * as stream from 'stream';
 import { getEnv } from '@cubejs-backend/shared';
+import { COLUMNAR_RESPONSE_TYPE } from '@cubejs-backend/base-driver';
 
 export class QueryStream extends stream.Transform {
   private timeout = 5 * 60 * 1000;
@@ -43,6 +44,24 @@ export class QueryStream extends stream.Transform {
     if (this.streams.has(this.queryKey)) {
       this.streams.delete(this.queryKey);
     }
+
+    // Columnar batch (see `ColumnarResponse` in base-driver): remap the `members` array
+    // (aliases → member names) once and forward the batch untouched.
+    if (chunk && chunk.$type === COLUMNAR_RESPONSE_TYPE) {
+      const members = this.aliasNameToMember
+        ? chunk.members.map((alias) => this.aliasNameToMember[alias])
+        : chunk.members;
+      const rowCount = chunk.columns[0] ? chunk.columns[0].length : 0;
+      if (this.counter + rowCount < this.readableHighWaterMark) {
+        this.counter += rowCount;
+      } else {
+        this.counter = 0;
+        this.debounce();
+      }
+      callback(null, { $type: COLUMNAR_RESPONSE_TYPE, members, columns: chunk.columns });
+      return;
+    }
+
     let row = {};
     if (this.aliasNameToMember) {
       Object.keys(chunk).forEach((alias) => {

@@ -1,4 +1,5 @@
 use crate::{
+    arrow_column::{ArrowColumn, DBResponseValueRef},
     query_message_parser::QueryResult,
     transport::{
         AnnotatedConfigItem, ConfigItem, MemberOrMemberExpression, MembersMap, NormalizedQuery,
@@ -9,13 +10,15 @@ use anyhow::{bail, Context, Result};
 use chrono::format::{Fixed, Item, Numeric, Pad};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use indexmap::{Equivalent, IndexMap};
-use itertools::multizip;
+use itertools::{multizip, Either};
 use serde::{
     de::{self, MapAccess, SeqAccess, Visitor},
+    ser::SerializeSeq,
     Deserialize, Deserializer, Serialize,
 };
 use serde_json::Value;
 use std::{
+    borrow::Cow,
     collections::{hash_map::DefaultHasher, HashMap, HashSet},
     fmt::Display,
     hash::{BuildHasher, Hash, Hasher},
@@ -457,12 +460,12 @@ pub fn get_members(
 /// eliminating the per-cell `db_data.data.get(col).and_then(...)` double
 /// lookup the row-major loop would otherwise do on every cell.
 pub(crate) enum CompactPlanEntry<'a> {
-    /// Read `column[row_idx]` and run [`transform_value`]. `column` is a slice
-    /// of the corresponding [`ColumnarArray`]; the fat pointer inlines
-    /// `(ptr, len)` so the per-cell access avoids the extra Vec metadata
-    /// indirection.
+    /// Read `column[row_idx]` and run [`transform_value`]. `column` is the
+    /// materialized view of the corresponding [`ColumnarArray`]: borrowed for
+    /// `Cells`-backed columns, converted once at plan build time for
+    /// Arrow-backed ones (this row-major output needs random access).
     Cell {
-        column: &'a [DBResponsePrimitive],
+        column: Cow<'a, [DBResponsePrimitive]>,
         member_type: &'a str,
     },
     /// Constant value replicated across every row (the
@@ -489,7 +492,7 @@ pub(crate) fn build_compact_plan<'a>(
             if let Some(alias) = members_to_alias_map.get(m) {
                 if let Some(&column_index) = cube_store_result.columns_pos.get(alias) {
                     entries.push(CompactPlanEntry::Cell {
-                        column: cube_store_result.data[column_index].as_slice(),
+                        column: cube_store_result.data[column_index].to_cells(),
                         member_type: annotation_item.member_type.as_deref().unwrap_or(""),
                     });
                 }
@@ -513,7 +516,7 @@ pub(crate) fn build_compact_plan<'a>(
                     let member_type = annotation
                         .get(alias)
                         .map_or("", |a| a.member_type.as_deref().unwrap_or(""));
-                    let column = cube_store_result.data[column_index].as_slice();
+                    let column = cube_store_result.data[column_index].to_cells();
                     entries.push(CompactPlanEntry::Cell {
                         column,
                         member_type,
@@ -556,10 +559,10 @@ pub fn get_compact_row(plan: &CompactPlan<'_>, row_idx: usize) -> Vec<DBResponse
 /// the per-row materializer does one bounds check per cell instead of the
 /// `db_data.data.get(col).and_then(...)` double lookup.
 pub struct VanillaColumnPlan<'a> {
-    /// Slice of the corresponding [`ColumnarArray`]. Fat pointer inlines
-    /// `(ptr, len)`, so the per-cell access avoids the extra Vec metadata
-    /// indirection.
-    column: &'a [DBResponsePrimitive],
+    /// Materialized view of the corresponding [`ColumnarArray`]: borrowed for
+    /// `Cells`-backed columns, converted once at plan build time for
+    /// Arrow-backed ones (this row-major output needs random access).
+    column: Cow<'a, [DBResponsePrimitive]>,
     /// Interned IndexMap key for this column with a pre-computed hash.
     /// Cloned via [`Arc::clone`] per row (atomic refcount inc).
     key: Arc<InternedKey>,
@@ -634,7 +637,7 @@ pub fn build_vanilla_plan<'a>(
                 .push((track.level, Arc::clone(&key)));
         }
 
-        let column = cube_store_result.data[index].as_slice();
+        let column = cube_store_result.data[index].to_cells();
 
         columns.push(VanillaColumnPlan {
             column,
@@ -804,29 +807,43 @@ fn build_columnar_columns(
     db_data: &QueryResult,
 ) -> Vec<ColumnarArray> {
     let row_count = db_data.row_count;
-    let mut columns: Vec<ColumnarArray> = plan
-        .iter()
-        .map(|_| ColumnarArray::with_capacity(row_count))
-        .collect();
 
-    for (col_idx, plan_entry) in plan.iter().enumerate() {
-        let out = &mut columns[col_idx];
-        match &plan_entry.source {
+    plan.iter()
+        .map(|plan_entry| match &plan_entry.source {
             ColumnarColumnSource::DbColumn { index } => {
-                for cell in db_data.data[*index].iter() {
-                    out.push(transform_value(cell.clone(), plan_entry.member_type));
+                let src = &db_data.data[*index];
+                match src {
+                    // `transform_value` only rewrites `String` cells of "time"
+                    // members, so an Arrow column without string chunks (or for
+                    // a non-"time" member) passes through untouched — share it
+                    // as-is: the clone is an `Arc` bump per chunk, not a copy.
+                    ColumnarArray::Arrow(col) => {
+                        if plan_entry.member_type == "time" && col.has_string_values() {
+                            ColumnarArray::Cells(
+                                col.iter_values()
+                                    .map(|v| {
+                                        transform_value(v.into_primitive(), plan_entry.member_type)
+                                    })
+                                    .collect(),
+                            )
+                        } else {
+                            src.clone()
+                        }
+                    }
+                    ColumnarArray::Cells(cells) => ColumnarArray::Cells(
+                        cells
+                            .iter()
+                            .map(|cell| transform_value(cell.clone(), plan_entry.member_type))
+                            .collect(),
+                    ),
                 }
             }
-            ColumnarColumnSource::Constant(v) => {
-                out.resize(row_count, v.clone());
-            }
+            ColumnarColumnSource::Constant(v) => ColumnarArray::Cells(vec![v.clone(); row_count]),
             ColumnarColumnSource::NullFilled => {
-                out.resize(row_count, DBResponsePrimitive::Null);
+                ColumnarArray::Cells(vec![DBResponsePrimitive::Null; row_count])
             }
-        }
-    }
-
-    columns
+        })
+        .collect()
 }
 
 /// Convert DB response object to the vanilla output format. Keys are
@@ -1166,7 +1183,7 @@ pub enum DBResponsePrimitive {
 }
 
 /// `%Y-%m-%dT%H:%M:%S%.3f`
-const TIMESTAMP_ITEMS: &[Item<'static>] = &[
+pub(crate) const TIMESTAMP_ITEMS: &[Item<'static>] = &[
     Item::Numeric(Numeric::Year, Pad::Zero),
     Item::Literal("-"),
     Item::Numeric(Numeric::Month, Pad::Zero),
@@ -1325,53 +1342,114 @@ impl Display for DBResponsePrimitive {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(transparent)]
-pub struct ColumnarArray(pub Vec<DBResponsePrimitive>);
+/// One logical result column. `Cells` is the materialized form (JS raw input,
+/// legacy CubeStore result sets, synthetic transform columns). `Arrow` wraps
+/// the Arrow arrays a CubeStore result arrived in: values are read straight
+/// from the Arrow buffers at serialize time, and cloning the column — e.g. to
+/// carry it into [`TransformedData::Columnar`] — is an `Arc` bump instead of a
+/// per-cell copy. Both variants serialize to identical JSON.
+#[derive(Debug, Clone)]
+pub enum ColumnarArray {
+    Cells(Vec<DBResponsePrimitive>),
+    Arrow(ArrowColumn),
+}
 
 impl ColumnarArray {
     #[inline]
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self::Cells(Vec::new())
     }
 
     #[inline]
     pub fn with_capacity(cap: usize) -> Self {
-        Self(Vec::with_capacity(cap))
+        Self::Cells(Vec::with_capacity(cap))
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[DBResponsePrimitive] {
-        &self.0
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Cells(v) => v.len(),
+            Self::Arrow(a) => a.len(),
+        }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Append a cell to a materialized column. Construction-time helper;
+    /// Arrow-backed columns are immutable.
+    #[inline]
+    pub fn push(&mut self, cell: DBResponsePrimitive) {
+        match self {
+            Self::Cells(v) => v.push(cell),
+            Self::Arrow(_) => panic!("cannot push into an Arrow-backed ColumnarArray"),
+        }
+    }
+
+    /// Borrowed per-cell views in row order. String cells borrow their bytes
+    /// (no allocation) whichever variant backs the column.
+    pub fn iter_values(&self) -> impl Iterator<Item = DBResponseValueRef<'_>> + '_ {
+        match self {
+            Self::Cells(v) => Either::Left(v.iter().map(DBResponseValueRef::from)),
+            Self::Arrow(a) => Either::Right(a.iter_values()),
+        }
+    }
+
+    /// Materialized cells: borrowed as-is for `Cells`, converted (allocating
+    /// per string cell) for `Arrow`. Row-major consumers (compact/vanilla
+    /// plans) use this to get random access.
+    pub fn to_cells(&self) -> Cow<'_, [DBResponsePrimitive]> {
+        match self {
+            Self::Cells(v) => Cow::Borrowed(v.as_slice()),
+            Self::Arrow(a) => Cow::Owned(a.iter_values().map(|v| v.into_primitive()).collect()),
+        }
+    }
+}
+
+impl Default for ColumnarArray {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl From<Vec<DBResponsePrimitive>> for ColumnarArray {
     #[inline]
     fn from(v: Vec<DBResponsePrimitive>) -> Self {
-        Self(v)
+        Self::Cells(v)
     }
 }
 
-impl From<ColumnarArray> for Vec<DBResponsePrimitive> {
-    #[inline]
-    fn from(c: ColumnarArray) -> Self {
-        c.0
+// Compares by value across backing variants, so an Arrow-backed column equals
+// its materialized twin.
+impl PartialEq for ColumnarArray {
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter_values().eq(other.iter_values())
     }
 }
 
-impl std::ops::Deref for ColumnarArray {
-    type Target = Vec<DBResponsePrimitive>;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl Serialize for ColumnarArray {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Cells(v) => v.serialize(serializer),
+            Self::Arrow(a) => {
+                let mut seq = serializer.serialize_seq(Some(a.len()))?;
+                for value in a.iter_values() {
+                    seq.serialize_element(&value)?;
+                }
+                seq.end()
+            }
+        }
     }
 }
 
-impl std::ops::DerefMut for ColumnarArray {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+// Only the materialized form ever arrives over the wire (JS raw columnar
+// JSON, cached transform fixtures); Arrow columns are created in-process.
+impl<'de> Deserialize<'de> for ColumnarArray {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Vec::<DBResponsePrimitive>::deserialize(deserializer).map(Self::Cells)
     }
 }
 
@@ -2289,8 +2367,11 @@ mod tests {
                             right_column.len()
                         )));
                     }
-                    for (row, left_value) in left_column.iter().enumerate() {
-                        let right_value = &right_column[row];
+                    for (row, (left_value, right_value)) in left_column
+                        .iter_values()
+                        .zip(right_column.iter_values())
+                        .enumerate()
+                    {
                         if left_value != right_value {
                             return Err(TestError(format!(
                                 "Columnar value at row {} for member '{}' differs: {} != {}",
@@ -3538,9 +3619,10 @@ mod tests {
                 "column {} length must equal row count",
                 col_idx
             );
+            let cells = column.to_cells();
             for (row_idx, expected_row) in compact_dataset.iter().enumerate() {
                 assert_eq!(
-                    &column[row_idx], &expected_row[col_idx],
+                    &cells[row_idx], &expected_row[col_idx],
                     "value at column {} row {} must match compact dataset",
                     col_idx, row_idx
                 );
@@ -3710,6 +3792,135 @@ mod tests {
             Some(&day_transformed),
             "bare base key must use the finest (day) candidate, not month"
         );
+        Ok(())
+    }
+
+    /// Columnar output over an Arrow-backed result: every column whose
+    /// transform is an identity (non-"time" members, and "time" members
+    /// without string chunks) must be shared as-is — an `Arc` bump, not a
+    /// per-cell copy — while "time" string columns still materialize through
+    /// `transform_value`. The serialized JSON must be identical to what the
+    /// materialized path produces.
+    #[test]
+    fn test_columnar_transform_shares_arrow_columns() -> Result<()> {
+        use arrow::array::{ArrayRef, Int64Array, StringArray, TimestampMillisecondArray};
+        use arrow::datatypes::{DataType as ArrowDataType, Field, Schema as ArrowSchema, TimeUnit};
+        use arrow::ipc::writer::StreamWriter;
+        use arrow::record_batch::RecordBatch;
+        use serde_json::json;
+
+        let schema = Arc::new(ArrowSchema::new(vec![
+            Field::new("orders__city", ArrowDataType::Utf8, true),
+            Field::new("orders__count", ArrowDataType::Int64, true),
+            Field::new(
+                "orders__created_at",
+                ArrowDataType::Timestamp(TimeUnit::Millisecond, None),
+                true,
+            ),
+            Field::new("orders__updated_at", ArrowDataType::Utf8, true),
+        ]));
+
+        // Two batches, so the shared columns are chunked.
+        let batch1 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(StringArray::from(vec![Some("Berlin"), Some("Lisbon")])) as ArrayRef,
+                Arc::new(Int64Array::from(vec![Some(1i64), None])),
+                Arc::new(TimestampMillisecondArray::from(vec![
+                    Some(0i64),
+                    Some(1_000),
+                ])),
+                Arc::new(StringArray::from(vec![Some("2024-01-02 03:04:05"), None])),
+            ],
+        )
+        .unwrap();
+        let batch2 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(StringArray::from(vec![None::<&str>])) as ArrayRef,
+                Arc::new(Int64Array::from(vec![Some(3i64)])),
+                Arc::new(TimestampMillisecondArray::from(vec![None::<i64>])),
+                Arc::new(StringArray::from(vec![Some("2024-03-04T05:06:07")])),
+            ],
+        )
+        .unwrap();
+
+        let mut buf = Vec::new();
+        {
+            let mut writer = StreamWriter::try_new(&mut buf, schema.as_ref()).unwrap();
+            writer.write(&batch1).unwrap();
+            writer.write(&batch2).unwrap();
+            writer.finish().unwrap();
+        }
+        let raw_data = QueryResult::from_arrow(&buf)?;
+
+        let request: TransformDataRequest = serde_json::from_value(json!({
+            "aliasToMemberNameMap": {
+                "orders__city": "Orders.city",
+                "orders__count": "Orders.count",
+                "orders__created_at": "Orders.createdAt",
+                "orders__updated_at": "Orders.updatedAt"
+            },
+            "annotation": {
+                "Orders.city": { "type": "string" },
+                "Orders.count": { "type": "number" },
+                "Orders.createdAt": { "type": "time" },
+                "Orders.updatedAt": { "type": "time" }
+            },
+            "query": {
+                "dimensions": ["Orders.city", "Orders.createdAt", "Orders.updatedAt"],
+                "measures": ["Orders.count"]
+            },
+            "queryType": "regularQuery",
+            "resType": "columnar"
+        }))?;
+
+        let transformed = TransformedData::transform(&request, &raw_data)?;
+        let TransformedData::Columnar { members, columns } = &transformed else {
+            panic!("expected Columnar");
+        };
+
+        assert_eq!(
+            members,
+            &[
+                "Orders.city".to_string(),
+                "Orders.count".to_string(),
+                "Orders.createdAt".to_string(),
+                "Orders.updatedAt".to_string(),
+            ]
+        );
+
+        // Identity transforms keep the Arrow backing; the "time" string
+        // column is the only one that materializes.
+        assert!(matches!(columns[0], ColumnarArray::Arrow(_)), "city");
+        assert!(matches!(columns[1], ColumnarArray::Arrow(_)), "count");
+        assert!(
+            matches!(columns[2], ColumnarArray::Arrow(_)),
+            "createdAt (timestamp) has no string chunks"
+        );
+        assert!(
+            matches!(columns[3], ColumnarArray::Cells(_)),
+            "updatedAt ('time' strings) must be materialized"
+        );
+
+        assert_eq!(
+            serde_json::to_value(&transformed)?,
+            json!({
+                "members": [
+                    "Orders.city",
+                    "Orders.count",
+                    "Orders.createdAt",
+                    "Orders.updatedAt"
+                ],
+                "columns": [
+                    ["Berlin", "Lisbon", null],
+                    ["1", null, "3"],
+                    ["1970-01-01T00:00:00.000", "1970-01-01T00:00:01.000", null],
+                    ["2024-01-02T03:04:05.000", null, "2024-03-04T05:06:07.000"]
+                ]
+            })
+        );
+
         Ok(())
     }
 }
