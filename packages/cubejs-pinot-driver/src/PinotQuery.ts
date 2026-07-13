@@ -138,6 +138,23 @@ export class PinotQuery extends BaseQuery {
     return expr;
   }
 
+  /**
+   * Floors `source` to the timestamp aligned with `interval`-sized bins relative
+   * to `origin`, used for custom (non-natural-aligned) granularities.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const originAligned = this.timeStampCast(`'${origin.replace('T', ' ')}'`);
+    const beginOfTime = this.timeStampCast('\'1970-01-01 00:00:00.000\'');
+    const timeUnit = this.diffTimeUnitForInterval(interval).toUpperCase();
+    const intervalSize = `TIMESTAMPDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})`;
+
+    return this.timeStampCast(
+      `TIMESTAMPADD(${timeUnit}, ` +
+      `CAST(FLOOR(CAST(TIMESTAMPDIFF(${timeUnit}, ${originAligned}, ${source}) AS DOUBLE) / ${intervalSize}) AS INTEGER) * ${intervalSize}, ` +
+      `${originAligned})`
+    );
+  }
+
   public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`

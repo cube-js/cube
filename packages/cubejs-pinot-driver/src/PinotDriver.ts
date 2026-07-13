@@ -7,7 +7,8 @@ import {
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
-  assertDataSource, Required,
+  assertDataSource,
+  Required,
 } from '@cubejs-backend/shared';
 
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';

@@ -137,6 +137,16 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "TBuildOnlyHalfYear",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "build_only_half_year",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity"
+        ]
       }
     ],
     "BigECommerce": [
@@ -159,6 +169,24 @@
         "measures": [
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ],
+        "sqlAlias": "mtdfc"
       }
     ]
   },
@@ -232,19 +260,10 @@
     "querying BigECommerce: rolling window YTD without date range",
 
     "---------------------------------------",
-    "Custom granularities (half_year / three_months / two_mo rolling): unsupported",
-    "granularity/interval SQL under the Pinot dialect -- follow-up.",
+    "Custom granularity + rolling window without an explicit date range needs the",
+    "Tesseract-generated time series bounds (see above) -- follow-up.",
     "---------------------------------------",
-    "querying custom granularities ECommerce: count by half_year + dimension",
-    "querying custom granularities ECommerce: count by half_year + no dimension",
-    "querying custom granularities ECommerce: count by half_year_by_1st_april + dimension",
-    "querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension",
-    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
-    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
-    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
-    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
-    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
 
     "---------------------------------------",
     "Multi-stage & time-shift measures -- not yet supported by the Pinot dialect.",
@@ -274,19 +293,8 @@
     "SQL API: Window function over measure (running total)",
 
     "---------------------------------------",
-    "Pre-aggregation build via the HTTP API does not complete for Pinot (builds fine",
-    "in-process -- see the green pinot-core tier); the build test times out, and with",
-    "no rollups built the pre-agg-backed query tests below can't be served. Skipped",
-    "together as a pre-agg-over-API follow-up. Raw-source query coverage still runs.",
+    "SQL API push-down over a pre-aggregation not supported on Pinot yet.",
     "---------------------------------------",
-    "must built pre-aggregations",
-    "querying BigECommerce: totalProfitYearAgo",
-    "pre-aggregations Customers: running total without time dimension",
-    "querying ECommerce: partitioned pre-agg",
-    "querying ECommerce: partitioned pre-agg higher granularity",
-    "querying BigECommerce: partitioned pre-agg",
-    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
-    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
     "SQL API: ungrouped pre-agg",
 
     "---------------------------------------",
