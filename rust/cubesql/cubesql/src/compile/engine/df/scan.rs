@@ -339,19 +339,43 @@ fn json_value_to_field_value(value: &Value) -> std::result::Result<FieldValue<'_
 }
 
 #[derive(Deserialize)]
+pub struct JsonColumnarValueObjectRaw {
+    members: Vec<String>,
+    columns: Vec<Vec<Value>>,
+}
+
+impl std::convert::TryFrom<JsonColumnarValueObjectRaw> for JsonColumnarValueObject {
+    type Error = CubeError;
+
+    fn try_from(raw: JsonColumnarValueObjectRaw) -> std::result::Result<Self, Self::Error> {
+        Self::try_new(raw.members, raw.columns)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(try_from = "JsonColumnarValueObjectRaw")]
 pub struct JsonColumnarValueObject {
     members: Vec<String>,
     columns: Vec<Vec<Value>>,
 }
 
 impl JsonColumnarValueObject {
-    pub fn new(members: Vec<String>, columns: Vec<Vec<Value>>) -> Self {
-        debug_assert!(
-            columns.windows(2).all(|w| w[0].len() == w[1].len()),
-            "columnar response has ragged columns"
-        );
+    pub fn try_new(
+        members: Vec<String>,
+        columns: Vec<Vec<Value>>,
+    ) -> std::result::Result<Self, CubeError> {
+        if let Some(expected) = columns.first().map(|c| c.len()) {
+            if let Some(idx) = columns.iter().position(|c| c.len() != expected) {
+                return Err(CubeError::internal(format!(
+                    "columnar response has ragged columns: column {} has {} rows, expected {}",
+                    idx,
+                    columns[idx].len(),
+                    expected
+                )));
+            }
+        }
 
-        Self { members, columns }
+        Ok(Self { members, columns })
     }
 }
 
@@ -1270,7 +1294,7 @@ pub fn convert_transport_response(
             } = result;
             let V1LoadResultDataColumnar { members, columns } = data;
 
-            let mut response = JsonColumnarValueObject::new(members, columns);
+            let mut response = JsonColumnarValueObject::try_new(members, columns)?;
             let updated_schema =
                 build_response_schema(&schema, last_refresh_time, external.unwrap_or(false));
 
