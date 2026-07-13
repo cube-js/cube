@@ -24,6 +24,11 @@ export function testConnection(type: string): void {
     jest.setTimeout(60 * 5 * 1000);
 
     const fixtures = getFixtures(type);
+    // Pinot cannot be seeded via SQL DDL; runEnvironment ingests fixed-name
+    // `<table>_pinot` tables via the controller. Every other driver uses the
+    // per-suite 'driver' suffix. The SQL create/stream/drop cases are skipped for
+    // Pinot through fixtures.skip (see fixtures/pinot.json).
+    const suffix = type === 'pinot' ? 'pinot' : 'driver';
     let driver: BaseDriver & {
       stream?: (
         query: string,
@@ -43,7 +48,7 @@ export function testConnection(type: string): void {
     }
 
     beforeAll(async () => {
-      env = await runEnvironment(type, 'driver');
+      env = await runEnvironment(type, suffix);
       if (env.data) {
         process.env.CUBEJS_DB_HOST = '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
@@ -61,14 +66,14 @@ export function testConnection(type: string): void {
     });
 
     execute('must creates a data source', async () => {
-      query = getCreateQueries(type, 'driver');
+      query = getCreateQueries(type, suffix);
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
     });
 
     execute('must select from the data source', async () => {
-      query = getSelectQueries(type, 'driver');
+      query = getSelectQueries(type, suffix);
       const response = await Promise.all(
         query.map(async (q) => {
           const res = await driver.query(q);
@@ -173,7 +178,7 @@ export function testConnection(type: string): void {
     });
 
     execute('must download query from the data source via memory', async () => {
-      query = getSelectQueries(type, 'driver');
+      query = getSelectQueries(type, suffix);
       expect(driver.downloadQueryResults).toBeDefined();
 
       const response = await Promise.all(
@@ -200,7 +205,7 @@ export function testConnection(type: string): void {
     });
 
     execute('must download query from the data source via stream', async () => {
-      query = getSelectQueries(type, 'driver');
+      query = getSelectQueries(type, suffix);
       expect(driver.downloadQueryResults).toBeDefined();
 
       const response = await Promise.all(
@@ -240,7 +245,7 @@ export function testConnection(type: string): void {
     execute('must delete the data source', async () => {
       const tables = Object
         .keys(fixtures.tables)
-        .map((key: string) => `${fixtures.tables[key]}_driver`);
+        .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
       await Promise.all(
         tables.map(async (t) => {
           await driver.dropTable(t);

@@ -1,12 +1,8 @@
-/**
- * @copyright Cube Dev, Inc.
- * @license Apache-2.0
- * @fileoverview The `PinotDriver` and related types declaration.
- */
-
 import {
   DriverInterface,
   StreamTableData,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
   BaseDriver
 } from '@cubejs-backend/base-driver';
 import {
@@ -68,20 +64,27 @@ type PinotResponse = {
   traceInfo: any
 };
 
-/**
- * Presto driver class.
- */
+const PinotTypeToGenericType: Record<string, string> = {
+  string: 'text',
+  int: 'int',
+  long: 'bigint',
+  float: 'double',
+  double: 'double',
+  big_decimal: 'decimal',
+  boolean: 'boolean',
+  timestamp: 'timestamp',
+  json: 'text',
+  bytes: 'text',
+};
+
 export class PinotDriver extends BaseDriver implements DriverInterface {
-  /**
-   * Returns default concurrency value.
-   */
   public static getDefaultConcurrency() {
     return 10;
   }
 
-  private config: PinotDriverConfiguration;
+  protected readonly config: PinotDriverConfiguration;
 
-  private url: string;
+  protected readonly url: string;
 
   public static dialectClass() {
     return PinotQuery;
@@ -116,7 +119,16 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       ...config
     };
 
-    this.url = `${this.config.host}:${this.config.port}/query/sql`;
+    const useSsl = getEnv('dbSsl', { dataSource, preAggregations });
+    const rawHost = this.config.host || '';
+    const host = /^https?:\/\//i.test(rawHost)
+      ? rawHost
+      : `${useSsl ? 'https' : 'http'}://${rawHost}`;
+    this.url = `${host}:${this.config.port}/query/sql`;
+  }
+
+  public readOnly(): boolean {
+    return true;
   }
 
   public testConnection() {
@@ -160,7 +172,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return { Authorization: `Basic ${encodedCredentials}` };
   }
 
-  public queryPromised(query: string): Promise<any[] | StreamTableData> {
+  protected async request(query: string): Promise<PinotResponse> {
     const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
 
     const request: Request = new Request(this.url, {
@@ -175,26 +187,51 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       })
     });
 
-    return new Promise((resolve, reject) => {
-      fetch(request)
-        .then(async (response: Response) => {
-          if (!response.ok) {
-            if (response.status === 401) {
-              return reject(toError({ message: 'Unauthorized request' }));
-            }
+    let response: Response;
 
-            return reject(toError({ message: 'Unexpected error' }));
-          }
-          const pinotResponse: PinotResponse = await response.json();
+    try {
+      response = await fetch(request);
+    } catch (error: any) {
+      throw toError(error);
+    }
 
-          if (pinotResponse?.exceptions?.length) {
-            return reject(toError(pinotResponse.exceptions[0]));
-          }
+    if (!response.ok) {
+      throw toError({ message: response.status === 401 ? 'Unauthorized request' : 'Unexpected error' });
+    }
 
-          return resolve(this.normalizeResultOverColumns(pinotResponse.resultTable.rows, pinotResponse.resultTable.dataSchema.columnNames));
-        })
-        .catch((error: any) => reject(toError(error)));
-    });
+    const result: PinotResponse = await response.json();
+
+    if (result?.exceptions?.length) {
+      throw toError(result.exceptions[0]);
+    }
+
+    return result;
+  }
+
+  public async queryPromised(query: string): Promise<any[] | StreamTableData> {
+    const { resultTable } = await this.request(query);
+    return this.normalizeResultOverColumns(resultTable.rows, resultTable.dataSchema.columnNames);
+  }
+
+  public async downloadQueryResults(
+    query: string,
+    values: unknown[],
+    _options: DownloadQueryResultsOptions,
+  ): Promise<DownloadQueryResultsResult> {
+    const { resultTable } = await this.request(this.prepareQueryWithParams(query, values));
+    const { rows, dataSchema } = resultTable;
+
+    return {
+      rows: this.normalizeResultOverColumns(rows, dataSchema.columnNames),
+      types: dataSchema.columnNames.map((name, index) => ({
+        name,
+        type: this.toGenericType(dataSchema.columnDataTypes[index]),
+      })),
+    };
+  }
+
+  protected override toGenericType(columnType: string): string {
+    return PinotTypeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 
   protected override quoteIdentifier(identifier: string): string {
