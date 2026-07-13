@@ -1,8 +1,9 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
+use cubeorchestrator::arrow_column::DBResponseValueRef;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
+    RequestResultData, RequestResultDataMulti, TransformedData,
 };
 use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue};
@@ -128,18 +129,22 @@ impl ResultWrapper {
     }
 }
 
-fn db_primitive_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
+// String cells borrow their bytes from the backing column (a materialized
+// primitive or an Arrow buffer) — no per-cell allocation on the way to the
+// wire encoder.
+fn db_value_to_field_value(value: DBResponseValueRef<'_>) -> FieldValue<'_> {
     match value {
-        DBResponsePrimitive::String(s) => FieldValue::String(Cow::Borrowed(s)),
-        DBResponsePrimitive::Int64(n) => FieldValue::Number(*n as f64),
-        DBResponsePrimitive::UInt64(n) => FieldValue::Number(*n as f64),
-        DBResponsePrimitive::Float64(n) => FieldValue::Number(*n),
-        DBResponsePrimitive::Boolean(b) => FieldValue::Bool(*b),
-        DBResponsePrimitive::Timestamp(_) => FieldValue::String(Cow::Owned(value.to_string())),
-        DBResponsePrimitive::Uncommon(v) => FieldValue::String(Cow::Owned(
-            serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
+        DBResponseValueRef::Str(s) => FieldValue::String(Cow::Borrowed(s)),
+        DBResponseValueRef::StringOwned(s) => FieldValue::String(Cow::Owned(s)),
+        DBResponseValueRef::Int64(n) => FieldValue::Number(n as f64),
+        DBResponseValueRef::UInt64(n) => FieldValue::Number(n as f64),
+        DBResponseValueRef::Float64(n) => FieldValue::Number(n),
+        DBResponseValueRef::Boolean(b) => FieldValue::Bool(b),
+        DBResponseValueRef::Timestamp(_) => FieldValue::String(Cow::Owned(value.to_string())),
+        DBResponseValueRef::Uncommon(v) => FieldValue::String(Cow::Owned(
+            serde_json::to_string(v).unwrap_or_else(|_| v.to_string()),
         )),
-        DBResponsePrimitive::Null => FieldValue::Null,
+        DBResponseValueRef::Null => FieldValue::Null,
     }
 }
 
@@ -189,7 +194,7 @@ impl ColumnarValueObject for ResultWrapper {
         };
 
         Ok(Box::new(
-            column.iter().map(|v| Ok(db_primitive_to_field_value(v))),
+            column.iter_values().map(|v| Ok(db_value_to_field_value(v))),
         ))
     }
 }
@@ -257,8 +262,11 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
             result.members().iter().map(|k| cx.string(k)).collect();
 
         let row_count = result.row_count();
-        let columns: Vec<_> = (0..js_keys.len())
-            .map(|i| result.column(i))
+        // Collect borrowed per-cell views up front: the row-major loop below
+        // needs random access, and value refs are cheap (string cells borrow
+        // from the backing column instead of copying).
+        let columns: Vec<Vec<DBResponseValueRef<'_>>> = (0..js_keys.len())
+            .map(|i| result.column(i).map(|col| col.iter_values().collect()))
             .collect::<Result<_, _>>()
             .or_else(|err| cx.throw_error(err.to_string()))?;
         let js_array = JsArray::new(&mut cx, row_count);
@@ -270,8 +278,9 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
                 for (col_idx, js_key) in js_keys.iter().enumerate() {
                     let value = &columns[col_idx][row_idx];
                     let js_value: Handle<'_, JsValue> = match value {
-                        DBResponsePrimitive::Null => cx.null().upcast(),
+                        DBResponseValueRef::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings
+                        DBResponseValueRef::Str(s) => cx.string(s).upcast(),
                         other => cx.string(other.to_string()).upcast(),
                     };
 

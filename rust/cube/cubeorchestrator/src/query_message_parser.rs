@@ -1,15 +1,9 @@
 use crate::{
+    arrow_column::ArrowColumn,
     query_result_transform::{ColumnarArray, DBResponsePrimitive},
     transport::JsRawColumnarData,
 };
-use arrow::array::{
-    Array, BooleanArray, Date32Array, Date64Array, Decimal128Array, Decimal256Array, Float16Array,
-    Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, LargeStringArray,
-    StringArray, StringViewArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-    TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
-    UInt8Array,
-};
-use arrow::datatypes::{DataType, TimeUnit};
+use arrow::array::ArrayRef;
 use arrow::ipc::reader::StreamReader;
 use cubeshared::codegen::{
     root_as_http_message_with_opts, HttpCommand, HttpQueryResultData, HttpResultSet,
@@ -243,11 +237,10 @@ impl QueryResult {
         };
 
         let n_cols = members.len();
-        let data: Vec<ColumnarArray> = if let Some(result_set_rows) = result_set.rows() {
+        let data: Vec<Vec<DBResponsePrimitive>> = if let Some(result_set_rows) = result_set.rows() {
             let row_count = result_set_rows.len();
-            let mut data: Vec<ColumnarArray> = (0..n_cols)
-                .map(|_| ColumnarArray::with_capacity(row_count))
-                .collect();
+            let mut data: Vec<Vec<DBResponsePrimitive>> =
+                (0..n_cols).map(|_| Vec::with_capacity(row_count)).collect();
 
             for row in result_set_rows.iter() {
                 let values = row.values().ok_or(ParseError::NullRow)?;
@@ -270,12 +263,17 @@ impl QueryResult {
 
             data
         } else {
-            (0..n_cols).map(|_| ColumnarArray::new()).collect()
+            (0..n_cols).map(|_| Vec::new()).collect()
         };
 
-        QueryResult::try_new(members, data)
+        QueryResult::try_new(members, data.into_iter().map(ColumnarArray::from).collect())
     }
 
+    /// Wraps the Arrow arrays as-is (one chunk per record batch) instead of
+    /// materializing per-cell primitives: values are read straight from the
+    /// Arrow buffers when the result is transformed/serialized. Column data
+    /// types are still validated eagerly, so unsupported types fail here, at
+    /// parse time.
     pub(crate) fn from_arrow(bytes: &[u8]) -> Result<Self, ParseError> {
         let reader = StreamReader::try_new(Cursor::new(bytes), None)
             .map_err(|err| ParseError::ArrowError(err.to_string()))?;
@@ -284,220 +282,31 @@ impl QueryResult {
         let members: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
         let n_cols = members.len();
 
-        let mut columns: Vec<Vec<DBResponsePrimitive>> = (0..n_cols).map(|_| Vec::new()).collect();
+        let mut columns: Vec<Vec<ArrayRef>> = (0..n_cols).map(|_| Vec::new()).collect();
 
         for batch in reader {
             let batch = batch.map_err(|err| ParseError::ArrowError(err.to_string()))?;
-            for (idx, col) in columns.iter_mut().enumerate() {
-                append_arrow_array(col, batch.column(idx).as_ref())?;
+            for (idx, chunks) in columns.iter_mut().enumerate() {
+                chunks.push(batch.column(idx).clone());
             }
         }
 
-        let data: Vec<ColumnarArray> = columns.into_iter().map(ColumnarArray::from).collect();
+        let data: Vec<ColumnarArray> = columns
+            .into_iter()
+            .map(|chunks| ArrowColumn::try_new(chunks).map(ColumnarArray::Arrow))
+            .collect::<Result<_, _>>()?;
         QueryResult::try_new(members, data)
     }
-}
-
-/// Format a decimal `mantissa` with `scale` fractional digits, stripping trailing
-/// fractional zeros. Generic over the mantissa's `Display`, so it renders any Arrow
-/// decimal width (`i32`/`i64`/`i128`/`i256`) directly — Decimal256 needs no fallback
-/// to Arrow's own string conversion.
-///
-/// e.g. `(25987600, 5) -> "259.876"`, `(6199200000, 5) -> "61992"`,
-/// `(-250, 3) -> "-0.25"`, `(25, 5) -> "0.00025"`.
-fn decimal_to_string<T: std::fmt::Display>(mantissa: T, scale: u32) -> String {
-    let raw = mantissa.to_string();
-    if scale == 0 {
-        return raw;
-    }
-
-    let scale = scale as usize;
-    let (sign, digits) = match raw.strip_prefix('-') {
-        Some(rest) => ("-", rest),
-        None => ("", raw.as_str()),
-    };
-
-    let (int_part, frac) = if digits.len() > scale {
-        let (int_part, frac) = digits.split_at(digits.len() - scale);
-        (int_part, frac.to_string())
-    } else {
-        let pad = "0".repeat(scale - digits.len());
-        ("0", format!("{pad}{digits}"))
-    };
-
-    let frac = frac.trim_end_matches('0');
-    if frac.is_empty() {
-        format!("{sign}{int_part}")
-    } else {
-        format!("{sign}{int_part}.{frac}")
-    }
-}
-
-/// Append every element of an Arrow `array` to a column accumulator, converting
-/// each value to [`DBResponsePrimitive`].
-fn append_arrow_array(
-    col: &mut Vec<DBResponsePrimitive>,
-    array: &dyn Array,
-) -> Result<(), ParseError> {
-    let len = array.len();
-    col.reserve(len);
-
-    macro_rules! downcast_array_ref {
-        ($ty:ty) => {
-            array.as_any().downcast_ref::<$ty>().ok_or_else(|| {
-                ParseError::ArrowError(format!(
-                    "Failed to downcast Arrow array to {}",
-                    stringify!($ty)
-                ))
-            })?
-        };
-    }
-
-    macro_rules! push_int {
-        ($ty:ty) => {{
-            let a = downcast_array_ref!($ty);
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    col.push(DBResponsePrimitive::Int64(a.value(i) as i64));
-                }
-            }
-        }};
-    }
-
-    macro_rules! push_uint {
-        ($ty:ty) => {{
-            let a = downcast_array_ref!($ty);
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    col.push(DBResponsePrimitive::UInt64(a.value(i) as u64));
-                }
-            }
-        }};
-    }
-
-    macro_rules! push_float {
-        ($ty:ty) => {{
-            let a = downcast_array_ref!($ty);
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    col.push(DBResponsePrimitive::Float64(a.value(i) as f64));
-                }
-            }
-        }};
-    }
-
-    macro_rules! push_str {
-        ($ty:ty) => {{
-            let a = downcast_array_ref!($ty);
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    col.push(DBResponsePrimitive::String(a.value(i).to_owned()));
-                }
-            }
-        }};
-    }
-
-    macro_rules! push_datetime {
-        ($ty:ty) => {{
-            let a = downcast_array_ref!($ty);
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    match a.value_as_datetime(i) {
-                        Some(dt) => col.push(DBResponsePrimitive::Timestamp(dt)),
-                        None => col.push(DBResponsePrimitive::Null),
-                    }
-                }
-            }
-        }};
-    }
-
-    // Format decimal arrays from their mantissa and scale. `decimal_to_string` is
-    // generic over the mantissa width, so one path handles Decimal128/256.
-    macro_rules! push_decimal {
-        ($ty:ty) => {{
-            let a = downcast_array_ref!($ty);
-            let scale = a.scale().max(0) as u32;
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    col.push(DBResponsePrimitive::String(decimal_to_string(
-                        a.value(i),
-                        scale,
-                    )));
-                }
-            }
-        }};
-    }
-
-    match array.data_type() {
-        DataType::Null => {
-            for _ in 0..len {
-                col.push(DBResponsePrimitive::Null);
-            }
-        }
-        DataType::Boolean => {
-            let a = downcast_array_ref!(BooleanArray);
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    col.push(DBResponsePrimitive::Boolean(a.value(i)));
-                }
-            }
-        }
-        DataType::Int8 => push_int!(Int8Array),
-        DataType::Int16 => push_int!(Int16Array),
-        DataType::Int32 => push_int!(Int32Array),
-        DataType::Int64 => push_int!(Int64Array),
-        DataType::UInt8 => push_uint!(UInt8Array),
-        DataType::UInt16 => push_uint!(UInt16Array),
-        DataType::UInt32 => push_uint!(UInt32Array),
-        DataType::UInt64 => push_uint!(UInt64Array),
-        DataType::Float32 => push_float!(Float32Array),
-        DataType::Float64 => push_float!(Float64Array),
-        DataType::Float16 => {
-            let a = downcast_array_ref!(Float16Array);
-            for i in 0..len {
-                if a.is_null(i) {
-                    col.push(DBResponsePrimitive::Null);
-                } else {
-                    col.push(DBResponsePrimitive::Float64(a.value(i).to_f64()));
-                }
-            }
-        }
-        DataType::Utf8 => push_str!(StringArray),
-        DataType::LargeUtf8 => push_str!(LargeStringArray),
-        DataType::Utf8View => push_str!(StringViewArray),
-        DataType::Date32 => push_datetime!(Date32Array),
-        DataType::Date64 => push_datetime!(Date64Array),
-        DataType::Timestamp(TimeUnit::Second, _) => push_datetime!(TimestampSecondArray),
-        DataType::Timestamp(TimeUnit::Millisecond, _) => push_datetime!(TimestampMillisecondArray),
-        DataType::Timestamp(TimeUnit::Microsecond, _) => push_datetime!(TimestampMicrosecondArray),
-        DataType::Timestamp(TimeUnit::Nanosecond, _) => push_datetime!(TimestampNanosecondArray),
-        DataType::Decimal128(_, _) => push_decimal!(Decimal128Array),
-        DataType::Decimal256(_, _) => push_decimal!(Decimal256Array),
-        other => return Err(ParseError::UnsupportedArrowType(format!("{other:?}"))),
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::BinaryArray;
-    use arrow::datatypes::{Field, Schema};
+    use arrow::array::{
+        BinaryArray, Decimal128Array, Decimal256Array, Float64Array, StringArray,
+        TimestampMillisecondArray,
+    };
+    use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
     use arrow::ipc::writer::StreamWriter;
     use arrow::record_batch::RecordBatch;
     use cubeshared::codegen::{
@@ -717,7 +526,7 @@ mod tests {
         assert_eq!(result.data.len(), 3);
 
         assert_eq!(
-            result.data[0].as_slice(),
+            result.data[0].to_cells().as_ref(),
             &[
                 DBResponsePrimitive::String("Berlin".to_string()),
                 DBResponsePrimitive::Null,
@@ -725,7 +534,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            result.data[1].as_slice(),
+            result.data[1].to_cells().as_ref(),
             &[
                 DBResponsePrimitive::Float64(1.5),
                 DBResponsePrimitive::Float64(2.0),
@@ -734,18 +543,18 @@ mod tests {
         );
 
         // Numeric values serialize as JSON strings, matching the legacy result set.
-        let amounts_json = serde_json::to_value(result.data[1].as_slice()).unwrap();
+        let amounts_json = serde_json::to_value(&result.data[1]).unwrap();
         assert_eq!(amounts_json[0], "1.5");
         assert_eq!(amounts_json[1], "2");
         assert_eq!(amounts_json[2], serde_json::Value::Null);
 
         // Timestamps land in the dedicated variant and serialize to the ISO format.
-        match &result.data[2].as_slice()[0] {
+        match &result.data[2].to_cells()[0] {
             DBResponsePrimitive::Timestamp(_) => {}
             other => panic!("expected Timestamp, got {other:?}"),
         }
-        assert_eq!(result.data[2].as_slice()[1], DBResponsePrimitive::Null);
-        let json = serde_json::to_value(result.data[2].as_slice()).unwrap();
+        assert_eq!(result.data[2].to_cells()[1], DBResponsePrimitive::Null);
+        let json = serde_json::to_value(&result.data[2]).unwrap();
         assert_eq!(json[0], "1970-01-01T00:00:00.000");
         assert_eq!(json[1], serde_json::Value::Null);
         assert_eq!(json[2], "1970-01-01T00:00:01.000");
@@ -774,7 +583,7 @@ mod tests {
         let result = QueryResult::from_arrow(&bytes)?;
 
         assert_eq!(
-            result.data[0].as_slice(),
+            result.data[0].to_cells().as_ref(),
             &[
                 DBResponsePrimitive::String("9999999999999999999999999999999999999.99".to_string()),
                 DBResponsePrimitive::Null,
@@ -807,7 +616,7 @@ mod tests {
         let result = QueryResult::from_arrow(&bytes)?;
 
         assert_eq!(result.row_count, 5);
-        let json = serde_json::to_value(result.data[0].as_slice()).unwrap();
+        let json = serde_json::to_value(&result.data[0]).unwrap();
         assert_eq!(json[0], serde_json::Value::Null);
         assert_eq!(json[1], "2399.96");
         assert_eq!(json[2], "2249.91");
@@ -815,30 +624,6 @@ mod tests {
         assert_eq!(json[4], "1979.89");
 
         Ok(())
-    }
-
-    #[test]
-    fn test_decimal_to_string() {
-        for (mantissa, scale, expected) in [
-            (6199200000i128, 5u32, "61992"),
-            (25987600, 5, "259.876"),
-            (1500, 3, "1.5"),
-            (-250, 3, "-0.25"),
-            (0, 5, "0"),
-            (21098000, 5, "210.98"),
-            (100, 0, "100"),
-            (0, 0, "0"),
-            (-5, 0, "-5"),
-            (25, 5, "0.00025"),
-            (-1, 0, "-1"),
-            (i128::MAX, 0, "170141183460469231731687303715884105727"),
-        ] {
-            assert_eq!(
-                decimal_to_string(mantissa, scale),
-                expected,
-                "mantissa={mantissa} scale={scale}"
-            );
-        }
     }
 
     #[test]
@@ -909,14 +694,14 @@ mod tests {
         assert_eq!(result.members, vec!["city", "amount"]);
         assert_eq!(result.row_count, 2);
         assert_eq!(
-            result.data[0].as_slice(),
+            result.data[0].to_cells().as_ref(),
             &[
                 DBResponsePrimitive::String("Berlin".to_string()),
                 DBResponsePrimitive::String("Lisbon".to_string()),
             ]
         );
         assert_eq!(
-            result.data[1].as_slice(),
+            result.data[1].to_cells().as_ref(),
             &[
                 DBResponsePrimitive::Float64(1.5),
                 DBResponsePrimitive::Float64(2.0),
