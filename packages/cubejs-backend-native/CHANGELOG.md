@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+### Performance Improvements
+
+- **cubesql:** Migrate streaming to columnar JSON batches, 40-80% ([#11232](https://github.com/cube-js/cube/issues/11232)) ([7b4b124](https://github.com/cube-js/cube/commit/7b4b124e559867b992f8dafcb81f3b3082884c9a))
+
 ## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
 
 ### Bug Fixes

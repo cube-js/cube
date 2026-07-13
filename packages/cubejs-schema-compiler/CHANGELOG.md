@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+### Bug Fixes
+
+- **schema-compiler:** Pass query-level join hints to native pre-aggregation matching ([#11221](https://github.com/cube-js/cube/issues/11221)) ([79faaa3](https://github.com/cube-js/cube/commit/79faaa3166b739b8f99b41b8eae8d25e0593468a))
+- **schema-compiler:** resolve multi-stage order_by against owning cube through views ([#11224](https://github.com/cube-js/cube/issues/11224)) ([6e54e9e](https://github.com/cube-js/cube/commit/6e54e9e7aa655d663fe15f9668fae0ebd6e9a46f))
+
 ## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
 
 ### Bug Fixes

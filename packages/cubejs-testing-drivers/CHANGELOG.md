@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+### Features
+
+- **pinot-driver:** Retrieve types from database + small fixes ([#11241](https://github.com/cube-js/cube/issues/11241)) ([222dece](https://github.com/cube-js/cube/commit/222dece5469d94afda95157c82fef8944652ed7d))
+- **pinot-driver:** Tesseract SQL dialect fixes + incorrect timeout bug ([#11242](https://github.com/cube-js/cube/issues/11242)) ([076ad77](https://github.com/cube-js/cube/commit/076ad775254a9dcc105825315044bb41a17edf91)), closes [#11238](https://github.com/cube-js/cube/issues/11238) [#11239](https://github.com/cube-js/cube/issues/11239) [#11237](https://github.com/cube-js/cube/issues/11237)
+
 ## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

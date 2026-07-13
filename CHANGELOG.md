@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+### Bug Fixes
+
+- **cubesql:** Keep distinct aliases for same-named columns across join sides ([#11197](https://github.com/cube-js/cube/issues/11197)) ([6129ec7](https://github.com/cube-js/cube/commit/6129ec73d8b0e5c55bba9d8a079ae7e1ab970879))
+- **pinot-driver:** Initial support for Tesseract, thanks [@seanm-stripe](https://github.com/seanm-stripe) ([#11001](https://github.com/cube-js/cube/issues/11001)) ([f182019](https://github.com/cube-js/cube/commit/f1820198c499c21c76964f5a2056185c07ee19ca))
+- **schema-compiler:** Pass query-level join hints to native pre-aggregation matching ([#11221](https://github.com/cube-js/cube/issues/11221)) ([79faaa3](https://github.com/cube-js/cube/commit/79faaa3166b739b8f99b41b8eae8d25e0593468a))
+- **schema-compiler:** resolve multi-stage order_by against owning cube through views ([#11224](https://github.com/cube-js/cube/issues/11224)) ([6e54e9e](https://github.com/cube-js/cube/commit/6e54e9e7aa655d663fe15f9668fae0ebd6e9a46f))
+- **tesseract:** Reuse same placeholder for repeated native params ([#11222](https://github.com/cube-js/cube/issues/11222)) ([dc5b2ed](https://github.com/cube-js/cube/commit/dc5b2ed1807b3669a060a4ce12d44d8198342bf2))
+
+### Features
+
+- **pinot-driver:** Retrieve types from database + small fixes ([#11241](https://github.com/cube-js/cube/issues/11241)) ([222dece](https://github.com/cube-js/cube/commit/222dece5469d94afda95157c82fef8944652ed7d))
+- **pinot-driver:** Tesseract SQL dialect fixes + incorrect timeout bug ([#11242](https://github.com/cube-js/cube/issues/11242)) ([076ad77](https://github.com/cube-js/cube/commit/076ad775254a9dcc105825315044bb41a17edf91)), closes [#11238](https://github.com/cube-js/cube/issues/11238) [#11239](https://github.com/cube-js/cube/issues/11239) [#11237](https://github.com/cube-js/cube/issues/11237)
+
+### Performance Improvements
+
+- **cubesql:** Migrate streaming to columnar JSON batches, 40-80% ([#11232](https://github.com/cube-js/cube/issues/11232)) ([7b4b124](https://github.com/cube-js/cube/commit/7b4b124e559867b992f8dafcb81f3b3082884c9a))
+
 ## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
 
 ### Bug Fixes
