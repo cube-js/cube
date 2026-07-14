@@ -36,11 +36,29 @@ const OUT = path.join(__dirname, '..', 'api-reference', 'chat.yaml');
 
 // Source path(s) to include. The public endpoint is served under
 // .../agents/{agentId}, so strip the leading /api (the server URL holds it).
-const SRC_PATHS = ['/api/chat/stream-chat-state'];
+const SRC_PATHS = ['/api/chat/stream-chat-state', '/api/chat/abort'];
 const TAG = 'Chat';
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
+// Internal ChatRequest fields not part of the public API — stripped from the
+// published spec (this also keeps their Dto schemas out of the $ref closure).
+const INTERNAL_CHAT_REQUEST_FIELDS = [
+  'agentId',
+  'context',
+  'cubeCredentials',
+  'dashboardContext',
+  'workbookContext',
+  'workbookId',
+];
+
 const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
+
+const chatRequest = src.components.schemas.ChatRequest;
+if (chatRequest && chatRequest.properties) {
+  for (const field of INTERNAL_CHAT_REQUEST_FIELDS) {
+    delete chatRequest.properties[field];
+  }
+}
 
 // 1. Filter + rewrite chat paths (strip leading /api -> server holds it),
 //    retag to a clean name, and clean up operationIds for nice page slugs.

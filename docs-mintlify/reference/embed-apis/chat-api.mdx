@@ -957,6 +957,16 @@ Supports the same authentication methods as the Chat API: an
   thread.
 - **`404 Not Found`**: The specified `chatId` does not exist.
 
+<Info>
+
+A successful cancellation is indicated solely by the `204 No Content` status —
+the response has no body. The aborted `stream-chat-state` request itself does
+not fail with an HTTP error: the streaming response already returned `200 OK`
+when the stream opened, so treat the abort endpoint's `204` as the
+confirmation that the stream was aborted.
+
+</Info>
+
 ### Code Examples
 
 <CodeGroup>
