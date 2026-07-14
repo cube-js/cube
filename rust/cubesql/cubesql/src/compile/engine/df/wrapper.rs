@@ -1635,9 +1635,33 @@ impl WrappedSelectNode {
         )
         .await?;
 
+        // Sort expressions can reference window expressions computed in this same select
+        // by their full DataFusion name. Those columns don't exist in the source SQL, so
+        // rewrite them to the generated window aliases, which ORDER BY can reference by name.
+        let order_expr = if window.is_empty() {
+            self.order_expr.clone()
+        } else {
+            let window_columns = self
+                .window_expr
+                .iter()
+                .zip(window.iter())
+                .map(|(window_expr, (aliased_column, _))| {
+                    Ok((
+                        Column::from_name(expr_name(window_expr, schema)?),
+                        Column::from_name(&aliased_column.alias),
+                    ))
+                })
+                .collect::<result::Result<HashMap<_, _>, CubeError>>()?;
+            let window_columns_ref = window_columns.iter().collect();
+            self.order_expr
+                .iter()
+                .map(|e| replace_col(e.clone(), &window_columns_ref))
+                .collect::<Result<Vec<_>>>()?
+        };
+
         let (order, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.order_expr.iter().cloned(),
+            order_expr,
             sql,
             generator.clone(),
             column_remapping,
@@ -3763,13 +3787,15 @@ impl WrappedSelectNode {
                                 let aliased_column = find_column(&self.aggr_expr, &aggregate)
                                     .or_else(|| find_column(&self.projection_expr, &projection))
                                     .or_else(|| find_column(&flat_group_expr, &group_by))
+                                    .or_else(|| find_column(&self.window_expr, &window))
                                     .ok_or_else(|| {
                                         DataFusionError::Execution(format!(
-                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
+                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?} or window {:?}",
                                             col_name,
                                             self.projection_expr,
                                             self.aggr_expr,
-                                            flat_group_expr
+                                            flat_group_expr,
+                                            self.window_expr
                                         ))
                                     })?;
                                 Ok(vec![
