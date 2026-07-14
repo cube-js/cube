@@ -218,6 +218,42 @@ paths:
       summary: Stream chat state
       tags:
         - Chat
+  /chat/abort:
+    post:
+      description: >-
+        Stops an in-progress chat stream — for example, when the user cancels a request or
+        navigates away while the agent is still generating a response.
+
+
+        The abort URL is derived from the Chat API URL by replacing `/stream-chat-state` with
+        `/abort`.
+
+
+        A successful cancellation is indicated solely by the `204 No Content` status — the
+        response has no body. Note that the aborted `stream-chat-state` request itself does not
+        fail with an HTTP error: the streaming response already returned `200 OK` when the stream
+        opened, so treat this endpoint's `204` as the confirmation that the stream was aborted.
+      operationId: abortChat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbortChatRequest'
+        description: Abort request identifying the chat thread to stop.
+        required: true
+      responses:
+        '204':
+          description: Chat streaming was aborted successfully. The response has no body.
+        '403':
+          description: The authenticated user does not own the specified chat thread.
+        '404':
+          description: The specified `chatId` does not exist.
+      security:
+        - apiKey: []
+        - cubeToken: []
+      summary: Abort chat stream
+      tags:
+        - Chat
 components:
   securitySchemes:
     apiKey:
@@ -236,6 +272,18 @@ components:
         scope in its `scope` claim (an array). Disabled by default — enable it in your
         deployment settings.
   schemas:
+    AbortChatRequest:
+      properties:
+        chatId:
+          description: >-
+            Chat thread ID to abort. Must match the `chatId` of an active or recently completed
+            chat session.
+          type: string
+        sessionSettings:
+          $ref: '#/components/schemas/SessionSettingsDto'
+      required:
+        - chatId
+      type: object
     ChatRequest:
       properties:
         activeBranchName:

@@ -36,7 +36,7 @@ const OUT = path.join(__dirname, '..', 'api-reference', 'chat.yaml');
 
 // Source path(s) to include. The public endpoint is served under
 // .../agents/{agentId}, so strip the leading /api (the server URL holds it).
-const SRC_PATHS = ['/api/chat/stream-chat-state'];
+const SRC_PATHS = ['/api/chat/stream-chat-state', '/api/chat/abort'];
 const TAG = 'Chat';
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
