@@ -47,6 +47,7 @@ const INTERNAL_CHAT_REQUEST_FIELDS = [
   'context',
   'cubeCredentials',
   'dashboardContext',
+  'isDevMode',
   'workbookContext',
   'workbookId',
 ];
