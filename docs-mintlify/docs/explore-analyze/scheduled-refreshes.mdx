@@ -73,6 +73,9 @@ The sidebar lists all existing schedules with the following information:
 - **Enable/disable toggle** — turn schedules on or off without deleting them.
 - **Next run time** — shows the next scheduled execution, or "Disabled" if the
   schedule is off.
+- **Notification channel** — when a [notification][ref-notifications] is
+  configured, the card shows its delivery channel, for example "Notification:
+  Email" or "Notification: Slack (#channel)".
 
 ### Actions
 
@@ -80,7 +83,26 @@ The sidebar lists all existing schedules with the following information:
 | --- | --- |
 | Run now | Manually trigger the schedule immediately |
 | Edit | Open the form dialog to modify the schedule |
+| Duplicate | Create a new schedule pre-filled from this one (see [Duplicating a schedule](#duplicating-a-schedule)) |
 | Delete | Remove the schedule permanently |
+
+## Duplicating a schedule
+
+To create a new schedule based on an existing one — for example, to send the
+same dashboard to another Slack channel or a different set of recipients without
+re-entering the frequency, timezone, and notification settings — you can
+duplicate it. There are two ways:
+
+- **From the sidebar** — click the duplicate (copy) icon on a schedule card. The
+  form dialog opens pre-filled with that schedule's frequency, timezone, and
+  notification configuration. Adjust anything you need, then click **Save** to
+  create the new schedule.
+- **From the edit dialog** — while editing a schedule, click **Save as copy** in
+  the dialog footer. This creates a new schedule from the current form values,
+  including any unsaved changes, instead of updating the original.
+
+Duplicates are independent schedules: the original is left unchanged, and the
+copy keeps the source schedule's enabled or disabled state.
 
 ## Run phases
 
@@ -95,4 +117,4 @@ When a scheduled refresh runs, it progresses through these phases:
 The sidebar shows real-time status updates during execution.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
-[ref-notifications]: /analytics/notifications
+[ref-notifications]: /docs/explore-analyze/notifications
