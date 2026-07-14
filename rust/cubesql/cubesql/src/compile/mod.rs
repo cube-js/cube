@@ -17415,6 +17415,56 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_sort_by_window_expr_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            WITH monthly AS (
+                SELECT
+                    customer_gender,
+                    DATE_TRUNC('month', order_date) AS order_date_month,
+                    MEASURE(sumPrice) AS monthly_spend
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1, 2
+                LIMIT 5000
+            )
+            SELECT
+                customer_gender,
+                order_date_month,
+                monthly_spend,
+                SUM(monthly_spend) OVER (PARTITION BY customer_gender) AS ytd_total
+            FROM monthly
+            ORDER BY ytd_total DESC, customer_gender, order_date_month
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        // ORDER BY must reference the window expression by its generated alias,
+        // not by the raw DataFusion expression name
+        assert!(!sql.contains("PARTITION BY [#"));
+        let window_alias = &regex::Regex::new(r#"OVER \(PARTITION BY [^)]+\) "([^"]+)""#)
+            .unwrap()
+            .captures(&sql)
+            .expect("window expression with alias must be present in generated SQL")[1];
+        assert!(sql.contains(&format!(r#"ORDER BY "{window_alias}" DESC"#)));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
     async fn test_date_filter_with_or_and() {
         init_testing_logger();
 
