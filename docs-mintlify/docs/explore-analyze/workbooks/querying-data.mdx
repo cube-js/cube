@@ -213,6 +213,13 @@ The **Semantic SQL** tab also has a dropdown for viewing the same query in the f
 
 These views are convenient when you want to take a query you've built interactively in a workbook and reuse it directly through one of the Core Data APIs from your own application.
 
+## Result freshness and provenance
+
+Two indicators next to each result describe the data behind it.
+
+- **Freshness** — a leaf icon shows how recently the underlying data was refreshed. Hover over it to see the last refresh time (for example, "Refreshed 5 minutes ago"); its color shifts as the data ages, so you can tell fresh from stale results at a glance. If the refresh time can't be determined, the leaf turns gray with a "Data age unknown" label. When you have access to [Query History](/admin/monitoring/query-history), clicking the leaf opens the underlying request for that result.
+- **Pre-aggregation** — for those same users, a lightning-bolt icon appears next to the leaf with a "Served from a pre-aggregation" label whenever the result was served from a [pre-aggregation](/docs/pre-aggregations). If no icon is shown, the query ran directly against your data source.
+
 ## Editing Semantic SQL by hand
 
 You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert.
