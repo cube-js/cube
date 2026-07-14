@@ -306,8 +306,6 @@ components:
         isDefaultBranch:
           description: Whether `activeBranchName` is the default branch. Defaults to `true` when not set.
           type: boolean
-        isDevMode:
-          type: boolean
         messageId:
           description: >-
             Client-provided identifier in the format `<timestamp>-message` (13+ digit Unix
