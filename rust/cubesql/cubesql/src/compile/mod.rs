@@ -18928,6 +18928,36 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_order_by_ungrouped_column_returns_error() {
+        init_testing_logger();
+
+        // ORDER BY expression references a column consumed by the Aggregate and not
+        // present in GROUP BY — the query is invalid and must be rejected during
+        // planning instead of producing unresolvable SQL for the data source
+        let error = TestContext::new(DatabaseProtocol::PostgreSQL)
+            .await
+            .convert_sql_to_cube_query(
+                r#"
+                SELECT
+                    CASE
+                        WHEN order_date >= '2024-06-01' THEN 'recent'
+                        ELSE 'older'
+                    END AS time_period,
+                    MEASURE(count) AS cnt
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1
+                ORDER BY CASE WHEN order_date >= '2024-06-01' THEN 1 ELSE 2 END
+                "#,
+            )
+            .await
+            .expect_err("query with ORDER BY over ungrouped column should not plan");
+
+        assert!(error
+            .to_string()
+            .contains("must appear in the GROUP BY clause or be used in an aggregate function"));
+    }
+
+    #[tokio::test]
     async fn test_set_cache_mode() -> Result<(), CubeError> {
         if !Rewriter::sql_push_down_enabled() {
             return Ok(());
