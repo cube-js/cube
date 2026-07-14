@@ -11,9 +11,9 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Array,
-            Int32Builder, Int64Array, Int64Builder, IntervalMonthDayNanoArray, ListArray,
-            ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            Date32Array, Date32Builder, Float64Array, Float64Builder, GenericStringArray,
+            Int32Array, Int32Builder, Int64Array, Int64Builder, IntervalMonthDayNanoArray,
+            ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
             StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
             TimestampNanosecondArray, TimestampNanosecondBuilder, TimestampSecondArray,
             UInt32Builder, UInt64Builder,
@@ -31,8 +31,7 @@ use datafusion::{
     logical_plan::create_udf,
     physical_plan::{
         functions::{
-            datetime_expressions::date_trunc, make_scalar_function, make_table_function, Signature,
-            TypeSignature, Volatility,
+            make_scalar_function, make_table_function, Signature, TypeSignature, Volatility,
         },
         udaf::AggregateUDF,
         udf::ScalarUDF,
@@ -47,10 +46,13 @@ use regex::Regex;
 use sha1_smol::Sha1;
 
 use crate::{
-    compile::engine::{
-        df::{coerce::common_type_coercion, columar::if_then_else},
-        information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
-        udf::utils::*,
+    compile::{
+        date_parser::parse_date_str,
+        engine::{
+            df::{coerce::common_type_coercion, columar::if_then_else},
+            information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
+            udf::utils::*,
+        },
     },
     sql::SessionState,
 };
@@ -786,24 +788,46 @@ pub fn create_ends_with_udf() -> ScalarUDF {
 
 pub fn create_to_date_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 2 || args.len() == 3);
+        assert!(args.len() == 2);
 
-        return Err(DataFusionError::NotImplemented(format!(
-            "to_date is not implemented, it's stub"
-        )));
+        let dates = downcast_string_arg!(args[0], "date", i32);
+        let formats = downcast_string_arg!(args[1], "format", i32);
+
+        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+        let mut builder = Date32Builder::new(dates.len());
+        for i in 0..dates.len() {
+            if dates.is_null(i) || formats.is_null(i) {
+                builder.append_null()?;
+                continue;
+            }
+
+            let chrono_format = match formats.value(i) {
+                "YYYY-MM-DD" | "yyyy-MM-dd" => "%Y-%m-%d",
+                format => {
+                    return Err(DataFusionError::NotImplemented(format!(
+                        "TO_DATE format is not supported: {}",
+                        format
+                    )))
+                }
+            };
+            let date = NaiveDate::parse_from_str(dates.value(i), chrono_format).map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Error parsing {:?} in TO_DATE: {}",
+                    dates.value(i),
+                    e
+                ))
+            })?;
+            builder.append_value(date.signed_duration_since(epoch).num_days() as i32)?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
     });
 
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
 
     ScalarUDF::new(
         "to_date",
-        &Signature::one_of(
-            vec![
-                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
-                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Boolean]),
-            ],
-            Volatility::Immutable,
-        ),
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
     )
@@ -875,46 +899,39 @@ pub fn create_date_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
-        let mut args = args
-            .iter()
-            .map(|i| -> Result<ColumnarValue> {
-                if let Some(strings) = i.as_any().downcast_ref::<StringArray>() {
-                    let mut builder = TimestampNanosecondArray::builder(strings.len());
-                    for i in 0..strings.len() {
-                        builder.append_value(
-                            NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
-                                .map_err(|e| DataFusionError::Execution(e.to_string()))?
-                                .and_utc()
-                                .timestamp_nanos_opt()
-                                .unwrap(),
-                        )?;
-                    }
-                    Ok(ColumnarValue::Array(Arc::new(builder.finish())))
-                } else {
-                    assert!(i
-                        .as_any()
-                        .downcast_ref::<TimestampNanosecondArray>()
-                        .is_some());
-                    Ok(ColumnarValue::Array(i.clone()))
-                }
-            })
-            .collect::<Result<Vec<_>>>()?;
-        args.insert(
-            0,
-            ColumnarValue::Scalar(ScalarValue::Utf8(Some("day".to_string()))),
-        );
+        const NANOS_PER_DAY: i64 = 86_400_000_000_000;
+        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
-        let res = date_trunc(args.as_slice())?;
-        match res {
-            ColumnarValue::Array(a) => Ok(a),
-            ColumnarValue::Scalar(_) => Err(DataFusionError::Internal(
-                "Date trunc returned scalar value for array input".to_string(),
-            )),
+        let mut builder = Date32Builder::new(args[0].len());
+        if let Some(strings) = args[0].as_any().downcast_ref::<StringArray>() {
+            for i in 0..strings.len() {
+                if strings.is_null(i) {
+                    builder.append_null()?;
+                } else {
+                    let date = parse_date_str(strings.value(i))?.date();
+                    builder.append_value(date.signed_duration_since(epoch).num_days() as i32)?;
+                }
+            }
+        } else if let Some(timestamps) = args[0].as_any().downcast_ref::<TimestampNanosecondArray>()
+        {
+            for i in 0..timestamps.len() {
+                if timestamps.is_null(i) {
+                    builder.append_null()?;
+                } else {
+                    builder.append_value(timestamps.value(i).div_euclid(NANOS_PER_DAY) as i32)?;
+                }
+            }
+        } else {
+            return Err(DataFusionError::Execution(format!(
+                "DATE expects a string or timestamp argument, actual: {}",
+                args[0].data_type()
+            )));
         }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
     });
 
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
 
     ScalarUDF::new(
         "date",
@@ -934,8 +951,7 @@ pub fn create_date_udf() -> ScalarUDF {
 pub fn create_makedate_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
 
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Millisecond, None))));
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
 
     ScalarUDF::new(
         "makedate",
