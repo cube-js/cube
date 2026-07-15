@@ -1400,3 +1400,61 @@ async fn test_pg_tablespace_location() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_string_agg() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    assert_eq!(
+        execute_query(
+            "SELECT
+                STRING_AGG(x, ', ') AS r1,
+                STRING_AGG(DISTINCT x, ', ') AS r2,
+                STRING_AGG(nothing, ', ') AS r3
+            FROM (
+                SELECT x, NULLIF(x, x) AS nothing
+                FROM (SELECT UNNEST(ARRAY['b', 'a', 'b', 'c']) AS x) t
+            ) t"
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+------------+---------+------+\n\
+            | r1         | r2      | r3   |\n\
+            +------------+---------+------+\n\
+            | b, a, b, c | a, b, c | NULL |\n\
+            +------------+---------+------+"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_string_agg_group_by() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    // GROUP BY goes through the partial/final aggregate path, exercising
+    // per-group state merges
+    assert_eq!(
+        execute_query(
+            "SELECT k, STRING_AGG(DISTINCT x, ', ') AS r
+            FROM (
+                SELECT UNNEST(ARRAY[1, 1, 1, 2, 2]) AS k,
+                       UNNEST(ARRAY['b', 'a', 'b', 'c', 'a']) AS x
+            ) t
+            GROUP BY k
+            ORDER BY k"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+---+------+\n\
+            | k | r    |\n\
+            +---+------+\n\
+            | 1 | a, b |\n\
+            | 2 | a, c |\n\
+            +---+------+"
+    );
+
+    Ok(())
+}

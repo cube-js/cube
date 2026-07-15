@@ -1,5 +1,6 @@
 use std::{
     any::type_name,
+    collections::BTreeSet,
     convert::TryInto,
     mem::swap,
     sync::{Arc, LazyLock},
@@ -2247,6 +2248,177 @@ pub fn create_patch_measure_udaf() -> AggregateUDF {
         &accumulator,
         &state_type,
     )
+}
+
+pub fn create_string_agg_udaf() -> AggregateUDF {
+    // The bytea variant is advertised to match Postgres' signatures, but only
+    // text values are supported; the accumulator errors on binary input
+    let signature = Signature::one_of(
+        vec![
+            TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+            TypeSignature::Exact(vec![DataType::Binary, DataType::Binary]),
+        ],
+        Volatility::Immutable,
+    );
+    let return_type: ReturnTypeFunction =
+        Arc::new(|inputs| Ok(Arc::new(inputs.first().cloned().unwrap_or(DataType::Utf8))));
+    let accumulator: AccumulatorFunctionImplementation =
+        Arc::new(|distinct| Ok(Box::new(StringAggAccumulator::new(distinct))));
+    let state_type: StateTypeFunction = Arc::new(|_, _| {
+        Ok(Arc::new(vec![
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+        ]))
+    });
+    AggregateUDF::new(
+        "string_agg",
+        &signature,
+        &return_type,
+        &accumulator,
+        &state_type,
+    )
+}
+
+#[derive(Debug)]
+struct StringAggAccumulator {
+    values: Vec<String>,
+    delimiter: Option<String>,
+    distinct: bool,
+}
+
+impl StringAggAccumulator {
+    fn new(distinct: bool) -> Self {
+        Self {
+            values: vec![],
+            delimiter: None,
+            distinct,
+        }
+    }
+}
+
+impl Accumulator for StringAggAccumulator {
+    fn state(&self) -> Result<Vec<ScalarValue>> {
+        let values = self
+            .values
+            .iter()
+            .map(|v| ScalarValue::Utf8(Some(v.clone())))
+            .collect::<Vec<_>>();
+        let delimiter = match &self.delimiter {
+            Some(delimiter) => vec![ScalarValue::Utf8(Some(delimiter.clone()))],
+            None => vec![],
+        };
+        Ok(vec![
+            ScalarValue::List(Some(Box::new(values)), Box::new(DataType::Utf8)),
+            ScalarValue::List(Some(Box::new(delimiter)), Box::new(DataType::Utf8)),
+        ])
+    }
+
+    fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
+        if matches!(
+            values[0].data_type(),
+            DataType::Binary | DataType::LargeBinary
+        ) {
+            return Err(DataFusionError::NotImplemented(
+                "STRING_AGG over bytea values is not supported".to_string(),
+            ));
+        }
+        let value_array = cast(&values[0], &DataType::Utf8)?;
+        let value_array = value_array
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("cast to Utf8 must produce a StringArray");
+        let delimiter_array = cast(&values[1], &DataType::Utf8)?;
+        let delimiter_array = delimiter_array
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("cast to Utf8 must produce a StringArray");
+        for (value, delimiter) in value_array.iter().zip(delimiter_array.iter()) {
+            if self.delimiter.is_none() {
+                if let Some(delimiter) = delimiter {
+                    self.delimiter = Some(delimiter.to_string());
+                }
+            }
+            if let Some(value) = value {
+                self.values.push(value.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        let values_list = states[0]
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .ok_or_else(|| {
+                DataFusionError::Execution(
+                    "STRING_AGG state `values` must be a ListArray".to_string(),
+                )
+            })?;
+        for i in 0..values_list.len() {
+            if values_list.is_null(i) {
+                continue;
+            }
+            let row = values_list.value(i);
+            let row = cast(&row, &DataType::Utf8)?;
+            let row = row
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("cast to Utf8 must produce a StringArray");
+            for value in row.iter().flatten() {
+                self.values.push(value.to_string());
+            }
+        }
+
+        let delimiters_list = states[1]
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .ok_or_else(|| {
+                DataFusionError::Execution(
+                    "STRING_AGG state `delimiter` must be a ListArray".to_string(),
+                )
+            })?;
+        for i in 0..delimiters_list.len() {
+            if self.delimiter.is_some() {
+                break;
+            }
+            if delimiters_list.is_null(i) {
+                continue;
+            }
+            let row = delimiters_list.value(i);
+            let row = cast(&row, &DataType::Utf8)?;
+            let row = row
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("cast to Utf8 must produce a StringArray");
+            if let Some(delimiter) = row.iter().flatten().next() {
+                self.delimiter = Some(delimiter.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    fn evaluate(&self) -> Result<ScalarValue> {
+        if self.values.is_empty() {
+            return Ok(ScalarValue::Utf8(None));
+        }
+        let delimiter = self.delimiter.as_deref().unwrap_or("");
+        let result = if self.distinct {
+            self.values
+                .iter()
+                .map(|v| v.as_str())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(delimiter)
+        } else {
+            self.values
+                .iter()
+                .map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(delimiter)
+        };
+        Ok(ScalarValue::Utf8(Some(result)))
+    }
 }
 
 macro_rules! generate_series_udtf {
@@ -5224,11 +5396,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     register_fun_stub!(udaf, "bit_xor", tsigs = [[Int16], [Int32], [Int64],]);
     register_fun_stub!(udaf, "every", tsig = [Boolean], rettyp = Boolean);
     register_fun_stub!(udaf, "median", argc = 1);
-    register_fun_stub!(
-        udaf,
-        "string_agg",
-        tsigs = [[Utf8, Utf8], [Binary, Binary],]
-    );
     register_fun_stub!(
         udaf,
         "regr_avgx",
