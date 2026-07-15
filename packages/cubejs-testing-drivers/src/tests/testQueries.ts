@@ -237,17 +237,22 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         await delay(OP_DELAY);
       }
 
-      // Exercise pre-aggregation build with a custom granularity for every
-      // driver. The granularity name `build_only_half_year` is unique to this
-      // rollup — no query test references it, so the rollup cannot match any
-      // test query and only the build path is exercised.
-      await buildPreaggs(env.cube.port, apiToken, {
-        timezones: ['UTC'],
-        preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
-        contexts: [{ securityContext: { tenant: 't1' } }],
-      });
+      // Exercise pre-aggregation build with a custom granularity. The
+      // granularity name `build_only_half_year` is unique to this rollup — no
+      // query test references it, so the rollup cannot match any test query and
+      // only the build path is exercised.
+      // QuestDB is skipped: its dialect has no date_bin implementation, so
+      // custom time-dimension granularities cannot be materialized (the
+      // corresponding query cases are skipped in fixtures/questdb.json too).
+      if (type !== 'questdb') {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
 
-      await delay(OP_DELAY);
+        await delay(OP_DELAY);
+      }
     });
 
     execute('must not fetch a hidden cube', async () => {
