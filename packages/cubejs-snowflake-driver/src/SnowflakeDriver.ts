@@ -25,6 +25,7 @@ import crypto from 'crypto';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 import { hydrators } from './type-parsers';
+import { ConnectionError } from './errors';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
@@ -435,7 +436,28 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   private async createConnection() {
     const config = await this.prepareConnectOptions();
 
-    return snowflake.createConnection(config);
+    try {
+      return snowflake.createConnection(config);
+    } catch (e) {
+      // snowflake-sdk validates connection options synchronously here and can
+      // throw both clear errors (e.g. a missing account) and opaque ones. Wrap
+      // them so the operator always gets an actionable Snowflake message.
+      throw new ConnectionError(e);
+    }
+  }
+
+  /**
+   * Opens the SDK connection, wrapping any error the SDK throws (including its
+   * opaque internal `TypeError`s) into an actionable {@link ConnectionError}.
+   */
+  private async connect(connection: Connection): Promise<Connection> {
+    try {
+      return await new Promise<Connection>(
+        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+      );
+    } catch (e) {
+      throw new ConnectionError(e);
+    }
   }
 
   /**
@@ -444,9 +466,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public async testConnection() {
     const connection = await this.createConnection();
 
-    await new Promise(
-      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-    );
+    await this.connect(connection);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...rest } = this.config;
     if (!connection.isUp()) {
@@ -478,9 +498,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     try {
       const connection = await this.createConnection();
 
-      await new Promise(
-        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-      );
+      await this.connect(connection);
 
       await this.execute(
         connection,
