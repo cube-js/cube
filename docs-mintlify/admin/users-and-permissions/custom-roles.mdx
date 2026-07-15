@@ -112,8 +112,9 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Group       | Permission                          | What it grants                                                                                                                                                            |
 | ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | General     | Access deployment                   | Foundation permission required to access the deployment at all. A Viewer needs this just to open it.                                                                      |
-| General     | Edit deployment                     | Modify deployment settings.                                                                                                                                               |
+| General     | Edit deployment                     | Modify general deployment settings (name, Build & Deploy, Configuration flags, etc.). Does **not** include environment variables, data sources, or other configuration secrets — see **Manage secrets**. |
 | General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
+| Configuration & Secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
@@ -246,6 +247,7 @@ This section lists every action a custom role can grant. The internal action nam
 | `DeploymentRead`          | Access deployment                                           |
 | `DeploymentUpdate`        | Edit deployment                                             |
 | `DeploymentDelete`        | Delete deployment                                           |
+| `SecretsManage`           | Manage secrets                                              |
 | `SchemaRead`              | View data model                                             |
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
