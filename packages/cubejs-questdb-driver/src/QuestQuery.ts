@@ -1,4 +1,5 @@
 import R from 'ramda';
+import * as moment from 'moment';
 import {
   BaseFilter,
   BaseQuery,
@@ -15,9 +16,24 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   year: 'y'
 };
 
+const QUEST_UNIT_TO_MOMENT: Record<string, moment.unitOfTime.Diff> = {
+  s: 'seconds',
+  m: 'minutes',
+  h: 'hours',
+  d: 'days',
+  w: 'weeks',
+  M: 'months',
+  y: 'years',
+};
+
+// A fixed instant that precedes any realistic analytics data. A custom
+// granularity's origin is shifted back to just before this anchor so QuestDB's
+// timestamp_floor() always buckets forward from an origin at/under the data.
+const DATE_BIN_ORIGIN_ANCHOR = '1000-01-01T00:00:00.000Z';
+const INT32_MAX = 2147483647;
+
 // QuestDB dateadd/datediff take a single-character period unit (e.g. 'd', 'M'),
-// not the full word Cube's parseInterval yields ('day', 'month', …). QuestDB has
-// no quarter unit, so it is expressed as 3 months.
+// not the full word Cube's parseInterval yields ('day', 'month', …).
 const INTERVAL_TO_QUEST_DATE_UNIT: Record<string, { unit: string, factor: number }> = {
   second: { unit: 's', factor: 1 },
   minute: { unit: 'm', factor: 1 },
@@ -25,6 +41,7 @@ const INTERVAL_TO_QUEST_DATE_UNIT: Record<string, { unit: string, factor: number
   day: { unit: 'd', factor: 1 },
   week: { unit: 'w', factor: 1 },
   month: { unit: 'M', factor: 1 },
+  // no quarter unit, 3 months
   quarter: { unit: 'M', factor: 3 },
   year: { unit: 'y', factor: 1 },
 };
@@ -103,20 +120,43 @@ export class QuestQuery extends BaseQuery {
 
   public dateBin(interval: string, source: string, origin: string): string {
     const { stride, unit, count } = this.questFloorStride(interval);
-    const shiftedOrigin = `dateadd('${unit}', ${-1000 * count}, cast('${origin}' as timestamp))`;
+    // timestamp_floor(stride, ts, origin) only buckets forward from `origin`, so
+    // an origin later than the data collapses every row into a single bucket.
+    // Shift `origin` back by a whole number of strides (which preserves the bin
+    // phase, as flooring is periodic modulo the stride) to just before a fixed
+    // anchor that precedes any realistic data.
+    const shift = this.dateBinOriginShift(origin, unit, count);
+    const shiftedOrigin = shift > 0
+      ? `dateadd('${unit}', ${-shift}, cast('${origin}' as timestamp))`
+      : `cast('${origin}' as timestamp)`;
+
     return `timestamp_floor('${stride}', ${source}, ${shiftedOrigin})`;
   }
 
-  private questFloorStride(interval: string): { stride: string, unit: string, count: number } {
-    const parts = [...interval.matchAll(/(\d+)\s+(second|minute|hour|day|week|month|quarter|year)s?/g)];
-    if (parts.length !== 1) {
-      throw new Error(`QuestDB supports only single-unit custom granularities, got: ${interval}`);
+  private dateBinOriginShift(origin: string, unit: string, count: number): number {
+    const parsedOrigin = moment.utc(origin);
+    if (!parsedOrigin.isValid()) {
+      throw new Error(`QuestDB custom granularity has an unparseable origin: ${origin}`);
     }
 
-    const [, num, type] = parts[0];
+    const anchor = moment.utc(DATE_BIN_ORIGIN_ANCHOR);
+    const strides = Math.ceil(parsedOrigin.diff(anchor, QUEST_UNIT_TO_MOMENT[unit]) / count);
+
+    const shift = strides > 0 ? strides * count : 0;
+    if (shift > INT32_MAX) {
+      throw new Error(
+        `QuestDB cannot anchor custom granularity '${count} ${unit}': origin shift ${shift} exceeds dateadd()'s 32-bit range`
+      );
+    }
+
+    return shift;
+  }
+
+  private questFloorStride(interval: string): { stride: string, unit: string, count: number } {
+    const [duration, type] = this.parseInterval(interval);
     const { unit, factor } = INTERVAL_TO_QUEST_DATE_UNIT[type];
 
-    const count = parseInt(num, 10) * factor;
+    const count = duration * factor;
     return { stride: `${count}${unit}`, unit, count };
   }
 
