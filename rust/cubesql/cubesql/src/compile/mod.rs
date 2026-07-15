@@ -19062,6 +19062,59 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_distinct_on_cte() {
+        init_testing_logger();
+
+        // DISTINCT ON was silently dropped during planning; it must dedupe,
+        // keeping the first row per group, in DF post-processing over the
+        // inner cube scan
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"
+            WITH t1 AS (
+                SELECT
+                    customer_gender,
+                    taxful_total_price AS price,
+                    MEASURE(count) AS cnt
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1, 2
+            ),
+            t2 AS (
+                SELECT DISTINCT ON (customer_gender) customer_gender, cnt
+                FROM t1
+                ORDER BY customer_gender, cnt DESC
+            )
+            SELECT * FROM t2
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let request = logical_plan.find_cube_scan().request;
+        assert_eq!(
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
+        );
+        assert_eq!(
+            request.dimensions,
+            Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+            ])
+        );
+        // The dedupe must be present in the plan; previously DISTINCT ON was
+        // silently dropped
+        assert!(
+            format!("{:?}", logical_plan).contains("ROW_NUMBER() PARTITION BY"),
+            "plan must contain the DISTINCT ON window: {:?}",
+            logical_plan
+        );
+    }
+
+    #[tokio::test]
     async fn test_set_cache_mode() -> Result<(), CubeError> {
         if !Rewriter::sql_push_down_enabled() {
             return Ok(());
