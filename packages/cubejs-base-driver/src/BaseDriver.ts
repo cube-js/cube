@@ -1,9 +1,3 @@
-/**
- * @copyright Cube Dev, Inc.
- * @license Apache-2.0
- * @fileoverview The `BaseDriver` and related types declaration.
- */
-
 import * as stream from 'stream';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
@@ -18,6 +12,7 @@ import {
 import fs from 'fs';
 
 import { cancelCombinator } from './utils';
+import { detectTypesFromTabular } from './type-detection';
 import {
   ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
@@ -64,16 +59,6 @@ export type ParsedBucketUrl = {
   original: string;
 };
 
-const sortByKeys = (unordered: any) => {
-  const ordered: any = {};
-
-  Object.keys(unordered).sort().forEach((key) => {
-    ordered[key] = unordered[key];
-  });
-
-  return ordered;
-};
-
 const DbTypeToGenericType: Record<string, string> = {
   'timestamp without time zone': 'timestamp',
   'character varying': 'text',
@@ -97,54 +82,6 @@ const DbTypeToGenericType: Record<string, string> = {
   bool: 'boolean',
   float4: 'float',
   float8: 'double',
-};
-
-const DB_BIG_INT_MAX = BigInt('9223372036854775807');
-const DB_BIG_INT_MIN = BigInt('-9223372036854775808');
-
-const DB_INT_MAX = 2147483647;
-const DB_INT_MIN = -2147483648;
-
-// Order of keys is important here: from more specific to less specific
-const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
-  timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
-  date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
-  int: (v) => {
-    if (Number.isInteger(v)) {
-      return (v <= DB_INT_MAX && v >= DB_INT_MIN);
-    }
-
-    if (v.toString().match(/^[-]?\d+$/)) {
-      const value = BigInt(v.toString());
-
-      return value <= DB_INT_MAX && value >= DB_INT_MIN;
-    }
-
-    return false;
-  },
-  bigint: (v) => {
-    if (Number.isInteger(v)) {
-      return (v <= DB_BIG_INT_MAX && v >= DB_BIG_INT_MIN);
-    }
-
-    if (v.toString().match(/^[-]?\d+$/)) {
-      const value = BigInt(v.toString());
-
-      return value <= DB_BIG_INT_MAX && value >= DB_BIG_INT_MIN;
-    }
-
-    return false;
-  },
-  decimal: (v) => {
-    if (v instanceof Number) {
-      return true;
-    }
-
-    return v.toString().match(/^[-]?\d+(\.\d+)?$/);
-  },
-  boolean: (v) => v === false || v === true || v.toString().toLowerCase() === 'true' || v.toString().toLowerCase() === 'false',
-  string: (v) => v.length < 256,
-  text: () => true
 };
 
 export function createPoolName(driverName: string, dataSource: string, preAggregations: boolean = false): string {
@@ -361,21 +298,7 @@ export abstract class BaseDriver implements DriverInterface {
 
   public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     const rows = await this.query<Row>(query, values);
-    if (rows.length === 0) {
-      throw new Error(
-        'Unable to detect column types for pre-aggregation on empty values in readOnly mode.'
-      );
-    }
-
-    const fields = Object.keys(rows[0]);
-
-    const types = fields.map(field => ({
-      name: field,
-      type: Object.keys(DbTypeValueMatcher).find(
-        type => !rows.filter(row => field in row).find(row => !DbTypeValueMatcher[type](row[field])) &&
-          rows.find(row => field in row)
-      ) || 'text'
-    }));
+    const types = detectTypesFromTabular(rows);
 
     return {
       rows,
