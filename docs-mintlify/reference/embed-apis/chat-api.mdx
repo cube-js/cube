@@ -277,6 +277,14 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
 - **`activeBranchName`** (string): Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch.
 - **`isDefaultBranch`** (boolean): Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name.
 
+<Info>
+
+The request body fields listed above are the complete public contract of the
+Chat API. Any other fields are ignored or resolved automatically on the
+server and should not be sent.
+
+</Info>
+
 ## Idempotency
 
 You can pass a client-provided `messageId` in the request body to make Chat API
@@ -559,6 +567,54 @@ All tool results are returned as **JSON strings** within the `toolCall.result` f
 - Both input and result contain escaped JSON that requires parsing
 - Results may contain nested JSON structures, especially for complex data queries
 - Error responses are also JSON strings with consistent error formatting
+
+#### Tool names
+
+The set of tools available to the agent is **not a fixed, versioned list**:
+it depends on the agent's configuration and evolves as new capabilities are
+added to Cube, so new `toolCall.name` values may appear in the stream at any
+time without notice. Build your client to handle unknown tool names
+gracefully — for example, render them generically or skip them — rather than
+exhaustively matching on every name.
+
+The two tool calls most relevant for rendering a chat UI are documented in
+detail below: [`cubeMeta`](#cubemeta) (semantic model search) and
+[`cubeSqlApi`](#cubesqlapi) (query execution, including the data and the
+Vega-Lite chart spec). The full set of tool names that can appear in the
+stream, with the conditions under which each is available to the agent:
+
+| Tool name | What the agent is doing | Available |
+|-----------|------------------------|-----------|
+| `cubeMeta` | Searching the semantic model for relevant cubes, views, and members | Always |
+| `cubeSqlApi`, `cubeSqlApiWithChart` | Running a SQL query against the deployment; the `WithChart` variant also produces a Vega-Lite chart spec | Always |
+| `searchDimensionValues` | Looking up actual values of a dimension (e.g., to resolve a filter) | Always |
+| `reportsSearch`, `dashboardsSearch` | Searching saved reports and dashboards | Always |
+| `searchHtmlChartExamples` | Searching chart spec examples to base a visualization on | Always |
+| `updateTodoList` | Maintaining the agent's plan for a multi-step task | Always |
+| `task` | Delegating a multi-step job (e.g., building a dashboard or a data-modeling change) to a specialized sub-agent | Always |
+| `handOff` | Switching between task types (e.g., from data analysis to data modeling) | Always |
+| `lookupMemoryAndExamples` | Recalling memories and [certified query](/admin/ai/certified-queries) examples from past runs relevant to the current task | Always |
+| `downVote` | Flagging a recalled memory as incorrect so it is not reused | Always |
+| `loadSkill` | Loading an agent [skill](/admin/ai/skills) | Always |
+| `listThreadAttachments`, `readThreadAttachment` | Listing and reading files attached to the chat thread | Always |
+| `createNewReport`, `createNewReportWithChart`, `updateReport`, `updateReportWithChart` | Creating or updating a saved report | User can create reports and dashboards |
+| `createWorkbook`, `readWorkbook`, `upsertWorkbook`, `publishDashboard`, `setDashboardSlug` | Creating, reading, or updating a workbook, publishing a dashboard, and setting its URL slug | User can create reports and dashboards |
+| `enterDevMode` | Entering development mode on a branch to make data model changes | User has data model access¹ |
+| `listModelFiles`, `readFile`, `fileGrep`, `updateModelFile`, `deleteFile` | Browsing, searching, and editing data model files | User has data model access¹ |
+| `listDataSources`, `listSchemas`, `listTables`, `listTableColumns` | Exploring the connected database's schemas, tables, and columns | User has data model access¹ |
+| `runSql` | Running raw SQL directly against the database | User has data model access¹ |
+| `queryHistory` | Reviewing the deployment's query history | User has data model access¹ |
+| `cubeDocumentationRetrieval` | Searching the Cube documentation | User has data model access¹ |
+| `graphqlQuery` | Querying deployment configuration and management operations | User has data model access¹ |
+| `web_search`, `read_url` | Searching the web or reading a web page | Web access enabled for the agent |
+| `runPythonAnalysis` | Running Python code for advanced analysis | Python analysis enabled for the agent |
+| `sendEmail` | Sending an email on the user's behalf | Email sending enabled for the agent |
+| `createScheduledTask`, `updateScheduledTask`, `deleteScheduledTask`, `listScheduledTasks` | Managing scheduled tasks | Scheduled tasks enabled for the agent |
+| `list_mcp_tools`, `invoke_mcp_tool` | Discovering and invoking connected MCP tools | MCP tools connected for the agent |
+
+¹ Available when the chat user has permission to edit the data model.
+External users (`externalId`) typically do not, so you are unlikely to see
+these tool calls in customer-facing sessions.
 
 **Parsing Example:**
 ```javascript
