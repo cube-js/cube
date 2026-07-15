@@ -1,47 +1,58 @@
 ---
 title: dbt Integration
 sidebarTitle: dbt
-description: Pull dbt models into Cube and convert them into cubes automatically. The dbt integration is currently in preview.
+description: Pull dbt models into Cube and convert them into cubes automatically — manually, from your CI/CD pipeline, or on every push to your dbt repository.
 ---
 
-<Note>
-
-The dbt integration is currently in **preview**. Reach out to your account
-manager or [contact us](https://cube.dev/contact) to have it enabled for your
-Cube account.
-
-</Note>
-
 If your team already models data in [dbt](https://www.getdbt.com/), you can import
-those models into Cube as cubes instead of redefining them by hand. **dbt Pull**
+those models into Cube as cubes instead of redefining them by hand. **dbt pull**
 connects to your dbt project's Git repository, parses the project, converts each dbt
-model into a cube, and commits the generated files to a development branch — where you
-review them before they reach production.
+model into a cube — including dimensions, measures, descriptions, and joins — and
+commits the generated files to a branch where you review them before they reach
+production.
+
+Pulls can run manually, from your CI/CD pipeline, or automatically on every push to
+your dbt repository — so your semantic layer stays in sync with dbt as it evolves.
+
+<Info>
+
+The integration is one-directional: **dbt → Cube**. Cube never writes back to your
+dbt project. dbt stays the source of truth for how tables are transformed; Cube
+serves those models to BI tools, APIs, and AI agents.
+
+</Info>
 
 ## How it works
 
-When you run a pull, Cube:
+When a pull runs — whether triggered manually, from CI, or by a repository push —
+Cube spins up a short-lived, isolated sandbox and:
 
-1. Reads your dbt project from its Git repository.
-2. Converts each dbt model into a cube definition (one `.yml` file per model).
-3. Commits the generated files to your current development branch.
+1. **Clones your dbt repository** (a shallow clone of the branch you selected).
+2. **Installs your project's dependencies** (`dbt deps`).
+3. **Parses the project** (`dbt parse`) to produce dbt's `manifest.json` — the
+   structured description of every model, column, test, and constraint.
+4. **Converts each dbt model into a cube definition** (one `.yml` file per model).
+5. **Commits the generated files** to a branch for review, then tears the sandbox
+   down.
 
-**No connection to your data warehouse is made during a pull.** Cube only reads your
-dbt project code and writes cube files — it never queries or modifies your warehouse.
+**No connection to your data warehouse is made during a pull.** Cube uses
+`dbt parse`, not `dbt run` or `dbt compile`, so it reads your project's structure
+without ever querying your warehouse. dbt pull generates cube definitions; it assumes
+the underlying tables were already built by your own production `dbt run`.
 
 ## Prerequisites
 
-- **A supported data warehouse.** dbt Pull supports **Snowflake**, **Redshift**, and
-  **Postgres**. If your deployment uses any other database type, the pull dialog will
-  tell you it's unsupported.
-- **A Git repository** containing your dbt project, reachable over **HTTPS**.
-  (SSH remotes are not supported.)
-- **A personal access token (PAT)** with read access to that repository.
-- **The dbt feature enabled** for your account. If you don't see the
-  **Integrations → dbt** menu, contact Cube to have it enabled.
+- **A supported data warehouse.** dbt pull supports **Snowflake**,
+  **Amazon Redshift**, **PostgreSQL**, and **Google BigQuery**. If your deployment
+  uses any other database type, the pull dialog will tell you it's unsupported.
+- **A Git repository** containing your dbt project, reachable over **HTTPS** or
+  **SSH**. GitHub, GitLab, Bitbucket, Azure DevOps, and self-hosted Git servers all
+  work.
+- **Read access to that repository** — either a personal access token (PAT) for
+  HTTPS, or the ability to register a read-only deploy key for SSH.
 - For the generated cubes to return data, the dbt models must already be **built into
   your warehouse** (via your normal production `dbt run`) in the schema you configure
-  below. dbt Pull generates cube definitions that point at `schema.<model>`; it does
+  below. dbt pull generates cube definitions that point at `schema.<model>`; it does
   not create the underlying tables.
 
 ## Connect your dbt repository
@@ -53,7 +64,7 @@ The dbt connection is configured on your deployment's **default data source**.
 <Step title="Open the data source settings">
 
 Go to **Settings → Data Sources** and **edit** the default data source.
-Expand the **dbt project (optional)** section.
+Expand the **dbt project** section.
 
 </Step>
 
@@ -61,21 +72,43 @@ Expand the **dbt project (optional)** section.
 
 | Field | Description |
 | --- | --- |
-| **Repository URL** | The HTTPS clone URL of the repo that contains your dbt project, e.g. `https://github.com/your-org/your-repo.git`. |
-| **Access token (PAT)** | A personal access token with read access to the repository. Leave it unchanged to reuse the existing token. |
+| **Repository URL** | The clone URL of the repo that contains your dbt project, e.g. `https://github.com/your-org/your-repo.git` or `git@github.com:your-org/your-repo.git`. |
 | **Project path** | The path to the dbt project inside the repository (the folder containing `dbt_project.yml`). Use `.` if the project is at the repository root. |
+| **Branch** | The branch of the dbt repository to sync. Defaults to the repository's default branch. |
 | **dbt models schema** | The schema or dataset where your production dbt run builds its tables. Generated cubes will query the models in this schema. |
+
+</Step>
+
+<Step title="Choose an authentication method">
+
+Two authentication methods are supported:
+
+- **HTTPS + personal access token** — paste a PAT with read access to the
+  repository. Leave it unchanged on later edits to reuse the existing token.
+- **SSH deploy key** — Cube generates a key pair for you and shows you the
+  **public** key to register as a read-only deploy key on your Git host. The
+  private key is generated and stored server-side and never leaves Cube.
+
+Whichever method you use, the secret is stored encrypted and resolved server-side
+at pull time — your Git credentials never reach the browser.
+
+<Frame>
+  <img
+    src="https://ucarecdn.com/4b82b61a-ff32-4483-999c-310f5a6907bb/42acfc1b-light.png"
+    alt="dbt project settings card with the SSH authentication method selected and the generated public deploy key"
+  />
+</Frame>
 
 </Step>
 
 <Step title="Test the connection">
 
 Click **Test connection**. Cube checks that the repository is reachable with your
-URL and token and reports the result:
+URL and credentials and reports the result:
 
-- **"Repository is reachable with this token"** — you're good to save.
+- **"Repository is reachable"** — you're good to save.
 - An error message identifying the problem (invalid/expired token, repository not
-  found, host unreachable, not a Git URL, SSH remote, etc.).
+  found, host unreachable, not a Git URL, etc.).
 
 </Step>
 
@@ -87,39 +120,41 @@ Click **Save dbt settings**.
 
 </Steps>
 
-The access token is stored encrypted and is never returned to the browser. Saving
-these settings does not restart your deployment.
+Saving these settings does not restart your deployment.
 
-## Pull the models
+## Configure pull settings
+
+Pull options are saved on the integration itself, so every pull — manual or
+automated — uses the same configuration:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| **Output path** | `/model/cubes/dbt` | Directory in the repository where the generated cube files are written. This folder is replaced on each pull. |
+| **Name prefix** | `dbt_` | Prefix added to each generated cube's name. |
+| **Title prefix** | `(dbt) ` | Prefix added to each generated cube's display title. |
+| **Model selector** | _(empty)_ | Optional dbt selector using `dbt ls --select` syntax to limit which models are pulled, e.g. `tag:cube` or `marts.*`. Leave empty to pull all models. |
+| **Only pull marts** | Off | When enabled, only pulls models whose path starts with the **Marts folder** value (e.g. `marts`). |
+| **Auto-detect primary keys** | On | Marks `id` / `*_id` columns (and columns with a dbt `primary_key` constraint) as the cube's primary key. |
+| **Add default measures** | On | Adds a `count` measure to every cube, and `sum` measures for additive numeric columns. |
+| **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
+| **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
+
+## Run a pull manually
 
 <Steps>
 
 <Step title="Enter development mode">
 
 Open the deployment's **data model** page (the IDE) and enter **development mode**.
-The dbt integration is disabled outside dev mode — the pull lands on your dev branch,
-never directly on production.
+The dbt integration is disabled outside dev mode — a manual pull lands on your dev
+branch, never directly on production.
 
 </Step>
 
 <Step title="Open the pull dialog">
 
-Open the **Integrations** menu → **dbt** → **Pull**.
-
-</Step>
-
-<Step title="Set the output options">
-
-In the **Pull from dbt Models** dialog, configure how the cubes are generated:
-
-| Option | Default | Description |
-| --- | --- | --- |
-| **Path** | `/model/cubes/dbt` | Directory in the repository where the generated cube files are written. |
-| **Name prefix** | `dbt_` | Prefix added to each generated cube's name. |
-| **Title prefix** | `(dbt) ` | Prefix added to each generated cube's display title. |
-| **Model selector** | _(empty)_ | Optional dbt selector using `dbt ls --select` syntax to limit which models are pulled, e.g. `tag:cube` or `marts.*`. Leave empty to pull all models. |
-| **Auto-detect primary keys** | On | Marks `id` / `*_id` columns (and columns with a dbt `primary_key` constraint) as the cube's primary key. |
-| **Only pull marts** | Off | When enabled, only pulls models whose path starts with the **Marts folder** value (e.g. `marts`). |
+Open the **Integrations** menu → **dbt** → **Pull**. The dialog shows what will be
+pulled using your saved settings.
 
 <Warning>
 
@@ -142,13 +177,54 @@ under the output path, on your development branch.
 
 </Steps>
 
-Review the generated cubes, then commit and merge the branch through your normal
-workflow.
+Review the generated cubes in the **Changes** view, then commit and merge the branch
+through your normal workflow.
+
+## Keep Cube in sync automatically
+
+Automated syncs run the same pipeline as a manual pull, but instead of committing to
+your working branch they **create a fresh review branch** — so a person can approve
+the update before it reaches the live data model.
+
+### Trigger from your CI/CD pipeline
+
+Cube exposes a REST endpoint you can call at the end of your dbt deployment pipeline,
+right after `dbt run`. As soon as your warehouse tables are rebuilt, your pipeline
+tells Cube to regenerate the matching cubes. The exact endpoint URL for your
+deployment is shown in the dbt settings card, ready to drop into a CI step.
+
+<Frame>
+  <img
+    src="https://ucarecdn.com/2c278503-75cc-474b-920e-877ac5f530d7/2a32f0e7-light.png"
+    alt="API trigger section of the dbt settings card showing the sync endpoint URL"
+  />
+</Frame>
+
+### Trigger on every push
+
+Register a webhook on your dbt repository so Cube syncs automatically whenever the
+tracked branch is updated. In the settings card, generate a signing secret and copy
+the callback URL into your Git host's webhook settings. Pushes are verified by
+signature, de-duplicated (redeliveries and no-op ref changes are ignored), and scoped
+to the branch you're syncing.
+
+<Frame>
+  <img
+    src="https://ucarecdn.com/aba67409-ac67-471a-b7b5-ed55b644a466/22806854-light.png"
+    alt="Webhook section of the dbt settings card with the signing secret and callback URL"
+  />
+</Frame>
+
+### Review notifications
+
+When an automated sync produces a branch that's ready to review, Cube emails the
+recipients you configure — a comma-separated list in the settings card — with a link
+straight to the review. No one has to poll the UI to notice that dbt changed.
 
 ## What gets generated
 
-dbt Pull converts **models and their columns**. dbt **metrics, semantic models, and
-tests are not imported.**
+dbt pull converts **models, their columns, and their relationships**. dbt
+**metrics and semantic models are not imported.**
 
 For each dbt model in your project:
 
@@ -167,10 +243,17 @@ For each dbt model in your project:
   | `date`, `datetime`, `timestamp`, `timestamptz`, `time` | `time` |
   | `boolean`, `bool` | `boolean` |
 
-- **Column descriptions** from your dbt project are carried over to the dimensions.
+- **Model and column descriptions** from your dbt project are carried over to the
+  cubes and dimensions.
 - **A `count` measure** is added to every cube.
 - **`total_<column>` sum measures** are added for numeric columns whose names suggest
   an additive metric (names containing `amount`, `price`, `cost`, `total`, or `value`).
+- **Primary keys** are detected from `id` / `*_id` columns and dbt `primary_key`
+  constraints, and the matching dimensions are marked `primary_key`.
+- **Joins between cubes** are generated from dbt `relationships` tests and
+  foreign-key constraints, with the relationship type (`many_to_one`,
+  `one_to_many`, or `one_to_one`) inferred from the models — so the generated data
+  model is queryable across cubes out of the box.
 
 Models named `metricflow_time_spine` and any non-model resources (sources, seeds,
 snapshots, etc.) are skipped.
@@ -201,37 +284,30 @@ pull. Keep customizations in a separate cube that `extends` the generated one.
 
 ## Limitations
 
-- **Supported warehouses:** Snowflake, Redshift, and Postgres only.
-- **Imports models and columns only** — not dbt metrics, semantic models, tests,
-  exposures, or joins/relationships.
-- **HTTPS + PAT authentication only** — SSH remotes and other auth methods are not
-  supported.
-- **Pulls from the repository's default branch.**
-- **Manual, on-demand** — pulls are triggered from the UI; there is no scheduled or
-  automatic sync.
+- **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, and Google
+  BigQuery.
+- **Imports models, columns, and relationships only** — not dbt metrics, semantic
+  models, tests, or exposures.
+- **One-directional** — Cube never pushes anything back to your dbt repository.
+- **No warehouse connection** — a pull doesn't trigger a `dbt run`; it assumes your
+  tables are already built.
 - **One dbt project per deployment.**
 
 ## Troubleshooting
 
 <AccordionGroup>
 
-<Accordion title="The Integrations → dbt menu doesn't appear">
-
-The dbt feature isn't enabled for your account. Contact Cube to enable it.
-
-</Accordion>
-
 <Accordion title="The dbt menu item is greyed out">
 
-You're not in development mode. Enter dev mode on the data model page — dbt Pull only
-runs against a dev branch.
+You're not in development mode. Enter dev mode on the data model page — a manual
+pull only runs against a dev branch.
 
 </Accordion>
 
 <Accordion title="The pull dialog says the database type is unsupported">
 
-Your deployment uses a database other than Snowflake, Redshift, or Postgres. dbt Pull
-isn't available for it.
+Your deployment uses a database other than Snowflake, Amazon Redshift, PostgreSQL,
+or Google BigQuery. dbt pull isn't available for it.
 
 </Accordion>
 
@@ -249,11 +325,12 @@ administrator, ask someone who manages the deployment to set it up.
 The message identifies the cause:
 
 - *Authentication failed* — the token is invalid, expired, or lacks read access to
-  the repository. Generate a new read-scoped token.
+  the repository (for HTTPS), or the deploy key isn't registered on the repository
+  (for SSH). Generate a new read-scoped token, or register the public deploy key
+  shown in the settings card.
 - *Repository not found* — check the URL; for private repos this can also mean the
-  token can't see the repo.
-- *Unsupported protocol / SSH remotes aren't supported* — use the repository's HTTPS
-  clone URL, not an SSH (`git@…`) URL.
+  credential can't see the repo.
+- *Unsupported protocol* — use the repository's HTTPS or SSH clone URL.
 - *Host unreachable / could not resolve host* — check the URL; the host must be
   reachable over the public internet.
 
@@ -282,9 +359,22 @@ filters. Adjust the selector/marts folder and try again. Confirm the selector wi
 
 </Accordion>
 
+<Accordion title="A webhook push doesn't trigger a sync">
+
+Check that:
+
+- The webhook is registered on the **dbt repository** with the callback URL and
+  signing secret from the settings card.
+- The push targets the **branch** configured in the dbt settings — pushes to other
+  branches are ignored.
+- The delivery isn't a redelivery or a no-op ref change — those are de-duplicated
+  and skipped.
+
+</Accordion>
+
 <Accordion title="The pull succeeded but Playground returns no data">
 
-dbt Pull generates cube definitions that point at `schema.<model>`, but it doesn't
+dbt pull generates cube definitions that point at `schema.<model>`, but it doesn't
 build the tables. Make sure your production `dbt run` has materialized the models
 into the **dbt models schema** you configured, and that the schema matches.
 
