@@ -2179,6 +2179,7 @@ FROM MultiTypeCube
 WHERE
     DATE_TRUNC('day', CAST(dim_date0 AS TIMESTAMP)) >=
      '2025-01-01'
+    AND LOWER(dim_str0) = 'some value'
 GROUP BY
     1
 ;
@@ -2609,5 +2610,50 @@ GROUP BY 1
     assert_eq!(
         params_in_sql_order,
         vec!["sub_notes", "male_notes", "female_notes", "other_notes"]
+    );
+}
+
+/// Date-only string literals (e.g. `'2026-06-24'`) compared to a timestamp column
+/// inside an aggregated CASE expression must be normalized to timestamps
+/// so the whole query can be pushed down to the wrapper.
+#[tokio::test]
+async fn test_case_wrapper_sum_case_date_only_string() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT
+            customer_gender,
+            SUM(CASE WHEN order_date >= '2026-06-24' AND order_date < '2026-06-25' THEN sumPrice END) AS today_amount,
+            MEASURE(sumPrice) AS mtd_amount
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+            AND order_date >= '2026-06-01'
+            AND order_date <= '2026-06-24'
+        GROUP BY 1
+        HAVING MEASURE(sumPrice) != 0
+        ORDER BY 3 DESC
+        LIMIT 100
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("2026-06-24T00:00:00.000Z"),
+        "expected date-only string normalized to timestamp, got: {}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
     );
 }

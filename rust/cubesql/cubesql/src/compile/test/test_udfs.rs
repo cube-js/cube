@@ -50,6 +50,51 @@ async fn test_ends_with() -> Result<(), CubeError> {
 }
 
 #[tokio::test]
+async fn test_date() -> Result<(), CubeError> {
+    assert_eq!(
+        execute_query(
+            "select \
+                    DATE('2019-01-15 10:30:35.5') as r1,
+                    DATE('2019-01-15') as r2,
+                    DATE(CAST('2019-01-15 10:30:35' AS TIMESTAMP)) as r3;
+                "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+------------+------------+------------+\n\
+            | r1         | r2         | r3         |\n\
+            +------------+------------+------------+\n\
+            | 2019-01-15 | 2019-01-15 | 2019-01-15 |\n\
+            +------------+------------+------------+"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_to_date() -> Result<(), CubeError> {
+    assert_eq!(
+        execute_query(
+            "select \
+                    TO_DATE('2020-02-20', 'YYYY-MM-DD') as r1,
+                    TO_DATE('2020-02-20', 'yyyy-MM-dd') as r2;
+                "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?,
+        "+------------+------------+\n\
+            | r1         | r2         |\n\
+            +------------+------------+\n\
+            | 2020-02-20 | 2020-02-20 |\n\
+            +------------+------------+"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_locate() -> Result<(), CubeError> {
     assert_eq!(
         execute_query(

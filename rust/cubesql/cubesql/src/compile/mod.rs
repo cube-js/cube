@@ -16097,8 +16097,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        // WHY NOT "2025-01-01T00:00:00.000Z".to_string(), ?
-                        "2025-01-01".to_string(),
+                        "2025-01-01T00:00:00.000Z".to_string(),
                         "2025-01-31T23:59:59.999Z".to_string()
                     ])),
                 }]),
@@ -17059,8 +17058,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2024-01-01".to_string(),
-                        "2024-02-29".to_string()
+                        "2024-01-01T00:00:00.000Z".to_string(),
+                        "2024-02-29T00:00:00.000Z".to_string()
                     ]))
                 }]),
                 order: Some(vec![]),
