@@ -19007,6 +19007,61 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_cte_order_by_unprojected_column() {
+        init_testing_logger();
+
+        // The CTE's ORDER BY references `cnt`, which is not in the CTE's projection;
+        // the sort column must be resolved through the CTE's aliased projection
+        // during DF post-processing planning
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"
+            WITH t1 AS (
+                SELECT
+                    customer_gender,
+                    taxful_total_price AS price,
+                    MEASURE(count) AS cnt
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1, 2
+            ),
+            t2 AS (
+                SELECT customer_gender, price
+                FROM t1
+                ORDER BY customer_gender, cnt DESC
+            )
+            SELECT * FROM t2
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let request = logical_plan.find_cube_scan().request;
+        assert_eq!(
+            request.dimensions,
+            Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+            ])
+        );
+        assert_eq!(
+            request.order,
+            Some(vec![
+                vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ],
+                vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string(),
+                ],
+            ])
+        );
+    }
+
+    #[tokio::test]
     async fn test_set_cache_mode() -> Result<(), CubeError> {
         if !Rewriter::sql_push_down_enabled() {
             return Ok(());
