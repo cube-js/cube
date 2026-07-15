@@ -173,6 +173,12 @@ export async function runEnvironment(
   if (type === 'pinot') {
     compose.withWaitStrategy('pinot-server', Wait.forHealthCheck().withStartupTimeout(180 * 1000));
   }
+  // QuestDB opens its Postgres-wire port before it is ready to serve queries, so
+  // wait on the container HEALTHCHECK (defined in the questdb fixture, hitting the
+  // HTTP min-health endpoint on port 9003) before connecting.
+  if (type === 'questdb') {
+    compose.withWaitStrategy('data', Wait.forHealthCheck());
+  }
 
   const environment = await compose.up();
 

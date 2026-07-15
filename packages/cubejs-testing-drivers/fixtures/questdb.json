@@ -1,0 +1,300 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+      "CUBEJS_DB_TYPE": "questdb",
+      "CUBEJS_DB_HOST": "data",
+      "CUBEJS_DB_PORT": "8812",
+      "CUBEJS_DB_NAME": "qdb",
+      "CUBEJS_DB_USER": "admin",
+      "CUBEJS_DB_PASS": "quest",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
+    },
+    "depends_on": ["data"],
+    "links": ["data"],
+    "ports" : ["4000", "5656"]
+  },
+  "data": {
+    "image": "questdb/questdb:9.4.3",
+    "environment": {
+      "QDB_CAIRO_SQL_WINDOW_MAX_RECURSION": "8192"
+    },
+    "ports" : ["8812", "9003"],
+    "healthcheck": {
+      "test": ["CMD-SHELL", "curl -f http://127.0.0.1:9003 || exit 1"],
+      "interval": "10s",
+      "timeout": "5s",
+      "retries": 5
+    }
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "to_timestamp(",
+    "DATE_SUFFIX": ", 'yyyy-MM-dd')",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce",
+    "bigecommerce": "bigecommerce",
+    "retailcalendar": "retailcalendar"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.count"
+        ]
+      }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": [],
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
+        "measures": [
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
+  },
+  "skip": [
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
+    "---------------------------------------",
+    "SKIPPED FOR QUESTDB (streaming download not implemented)",
+    "downloadQueryResults ignores streamImport and always returns rows in memory,",
+    "so the stream test never gets a rowStream. The memory path IS implemented and tested.",
+    "---------------------------------------",
+    "must download query from the data source via stream",
+
+    "---------------------------------------",
+    "QuestDB: no source-side (internal) pre-aggregations (read-only driver)",
+    "---------------------------------------",
+    "for the Customers.RollingInternal",
+    "for the ECommerce.SimpleAnalysisInternal",
+    "for the ECommerce.TimeAnalysisInternal",
+
+    "---------------------------------------",
+    "QuestDB: SQL API push-down uses SQL that QuestDB does not support",
+    "(ROLLUP/GROUPING SETS, NULLS FIRST/LAST ordering, count_distinct(DOUBLE), window running total).",
+    "---------------------------------------",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: NULLS FIRST/LAST SQL push down",
+    "SQL API: SQL push down push to cube quoted alias",
+    "SQL API: powerbi min max ungrouped flag",
+    "SQL API: Window function over measure (running total)",
+    "SQL API: Timeshift measure from cube",
+
+    "---------------------------------------",
+    "QuestDB: rolling-window-backed queries push dateadd/timestamp_floor over a scalar",
+    "subquery (SELECT min(date_from) ...), which QuestDB rejects; week granularity here",
+    "is only reached through those rolling-window queries. The SQL API date/time",
+    "comparison cases query rolling-window measures too",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD (month + week + day)",
+    "querying BigECommerce: rolling window YTD (month + week + day + no gran)",
+    "SQL API: Date/time comparison with SQL push down",
+    "SQL API: Date/time comparison with date_trunc with SQL push down",
+
+    "---------------------------------------",
+    "QuestDB: compound-interval and rolling-window-backed custom granularities are",
+    "unsupported (single-unit timestamp_floor stride; rolling windows hit the scalar",
+    "subquery limit). half_year / half_year_by_1st_april work via timestamp_floor.",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation"
+  ],
+  "tesseractSkip": [
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "SQL API: Timeshift measure from cube",
+
+    "---------------------------------------",
+    "QuestDB: SQL API push-down not supported (ROLLUP/GROUPING SETS, NULLS ordering,",
+    "count_distinct(DOUBLE), date_trunc IN/=, window running total).",
+    "---------------------------------------",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: SQL push down push to cube quoted alias",
+    "SQL API: NULLS FIRST/LAST SQL push down",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Window function over measure (running total)",
+    "SQL API: powerbi min max ungrouped flag",
+
+    "---------------------------------------",
+    "QuestDB: rolling windows compute the series bound with a scalar subquery",
+    "(dateadd('M', -1, (SELECT min(date_from) ...))), which QuestDB rejects as a",
+    "CURSOR argument -- QuestDB does not support scalar subqueries in expressions.",
+    "---------------------------------------",
+    "SQL API: Date/time comparison with SQL push down",
+    "SQL API: Date/time comparison with date_trunc with SQL push down",
+    "querying BigECommerce: rolling window by 2 day",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce: time series in rolling window",
+    "querying BigECommerce: rolling window YTD (month)",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD (month + week + day)",
+    "querying BigECommerce: rolling window YTD (month + week + day + no gran)",
+    "querying BigECommerce: rolling window YTD without date range",
+
+    "---------------------------------------",
+    "QuestDB: custom granularities work via timestamp_floor (half_year etc.), but a",
+    "compound interval and rolling-window-backed custom granularities are unsupported",
+    "(single-unit stride only; rolling windows hit the scalar-subquery limit above).",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+
+    "---------------------------------------",
+    "QuestDB: SwitchSourceTest full cross join (nested source x curr switch) generates a",
+    "16-CTE WITH query; QuestDB mis-resolves positional ORDER BY inside those nested CTEs",
+    "(Invalid column: N) even though each CTE is valid standalone. The fix belongs in the",
+    "CubeSQL planner (drop the redundant CTE-internal ORDER BY); ordering by expression",
+    "instead regresses ~40 ordinary queries, so it cannot be fixed in the dialect.",
+    "---------------------------------------",
+    "querying SwitchSourceTest: full cross join"
+  ]
+}

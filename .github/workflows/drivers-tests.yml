@@ -24,6 +24,7 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-pinot-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
@@ -52,6 +53,7 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-pinot-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
@@ -271,6 +273,7 @@ jobs:
           - pinot
           - postgres
           - postgres-pre-agg-credentials
+          - questdb
           - redshift
           - redshift-export-bucket-s3
           - snowflake
@@ -304,6 +307,8 @@ jobs:
           - database: mssql
             use_tesseract_sql_planner: false
           - database: oracle
+            use_tesseract_sql_planner: false
+          - database: questdb
             use_tesseract_sql_planner: false
       fail-fast: false
 
