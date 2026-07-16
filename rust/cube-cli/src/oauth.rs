@@ -10,13 +10,15 @@ use serde::Deserialize;
 /// `client_id`, and the optional `client_secret` are the only deployment-
 /// specific knobs — everything else is standards-compliant.
 ///
-/// NOTE: these defaults are placeholders pending confirmation of the staging
-/// contract. They can also be overridden at runtime with `CUBE_OAUTH_*` env
-/// vars so the flow can be pointed at staging without a rebuild.
-const DEVICE_AUTHORIZATION_PATH: &str = "/auth/oauth2/device_authorization";
-const TOKEN_PATH: &str = "/auth/oauth2/access_token";
+/// Endpoints implemented by the console-server `DeviceOAuthController`
+/// (base `/auth/device`). The `cube-cli` client is public (empty secret),
+/// so no `client_secret` is sent. Overridable at runtime with `CUBE_OAUTH_*`
+/// env vars for non-default deployments.
+const DEVICE_CODE_PATH: &str = "/auth/device/code";
+const TOKEN_PATH: &str = "/auth/device/token";
 const DEFAULT_CLIENT_ID: &str = "cube-cli";
-const DEFAULT_SCOPE: &str = "all";
+/// Empty scope lets the server default to all OAUTH_SCOPES.
+const DEFAULT_SCOPE: &str = "";
 const DEVICE_CODE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
 
 pub struct OAuthConfig {
@@ -56,16 +58,15 @@ fn default_interval() -> u64 {
     5
 }
 
+/// Token response from `POST /auth/device/token`. The controller returns
+/// camelCase `accessToken`/`refreshToken` (with expiry timestamps, scope, and
+/// tenantUrl); aliases keep it tolerant of the RFC 8628 snake_case spelling.
 #[derive(Debug, Deserialize)]
 pub struct TokenResponse {
+    #[serde(alias = "accessToken")]
     pub access_token: String,
-    #[serde(default)]
+    #[serde(default, alias = "refreshToken")]
     pub refresh_token: Option<String>,
-    /// Access-token lifetime in seconds. Retained for a future token-refresh
-    /// path; not yet acted upon.
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub expires_in: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,11 +86,11 @@ pub async fn request_device_code(
     url: &str,
     cfg: &OAuthConfig,
 ) -> Result<DeviceAuthorization> {
-    let endpoint = format!("{}{}", base(url), DEVICE_AUTHORIZATION_PATH);
-    let mut form = vec![
-        ("client_id", cfg.client_id.as_str()),
-        ("scope", cfg.scope.as_str()),
-    ];
+    let endpoint = format!("{}{}", base(url), DEVICE_CODE_PATH);
+    let mut form = vec![("client_id", cfg.client_id.as_str())];
+    if !cfg.scope.is_empty() {
+        form.push(("scope", cfg.scope.as_str()));
+    }
     if let Some(secret) = &cfg.client_secret {
         form.push(("client_secret", secret));
     }
