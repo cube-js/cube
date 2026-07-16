@@ -150,11 +150,7 @@ export type DimensionConfig = {
    * omits built-ins, global customs, and the `type` field. See DEPRECATION.md.
    */
   granularities?: GranularityDefinition[];
-  /**
-   * Reconciled granularity set (enabled built-ins + global customs + local customs) for time
-   * dimensions. Baked in at compile time for env/static global configs; attached per request
-   * by CompilerApi meta variants when `granularities` is a context function.
-   */
+  /** Reconciled set for time dimensions: enabled built-ins + global customs + local customs. */
   effectiveGranularities?: EffectiveGranularity[];
   order?: 'asc' | 'desc';
   key?: string;
@@ -222,12 +218,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly granularitiesOption?: GranularitiesOption;
 
-  /**
-   * Per-dimension granularity inputs for time dimensions that customize their granularity set
-   * (a `granularities` block or local customs). Keyed by `cube.dimension`. Dimensions absent
-   * from this index use the config-wide default set. Consumed by `CompilerApi` to build
-   * context-dependent meta variants when `granularities` is a function; never serialized.
-   */
+  // Inputs for time dimensions that customize their granularity set, keyed by `cube.dimension`;
+  // absent dims use the config-wide default. Read by CompilerApi variant builds; never serialized.
   public readonly granularityInputs: Map<string, NormalizedGranularitiesBlock> = new Map();
 
   // Set during compile() for the context-independent config forms (env / static list);
@@ -263,10 +255,9 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
     this.granularityInputs.clear();
-    // Env / static-list configs are context-independent, so the effective granularity sets are
-    // resolved once here and baked into the meta configs. The function form is never called at
-    // compile time (the compiled model is shared across security contexts); `CompilerApi`
-    // resolves it per request and enriches cached variants from `granularityInputs`.
+    // Env/static configs are resolved once here and baked in. The function form must never run
+    // at compile time (the compiled model is shared across security contexts) — CompilerApi
+    // resolves it per request from `granularityInputs`.
     if (typeof this.granularitiesOption === 'function') {
       this.staticGranularityState = null;
     } else {
@@ -463,12 +454,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
     };
   }
 
-  /**
-   * Granularity-resolution inputs for one time dimension, or null when the dimension has no
-   * local customization and can use the config-wide default set. Local custom titles resolve
-   * here (short-title semantics, matching the legacy `granularities` array); every other field
-   * is projected from the raw definition so that e.g. `sql` never leaks into meta output.
-   */
+  // Resolution inputs for one time dimension; null = no local customization, use the default set.
+  // Fields are projected from raw definitions so e.g. `sql` never leaks into meta output.
   private granularityInputsForDimension(
     cubeTitle: string,
     granularitiesObj: Record<string, GranularityDefinition> | undefined,

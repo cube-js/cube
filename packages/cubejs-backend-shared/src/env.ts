@@ -2052,14 +2052,6 @@ const variables: Record<string, (...args: any) => any> = {
   // Comma-separated names (built-in or custom). Empty/unset = all 8 built-ins enabled.
   granularities: () => get('CUBEJS_GRANULARITIES')
     .asArray(','),
-  /**
-   * Max distinct `granularities` context-function configs cached as enriched meta variants
-   * per compiled model. A bound, not a target: contains a config function accidentally keyed
-   * on a high-cardinality context fact. Exceeding it evicts LRU and logs a warning.
-   */
-  maxGranularityVariants: () => get('CUBEJS_MAX_GRANULARITY_VARIANTS')
-    .default(64)
-    .asInt(),
   // `getEnv` forwards `opts` positionally, so callers pass `{ name }` (matches dbType: { dataSource }).
   granularityCustomInterval: ({ name }: { name: string }) => get(`CUBEJS_GRANULARITIES_${name.toUpperCase()}_INTERVAL`)
     .asString(),

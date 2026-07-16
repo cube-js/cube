@@ -32,7 +32,7 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy, getEnv } from '@cubejs-backend/shared';
+import { disposedProxy } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
@@ -97,18 +97,11 @@ export interface DataSourceInfo {
 }
 
 export class CompilerApi {
-  /**
-   * Bound on cached granularity-enriched meta variants per compiled model
-   * (`CUBEJS_MAX_GRANULARITY_VARIANTS`, default 64). Legitimate distinct-config cardinality is
-   * the product of low-cardinality context facts (fiscal-year origins × locales × week
-   * conventions), so real working sets stay well under the default; the bound exists to contain
-   * a `granularities` function accidentally keyed on something high-cardinality (a user id, a
-   * timestamp), which would otherwise pin one enriched meta copy (~2 MB on a 3k-cube model) per
-   * unique config forever. Exceeding it evicts LRU and logs. The default sits below CubeSQL's
-   * LRU-100 compiler cache — distinct configs mint distinct compilerIds, and cardinality past
-   * that ceiling hurts downstream regardless of this cache.
-   */
-  protected readonly maxGranularityVariants: number;
+  // Bound on cached granularity-enriched meta variants per compiled model (~2 MB each on a
+  // 3k-cube model). Contains a `granularities` function keyed on a high-cardinality context
+  // fact; legitimate configs (calendars × locales) stay well under it. Exceeding evicts LRU
+  // and logs. Kept below CubeSQL's LRU-100 compilerId-keyed cache.
+  protected static readonly MAX_GRANULARITY_VARIANTS = 64;
 
   protected readonly repository: SchemaFileRepository;
 
@@ -178,7 +171,6 @@ export class CompilerApi {
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
     this.granularities = options.granularities;
-    this.maxGranularityVariants = getEnv('maxGranularityVariants');
     this.nativeInstance = this.createNativeInstance();
 
     // Caching stuff
@@ -1120,15 +1112,9 @@ export class CompilerApi {
 
   /**
    * Meta cubes with `effectiveGranularities` attached, plus the hash to mix into compilerId.
-   *
-   * Env/static configs are context-independent: the transformer bakes the effective sets into
-   * the base meta at compile time (their hash is folded into compilerVersion), so this returns
-   * the base cubes untouched with a null hash.
-   *
-   * A function config resolves per request. Enriched variants are cached on the compiled model
-   * keyed by the canonical config hash — a bounded promise-valued LRU, so concurrent misses of
-   * one hash dedup to a single O(model) build, a failed build self-evicts, and the whole cache
-   * is discarded with the compilers object on recompile.
+   * Env/static configs are baked into the base meta at compile time (null hash); a function
+   * config resolves per request against a bounded promise-valued LRU of enriched variants keyed
+   * by config hash and owned by the compiled model, so a recompile discards it.
    */
   protected async selectGranularityVariant(
     compilers: Compiler,
@@ -1152,14 +1138,13 @@ export class CompilerApi {
       cache.delete(granularityHash);
       cache.set(granularityHash, variant);
     } else {
-      if (cache.size >= this.maxGranularityVariants) {
+      if (cache.size >= CompilerApi.MAX_GRANULARITY_VARIANTS) {
         const oldest = cache.keys().next().value;
         cache.delete(oldest);
         this.logger('Granularity variant cache is full', {
-          warning: `More than ${this.maxGranularityVariants} distinct granularity configs seen for one compiled model; ` +
-            'evicting the least recently used variant (raise CUBEJS_MAX_GRANULARITY_VARIANTS if this cardinality is intended). ' +
-            'A `granularities` function returning unstable values causes per-request meta rebuilds ' +
-            'and churns compilerId-based caches (e.g. in CubeSQL).',
+          warning: `More than ${CompilerApi.MAX_GRANULARITY_VARIANTS} distinct granularity configs seen for one compiled model; ` +
+            'evicting the least recently used variant. A `granularities` function returning unstable values ' +
+            'causes per-request meta rebuilds and churns compilerId-based caches (e.g. in CubeSQL).',
         });
       }
       variant = Promise.resolve().then(() => this.buildGranularityVariant(compilers, config));
@@ -1175,11 +1160,9 @@ export class CompilerApi {
   }
 
   /**
-   * One O(model) pass attaching `effectiveGranularities` to every time dimension. Never mutates
-   * the base meta: enriched cubes get new cube/config/dimensions containers, while untouched
-   * members stay shared by reference (all downstream consumers — visibility patch, gateway
-   * filters — copy-on-write rather than mutate). Time dimensions without local customization
-   * share one default set per variant instead of allocating identical arrays per dimension.
+   * One O(model) pass attaching `effectiveGranularities` to every time dimension. Copies only
+   * what it changes — the base meta is never mutated, untouched members stay shared by
+   * reference, and uncustomized time dimensions share one default set per variant.
    */
   protected buildGranularityVariant(compilers: Compiler, config: GlobalGranularitiesConfig): any[] {
     const catalog = buildBuiltInsCatalog(config);
