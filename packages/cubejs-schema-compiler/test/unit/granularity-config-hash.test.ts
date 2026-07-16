@@ -1,4 +1,4 @@
-import { granularityConfigHash } from '../../src/compiler/GranularityConfigHash';
+import { granularityConfigHash } from '../../src/compiler/GlobalGranularitiesConfig';
 import type { GlobalGranularitiesConfig } from '../../src/compiler/GlobalGranularitiesConfig';
 
 const config = (
