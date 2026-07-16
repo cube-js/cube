@@ -73,6 +73,32 @@ export function normalizeGranularitiesBlock(raw: any): NormalizedGranularitiesBl
   return EMPTY_BLOCK;
 }
 
+// Wire shape of one entry in a time dimension's `effectiveGranularities`.
+export type EffectiveGranularity = {
+  name: string;
+  type: 'built-in' | 'custom';
+  title: string;
+  interval?: string;
+  offset?: string;
+  origin?: string;
+  format?: string;
+};
+
+// Serialize a resolved set for /v1/meta. Field order and the conditional inclusion of
+// interval/offset/origin/format are part of the wire contract — keep byte-compatible.
+// `title` falls back to the granularity name (same as /v1/granularities) so it is always present.
+export function serializeEffectiveGranularities(resolved: ResolvedGranularitySet): EffectiveGranularity[] {
+  return Object.entries(resolved).map(([name, def]) => ({
+    name,
+    type: def.type,
+    title: def.title || name,
+    ...(def.interval !== undefined ? { interval: def.interval } : {}),
+    ...(def.offset !== undefined ? { offset: def.offset } : {}),
+    ...(def.origin !== undefined ? { origin: def.origin } : {}),
+    ...(def.format !== undefined ? { format: def.format } : {}),
+  }));
+}
+
 // Reconcile a dimension's local block against the global enabled built-ins and global customs,
 // producing the effective set. Local customs always survive — even if local excludes is '*'.
 export function resolveDimensionGranularities(

@@ -481,7 +481,6 @@ export class CubejsServerCore {
         queryRewrite:
           this.options.queryRewrite || this.options.queryTransformer,
         extendContext: this.options.extendContext,
-        granularities: this.options.granularities,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         apiSecrets: this.options.apiSecrets,
         jwt: this.options.jwt,
@@ -742,6 +741,7 @@ export class CubejsServerCore {
       compileContext: options.context,
       dialectClass: options.dialectClass,
       externalDialectClass: options.externalDialectClass,
+      granularities: this.options.granularities,
       allowJsDuplicatePropsInSchema: options.allowJsDuplicatePropsInSchema,
       sqlCache: this.options.sqlCache,
       standalone: this.standalone,

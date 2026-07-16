@@ -26,6 +26,7 @@ import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import type { ErrorReporter } from './ErrorReporter';
+import type { GranularitiesOption } from './GlobalGranularitiesConfig';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -40,6 +41,10 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
+  // Global `granularities` config (env fallback / static list / context function). Env and
+  // static forms are resolved at compile time by CubeToMetaTransformer; the function form is
+  // resolved per request by CompilerApi.
+  granularities?: GranularitiesOption;
 };
 
 export interface CompilerInterface {
@@ -56,6 +61,12 @@ export type Compiler = {
     compilerCache: CompilerCache;
     headCommitId?: string;
     compilerId: string;
+    /**
+     * Granularity-enriched meta variants, keyed by canonical global-config hash. Owned by the
+     * compiled model (not CompilerApi) so a recompile discards it implicitly. Populated lazily
+     * by CompilerApi when `granularities` is a context function; bounded LRU.
+     */
+    granularityVariants?: Map<string, Promise<any[]>>;
 };
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
@@ -69,7 +80,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator, cubeValidator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph);
+  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph, options.granularities);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
