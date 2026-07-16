@@ -103,13 +103,11 @@ export function resolveDimensionGranularities(
     }
     for (const [name, def] of Object.entries(globalCustom)) {
       // A name shadowing a built-in is an override, already emitted as `type: 'built-in'` above with
-      // its title/format folded in via `allBuiltInsCatalog`. Skip it here so it isn't relabeled custom.
-      if (allBuiltInsCatalog[name]) {
-        continue;
-      }
+      // its title/format folded in via `allBuiltInsCatalog`; skip it here so it isn't relabeled custom.
+      const shadowsBuiltIn = !!allBuiltInsCatalog[name];
       const passesIncludes = includesAllowsAll || includesSet!.has(name);
       const blockedByExcludes = excludesSet!.has(name);
-      if (passesIncludes && !blockedByExcludes) {
+      if (!shadowsBuiltIn && passesIncludes && !blockedByExcludes) {
         out[name] = { ...def, type: 'custom' };
       }
     }
