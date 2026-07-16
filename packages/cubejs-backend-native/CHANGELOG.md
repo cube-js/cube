@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+### Bug Fixes
+
+- **cubesql:** Reject `ORDER BY` over ungrouped columns with a clear error ([#11249](https://github.com/cube-js/cube/issues/11249)) ([ff5eac9](https://github.com/cube-js/cube/commit/ff5eac95c5dcf7a7fb14d978ae2fd597ffd6bf5e))
+- **cubesql:** Support `HAVING` on a measure combined with `ORDER BY` on the same measure ([#11254](https://github.com/cube-js/cube/issues/11254)) ([23b199e](https://github.com/cube-js/cube/commit/23b199e03be75596e150eec551fef68aaedc8251))
+
 ## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
 
 ### Performance Improvements

@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+### Bug Fixes
+
+- **base-driver:** Handle NULL values in readOnly type detection (fix [#11094](https://github.com/cube-js/cube/issues/11094)) ([#11245](https://github.com/cube-js/cube/issues/11245)) ([f06bfb9](https://github.com/cube-js/cube/commit/f06bfb9875c285c63ac99b73a988c7ce1c61ca13))
+- **cubesql:** Normalize date-only string literals in timestamp comparisons ([#11251](https://github.com/cube-js/cube/issues/11251)) ([ec12ff0](https://github.com/cube-js/cube/commit/ec12ff00ffca0084eb8658fad97f42680aa0c0d7))
+- **cubesql:** Reference window expressions by generated alias in `ORDER BY` ([#11250](https://github.com/cube-js/cube/issues/11250)) ([8068893](https://github.com/cube-js/cube/commit/8068893a2d83d62038436884d67ba700a7d515b7))
+- **cubesql:** Reject `ORDER BY` over ungrouped columns with a clear error ([#11249](https://github.com/cube-js/cube/issues/11249)) ([ff5eac9](https://github.com/cube-js/cube/commit/ff5eac95c5dcf7a7fb14d978ae2fd597ffd6bf5e))
+- **cubesql:** Support `HAVING` on a measure combined with `ORDER BY` on the same measure ([#11254](https://github.com/cube-js/cube/issues/11254)) ([23b199e](https://github.com/cube-js/cube/commit/23b199e03be75596e150eec551fef68aaedc8251))
+- **duckdb-driver:** Invalid SQL for custom granularities ([#11272](https://github.com/cube-js/cube/issues/11272)) ([7850aab](https://github.com/cube-js/cube/commit/7850aab6b291e486c5d1a9597da40d2ae021a755))
+
+### Features
+
+- **questdb-driver:** Initial support for Tesseract, add integration tests ([#11259](https://github.com/cube-js/cube/issues/11259)) ([e6cd6e1](https://github.com/cube-js/cube/commit/e6cd6e12a05b256509fc94639e6bc3b2c7a1bb65))
+
 ## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
 
 ### Bug Fixes
