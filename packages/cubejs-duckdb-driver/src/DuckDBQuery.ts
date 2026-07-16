@@ -47,7 +47,7 @@ export class DuckDBQuery extends BaseQuery {
     const timeUnit = this.diffTimeUnitForInterval(interval);
     const beginOfTime = this.dateTimeCast('\'1970-01-01 00:00:00.000\'');
 
-    return `${this.dateTimeCast(`'${origin}'`)}' + INTERVAL '${interval}' *
+    return `${this.dateTimeCast(`'${origin}'`)} + INTERVAL '${interval}' *
       floor(
         date_diff('${timeUnit}', ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
         date_diff('${timeUnit}', ${beginOfTime}, ${beginOfTime} + INTERVAL '${interval}')
