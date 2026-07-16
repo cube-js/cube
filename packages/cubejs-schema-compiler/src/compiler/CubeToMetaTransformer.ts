@@ -342,7 +342,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                   origin: gDef.origin,
                 }))
                 : undefined,
-            granularitiesBlock,
+            ...(granularitiesBlock ? { granularitiesBlock } : {}),
             order: extendedDimDef.order,
             key: extendedDimDef.keyReference,
             ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
