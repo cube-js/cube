@@ -46,6 +46,13 @@ impl Client {
         }
         if let Some(body) = body {
             req = req.json(body);
+        } else if matches!(method, Method::POST | Method::PUT | Method::PATCH | Method::DELETE) {
+            // Bodyless writes still need an explicit Content-Length: 0, otherwise
+            // some frontends (e.g. Google GFE) reject them with 411 Length
+            // Required. reqwest omits the header for an empty body, so set it.
+            req = req
+                .header(reqwest::header::CONTENT_LENGTH, "0")
+                .body(Vec::<u8>::new());
         }
         let res = req
             .send()
