@@ -1,4 +1,10 @@
-import { resolveGlobalGranularities, BUILT_IN_GRANULARITY_NAMES } from '../../src/compiler/GlobalGranularitiesConfig';
+import {
+  resolveGlobalGranularities,
+  buildBuiltInsCatalog,
+  granularityConfigHash,
+  isBuiltInGranularity,
+  BUILT_IN_GRANULARITY_NAMES,
+} from '../../src/compiler/GlobalGranularitiesConfig';
 
 describe('resolveGlobalGranularities', () => {
   const originalEnv = { ...process.env };
@@ -71,5 +77,50 @@ describe('resolveGlobalGranularities', () => {
       {},
     );
     expect(cfg.enabledBuiltIns).toEqual(['quarter']);
+  });
+
+  // Regression: CUBEJS_GRANULARITIES_<NAME>_TITLE was dropped for built-in names.
+  it('env title/format override applies to a built-in (folded into catalog, stays built-in)', async () => {
+    process.env.CUBEJS_GRANULARITIES = 'year,month';
+    process.env.CUBEJS_GRANULARITIES_YEAR_TITLE = 'Jaar';
+    const cfg = await resolveGlobalGranularities(undefined, {});
+    expect(cfg.enabledBuiltIns).toEqual(['year', 'month']);
+    const catalog = buildBuiltInsCatalog(cfg);
+    expect(catalog.year.title).toBe('Jaar');
+    expect(catalog.year.interval).toBe('1 year');
+  });
+
+  // Regression: a config-provided interval must not override a built-in's fixed 1-unit interval.
+  it('interval override on a built-in is ignored (SQL always buckets 1 unit)', async () => {
+    const cfg = await resolveGlobalGranularities([{ name: 'month', interval: '2 months', title: 'Bi' }], {});
+    const catalog = buildBuiltInsCatalog(cfg);
+    expect(catalog.month.interval).toBe('1 month');
+    expect(catalog.month.title).toBe('Bi');
+  });
+
+  // Regression: a config custom without an interval is unusable and must be dropped, not advertised.
+  it('drops a config custom granularity that has no interval', async () => {
+    const cfg = await resolveGlobalGranularities([{ name: 'fiscal_year', title: 'Fiscal Year' }], {});
+    expect(cfg.customGranularities.fiscal_year).toBeUndefined();
+  });
+
+  // Regression: non-string definition values must not survive (hash/serialize must agree).
+  it('sanitizes non-string custom fields so the config hash matches the wire output', async () => {
+    const cfgClean = await resolveGlobalGranularities([{ name: 'fy', interval: '1 year', origin: '2024-02-01' }], {});
+    const cfgDirty = await resolveGlobalGranularities(
+      [{ name: 'fy', interval: '1 year', origin: '2024-02-01', title: 123 as any, junk: () => 'x' } as any],
+      {},
+    );
+    expect(cfgDirty.customGranularities.fy).toEqual({ interval: '1 year', origin: '2024-02-01' });
+    // Two configs that serialize identically must hash identically.
+    expect(granularityConfigHash(cfgDirty)).toBe(granularityConfigHash(cfgClean));
+  });
+
+  // Regression (adversarial): prototype-chain names must not be classified as built-ins.
+  it('does not classify prototype-chain names as built-in granularities', () => {
+    expect(isBuiltInGranularity('__proto__')).toBe(false);
+    expect(isBuiltInGranularity('constructor')).toBe(false);
+    expect(isBuiltInGranularity('hasOwnProperty')).toBe(false);
+    expect(isBuiltInGranularity('year')).toBe(true);
   });
 });

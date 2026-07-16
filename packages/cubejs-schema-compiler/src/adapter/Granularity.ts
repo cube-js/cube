@@ -39,9 +39,18 @@ export class Granularity {
       this.granularityInterval = `1 ${this.granularity}`;
     } else {
       const customGranularity = this.query.cacheValue(
-        ['customGranularity', timeDimension.dimension, this.granularity],
+        [
+          'customGranularity',
+          timeDimension.dimension,
+          this.granularity,
+          JSON.stringify(query.options.granularityDefinitions?.[timeDimension.dimension]?.[this.granularity] || null),
+        ],
         () => query.cubeEvaluator
-          .resolveGranularity([...query.cubeEvaluator.parsePath('dimensions', timeDimension.dimension), 'granularities', this.granularity])
+          .resolveGranularity(
+            [...query.cubeEvaluator.parsePath('dimensions', timeDimension.dimension), 'granularities', this.granularity],
+            undefined,
+            query.options.granularityDefinitions,
+          )
       );
 
       if (!customGranularity) {
