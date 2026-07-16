@@ -39,6 +39,11 @@ const repository: SchemaFileRepository = {
             id: { sql: 'id', type: 'number', primaryKey: true },
             created_at: { sql: 'created_at', type: 'time' },
             updated_at: { sql: 'updated_at', type: 'time' },
+            excluded_at: {
+              sql: 'updated_at',
+              type: 'time',
+              granularities: { excludes: ['fiscal_year', 'sprint'] },
+            },
           },
         });
         cube('Events', {
@@ -87,6 +92,14 @@ const granularityNames = (dim: any) => dim.effectiveGranularities.map((g: any) =
 
 const ALL_BUILT_INS = ['year', 'quarter', 'month', 'week', 'day', 'hour', 'minute', 'second'];
 
+const queryFor = (tenant: string, dimension: string, granularity: string): any => ({
+  measures: [dimension.startsWith('Events.') ? 'Events.count' : 'Orders.count'],
+  timeDimensions: [{ dimension, granularity }],
+  timezone: 'UTC',
+  contextSymbols: { securityContext: { tenant } },
+  requestId: `sql-${tenant}-${dimension}-${granularity}`,
+});
+
 describe('granularity variants in CompilerApi', () => {
   describe('env/static configs (baked at compile time)', () => {
     afterEach(() => {
@@ -123,6 +136,24 @@ describe('granularity variants in CompilerApi', () => {
         { name: 'fiscal_year', title: 'Fiscal Year', interval: '1 year', offset: undefined, origin: '2024-02-01' },
       ]);
       expect(api.buildCount).toBe(0);
+      api.dispose();
+    });
+
+    test('static global customs resolve in SQL, while dimension excludes and legacy behavior remain intact', async () => {
+      const api = createApi({
+        granularities: [{ name: 'fiscal_year', interval: '1 year', origin: '2024-02-01' }],
+      });
+
+      const globalSql = await api.getSql(queryFor('a', 'Orders.created_at', 'fiscal_year'));
+      expect(globalSql.sql[0]).toContain('created_at');
+      await expect(api.getSql(queryFor('a', 'Orders.excluded_at', 'fiscal_year')))
+        .rejects.toThrow('Granularity "fiscal_year" does not exist in dimension Orders.excluded_at');
+
+      // Existing local customs and predefined granularities still use their original paths.
+      const localSql = await api.getSql(queryFor('a', 'Events.ts', 'fiscal_year'));
+      expect(localSql.sql[0]).toContain('ts');
+      const builtInSql = await api.getSql(queryFor('a', 'Orders.updated_at', 'day'));
+      expect(builtInSql.sql[0]).toContain('updated_at');
       api.dispose();
     });
 
@@ -172,6 +203,20 @@ describe('granularity variants in CompilerApi', () => {
 
       expect(api.buildCount).toBe(2);
       expect((await api.variantCache())!.size).toBe(2);
+      api.dispose();
+    });
+
+    test('context-function global customs resolve in SQL without crossing dimension exclusions', async () => {
+      const api = createApi({ granularities: perTenant });
+
+      await expect(api.getSql(queryFor('a', 'Orders.created_at', 'sprint')))
+        .rejects.toThrow('Granularity "sprint" does not exist in dimension Orders.created_at');
+      const sql = await api.getSql(queryFor('b', 'Orders.created_at', 'sprint'));
+      expect(sql.sql[0]).toContain('created_at');
+      await expect(api.getSql(queryFor('b', 'Orders.excluded_at', 'sprint')))
+        .rejects.toThrow('Granularity "sprint" does not exist in dimension Orders.excluded_at');
+      await expect(api.getSql(queryFor('a', 'Orders.created_at', 'sprint')))
+        .rejects.toThrow('Granularity "sprint" does not exist in dimension Orders.created_at');
       api.dispose();
     });
 

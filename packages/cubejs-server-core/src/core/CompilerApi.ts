@@ -342,7 +342,9 @@ export class CompilerApi {
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
     const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
+    const granularityDefinitions = await this.granularityDefinitionsForQuery(compilers, query);
+    const queryWithGranularities = { ...query, granularityDefinitions };
+    let sqlGenerator = await this.createQueryByDataSource(compilers, queryWithGranularities, dataSource, dbType);
 
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
@@ -358,7 +360,7 @@ export class CompilerApi {
         // TODO consider more efficient way than instantiating query
         sqlGenerator = await this.createQueryByDataSource(
           compilers,
-          query,
+          queryWithGranularities,
           dataSource,
           _dbType
         );
@@ -372,6 +374,49 @@ export class CompilerApi {
     }
 
     return { sqlGenerator, compilers };
+  }
+
+  /**
+   * Request-scoped custom granularities keyed by time dimension. The shared cube evaluator cannot
+   * contain function-config results because it is reused across security contexts, so query-time
+   * resolution receives this immutable lookup instead. Building it through the same resolver and
+   * per-dimension inputs as meta keeps includes/excludes behavior identical on both paths.
+   */
+  protected async granularityDefinitionsForQuery(
+    compilers: Compiler,
+    query: NormalizedQuery,
+  ): Promise<Record<string, Record<string, any>>> {
+    const { contextSymbols } = query as any;
+    const requestContext = {
+      securityContext: contextSymbols?.securityContext || {},
+      requestId: query.requestId,
+    };
+    const config = await resolveGlobalGranularities(this.granularities, requestContext);
+    const catalog = buildBuiltInsCatalog(config);
+    const inputs = compilers.metaTransformer.granularityInputs;
+    const definitions: Record<string, Record<string, any>> = {};
+
+    for (const cube of compilers.metaTransformer.cubes) {
+      for (const dimension of (cube.config.dimensions || []).filter((d: any) => d.type === 'time')) {
+        const resolved = resolveDimensionGranularities(
+          inputs.get(dimension.name) || normalizeGranularitiesBlock(undefined),
+          config.enabledBuiltIns,
+          config.customGranularities,
+          catalog,
+        );
+        const customs = Object.fromEntries(
+          Object.entries(resolved)
+            .filter(([name, definition]) => definition.type === 'custom' &&
+              Object.prototype.hasOwnProperty.call(config.customGranularities, name))
+            .map(([name, { type: _type, ...definition }]) => [name, definition])
+        );
+        if (Object.keys(customs).length > 0) {
+          definitions[dimension.name] = customs;
+        }
+      }
+    }
+
+    return definitions;
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
@@ -398,7 +443,11 @@ export class CompilerApi {
     if (this.sqlCache) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...keyOptions } = query;
-      const key = { query: keyOptions, options };
+      const key = {
+        query: keyOptions,
+        options,
+        granularityDefinitions: sqlGenerator.options.granularityDefinitions,
+      };
       return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
     } else {
       return getSqlFn();

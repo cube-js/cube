@@ -139,11 +139,11 @@ export class BaseQuery {
    */
   constructor(compilers, options) {
     this.compilers = compilers;
+    this.options = options || {};
     /** @type {import('../compiler/CubeEvaluator').CubeEvaluator} */
-    this.cubeEvaluator = compilers.cubeEvaluator;
+    this.cubeEvaluator = compilers.cubeEvaluator.withGranularityDefinitions(this.options.granularityDefinitions);
     /** @type {import('../compiler/JoinGraph').JoinGraph} */
     this.joinGraph = compilers.joinGraph;
-    this.options = options || {};
 
     this.orderHashToString = this.orderHashToString.bind(this);
     this.defaultOrder = this.defaultOrder.bind(this);
@@ -270,6 +270,7 @@ export class BaseQuery {
       segments: this.options.segments,
       order: this.options.order,
       contextSymbols: this.options.contextSymbols,
+      granularityDefinitions: this.options.granularityDefinitions,
       timezone: this.options.timezone,
       limit: this.options.limit,
       offset: this.options.offset,
@@ -4208,6 +4209,7 @@ export class BaseQuery {
       preAggregationQuery: this.options.preAggregationQuery,
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       contextSymbols: this.contextSymbols,
+      granularityDefinitions: this.options.granularityDefinitions,
       preAggregationsSchema: this.preAggregationsSchemaOption,
       cubeLatticeCache: this.options.cubeLatticeCache,
       historyQueries: this.options.historyQueries,
@@ -4364,7 +4366,11 @@ export class BaseQuery {
         if (path.length === 3 && this.cubeEvaluator.isDimension(path.slice(0, 2))) {
           const dimensionDef = this.cubeEvaluator.dimensionByPath(path.slice(0, 2));
           if (dimensionDef.type === 'time' &&
-            this.cubeEvaluator.resolveGranularity([path[0], path[1], 'granularities', path[2]])) {
+            this.cubeEvaluator.resolveGranularity(
+              [path[0], path[1], 'granularities', path[2]],
+              undefined,
+              this.options.granularityDefinitions
+            )) {
             const td = this.newTimeDimension({
               dimension: `${path[0]}.${path[1]}`,
               granularity: path[2],
