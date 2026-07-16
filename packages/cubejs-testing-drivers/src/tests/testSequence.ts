@@ -5,6 +5,7 @@ import { CubejsServerCoreExposed } from '../types/CubejsServerCoreExposed';
 import {
   getFixtures,
   getCreateQueries,
+  getRefreshQueries,
   getCore,
   getDriver,
   patchDriver,
@@ -56,6 +57,11 @@ export function testSequence(type: string): void {
         await Promise.all(query.map(async (q) => {
           await source.query(q);
         }));
+        // CrateDB is eventually consistent: make the freshly loaded rows visible
+        // before pre-aggregations are built from them.
+        if (type === 'crate') {
+          await Promise.all(getRefreshQueries(type, suffix).map((q) => source.query(q)));
+        }
       }
       patchDriver(source);
       patchDriver(storage);

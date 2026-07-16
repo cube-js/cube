@@ -19,6 +19,7 @@ on:
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-crate-driver/**'
       - 'packages/cubejs-databricks-jdbc-driver/**'
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
@@ -48,6 +49,7 @@ on:
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-crate-driver/**'
       - 'packages/cubejs-databricks-jdbc-driver/**'
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
@@ -260,6 +262,7 @@ jobs:
           - clickhouse
           - clickhouse-export-bucket-s3
           - clickhouse-export-bucket-s3-prefix
+          - crate
           - databricks-jdbc
           - databricks-jdbc-export-bucket-s3
           - databricks-jdbc-export-bucket-s3-prefix
@@ -289,6 +292,8 @@ jobs:
         use_tesseract_sql_planner: [ true ]
         include:
           - database: postgres
+            use_tesseract_sql_planner: false
+          - database: crate
             use_tesseract_sql_planner: false
           - database: snowflake
             use_tesseract_sql_planner: false
