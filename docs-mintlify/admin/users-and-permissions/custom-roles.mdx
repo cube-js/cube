@@ -119,6 +119,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
+| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. Granted by default to the built-in Viewer, Explorer, and Developer roles. See [Data download controls][ref-data-download-controls]. |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
@@ -126,9 +127,11 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 
 <Tip>
 
-**Access deployment** (`DeploymentRead`) is special. It's the only deployment action that does **not** auto-bump the Base Role to Developer, because Viewers also need it just to open a deployment.
+**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them just to open a deployment and download data from it.
 
 </Tip>
+
+[ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 
 ## Walkthroughs
 
@@ -252,3 +255,4 @@ This section lists every action a custom role can grant. The internal action nam
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
 | `APMRead`                 | Access query history                                        |
+| `DownloadData`            | Download data                                               |

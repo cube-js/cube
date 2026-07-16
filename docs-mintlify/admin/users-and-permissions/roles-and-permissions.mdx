@@ -28,6 +28,17 @@ Admin roles are billed at the developer rate.
 
 </Info>
 
+## Restricting data downloads
+
+By default, all roles can download query results as CSV from workbooks, Analytics Chat, and published dashboards. Two controls restrict this:
+
+- **Account-wide** — the **Allow data downloads** switch on the **Admin → Settings** page. Turning it off hides export controls everywhere, for all users — including admins and embeds.
+- **Per user** — the **Download data** action in [custom roles][ref-custom-roles]. Built-in roles grant it by default; to remove download access for a group of users, assign them a custom role without it. Admins and anonymous embed viewers bypass it.
+
+The account-wide switch always wins; the permission applies only while downloads are allowed account-wide. Both govern the download button, not data access — query results are still rendered on screen.
+
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+
 ## Agent Permissions
 
 Agents are connected to Semantic Model Deployments and inherit the permission level of the user they are operating under.
