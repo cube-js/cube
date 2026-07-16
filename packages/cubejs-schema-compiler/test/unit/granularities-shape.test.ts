@@ -151,4 +151,27 @@ describe('resolveDimensionGranularities — spec resolution table', () => {
     );
     expect(out.fiscal_year.origin).toBe('2026-01-01');
   });
+
+  it('built-in overridden via global custom stays type built-in (not relabeled custom)', () => {
+    // `config.granularities: [{ name: 'year', title: 'Anno' }]` both enables 'year' and puts it in
+    // globalCustom; the resolved entry must remain a built-in.
+    const out = resolveDimensionGranularities(
+      normalizeGranularitiesBlock(undefined),
+      ['year'],
+      { year: { title: 'Anno' } },
+      { ...BUILT_INS, year: { title: 'Anno' } },
+    );
+    expect(out.year.type).toBe('built-in');
+    expect(out.year.title).toBe('Anno');
+  });
+});
+
+describe('normalizeGranularitiesBlock — reserved-name disambiguation', () => {
+  it('custom granularity named "includes" is not misread as the dict form', () => {
+    const out = normalizeGranularitiesBlock({
+      includes: { interval: '1 year', origin: '2026-04-01' },
+    });
+    expect(out.includes).toBe('*');
+    expect(out.custom.includes).toEqual({ interval: '1 year', origin: '2026-04-01' });
+  });
 });
