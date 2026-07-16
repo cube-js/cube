@@ -70,12 +70,32 @@ impl Ctx {
             .api_url
             .clone()
             .or_else(|| ctx.map(|(_, c)| c.url.clone()));
+        // An explicit --token / CUBE_API_KEY wins and disables auto-refresh
+        // (it isn't tied to a stored refresh token).
         let token = self
             .token
             .clone()
             .or_else(|| ctx.map(|(_, c)| c.api_key.clone()));
         match (url, token) {
-            (Some(url), Some(token)) => client::Client::new(&url, &token),
+            (Some(url), Some(token)) => {
+                // Enable auto-refresh only when using the context's own access
+                // token and it has a refresh token saved alongside it.
+                let refresh = if self.token.is_none() {
+                    ctx.and_then(|(name, c)| {
+                        c.refresh_token
+                            .as_ref()
+                            .map(|rt| (rt.clone(), name.to_string()))
+                    })
+                } else {
+                    None
+                };
+                match refresh {
+                    Some((rt, name)) => {
+                        client::Client::with_refresh(&url, &token, &rt, Some(name))
+                    }
+                    None => client::Client::new(&url, &token),
+                }
+            }
             _ => bail!(
                 "not logged in: run `cube login`, or set CUBE_API_URL and CUBE_API_KEY \
                  (or pass --api-url/--token)"

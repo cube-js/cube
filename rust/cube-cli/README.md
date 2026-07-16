@@ -42,6 +42,15 @@ cube context use staging
 cube whoami
 ```
 
+Access tokens are short-lived; the CLI **auto-refreshes** them. When a
+request gets a `401` and the active context has a refresh token, the client
+transparently exchanges it at `/auth/oauth2/refresh`, saves the new token
+pair back to the config, and retries — so a saved login keeps working
+without re-authenticating every hour. If the refresh token itself is dead
+(e.g. revoked), the CLI falls back to a clear "session expired — run
+`cube login`" message. Auto-refresh is disabled when an explicit `--token`
+/ `CUBE_API_KEY` is supplied (that token stands on its own).
+
 The device-flow endpoints, CLI `client_id`, scope, and (if the client is
 confidential) secret can be overridden without a rebuild via
 `CUBE_OAUTH_CLIENT_ID`, `CUBE_OAUTH_CLIENT_SECRET`, and `CUBE_OAUTH_SCOPE`.

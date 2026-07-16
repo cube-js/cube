@@ -16,6 +16,7 @@ use serde::Deserialize;
 /// env vars for non-default deployments.
 const DEVICE_CODE_PATH: &str = "/auth/device/code";
 const TOKEN_PATH: &str = "/auth/device/token";
+const REFRESH_PATH: &str = "/auth/oauth2/refresh";
 const DEFAULT_CLIENT_ID: &str = "cube-cli";
 /// Empty scope lets the server default to all OAUTH_SCOPES.
 const DEFAULT_SCOPE: &str = "";
@@ -163,6 +164,34 @@ pub async fn poll_for_token(
             Err(_) => bail!("token poll failed ({status}) at {endpoint}: {}", text.trim()),
         }
     }
+}
+
+/// Exchange a refresh token for a new access/refresh token pair
+/// (OAuth 2.0 refresh_token grant). Used transparently by the API client
+/// when an access token has expired.
+pub async fn refresh(
+    http: &reqwest::Client,
+    url: &str,
+    cfg: &OAuthConfig,
+    refresh_token: &str,
+) -> Result<TokenResponse> {
+    let endpoint = format!("{}{}", base(url), REFRESH_PATH);
+    let mut form = vec![
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh_token),
+        ("client_id", cfg.client_id.as_str()),
+    ];
+    if let Some(secret) = &cfg.client_secret {
+        form.push(("client_secret", secret));
+    }
+    let res = http.post(&endpoint).form(&form).send().await?;
+    let status = res.status();
+    let text = res.text().await.unwrap_or_default();
+    if !status.is_success() {
+        bail!("token refresh failed ({status}): {}", text.trim());
+    }
+    serde_json::from_str(&text)
+        .map_err(|e| anyhow!("could not parse refresh response: {e}\n{text}"))
 }
 
 /// Best-effort attempt to open a URL in the user's browser (no extra deps).
