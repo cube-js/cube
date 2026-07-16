@@ -41,9 +41,8 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
-  // Global `granularities` config (env fallback / static list / context function). Env and
-  // static forms are resolved at compile time by CubeToMetaTransformer; the function form is
-  // resolved per request by CompilerApi.
+  // Global `granularities` config: env/static forms are resolved at compile time by
+  // CubeToMetaTransformer; the function form per request by CompilerApi.
   granularities?: GranularitiesOption;
 };
 
@@ -61,11 +60,8 @@ export type Compiler = {
     compilerCache: CompilerCache;
     headCommitId?: string;
     compilerId: string;
-    /**
-     * Granularity-enriched meta variants, keyed by canonical global-config hash. Owned by the
-     * compiled model (not CompilerApi) so a recompile discards it implicitly. Populated lazily
-     * by CompilerApi when `granularities` is a context function; bounded LRU.
-     */
+    // Granularity-enriched meta variants keyed by config hash; owned by the compiled model so a
+    // recompile discards it. Populated lazily by CompilerApi (bounded LRU, function form only).
     granularityVariants?: Map<string, Promise<any[]>>;
 };
 

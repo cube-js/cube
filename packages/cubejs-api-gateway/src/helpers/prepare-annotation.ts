@@ -41,13 +41,9 @@ type ConfigItem = {
   granularities?: GranularityMeta[];
 };
 
-/**
- * Effective granularity meta for one queried time dimension, read from the (already granularity-
- * enriched) meta config. Two fallbacks keep the annotation complete for granularities that
- * execute but aren't in the dimension's effective set:
- * - a built-in disabled by config is synthesized from `BUILT_IN_GRANULARITIES` defaults;
- * - an unknown custom name yields `undefined` (never the deprecated legacy array).
- */
+// Effective granularity meta for one queried time dimension, read from the enriched meta config.
+// A queried granularity outside the effective set still annotates: disabled built-ins are
+// synthesized from defaults; unknown customs yield undefined (never the deprecated legacy array).
 function resolveGranularityMeta(
   configMap: MetaConfigMap,
   dimension: string,
