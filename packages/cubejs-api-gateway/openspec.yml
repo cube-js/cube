@@ -133,8 +133,30 @@ components:
           type: "object"
     V1CubeMetaDimensionGranularity:
       type: "object"
+      deprecated: true
+      description: "Deprecated. Legacy shape listing only model-defined custom granularities. Use V1CubeMetaDimensionEffectiveGranularity via `effectiveGranularities`."
       required:
         - name
+        - title
+      properties:
+        name:
+          type: "string"
+        title:
+          type: "string"
+        interval:
+          type: "string"
+        sql:
+          type: "string"
+        offset:
+          type: "string"
+        origin:
+          type: "string"
+    V1CubeMetaDimensionEffectiveGranularity:
+      type: "object"
+      description: "Reconciled granularity: enabled built-ins plus global and per-dimension custom granularities."
+      required:
+        - name
+        - type
         - title
       properties:
         name:
@@ -152,8 +174,6 @@ components:
           description: "d3-time-format string used by clients to display bucketed timestamps."
         interval:
           type: "string"
-        sql:
-          type: "string"
         offset:
           type: "string"
         origin:
@@ -168,7 +188,7 @@ components:
             granularities:
               type: array
               items:
-                $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
+                $ref: "#/components/schemas/V1CubeMetaDimensionEffectiveGranularity"
     V1CubeMetaDimension:
       type: "object"
       required:
@@ -189,9 +209,15 @@ components:
           description: "When dimension is defined in View, it keeps the original path: Cube.dimension"
           type: "string"
         granularities:
+          deprecated: true
+          description: "Deprecated. Use `effectiveGranularities`."
           type: array
           items:
             $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
+        effectiveGranularities:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1CubeMetaDimensionEffectiveGranularity"
         meta:
           type: "object"
         format:

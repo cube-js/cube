@@ -13,7 +13,16 @@ import prepareAnnotationDef
 import {
   annotation,
   prepareAnnotation,
+  GranularityResolverFn,
 } from '../../src/helpers/prepare-annotation';
+
+// Mimics the gateway's built-in fallback: the resolver the gateway injects resolves `day` from
+// BUILT_IN_GRANULARITIES defaults.
+const dayResolver: GranularityResolverFn = (_dimension, granularity) => (
+  granularity === 'day'
+    ? { name: 'day', type: 'built-in', title: 'Day', interval: '1 day', format: '%Y-%m-%d' }
+    : undefined
+);
 
 describe('prepareAnnotation helpers', () => {
   test('export looks as expected', () => {
@@ -179,7 +188,7 @@ describe('prepareAnnotation helpers', () => {
           dimension: 'cube_name.member',
           granularity: 'day',
         }],
-      }).timeDimensions
+      }, dayResolver).timeDimensions
     ).toEqual({
       'cube_name.member': {
         currency: undefined,

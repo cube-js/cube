@@ -619,6 +619,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
     for (const dim of Object.values(dimensions)) {
       if (dim && dim.type === 'time' && 'granularities' in dim) {
+        // Keep the raw user value for the validator (it runs after this and would otherwise only
+        // see the extracted customs, never the includes/excludes/custom dict).
+        dim.rawGranularities = dim.granularities;
         const block: NormalizedGranularitiesBlock = normalizeGranularitiesBlock(dim.granularities);
         dim.granularitiesBlock = block;
         dim.granularities = block.custom;
@@ -1161,6 +1164,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           format: memberRef.override?.format || resolvedMember.format,
           ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
+          ...(resolvedMember.granularitiesBlock ? { granularitiesBlock: resolvedMember.granularitiesBlock } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),

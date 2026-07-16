@@ -6,8 +6,6 @@
  */
 
 import R from 'ramda';
-import { isPredefinedGranularity } from '@cubejs-backend/shared';
-import { BUILT_IN_GRANULARITIES } from '@cubejs-backend/schema-compiler';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './to-config-map';
 import { MemberType } from '../types/strings';
 import { MemberType as MemberTypeEnum } from '../types/enums';
@@ -23,6 +21,10 @@ type GranularityMeta = {
   offset?: string;
   origin?: string;
 };
+
+// Resolves the effective granularity for a queried time dimension against the request's global
+// config, so the load path doesn't have to enrich the whole meta. `dimension` is `cube.member`.
+export type GranularityResolverFn = (dimension: string, granularity: string) => GranularityMeta | undefined;
 
 /**
  * Annotation item for cube's member.
@@ -81,8 +83,9 @@ const annotation = (
 
 /**
  * Returns annotations object by MetaConfigs and query.
+ * `resolveGranularity` computes the effective granularity meta for a queried time dimension.
  */
-function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
+function prepareAnnotation(metaConfig: MetaConfig[], query: any, resolveGranularity?: GranularityResolverFn) {
   const configMap = toConfigMap(metaConfig);
   const dimensions = (query.dimensions || []);
   return {
@@ -117,29 +120,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
               let dimAnnotation: [string, AnnotatedConfigItem] | undefined;
 
               if (an) {
-                let granularityMeta: GranularityMeta | undefined;
-                if (isPredefinedGranularity(td.granularity)) {
-                  // Prefer values the meta endpoint already attached (these honor any global
-                  // title/format override). Fall back to BUILT_IN_GRANULARITIES, then to the bare name.
-                  const fromMeta = an[1].granularities?.find(g => g.name === td.granularity);
-                  const builtInDefaults = BUILT_IN_GRANULARITIES[td.granularity] || {};
-                  granularityMeta = {
-                    name: td.granularity,
-                    type: 'built-in',
-                    title: fromMeta?.title || builtInDefaults.title || td.granularity,
-                    interval: fromMeta?.interval || `1 ${td.granularity}`,
-                    ...(fromMeta?.format || builtInDefaults.format
-                      ? { format: fromMeta?.format || builtInDefaults.format }
-                      : {}),
-                  };
-                } else if (an[1].granularities) {
-                  // Forward only the granularity in play for this query; siblings stay in /v1/meta.
-                  granularityMeta = an[1].granularities.find(g => g.name === td.granularity);
-                  if (granularityMeta && !granularityMeta.type) {
-                    granularityMeta = { ...granularityMeta, type: 'custom' };
-                  }
-                }
-
+                const granularityMeta = resolveGranularity?.(td.dimension, td.granularity);
                 const { granularities: _, ...rest } = an[1];
                 dimAnnotation = [an[0], { ...rest, granularity: granularityMeta }];
               }
