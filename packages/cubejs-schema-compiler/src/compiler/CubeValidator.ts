@@ -181,6 +181,31 @@ const GranularityInclusionListSchema = Joi.alternatives([
   Joi.array().items(Joi.string()),
 ]);
 
+// Validates a time dimension's granularities in either shape: the new dict form
+// (includes/excludes/custom) or the legacy custom map. Applied to both `granularities` (the raw
+// user value in unit tests / pre-normalization) and `rawGranularities` (the stashed raw value the
+// real pipeline validates, since normalization replaces `granularities` with the custom map first).
+const GranularitiesFieldSchema = Joi.alternatives()
+  .conditional(Joi.ref('.'), {
+    // Only the new dict form has exclusively includes/excludes/custom keys.
+    is: Joi.object().keys({
+      includes: Joi.any(),
+      excludes: Joi.any(),
+      custom: Joi.any(),
+    }).unknown(false),
+    then: Joi.object().keys({
+      includes: GranularityInclusionListSchema,
+      excludes: GranularityInclusionListSchema,
+      custom: Joi.object().pattern(identifierRegex, CustomGranularityEntrySchema),
+    }).custom((value, helper) => {
+      if (value && value.includes !== undefined && value.excludes !== undefined && value.includes !== '*') {
+        return helper.message({ custom: '"includes" and "excludes" cannot be used together unless includes is "*"' } as any);
+      }
+      return value;
+    }),
+    otherwise: Joi.object().pattern(identifierRegex, CustomGranularityEntrySchema),
+  });
+
 const formatAlternatives = [
   Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
   Joi.object().keys({
@@ -446,33 +471,20 @@ const BaseDimensionWithoutSubQuery = {
     then: Joi.array().items(Joi.string()),
     otherwise: Joi.forbidden()
   }),
+  // Validated in both shapes. In the real pipeline CubeSymbols.normalizeDimensionGranularities runs
+  // first and replaces `granularities` with the extracted custom map (still valid here) while
+  // stashing the user's raw value in `rawGranularities`; when validated directly (unit tests) only
+  // `granularities` is set and carries the raw shape.
   granularities: Joi.when('type', {
     is: 'time',
-    then: Joi.alternatives()
-      .conditional(Joi.ref('.'), {
-        // Discriminate by shape: only the new dict form has includes/excludes/custom and no other keys.
-        is: Joi.object().keys({
-          includes: Joi.any(),
-          excludes: Joi.any(),
-          custom: Joi.any(),
-        }).unknown(false),
-        then: Joi.object().keys({
-          includes: GranularityInclusionListSchema,
-          excludes: GranularityInclusionListSchema,
-          custom: Joi.object().pattern(identifierRegex, CustomGranularityEntrySchema),
-        }).custom((value, helper) => {
-          if (value && value.includes !== undefined && value.excludes !== undefined && value.includes !== '*') {
-            return helper.message({ custom: '"includes" and "excludes" cannot be used together unless includes is "*"' } as any);
-          }
-          return value;
-        }),
-        otherwise: Joi.object().pattern(identifierRegex, CustomGranularityEntrySchema),
-      })
-      .optional(),
+    then: GranularitiesFieldSchema.optional(),
     otherwise: Joi.forbidden()
   }),
-  // Internal field written by CubeSymbols.normalizeDimensionGranularities before the validator runs.
-  // Not user-facing; declared so unknown-key validation doesn't reject it.
+  rawGranularities: Joi.when('type', {
+    is: 'time',
+    then: GranularitiesFieldSchema.optional(),
+    otherwise: Joi.forbidden()
+  }),
   granularitiesBlock: Joi.any()
 };
 
