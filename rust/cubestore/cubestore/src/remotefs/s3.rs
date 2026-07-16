@@ -53,6 +53,7 @@ impl S3RemoteFs {
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
+        endpoint: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
         let access_key = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
         let secret_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
@@ -86,9 +87,17 @@ impl S3RemoteFs {
             .map_err(|e| CubeError::internal(format!("Failed to create S3 credentials: {}", e)))?
         };
 
-        let region = region.parse::<Region>().map_err(|e| {
-            CubeError::internal(format!("Failed to parse Region '{}': {}", region, e))
-        })?;
+        // If endpoint is provided, create a Custom region to support GovCloud and other non-standard regions
+        let region = if let Some(ep) = &endpoint {
+            Region::Custom {
+                region: region.clone(),
+                endpoint: ep.clone(),
+            }
+        } else {
+            region.parse::<Region>().map_err(|e| {
+                CubeError::internal(format!("Failed to parse Region '{}': {}", region, e))
+            })?
+        };
         let bucket = Bucket::new(&bucket_name, region.clone(), credentials)?;
         let fs = Arc::new(Self {
             dir,
