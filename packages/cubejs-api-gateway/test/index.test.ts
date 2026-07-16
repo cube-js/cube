@@ -333,6 +333,7 @@ describe('API Gateway', () => {
       .toStrictEqual({
         granularity: {
           name: 'half_year_by_1st_april',
+          type: 'custom',
           title: 'Half Year By1 St April',
           interval: '6 months',
           offset: '3 months',
@@ -355,6 +356,7 @@ describe('API Gateway', () => {
       .toStrictEqual({
         granularity: {
           name: 'half_year_by_1st_april',
+          type: 'custom',
           title: 'Half Year By1 St April',
           interval: '6 months',
           offset: '3 months',

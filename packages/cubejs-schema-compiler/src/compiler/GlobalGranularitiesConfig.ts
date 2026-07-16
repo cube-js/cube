@@ -74,7 +74,11 @@ function resolveFromEnv(): GlobalGranularitiesConfig {
         enabledBuiltIns.push(trimmed);
       } else {
         // Non-built-in name: pull the definition from `CUBEJS_GRANULARITIES_<NAME>_*` env vars.
-        customGranularities[trimmed] = applyEnvOverrides(trimmed);
+        // Skip if no interval was provided — a custom granularity without an interval is unusable.
+        const def = applyEnvOverrides(trimmed);
+        if (def.interval !== undefined) {
+          customGranularities[trimmed] = def;
+        }
       }
     }
   }

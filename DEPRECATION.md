@@ -70,6 +70,7 @@ features:
 | Removed    | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     | v1.7.0    |
 | Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
 | Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
+| Deprecated | [`granularities` field on time dimensions in `/v1/meta`](#granularities-field-on-time-dimensions-in-v1meta)                        | v1.7.4     |           |
 
 ### Node.js 8
 
@@ -454,3 +455,15 @@ The `context_to_roles` configuration option has been removed. Please use `contex
 
 Node.js 22 is in maintenance mode from [October 21, 2025][link-nodejs-eol]. This means
 no more new features, only security updates. Please upgrade to Node.js 24 or higher.
+
+### `granularities` field on time dimensions in `/v1/meta`
+
+**Deprecated in Release: v1.7.4**
+
+The `granularities` field returned for each time dimension by the `/v1/meta` endpoint lists only
+the custom granularities defined in the data model, without the enabled built-in granularities or a
+`type` discriminator. It is deprecated in favor of the `effectiveGranularities` field, which returns
+the full reconciled set (enabled built-ins, global custom granularities, and per-dimension custom
+granularities), each tagged with `type` (`built-in` or `custom`) and carrying `title`, `format`, and
+`interval`. The `granularities` field remains for backward compatibility and will be removed in a
+future release; new integrations should read `effectiveGranularities`.

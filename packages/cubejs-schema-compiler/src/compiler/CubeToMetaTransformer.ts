@@ -132,6 +132,10 @@ export type DimensionConfig = {
   public: boolean;
   primaryKey: boolean;
   aliasMember?: string;
+  /**
+   * @deprecated Use `effectiveGranularities`. Lists only the model's custom granularities;
+   * omits built-ins, global customs, and the `type` field. See DEPRECATION.md.
+   */
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
   key?: string;
@@ -302,9 +306,9 @@ export class CubeToMetaTransformer implements CompilerInterface {
             ? this.isVisible(extendedDimDef, !extendedDimDef.primaryKey)
             : false;
           const granularitiesObj = extendedDimDef.granularities;
-          // The gateway reconciles `granularitiesBlock` (includes/excludes/custom) with global
-          // config per request. Forwarded as-is; the flat `granularities` field alone can't
-          // represent `includes: '*'` vs `includes: []`.
+          // `granularities` keeps its legacy custom-only shape (deprecated); the gateway attaches
+          // the reconciled set as `effectiveGranularities` per request from `granularitiesBlock`
+          // and strips the block before responding.
           const { granularitiesBlock } = extendedDimDef as any;
           const dimType = this.dimensionDataType(extendedDimDef.type || 'string');
           const dimFormat = this.transformDimensionFormat(extendedDimDef);
@@ -332,9 +336,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
               granularitiesObj
                 ? Object.entries(granularitiesObj).map(([gName, gDef]: [string, any]) => ({
                   name: gName,
-                  type: 'custom',
                   title: this.title(cubeTitle, [gName, gDef], true),
-                  ...(gDef.format !== undefined ? { format: gDef.format } : {}),
                   interval: gDef.interval,
                   offset: gDef.offset,
                   origin: gDef.origin,

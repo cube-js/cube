@@ -41,8 +41,13 @@ export function normalizeGranularitiesBlock(raw: any): NormalizedGranularitiesBl
   }
 
   if (typeof raw === 'object') {
-    if ('includes' in raw || 'excludes' in raw || 'custom' in raw) {
-      // New dict form. YamlCompiler has already keyed `custom` by name.
+    // New dict form iff every key is one of includes/excludes/custom. Requiring ALL keys to match
+    // (not just any) avoids misreading a legacy custom granularity named `includes`/`excludes`/`custom`
+    // as the dict form. Mirrors the validator's `.unknown(false)` discrimination.
+    const keys = Object.keys(raw);
+    const isDictForm = keys.length > 0 && keys.every(k => k === 'includes' || k === 'excludes' || k === 'custom');
+    if (isDictForm) {
+      // YamlCompiler has already keyed `custom` by name.
       return {
         includes: raw.includes ?? '*',
         excludes: raw.excludes ?? [],
