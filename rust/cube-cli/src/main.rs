@@ -98,6 +98,9 @@ enum Command {
     /// Manage deployments
     #[command(alias = "deployment")]
     Deployments(commands::deployments::Args),
+    /// List available deployment regions
+    #[command(alias = "region")]
+    Regions(commands::regions::Args),
     /// Manage deployment environments and environment tokens
     #[command(alias = "environment", alias = "envs")]
     Environments(commands::environments::Args),
@@ -185,6 +188,7 @@ async fn run(cli: Cli) -> Result<()> {
         Whoami(args) => commands::whoami::command(args, &ctx).await,
         Context(args) => commands::context::command(args, &mut ctx).await,
         Deployments(args) => commands::deployments::command(args, &ctx).await,
+        Regions(args) => commands::regions::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,
         Folders(args) => commands::folders::command(args, &ctx).await,

@@ -21,8 +21,6 @@ enum Cmd {
         #[arg(long)]
         security_context: Option<String>,
     },
-    /// Show the caller's active agent region
-    Region,
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -38,12 +36,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "agentId", &agent);
             util::push(&mut query, "securityContext", &security_context);
             let res = api.get("/api/v1/ai-engineer/settings", &query).await?;
-            output::print_json(&res);
-        }
-        Cmd::Region => {
-            let res = api
-                .get("/api/v1/ai-engineer/active-region", &Vec::new())
-                .await?;
             output::print_json(&res);
         }
     }

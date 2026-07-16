@@ -30,6 +30,41 @@ enum Cmd {
     },
     /// Show a single deployment
     Get { deployment: i64 },
+    /// Create a deployment
+    Create {
+        /// Deployment name
+        #[arg(long)]
+        name: Option<String>,
+        /// Region name (see `cube regions`), e.g. aws-us-east-1-2
+        #[arg(long)]
+        region: Option<String>,
+        /// Cloud provider: cubecloud, aws, gcp
+        #[arg(long, default_value = "cubecloud")]
+        cloud_provider: String,
+        /// Target platform, e.g. aws, gcp
+        #[arg(long, default_value = "aws")]
+        target_platform: String,
+        /// Provision a self-managed (BYOC/k8s-hybrid) deployment instead of managed
+        #[arg(long)]
+        unmanaged: bool,
+        /// Creation step: project, upload, schema, github, ssh, databases, ready, demo
+        #[arg(long, default_value = "project")]
+        creation_step: String,
+        /// Full CreateDeploymentInput as JSON (overrides the flags above)
+        #[arg(long, short = 'd')]
+        data: Option<String>,
+    },
+    /// Update a deployment (rename, or full UpdateDeploymentInput via --data)
+    Update {
+        deployment: i64,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long, short = 'd')]
+        data: Option<String>,
+    },
+    /// Delete a deployment
+    #[command(alias = "rm")]
+    Delete { deployment: i64 },
     /// Generate a Cube API token for a deployment
     Token { deployment: i64 },
 }
@@ -69,6 +104,61 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .get(&format!("/api/v1/deployments/{deployment}"), &Vec::new())
                 .await?;
             output::print_json(&res);
+        }
+        Cmd::Create {
+            name,
+            region,
+            cloud_provider,
+            target_platform,
+            unmanaged,
+            creation_step,
+            data,
+        } => {
+            // Flags populate the body; --data (if given) overrides them.
+            let mut body = serde_json::Map::new();
+            util::set(&mut body, "name", &name);
+            util::set(&mut body, "region", &region);
+            body.insert("cloudProvider".into(), serde_json::json!(cloud_provider));
+            body.insert("targetPlatform".into(), serde_json::json!(target_platform));
+            body.insert("isManaged".into(), serde_json::json!(!unmanaged));
+            body.insert("creationStep".into(), serde_json::json!(creation_step));
+            for (k, v) in util::parse_data(data.as_deref())? {
+                body.insert(k, v);
+            }
+            for required in ["name", "region"] {
+                if !body.contains_key(required) {
+                    anyhow::bail!("--{required} is required (or provide it via --data)");
+                }
+            }
+            let res = api
+                .post("/api/v1/deployments", Some(&util::body(body)))
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::Update {
+            deployment,
+            name,
+            data,
+        } => {
+            let mut body = util::parse_data(data.as_deref())?;
+            util::set(&mut body, "name", &name);
+            let res = api
+                .put(
+                    &format!("/api/v1/deployments/{deployment}"),
+                    Some(&util::body(body)),
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::Delete { deployment } => {
+            let res = api
+                .delete(&format!("/api/v1/deployments/{deployment}"), None)
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success(&format!("Deleted deployment {deployment}"));
+            }
         }
         Cmd::Token { deployment } => {
             let res = api

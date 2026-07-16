@@ -53,7 +53,8 @@ Every endpoint of the Console Server public API is covered:
 
 | Group | Endpoints |
 |---|---|
-| `deployments` | list, get, token |
+| `deployments` | list, get, create, update, delete, token |
+| `regions` | list available deployment regions |
 | `environments` | list, tokens, create-token (incl. `--meta-sync`) |
 | `variables` | list, set (`KEY=VALUE` upserts) |
 | `folders` | list, create, update, delete, ancestors |
@@ -70,7 +71,7 @@ Every endpoint of the Console Server public API is covered:
 | `integrations` | list, get, create, update, delete, tokens list/get/revoke/initiate |
 | `oidc` | list, get, create, update, delete |
 | `agents` | list, skills |
-| `ai-engineer` | settings, region |
+| `ai-engineer` | settings |
 | `app` | config, theme |
 | `meta` | POST /api/v1/meta/ |
 | `scim` | Users/Groups CRUD + patch, resource-types, schemas, service-provider-config |
