@@ -9,6 +9,7 @@ import { Environment } from '../types/Environment';
 import {
   getFixtures,
   getCreateQueries,
+  getRefreshQueries,
   getDriver,
   runEnvironment,
   buildPreaggs,
@@ -147,6 +148,13 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
             await driver.createTableRaw(q);
             if (type.includes('redshift')) {
               await delay(10 * OP_DELAY);
+            }
+          }
+          // CrateDB is eventually consistent: make the freshly loaded rows visible
+          // before any queries run against the fixture tables.
+          if (type === 'crate') {
+            for (const q of getRefreshQueries(type, suffix)) {
+              await driver.query(q);
             }
           }
           console.log(`Creating ${queries.length} fixture tables completed`);

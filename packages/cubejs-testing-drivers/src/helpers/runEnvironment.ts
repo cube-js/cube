@@ -179,6 +179,12 @@ export async function runEnvironment(
   if (type === 'questdb') {
     compose.withWaitStrategy('data', Wait.forHealthCheck());
   }
+  // CrateDB opens its Postgres-wire port before the cluster is ready to serve
+  // queries, so wait on the "started" startup log line (matching CrateDBRunner in
+  // testing-shared) before connecting.
+  if (type === 'crate') {
+    compose.withWaitStrategy('data', Wait.forLogMessage('started').withStartupTimeout(120 * 1000));
+  }
 
   const environment = await compose.up();
 
