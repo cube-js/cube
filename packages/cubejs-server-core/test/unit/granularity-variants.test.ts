@@ -233,25 +233,26 @@ describe('granularity variants in CompilerApi', () => {
     });
 
     test('LRU eviction beyond the bound, with a logged warning and rebuild on re-request', async () => {
+      const bound = (CompilerApi as any).MAX_GRANULARITY_VARIANTS;
       const capturedLogs: any[] = [];
       const api = createApi({
         capturedLogs,
         granularities: (ctx: any) => [{ name: `g_${ctx.securityContext.tenant}`, interval: '1 week' }],
       });
 
-      for (let i = 0; i < 17; i++) {
+      for (let i = 0; i < bound + 1; i++) {
         await api.metaConfig(ctxFor(`t${i}`), {});
       }
-      expect(api.buildCount).toBe(17);
-      expect((await api.variantCache())!.size).toBe(16);
+      expect(api.buildCount).toBe(bound + 1);
+      expect((await api.variantCache())!.size).toBe(bound);
       expect(capturedLogs.some(l => l.msg === 'Granularity variant cache is full')).toBe(true);
 
       // t0 was evicted (least recently used) — asking again rebuilds.
       await api.metaConfig(ctxFor('t0'), {});
-      expect(api.buildCount).toBe(18);
-      // t16 is still cached — no rebuild.
-      await api.metaConfig(ctxFor('t16'), {});
-      expect(api.buildCount).toBe(18);
+      expect(api.buildCount).toBe(bound + 2);
+      // The newest entry is still cached — no rebuild.
+      await api.metaConfig(ctxFor(`t${bound}`), {});
+      expect(api.buildCount).toBe(bound + 2);
       api.dispose();
     });
 
