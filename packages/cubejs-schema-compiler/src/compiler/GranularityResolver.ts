@@ -41,11 +41,19 @@ export function normalizeGranularitiesBlock(raw: any): NormalizedGranularitiesBl
   }
 
   if (typeof raw === 'object') {
-    // New dict form iff every key is one of includes/excludes/custom. Requiring ALL keys to match
-    // (not just any) avoids misreading a legacy custom granularity named `includes`/`excludes`/`custom`
-    // as the dict form. Mirrors the validator's `.unknown(false)` discrimination.
+    // New dict form iff every key is one of includes/excludes/custom AND the values have the dict
+    // shape (includes/excludes are '*' or arrays, custom is a plain object). The value check keeps a
+    // legacy custom granularity named `includes`/`excludes`/`custom` — whose value is a granularity
+    // definition object — from being misread as the dict form.
     const keys = Object.keys(raw);
-    const isDictForm = keys.length > 0 && keys.every(k => k === 'includes' || k === 'excludes' || k === 'custom');
+    const isInclusionList = (v: any) => v === undefined || v === '*' || Array.isArray(v);
+    const isCustomMap = (v: any) => v === undefined || (typeof v === 'object' && v !== null && !Array.isArray(v));
+    const isDictForm =
+      keys.length > 0 &&
+      keys.every(k => k === 'includes' || k === 'excludes' || k === 'custom') &&
+      isInclusionList(raw.includes) &&
+      isInclusionList(raw.excludes) &&
+      isCustomMap(raw.custom);
     if (isDictForm) {
       // YamlCompiler has already keyed `custom` by name.
       return {
@@ -94,6 +102,11 @@ export function resolveDimensionGranularities(
       }
     }
     for (const [name, def] of Object.entries(globalCustom)) {
+      // A name shadowing a built-in is an override, already emitted as `type: 'built-in'` above with
+      // its title/format folded in via `allBuiltInsCatalog`. Skip it here so it isn't relabeled custom.
+      if (allBuiltInsCatalog[name]) {
+        continue;
+      }
       const passesIncludes = includesAllowsAll || includesSet!.has(name);
       const blockedByExcludes = excludesSet!.has(name);
       if (passesIncludes && !blockedByExcludes) {

@@ -1,30 +1,40 @@
 import { camelize } from 'inflection';
 
-// It's a map where key - is a level and value - is a map of properties on this level to ignore camelization
-const IGNORE_CAMELIZE = {
+// Map of level -> keys at that level whose children must not be camelized (they hold user-defined
+// identifiers). Each entry can require a specific parent key so the guard is path-scoped rather than
+// matching any same-named property elsewhere in the tree.
+const IGNORE_CAMELIZE: Record<number, Record<string, { parent?: string }>> = {
   1: {
-    granularities: true,
+    granularities: {},
   },
-  // Custom granularity names live one level deeper than the legacy flat-array form
-  // (`granularities.custom.<name>`), so they need their own guard.
+  // Custom granularity names in the new dict form live at `granularities.custom.<name>`; scope the
+  // guard to that path so an unrelated `custom` property elsewhere isn't affected.
   2: {
-    custom: true,
+    custom: { parent: 'granularities' },
   }
 };
 
-function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unknown {
+function shouldIgnoreCamelize(level: number, key: string, parentKey: string | undefined): boolean {
+  const entry = IGNORE_CAMELIZE[level]?.[key];
+  if (!entry) {
+    return false;
+  }
+  return entry.parent === undefined || entry.parent === parentKey;
+}
+
+function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0, parentKey?: string): unknown {
   if (!obj) {
     return obj;
   }
 
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
-      obj[i] = camelizeObjectPart(obj[i], true, level + 1);
+      obj[i] = camelizeObjectPart(obj[i], true, level + 1, parentKey);
     }
   } else if (typeof obj === 'object') {
     for (const key of Object.keys(obj)) {
       if (!(level === 1 && key === 'meta')) {
-        obj[key] = camelizeObjectPart(obj[key], !IGNORE_CAMELIZE[level]?.[key], level + 1);
+        obj[key] = camelizeObjectPart(obj[key], !shouldIgnoreCamelize(level, key, parentKey), level + 1, key);
       }
 
       if (camelizeKeys) {
