@@ -20,6 +20,19 @@ import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
 import { resolveNamedNumericFormat, STANDARD_FORMAT_SPECIFIERS, DEFAULT_FORMAT_SPECIFIER } from './named-numeric-formats';
+import {
+  EffectiveGranularity,
+  NormalizedGranularitiesBlock,
+  normalizeGranularitiesBlock,
+  resolveDimensionGranularities,
+  serializeEffectiveGranularities,
+} from './GranularityResolver';
+import {
+  GlobalGranularitiesConfig,
+  GranularitiesOption,
+  buildBuiltInsCatalog,
+  resolveGlobalGranularitiesSync,
+} from './GlobalGranularitiesConfig';
 
 export type CustomNumericFormat = { type: 'custom-numeric'; value: string; alias?: string };
 export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
@@ -137,6 +150,12 @@ export type DimensionConfig = {
    * omits built-ins, global customs, and the `type` field. See DEPRECATION.md.
    */
   granularities?: GranularityDefinition[];
+  /**
+   * Reconciled granularity set (enabled built-ins + global customs + local customs) for time
+   * dimensions. Baked in at compile time for env/static global configs; attached per request
+   * by CompilerApi meta variants when `granularities` is a context function.
+   */
+  effectiveGranularities?: EffectiveGranularity[];
   order?: 'asc' | 'desc';
   key?: string;
   links?: LinkConfig[];
@@ -201,12 +220,31 @@ export class CubeToMetaTransformer implements CompilerInterface {
    */
   public queries: TransformedCube[];
 
+  private readonly granularitiesOption?: GranularitiesOption;
+
+  /**
+   * Per-dimension granularity inputs for time dimensions that customize their granularity set
+   * (a `granularities` block or local customs). Keyed by `cube.dimension`. Dimensions absent
+   * from this index use the config-wide default set. Consumed by `CompilerApi` to build
+   * context-dependent meta variants when `granularities` is a function; never serialized.
+   */
+  public readonly granularityInputs: Map<string, NormalizedGranularitiesBlock> = new Map();
+
+  // Set during compile() for the context-independent config forms (env / static list);
+  // null when `granularities` is a function and resolution has to happen per request.
+  private staticGranularityState: {
+    config: GlobalGranularitiesConfig;
+    catalog: Record<string, GranularityDefinition>;
+    defaultSet: EffectiveGranularity[];
+  } | null = null;
+
   public constructor(
     cubeValidator: CubeValidator,
     cubeEvaluator: CubeEvaluator,
     contextEvaluator: ContextEvaluator,
     viewGroupEvaluator: ViewGroupEvaluator,
-    joinGraph: JoinGraph
+    joinGraph: JoinGraph,
+    granularitiesOption?: GranularitiesOption
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
@@ -214,6 +252,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     this.contextEvaluator = contextEvaluator;
     this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
+    this.granularitiesOption = granularitiesOption;
     this.cubes = [];
     this.queries = [];
   }
@@ -223,6 +262,30 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
+    this.granularityInputs.clear();
+    // Env / static-list configs are context-independent, so the effective granularity sets are
+    // resolved once here and baked into the meta configs. The function form is never called at
+    // compile time (the compiled model is shared across security contexts); `CompilerApi`
+    // resolves it per request and enriches cached variants from `granularityInputs`.
+    if (typeof this.granularitiesOption === 'function') {
+      this.staticGranularityState = null;
+    } else {
+      const config = resolveGlobalGranularitiesSync(this.granularitiesOption);
+      const catalog = buildBuiltInsCatalog(config);
+      this.staticGranularityState = {
+        config,
+        catalog,
+        // One shared array for every time dimension without local customization — with large
+        // models this avoids re-allocating an identical granularity set per dimension.
+        defaultSet: serializeEffectiveGranularities(resolveDimensionGranularities(
+          normalizeGranularitiesBlock(undefined),
+          config.enabledBuiltIns,
+          config.customGranularities,
+          catalog,
+        )),
+      };
+    }
+
     this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)));
@@ -306,13 +369,29 @@ export class CubeToMetaTransformer implements CompilerInterface {
             ? this.isVisible(extendedDimDef, !extendedDimDef.primaryKey)
             : false;
           const granularitiesObj = extendedDimDef.granularities;
-          // `granularities` keeps its legacy custom-only shape (deprecated); the gateway attaches
-          // the reconciled set as `effectiveGranularities` per request from `granularitiesBlock`
-          // and strips the block before responding.
+          // `granularities` keeps its legacy custom-only shape (deprecated). The reconciled set
+          // is emitted as `effectiveGranularities`: baked in here for env/static global configs,
+          // or attached per request by CompilerApi variants when the config is a function.
           const { granularitiesBlock } = extendedDimDef as any;
           const dimType = this.dimensionDataType(extendedDimDef.type || 'string');
           const dimFormat = this.transformDimensionFormat(extendedDimDef);
           const dimCurrency = extendedDimDef.currency?.toUpperCase();
+
+          let effectiveGranularities: EffectiveGranularity[] | undefined;
+          if (dimType === 'time') {
+            const inputs = this.granularityInputsForDimension(cubeTitle, granularitiesObj, granularitiesBlock);
+            if (inputs) {
+              this.granularityInputs.set(`${cubeName}.${dimensionName}`, inputs);
+            }
+            if (this.staticGranularityState) {
+              const s = this.staticGranularityState;
+              effectiveGranularities = inputs
+                ? serializeEffectiveGranularities(resolveDimensionGranularities(
+                  inputs, s.config.enabledBuiltIns, s.config.customGranularities, s.catalog,
+                ))
+                : s.defaultSet;
+            }
+          }
 
           return {
             name: `${cubeName}.${dimensionName}`,
@@ -342,7 +421,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                   origin: gDef.origin,
                 }))
                 : undefined,
-            ...(granularitiesBlock ? { granularitiesBlock } : {}),
+            ...(effectiveGranularities ? { effectiveGranularities } : {}),
             order: extendedDimDef.order,
             key: extendedDimDef.keyReference,
             ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
@@ -382,6 +461,35 @@ export class CubeToMetaTransformer implements CompilerInterface {
         nestedFolders,
       },
     };
+  }
+
+  /**
+   * Granularity-resolution inputs for one time dimension, or null when the dimension has no
+   * local customization and can use the config-wide default set. Local custom titles resolve
+   * here (short-title semantics, matching the legacy `granularities` array); every other field
+   * is projected from the raw definition so that e.g. `sql` never leaks into meta output.
+   */
+  private granularityInputsForDimension(
+    cubeTitle: string,
+    granularitiesObj: Record<string, GranularityDefinition> | undefined,
+    granularitiesBlock: NormalizedGranularitiesBlock | undefined,
+  ): NormalizedGranularitiesBlock | null {
+    const hasLocalCustoms = granularitiesObj && Object.keys(granularitiesObj).length > 0;
+    if (!granularitiesBlock && !hasLocalCustoms) {
+      return null;
+    }
+    const block = granularitiesBlock || normalizeGranularitiesBlock(undefined);
+    const custom: Record<string, GranularityDefinition> = {};
+    for (const [gName, gDef] of Object.entries({ ...block.custom, ...(granularitiesObj || {}) })) {
+      custom[gName] = {
+        title: this.title(cubeTitle, [gName, gDef], true),
+        interval: gDef.interval,
+        offset: gDef.offset,
+        origin: gDef.origin,
+        ...(gDef.format !== undefined ? { format: gDef.format } : {}),
+      };
+    }
+    return { includes: block.includes, excludes: block.excludes, custom };
   }
 
   public queriesForContext(contextId: string | null | undefined): TransformedCube[] {

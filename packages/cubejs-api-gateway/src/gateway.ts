@@ -34,13 +34,9 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 
 import { QueryBody } from '@cubejs-backend/query-orchestrator';
 import {
-  resolveGlobalGranularities,
-  resolveDimensionGranularities,
-  normalizeGranularitiesBlock,
   buildBuiltInsCatalog,
   BUILT_IN_GRANULARITIES,
 } from '@cubejs-backend/schema-compiler';
-import type { GlobalGranularitiesConfig } from '@cubejs-backend/schema-compiler';
 import {
   QueryType,
   ApiScopes,
@@ -110,7 +106,7 @@ import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer, SQLServerConstructorOptions } from './sql-server';
 import { getJsonQueryFromGraphQLQuery, makeSchema } from './graphql';
-import { ConfigItem, prepareAnnotation, GranularityMeta, GranularityResolverFn } from './helpers/prepare-annotation';
+import { ConfigItem, prepareAnnotation } from './helpers/prepare-annotation';
 import {
   transformCube,
   transformMeasure,
@@ -176,8 +172,6 @@ class ApiGateway {
 
   protected readonly extendContext?: ExtendContextFn;
 
-  protected readonly granularitiesOption?: ApiGatewayOptions['granularities'];
-
   protected readonly dataSourceStorage: any;
 
   public readonly checkAuthFn: PreparedCheckAuthFn;
@@ -236,7 +230,6 @@ class ApiGateway {
     this.subscriptionStore = options.subscriptionStore || new LocalSubscriptionStore();
     this.enforceSecurityChecks = options.enforceSecurityChecks || (process.env.NODE_ENV === 'production');
     this.extendContext = options.extendContext;
-    this.granularitiesOption = options.granularities;
 
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
@@ -755,9 +748,9 @@ class ApiGateway {
       const cubesConfig = onlyViews
         ? metaConfig.cubes.filter((c: any) => c.config?.type === 'view')
         : metaConfig.cubes;
-      const filteredCubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
-      // Apply after the visibility filter so we only enrich what the client will actually receive.
-      const cubes = await this.applyGlobalGranularitiesToMetaCubes(context, filteredCubes);
+      // Time dimensions arrive from CompilerApi with `effectiveGranularities` already attached
+      // (baked at compile for env/static configs, variant-cached for the function form).
+      const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
       const visibleCubeNames = new Set(cubes.map(c => c.name));
       const viewGroups = (metaConfig.viewGroups || [])
         .map(group => this.filterVisibleViewGroup(group, visibleCubeNames))
@@ -788,7 +781,8 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       await this.assertApiScope('meta', context.securityContext);
-      const globalConfig = await this.resolveGlobalGranularitiesForRequest(context);
+      const compilerApi = await this.getCompilerApi(context);
+      const globalConfig = await compilerApi.resolveGlobalGranularitiesConfig(context);
       const builtInsCatalog = buildBuiltInsCatalog(globalConfig);
 
       const granularities: any[] = [];
@@ -1248,7 +1242,10 @@ class ApiGateway {
           } else {
             const metaCacheKey = JSON.stringify(ctx);
             if (!metaCache.has(metaCacheKey)) {
-              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(context, ctx));
+              // `ctx` (outer context merged with the job's own context) is the request context;
+              // passing the outer `context` here would select visibility and granularities for
+              // the wrong tenant.
+              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(ctx, { requestId: ctx.requestId }));
             }
 
             // checking and fetching result status
@@ -2142,8 +2139,6 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
-      // Resolve the queried granularity's meta on demand instead of rewriting the whole model.
-      const resolveGranularity = await this.buildGranularityResolver(context, metaConfigResult);
 
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
@@ -2161,7 +2156,7 @@ class ApiGateway {
           );
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery, resolveGranularity
+            metaConfigResult, normalizedQuery
           );
 
           return this.prepareResultTransformData(
@@ -2247,7 +2242,6 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
-      const resolveGranularity = await this.buildGranularityResolver(context, metaConfigResult);
 
       const sqlQueries = await this
         .getSqlQueriesInternal(
@@ -2297,7 +2291,7 @@ class ApiGateway {
           const response = await adapterApi.executeQuery(finalQuery);
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQueries[0], resolveGranularity
+            metaConfigResult, normalizedQueries[0]
           );
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
@@ -2334,7 +2328,7 @@ class ApiGateway {
               Boolean(sqlQueries[index].slowQuery);
 
             const annotation = prepareAnnotation(
-              metaConfigResult, normalizedQuery, resolveGranularity
+              metaConfigResult, normalizedQuery
             );
 
             if (request.streaming) {
@@ -2461,120 +2455,6 @@ class ApiGateway {
 
   protected async getAdapterApi(context: RequestContext) {
     return this.adapterApi(context);
-  }
-
-  protected async resolveGlobalGranularitiesForRequest(context: RequestContext) {
-    return resolveGlobalGranularities(this.granularitiesOption, context);
-  }
-
-  // Resolve one time dimension's effective granularity set against the request's global config.
-  // Returns the array serialized for `effectiveGranularities`; leaves the legacy `granularities`
-  // untouched.
-  private resolveEffectiveGranularitiesForDim(
-    dim: any,
-    globalConfig: GlobalGranularitiesConfig,
-    builtInsCatalog: Record<string, any>,
-  ): any[] {
-    const localCustom: Record<string, any> = {};
-    for (const g of dim.granularities || []) {
-      localCustom[g.name] = {
-        title: g.title,
-        interval: g.interval,
-        offset: g.offset,
-        origin: g.origin,
-        ...(g.format !== undefined ? { format: g.format } : {}),
-      };
-    }
-    const block = dim.granularitiesBlock || normalizeGranularitiesBlock(undefined);
-    const blockWithLocal = { ...block, custom: { ...block.custom, ...localCustom } };
-    const resolved = resolveDimensionGranularities(
-      blockWithLocal,
-      globalConfig.enabledBuiltIns,
-      globalConfig.customGranularities,
-      builtInsCatalog,
-    );
-    return Object.entries(resolved).map(([name, def]: [string, any]) => ({
-      name,
-      type: def.type,
-      title: def.title,
-      ...(def.interval !== undefined ? { interval: def.interval } : {}),
-      ...(def.offset !== undefined ? { offset: def.offset } : {}),
-      ...(def.origin !== undefined ? { origin: def.origin } : {}),
-      ...(def.format !== undefined ? { format: def.format } : {}),
-    }));
-  }
-
-  // Build a resolver that returns the effective granularity meta for one queried time dimension,
-  // computing per-dimension sets lazily so query paths don't enrich the whole meta.
-  protected async buildGranularityResolver(context: RequestContext, metaConfig: any[]): Promise<GranularityResolverFn> {
-    const globalConfig = await this.resolveGlobalGranularitiesForRequest(context);
-    const builtInsCatalog = buildBuiltInsCatalog(globalConfig);
-
-    // dimension name -> { granularityName -> meta }, filled on first use.
-    const perDimCache = new Map<string, Record<string, GranularityMeta>>();
-
-    const dimIndex = new Map<string, any>();
-    for (const cube of metaConfig) {
-      for (const dim of cube.config?.dimensions || []) {
-        // A queried granularity only ever targets a time dimension; also index dimensions that carry
-        // granularity definitions even if `type` is absent (defensive against partial meta).
-        if (dim.type === 'time' || dim.granularities || dim.granularitiesBlock) {
-          dimIndex.set(dim.name, dim);
-        }
-      }
-    }
-
-    return (dimension: string, granularity: string): GranularityMeta | undefined => {
-      let byName = perDimCache.get(dimension);
-      if (!byName) {
-        const dim = dimIndex.get(dimension);
-        byName = {};
-        if (dim) {
-          for (const g of this.resolveEffectiveGranularitiesForDim(dim, globalConfig, builtInsCatalog)) {
-            byName[g.name] = g;
-          }
-        }
-        perDimCache.set(dimension, byName);
-      }
-      const resolved = byName[granularity];
-      if (resolved) return resolved;
-      // A built-in that global config disabled still executes; annotate it from defaults so the
-      // response is never missing the queried granularity.
-      if (isPredefinedGranularity(granularity)) {
-        const defaults = BUILT_IN_GRANULARITIES[granularity];
-        return {
-          name: granularity,
-          type: 'built-in',
-          title: defaults?.title || granularity,
-          interval: `1 ${granularity}`,
-          ...(defaults?.format ? { format: defaults.format } : {}),
-        };
-      }
-      return undefined;
-    };
-  }
-
-  // Attach `effectiveGranularities` (reconciled built-ins + globals + local customs) to each time
-  // dimension for /v1/meta. The legacy `granularities` array is preserved as-is (deprecated).
-  // Non-time dimensions and cubes without time dimensions are returned by reference.
-  protected async applyGlobalGranularitiesToMetaCubes(context: RequestContext, cubes: any[]): Promise<any[]> {
-    const globalConfig = await this.resolveGlobalGranularitiesForRequest(context);
-    const builtInsCatalog = buildBuiltInsCatalog(globalConfig);
-
-    return cubes.map(cube => {
-      if (!cube.dimensions?.some((d: any) => d.type === 'time')) {
-        return cube;
-      }
-      return {
-        ...cube,
-        dimensions: cube.dimensions.map((dim: any) => {
-          if (dim.type !== 'time') return dim;
-          const effectiveGranularities = this.resolveEffectiveGranularitiesForDim(dim, globalConfig, builtInsCatalog);
-          const { granularitiesBlock, ...rest } = dim;
-          return { ...rest, effectiveGranularities };
-        }),
-      };
-    });
   }
 
   public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {

@@ -6,6 +6,8 @@
  */
 
 import R from 'ramda';
+import { isPredefinedGranularity } from '@cubejs-backend/shared';
+import { BUILT_IN_GRANULARITIES } from '@cubejs-backend/schema-compiler';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './to-config-map';
 import { MemberType } from '../types/strings';
 import { MemberType as MemberTypeEnum } from '../types/enums';
@@ -21,10 +23,6 @@ type GranularityMeta = {
   offset?: string;
   origin?: string;
 };
-
-// Resolves the effective granularity for a queried time dimension against the request's global
-// config, so the load path doesn't have to enrich the whole meta. `dimension` is `cube.member`.
-export type GranularityResolverFn = (dimension: string, granularity: string) => GranularityMeta | undefined;
 
 /**
  * Annotation item for cube's member.
@@ -42,6 +40,42 @@ type ConfigItem = {
   drillMembersGrouped?: any;
   granularities?: GranularityMeta[];
 };
+
+/**
+ * Effective granularity meta for one queried time dimension, read from the (already granularity-
+ * enriched) meta config. Two fallbacks keep the annotation complete for granularities that
+ * execute but aren't in the dimension's effective set:
+ * - a built-in disabled by config is synthesized from `BUILT_IN_GRANULARITIES` defaults;
+ * - an unknown custom name yields `undefined` (never the deprecated legacy array).
+ */
+function resolveGranularityMeta(
+  configMap: MetaConfigMap,
+  dimension: string,
+  granularity: string,
+): GranularityMeta | undefined {
+  const cubeName = dimension.split('.')[0];
+  const dimConfig: any = configMap[cubeName]?.[MemberTypeEnum.DIMENSIONS]
+    ?.find((m: any) => m.name === dimension);
+
+  const resolved = dimConfig?.effectiveGranularities
+    ?.find((g: GranularityMeta) => g.name === granularity);
+  if (resolved) {
+    return resolved;
+  }
+
+  if (isPredefinedGranularity(granularity)) {
+    const defaults = BUILT_IN_GRANULARITIES[granularity];
+    return {
+      name: granularity,
+      type: 'built-in',
+      title: defaults?.title || granularity,
+      interval: `1 ${granularity}`,
+      ...(defaults?.format ? { format: defaults.format } : {}),
+    };
+  }
+
+  return undefined;
+}
 
 type AnnotatedConfigItem = Omit<ConfigItem, 'granularities'> & {
   granularity?: GranularityMeta;
@@ -83,9 +117,8 @@ const annotation = (
 
 /**
  * Returns annotations object by MetaConfigs and query.
- * `resolveGranularity` computes the effective granularity meta for a queried time dimension.
  */
-function prepareAnnotation(metaConfig: MetaConfig[], query: any, resolveGranularity?: GranularityResolverFn) {
+function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
   const configMap = toConfigMap(metaConfig);
   const dimensions = (query.dimensions || []);
   return {
@@ -120,7 +153,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any, resolveGranular
               let dimAnnotation: [string, AnnotatedConfigItem] | undefined;
 
               if (an) {
-                const granularityMeta = resolveGranularity?.(td.dimension, td.granularity);
+                const granularityMeta = resolveGranularityMeta(configMap, td.dimension, td.granularity);
                 const { granularities: _, ...rest } = an[1];
                 dimAnnotation = [an[0], { ...rest, granularity: granularityMeta }];
               }
