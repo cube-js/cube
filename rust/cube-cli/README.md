@@ -27,14 +27,25 @@ Credentials resolve in this order:
 
 The config file lives at `~/.config/cube/config.toml` on Linux/macOS (XDG)
 and `%APPDATA%\cube\config.toml` on Windows, created with `0600`
-permissions. Multiple tenants are supported as named contexts:
+permissions. Multiple tenants are supported as named contexts.
+
+`cube login` uses the browser **device authorization flow** (OAuth 2.0
+device grant, RFC 8628), the same style as the Railway CLI: it prints a URL
+and a short code, opens your browser, and waits while you approve. The
+resulting access token (and refresh token) are saved to the active context.
 
 ```bash
-cube login --name staging          # prompts for URL + API key, validates them
+cube login --name staging          # device flow: opens browser, waits for approval
+cube login --api-key <key>         # non-interactive: use an API key instead
 cube context list
 cube context use staging
 cube whoami
 ```
+
+The device-flow endpoints, CLI `client_id`, scope, and (if the client is
+confidential) secret can be overridden without a rebuild via
+`CUBE_OAUTH_CLIENT_ID`, `CUBE_OAUTH_CLIENT_SECRET`, and `CUBE_OAUTH_SCOPE`.
+For CI, skip login entirely and pass `CUBE_API_KEY` / `CUBE_API_URL`.
 
 ## Commands
 

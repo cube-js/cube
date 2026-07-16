@@ -10,7 +10,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextConfig {
     pub url: String,
+    /// Bearer token used for API calls: an API key, or an OAuth access token.
     pub api_key: String,
+    /// OAuth refresh token, when the context was created via `cube login`
+    /// device flow. Absent for API-key contexts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
 }
 
 /// On-disk CLI configuration.

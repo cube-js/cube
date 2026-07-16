@@ -1,6 +1,7 @@
 mod client;
 mod commands;
 mod config;
+mod oauth;
 mod output;
 mod util;
 

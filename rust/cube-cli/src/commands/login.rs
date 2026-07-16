@@ -1,15 +1,16 @@
 use anyhow::Result;
+use owo_colors::OwoColorize;
 
 use crate::client::Client;
 use crate::config::ContextConfig;
-use crate::{output, Ctx};
+use crate::{oauth, output, Ctx};
 
 #[derive(clap::Args)]
 pub struct Args {
     /// Cube Cloud URL, e.g. https://<tenant>.cubecloud.dev
     #[arg(long)]
     url: Option<String>,
-    /// API key (prompted interactively when omitted)
+    /// Authenticate with an API key instead of the browser device flow
     #[arg(long)]
     api_key: Option<String>,
     /// Name to save this context under
@@ -24,23 +25,24 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
             .with_placeholder("https://<tenant>.cubecloud.dev")
             .prompt()?,
     };
-    let api_key = match args.api_key {
-        Some(key) => key,
-        None => inquire::Password::new("API key:")
-            .without_confirmation()
-            .prompt()?,
+    let url = url.trim_end_matches('/').to_string();
+
+    let (token, refresh_token) = match args.api_key {
+        Some(key) => (key, None),
+        None => device_login(&url).await?,
     };
 
     // Validate the credentials before saving them.
-    let client = Client::new(&url, &api_key)?;
+    let client = Client::new(&url, &token)?;
     let me = client.get("/api/v1/users/me", &Vec::new()).await?;
     let email = output::field(&me, "email");
 
     ctx.config.contexts.insert(
         args.name.clone(),
         ContextConfig {
-            url: url.trim_end_matches('/').to_string(),
-            api_key,
+            url,
+            api_key: token,
+            refresh_token,
         },
     );
     ctx.config.default_context = Some(args.name.clone());
@@ -52,4 +54,35 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
         crate::config::config_path()?.display()
     ));
     Ok(())
+}
+
+/// Drive the OAuth 2.0 device authorization grant and return
+/// (access_token, refresh_token).
+async fn device_login(url: &str) -> Result<(String, Option<String>)> {
+    let cfg = oauth::OAuthConfig::from_env();
+    let http = reqwest::Client::builder()
+        .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+        .build()?;
+
+    let device = oauth::request_device_code(&http, url, &cfg).await?;
+
+    let verification = device
+        .verification_uri_complete
+        .clone()
+        .unwrap_or_else(|| device.verification_uri.clone());
+
+    println!();
+    println!("To authorize this CLI, open the following URL in your browser:");
+    println!("  {}", verification.bold().underline());
+    println!();
+    println!("and confirm this code:  {}", device.user_code.bold().green());
+    println!();
+
+    if oauth::open_browser(&verification) {
+        println!("{}", "Opened your browser automatically…".dimmed());
+    }
+    println!("{}", "Waiting for authorization…".dimmed());
+
+    let token = oauth::poll_for_token(&http, url, &cfg, &device).await?;
+    Ok((token.access_token, token.refresh_token))
 }
