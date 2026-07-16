@@ -232,28 +232,33 @@ describe('granularity variants in CompilerApi', () => {
       api.dispose();
     });
 
-    test('LRU eviction beyond the bound, with a logged warning and rebuild on re-request', async () => {
-      const bound = (CompilerApi as any).MAX_GRANULARITY_VARIANTS;
+    test('LRU eviction beyond the CUBEJS_MAX_GRANULARITY_VARIANTS bound, with a logged warning and rebuild on re-request', async () => {
+      const bound = 4;
+      process.env.CUBEJS_MAX_GRANULARITY_VARIANTS = String(bound);
       const capturedLogs: any[] = [];
       const api = createApi({
         capturedLogs,
         granularities: (ctx: any) => [{ name: `g_${ctx.securityContext.tenant}`, interval: '1 week' }],
       });
 
-      for (let i = 0; i < bound + 1; i++) {
-        await api.metaConfig(ctxFor(`t${i}`), {});
-      }
-      expect(api.buildCount).toBe(bound + 1);
-      expect((await api.variantCache())!.size).toBe(bound);
-      expect(capturedLogs.some(l => l.msg === 'Granularity variant cache is full')).toBe(true);
+      try {
+        for (let i = 0; i < bound + 1; i++) {
+          await api.metaConfig(ctxFor(`t${i}`), {});
+        }
+        expect(api.buildCount).toBe(bound + 1);
+        expect((await api.variantCache())!.size).toBe(bound);
+        expect(capturedLogs.some(l => l.msg === 'Granularity variant cache is full')).toBe(true);
 
-      // t0 was evicted (least recently used) — asking again rebuilds.
-      await api.metaConfig(ctxFor('t0'), {});
-      expect(api.buildCount).toBe(bound + 2);
-      // The newest entry is still cached — no rebuild.
-      await api.metaConfig(ctxFor(`t${bound}`), {});
-      expect(api.buildCount).toBe(bound + 2);
-      api.dispose();
+        // t0 was evicted (least recently used) — asking again rebuilds.
+        await api.metaConfig(ctxFor('t0'), {});
+        expect(api.buildCount).toBe(bound + 2);
+        // The newest entry is still cached — no rebuild.
+        await api.metaConfig(ctxFor(`t${bound}`), {});
+        expect(api.buildCount).toBe(bound + 2);
+      } finally {
+        delete process.env.CUBEJS_MAX_GRANULARITY_VARIANTS;
+        api.dispose();
+      }
     });
 
     test('a failed variant build self-evicts and the next request retries', async () => {
