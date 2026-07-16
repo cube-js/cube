@@ -24,6 +24,7 @@
     "test": "yarn integration",
     "integration": "npm run integration:crate",
     "integration:crate": "jest --verbose dist/test",
+    "unit": "jest --forceExit --verbose dist/test/CrateDriver.unit.test.js",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
