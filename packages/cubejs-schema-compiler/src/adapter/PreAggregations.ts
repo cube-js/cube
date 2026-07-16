@@ -1,5 +1,6 @@
 import R from 'ramda';
-
+import moment from 'moment-timezone';
+import { parseSqlInterval, subtractInterval } from '@cubejs-backend/shared';
 import { CubeSymbols, PreAggregationDefinition } from '../compiler/CubeSymbols';
 import { FinishedJoinTree, JoinEdge } from '../compiler/JoinGraph';
 import { UserError } from '../compiler/UserError';
@@ -15,6 +16,8 @@ import { BaseFilter } from './BaseFilter';
 import { BaseGroupFilter } from './BaseGroupFilter';
 import { BaseDimension } from './BaseDimension';
 import { BaseSegment } from './BaseSegment';
+
+type ParsedInterval = ReturnType<typeof parseSqlInterval>;
 
 export type PartitionTimeDimension = {
   dimension: string;
@@ -200,7 +203,12 @@ export class PreAggregations {
       return descriptions.map(desc => ({
         ...desc,
         usageMapping: usageInfo.usages,
-        ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
+        // Union the usage date ranges with the base matched range so that neither
+        // the per-usage requirement (e.g. time_shift needing earlier partitions)
+        // nor the base range (e.g. a rolling window's trailing lookback) is lost.
+        ...(mergedDateRange && desc.matchedTimeDimensionDateRange
+          ? { matchedTimeDimensionDateRange: PreAggregations.unionDateRanges(desc.matchedTimeDimensionDateRange, mergedDateRange) }
+          : {}),
       }));
     });
   }
@@ -222,6 +230,10 @@ export class PreAggregations {
     }
 
     return minDate && maxDate ? [minDate, maxDate] : null;
+  }
+
+  private static unionDateRanges(a: [string, string], b: [string, string]): [string, string] {
+    return [a[0] < b[0] ? a[0] : b[0], a[1] > b[1] ? a[1] : b[1]];
   }
 
   private preAggregationDescriptionsFor(foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
@@ -291,6 +303,82 @@ export class PreAggregations {
     return this.hasCumulativeMeasuresValue;
   }
 
+  /**
+   * For a query with cumulative (rolling window) measures, decide how the matched
+   * time dimension date range can be narrowed for partition selection.
+   *
+   * A rolling window needs data preceding the requested range (the trailing window),
+   * so the range can only be narrowed if every cumulative measure has a bounded
+   * trailing window and no leading window. In that case we return the largest
+   * trailing interval so the caller can shift the matched range start back by it.
+   *
+   * Returns `null` when narrowing is not safe (an unbounded trailing or any leading
+   * window is present) — the caller then keeps the previous behaviour of building
+   * the whole build range. Returns `undefined` when there are no cumulative measures.
+   */
+  private cumulativeMeasuresTrailingInterval(): ParsedInterval | null | undefined {
+    // Mirror hasCumulativeMeasures(): inspect the leaf measures so composed
+    // measures whose cumulative-ness lives in a leaf are handled too.
+    const measures = [...this.query.measures, ...this.query.measureFilters];
+    const collectLeafMeasures = this.query.collectLeafMeasures.bind(this.query);
+    const leafMeasurePaths = R.uniq(
+      R.unnest(measures.map(m => this.query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures')))
+    ) as string[];
+    const cumulativeMeasures = leafMeasurePaths
+      .map(p => this.query.newMeasure(p))
+      .filter(m => m.isCumulative());
+
+    if (!cumulativeMeasures.length) {
+      return undefined;
+    }
+
+    let maxTrailing: ParsedInterval | undefined;
+    let maxTrailingSeconds = -1;
+
+    for (const measure of cumulativeMeasures) {
+      const { rollingWindow } = measure.measureDefinition();
+      // Non-fixed windows (to_date/year_to_date/etc.) or running totals have a
+      // variable trailing extent — don't narrow.
+      if (!rollingWindow || (rollingWindow.type && rollingWindow.type !== 'fixed')) {
+        return null;
+      }
+      // A leading window needs data after the requested range; not handled here.
+      if (rollingWindow.leading && rollingWindow.leading !== 'unbounded') {
+        return null;
+      }
+      if (rollingWindow.leading === 'unbounded' || rollingWindow.trailing === 'unbounded') {
+        return null;
+      }
+      if (rollingWindow.trailing) {
+        const parsed = parseSqlInterval(rollingWindow.trailing);
+        const seconds = moment.duration(parsed).asSeconds();
+        if (seconds > maxTrailingSeconds) {
+          maxTrailingSeconds = seconds;
+          maxTrailing = parsed;
+        }
+      }
+    }
+
+    return maxTrailing;
+  }
+
+  /**
+   * Shift the start of a matched time dimension range back by the trailing window
+   * so partitions covering the rolling window's lookback are also built.
+   * Leaves the range untouched when there's no range or no trailing interval.
+   */
+  private expandRangeByTrailingWindow(
+    range: [string, string] | undefined,
+    trailingInterval: ParsedInterval | null | undefined
+  ): [string, string] | undefined {
+    if (!range || !trailingInterval) {
+      return range;
+    }
+    const format = `YYYY-MM-DDTHH:mm:ss.${'S'.repeat(this.query.timestampPrecision())}`;
+    const start = subtractInterval(moment(range[0], format), trailingInterval).format(format);
+    return [start, range[1]];
+  }
+
   // Return array of `aggregations` columns descriptions in form `<func>(<column>)`
   // Aggregations used in CubeStore create table for describe measures in CubeStore side
   public aggregationsColumns(cube: string, preAggregation: PreAggregationDefinition): string[] {
@@ -326,7 +414,15 @@ export class PreAggregations {
 
     let matchedTimeDimension: BaseTimeDimension | undefined;
 
-    if (preAggregation.partitionGranularity && !this.hasCumulativeMeasures()) {
+    // For cumulative (rolling window) measures the matched range can only narrow
+    // partition selection when every window has a bounded trailing extent and no
+    // leading window. `undefined` => no cumulative measures (regular narrowing);
+    // a ParsedInterval => narrow but shift the start back by that trailing window;
+    // `null` => can't narrow safely, keep building the whole range.
+    const trailingInterval = this.cumulativeMeasuresTrailingInterval();
+    const canMatchTimeDimension = trailingInterval !== null;
+
+    if (preAggregation.partitionGranularity && canMatchTimeDimension) {
       matchedTimeDimension = this.query.timeDimensions.find(td => {
         if (!td.dateRange) {
           return false;
@@ -351,7 +447,7 @@ export class PreAggregations {
 
     let filters: BaseFilter[] | undefined;
 
-    if (preAggregation.partitionGranularity) {
+    if (preAggregation.partitionGranularity && canMatchTimeDimension) {
       filters = this.query.filters?.filter((td): td is BaseFilter => {
         // TODO support all date operators
         if (td.isDateOperator() && 'camelizeOperator' in td && td.camelizeOperator === 'inDateRange') {
@@ -404,9 +500,10 @@ export class PreAggregations {
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
         this.refreshRangeQuery(cube).preAggregationStartEndQueries(cube, preAggregation),
       matchedTimeDimensionDateRange:
-        preAggregation.partitionGranularity && (
+        preAggregation.partitionGranularity && this.expandRangeByTrailingWindow(
           matchedTimeDimension?.boundaryDateRangeFormatted() ||
-          filters?.[0]?.formattedDateRange() // TODO intersect all date ranges
+          filters?.[0]?.formattedDateRange(), // TODO intersect all date ranges
+          trailingInterval
         ),
       indexesSql: Object.keys(preAggregation.indexes || {})
         .map(
