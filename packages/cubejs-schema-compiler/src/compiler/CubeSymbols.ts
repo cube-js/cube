@@ -618,7 +618,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
 
     for (const dim of Object.values(dimensions)) {
-      if (dim && dim.type === 'time' && 'granularities' in dim) {
+      // A view's included dimension already carries a propagated granularitiesBlock (with the
+      // source dimension's includes/excludes) alongside the custom-only `granularities` map.
+      // Re-normalizing the custom-only map here would reset includes to '*' and drop the source's
+      // includes/excludes, so only normalize dimensions that haven't been normalized yet.
+      if (dim && dim.type === 'time' && 'granularities' in dim && !dim.granularitiesBlock) {
         // Keep the raw user value for the validator (it runs after this and would otherwise only
         // see the extracted customs, never the includes/excludes/custom dict).
         dim.rawGranularities = dim.granularities;
@@ -1523,7 +1527,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         }
         if (refProperty &&
           cube[refProperty].type === 'time' &&
-          self.resolveGranularity([cubeName, refProperty, 'granularities', propertyName], cube)
+          self.resolveGranularity(
+            [cubeName, refProperty, 'granularities', propertyName],
+            cube,
+            query?.options?.granularityDefinitions
+          )
         ) {
           return {
             toString: () => this.withSymbolsCallContext(
@@ -1554,7 +1562,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * @param {string|string[]} path
    * @param [refCube] Optional cube object to operate on
    */
-  public resolveGranularity(path: string | string[], refCube?: any) {
+  public resolveGranularity(
+    path: string | string[],
+    refCube?: any,
+    granularityDefinitions?: Record<string, Record<string, GranularityDefinition>>,
+  ) {
     const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
     const cube = refCube || this.symbols[cubeName];
 
@@ -1572,7 +1584,37 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       return { interval: `1 ${granName}` };
     }
 
-    return cube?.[dimName]?.[gr]?.[granName];
+    return cube?.[dimName]?.[gr]?.[granName] ||
+      granularityDefinitions?.[`${cubeName}.${dimName}`]?.[granName];
+  }
+
+  /**
+   * Returns a request-owned evaluator facade that keeps all state and method execution on the
+   * shared evaluator, while binding custom-granularity fallback to one request's effective set.
+   * The native SQL planner calls resolveGranularity on the evaluator bridge directly, so the
+   * request context has to live at this seam rather than only at JS adapter call sites.
+   */
+  public withGranularityDefinitions(
+    granularityDefinitions?: Record<string, Record<string, GranularityDefinition>>,
+  ): this {
+    if (!granularityDefinitions || Object.keys(granularityDefinitions).length === 0) {
+      return this;
+    }
+
+    const evaluator = this;
+    return new Proxy(this, {
+      get(target, property) {
+        if (property === 'resolveGranularity') {
+          return (path: string | string[], refCube?: any) => evaluator.resolveGranularity(
+            path,
+            refCube,
+            granularityDefinitions,
+          );
+        }
+        const value = Reflect.get(target, property, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
   }
 
   protected cubeDependenciesProxy(parentIndex, cubeName) {

@@ -187,11 +187,15 @@ const GranularityInclusionListSchema = Joi.alternatives([
 // real pipeline validates, since normalization replaces `granularities` with the custom map first).
 const GranularitiesFieldSchema = Joi.alternatives()
   .conditional(Joi.ref('.'), {
-    // Only the new dict form has exclusively includes/excludes/custom keys.
+    // Dict form iff keys are a subset of includes/excludes/custom AND their VALUES have the dict
+    // shape (includes/excludes are '*' or arrays, custom is a plain object). The value check
+    // mirrors normalizeGranularitiesBlock so a legacy custom granularity literally named
+    // `includes`/`excludes`/`custom` — whose value is a granularity DEFINITION object — is not
+    // misread as the dict form and rejected.
     is: Joi.object().keys({
-      includes: Joi.any(),
-      excludes: Joi.any(),
-      custom: Joi.any(),
+      includes: Joi.alternatives(Joi.string().valid('*'), Joi.array()),
+      excludes: Joi.alternatives(Joi.string().valid('*'), Joi.array()),
+      custom: Joi.object().pattern(Joi.string(), Joi.object()),
     }).unknown(false),
     then: Joi.object().keys({
       includes: GranularityInclusionListSchema,

@@ -1801,6 +1801,16 @@ describe('Cube Validation', () => {
       const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
       expect(validationResult.error).toBeFalsy();
     });
+
+    // Regression: a legacy custom granularity literally named includes/excludes/custom (value is a
+    // definition object) must be accepted as the legacy map, not misread as the dict form. Mirrors
+    // the value-shape disambiguation in normalizeGranularitiesBlock.
+    it.each(['includes', 'excludes', 'custom'])('accepts a legacy custom granularity named "%s"', (name) => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({ [name]: { interval: '1 year', origin: '2026-04-01' } });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
   });
 
   describe('Access Policy group/groups support:', () => {
