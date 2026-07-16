@@ -25,6 +25,7 @@ export {
   resolveGlobalGranularitiesSync,
   getBuiltInGranularityDefaults,
   buildBuiltInsCatalog,
+  granularityConfigHash,
 } from './GlobalGranularitiesConfig';
 export {
   NormalizedGranularitiesBlock,
@@ -34,4 +35,3 @@ export {
   resolveDimensionGranularities,
   serializeEffectiveGranularities,
 } from './GranularityResolver';
-export { granularityConfigHash } from './GranularityConfigHash';
