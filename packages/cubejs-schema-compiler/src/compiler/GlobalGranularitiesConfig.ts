@@ -110,22 +110,34 @@ function resolveFromList(list: GranularityList): GlobalGranularitiesConfig {
   return { enabledBuiltIns, customGranularities };
 }
 
+// Config forms accepted for `granularities` in cube.js / cube.py.
+export type GranularitiesOption =
+  GranularityList | ((ctx: any) => GranularityList | Promise<GranularityList>) | undefined;
+
+// Sync resolution for the context-independent forms (undefined -> env, static list).
+// The function form is per-context and must go through `resolveGlobalGranularities`.
+export function resolveGlobalGranularitiesSync(
+  userValue: Exclude<GranularitiesOption, Function>,
+): GlobalGranularitiesConfig {
+  if (!Array.isArray(userValue)) {
+    return resolveFromEnv();
+  }
+  return resolveFromList(userValue);
+}
+
 // `userValue` is the value of `granularities` from the cube.js / cube.py config file.
 //   undefined     -> fall back to `CUBEJS_GRANULARITIES` env vars
 //   GranularityList  -> use this list, replacing env vars entirely (no merge)
 //   function(ctx) -> called per request; same no-merge replacement as the list form
 export async function resolveGlobalGranularities(
-  userValue: GranularityList | ((ctx: any) => GranularityList | Promise<GranularityList>) | undefined,
+  userValue: GranularitiesOption,
   ctx: any,
 ): Promise<GlobalGranularitiesConfig> {
-  if (userValue === undefined) {
-    return resolveFromEnv();
+  if (typeof userValue === 'function') {
+    const resolved = await userValue(ctx);
+    return resolveGlobalGranularitiesSync(Array.isArray(resolved) ? resolved : undefined);
   }
-  const resolved = typeof userValue === 'function' ? await userValue(ctx) : userValue;
-  if (!Array.isArray(resolved)) {
-    return resolveFromEnv();
-  }
-  return resolveFromList(resolved);
+  return resolveGlobalGranularitiesSync(userValue);
 }
 
 export function getBuiltInGranularityDefaults(name: string) {

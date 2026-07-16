@@ -4,11 +4,16 @@ import {
   AccessPolicyDefinition,
   BaseQuery,
   CanUsePreAggregationFn,
+  buildBuiltInsCatalog,
   compile,
   Compiler,
   createQuery,
   CubeDefinition,
   EvaluatedCube,
+  GlobalGranularitiesConfig,
+  GranularitiesOption,
+  granularityConfigHash,
+  normalizeGranularitiesBlock,
   PreAggregationFilters,
   PreAggregationInfo,
   PreAggregationReferences,
@@ -16,6 +21,10 @@ import {
   prepareCompiler,
   queryClass,
   QueryFactory,
+  resolveDimensionGranularities,
+  resolveGlobalGranularities,
+  resolveGlobalGranularitiesSync,
+  serializeEffectiveGranularities,
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
@@ -51,6 +60,7 @@ export interface CompilerApiOptions {
   devServer?: boolean;
   fastReload?: boolean;
   allowNodeRequire?: boolean;
+  granularities?: GranularitiesOption;
 }
 
 export interface GetSqlOptions {
@@ -87,6 +97,13 @@ export interface DataSourceInfo {
 }
 
 export class CompilerApi {
+  /**
+   * Bound on cached granularity-enriched meta variants per compiled model. Each entry costs
+   * O(model) memory; expected distinct-config cardinality for a `granularities` context
+   * function is 1–4, so this is headroom, not a target. Exceeding it evicts LRU and logs.
+   */
+  protected static readonly MAX_GRANULARITY_VARIANTS = 16;
+
   protected readonly repository: SchemaFileRepository;
 
   protected readonly dbType: DbTypeInternalFn;
@@ -133,6 +150,8 @@ export class CompilerApi {
 
   protected compilerVersion?: string;
 
+  protected readonly granularities?: GranularitiesOption;
+
   protected queryFactory?: QueryFactory;
 
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
@@ -152,6 +171,7 @@ export class CompilerApi {
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
+    this.granularities = options.granularities;
     this.nativeInstance = this.createNativeInstance();
 
     // Caching stuff
@@ -224,6 +244,13 @@ export class CompilerApi {
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
 
+    // Env/static granularity configs are baked into the compiled meta, so a config change must
+    // force a recompile. The function form is resolved per request instead (variant cache) and
+    // must never churn the compiler version.
+    if (typeof this.granularities !== 'function') {
+      compilerVersion += `_gran_${granularityConfigHash(resolveGlobalGranularitiesSync(this.granularities))}`;
+    }
+
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
       this.compilers = this.compileSchema(compilerVersion, options.requestId).catch(e => {
         this.compilers = undefined;
@@ -267,6 +294,7 @@ export class CompilerApi {
         compiledScriptCache: this.compiledScriptCache,
         compiledJinjaCache: this.compiledJinjaCache,
         compiledYamlCache: this.compiledYamlCache,
+        granularities: this.granularities,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
@@ -1064,11 +1092,119 @@ export class CompilerApi {
     };
   }
 
-  protected mixInVisibilityMaskHash(compilerId: string, visibilityMaskHash: string): string {
+  protected mixInMaskHash(compilerId: string, maskHash: string): string {
     const uuidBytes = Buffer.from(uuidParse(compilerId));
-    const hashBytes = Buffer.from(visibilityMaskHash, 'hex');
+    const hashBytes = Buffer.from(maskHash, 'hex');
     return uuidv4({ random: crypto.createHash('sha256').update(uuidBytes).update(hashBytes).digest()
       .subarray(0, 16) as any });
+  }
+
+  protected mixInVisibilityMaskHash(compilerId: string, visibilityMaskHash: string): string {
+    return this.mixInMaskHash(compilerId, visibilityMaskHash);
+  }
+
+  /**
+   * Global granularity config for a request context. O(config): env/static forms ignore the
+   * context; the function form is invoked with it. Used by the /v1/granularities endpoint.
+   */
+  public async resolveGlobalGranularitiesConfig(context: Context): Promise<GlobalGranularitiesConfig> {
+    return resolveGlobalGranularities(this.granularities, context);
+  }
+
+  /**
+   * Meta cubes with `effectiveGranularities` attached, plus the hash to mix into compilerId.
+   *
+   * Env/static configs are context-independent: the transformer bakes the effective sets into
+   * the base meta at compile time (their hash is folded into compilerVersion), so this returns
+   * the base cubes untouched with a null hash.
+   *
+   * A function config resolves per request. Enriched variants are cached on the compiled model
+   * keyed by the canonical config hash — a bounded promise-valued LRU, so concurrent misses of
+   * one hash dedup to a single O(model) build, a failed build self-evicts, and the whole cache
+   * is discarded with the compilers object on recompile.
+   */
+  protected async selectGranularityVariant(
+    compilers: Compiler,
+    requestContext: Context,
+  ): Promise<{ cubes: any[]; granularityHash: string | null }> {
+    if (typeof this.granularities !== 'function') {
+      return { cubes: compilers.metaTransformer.cubes, granularityHash: null };
+    }
+
+    const config = await resolveGlobalGranularities(this.granularities, requestContext);
+    const granularityHash = granularityConfigHash(config);
+
+    if (!compilers.granularityVariants) {
+      compilers.granularityVariants = new Map();
+    }
+    const cache = compilers.granularityVariants;
+
+    let variant = cache.get(granularityHash);
+    if (variant) {
+      // Refresh LRU recency.
+      cache.delete(granularityHash);
+      cache.set(granularityHash, variant);
+    } else {
+      if (cache.size >= CompilerApi.MAX_GRANULARITY_VARIANTS) {
+        const oldest = cache.keys().next().value;
+        cache.delete(oldest);
+        this.logger('Granularity variant cache is full', {
+          warning: `More than ${CompilerApi.MAX_GRANULARITY_VARIANTS} distinct granularity configs seen for one compiled model; ` +
+            'evicting the least recently used variant. A `granularities` function returning unstable values ' +
+            'causes per-request meta rebuilds and churns compilerId-based caches (e.g. in CubeSQL).',
+        });
+      }
+      variant = Promise.resolve().then(() => this.buildGranularityVariant(compilers, config));
+      cache.set(granularityHash, variant);
+      variant.catch(() => {
+        if (cache.get(granularityHash) === variant) {
+          cache.delete(granularityHash);
+        }
+      });
+    }
+
+    return { cubes: await variant, granularityHash };
+  }
+
+  /**
+   * One O(model) pass attaching `effectiveGranularities` to every time dimension. Never mutates
+   * the base meta: enriched cubes get new cube/config/dimensions containers, while untouched
+   * members stay shared by reference (all downstream consumers — visibility patch, gateway
+   * filters — copy-on-write rather than mutate). Time dimensions without local customization
+   * share one default set per variant instead of allocating identical arrays per dimension.
+   */
+  protected buildGranularityVariant(compilers: Compiler, config: GlobalGranularitiesConfig): any[] {
+    const catalog = buildBuiltInsCatalog(config);
+    const inputs = compilers.metaTransformer.granularityInputs;
+    const defaultSet = serializeEffectiveGranularities(resolveDimensionGranularities(
+      normalizeGranularitiesBlock(undefined),
+      config.enabledBuiltIns,
+      config.customGranularities,
+      catalog,
+    ));
+
+    return compilers.metaTransformer.cubes.map((cube: any) => {
+      if (!cube.config.dimensions?.some((d: any) => d.type === 'time')) {
+        return cube;
+      }
+      return {
+        config: {
+          ...cube.config,
+          dimensions: cube.config.dimensions.map((dim: any) => {
+            if (dim.type !== 'time') {
+              return dim;
+            }
+            const block = inputs.get(dim.name);
+            const effectiveGranularities = block
+              ? serializeEffectiveGranularities(resolveDimensionGranularities(
+                block, config.enabledBuiltIns, config.customGranularities, catalog,
+              ))
+              : defaultSet;
+            return { ...dim, effectiveGranularities };
+          }),
+        },
+      };
+    });
   }
 
   public async metaConfig(
@@ -1077,11 +1213,23 @@ export class CompilerApi {
   ): Promise<any> {
     const { includeCompilerId, includeViewGroups, skipVisibilityPatch, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
-    const { cubes } = compilers.metaTransformer;
+    const { cubes, granularityHash } = await this.selectGranularityVariant(compilers, requestContext);
+
+    // Fixed composition order: base compilerId, then visibility mask, then granularity hash.
+    const composeCompilerId = (visibilityMaskHash: string | null) => {
+      let id = compilers.compilerId;
+      if (visibilityMaskHash) {
+        id = this.mixInMaskHash(id, visibilityMaskHash);
+      }
+      if (granularityHash) {
+        id = this.mixInMaskHash(id, granularityHash);
+      }
+      return id;
+    };
 
     if (skipVisibilityPatch) {
       if (includeCompilerId || includeViewGroups) {
-        const result: any = { cubes, compilerId: compilers.compilerId };
+        const result: any = { cubes, compilerId: composeCompilerId(null) };
         if (includeViewGroups) {
           result.viewGroups = compilers.metaTransformer.viewGroups;
         }
@@ -1098,7 +1246,7 @@ export class CompilerApi {
     if (includeCompilerId || includeViewGroups) {
       const result: any = {
         cubes: patchedCubes,
-        compilerId: visibilityMaskHash ? this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) : compilers.compilerId,
+        compilerId: composeCompilerId(visibilityMaskHash),
       };
       if (includeViewGroups) {
         result.viewGroups = compilers.metaTransformer.viewGroups;
@@ -1113,10 +1261,11 @@ export class CompilerApi {
     options?: { requestId?: string }
   ): Promise<{ metaConfig: any; cubeDefinitions: Record<string, CubeDefinition> }> {
     const compilers = await this.getCompilers(options);
+    const { cubes } = await this.selectGranularityVariant(compilers, requestContext);
     const { cubes: patchedCubes } = await this.patchVisibilityByAccessPolicy(
       compilers,
       requestContext,
-      compilers.metaTransformer?.cubes
+      cubes
     );
     return {
       metaConfig: patchedCubes,

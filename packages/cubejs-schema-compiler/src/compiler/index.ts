@@ -18,15 +18,20 @@ export {
   BuiltInGranularityDefinition,
   GranularityList,
   GranularityListItem,
+  GranularitiesOption,
   GlobalGranularitiesConfig,
   BuiltInCatalogEntry,
   resolveGlobalGranularities,
+  resolveGlobalGranularitiesSync,
   getBuiltInGranularityDefaults,
   buildBuiltInsCatalog,
 } from './GlobalGranularitiesConfig';
 export {
   NormalizedGranularitiesBlock,
   ResolvedGranularitySet,
+  EffectiveGranularity,
   normalizeGranularitiesBlock,
   resolveDimensionGranularities,
+  serializeEffectiveGranularities,
 } from './GranularityResolver';
+export { granularityConfigHash } from './GranularityConfigHash';
