@@ -24,8 +24,7 @@ import {
   EffectiveGranularity,
   NormalizedGranularitiesBlock,
   normalizeGranularitiesBlock,
-  resolveDimensionGranularities,
-  serializeEffectiveGranularities,
+  effectiveGranularitiesFor,
 } from './GranularityResolver';
 import {
   GlobalGranularitiesConfig,
@@ -268,12 +267,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
         catalog,
         // One shared array for every time dimension without local customization — with large
         // models this avoids re-allocating an identical granularity set per dimension.
-        defaultSet: serializeEffectiveGranularities(resolveDimensionGranularities(
-          normalizeGranularitiesBlock(undefined),
-          config.enabledBuiltIns,
-          config.customGranularities,
-          catalog,
-        )),
+        defaultSet: effectiveGranularitiesFor(undefined, config.enabledBuiltIns, config.customGranularities, catalog),
       };
     }
 
@@ -377,9 +371,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
             if (this.staticGranularityState) {
               const s = this.staticGranularityState;
               effectiveGranularities = inputs
-                ? serializeEffectiveGranularities(resolveDimensionGranularities(
-                  inputs, s.config.enabledBuiltIns, s.config.customGranularities, s.catalog,
-                ))
+                ? effectiveGranularitiesFor(inputs, s.config.enabledBuiltIns, s.config.customGranularities, s.catalog)
                 : s.defaultSet;
             }
           }

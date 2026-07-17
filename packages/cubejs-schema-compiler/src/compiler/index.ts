@@ -31,7 +31,9 @@ export {
   NormalizedGranularitiesBlock,
   ResolvedGranularitySet,
   EffectiveGranularity,
+  GRANULARITY_STRING_FIELDS,
   normalizeGranularitiesBlock,
   resolveDimensionGranularities,
   serializeEffectiveGranularities,
+  effectiveGranularitiesFor,
 } from './GranularityResolver';
