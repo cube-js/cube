@@ -13,6 +13,7 @@ import {
   GlobalGranularitiesConfig,
   GranularitiesOption,
   granularityConfigHash,
+  NormalizedGranularitiesBlock,
   normalizeGranularitiesBlock,
   PreAggregationFilters,
   PreAggregationInfo,
@@ -436,26 +437,38 @@ export class CompilerApi {
     const { enabledBuiltIns, customGranularities } = config;
     const catalog = buildBuiltInsCatalog(config);
     const inputs = compilers.metaTransformer.granularityInputs;
-    const emptyBlock = normalizeGranularitiesBlock(undefined);
     const definitions: Record<string, Record<string, any>> = {};
 
-    for (const cube of compilers.metaTransformer.cubes) {
-      for (const dimension of (cube.config.dimensions || []).filter((d: any) => d.type === 'time')) {
-        const resolved = resolveDimensionGranularities(
-          inputs.get(dimension.name) || emptyBlock,
-          enabledBuiltIns,
-          customGranularities,
-          catalog,
-        );
-        const customs = Object.fromEntries(
-          Object.entries(resolved)
-            .filter(([name, def]) => def.type === 'custom' &&
-              Object.prototype.hasOwnProperty.call(customGranularities, name))
-            .map(([name, { type: _type, ...def }]) => [name, def])
-        );
-        if (Object.keys(customs).length > 0) {
-          definitions[dimension.name] = customs;
+    // Keep only the global customs a dimension's resolved set actually exposes, `type` tag stripped.
+    const globalCustomsOf = (block: NormalizedGranularitiesBlock) => Object.fromEntries(
+      Object.entries(resolveDimensionGranularities(block, enabledBuiltIns, customGranularities, catalog))
+        .filter(([name, def]) => def.type === 'custom' &&
+          Object.prototype.hasOwnProperty.call(customGranularities, name))
+        .map(([name, { type: _type, ...def }]) => [name, def])
+    );
+
+    // A time dimension WITHOUT a local block resolves against the empty block, so it exposes every
+    // global custom with no filtering — the same map for all of them. Local blocks (rare) are the
+    // only dimensions needing individual reconciliation, so only those are walked. No full model
+    // scan: cost is O(global customs) + O(local-block dims), not O(all time dimensions).
+    const shared = globalCustomsOf(normalizeGranularitiesBlock(undefined));
+
+    if (Object.keys(shared).length > 0) {
+      // A time dimension is "plain" iff it isn't in `granularityInputs` (which holds only dims that
+      // declared a local granularities block). Assign the shared map by reference to each plain dim.
+      for (const cube of compilers.metaTransformer.cubes) {
+        for (const dim of cube.config.dimensions || []) {
+          if (dim.type === 'time' && !inputs.has(dim.name)) {
+            definitions[dim.name] = shared;
+          }
         }
+      }
+    }
+
+    for (const [dimName, block] of inputs) {
+      const customs = globalCustomsOf(block);
+      if (Object.keys(customs).length > 0) {
+        definitions[dimName] = customs;
       }
     }
 
@@ -1264,9 +1277,10 @@ export class CompilerApi {
   }
 
   /**
-   * One O(model) pass attaching `effectiveGranularities` to every time dimension. Copies only
-   * what it changes — the base meta is never mutated, untouched members stay shared by
-   * reference, and uncustomized time dimensions share one default set per variant.
+   * Attach `effectiveGranularities` to every time dimension for one config. Must copy each cube
+   * (the base meta is never mutated), but the expensive reconciliation runs ONLY for the rare
+   * dimensions with a local block; every plain dimension shares one precomputed `defaultSet` by
+   * reference — so the per-dimension cost is O(local-block dims), not O(all time dimensions).
    */
   protected buildGranularityVariant(compilers: Compiler, config: GlobalGranularitiesConfig): any[] {
     const catalog = buildBuiltInsCatalog(config);
