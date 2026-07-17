@@ -33,8 +33,10 @@ scratch — the copy carries over the source schedule's notification settings.
 
 Toggle between two delivery channels:
 
-- **Email** — select multiple recipients from workspace users using a searchable
-  picker with checkboxes.
+- **Email** — select recipients using a searchable picker with checkboxes. The
+  picker is grouped into **Users** and **User groups** sections, so you can add
+  individual workspace users, entire [user groups][ref-user-groups], or a mix of
+  both.
 - **Slack** — select a Slack channel to post to. Requires connecting your Slack
   workspace first (one-time OAuth flow via **Connect to Slack**). Once
   connected, select a channel from a searchable picker.
@@ -59,9 +61,22 @@ notification card header before saving.
 
 ## Email notifications
 
-Email notifications are sent to selected workspace users after a scheduled
+Email notifications are sent to the selected recipients after a scheduled
 refresh completes. Each recipient receives a message with a link to the
 dashboard and the attached screenshot.
+
+### Recipients
+
+The recipient picker is split into two sections:
+
+- **Users** — individual workspace users.
+- **User groups** — [user groups][ref-user-groups]. A group is expanded to its
+  current members each time the notification is sent, so adding or removing
+  members takes effect on the next run without editing the schedule. The **User
+  groups** section only appears when your workspace has at least one user group.
+
+A recipient who is selected individually and also belongs to a selected group is
+emailed only once.
 
 ## Slack notifications
 
@@ -83,4 +98,4 @@ workspace has access to.
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
-[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-user-groups]: /admin/users-and-permissions/user-groups
