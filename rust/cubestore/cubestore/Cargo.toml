@@ -63,8 +63,8 @@ bigdecimal = { version = "0.2.0", features = ["serde"] }
 # Tracking PR with backports: https://github.com/cube-js/rust-s3/pull/1
 # The fork also includes a fix for AWS_STS_REGIONAL_ENDPOINTS
 # See https://github.com/cube-js/rust-s3/pull/1/commits for more details
-# rev = tip of https://github.com/cube-js/rust-s3/pull/2 (per-operation SSE header)
-rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", rev = "b586c38bf2383f0763229708ab42cbd705b9685c", default-features = false, features = ["tokio", "tokio-native-tls"] }
+# rev = cubestore-0.32.3-backport tip incl. per-operation SSE header (https://github.com/cube-js/rust-s3/pull/2)
+rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", rev = "9deb3475c7963deaa6c30de59771e61af5b15b8f", default-features = false, features = ["tokio", "tokio-native-tls"] }
 deadqueue = "0.2.4"
 reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"
