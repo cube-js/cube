@@ -73,6 +73,12 @@ export function normalizeGranularitiesBlock(raw: any): NormalizedGranularitiesBl
   return EMPTY_BLOCK;
 }
 
+// The string-valued fields of a granularity definition, in wire-emission order. Single source of
+// truth for every place that projects a definition (serialize, hash, sanitize, meta) so those
+// projections can't drift — notably the hash and the serializer, which MUST agree or two tenant
+// configs could collide on one variant-cache key.
+export const GRANULARITY_STRING_FIELDS = ['title', 'interval', 'offset', 'origin', 'format'] as const;
+
 // Wire shape of one entry in a time dimension's `effectiveGranularities`.
 export type EffectiveGranularity = {
   name: string;
@@ -84,19 +90,19 @@ export type EffectiveGranularity = {
   format?: string;
 };
 
-// Serialize a resolved set for /v1/meta. Field order and the conditional inclusion of
-// interval/offset/origin/format are part of the wire contract — keep byte-compatible.
-// `title` falls back to the granularity name (same as /v1/granularities) so it is always present.
+// Serialize a resolved set for /v1/meta. `title` always present (falls back to the name); the
+// other string fields are included only when defined. Order follows GRANULARITY_STRING_FIELDS,
+// which also drives the config hash — the two share the field list so they can't drift.
 export function serializeEffectiveGranularities(resolved: ResolvedGranularitySet): EffectiveGranularity[] {
-  return Object.entries(resolved).map(([name, def]) => ({
-    name,
-    type: def.type,
-    title: def.title || name,
-    ...(def.interval !== undefined ? { interval: def.interval } : {}),
-    ...(def.offset !== undefined ? { offset: def.offset } : {}),
-    ...(def.origin !== undefined ? { origin: def.origin } : {}),
-    ...(def.format !== undefined ? { format: def.format } : {}),
-  }));
+  return Object.entries(resolved).map(([name, def]) => {
+    const out: EffectiveGranularity = { name, type: def.type, title: def.title || name };
+    for (const field of GRANULARITY_STRING_FIELDS) {
+      if (field !== 'title' && def[field] !== undefined) {
+        out[field] = def[field];
+      }
+    }
+    return out;
+  });
 }
 
 // Reconcile a dimension's local block against the global enabled built-ins and global customs,
@@ -146,4 +152,21 @@ export function resolveDimensionGranularities(
   }
 
   return out;
+}
+
+// One-shot: reconcile a dimension's block against the global config and serialize to the wire set.
+// The single seam every path uses to turn a (block, config) into `effectiveGranularities`, so the
+// resolve→serialize contract lives in exactly one place. A missing block means "no local block".
+export function effectiveGranularitiesFor(
+  block: NormalizedGranularitiesBlock | undefined,
+  globalEnabledBuiltIns: ReadonlyArray<string>,
+  globalCustom: Readonly<Record<string, GranularityDefinition>>,
+  allBuiltInsCatalog: Readonly<Record<string, GranularityDefinition>>,
+): EffectiveGranularity[] {
+  return serializeEffectiveGranularities(resolveDimensionGranularities(
+    block ?? normalizeGranularitiesBlock(undefined),
+    globalEnabledBuiltIns,
+    globalCustom,
+    allBuiltInsCatalog,
+  ));
 }
