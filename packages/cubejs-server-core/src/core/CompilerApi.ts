@@ -381,6 +381,11 @@ export class CompilerApi {
    * contain function-config results because it is reused across security contexts, so query-time
    * resolution receives this immutable lookup instead. Building it through the same resolver and
    * per-dimension inputs as meta keeps includes/excludes behavior identical on both paths.
+   *
+   * The result is a pure function of (compiled model, resolved config), so it is cached on the
+   * compiled model keyed by the canonical config hash — the same discriminator the meta variant
+   * cache uses. Steady state is O(config) (resolve + hash + map lookup); the O(model) scan runs
+   * once per distinct config, not once per query. Recompile discards the cache with `compilers`.
    */
   protected async granularityDefinitionsForQuery(
     compilers: Compiler,
@@ -390,19 +395,49 @@ export class CompilerApi {
     // the effective set — a `granularities` function must key only on securityContext.
     const { contextSymbols } = query as any;
     const config = await this.resolveGranularities({ securityContext: contextSymbols?.securityContext });
-    const definitions: Record<string, Record<string, any>> = {};
 
-    // Only GLOBAL customs need threading (locals already resolve via the compiled symbols map). With
-    // none configured there's nothing to add, so skip the O(model) scan — the common case allocates
-    // nothing and query-time resolution falls straight through to the symbols map.
+    // Only GLOBAL customs need threading (locals already resolve via the compiled symbols map, and
+    // built-ins via the predefined path). With none configured there's nothing to add, so skip both
+    // the cache and the scan — the common case falls straight through to the symbols map.
     if (Object.keys(config.customGranularities).length === 0) {
-      return definitions;
+      return {};
     }
 
-    const catalog = buildBuiltInsCatalog(config);
+    if (!compilers.granularityDefinitions) {
+      compilers.granularityDefinitions = new Map();
+    }
+    const cache = compilers.granularityDefinitions;
+    const hash = granularityConfigHash(config);
+
+    let definitions = cache.get(hash);
+    if (definitions) {
+      // Refresh LRU recency.
+      cache.delete(hash);
+      cache.set(hash, definitions);
+    } else {
+      if (cache.size >= CompilerApi.MAX_GRANULARITY_VARIANTS) {
+        cache.delete(cache.keys().next().value);
+      }
+      definitions = this.buildGranularityDefinitions(compilers, config);
+      cache.set(hash, definitions);
+    }
+    return definitions;
+  }
+
+  /**
+   * One O(model) pass building the SQL-path global-custom lookup: `dim -> { customName -> def }`,
+   * respecting each dimension's includes/excludes exactly as the meta path does. Emits only global
+   * customs (locals/built-ins resolve elsewhere) with the meta-only `type` tag stripped.
+   */
+  protected buildGranularityDefinitions(
+    compilers: Compiler,
+    config: GlobalGranularitiesConfig,
+  ): Record<string, Record<string, any>> {
     const { enabledBuiltIns, customGranularities } = config;
+    const catalog = buildBuiltInsCatalog(config);
     const inputs = compilers.metaTransformer.granularityInputs;
     const emptyBlock = normalizeGranularitiesBlock(undefined);
+    const definitions: Record<string, Record<string, any>> = {};
 
     for (const cube of compilers.metaTransformer.cubes) {
       for (const dimension of (cube.config.dimensions || []).filter((d: any) => d.type === 'time')) {
@@ -412,8 +447,6 @@ export class CompilerApi {
           customGranularities,
           catalog,
         );
-        // Only GLOBAL customs need threading to SQL — locals already resolve via the symbols map,
-        // built-ins via the predefined path. Strip the meta-only `type` tag the resolver added.
         const customs = Object.fromEntries(
           Object.entries(resolved)
             .filter(([name, def]) => def.type === 'custom' &&

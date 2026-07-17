@@ -63,6 +63,10 @@ export type Compiler = {
     // Granularity-enriched meta variants keyed by config hash; owned by the compiled model so a
     // recompile discards it. Populated lazily by CompilerApi (bounded LRU, function form only).
     granularityVariants?: Map<string, Promise<any[]>>;
+    // Per-request SQL-path global-custom lookups (dim -> name -> def) keyed by config hash. Same
+    // ownership/lifecycle as granularityVariants: the map is a pure function of (model, config),
+    // so it's cached here and discarded on recompile. Bounded to match the variant cache.
+    granularityDefinitions?: Map<string, Record<string, Record<string, any>>>;
 };
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
