@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+### Bug Fixes
+
+- **cubesql:** Translate PostgreSQL format tokens in `TO_CHAR` SQL push down ([#11279](https://github.com/cube-js/cube/issues/11279)) ([fc42b0c](https://github.com/cube-js/cube/commit/fc42b0c2282ec54feafe1e35a9b4cf588c7c8f82))
+
 ## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

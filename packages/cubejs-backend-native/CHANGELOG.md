@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+### Bug Fixes
+
+- **cubesql:** Support `ORDER BY` over unprojected columns in CTEs ([#11261](https://github.com/cube-js/cube/issues/11261)) ([760a645](https://github.com/cube-js/cube/commit/760a64537f62ad527214381794ad30cc711090c8))
+
+### Features
+
+- **cubesql:** Support `SELECT DISTINCT ON` ([#11262](https://github.com/cube-js/cube/issues/11262)) ([909d9ee](https://github.com/cube-js/cube/commit/909d9ee3b7204aa08b09cc53a5215fedece639a6))
+
 ## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
 
 ### Bug Fixes
