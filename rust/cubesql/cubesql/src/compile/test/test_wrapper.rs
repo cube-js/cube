@@ -1115,6 +1115,103 @@ async fn test_wrapper_ilike_lowered_pushdown() {
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
 
+/// The TO_CHAR format string is passed to the dialect template as a bound parameter,
+/// not as an inline literal, so dialects that need to translate PostgreSQL format tokens
+/// (e.g. Databricks translating `YYYY-MM-DD` to Spark's `yyyy-MM-dd`) must do so in SQL,
+/// wrapping the parameter itself. The template below is a copy of the Databricks one
+/// (see `DatabricksQuery.sqlTemplates` in `@cubejs-backend/databricks-jdbc-driver`);
+/// the REPLACE chain is order-sensitive, so the translations it produces are verified
+/// here by simulating the sequential replace-all semantics of SQL REPLACE
+#[tokio::test]
+async fn test_wrapper_to_char_format_as_param() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    const TO_CHAR_TEMPLATE: &str = "TO_CHAR({{ args[0] }}, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({{ args[1] }}, 'HH12', 'hh'), 'HH24', '@H24@'), 'HH', 'hh'), '@H24@', 'HH'), 'MI', 'mm'), 'SS', 'ss'), 'MS', 'SSS'), 'US', 'SSSSSS'), 'YYYY', 'yyyy'), 'YY', 'yy'), 'Month', 'MMMM'), 'Mon', 'MMM'), 'DDD', '@DOY@'), 'Day', 'EEEE'), 'Dy', 'EEE'), 'DD', 'dd'), '@DOY@', 'DDD'), 'AM', 'a'), 'PM', 'a'))";
+
+    let query_plan = convert_select_to_query_plan_customized(
+        "SELECT TO_CHAR(DATE_TRUNC('week', order_date), 'YYYY-MM-DD') d1, TO_CHAR(DATE_TRUNC('day', order_date), 'HH24:MI:SS') d2, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "functions/TO_CHAR".to_string(),
+            TO_CHAR_TEMPLATE.to_string(),
+        )],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql;
+    assert!(
+        wrapped_sql.sql.contains("TO_CHAR(")
+            && wrapped_sql.sql.contains("'HH12', 'hh')")
+            && wrapped_sql.sql.contains("'PM', 'a'))"),
+        "expected TO_CHAR template with the REPLACE translation chain applied, got: {}",
+        wrapped_sql.sql
+    );
+    for format in ["YYYY-MM-DD", "HH24:MI:SS"] {
+        assert!(
+            wrapped_sql.values.contains(&Some(format.to_string())),
+            "expected format string '{}' to be passed as a bound parameter, got: {:?}",
+            format,
+            wrapped_sql.values
+        );
+    }
+
+    // Extract the ordered (from, to) REPLACE pairs from the template and verify that
+    // applying them sequentially translates PostgreSQL formats to correct Spark
+    // datetime patterns; expected values were validated against Databricks itself
+    let pair_regex = Regex::new(r"'([^']+)', '([^']+)'\)").unwrap();
+    let replacements = pair_regex
+        .captures_iter(TO_CHAR_TEMPLATE)
+        .map(|c| (c[1].to_string(), c[2].to_string()))
+        .collect::<Vec<_>>();
+    assert_eq!(replacements.len(), 19);
+
+    let translate = |format: &str| {
+        replacements
+            .iter()
+            .fold(format.to_string(), |acc, (from, to)| acc.replace(from, to))
+    };
+
+    for (postgres_format, spark_pattern) in [
+        ("YYYY-MM-DD", "yyyy-MM-dd"),
+        ("YYYY-MM-DD HH24:MI:SS", "yyyy-MM-dd HH:mm:ss"),
+        ("YYYY-MM-DD HH24:MI:SS.MS", "yyyy-MM-dd HH:mm:ss.SSS"),
+        ("YYYY-MM-DD HH24:MI:SS.US", "yyyy-MM-dd HH:mm:ss.SSSSSS"),
+        // Bare HH is a 12-hour clock in PostgreSQL while Spark's HH is 24-hour
+        ("HH:MI:SS AM", "hh:mm:ss a"),
+        ("HH12:MI PM", "hh:mm a"),
+        ("HH24:MI:SS", "HH:mm:ss"),
+        // DDD (day-of-year) must not be clobbered by the DD (day-of-month) rule
+        ("DDD", "DDD"),
+        ("YYYY-DDD", "yyyy-DDD"),
+        ("Day", "EEEE"),
+        ("Dy", "EEE"),
+        ("Month", "MMMM"),
+        ("Mon", "MMM"),
+        ("YYYY-Mon", "yyyy-MMM"),
+        ("MMDD", "MMdd"),
+        ("YY-MM", "yy-MM"),
+    ] {
+        let translated = translate(postgres_format);
+        assert_eq!(
+            translated, spark_pattern,
+            "expected '{}' to translate to '{}'",
+            postgres_format, spark_pattern
+        );
+        assert!(
+            !translated.contains('@'),
+            "expected no stash placeholders left in '{}'",
+            translated
+        );
+    }
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
 /// Test aliases for grouped CubeScan in wrapper
 /// qualifiers from join should get remapped to single from alias
 /// long generated aliases from Datafusion should get shortened
