@@ -600,7 +600,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "aws-creds"
 version = "0.38.0"
-source = "git+https://github.com/cube-js/rust-s3.git?rev=c662b9c66c2929da185c46084fc5f455030ad75f#c662b9c66c2929da185c46084fc5f455030ad75f"
+source = "git+https://github.com/cube-js/rust-s3.git?rev=dc65d9c9a1e806d99b1fe2204331270d58f1c4b9#dc65d9c9a1e806d99b1fe2204331270d58f1c4b9"
 dependencies = [
  "attohttpc",
  "home",
@@ -3676,7 +3676,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.4",
 ]
 
 [[package]]
@@ -5565,7 +5565,7 @@ dependencies = [
 [[package]]
 name = "rust-s3"
 version = "0.32.3"
-source = "git+https://github.com/cube-js/rust-s3.git?rev=c662b9c66c2929da185c46084fc5f455030ad75f#c662b9c66c2929da185c46084fc5f455030ad75f"
+source = "git+https://github.com/cube-js/rust-s3.git?rev=dc65d9c9a1e806d99b1fe2204331270d58f1c4b9#dc65d9c9a1e806d99b1fe2204331270d58f1c4b9"
 dependencies = [
  "async-trait",
  "aws-creds",
@@ -6815,7 +6815,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "rand 0.7.3",
  "static_assertions",
 ]
