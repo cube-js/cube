@@ -8,6 +8,8 @@ class TestableCompilerApi extends CompilerApi {
 
   public failNextBuild = false;
 
+  public defsBuildCount = 0;
+
   protected buildGranularityVariant(compilers: Compiler, config: GlobalGranularitiesConfig): any[] {
     if (this.failNextBuild) {
       this.failNextBuild = false;
@@ -17,12 +19,21 @@ class TestableCompilerApi extends CompilerApi {
     return super.buildGranularityVariant(compilers, config);
   }
 
+  protected buildGranularityDefinitions(compilers: Compiler, config: GlobalGranularitiesConfig): any {
+    this.defsBuildCount++;
+    return super.buildGranularityDefinitions(compilers, config);
+  }
+
   public version(): string | undefined {
     return this.compilerVersion;
   }
 
   public async variantCache(): Promise<Map<string, Promise<any[]>> | undefined> {
     return (await this.getCompilers()).granularityVariants;
+  }
+
+  public async definitionsCache(): Promise<Map<string, any> | undefined> {
+    return (await this.getCompilers()).granularityDefinitions;
   }
 }
 
@@ -334,6 +345,74 @@ describe('granularity variants in CompilerApi', () => {
       await api.metaConfig(ctxFor('a'), {});
       expect(api.buildCount).toBe(2);
       expect((await api.variantCache())!.size).toBe(1);
+      api.dispose();
+    });
+  });
+
+  describe('SQL-path global-custom definitions cache', () => {
+    const perTenant = (ctx: any) => (ctx.securityContext.tenant === 'a'
+      ? [{ name: 'sprint', interval: '2 weeks', origin: '2024-01-01' }]
+      : [{ name: 'fortnight', interval: '2 weeks', origin: '2024-01-08' }]);
+
+    test('scan runs once per distinct config, then serves from cache; result is byte-identical', async () => {
+      const api = createApi({ granularities: perTenant });
+
+      const a1 = await api.getSql(queryFor('a', 'Orders.created_at', 'sprint'));
+      const a2 = await api.getSql(queryFor('a', 'Orders.created_at', 'sprint'));
+      // Two identical-config queries → one scan.
+      expect(api.defsBuildCount).toBe(1);
+      expect(a1.sql[0]).toBe(a2.sql[0]);
+
+      // A different tenant is a distinct config → one more scan, and a second cache entry.
+      await api.getSql(queryFor('b', 'Orders.created_at', 'fortnight'));
+      expect(api.defsBuildCount).toBe(2);
+      expect((await api.definitionsCache())!.size).toBe(2);
+      api.dispose();
+    });
+
+    test('no scan and no cache entry when no global customs are configured', async () => {
+      const api = createApi({ granularities: () => ['year', 'month'] });
+      await api.getSql(queryFor('a', 'Orders.created_at', 'month'));
+      await api.getSql(queryFor('a', 'Orders.created_at', 'year'));
+      expect(api.defsBuildCount).toBe(0);
+      expect(await api.definitionsCache()).toBeUndefined();
+      api.dispose();
+    });
+
+    test('distinct tenants never share a definitions entry (no cross-tenant bleed)', async () => {
+      const api = createApi({ granularities: perTenant });
+      // Tenant a's custom is `sprint`; tenant b's is `fortnight`. Each resolves only its own.
+      const aSql = await api.getSql(queryFor('a', 'Orders.created_at', 'sprint'));
+      expect(aSql.sql[0]).toContain('created_at');
+      await expect(api.getSql(queryFor('a', 'Orders.created_at', 'fortnight')))
+        .rejects.toThrow('Granularity "fortnight" does not exist in dimension Orders.created_at');
+      const bSql = await api.getSql(queryFor('b', 'Orders.created_at', 'fortnight'));
+      expect(bSql.sql[0]).toContain('created_at');
+      await expect(api.getSql(queryFor('b', 'Orders.created_at', 'sprint')))
+        .rejects.toThrow('Granularity "sprint" does not exist in dimension Orders.created_at');
+      api.dispose();
+    });
+
+    test('a recompile discards the definitions cache with the compilers object', async () => {
+      let version = 'v1';
+      const api = createApi({ granularities: perTenant, schemaVersion: () => version });
+      await api.getSql(queryFor('a', 'Orders.created_at', 'sprint'));
+      expect(api.defsBuildCount).toBe(1);
+
+      version = 'v2';
+      await api.getSql(queryFor('a', 'Orders.created_at', 'sprint'));
+      expect(api.defsBuildCount).toBe(2);
+      expect((await api.definitionsCache())!.size).toBe(1);
+      api.dispose();
+    });
+
+    test('static config caches a single entry reused across queries', async () => {
+      const api = createApi({ granularities: [{ name: 'sprint', interval: '2 weeks', origin: '2024-01-01' }] });
+      await api.getSql(queryFor('a', 'Orders.created_at', 'sprint'));
+      await api.getSql(queryFor('b', 'Orders.created_at', 'sprint'));
+      // Context-independent config → one scan, one entry, regardless of tenant.
+      expect(api.defsBuildCount).toBe(1);
+      expect((await api.definitionsCache())!.size).toBe(1);
       api.dispose();
     });
   });
