@@ -9,9 +9,11 @@ import {
   Compiler,
   createQuery,
   CubeDefinition,
+  EffectiveGranularity,
   EvaluatedCube,
   GlobalGranularitiesConfig,
   GranularitiesOption,
+  GranularitySets,
   granularityConfigHash,
   NormalizedGranularitiesBlock,
   normalizeGranularitiesBlock,
@@ -1230,8 +1232,9 @@ export class CompilerApi {
   /**
    * Meta cubes with `effectiveGranularities` attached, plus the hash to mix into compilerId.
    * Env/static configs are baked into the base meta at compile time (null hash); a function
-   * config resolves per request against a bounded promise-valued LRU of enriched variants keyed
-   * by config hash and owned by the compiled model, so a recompile discards it.
+   * config resolves per request. The cache holds the sparse per-config granularity SETS (a few KB)
+   * — not enriched cube copies — keyed by config hash and owned by the compiled model, so a
+   * recompile discards it; the (cheap) attach onto base cubes happens here at read time.
    */
   protected async selectGranularityVariant(
     compilers: Compiler,
@@ -1249,11 +1252,11 @@ export class CompilerApi {
     }
     const cache = compilers.granularityVariants;
 
-    let variant = cache.get(granularityHash);
-    if (variant) {
+    let sets = cache.get(granularityHash);
+    if (sets) {
       // Refresh LRU recency.
       cache.delete(granularityHash);
-      cache.set(granularityHash, variant);
+      cache.set(granularityHash, sets);
     } else {
       if (cache.size >= CompilerApi.MAX_GRANULARITY_VARIANTS) {
         const oldest = cache.keys().next().value;
@@ -1264,47 +1267,56 @@ export class CompilerApi {
             'causes per-request meta rebuilds and churns compilerId-based caches (e.g. in CubeSQL).',
         });
       }
-      variant = Promise.resolve().then(() => this.buildGranularityVariant(compilers, config));
-      cache.set(granularityHash, variant);
-      variant.catch(() => {
-        if (cache.get(granularityHash) === variant) {
+      sets = Promise.resolve().then(() => this.buildGranularitySets(compilers, config));
+      cache.set(granularityHash, sets);
+      sets.catch(() => {
+        if (cache.get(granularityHash) === sets) {
           cache.delete(granularityHash);
         }
       });
     }
 
-    return { cubes: await variant, granularityHash };
+    return { cubes: this.attachEffectiveGranularities(compilers.metaTransformer.cubes, await sets), granularityHash };
   }
 
   /**
-   * Attach `effectiveGranularities` to every time dimension for one config. Must copy each cube
-   * (the base meta is never mutated), but the expensive reconciliation runs ONLY for the rare
-   * dimensions with a local block; every plain dimension shares one precomputed `defaultSet` by
-   * reference — so the per-dimension cost is O(local-block dims), not O(all time dimensions).
+   * The sparse effective granularity data for one config. The expensive reconciliation runs ONLY
+   * for the rare dimensions with a local block; every plain dimension uses one shared `defaultSet`.
+   * No cube copying here — that happens cheaply in `attachEffectiveGranularities` at read time.
    */
-  protected buildGranularityVariant(compilers: Compiler, config: GlobalGranularitiesConfig): any[] {
+  protected buildGranularitySets(compilers: Compiler, config: GlobalGranularitiesConfig): GranularitySets {
     const catalog = buildBuiltInsCatalog(config);
-    const inputs = compilers.metaTransformer.granularityInputs;
     const { enabledBuiltIns, customGranularities } = config;
-    const defaultSet = effectiveGranularitiesFor(undefined, enabledBuiltIns, customGranularities, catalog);
+    const overrides = new Map<string, EffectiveGranularity[]>();
+    for (const [dimName, block] of compilers.metaTransformer.granularityInputs) {
+      overrides.set(dimName, effectiveGranularitiesFor(block, enabledBuiltIns, customGranularities, catalog));
+    }
+    return {
+      defaultSet: effectiveGranularitiesFor(undefined, enabledBuiltIns, customGranularities, catalog),
+      overrides,
+    };
+  }
 
-    return compilers.metaTransformer.cubes.map((cube: any) => {
+  /**
+   * Attach the per-config effective sets onto the base meta cubes without mutating them: copy only
+   * the cubes/dimensions touched, and reference the shared `defaultSet` for plain time dimensions
+   * (per-dim `overrides` for the rare local-block ones). O(time dimensions) shallow work — no
+   * reconciliation, no deep clone of measures/segments/etc.
+   */
+  protected attachEffectiveGranularities(baseCubes: any[], sets: GranularitySets): any[] {
+    return baseCubes.map((cube: any) => {
       if (!cube.config.dimensions?.some((d: any) => d.type === 'time')) {
         return cube;
       }
       return {
+        ...cube,
         config: {
           ...cube.config,
-          dimensions: cube.config.dimensions.map((dim: any) => {
-            if (dim.type !== 'time') {
-              return dim;
-            }
-            const block = inputs.get(dim.name);
-            const effectiveGranularities = block
-              ? effectiveGranularitiesFor(block, enabledBuiltIns, customGranularities, catalog)
-              : defaultSet;
-            return { ...dim, effectiveGranularities };
-          }),
+          dimensions: cube.config.dimensions.map((dim: any) => (
+            dim.type === 'time'
+              ? { ...dim, effectiveGranularities: sets.overrides.get(dim.name) ?? sets.defaultSet }
+              : dim
+          )),
         },
       };
     });

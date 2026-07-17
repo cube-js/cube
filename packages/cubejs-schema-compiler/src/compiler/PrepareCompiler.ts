@@ -27,6 +27,7 @@ import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import type { ErrorReporter } from './ErrorReporter';
 import type { GranularitiesOption } from './GlobalGranularitiesConfig';
+import type { GranularitySets } from './GranularityResolver';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -60,9 +61,12 @@ export type Compiler = {
     compilerCache: CompilerCache;
     headCommitId?: string;
     compilerId: string;
-    // Granularity-enriched meta variants keyed by config hash; owned by the compiled model so a
-    // recompile discards it. Populated lazily by CompilerApi (bounded LRU, function form only).
-    granularityVariants?: Map<string, Promise<any[]>>;
+    // Per-config effective granularity SETS keyed by config hash — NOT enriched cube copies. The
+    // sparse `{ defaultSet, overrides }` shape is a few KB (one shared array + the rare local-block
+    // dims) rather than a ~MB clone of the whole meta; CompilerApi attaches these onto the base
+    // cubes cheaply at read time. Owned by the compiled model so a recompile discards it. Bounded
+    // LRU, function form only.
+    granularityVariants?: Map<string, Promise<GranularitySets>>;
     // Per-request SQL-path global-custom lookups (dim -> name -> def) keyed by config hash. Same
     // ownership/lifecycle as granularityVariants: the map is a pure function of (model, config),
     // so it's cached here and discarded on recompile. Bounded to match the variant cache.
