@@ -2090,6 +2090,13 @@ class ApiGateway {
         })
       );
 
+      // A request may consist of several queries; the oldest refresh time
+      // defines the freshness of the whole result
+      const lastRefreshTimestamps = results
+        .map((r: any) => r.getRootResultObject()[0].lastRefreshTime)
+        .filter(Boolean)
+        .map((t: string) => new Date(t).getTime());
+
       this.log(
         {
           type: 'Load Request Success',
@@ -2109,6 +2116,9 @@ class ApiGateway {
           // queriesWithData:
           //   results.filter((r: any) => r.data?.length).length,
           dbType: results.map(r => r.getRootResultObject()[0].dbType),
+          lastRefreshTime: lastRefreshTimestamps.length
+            ? new Date(Math.min(...lastRefreshTimestamps)).toISOString()
+            : undefined,
         },
         context,
       );

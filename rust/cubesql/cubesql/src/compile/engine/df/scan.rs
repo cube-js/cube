@@ -10,7 +10,7 @@ use crate::{
     CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDate};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadResponse, V1LoadResult, V1LoadResultDataColumnar,
 };
@@ -793,7 +793,7 @@ async fn load_data(
     } else {
         let result = transport
             .load(
-                span_id,
+                span_id.clone(),
                 request,
                 sql_query,
                 auth_context,
@@ -822,6 +822,16 @@ async fn load_data(
             })?;
 
         if let Some(data) = result.into_iter().next() {
+            if let Some(span_id) = &span_id {
+                if let Some(last_refresh_time) = data.schema().metadata().get("lastRefreshTime") {
+                    if let Ok(last_refresh_time) = DateTime::parse_from_rfc3339(last_refresh_time) {
+                        span_id
+                            .set_last_refresh_time(last_refresh_time.with_timezone(&Utc))
+                            .await;
+                    }
+                }
+            }
+
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ExternalError(Box::new(CubeError::user(
