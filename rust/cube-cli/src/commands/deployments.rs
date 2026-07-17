@@ -50,6 +50,11 @@ enum Cmd {
         /// Creation step: project, upload, schema, github, ssh, databases, ready, demo
         #[arg(long, default_value = "project")]
         creation_step: String,
+        /// Scaffold a project and run the first build so the deployment serves
+        /// immediately (POST /build/api/v1/deployments). Without this, the
+        /// deployment row is created but has no build until code is deployed.
+        #[arg(long, short = 'b')]
+        bootstrap: bool,
         /// Full CreateDeploymentInput as JSON (overrides the flags above)
         #[arg(long, short = 'd')]
         data: Option<String>,
@@ -112,6 +117,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             target_platform,
             unmanaged,
             creation_step,
+            bootstrap,
             data,
         } => {
             // Flags populate the body; --data (if given) overrides them.
@@ -130,9 +136,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     anyhow::bail!("--{required} is required (or provide it via --data)");
                 }
             }
-            let res = api
-                .post("/api/v1/deployments", Some(&util::body(body)))
-                .await?;
+            // The bootstrap endpoint lives on the build pod and scaffolds +
+            // builds the project; the base endpoint only creates the row.
+            let path = if bootstrap {
+                "/build/api/v1/deployments"
+            } else {
+                "/api/v1/deployments"
+            };
+            let res = api.post(path, Some(&util::body(body))).await?;
             output::print_json(&res);
         }
         Cmd::Update {

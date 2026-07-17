@@ -62,7 +62,7 @@ Every endpoint of the Console Server public API is covered:
 
 | Group | Endpoints |
 |---|---|
-| `deployments` | list, get, create, update, delete, token |
+| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token |
 | `regions` | list available deployment regions |
 | `environments` | list, tokens, create-token (incl. `--meta-sync`) |
 | `variables` | list, set (`KEY=VALUE` upserts) |
