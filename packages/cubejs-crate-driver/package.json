@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/crate-driver",
   "description": "Cube.js Crate database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.7.2",
+  "version": "1.7.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -24,17 +24,18 @@
     "test": "yarn integration",
     "integration": "npm run integration:crate",
     "integration:crate": "jest --verbose dist/test",
+    "unit": "jest --forceExit --verbose dist/test/CrateDriver.unit.test.js",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/postgres-driver": "1.7.2",
-    "@cubejs-backend/shared": "1.7.2"
+    "@cubejs-backend/postgres-driver": "1.7.4",
+    "@cubejs-backend/shared": "1.7.4"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.2",
-    "@cubejs-backend/testing-shared": "1.7.2",
+    "@cubejs-backend/linter": "1.7.4",
+    "@cubejs-backend/testing-shared": "1.7.4",
     "testcontainers": "^10.28.0",
     "typescript": "~5.2.2"
   },

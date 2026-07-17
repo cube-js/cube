@@ -728,7 +728,8 @@
             "group": "AI Endpoints",
             "openapi": "/api-reference/chat.yaml",
             "pages": [
-              "POST /chat/stream-chat-state"
+              "POST /chat/stream-chat-state",
+              "POST /chat/abort"
             ]
           },
           {
