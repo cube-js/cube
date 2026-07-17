@@ -73,12 +73,33 @@ fn base(deployment: i64) -> String {
     format!("/build/api/v1/deployments/{deployment}/data-model/files")
 }
 
-/// Files write endpoints take a `branchName` alongside the payload.
-fn with_branch(mut body: serde_json::Map<String, serde_json::Value>, branch: &Option<String>) -> serde_json::Value {
-    if let Some(b) = branch {
-        body.insert("branchName".into(), json!(b));
+/// The files endpoint returns a nested tree under `data`, each node carrying
+/// `path`, `type` (file|directory), `content`, and `children`. Flatten it
+/// depth-first into a single list of nodes.
+fn flatten(nodes: &[serde_json::Value], out: &mut Vec<serde_json::Value>) {
+    for n in nodes {
+        out.push(n.clone());
+        if let Some(children) = n.get("children").and_then(|c| c.as_array()) {
+            flatten(children, out);
+        }
     }
-    util::body(body)
+}
+
+fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
+    let mut out = Vec::new();
+    if let Some(arr) = res.get("data").and_then(|d| d.as_array()) {
+        flatten(arr, &mut out);
+    }
+    out
+}
+
+/// Append `?branchName=` to a path when a branch is given (the endpoints take
+/// the branch as a query parameter, same as GET's `branchName`).
+fn with_branch(path: String, branch: &Option<String>) -> String {
+    match branch {
+        Some(b) => format!("{path}?branchName={b}"),
+        None => path,
+    }
 }
 
 fn read_content(file: Option<String>, content: Option<String>) -> Result<String> {
@@ -113,9 +134,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if ctx.json || content {
                 output::print_json(&res);
             } else {
-                // Print just the paths for a quick tree view.
-                for f in output::items(&res) {
-                    println!("{}", output::field(&f, "path"));
+                // Depth-first tree view: mark directories with a trailing slash.
+                for n in tree_nodes(&res) {
+                    let path = output::field(&n, "path");
+                    if output::field(&n, "type") == "directory" {
+                        println!("{path}/");
+                    } else {
+                        println!("{path}");
+                    }
                 }
             }
         }
@@ -127,9 +153,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut query: Query = vec![("withContent".into(), "true".into())];
             util::push(&mut query, "branchName", &branch);
             let res = api.get(&base(deployment), &query).await?;
-            let file = output::items(&res)
+            let file = tree_nodes(&res)
                 .into_iter()
-                .find(|f| output::field(f, "path") == path);
+                .find(|f| output::field(f, "path") == path && output::field(f, "type") == "file");
             match file {
                 Some(f) => print!("{}", output::field(&f, "content")),
                 None => anyhow::bail!("file not found: {path}"),
@@ -143,12 +169,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             branch,
         } => {
             let text = read_content(file, content)?;
-            let mut body = serde_json::Map::new();
-            body.insert(
-                "files".into(),
-                json!([{ "path": path, "content": text }]),
-            );
-            let res = api.put(&base(deployment), Some(&with_branch(body, &branch))).await?;
+            let body = json!({ "files": [{ "path": path, "content": text }] });
+            let res = api
+                .put(&with_branch(base(deployment), &branch), Some(&body))
+                .await?;
             if ctx.json {
                 output::print_json(&res);
             } else {
@@ -160,10 +184,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             paths,
             branch,
         } => {
-            let mut body = serde_json::Map::new();
-            body.insert("paths".into(), json!(paths));
+            let body = json!({ "paths": paths });
             let res = api
-                .delete(&base(deployment), Some(&with_branch(body, &branch)))
+                .delete(&with_branch(base(deployment), &branch), Some(&body))
                 .await?;
             if ctx.json {
                 output::print_json(&res);
@@ -177,13 +200,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             to,
             branch,
         } => {
-            let mut body = serde_json::Map::new();
-            body.insert("from".into(), json!(from));
-            body.insert("to".into(), json!(to));
+            let body = json!({ "from": from, "to": to });
             let res = api
                 .post(
-                    &format!("{}/rename", base(deployment)),
-                    Some(&with_branch(body, &branch)),
+                    &with_branch(format!("{}/rename", base(deployment)), &branch),
+                    Some(&body),
                 )
                 .await?;
             if ctx.json {
