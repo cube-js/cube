@@ -7,7 +7,9 @@ description: Scheduled refreshes are available on Premium and Enterprise plans.
 
 Scheduled refreshes are available on [Premium and Enterprise plans](https://cube.dev/pricing).
 <br/ >Users need at least the [Explorer][ref-roles] role and Edit or Manage permission
-on the workbook to set up scheduled refreshes.
+on the workbook to set up scheduled refreshes. Anyone who can view the dashboard
+can open the sidebar to see its schedules and [subscribe to
+notifications](#subscribing-to-notifications).
 
 </Info>
 
@@ -24,6 +26,16 @@ send email or Slack messages with a dashboard screenshot after each refresh.
 From the Dashboard Builder, click the calendar icon in the toolbar to open the
 scheduled refreshes sidebar. From this sidebar, you can create new schedules,
 modify existing ones, or remove schedules you no longer need.
+
+The same calendar icon is also available on a published dashboard, so you can
+reach the sidebar without opening the builder. What you can do there depends on
+your permission on the workbook:
+
+- **Edit** or **Manage** — the full sidebar: create, edit, run, and delete
+  schedules.
+- **View only** — a read-only list of the configured schedules, where you can
+  [subscribe or unsubscribe](#subscribing-to-notifications) yourself from each
+  schedule's email notifications.
 
 <Warning>
 
@@ -103,6 +115,22 @@ duplicate it. There are two ways:
 
 Duplicates are independent schedules: the original is left unchanged, and the
 copy keeps the source schedule's enabled or disabled state.
+
+## Subscribing to notifications
+
+If a schedule sends [email notifications][ref-notifications], anyone who can view
+the dashboard can subscribe to it themselves — an editor does not have to add
+them as a recipient. Open the scheduled refreshes sidebar from the published
+dashboard and use the toggle on a schedule to subscribe or unsubscribe.
+Subscribing adds you to the schedule's email recipients; unsubscribing removes
+you. The change takes effect on the next run.
+
+The toggle appears only for schedules that email individual recipients — those
+with notifications enabled and the email delivery channel. Schedules that post to
+Slack deliver to a channel rather than to individuals, and schedules with
+notifications turned off send nothing, so there is nothing to subscribe to. If
+you are already subscribed, the toggle always remains available so that you can
+unsubscribe.
 
 ## Run phases
 
