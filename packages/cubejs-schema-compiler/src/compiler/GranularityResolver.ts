@@ -42,12 +42,19 @@ export function normalizeGranularitiesBlock(raw: any): NormalizedGranularitiesBl
 
   if (typeof raw === 'object') {
     // New dict form iff every key is one of includes/excludes/custom AND the values have the dict
-    // shape (includes/excludes are '*' or arrays, custom is a plain object). The value check keeps a
-    // legacy custom granularity named `includes`/`excludes`/`custom` — whose value is a granularity
-    // definition object — from being misread as the dict form.
+    // shape. The value checks keep a legacy custom granularity NAMED `includes`/`excludes`/`custom`
+    // from being misread as the dict form:
+    //   - includes/excludes must be '*' or an array (a legacy custom named `includes` has an object
+    //     definition value, which fails this);
+    //   - `custom` must be a map of name -> definition OBJECT. A legacy custom named `custom` has a
+    //     definition whose own values are strings/functions (interval:'1 year', sql:()=>...), never
+    //     nested objects — so requiring every `custom` value to be an object distinguishes the dict
+    //     form ({custom:{fy:{...}}}) from the legacy custom-named-`custom` ({custom:{interval:...}}).
     const keys = Object.keys(raw);
     const isInclusionList = (v: any) => v === undefined || v === '*' || Array.isArray(v);
-    const isCustomMap = (v: any) => v === undefined || (typeof v === 'object' && v !== null && !Array.isArray(v));
+    const isDefinitionObject = (v: any) => typeof v === 'object' && v !== null && !Array.isArray(v);
+    const isCustomMap = (v: any) => v === undefined ||
+      (isDefinitionObject(v) && Object.values(v).every(isDefinitionObject));
     const isDictForm =
       keys.length > 0 &&
       keys.every(k => k === 'includes' || k === 'excludes' || k === 'custom') &&

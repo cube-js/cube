@@ -154,6 +154,10 @@ export class CompilerApi {
 
   protected readonly granularities?: GranularitiesOption;
 
+  // Memoized hash of a STATIC-list granularities config (immutable for the instance lifetime).
+  // Undefined until first computed; the env form is never memoized here (env can change at runtime).
+  private staticGranularityHashMemo?: string;
+
   protected queryFactory?: QueryFactory;
 
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
@@ -248,9 +252,10 @@ export class CompilerApi {
 
     // Env/static granularity configs are baked into the compiled meta, so a config change must
     // force a recompile. The function form is resolved per request instead (variant cache) and
-    // must never churn the compiler version.
+    // must never churn the compiler version. A static LIST is immutable for the instance lifetime,
+    // so its hash is memoized; the env form stays per-call since env vars can change at runtime.
     if (typeof this.granularities !== 'function') {
-      compilerVersion += `_gran_${granularityConfigHash(resolveGlobalGranularitiesSync(this.granularities))}`;
+      compilerVersion += `_gran_${this.staticGranularityHash()}`;
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
@@ -345,8 +350,11 @@ export class CompilerApi {
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
     const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    const granularityDefinitions = await this.granularityDefinitionsForQuery(compilers, query);
-    const queryWithGranularities = { ...query, granularityDefinitions };
+    // `granularityDefinitions` (a reference-shared map) flows to resolveGranularity for SQL, but the
+    // query cache must key on the O(1) `granularityHash` instead — JSON.stringify'ing the map would
+    // expand the shared references once per time dimension and bloat the cache key.
+    const { definitions: granularityDefinitions, hash: granularityHash } = await this.granularityDefinitionsForQuery(compilers, query);
+    const queryWithGranularities = { ...query, granularityDefinitions, granularityHash };
     let sqlGenerator = await this.createQueryByDataSource(compilers, queryWithGranularities, dataSource, dbType);
 
     if (!sqlGenerator) {
@@ -393,7 +401,7 @@ export class CompilerApi {
   protected async granularityDefinitionsForQuery(
     compilers: Compiler,
     query: NormalizedQuery,
-  ): Promise<Record<string, Record<string, any>>> {
+  ): Promise<{ definitions: Record<string, Record<string, any>>; hash: string | null }> {
     // Resolve through the same securityContext-only seam as the meta path so both paths agree on
     // the effective set — a `granularities` function must key only on securityContext.
     const { contextSymbols } = query as any;
@@ -401,9 +409,10 @@ export class CompilerApi {
 
     // Only GLOBAL customs need threading (locals already resolve via the compiled symbols map, and
     // built-ins via the predefined path). With none configured there's nothing to add, so skip both
-    // the cache and the scan — the common case falls straight through to the symbols map.
+    // the cache and the scan — the common case falls straight through to the symbols map. A null
+    // hash then keeps the query-cache key free of any granularity discriminator.
     if (Object.keys(config.customGranularities).length === 0) {
-      return {};
+      return { definitions: {}, hash: null };
     }
 
     if (!compilers.granularityDefinitions) {
@@ -412,19 +421,26 @@ export class CompilerApi {
     const cache = compilers.granularityDefinitions;
     const hash = granularityConfigHash(config);
 
-    let definitions = cache.get(hash);
-    if (definitions) {
+    // Promise-valued (like granularityVariants) so concurrent misses of one hash coalesce into a
+    // single build rather than each re-running the O(model) scan.
+    let built = cache.get(hash);
+    if (built) {
       // Refresh LRU recency.
       cache.delete(hash);
-      cache.set(hash, definitions);
+      cache.set(hash, built);
     } else {
       if (cache.size >= CompilerApi.MAX_GRANULARITY_VARIANTS) {
         cache.delete(cache.keys().next().value);
       }
-      definitions = this.buildGranularityDefinitions(compilers, config);
-      cache.set(hash, definitions);
+      built = Promise.resolve().then(() => this.buildGranularityDefinitions(compilers, config));
+      cache.set(hash, built);
+      built.catch(() => {
+        if (cache.get(hash) === built) {
+          cache.delete(hash);
+        }
+      });
     }
-    return definitions;
+    return { definitions: await built, hash };
   }
 
   /**
@@ -504,7 +520,8 @@ export class CompilerApi {
       const key = {
         query: keyOptions,
         options,
-        granularityDefinitions: sqlGenerator.options.granularityDefinitions,
+        // Key on the O(1) hash, not the reference-shared definitions map (see getQueryCache).
+        granularityHash: sqlGenerator.options.granularityHash,
       };
       return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
     } else {
@@ -1216,6 +1233,20 @@ export class CompilerApi {
    * on it — and nothing else — is what guarantees the two paths resolve the SAME config and never
    * advertise a granularity that then fails at query time.
    */
+  // Hash of the static/env granularities config for the compilerVersion suffix. Memoized for the
+  // array (static-list) form since it can't change; recomputed for the env form (undefined) since
+  // CUBEJS_GRANULARITIES* can change between calls. Never called for the function form.
+  private staticGranularityHash(): string {
+    if (Array.isArray(this.granularities)) {
+      if (this.staticGranularityHashMemo === undefined) {
+        this.staticGranularityHashMemo = granularityConfigHash(resolveGlobalGranularitiesSync(this.granularities));
+      }
+      return this.staticGranularityHashMemo;
+    }
+    // Only reached for the env form (undefined); the function form never calls this.
+    return granularityConfigHash(resolveGlobalGranularitiesSync(undefined));
+  }
+
   private async resolveGranularities(context: Context): Promise<GlobalGranularitiesConfig> {
     const securityContext = context?.securityContext ?? {};
     return resolveGlobalGranularities(this.granularities, { securityContext });
@@ -1330,7 +1361,9 @@ export class CompilerApi {
     const compilers = await this.getCompilers(restOptions);
     const { cubes, granularityHash } = await this.selectGranularityVariant(compilers, requestContext);
 
-    // Fixed composition order: base compilerId, then visibility mask, then granularity hash.
+    // Fixed composition order: base compilerId, then visibility mask, then granularity hash. Only
+    // computed when the caller actually wants the id — the hashing is skipped when a caller asks
+    // for view groups alone (the gateway always requests view groups).
     const composeCompilerId = (visibilityMaskHash: string | null) => {
       let id = compilers.compilerId;
       if (visibilityMaskHash) {
@@ -1344,7 +1377,10 @@ export class CompilerApi {
 
     if (skipVisibilityPatch) {
       if (includeCompilerId || includeViewGroups) {
-        const result: any = { cubes, compilerId: composeCompilerId(null) };
+        const result: any = { cubes };
+        if (includeCompilerId) {
+          result.compilerId = composeCompilerId(null);
+        }
         if (includeViewGroups) {
           result.viewGroups = compilers.metaTransformer.viewGroups;
         }
@@ -1359,10 +1395,10 @@ export class CompilerApi {
       cubes
     );
     if (includeCompilerId || includeViewGroups) {
-      const result: any = {
-        cubes: patchedCubes,
-        compilerId: composeCompilerId(visibilityMaskHash),
-      };
+      const result: any = { cubes: patchedCubes };
+      if (includeCompilerId) {
+        result.compilerId = composeCompilerId(visibilityMaskHash);
+      }
       if (includeViewGroups) {
         result.viewGroups = compilers.metaTransformer.viewGroups;
       }

@@ -68,9 +68,10 @@ export type Compiler = {
     // LRU, function form only.
     granularityVariants?: Map<string, Promise<GranularitySets>>;
     // Per-request SQL-path global-custom lookups (dim -> name -> def) keyed by config hash. Same
-    // ownership/lifecycle as granularityVariants: the map is a pure function of (model, config),
-    // so it's cached here and discarded on recompile. Bounded to match the variant cache.
-    granularityDefinitions?: Map<string, Record<string, Record<string, any>>>;
+    // ownership/lifecycle as granularityVariants: a pure function of (model, config), cached here
+    // and discarded on recompile, bounded to match the variant cache. Promise-valued so concurrent
+    // misses of one hash coalesce into a single build.
+    granularityDefinitions?: Map<string, Promise<Record<string, Record<string, any>>>>;
 };
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
