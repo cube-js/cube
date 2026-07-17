@@ -203,12 +203,7 @@ export class PreAggregations {
       return descriptions.map(desc => ({
         ...desc,
         usageMapping: usageInfo.usages,
-        // Union the usage date ranges with the base matched range so that neither
-        // the per-usage requirement (e.g. time_shift needing earlier partitions)
-        // nor the base range (e.g. a rolling window's trailing lookback) is lost.
-        ...(mergedDateRange && desc.matchedTimeDimensionDateRange
-          ? { matchedTimeDimensionDateRange: PreAggregations.unionDateRanges(desc.matchedTimeDimensionDateRange, mergedDateRange) }
-          : {}),
+        ...(mergedDateRange && desc.matchedTimeDimensionDateRange ? { matchedTimeDimensionDateRange: mergedDateRange } : {}),
       }));
     });
   }
@@ -230,10 +225,6 @@ export class PreAggregations {
     }
 
     return minDate && maxDate ? [minDate, maxDate] : null;
-  }
-
-  private static unionDateRanges(a: [string, string], b: [string, string]): [string, string] {
-    return [a[0] < b[0] ? a[0] : b[0], a[1] > b[1] ? a[1] : b[1]];
   }
 
   private preAggregationDescriptionsFor(foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
