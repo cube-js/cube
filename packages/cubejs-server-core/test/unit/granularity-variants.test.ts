@@ -1,5 +1,5 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
-import type { Compiler, GlobalGranularitiesConfig } from '@cubejs-backend/schema-compiler';
+import type { Compiler, GlobalGranularitiesConfig, GranularitySets } from '@cubejs-backend/schema-compiler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { DbTypeInternalFn } from '../../src/core/types';
 
@@ -10,13 +10,13 @@ class TestableCompilerApi extends CompilerApi {
 
   public defsBuildCount = 0;
 
-  protected buildGranularityVariant(compilers: Compiler, config: GlobalGranularitiesConfig): any[] {
+  protected buildGranularitySets(compilers: Compiler, config: GlobalGranularitiesConfig): GranularitySets {
     if (this.failNextBuild) {
       this.failNextBuild = false;
       throw new Error('injected variant build failure');
     }
     this.buildCount++;
-    return super.buildGranularityVariant(compilers, config);
+    return super.buildGranularitySets(compilers, config);
   }
 
   public lastDefinitions: any;
@@ -31,7 +31,7 @@ class TestableCompilerApi extends CompilerApi {
     return this.compilerVersion;
   }
 
-  public async variantCache(): Promise<Map<string, Promise<any[]>> | undefined> {
+  public async variantCache(): Promise<Map<string, Promise<GranularitySets>> | undefined> {
     return (await this.getCompilers()).granularityVariants;
   }
 
@@ -240,6 +240,30 @@ describe('granularity variants in CompilerApi', () => {
       const compilers = await (api as any).getCompilers();
       const baseDim = dimByName(compilers.metaTransformer.cubes, 'Orders.created_at');
       expect(baseDim.effectiveGranularities).toBeUndefined();
+      api.dispose();
+    });
+
+    // The cache stores the sparse per-config sets ({ defaultSet, overrides }), NOT an enriched cube
+    // array — plain dims reference one shared defaultSet; only local-block dims are in overrides.
+    test('variant cache stores sparse sets, not cube copies', async () => {
+      const api = createApi({ granularities: perTenant });
+      const cubes = await api.metaConfig(ctxFor('a'), {});
+
+      const entry = await (await api.variantCache())!.get(
+        [...(await api.variantCache())!.keys()][0]
+      )!;
+      expect(Array.isArray(entry)).toBe(false);
+      expect(Array.isArray(entry.defaultSet)).toBe(true);
+      expect(entry.overrides instanceof Map).toBe(true);
+      // Events.ts has a local block → in overrides; plain dims are not.
+      expect(entry.overrides.has('Events.ts')).toBe(true);
+      expect(entry.overrides.has('Orders.created_at')).toBe(false);
+
+      // And the attached read-time result shares the one defaultSet across plain dims by reference.
+      const created = dimByName(cubes, 'Orders.created_at');
+      const updated = dimByName(cubes, 'Orders.updated_at');
+      expect(created.effectiveGranularities).toBe(updated.effectiveGranularities);
+      expect(created.effectiveGranularities).toBe(entry.defaultSet);
       api.dispose();
     });
 
