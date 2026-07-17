@@ -1,6 +1,8 @@
 [package]
 name = "cube-cli"
-version = "0.1.0"
+# Kept in lockstep with the Cube monorepo version (lerna.json). The release
+# workflow overrides this from the pushed `v*` tag at build time.
+version = "1.7.2"
 edition = "2021"
 description = "Cube Cloud command line interface"
 license = "Apache-2.0"

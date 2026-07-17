@@ -17,15 +17,16 @@ cargo build --release
 The binary is fully static-friendly: TLS is provided by rustls, so there is
 no OpenSSL dependency and musl builds work out of the box.
 
-## Releases
+## Versioning & releases
 
-CI (`.github/workflows/cube-cli.yml`) runs fmt, clippy, tests, and a release
-build on every change under `rust/cube-cli/`.
+The CLI version tracks the Cube monorepo version (`lerna.json`); `Cargo.toml`
+is kept in sync and the release build overrides it from the pushed tag, so
+`cube --version` always matches the Cube release.
 
-Tagging `cube-cli-v*` (e.g. `cube-cli-v0.1.0`) triggers
-`.github/workflows/cube-cli-release.yml`, which builds a single static binary
-for each platform and publishes them (plus `SHA256SUMS`) as GitHub release
-assets:
+The CLI is built and published by the **same release workflow as the rest of
+Cube** (`.github/workflows/publish.yml`, on `v*.*.*` tags). Its `cube-cli`
+job builds a single static binary per platform and attaches them to the same
+GitHub release as the Cube version, via `svenstaro/upload-release-action`:
 
 | Platform | Target | Asset |
 |---|---|---|
@@ -33,10 +34,13 @@ assets:
 | Linux arm64 | `aarch64-unknown-linux-musl` | `cube-aarch64-unknown-linux-musl.tar.gz` |
 | macOS Intel | `x86_64-apple-darwin` | `cube-x86_64-apple-darwin.tar.gz` |
 | macOS Apple Silicon | `aarch64-apple-darwin` | `cube-aarch64-apple-darwin.tar.gz` |
-| Windows x86_64 | `x86_64-pc-windows-msvc` | `cube-x86_64-pc-windows-msvc.zip` |
+| Windows x86_64 | `x86_64-pc-windows-msvc` | `cube-x86_64-pc-windows-msvc.tar.gz` |
 
 The Linux builds are fully static (musl + rustls); each archive contains just
 the `cube` binary.
+
+Pull-request CI (`.github/workflows/cube-cli.yml`) runs fmt, clippy, tests,
+and a release build on every change under `rust/cube-cli/`.
 
 ## Authentication
 
