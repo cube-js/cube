@@ -30,7 +30,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.3.3",
+    "@babel/core": "^8.0.0",
     "@babel/preset-env": "^7.3.1",
     "@babel/preset-typescript": "^7.12.1",
     "@cubejs-backend/linter": "1.7.4",
