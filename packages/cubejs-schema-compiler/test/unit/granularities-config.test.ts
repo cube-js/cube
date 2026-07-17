@@ -116,6 +116,23 @@ describe('resolveGlobalGranularities', () => {
     expect(granularityConfigHash(cfgDirty)).toBe(granularityConfigHash(cfgClean));
   });
 
+  // Regression: a set-but-empty interval env var must be treated as absent (unusable), not advertised.
+  it('drops a custom granularity whose env interval is set-but-empty', async () => {
+    process.env.CUBEJS_GRANULARITIES = 'year,foo';
+    process.env.CUBEJS_GRANULARITIES_FOO_INTERVAL = '';
+    const cfg = await resolveGlobalGranularities(undefined, {});
+    expect(cfg.enabledBuiltIns).toEqual(['year']);
+    expect(cfg.customGranularities.foo).toBeUndefined();
+  });
+
+  // Regression: a function returning a non-array opts out of env (no leak), yielding the default catalog.
+  it('function returning a non-array yields the default catalog, not an env fallback', async () => {
+    process.env.CUBEJS_GRANULARITIES = 'week';
+    const cfg = await resolveGlobalGranularities(() => null as any, {});
+    expect([...cfg.enabledBuiltIns].sort()).toEqual([...BUILT_IN_GRANULARITY_NAMES].sort());
+    expect(cfg.customGranularities).toEqual({});
+  });
+
   // Regression (adversarial): prototype-chain names must not be classified as built-ins.
   it('does not classify prototype-chain names as built-in granularities', () => {
     expect(isBuiltInGranularity('__proto__')).toBe(false);

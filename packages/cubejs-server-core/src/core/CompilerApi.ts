@@ -386,15 +386,21 @@ export class CompilerApi {
     compilers: Compiler,
     query: NormalizedQuery,
   ): Promise<Record<string, Record<string, any>>> {
+    // Resolve through the same securityContext-only seam as the meta path so both paths agree on
+    // the effective set — a `granularities` function must key only on securityContext.
     const { contextSymbols } = query as any;
-    const requestContext = {
-      securityContext: contextSymbols?.securityContext || {},
-      requestId: query.requestId,
-    };
-    const config = await resolveGlobalGranularities(this.granularities, requestContext);
+    const config = await this.resolveGranularities({ securityContext: contextSymbols?.securityContext });
+    const definitions: Record<string, Record<string, any>> = {};
+
+    // Only GLOBAL customs need threading (locals already resolve via the compiled symbols map). With
+    // none configured there's nothing to add, so skip the O(model) scan — the common case allocates
+    // nothing and query-time resolution falls straight through to the symbols map.
+    if (Object.keys(config.customGranularities).length === 0) {
+      return definitions;
+    }
+
     const catalog = buildBuiltInsCatalog(config);
     const inputs = compilers.metaTransformer.granularityInputs;
-    const definitions: Record<string, Record<string, any>> = {};
 
     for (const cube of compilers.metaTransformer.cubes) {
       for (const dimension of (cube.config.dimensions || []).filter((d: any) => d.type === 'time')) {
@@ -1152,11 +1158,23 @@ export class CompilerApi {
   }
 
   /**
+   * Resolve the global granularity config for a request. A `granularities` function may depend
+   * only on `securityContext` (like queryRewrite and access policies): the meta path and the SQL
+   * path receive different-shaped request objects, but both carry the security context, so keying
+   * on it — and nothing else — is what guarantees the two paths resolve the SAME config and never
+   * advertise a granularity that then fails at query time.
+   */
+  private async resolveGranularities(context: Context): Promise<GlobalGranularitiesConfig> {
+    const securityContext = context?.securityContext ?? {};
+    return resolveGlobalGranularities(this.granularities, { securityContext });
+  }
+
+  /**
    * Global granularity config for a request context. O(config): env/static forms ignore the
    * context; the function form is invoked with it. Used by the /v1/granularities endpoint.
    */
   public async resolveGlobalGranularitiesConfig(context: Context): Promise<GlobalGranularitiesConfig> {
-    return resolveGlobalGranularities(this.granularities, context);
+    return this.resolveGranularities(context);
   }
 
   /**
@@ -1173,7 +1191,7 @@ export class CompilerApi {
       return { cubes: compilers.metaTransformer.cubes, granularityHash: null };
     }
 
-    const config = await resolveGlobalGranularities(this.granularities, requestContext);
+    const config = await this.resolveGranularities(requestContext);
     const granularityHash = granularityConfigHash(config);
 
     if (!compilers.granularityVariants) {
