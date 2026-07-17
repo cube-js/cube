@@ -126,11 +126,11 @@ Subscribing adds you to the schedule's email recipients; unsubscribing removes
 you. The change takes effect on the next run.
 
 The toggle appears only for schedules that email individual recipients — those
-with notifications enabled and the email delivery channel. Schedules that post to
-Slack deliver to a channel rather than to individuals, and schedules with
-notifications turned off send nothing, so there is nothing to subscribe to. If
-you are already subscribed, the toggle always remains available so that you can
-unsubscribe.
+with notifications enabled and the email delivery channel. A schedule delivers to
+either individual inboxes or a Slack channel, not both, so a schedule that posts
+to Slack (or that has notifications turned off) has nothing to subscribe to. If an
+editor switches a schedule to Slack, its existing subscriptions are cancelled;
+you can subscribe again if it is later switched back to email.
 
 ## Run phases
 
