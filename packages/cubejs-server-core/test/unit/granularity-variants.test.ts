@@ -19,9 +19,12 @@ class TestableCompilerApi extends CompilerApi {
     return super.buildGranularityVariant(compilers, config);
   }
 
+  public lastDefinitions: any;
+
   protected buildGranularityDefinitions(compilers: Compiler, config: GlobalGranularitiesConfig): any {
     this.defsBuildCount++;
-    return super.buildGranularityDefinitions(compilers, config);
+    this.lastDefinitions = super.buildGranularityDefinitions(compilers, config);
+    return this.lastDefinitions;
   }
 
   public version(): string | undefined {
@@ -413,6 +416,27 @@ describe('granularity variants in CompilerApi', () => {
       // Context-independent config → one scan, one entry, regardless of tenant.
       expect(api.defsBuildCount).toBe(1);
       expect((await api.definitionsCache())!.size).toBe(1);
+      api.dispose();
+    });
+
+    // Plain time dimensions (no local block) share ONE global-custom map by reference; a dimension
+    // with a local block (Orders.excluded_at excludes sprint) is reconciled individually.
+    test('plain dimensions share the global-custom map by reference; local-block dims are individual', async () => {
+      const api = createApi({ granularities: [{ name: 'sprint', interval: '2 weeks', origin: '2024-01-01' }] });
+      await api.getSql(queryFor('a', 'Orders.created_at', 'sprint'));
+      const defs = api.lastDefinitions;
+
+      // created_at and updated_at are both plain (no local block) → the very same object.
+      expect(defs['Orders.created_at']).toBeDefined();
+      expect(defs['Orders.created_at']).toBe(defs['Orders.updated_at']);
+      expect(defs['Orders.created_at'].sprint).toEqual({ interval: '2 weeks', origin: '2024-01-01' });
+
+      // excluded_at excludes sprint → not in the shared map; sprint absent there.
+      expect(defs['Orders.excluded_at']?.sprint).toBeUndefined();
+      expect(defs['Orders.excluded_at']).not.toBe(defs['Orders.created_at']);
+      // Querying the excluded custom on it fails, matching meta.
+      await expect(api.getSql(queryFor('a', 'Orders.excluded_at', 'sprint')))
+        .rejects.toThrow('Granularity "sprint" does not exist in dimension Orders.excluded_at');
       api.dispose();
     });
   });
