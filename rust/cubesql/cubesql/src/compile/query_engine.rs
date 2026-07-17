@@ -519,6 +519,7 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udaf(create_measure_udaf());
         ctx.register_udaf(create_patch_measure_udaf());
         ctx.register_udaf(create_xirr_udaf());
+        ctx.register_udaf(create_string_agg_udaf());
 
         // udtf
         ctx.register_udtf(create_generate_series_udtf());
