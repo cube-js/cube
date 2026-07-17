@@ -270,7 +270,10 @@ export class BaseQuery {
       segments: this.options.segments,
       order: this.options.order,
       contextSymbols: this.options.contextSymbols,
-      granularityDefinitions: this.options.granularityDefinitions,
+      // Key on the O(1) config hash, NOT the granularityDefinitions map: the map shares one object
+      // across all plain dimensions by reference, and JSON.stringify would expand it once per time
+      // dimension, bloating the (serialized, LRU-retained) cache key by O(dimensions × customs).
+      granularityHash: this.options.granularityHash,
       timezone: this.options.timezone,
       limit: this.options.limit,
       offset: this.options.offset,
@@ -4210,6 +4213,7 @@ export class BaseQuery {
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       contextSymbols: this.contextSymbols,
       granularityDefinitions: this.options.granularityDefinitions,
+      granularityHash: this.options.granularityHash,
       preAggregationsSchema: this.preAggregationsSchemaOption,
       cubeLatticeCache: this.options.cubeLatticeCache,
       historyQueries: this.options.historyQueries,
