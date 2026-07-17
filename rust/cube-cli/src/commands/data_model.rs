@@ -97,6 +97,34 @@ enum Cmd {
         #[arg(long)]
         branch: Option<String>,
     },
+    /// Merge a branch into its parent branch
+    Merge {
+        deployment: i64,
+        /// Branch to merge (defaults to the active dev-mode branch)
+        #[arg(long)]
+        branch: Option<String>,
+        /// Squash commits into one
+        #[arg(long)]
+        squash: bool,
+        /// Switch to the parent branch after merging
+        #[arg(long)]
+        switch_to_parent: bool,
+        /// Delete the branch after merging
+        #[arg(long)]
+        delete_branch: bool,
+    },
+    /// Merge a branch straight into the deploy/default branch (production)
+    MergeToDefault {
+        deployment: i64,
+        /// Branch to merge (defaults to the active dev-mode branch)
+        #[arg(long)]
+        branch: Option<String>,
+        #[arg(long, short = 'm')]
+        message: Option<String>,
+        /// Keep the branch after merging (default removes it)
+        #[arg(long)]
+        keep_branch: bool,
+    },
 }
 
 fn base(deployment: i64) -> String {
@@ -333,6 +361,42 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             } else {
                 output::success("Pulled");
             }
+        }
+        Cmd::Merge {
+            deployment,
+            branch,
+            squash,
+            switch_to_parent,
+            delete_branch,
+        } => {
+            let mut map = serde_json::Map::new();
+            map.insert("squashCommits".into(), json!(squash));
+            map.insert("switchToParentBranch".into(), json!(switch_to_parent));
+            map.insert("deleteBranch".into(), json!(delete_branch));
+            let res = api
+                .post(
+                    &format!("/build/api/v1/deployments/{deployment}/merge"),
+                    Some(&write_body(map, &branch)),
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::MergeToDefault {
+            deployment,
+            branch,
+            message,
+            keep_branch,
+        } => {
+            let mut map = serde_json::Map::new();
+            util::set(&mut map, "message", &message);
+            map.insert("removeBranchAfterMerge".into(), json!(!keep_branch));
+            let res = api
+                .post(
+                    &format!("/build/api/v1/deployments/{deployment}/merge-to-default"),
+                    Some(&write_body(map, &branch)),
+                )
+                .await?;
+            output::print_json(&res);
         }
     }
     Ok(())
