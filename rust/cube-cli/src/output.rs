@@ -3,7 +3,10 @@ use serde_json::Value;
 
 /// Pretty-print a JSON value to stdout.
 pub fn print_json(value: &Value) {
-    println!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(value).unwrap_or_default()
+    );
 }
 
 /// Extract the list payload from a response. The public API wraps lists as

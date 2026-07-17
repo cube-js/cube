@@ -19,6 +19,7 @@ enum Cmd {
     /// List the data model source tree
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
         /// Include each file's content in the output
         #[arg(long)]
@@ -29,14 +30,17 @@ enum Cmd {
     },
     /// Print a single file's content
     Get {
+        /// Deployment id
         deployment: i64,
         /// File path within the project, e.g. model/cubes/orders.yml
         path: String,
+        /// Branch name (defaults to the deployment default branch)
         #[arg(long)]
         branch: Option<String>,
     },
     /// Create or overwrite a file
     Put {
+        /// Deployment id
         deployment: i64,
         /// Destination path, e.g. model/cubes/orders.yml
         path: String,
@@ -46,32 +50,44 @@ enum Cmd {
         /// Inline content (use `-` to read stdin)
         #[arg(long)]
         content: Option<String>,
+        /// Branch name (defaults to the deployment default branch)
         #[arg(long)]
         branch: Option<String>,
     },
     /// Delete files
     #[command(alias = "rm")]
     Delete {
+        /// Deployment id
         deployment: i64,
         /// One or more file paths to delete
         #[arg(required = true)]
         paths: Vec<String>,
+        /// Branch name (defaults to the deployment default branch)
         #[arg(long)]
         branch: Option<String>,
     },
     /// Rename (move) a file
     Rename {
+        /// Deployment id
         deployment: i64,
+        /// Source path
         from: String,
+        /// Destination path
         to: String,
+        /// Branch name (defaults to the deployment default branch)
         #[arg(long)]
         branch: Option<String>,
     },
     /// List branches
-    Branches { deployment: i64 },
+    Branches {
+        /// Deployment id
+        deployment: i64,
+    },
     /// Create a branch (optionally entering dev mode)
     CreateBranch {
+        /// Deployment id
         deployment: i64,
+        /// Name
         name: String,
         /// Enter dev mode on the new branch
         #[arg(long)]
@@ -79,26 +95,35 @@ enum Cmd {
     },
     /// Enter dev mode / switch to a branch
     DevMode {
+        /// Deployment id
         deployment: i64,
         /// Branch to switch to (required by the API)
         branch: String,
     },
     /// Exit dev mode
-    ExitDevMode { deployment: i64 },
+    ExitDevMode {
+        /// Deployment id
+        deployment: i64,
+    },
     /// Commit and push the active branch
     Commit {
+        /// Deployment id
         deployment: i64,
+        /// Commit message
         #[arg(long, short = 'm')]
         message: Option<String>,
     },
     /// Sync a branch from its remote and rebuild if it moved
     Pull {
+        /// Deployment id
         deployment: i64,
+        /// Branch name (defaults to the deployment default branch)
         #[arg(long)]
         branch: Option<String>,
     },
     /// Merge a branch into its parent branch
     Merge {
+        /// Deployment id
         deployment: i64,
         /// Branch to merge (defaults to the active dev-mode branch)
         #[arg(long)]
@@ -115,10 +140,12 @@ enum Cmd {
     },
     /// Merge a branch straight into the deploy/default branch (production)
     MergeToDefault {
+        /// Deployment id
         deployment: i64,
         /// Branch to merge (defaults to the active dev-mode branch)
         #[arg(long)]
         branch: Option<String>,
+        /// Commit message
         #[arg(long, short = 'm')]
         message: Option<String>,
         /// Keep the branch after merging (default removes it)
@@ -153,7 +180,10 @@ fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
 
 /// Write endpoints take the target branch as a `branchName` body field (with
 /// the caller's active dev-mode branch as the fallback when omitted).
-fn write_body(mut body: serde_json::Map<String, serde_json::Value>, branch: &Option<String>) -> serde_json::Value {
+fn write_body(
+    mut body: serde_json::Map<String, serde_json::Value>,
+    branch: &Option<String>,
+) -> serde_json::Value {
     if let Some(b) = branch {
         body.insert("branchName".into(), json!(b));
     }
@@ -287,7 +317,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             output::print_list(
                 ctx.json,
                 &res,
-                &[("NAME", "name"), ("DEFAULT", "isDefault"), ("CURRENT", "isCurrent")],
+                &[
+                    ("NAME", "name"),
+                    ("DEFAULT", "isDefault"),
+                    ("CURRENT", "isCurrent"),
+                ],
             );
         }
         Cmd::CreateBranch {

@@ -62,10 +62,7 @@ mod tests {
 
     #[test]
     fn parse_kv_accepts_key_value_pairs() {
-        assert_eq!(
-            parse_kv("A=1").unwrap(),
-            ("A".to_string(), "1".to_string())
-        );
+        assert_eq!(parse_kv("A=1").unwrap(), ("A".to_string(), "1".to_string()));
         assert_eq!(
             parse_kv("A=b=c").unwrap(),
             ("A".to_string(), "b=c".to_string())

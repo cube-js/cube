@@ -90,9 +90,7 @@ impl Ctx {
                     None
                 };
                 match refresh {
-                    Some((rt, name)) => {
-                        client::Client::with_refresh(&url, &token, &rt, Some(name))
-                    }
+                    Some((rt, name)) => client::Client::with_refresh(&url, &token, &rt, Some(name)),
                     None => client::Client::new(&url, &token),
                 }
             }

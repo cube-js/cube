@@ -11,7 +11,11 @@ pub async fn command(_args: Args, ctx: &Ctx) -> Result<()> {
         output::print_json(&me);
         return Ok(());
     }
-    println!("{} ({})", output::field(&me, "email"), output::field(&me, "username"));
+    println!(
+        "{} ({})",
+        output::field(&me, "email"),
+        output::field(&me, "username")
+    );
     println!("id: {}", output::field(&me, "id"));
     if output::field(&me, "isAdmin") == "true" {
         println!("role: admin");

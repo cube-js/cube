@@ -15,21 +15,30 @@ enum Cmd {
     #[command(alias = "ls")]
     List,
     /// Show an OIDC token config
-    Get { config: i64 },
+    Get {
+        /// OIDC token config id
+        config: i64,
+    },
     /// Create an OIDC token config (CreateOidcTokenConfigInput as JSON)
     Create {
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Update an OIDC token config (UpdateOidcTokenConfigInput as JSON)
     Update {
+        /// OIDC token config id
         config: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Delete an OIDC token config
     #[command(alias = "rm")]
-    Delete { config: i64 },
+    Delete {
+        /// OIDC token config id
+        config: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {

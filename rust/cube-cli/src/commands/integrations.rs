@@ -15,21 +15,30 @@ enum Cmd {
     #[command(alias = "ls")]
     List,
     /// Show an OAuth integration
-    Get { integration: i64 },
+    Get {
+        /// OAuth integration id
+        integration: i64,
+    },
     /// Create an OAuth integration (CreateOAuthIntegrationInput as JSON)
     Create {
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Update an OAuth integration (UpdateOAuthIntegrationInput as JSON)
     Update {
+        /// OAuth integration id
         integration: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Delete an OAuth integration
     #[command(alias = "rm")]
-    Delete { integration: i64 },
+    Delete {
+        /// OAuth integration id
+        integration: i64,
+    },
     /// Manage the current user's OAuth tokens
     Tokens {
         #[command(subcommand)]
@@ -43,11 +52,20 @@ enum TokensCmd {
     #[command(alias = "ls")]
     List,
     /// Show the user's OAuth token for an integration
-    Get { integration: i64 },
+    Get {
+        /// OAuth integration id
+        integration: i64,
+    },
     /// Revoke the user's OAuth token for an integration
-    Revoke { integration: i64 },
+    Revoke {
+        /// OAuth integration id
+        integration: i64,
+    },
     /// Initiate the OAuth flow for an integration
-    Initiate { integration: i64 },
+    Initiate {
+        /// OAuth integration id
+        integration: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -68,7 +86,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
         Cmd::Get { integration } => {
             let res = api
-                .get(&format!("/api/v1/oauth-integrations/{integration}"), &Vec::new())
+                .get(
+                    &format!("/api/v1/oauth-integrations/{integration}"),
+                    &Vec::new(),
+                )
                 .await?;
             output::print_json(&res);
         }
@@ -110,14 +131,19 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
             TokensCmd::Get { integration } => {
                 let res = api
-                    .get(&format!("/api/v1/user-oauth-tokens/{integration}"), &Vec::new())
+                    .get(
+                        &format!("/api/v1/user-oauth-tokens/{integration}"),
+                        &Vec::new(),
+                    )
                     .await?;
                 output::print_json(&res);
             }
             TokensCmd::Revoke { integration } => {
                 api.delete(&format!("/api/v1/user-oauth-tokens/{integration}"), None)
                     .await?;
-                output::success(&format!("Revoked OAuth token for integration {integration}"));
+                output::success(&format!(
+                    "Revoked OAuth token for integration {integration}"
+                ));
             }
             TokensCmd::Initiate { integration } => {
                 let res = api

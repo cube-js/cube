@@ -14,27 +14,36 @@ enum Cmd {
     /// List environments of a deployment
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
         /// Filter by type: production, staging, development
         #[arg(long = "type")]
         env_type: Option<String>,
+        /// Pagination offset
         #[arg(long)]
         offset: Option<u64>,
+        /// Maximum number of items to return
         #[arg(long)]
         limit: Option<u64>,
     },
     /// List tokens issued for an environment
     Tokens {
+        /// Deployment id
         deployment: i64,
+        /// Environment id
         environment: i64,
+        /// Pagination offset
         #[arg(long)]
         offset: Option<u64>,
+        /// Maximum number of items to return
         #[arg(long)]
         limit: Option<u64>,
     },
     /// Create an environment token
     CreateToken {
+        /// Deployment id
         deployment: i64,
+        /// Environment id
         environment: i64,
         /// Security context as JSON (inline, @file, or - for stdin)
         #[arg(long)]
@@ -73,7 +82,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             output::print_list(
                 ctx.json,
                 &res,
-                &[("ID", "id"), ("TYPE", "type"), ("BRANCH", "branch"), ("USER", "user")],
+                &[
+                    ("ID", "id"),
+                    ("TYPE", "type"),
+                    ("BRANCH", "branch"),
+                    ("USER", "user"),
+                ],
             );
         }
         Cmd::Tokens {
@@ -87,9 +101,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "limit", &limit);
             let res = api
                 .get(
-                    &format!(
-                        "/api/v1/deployments/{deployment}/environments/{environment}/tokens"
-                    ),
+                    &format!("/api/v1/deployments/{deployment}/environments/{environment}/tokens"),
                     &query,
                 )
                 .await?;
@@ -120,7 +132,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if !scope.is_empty() {
                 util::set(&mut body, "scopes", &Some(scope));
             }
-            let suffix = if meta_sync { "tokens-for-meta-sync" } else { "tokens" };
+            let suffix = if meta_sync {
+                "tokens-for-meta-sync"
+            } else {
+                "tokens"
+            };
             let res = api
                 .post(
                     &format!(

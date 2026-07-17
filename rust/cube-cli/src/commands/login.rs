@@ -75,7 +75,10 @@ async fn device_login(url: &str) -> Result<(String, Option<String>)> {
     println!("To authorize this CLI, open the following URL in your browser:");
     println!("  {}", verification.bold().underline());
     println!();
-    println!("and confirm this code:  {}", device.user_code.bold().green());
+    println!(
+        "and confirm this code:  {}",
+        device.user_code.bold().green()
+    );
     println!();
 
     if oauth::open_browser(&verification) {

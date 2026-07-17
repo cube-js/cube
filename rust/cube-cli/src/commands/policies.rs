@@ -17,15 +17,19 @@ enum Cmd {
         /// Global, Deployment, Report, ReportFolder, Agent, AgentSpace, Workbook, Dashboard, Folder, ChatThread
         #[arg(long)]
         resource_type: String,
+        /// Resource id
         #[arg(long)]
         resource_id: i64,
     },
     /// Set (or clear) a user's policy on a resource
     SetUser {
+        /// Resource type
         #[arg(long)]
         resource_type: String,
+        /// Resource id
         #[arg(long)]
         resource_id: i64,
+        /// User id
         #[arg(long)]
         user: Option<i64>,
         /// Action to grant, e.g. WorkbookRead; omit to clear
@@ -34,10 +38,13 @@ enum Cmd {
     },
     /// Set (or clear) a group's policy on a resource
     SetGroup {
+        /// Resource type
         #[arg(long)]
         resource_type: String,
+        /// Resource id
         #[arg(long)]
         resource_id: i64,
+        /// Group id
         #[arg(long)]
         group: i64,
         /// Action to grant, e.g. WorkbookRead; omit to clear

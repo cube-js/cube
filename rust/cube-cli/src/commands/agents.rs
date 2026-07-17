@@ -14,15 +14,20 @@ enum Cmd {
     /// List agents of a deployment
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
+        /// Allow embedding
         #[arg(long)]
         allow_embedding: Option<bool>,
     },
     /// List agent skills of a deployment
     Skills {
+        /// Deployment id
         deployment: i64,
+        /// Space
         #[arg(long)]
         space: Option<String>,
+        /// Branch name (defaults to the deployment default branch)
         #[arg(long)]
         branch: Option<String>,
     },

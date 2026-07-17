@@ -13,8 +13,10 @@ pub struct Args {
 enum Cmd {
     /// Show AI Engineer settings
     Settings {
+        /// Deployment id
         #[arg(long)]
         deployment: Option<i64>,
+        /// Agent
         #[arg(long)]
         agent: Option<i64>,
         /// Security context as a JSON string

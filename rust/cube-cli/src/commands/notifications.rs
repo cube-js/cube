@@ -14,42 +14,66 @@ enum Cmd {
     /// List scheduled notifications (admin only)
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
+        /// Dashboard
         #[arg(long)]
         dashboard: Option<i64>,
+        /// Dashboard public id
         #[arg(long)]
         dashboard_public_id: Option<String>,
+        /// Recipient user
         #[arg(long)]
         recipient_user: Option<i64>,
+        /// Recipient email
         #[arg(long)]
         recipient_email: Option<String>,
+        /// Recipient embed tenant
         #[arg(long)]
         recipient_embed_tenant: Option<String>,
+        /// Recipient external id
         #[arg(long)]
         recipient_external_id: Option<String>,
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
     /// Show a scheduled notification
-    Get { deployment: i64, notification: i64 },
+    Get {
+        /// Deployment id
+        deployment: i64,
+        /// Notification id
+        notification: i64,
+    },
     /// Create a scheduled notification (CreateNotificationInput as JSON)
     Create {
+        /// Deployment id
         deployment: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Update a scheduled notification (UpdateNotificationInput as JSON)
     Update {
+        /// Deployment id
         deployment: i64,
+        /// Notification id
         notification: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Delete a scheduled notification and all its recipients
     #[command(alias = "rm")]
-    Delete { deployment: i64, notification: i64 },
+    Delete {
+        /// Deployment id
+        deployment: i64,
+        /// Notification id
+        notification: i64,
+    },
     /// Manage notification recipients
     Recipients {
         #[command(subcommand)]
@@ -62,24 +86,34 @@ enum RecipientsCmd {
     /// List recipients of a notification
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
+        /// Notification id
         notification: i64,
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
     /// Subscribe recipients (AddNotificationRecipientsInput as JSON)
     Add {
+        /// Deployment id
         deployment: i64,
+        /// Notification id
         notification: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Unsubscribe recipients (RemoveNotificationRecipientsInput as JSON)
     Remove {
+        /// Deployment id
         deployment: i64,
+        /// Notification id
         notification: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
@@ -104,7 +138,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "dashboardPublicId", &dashboard_public_id);
             util::push(&mut query, "recipientUserId", &recipient_user);
             util::push(&mut query, "recipientEmail", &recipient_email);
-            util::push(&mut query, "recipientEmbedTenantName", &recipient_embed_tenant);
+            util::push(
+                &mut query,
+                "recipientEmbedTenantName",
+                &recipient_embed_tenant,
+            );
             util::push(&mut query, "recipientExternalId", &recipient_external_id);
             util::push(&mut query, "first", &first);
             util::push(&mut query, "after", &after);

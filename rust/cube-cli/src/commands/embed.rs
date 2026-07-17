@@ -14,16 +14,21 @@ pub struct Args {
 enum Cmd {
     /// Generate a one-time embed session (GenerateSession as JSON; admin only)
     GenerateSession {
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Exchange a session id for a signed embed JWT
     Token {
+        /// Embed session id
         #[arg(long)]
         session_id: String,
     },
     /// Fetch an embeddable dashboard by public id
-    Dashboard { public_id: String },
+    Dashboard {
+        /// Public id
+        public_id: String,
+    },
     /// Manage embed tenants
     Tenant {
         #[command(subcommand)]
@@ -35,17 +40,28 @@ enum Cmd {
 enum TenantCmd {
     /// Delete an embed tenant
     #[command(alias = "rm")]
-    Delete { name: String },
+    Delete {
+        /// Name
+        name: String,
+    },
     /// List an embed tenant's groups
     Groups {
+        /// Name
         name: String,
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
     /// Delete a group of an embed tenant
-    DeleteGroup { name: String, group: i64 },
+    DeleteGroup {
+        /// Name
+        name: String,
+        /// Group id
+        group: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -101,8 +117,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 );
             }
             TenantCmd::DeleteGroup { name, group } => {
-                api.delete(&format!("/api/v1/embed-tenants/{name}/groups/{group}"), None)
-                    .await?;
+                api.delete(
+                    &format!("/api/v1/embed-tenants/{name}/groups/{group}"),
+                    None,
+                )
+                .await?;
                 output::success(&format!("Deleted group {group} of embed tenant `{name}`"));
             }
         },

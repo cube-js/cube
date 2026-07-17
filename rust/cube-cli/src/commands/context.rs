@@ -14,7 +14,10 @@ enum Cmd {
     /// List saved contexts
     List,
     /// Switch the default context
-    Use { name: String },
+    Use {
+        /// Name
+        name: String,
+    },
 }
 
 pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {

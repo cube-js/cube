@@ -14,9 +14,13 @@ pub struct Args {
 enum Cmd {
     /// List environment variables (secret values are masked by the API)
     #[command(alias = "ls")]
-    List { deployment: i64 },
+    List {
+        /// Deployment id
+        deployment: i64,
+    },
     /// Upsert environment variables; omitted variables keep their values
     Set {
+        /// Deployment id
         deployment: i64,
         /// Variables as KEY=VALUE pairs
         #[arg(value_parser = util::parse_kv, required = true)]
@@ -29,7 +33,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     match args.cmd {
         Cmd::List { deployment } => {
             let res = api
-                .get(&format!("/api/v1/deployments/{deployment}/env-vars"), &Vec::new())
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/env-vars"),
+                    &Vec::new(),
+                )
                 .await?;
             output::print_list(ctx.json, &res, &[("NAME", "name"), ("VALUE", "value")]);
         }

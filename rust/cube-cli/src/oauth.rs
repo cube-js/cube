@@ -161,7 +161,10 @@ pub async fn poll_for_token(
                         .unwrap_or_default()
                 ),
             },
-            Err(_) => bail!("token poll failed ({status}) at {endpoint}: {}", text.trim()),
+            Err(_) => bail!(
+                "token poll failed ({status}) at {endpoint}: {}",
+                text.trim()
+            ),
         }
     }
 }

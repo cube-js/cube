@@ -37,33 +37,46 @@ enum ResourceCmd {
         /// SCIM filter expression
         #[arg(long)]
         filter: Option<String>,
+        /// Start index
         #[arg(long)]
         start_index: Option<u64>,
+        /// Count
         #[arg(long)]
         count: Option<u64>,
     },
     /// Show a resource
-    Get { id: String },
+    Get {
+        /// Resource id
+        id: String,
+    },
     /// Create a resource (SCIM JSON body)
     Create {
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Patch a resource (SCIM PatchOp JSON body)
     Patch {
+        /// Resource id
         id: String,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Replace a resource (SCIM JSON body)
     Replace {
+        /// Resource id
         id: String,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Delete a resource
     #[command(alias = "rm")]
-    Delete { id: String },
+    Delete {
+        /// Resource id
+        id: String,
+    },
 }
 
 async fn resource(base: &str, cmd: ResourceCmd, ctx: &Ctx) -> Result<()> {

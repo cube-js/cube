@@ -15,21 +15,33 @@ enum Cmd {
     /// List workbooks
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
+        /// Folder id
         #[arg(long)]
         folder: Option<i64>,
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
     /// Show a workbook
-    Get { deployment: i64, workbook: i64 },
+    Get {
+        /// Deployment id
+        deployment: i64,
+        /// Workbook id
+        workbook: i64,
+    },
     /// Create a workbook
     Create {
+        /// Deployment id
         deployment: i64,
+        /// Name
         #[arg(long)]
         name: Option<String>,
+        /// Folder id
         #[arg(long)]
         folder: Option<i64>,
         /// Full CreateWorkbookInput as JSON (inline, @file, or -)
@@ -38,13 +50,17 @@ enum Cmd {
     },
     /// Update a workbook (rename, move, metadata, slug)
     Update {
+        /// Deployment id
         deployment: i64,
+        /// Workbook id
         workbook: i64,
+        /// Name
         #[arg(long)]
         name: Option<String>,
         /// Destination folder id; pass 0 to move to the workspace root
         #[arg(long)]
         folder: Option<i64>,
+        /// Slug
         #[arg(long)]
         slug: Option<String>,
         /// Full UpdateWorkbookInput as JSON (inline, @file, or -)
@@ -53,10 +69,17 @@ enum Cmd {
     },
     /// Delete a workbook
     #[command(alias = "rm")]
-    Delete { deployment: i64, workbook: i64 },
+    Delete {
+        /// Deployment id
+        deployment: i64,
+        /// Workbook id
+        workbook: i64,
+    },
     /// Clone a workbook including reports and published dashboard
     Duplicate {
+        /// Deployment id
         deployment: i64,
+        /// Workbook id
         workbook: i64,
         /// Clone from the shared workspace (creator-mode embed sessions)
         #[arg(long)]
@@ -64,7 +87,9 @@ enum Cmd {
     },
     /// Publish a workbook's dashboard
     Publish {
+        /// Deployment id
         deployment: i64,
+        /// Workbook id
         workbook: i64,
         /// PublishDashboardInput as JSON; workbookId is filled in automatically
         #[arg(long, short = 'd')]
@@ -72,7 +97,9 @@ enum Cmd {
     },
     /// Update a workbook's dashboard draft
     Dashboard {
+        /// Deployment id
         deployment: i64,
+        /// Workbook id
         workbook: i64,
         /// WorkbookDashboardInput as JSON (inline, @file, or -)
         #[arg(long, short = 'd')]
@@ -80,10 +107,14 @@ enum Cmd {
     },
     /// Attach an AI widget thread to a published dashboard
     AiThread {
+        /// Deployment id
         deployment: i64,
+        /// Workbook id
         workbook: i64,
+        /// Widget id
         #[arg(long)]
         widget_id: String,
+        /// Thread id
         #[arg(long)]
         thread_id: String,
     },
@@ -103,7 +134,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             util::push(&mut query, "first", &first);
             util::push(&mut query, "after", &after);
             let res = api
-                .get(&format!("/api/v1/deployments/{deployment}/workbooks"), &query)
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/workbooks"),
+                    &query,
+                )
                 .await?;
             output::print_list(
                 ctx.json,
@@ -117,7 +151,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 ],
             );
         }
-        Cmd::Get { deployment, workbook } => {
+        Cmd::Get {
+            deployment,
+            workbook,
+        } => {
             let res = api
                 .get(
                     &format!("/api/v1/deployments/{deployment}/workbooks/{workbook}"),
@@ -157,7 +194,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if let Some(folder) = folder {
                 body.insert(
                     "folderId".to_string(),
-                    if folder == 0 { serde_json::Value::Null } else { json!(folder) },
+                    if folder == 0 {
+                        serde_json::Value::Null
+                    } else {
+                        json!(folder)
+                    },
                 );
             }
             let res = api
@@ -168,7 +209,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .await?;
             output::print_json(&res);
         }
-        Cmd::Delete { deployment, workbook } => {
+        Cmd::Delete {
+            deployment,
+            workbook,
+        } => {
             api.delete(
                 &format!("/api/v1/deployments/{deployment}/workbooks/{workbook}"),
                 None,
@@ -181,7 +225,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             workbook,
             shared,
         } => {
-            let body = if shared { Some(json!({ "shared": true })) } else { None };
+            let body = if shared {
+                Some(json!({ "shared": true }))
+            } else {
+                None
+            };
             let res = api
                 .post(
                     &format!("/api/v1/deployments/{deployment}/workbooks/{workbook}/duplicate"),

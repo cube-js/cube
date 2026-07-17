@@ -15,6 +15,7 @@ enum Cmd {
     Settings,
     /// Update tenant settings (TenantSettingsInput as JSON)
     Update {
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },

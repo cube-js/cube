@@ -14,14 +14,19 @@ enum Cmd {
     /// List user groups
     #[command(alias = "ls")]
     List {
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
     /// Delete a user group
     #[command(alias = "rm")]
-    Delete { group: i64 },
+    Delete {
+        /// Group id
+        group: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {

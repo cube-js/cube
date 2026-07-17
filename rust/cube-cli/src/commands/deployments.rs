@@ -17,8 +17,10 @@ enum Cmd {
         /// Filter by creation step (repeatable): project, upload, schema, github, ssh, databases, ready, demo
         #[arg(long = "creation-step")]
         creation_step: Vec<String>,
+        /// Pagination offset
         #[arg(long)]
         offset: Option<u64>,
+        /// Maximum number of items to return
         #[arg(long)]
         limit: Option<u64>,
         /// Page size for cursor-based pagination
@@ -29,7 +31,10 @@ enum Cmd {
         after: Option<String>,
     },
     /// Show a single deployment
-    Get { deployment: i64 },
+    Get {
+        /// Deployment id
+        deployment: i64,
+    },
     /// Create a deployment
     Create {
         /// Deployment name
@@ -61,17 +66,26 @@ enum Cmd {
     },
     /// Update a deployment (rename, or full UpdateDeploymentInput via --data)
     Update {
+        /// Deployment id
         deployment: i64,
+        /// Name
         #[arg(long)]
         name: Option<String>,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: Option<String>,
     },
     /// Delete a deployment
     #[command(alias = "rm")]
-    Delete { deployment: i64 },
+    Delete {
+        /// Deployment id
+        deployment: i64,
+    },
     /// Generate a Cube API token for a deployment
-    Token { deployment: i64 },
+    Token {
+        /// Deployment id
+        deployment: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {

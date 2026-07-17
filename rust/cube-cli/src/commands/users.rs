@@ -14,8 +14,10 @@ enum Cmd {
     /// List users
     #[command(alias = "ls")]
     List {
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
@@ -23,18 +25,24 @@ enum Cmd {
     Me,
     /// Create a user (UserCreateInput as JSON, admin only)
     Create {
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Update a user (UserUpdateInput as JSON, admin only)
     Update {
+        /// User id
         user: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: String,
     },
     /// Delete a user (admin only)
     #[command(alias = "rm")]
-    Delete { user: i64 },
+    Delete {
+        /// User id
+        user: i64,
+    },
     /// Show the embed theme for the current user
     EmbedTheme,
 }

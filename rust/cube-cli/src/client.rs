@@ -83,13 +83,19 @@ impl Client {
         body: Option<&Value>,
     ) -> Result<(StatusCode, String)> {
         let url = format!("{}{}", self.base_url, path);
-        let mut req = self.http.request(method.clone(), &url).bearer_auth(self.token());
+        let mut req = self
+            .http
+            .request(method.clone(), &url)
+            .bearer_auth(self.token());
         if !query.is_empty() {
             req = req.query(query);
         }
         if let Some(body) = body {
             req = req.json(body);
-        } else if matches!(*method, Method::POST | Method::PUT | Method::PATCH | Method::DELETE) {
+        } else if matches!(
+            *method,
+            Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+        ) {
             // Bodyless writes still need an explicit Content-Length: 0, otherwise
             // some frontends (e.g. Google GFE) reject them with 411 Length
             // Required. reqwest omits the header for an empty body, so set it.

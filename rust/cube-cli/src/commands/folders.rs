@@ -14,18 +14,23 @@ enum Cmd {
     /// List folders at the workspace root or inside a parent folder
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
         /// List children of this folder instead of the root
         #[arg(long)]
         parent: Option<i64>,
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
     /// Create a folder
     Create {
+        /// Deployment id
         deployment: i64,
+        /// Name
         #[arg(long)]
         name: String,
         /// Parent folder id (omit for workspace root)
@@ -37,18 +42,32 @@ enum Cmd {
     },
     /// Rename a folder or change its position
     Update {
+        /// Deployment id
         deployment: i64,
+        /// Folder id
         folder: i64,
+        /// Name
         #[arg(long)]
         name: Option<String>,
+        /// Position
         #[arg(long)]
         position: Option<i64>,
     },
     /// Delete a folder (must have no sub-folders; content moves to root)
     #[command(alias = "rm")]
-    Delete { deployment: i64, folder: i64 },
+    Delete {
+        /// Deployment id
+        deployment: i64,
+        /// Folder id
+        folder: i64,
+    },
     /// Show the ancestor chain of a folder (breadcrumb)
-    Ancestors { deployment: i64, folder: i64 },
+    Ancestors {
+        /// Deployment id
+        deployment: i64,
+        /// Folder id
+        folder: i64,
+    },
 }
 
 const COLUMNS: &[(&str, &str)] = &[

@@ -15,10 +15,13 @@ enum Cmd {
     /// List user attribute definitions
     #[command(alias = "ls")]
     List {
+        /// Pagination offset
         #[arg(long)]
         offset: Option<u64>,
+        /// Maximum number of items to return
         #[arg(long)]
         limit: Option<u64>,
+        /// Name
         #[arg(long)]
         name: Option<String>,
         /// string, number, boolean, string_array, number_array
@@ -27,31 +30,42 @@ enum Cmd {
     },
     /// Create a user attribute definition
     Create {
+        /// Name
         #[arg(long)]
         name: String,
         /// string, number, boolean, string_array, number_array
         #[arg(long = "type")]
         attr_type: String,
+        /// Display name
         #[arg(long)]
         display_name: Option<String>,
+        /// Description
         #[arg(long)]
         description: Option<String>,
+        /// Default value
         #[arg(long)]
         default_value: Option<String>,
     },
     /// Update a user attribute definition
     Update {
+        /// User attribute id
         attribute: i64,
+        /// Display name
         #[arg(long)]
         display_name: Option<String>,
+        /// Description
         #[arg(long)]
         description: Option<String>,
+        /// Default value
         #[arg(long)]
         default_value: Option<String>,
     },
     /// Delete a user attribute definition
     #[command(alias = "rm")]
-    Delete { attribute: i64 },
+    Delete {
+        /// User attribute id
+        attribute: i64,
+    },
     /// Get or set attribute values for users
     Values {
         #[command(subcommand)]
@@ -62,11 +76,16 @@ enum Cmd {
 #[derive(Subcommand)]
 enum ValuesCmd {
     /// List attribute values for a user
-    Get { user: i64 },
+    Get {
+        /// User id
+        user: i64,
+    },
     /// Upsert an attribute value binding for a user
     Set {
+        /// User id
         #[arg(long)]
         user: String,
+        /// User attribute id
         #[arg(long)]
         attribute: String,
     },
@@ -143,7 +162,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         Cmd::Values { cmd } => match cmd {
             ValuesCmd::Get { user } => {
                 let res = api
-                    .get(&format!("/api/v1/user-attribute-values/{user}"), &Vec::new())
+                    .get(
+                        &format!("/api/v1/user-attribute-values/{user}"),
+                        &Vec::new(),
+                    )
                     .await?;
                 output::print_json(&res);
             }

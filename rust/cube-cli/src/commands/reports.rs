@@ -15,15 +15,21 @@ enum Cmd {
     /// List reports
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
+        /// Workbook id
         #[arg(long)]
         workbook: Option<i64>,
+        /// Folder id
         #[arg(long)]
         folder: Option<i64>,
+        /// External workbook
         #[arg(long)]
         external_workbook: Option<String>,
+        /// Maximum number of items to return
         #[arg(long)]
         limit: Option<u64>,
+        /// Page number
         #[arg(long)]
         page: Option<u64>,
         /// Sort by: name, createdAt, updatedAt, lastViewedAt
@@ -32,22 +38,34 @@ enum Cmd {
         /// ASC or DESC
         #[arg(long)]
         sort_direction: Option<String>,
+        /// Page size (cursor pagination)
         #[arg(long)]
         first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
         #[arg(long)]
         after: Option<String>,
     },
     /// Show a report
-    Get { deployment: i64, report: i64 },
+    Get {
+        /// Deployment id
+        deployment: i64,
+        /// Report id
+        report: i64,
+    },
     /// Create a report (CreateReportInput as JSON)
     Create {
+        /// Deployment id
         deployment: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: Option<String>,
+        /// Name
         #[arg(long)]
         name: Option<String>,
+        /// Folder id
         #[arg(long)]
         folder: Option<i64>,
+        /// Workbook id
         #[arg(long)]
         workbook: Option<i64>,
         /// Cube JSON query for the report
@@ -59,37 +77,62 @@ enum Cmd {
     },
     /// Update a report (UpdateReportInput as JSON)
     Update {
+        /// Deployment id
         deployment: i64,
+        /// Report id
         report: i64,
+        /// Request body as JSON (inline, @file, or - for stdin)
         #[arg(long, short = 'd')]
         data: Option<String>,
+        /// Name
         #[arg(long)]
         name: Option<String>,
+        /// Folder id
         #[arg(long)]
         folder: Option<i64>,
+        /// Json query
         #[arg(long)]
         json_query: Option<String>,
+        /// Sql query
         #[arg(long)]
         sql_query: Option<String>,
     },
     /// Delete a report
     #[command(alias = "rm")]
-    Delete { deployment: i64, report: i64 },
+    Delete {
+        /// Deployment id
+        deployment: i64,
+        /// Report id
+        report: i64,
+    },
     /// Re-run a report's query
-    Refresh { deployment: i64, report: i64 },
+    Refresh {
+        /// Deployment id
+        deployment: i64,
+        /// Report id
+        report: i64,
+    },
     /// Link a report to a spreadsheet placement
     ConnectWorkbook {
+        /// Deployment id
         deployment: i64,
+        /// Report id
         report: i64,
+        /// External workbook id
         #[arg(long)]
         external_workbook_id: String,
+        /// Result location
         #[arg(long)]
         result_location: String,
+        /// End result cell
         #[arg(long)]
         end_result_cell: Option<String>,
     },
     /// List report folders
-    Folders { deployment: i64 },
+    Folders {
+        /// Deployment id
+        deployment: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -216,14 +259,15 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             end_result_cell,
         } => {
             let mut body = serde_json::Map::new();
-            body.insert("externalWorkbookId".to_string(), json!(external_workbook_id));
+            body.insert(
+                "externalWorkbookId".to_string(),
+                json!(external_workbook_id),
+            );
             body.insert("resultLocation".to_string(), json!(result_location));
             util::set(&mut body, "endResultCell", &end_result_cell);
             let res = api
                 .put(
-                    &format!(
-                        "/api/v1/deployments/{deployment}/reports/{report}/connect-workbook"
-                    ),
+                    &format!("/api/v1/deployments/{deployment}/reports/{report}/connect-workbook"),
                     Some(&util::body(body)),
                 )
                 .await?;

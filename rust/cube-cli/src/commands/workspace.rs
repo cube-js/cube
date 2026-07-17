@@ -28,8 +28,10 @@ struct ListFlags {
     /// ASC or DESC
     #[arg(long)]
     direction: Option<String>,
+    /// Page size (cursor pagination)
     #[arg(long)]
     first: Option<u64>,
+    /// Cursor for the next page (from a previous pageInfo.endCursor)
     #[arg(long)]
     after: Option<String>,
 }
@@ -39,18 +41,21 @@ enum Cmd {
     /// List workspace items (folders, workbooks, reports)
     #[command(alias = "ls")]
     List {
+        /// Deployment id
         deployment: i64,
         #[command(flatten)]
         flags: ListFlags,
     },
     /// List items shared with embed users
     Shared {
+        /// Deployment id
         deployment: i64,
         #[command(flatten)]
         flags: ListFlags,
     },
     /// Move a workbook, report, or folder into a folder
     Move {
+        /// Deployment id
         deployment: i64,
         /// Item type: WORKBOOK, REPORT, or FOLDER
         #[arg(long = "type")]
