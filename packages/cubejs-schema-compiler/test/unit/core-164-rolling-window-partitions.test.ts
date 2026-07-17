@@ -1,4 +1,5 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
 // CORE-164: a query with a narrow dateRange against a partitioned pre-aggregation
@@ -52,10 +53,10 @@ cubes:
 `;
 
 describe('CORE-164 rolling-window pre-aggregation partition scope', () => {
-  async function preAggDescription(query) {
+  async function preAggDescription(query, QueryClass: any = PostgresQuery) {
     const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(SCHEMA);
     await compiler.compile();
-    const q = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, query);
+    const q = new QueryClass({ joinGraph, cubeEvaluator, compiler }, query);
     q.buildSqlAndParams();
     return q.preAggregations?.preAggregationsDescription();
   }
@@ -97,5 +98,25 @@ describe('CORE-164 rolling-window pre-aggregation partition scope', () => {
     expect(desc[0].preAggregationId).toEqual('rent.rolling_unbounded_pa');
     // Unbounded trailing genuinely needs all history => no narrowing.
     expect(desc[0].matchedTimeDimensionDateRange).toBeUndefined();
+  });
+
+  it('expanded range keeps the query timestamp precision (microseconds)', async () => {
+    // BigQuery uses microsecond precision. The expanded start/end must be emitted
+    // at that same precision — mixing 3-digit and 6-digit strings produced
+    // malformed ranges (`...,...999999`) that the partition loader rejected.
+    const desc: any = await preAggDescription({
+      measures: ['rent.rolling_7d'],
+      timeDimensions: [{
+        dimension: 'rent.date',
+        granularity: 'day',
+        dateRange: ['2024-06-10', '2024-06-10'],
+      }],
+      timezone: 'UTC',
+    }, BigqueryQuery);
+
+    expect(desc[0].matchedTimeDimensionDateRange).toEqual([
+      '2024-06-03T00:00:00.000000',
+      '2024-06-10T23:59:59.999999',
+    ]);
   });
 });
