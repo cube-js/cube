@@ -80,8 +80,8 @@ enum Cmd {
     /// Enter dev mode / switch to a branch
     DevMode {
         deployment: i64,
-        #[arg(long)]
-        branch: Option<String>,
+        /// Branch to switch to (required by the API)
+        branch: String,
     },
     /// Exit dev mode
     ExitDevMode { deployment: i64 },
@@ -275,17 +275,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
         }
         Cmd::DevMode { deployment, branch } => {
-            let body = branch.as_ref().map(|b| json!({ "branchName": b }));
+            let body = json!({ "branchName": branch });
             let res = api
                 .post(
                     &format!("/build/api/v1/deployments/{deployment}/dev-mode"),
-                    body.as_ref(),
+                    Some(&body),
                 )
                 .await?;
             if ctx.json {
                 output::print_json(&res);
             } else {
-                output::success("Entered dev mode");
+                output::success(&format!("Entered dev mode on {branch}"));
             }
         }
         Cmd::ExitDevMode { deployment } => {
