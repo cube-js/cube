@@ -229,6 +229,19 @@ describe('granularity variants in CompilerApi', () => {
       api.dispose();
     });
 
+    // Regression: meta and SQL paths must resolve the config from the SAME securityContext-only
+    // view. A function keyed on securityContext advertises `sprint` for tenant b in meta AND
+    // resolves it in SQL — no path can advertise a custom the other can't execute.
+    test('meta and SQL paths agree on the effective set (securityContext-keyed function)', async () => {
+      const api = createApi({ granularities: perTenant });
+      const cubes = await api.metaConfig(ctxFor('b'), {});
+      expect(granularityNames(dimByName(cubes, 'Orders.created_at'))).toContain('sprint');
+      // Same tenant, SQL path: the advertised custom actually resolves.
+      const sql = await api.getSql(queryFor('b', 'Orders.created_at', 'sprint'));
+      expect(sql.sql[0]).toContain('created_at');
+      api.dispose();
+    });
+
     test('distinct compilerIds per tenant, both distinct from the base', async () => {
       const api = createApi({ granularities: perTenant });
       const a = await api.metaConfig(ctxFor('a'), { includeCompilerId: true });

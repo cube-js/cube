@@ -49,10 +49,13 @@ const DEFAULT_CONFIG: GlobalGranularitiesConfig = Object.freeze({
 function applyEnvOverrides(name: string, base?: Partial<GranularityDefinition>): GranularityDefinition {
   // getEnv types `opts` as a Parameters<> tuple but forwards it positionally; cast to bypass that.
   const opts = { name } as any;
-  const interval = getEnv('granularityCustomInterval', opts) ?? base?.interval;
-  const title = getEnv('granularityCustomTitle', opts) ?? base?.title;
-  const offset = getEnv('granularityCustomOffset', opts) ?? base?.offset;
-  const origin = getEnv('granularityCustomOrigin', opts) ?? base?.origin;
+  // A set-but-empty env var (e.g. `CUBEJS_GRANULARITIES_FOO_INTERVAL=`) reads as '' — treat that
+  // as absent so an unusable empty interval isn't advertised and later fails at query time.
+  const nonEmpty = (v: string | undefined) => (v === undefined || v === '' ? undefined : v);
+  const interval = nonEmpty(getEnv('granularityCustomInterval', opts)) ?? base?.interval;
+  const title = nonEmpty(getEnv('granularityCustomTitle', opts)) ?? base?.title;
+  const offset = nonEmpty(getEnv('granularityCustomOffset', opts)) ?? base?.offset;
+  const origin = nonEmpty(getEnv('granularityCustomOrigin', opts)) ?? base?.origin;
 
   const out: GranularityDefinition = {};
   if (interval !== undefined) out.interval = interval;
@@ -161,7 +164,10 @@ export async function resolveGlobalGranularities(
 ): Promise<GlobalGranularitiesConfig> {
   if (typeof userValue === 'function') {
     const resolved = await userValue(ctx);
-    return resolveGlobalGranularitiesSync(Array.isArray(resolved) ? resolved : undefined);
+    // A function opts out of env vars entirely, so a non-array return (null / undefined / a stray
+    // object) means "no explicit config" → the default built-in catalog, NOT an env fallback that
+    // would leak CUBEJS_GRANULARITIES into a context the function meant to leave unconfigured.
+    return Array.isArray(resolved) ? resolveFromList(resolved) : DEFAULT_CONFIG;
   }
   return resolveGlobalGranularitiesSync(userValue);
 }
