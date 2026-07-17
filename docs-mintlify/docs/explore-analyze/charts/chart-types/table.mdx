@@ -165,28 +165,18 @@ dimension](/docs/data-modeling/dimensions#links) — drill into another dashboar
 (`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, where
 they apply, **Drill down** options.
 
-### Drill down on a measure
+**Drill down** works in two ways:
 
-On a measure cell whose data model defines drill members, **Drill down** opens
-the underlying rows behind that value.
+- On a **measure** cell whose data model defines drill members, it opens the
+  underlying rows behind that value.
+- On a **time-dimension** cell shown at a granularity, it opens a submenu of
+  finer granularities. Picking one re-buckets the **same measures** to that
+  granularity, scoped to the period you clicked — drilling `2024` to **Quarter**
+  shows the four quarters of 2024. You can keep drilling, then close the view to
+  return to the original table.
 
-### Drill down on a time dimension
-
-On a time-dimension cell that is displayed at a granularity (year, quarter,
-month, week, day, hour, or minute), **Drill down** opens a submenu of the finer
-granularities you can drill into. For example, a cell shown by year offers
-**Quarter**, **Month**, **Day**, and finer; a cell shown by quarter offers
-**Month**, **Day**, and finer.
-
-Choosing a finer granularity opens a view of the **same measures**, re-bucketed
-to that granularity and scoped to the period you clicked — clicking `2024` and
-drilling to **Quarter** shows the four quarters of 2024. You can keep drilling
-from that view (quarter → month → day) and close it to return to the original
-table.
-
-Granularities follow the calendar hierarchy: because a week can span two months
-or quarters, **Week** is never offered as a drill target from a coarser
-granularity. A cell already displayed by week drills down to **Day** and finer.
+Because a week can straddle two months or quarters, **Week** is only ever offered
+when a cell is already shown by week.
 
 ## Selecting and copying cells
 
