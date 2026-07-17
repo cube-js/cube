@@ -21,10 +21,10 @@ import {
   prepareCompiler,
   queryClass,
   QueryFactory,
+  effectiveGranularitiesFor,
   resolveDimensionGranularities,
   resolveGlobalGranularities,
   resolveGlobalGranularitiesSync,
-  serializeEffectiveGranularities,
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
@@ -400,21 +400,25 @@ export class CompilerApi {
     }
 
     const catalog = buildBuiltInsCatalog(config);
+    const { enabledBuiltIns, customGranularities } = config;
     const inputs = compilers.metaTransformer.granularityInputs;
+    const emptyBlock = normalizeGranularitiesBlock(undefined);
 
     for (const cube of compilers.metaTransformer.cubes) {
       for (const dimension of (cube.config.dimensions || []).filter((d: any) => d.type === 'time')) {
         const resolved = resolveDimensionGranularities(
-          inputs.get(dimension.name) || normalizeGranularitiesBlock(undefined),
-          config.enabledBuiltIns,
-          config.customGranularities,
+          inputs.get(dimension.name) || emptyBlock,
+          enabledBuiltIns,
+          customGranularities,
           catalog,
         );
+        // Only GLOBAL customs need threading to SQL — locals already resolve via the symbols map,
+        // built-ins via the predefined path. Strip the meta-only `type` tag the resolver added.
         const customs = Object.fromEntries(
           Object.entries(resolved)
-            .filter(([name, definition]) => definition.type === 'custom' &&
-              Object.prototype.hasOwnProperty.call(config.customGranularities, name))
-            .map(([name, { type: _type, ...definition }]) => [name, definition])
+            .filter(([name, def]) => def.type === 'custom' &&
+              Object.prototype.hasOwnProperty.call(customGranularities, name))
+            .map(([name, { type: _type, ...def }]) => [name, def])
         );
         if (Object.keys(customs).length > 0) {
           definitions[dimension.name] = customs;
@@ -1234,12 +1238,8 @@ export class CompilerApi {
   protected buildGranularityVariant(compilers: Compiler, config: GlobalGranularitiesConfig): any[] {
     const catalog = buildBuiltInsCatalog(config);
     const inputs = compilers.metaTransformer.granularityInputs;
-    const defaultSet = serializeEffectiveGranularities(resolveDimensionGranularities(
-      normalizeGranularitiesBlock(undefined),
-      config.enabledBuiltIns,
-      config.customGranularities,
-      catalog,
-    ));
+    const { enabledBuiltIns, customGranularities } = config;
+    const defaultSet = effectiveGranularitiesFor(undefined, enabledBuiltIns, customGranularities, catalog);
 
     return compilers.metaTransformer.cubes.map((cube: any) => {
       if (!cube.config.dimensions?.some((d: any) => d.type === 'time')) {
@@ -1254,9 +1254,7 @@ export class CompilerApi {
             }
             const block = inputs.get(dim.name);
             const effectiveGranularities = block
-              ? serializeEffectiveGranularities(resolveDimensionGranularities(
-                block, config.enabledBuiltIns, config.customGranularities, catalog,
-              ))
+              ? effectiveGranularitiesFor(block, enabledBuiltIns, customGranularities, catalog)
               : defaultSet;
             return { ...dim, effectiveGranularities };
           }),

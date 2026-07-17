@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { getEnv } from '@cubejs-backend/shared';
 
 import type { GranularityDefinition } from './CubeSymbols';
+import { GRANULARITY_STRING_FIELDS } from './GranularityResolver';
 
 // Default `title` and `format` for each built-in granularity. Overridable via `config.granularities`
 // (file) or `CUBEJS_GRANULARITIES_<NAME>_TITLE` (env, title only). Format syntax: d3-time-format.
@@ -103,7 +104,7 @@ function resolveFromEnv(): GlobalGranularitiesConfig {
 // props a config spreads in can't leak onto the wire.
 function sanitizeDefinition(def: Partial<GranularityDefinition>): GranularityDefinition {
   const out: GranularityDefinition = {};
-  for (const key of ['title', 'format', 'interval', 'offset', 'origin'] as const) {
+  for (const key of GRANULARITY_STRING_FIELDS) {
     if (typeof def[key] === 'string') {
       out[key] = def[key];
     }
@@ -214,11 +215,8 @@ export function granularityConfigHash(config: GlobalGranularitiesConfig): string
     builtIns: [...config.enabledBuiltIns],
     custom: Object.entries(config.customGranularities).map(([name, def]) => ({
       name,
-      title: def.title,
-      format: def.format,
-      interval: def.interval,
-      offset: def.offset,
-      origin: def.origin,
+      // Same fields, same order the serializer emits — driven by one constant so they can't drift.
+      ...Object.fromEntries(GRANULARITY_STRING_FIELDS.map((f) => [f, def[f]])),
     })),
   };
   return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
