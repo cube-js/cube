@@ -214,7 +214,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             paths,
             branch,
         } => {
-            let body = json!({ "paths": paths });
+            // The delete endpoint expects `files` as an array of objects.
+            let files: Vec<_> = paths.iter().map(|p| json!({ "path": p })).collect();
+            let body = json!({ "files": files });
             let res = api
                 .delete(&with_branch(base(deployment), &branch), Some(&body))
                 .await?;
