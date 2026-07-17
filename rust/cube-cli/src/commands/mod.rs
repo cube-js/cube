@@ -5,6 +5,7 @@ pub mod app;
 pub mod attributes;
 pub mod completion;
 pub mod context;
+pub mod data_model;
 pub mod deployments;
 pub mod embed;
 pub mod environments;
