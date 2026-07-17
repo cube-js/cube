@@ -1,0 +1,38 @@
+name: Cube CLI CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'rust/cube-cli/**'
+      - '.github/workflows/cube-cli.yml'
+  pull_request:
+    paths:
+      - 'rust/cube-cli/**'
+      - '.github/workflows/cube-cli.yml'
+
+concurrency:
+  group: cube-cli-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: rust/cube-cli
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+          cache-workspaces: rust/cube-cli
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --locked
+      - name: Build (release)
+        run: cargo build --release --locked
