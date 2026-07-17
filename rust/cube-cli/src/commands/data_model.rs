@@ -67,6 +67,36 @@ enum Cmd {
         #[arg(long)]
         branch: Option<String>,
     },
+    /// List branches
+    Branches { deployment: i64 },
+    /// Create a branch (optionally entering dev mode)
+    CreateBranch {
+        deployment: i64,
+        name: String,
+        /// Enter dev mode on the new branch
+        #[arg(long)]
+        dev_mode: bool,
+    },
+    /// Enter dev mode / switch to a branch
+    DevMode {
+        deployment: i64,
+        #[arg(long)]
+        branch: Option<String>,
+    },
+    /// Exit dev mode
+    ExitDevMode { deployment: i64 },
+    /// Commit and push the active branch
+    Commit {
+        deployment: i64,
+        #[arg(long, short = 'm')]
+        message: Option<String>,
+    },
+    /// Sync a branch from its remote and rebuild if it moved
+    Pull {
+        deployment: i64,
+        #[arg(long)]
+        branch: Option<String>,
+    },
 }
 
 fn base(deployment: i64) -> String {
@@ -211,6 +241,91 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 output::print_json(&res);
             } else {
                 output::success(&format!("Renamed {from} -> {to}"));
+            }
+        }
+        Cmd::Branches { deployment } => {
+            let res = api
+                .get(
+                    &format!("/build/api/v1/deployments/{deployment}/branches"),
+                    &Vec::new(),
+                )
+                .await?;
+            output::print_list(
+                ctx.json,
+                &res,
+                &[("NAME", "name"), ("DEFAULT", "isDefault"), ("CURRENT", "isCurrent")],
+            );
+        }
+        Cmd::CreateBranch {
+            deployment,
+            name,
+            dev_mode,
+        } => {
+            let body = json!({ "name": name, "enterDevMode": dev_mode });
+            let res = api
+                .post(
+                    &format!("/build/api/v1/deployments/{deployment}/branches"),
+                    Some(&body),
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success(&format!("Created branch {name}"));
+            }
+        }
+        Cmd::DevMode { deployment, branch } => {
+            let body = branch.as_ref().map(|b| json!({ "branchName": b }));
+            let res = api
+                .post(
+                    &format!("/build/api/v1/deployments/{deployment}/dev-mode"),
+                    body.as_ref(),
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success("Entered dev mode");
+            }
+        }
+        Cmd::ExitDevMode { deployment } => {
+            api.delete(
+                &format!("/build/api/v1/deployments/{deployment}/dev-mode"),
+                None,
+            )
+            .await?;
+            output::success("Exited dev mode");
+        }
+        Cmd::Commit {
+            deployment,
+            message,
+        } => {
+            let mut body = serde_json::Map::new();
+            util::set(&mut body, "message", &message);
+            let res = api
+                .post(
+                    &format!("/build/api/v1/deployments/{deployment}/commit"),
+                    Some(&util::body(body)),
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success("Committed and pushed");
+            }
+        }
+        Cmd::Pull { deployment, branch } => {
+            let body = branch.as_ref().map(|b| json!({ "branchName": b }));
+            let res = api
+                .post(
+                    &format!("/build/api/v1/deployments/{deployment}/pull"),
+                    body.as_ref(),
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success("Pulled");
             }
         }
     }
