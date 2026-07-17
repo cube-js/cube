@@ -9,6 +9,7 @@ import {
   getFixtures,
   getCreateQueries,
   getSelectQueries,
+  getRefreshQueries,
   getDriver,
   runEnvironment,
 } from '../helpers';
@@ -70,6 +71,11 @@ export function testConnection(type: string): void {
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
+      // CrateDB is eventually consistent: make the freshly loaded rows visible to
+      // the following SELECTs before they run.
+      if (type === 'crate') {
+        await Promise.all(getRefreshQueries(type, suffix).map((q) => driver.query(q)));
+      }
     });
 
     execute('must select from the data source', async () => {

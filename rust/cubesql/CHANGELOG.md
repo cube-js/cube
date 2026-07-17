@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+### Bug Fixes
+
+- **cubesql:** Support `ORDER BY` over unprojected columns in CTEs ([#11261](https://github.com/cube-js/cube/issues/11261)) ([760a645](https://github.com/cube-js/cube/commit/760a64537f62ad527214381794ad30cc711090c8))
+- **cubesql:** Translate PostgreSQL format tokens in `TO_CHAR` SQL push down ([#11279](https://github.com/cube-js/cube/issues/11279)) ([fc42b0c](https://github.com/cube-js/cube/commit/fc42b0c2282ec54feafe1e35a9b4cf588c7c8f82))
+
+### Features
+
+- **cubesql:** Implement `STRING_AGG` aggregate function ([#11263](https://github.com/cube-js/cube/issues/11263)) ([0bdbe18](https://github.com/cube-js/cube/commit/0bdbe182497045a7e34c903c875551a20a078420))
+- **cubesql:** Support `SELECT DISTINCT ON` ([#11262](https://github.com/cube-js/cube/issues/11262)) ([909d9ee](https://github.com/cube-js/cube/commit/909d9ee3b7204aa08b09cc53a5215fedece639a6))
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+### Bug Fixes
+
+- **cubesql:** Normalize date-only string literals in timestamp comparisons ([#11251](https://github.com/cube-js/cube/issues/11251)) ([ec12ff0](https://github.com/cube-js/cube/commit/ec12ff00ffca0084eb8658fad97f42680aa0c0d7))
+- **cubesql:** Reference window expressions by generated alias in `ORDER BY` ([#11250](https://github.com/cube-js/cube/issues/11250)) ([8068893](https://github.com/cube-js/cube/commit/8068893a2d83d62038436884d67ba700a7d515b7))
+- **cubesql:** Reject `ORDER BY` over ungrouped columns with a clear error ([#11249](https://github.com/cube-js/cube/issues/11249)) ([ff5eac9](https://github.com/cube-js/cube/commit/ff5eac95c5dcf7a7fb14d978ae2fd597ffd6bf5e))
+- **cubesql:** Support `HAVING` on a measure combined with `ORDER BY` on the same measure ([#11254](https://github.com/cube-js/cube/issues/11254)) ([23b199e](https://github.com/cube-js/cube/commit/23b199e03be75596e150eec551fef68aaedc8251))
+
 ## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
 
 ### Bug Fixes

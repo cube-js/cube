@@ -293,7 +293,8 @@ filters are pre-populated as regular, fully editable filters — data consumers
 can change their values, switch operators, or remove them entirely.
 
 Each entry has a `member` (a dimension or measure exposed by the view), an
-`operator`, and a list of `values`.
+`operator`, and a list of `values` — or a single `value`, which is natural for
+single-value operators. Null-check operators take no value.
 
 <Info>
 
@@ -314,11 +315,16 @@ views:
 
     meta:
       default_ui_filters:
+        # "is yesterday" → equality at day grain, shows yesterday's data
         - member: created_at
+          operator: is
+          value: yesterday
+        # Rolling window → use "between" with two bounds
+        - member: updated_at
           operator: between
           values: ["7 days ago", "today"]
         - member: status
-          operator: equals
+          operator: is
           values: ["completed", "shipped"]
 ```
 
@@ -333,14 +339,21 @@ view(`orders_view`, {
 
   meta: {
     default_ui_filters: [
+      // "is yesterday" → equality at day grain, shows yesterday's data
       {
         member: `created_at`,
+        operator: `is`,
+        value: `yesterday`
+      },
+      // Rolling window → use "between" with two bounds
+      {
+        member: `updated_at`,
         operator: `between`,
         values: [`7 days ago`, `today`]
       },
       {
         member: `status`,
-        operator: `equals`,
+        operator: `is`,
         values: [`completed`, `shipped`]
       }
     ]
@@ -352,10 +365,20 @@ view(`orders_view`, {
 
 ##### Operators
 
-Operators use the same names data consumers see in the workbook filter bar:
-`equals`, `not_equals`, `between`, `greater_than`, `greater_than_or_equal`,
-`less_than`, `less_than_or_equal`, `contains`, `not_contains`, `starts_with`,
-`not_starts_with`, `ends_with`, `not_ends_with`, `is_null`, `is_not_null`.
+Operators use the same labels data consumers see in the workbook filter bar —
+what you see in the filter bar is what you type: `is`, `is not`, `after date`,
+`after or on date`, `before date`, `before or on date`, `between`, `contains`,
+`not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
+`is null`, `is not null`.
+
+Operators are case-insensitive and whitespace-tolerant. Internal type names and
+REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.
+
+On a date or time member, `is` with a relative value is an **equality** at that
+value's grain, not a range — `is yesterday` matches yesterday only (e.g.
+`DATE_TRUNC('day', created_at) = CURRENT_DATE - INTERVAL '1 day'`), and
+`is this month` matches the current month. For a rolling window, use `between`
+with two bounds.
 
 ##### Relative date values
 
@@ -366,11 +389,11 @@ Each bound is one of:
   `N days|weeks|months|quarters|years ago` (e.g. `7 days ago`),
   `N ... from now` (e.g. `2 weeks from now`), or
   `this week|month|quarter|year`. `now` is accepted as an alias for `today`.
-- **A fixed ISO date**: `"2026-01-15"`.
+- **A fixed ISO date**: `"2026-01-15"`, meaning that whole day.
 - **A number**, for numeric members.
 
-Relative values also work with the open-ended comparison operators — for
-example, `greater_than` with `values: ["7 days ago"]`.
+Relative values also work with `is` and the open-ended comparison operators —
+for example, `after date` with `value: 7 days ago`.
 
 Relative bounds resolve when a query runs, not when the filter is seeded:
 `["7 days ago", "today"]` produces SQL based on the current date (e.g.
@@ -379,10 +402,10 @@ rolls forward day over day. Both bounds are inclusive — `["7 days ago",
 "today"]` covers 8 calendar days for daily data. In the workbook, the seeded
 filter opens the date editor on the **Relative** tab showing its bounds.
 
-Values are case- and whitespace-insensitive. Bounds are validated: an
-unrecognized value, or a `between` filter with a single value, drops that
-filter entry with a browser-console warning — the remaining entries still
-apply, and view selection never breaks.
+Values are case- and whitespace-insensitive. Entries are validated: an
+unrecognized operator or value, or a `between` filter without exactly two
+bounds, drops that filter entry with a browser-console warning — the remaining
+entries still apply, and view selection never breaks.
 
 Unlike [`default_filters`](#default_filters), which are enforced on every query
 against the view, `default_ui_filters` only provide a starting point for the

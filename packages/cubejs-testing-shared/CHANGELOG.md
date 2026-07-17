@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-shared
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+### Features
+
+- **questdb-driver:** Initial support for Tesseract, add integration tests ([#11259](https://github.com/cube-js/cube/issues/11259)) ([e6cd6e1](https://github.com/cube-js/cube/commit/e6cd6e12a05b256509fc94639e6bc3b2c7a1bb65))
+
 ## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
 
 **Note:** Version bump only for package @cubejs-backend/testing-shared

@@ -44,7 +44,7 @@ use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Date32Array, Date64Array, TimestampNanosecondArray},
-        datatypes::{DataType, IntervalDayTimeType},
+        datatypes::DataType,
     },
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
@@ -2780,16 +2780,13 @@ impl RewriteRules for FilterRules {
                             vec![literal_string("day"), column_expr("?column")],
                         ),
                         "?op",
-                        udf_expr(
-                            "to_date",
-                            vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
-                        ),
+                        literal_expr("?timestamp"),
                     ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
-                self.transform_date_column_compare_date_str("?op", "?literal"),
+                self.transform_date_column_compare_date_str("?op", "?literal", "?timestamp"),
             ),
             rewrite(
                 "filter-domo-date-column-between",
@@ -2825,33 +2822,19 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     binary_expr(
-                        binary_expr(
-                            column_expr("?column"),
-                            "<",
-                            udf_expr(
-                                "to_date",
-                                vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
-                            ),
-                        ),
+                        binary_expr(column_expr("?column"), "<", literal_expr("?day_start")),
                         "OR",
                         binary_expr(
                             column_expr("?column"),
                             ">=",
-                            binary_expr(
-                                udf_expr(
-                                    "to_date",
-                                    vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
-                                ),
-                                "+",
-                                literal_expr("?one_day"),
-                            ),
+                            literal_expr("?next_day_start"),
                         ),
                     ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
-                self.transform_not_column_equals_date("?literal", "?one_day"),
+                self.transform_not_column_equals_date("?literal", "?day_start", "?next_day_start"),
             ),
             rewrite(
                 "filter-tableau-case-when-not-null",
@@ -5778,13 +5761,30 @@ impl FilterRules {
         }
     }
 
+    /// Converts a date/time literal to a timestamp in nanoseconds.
+    /// String literals are parsed with Cube's date parser to also support
+    /// date-only strings (e.g. `'2019-01-01'`).
+    fn filter_scalar_to_timestamp_nanos(literal: &ScalarValue) -> Option<i64> {
+        match literal {
+            ScalarValue::Utf8(Some(value)) => {
+                parse_date_str(value).ok()?.and_utc().timestamp_nanos_opt()
+            }
+            _ => Self::scalar_to_native_datetime(literal)
+                .ok()??
+                .and_utc()
+                .timestamp_nanos_opt(),
+        }
+    }
+
     fn transform_date_column_compare_date_str(
         &self,
         op_var: &'static str,
         literal_var: &'static str,
+        timestamp_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let op_var = var!(op_var);
         let literal_var = var!(literal_var);
+        let timestamp_var = var!(timestamp_var);
         move |egraph, subst| {
             for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
                 match op {
@@ -5797,9 +5797,17 @@ impl FilterRules {
                 };
 
                 for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                    if let ScalarValue::Utf8(_) = literal {
-                        return true;
-                    }
+                    let Some(timestamp) = Self::filter_scalar_to_timestamp_nanos(literal) else {
+                        continue;
+                    };
+
+                    subst.insert(
+                        timestamp_var,
+                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            ScalarValue::TimestampNanosecond(Some(timestamp), None),
+                        ))),
+                    );
+                    return true;
                 }
             }
 
@@ -5810,23 +5818,32 @@ impl FilterRules {
     fn transform_not_column_equals_date(
         &self,
         literal_var: &'static str,
-        one_day_var: &'static str,
+        day_start_var: &'static str,
+        next_day_start_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
-        let one_day_var = var!(one_day_var);
+        let day_start_var = var!(day_start_var);
+        let next_day_start_var = var!(next_day_start_var);
         move |egraph, subst| {
+            const ONE_DAY_NANOS: i64 = 86_400_000_000_000;
             for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                if let ScalarValue::Utf8(_) = literal {
-                    subst.insert(
-                        one_day_var,
-                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                            ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(
-                                1, 0,
-                            ))),
-                        ))),
-                    );
-                    return true;
-                }
+                let Some(timestamp) = Self::filter_scalar_to_timestamp_nanos(literal) else {
+                    continue;
+                };
+
+                subst.insert(
+                    day_start_var,
+                    egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                        ScalarValue::TimestampNanosecond(Some(timestamp), None),
+                    ))),
+                );
+                subst.insert(
+                    next_day_start_var,
+                    egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                        ScalarValue::TimestampNanosecond(Some(timestamp + ONE_DAY_NANOS), None),
+                    ))),
+                );
+                return true;
             }
 
             false

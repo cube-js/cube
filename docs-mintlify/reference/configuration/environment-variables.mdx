@@ -1953,6 +1953,17 @@ The name of a bucket in AWS S3. Required when using AWS S3.
 | -------------------------------------- | ---------------------- | --------------------- |
 | [A valid AWS region][aws-docs-regions] | N/A                    | N/A                   |
 
+## `CUBESTORE_S3_SSE`
+
+When set, Cube Store sends the `x-amz-server-side-encryption` header with this
+value on every AWS S3 request. Optional. Useful when an AWS Organizations
+service control policy denies `s3:PutObject` requests that lack this header,
+even if the bucket has default encryption enabled.
+
+| Possible Values                   | Default in Development | Default in Production |
+| --------------------------------- | ---------------------- | --------------------- |
+| `AES256`, `aws:kms`, `aws:kms:dsse` | N/A                    | N/A                   |
+
 ## `CUBESTORE_S3_SUB_PATH`
 
 The path in a AWS S3 bucket to store pre-aggregations. Optional.

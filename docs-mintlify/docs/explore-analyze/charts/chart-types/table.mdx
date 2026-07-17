@@ -162,8 +162,21 @@ Choose a reasonable granularity for the data's time span. An overly fine granula
 
 Left-clicking a table cell opens a context menu with any [`links` defined on the
 dimension](/docs/data-modeling/dimensions#links) — drill into another dashboard
-(`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, on
-measure cells that support it, **Drill down**.
+(`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, where
+they apply, **Drill down** options.
+
+**Drill down** works in two ways:
+
+- On a **measure** cell whose data model defines drill members, it opens the
+  underlying rows behind that value.
+- On a **time-dimension** cell shown at a granularity, it opens a submenu of
+  finer granularities. Picking one re-buckets the **same measures** to that
+  granularity, scoped to the period you clicked — drilling `2024` to **Quarter**
+  shows the four quarters of 2024. You can keep drilling, then close the view to
+  return to the original table.
+
+Because a week can straddle two months or quarters, **Week** is never a drill
+target from a coarser granularity — a week cell drills only to **Day** and finer.
 
 ## Selecting and copying cells
 

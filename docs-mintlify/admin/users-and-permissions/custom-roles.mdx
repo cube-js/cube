@@ -112,12 +112,14 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Group       | Permission                          | What it grants                                                                                                                                                            |
 | ----------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | General     | Access deployment                   | Foundation permission required to access the deployment at all. A Viewer needs this just to open it.                                                                      |
-| General     | Edit deployment                     | Modify deployment settings.                                                                                                                                               |
+| General     | Edit deployment                     | Modify general deployment settings (name, Build & Deploy, Configuration flags, etc.). Does **not** include environment variables, data sources, or other configuration secrets — see **Manage secrets**. |
 | General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
+| Configuration & Secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
 | Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
+| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. Granted by default to the built-in Viewer, Explorer, and Developer roles. See [Data download controls][ref-data-download-controls]. |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
@@ -125,9 +127,11 @@ When **Full access** is checked, the granular checkboxes appear checked and disa
 
 <Tip>
 
-**Access deployment** (`DeploymentRead`) is special. It's the only deployment action that does **not** auto-bump the Base Role to Developer, because Viewers also need it just to open a deployment.
+**Access deployment** (`DeploymentRead`) and **Download data** (`DownloadData`) are special. They are the only deployment actions that do **not** auto-bump the Base Role to Developer, because Viewers also need them just to open a deployment and download data from it.
 
 </Tip>
+
+[ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 
 ## Walkthroughs
 
@@ -246,7 +250,9 @@ This section lists every action a custom role can grant. The internal action nam
 | `DeploymentRead`          | Access deployment                                           |
 | `DeploymentUpdate`        | Edit deployment                                             |
 | `DeploymentDelete`        | Delete deployment                                           |
+| `SecretsManage`           | Manage secrets                                              |
 | `SchemaRead`              | View data model                                             |
 | `SchemaUpdate`            | Edit data model                                             |
 | `SchemaUpdateDevBranches` | Edit data model on dev branches                             |
 | `APMRead`                 | Access query history                                        |
+| `DownloadData`            | Download data                                               |

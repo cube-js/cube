@@ -19,11 +19,13 @@ on:
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-crate-driver/**'
       - 'packages/cubejs-databricks-jdbc-driver/**'
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-pinot-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
@@ -47,11 +49,13 @@ on:
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-crate-driver/**'
       - 'packages/cubejs-databricks-jdbc-driver/**'
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-pinot-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
@@ -258,6 +262,7 @@ jobs:
           - clickhouse
           - clickhouse-export-bucket-s3
           - clickhouse-export-bucket-s3-prefix
+          - crate
           - databricks-jdbc
           - databricks-jdbc-export-bucket-s3
           - databricks-jdbc-export-bucket-s3-prefix
@@ -271,6 +276,7 @@ jobs:
           - pinot
           - postgres
           - postgres-pre-agg-credentials
+          - questdb
           - redshift
           - redshift-export-bucket-s3
           - snowflake
@@ -286,6 +292,8 @@ jobs:
         use_tesseract_sql_planner: [ true ]
         include:
           - database: postgres
+            use_tesseract_sql_planner: false
+          - database: crate
             use_tesseract_sql_planner: false
           - database: snowflake
             use_tesseract_sql_planner: false
@@ -304,6 +312,8 @@ jobs:
           - database: mssql
             use_tesseract_sql_planner: false
           - database: oracle
+            use_tesseract_sql_planner: false
+          - database: questdb
             use_tesseract_sql_planner: false
       fail-fast: false
 
