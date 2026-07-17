@@ -1593,6 +1593,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * shared evaluator, while binding custom-granularity fallback to one request's effective set.
    * The native SQL planner calls resolveGranularity on the evaluator bridge directly, so the
    * request context has to live at this seam rather than only at JS adapter call sites.
+   *
+   * Must be a Proxy (not Object.create): the native bridge serializes this object's OWN enumerable
+   * fields (e.g. `primaryKeys`), which a prototype-delegating object would hide. The Proxy forwards
+   * every property to the real evaluator; to avoid allocating a bound function on every method
+   * access on the hot query path, bound methods are memoized in `boundCache` (bind once, reuse).
    */
   public withGranularityDefinitions(
     granularityDefinitions?: Record<string, Record<string, GranularityDefinition>>,
@@ -1602,17 +1607,28 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
 
     const evaluator = this;
+    const boundResolveGranularity = (path: string | string[], refCube?: any) => evaluator.resolveGranularity(
+      path,
+      refCube,
+      granularityDefinitions,
+    );
+    const boundCache = new Map<PropertyKey, Function>();
     return new Proxy(this, {
       get(target, property) {
         if (property === 'resolveGranularity') {
-          return (path: string | string[], refCube?: any) => evaluator.resolveGranularity(
-            path,
-            refCube,
-            granularityDefinitions,
-          );
+          return boundResolveGranularity;
         }
         const value = Reflect.get(target, property, target);
-        return typeof value === 'function' ? value.bind(target) : value;
+        if (typeof value !== 'function') {
+          return value;
+        }
+        const cached = boundCache.get(property);
+        if (cached) {
+          return cached;
+        }
+        const bound = value.bind(target);
+        boundCache.set(property, bound);
+        return bound;
       },
     });
   }

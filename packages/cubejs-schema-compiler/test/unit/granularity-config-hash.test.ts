@@ -52,4 +52,33 @@ describe('granularityConfigHash', () => {
     expect(granularityConfigHash(config(['year'], { fy: { interval: '1 year' } })))
       .not.toBe(granularityConfigHash(config(['year'], { fy: { interval: '1 year', title: 'FY' } })));
   });
+
+  // Regression (F6): for a name shadowing a built-in, only title/format affect output — the SQL
+  // layer fixes a built-in's interval at `1 <name>`. So changing interval/offset/origin on a
+  // built-in override must NOT change the hash (else it churns the cache/compilerId for identical
+  // output), while changing title/format must.
+  describe('built-in override hashes only the fields that affect output', () => {
+    const withYear = (def: any) => config(['year'], { year: def });
+
+    it('ignores interval/offset/origin overrides on a built-in name', () => {
+      const baseHash = granularityConfigHash(withYear({ title: 'Year' }));
+      expect(granularityConfigHash(withYear({ title: 'Year', interval: '2 years' }))).toBe(baseHash);
+      expect(granularityConfigHash(withYear({ title: 'Year', offset: '1 day' }))).toBe(baseHash);
+      expect(granularityConfigHash(withYear({ title: 'Year', origin: '2024-02-01' }))).toBe(baseHash);
+    });
+
+    it('still reflects title/format overrides on a built-in name', () => {
+      const baseHash = granularityConfigHash(withYear({ title: 'Year' }));
+      expect(granularityConfigHash(withYear({ title: 'Jaar' }))).not.toBe(baseHash);
+      expect(granularityConfigHash(withYear({ title: 'Year', format: '%y' }))).not.toBe(baseHash);
+    });
+
+    it('still hashes every field for a real (non-built-in) custom', () => {
+      const baseHash = granularityConfigHash(config([], { fy: { interval: '1 year', origin: '2024-02-01' } }));
+      expect(granularityConfigHash(config([], { fy: { interval: '2 years', origin: '2024-02-01' } })))
+        .not.toBe(baseHash);
+      expect(granularityConfigHash(config([], { fy: { interval: '1 year', origin: '2025-02-01' } })))
+        .not.toBe(baseHash);
+    });
+  });
 });

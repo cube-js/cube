@@ -35,7 +35,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import { QueryBody } from '@cubejs-backend/query-orchestrator';
 import {
   buildBuiltInsCatalog,
-  BUILT_IN_GRANULARITIES,
+  isBuiltInGranularity,
 } from '@cubejs-backend/schema-compiler';
 import {
   QueryType,
@@ -772,8 +772,10 @@ class ApiGateway {
         granularities.push({ type: 'built-in', name, ...entry });
       }
       for (const [name, def] of Object.entries<any>(globalConfig.customGranularities)) {
-        // Skip names already emitted by `buildBuiltInsCatalog` (their inline overrides are folded in there).
-        if (!(name in BUILT_IN_GRANULARITIES)) {
+        // Skip names already emitted by `buildBuiltInsCatalog` (their inline overrides are folded in
+        // there). Use isBuiltInGranularity (hasOwnProperty), not `in`, so a custom named e.g.
+        // `constructor`/`toString` isn't misclassified as a built-in via the prototype chain and dropped.
+        if (!isBuiltInGranularity(name)) {
           const entry: any = {
             type: 'custom',
             name,

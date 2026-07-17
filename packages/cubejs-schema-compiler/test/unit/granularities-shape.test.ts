@@ -174,4 +174,31 @@ describe('normalizeGranularitiesBlock — reserved-name disambiguation', () => {
     expect(out.includes).toBe('*');
     expect(out.custom.includes).toEqual({ interval: '1 year', origin: '2026-04-01' });
   });
+
+  // Regression: a legacy custom granularity literally named `custom` whose value is a DEFINITION
+  // (string-valued fields) must NOT be misread as the dict form's custom map (name -> definition).
+  it('custom granularity named "custom" (definition value) is not misread as the dict form', () => {
+    const out = normalizeGranularitiesBlock({
+      custom: { interval: '1 year', origin: '2026-04-01' },
+    });
+    expect(out.includes).toBe('*');
+    expect(out.custom.custom).toEqual({ interval: '1 year', origin: '2026-04-01' });
+  });
+
+  it('custom granularity named "custom" with only an sql function is not misread as the dict form', () => {
+    const sql = () => 'date_trunc(\'year\', x)';
+    const out = normalizeGranularitiesBlock({ custom: { sql } });
+    expect(out.custom.custom).toEqual({ sql });
+  });
+
+  // The genuine dict form (custom is a map of name -> definition OBJECT) is still recognized.
+  it('genuine dict form with a custom map is recognized', () => {
+    const out = normalizeGranularitiesBlock({
+      includes: ['year'],
+      custom: { fiscal_year: { interval: '1 year', origin: '2026-04-01' } },
+    });
+    expect(out.includes).toEqual(['year']);
+    expect(out.custom.fiscal_year).toEqual({ interval: '1 year', origin: '2026-04-01' });
+    expect(out.custom.custom).toBeUndefined();
+  });
 });

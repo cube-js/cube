@@ -205,18 +205,24 @@ export function buildBuiltInsCatalog(globalConfig: GlobalGranularitiesConfig): R
   return catalog;
 }
 
+// Fields that a config override actually changes in the emitted output, per granularity name. For
+// a name shadowing a built-in, buildBuiltInsCatalog honors only title/format (interval/offset/origin
+// are fixed at `1 <name>` for predefined granularities), so hashing the ignored fields would churn
+// the cache/compilerId on changes that produce identical output. A real custom uses every field.
+const hashableFields = (name: string): ReadonlyArray<typeof GRANULARITY_STRING_FIELDS[number]> => (
+  isBuiltInGranularity(name) ? ['title', 'format'] : GRANULARITY_STRING_FIELDS
+);
+
 // Canonical sha256 of a resolved config: equal hash iff identical effective sets. Order-sensitive
 // on purpose — built-in and custom order affect the emitted meta. Used as the meta-variant cache
-// key and compilerId discriminator. Values are already sanitized to strings at resolution time,
-// so the projected fields here are exactly what the serializer emits — the hash can never
-// disagree with the wire output (which would let two different tenant configs share one variant).
+// key and compilerId discriminator. Only the fields that actually affect output participate (see
+// hashableFields), so the hash never disagrees with the wire output nor churns on ignored fields.
 export function granularityConfigHash(config: GlobalGranularitiesConfig): string {
   const canonical = {
     builtIns: [...config.enabledBuiltIns],
     custom: Object.entries(config.customGranularities).map(([name, def]) => ({
       name,
-      // Same fields, same order the serializer emits — driven by one constant so they can't drift.
-      ...Object.fromEntries(GRANULARITY_STRING_FIELDS.map((f) => [f, def[f]])),
+      ...Object.fromEntries(hashableFields(name).map((f) => [f, def[f]])),
     })),
   };
   return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
