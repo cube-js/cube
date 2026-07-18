@@ -15,6 +15,9 @@ concurrency:
   group: cube-cli-ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-22.04

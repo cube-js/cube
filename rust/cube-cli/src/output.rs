@@ -14,9 +14,7 @@ pub fn print_json(value: &Value) {
 pub fn items(value: &Value) -> Vec<Value> {
     for key in ["items", "data"] {
         if let Some(arr) = value.get(key).and_then(Value::as_array) {
-            if !arr.is_empty() || value.get("items").is_some() || value.get("data").is_some() {
-                return arr.clone();
-            }
+            return arr.clone();
         }
     }
     match value {

@@ -58,12 +58,28 @@ impl Config {
             }
         }
         let raw = toml::to_string_pretty(self)?;
-        fs::write(&path, raw)?;
-        #[cfg(unix)]
+
+        // Write to a sibling temp file created with restrictive permissions up
+        // front (no world-readable window), then atomically rename into place so
+        // a crash mid-write can't truncate an existing token file.
+        let tmp = path.with_extension("toml.tmp");
         {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+            let mut opts = fs::OpenOptions::new();
+            opts.write(true).create(true).truncate(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                opts.mode(0o600);
+            }
+            let mut file = opts
+                .open(&tmp)
+                .with_context(|| format!("failed to create {}", tmp.display()))?;
+            use std::io::Write as _;
+            file.write_all(raw.as_bytes())?;
+            file.sync_all()?;
         }
+        fs::rename(&tmp, &path)
+            .with_context(|| format!("failed to write {}", path.display()))?;
         Ok(())
     }
 

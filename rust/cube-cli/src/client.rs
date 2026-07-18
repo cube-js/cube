@@ -174,8 +174,13 @@ impl Client {
                 }
                 Ok(true)
             }
-            // Refresh token itself is dead — fall through to the 401 message.
-            Err(_) => Ok(false),
+            // Fall through to the 401 message, but surface the underlying
+            // reason so a transient/endpoint failure isn't mistaken for an
+            // expired refresh token ("session expired").
+            Err(e) => {
+                eprintln!("warning: token refresh failed: {e:#}");
+                Ok(false)
+            }
         }
     }
 

@@ -202,7 +202,9 @@ pub fn open_browser(url: &str) -> bool {
     let candidates: &[(&str, &[&str])] = if cfg!(target_os = "macos") {
         &[("open", &[])]
     } else if cfg!(target_os = "windows") {
-        &[("cmd", &["/C", "start", ""])]
+        // Not `cmd /C start`: cmd.exe parses the URL and treats `&` as a
+        // command separator, mangling query strings. rundll32 passes it through.
+        &[("rundll32", &["url.dll,FileProtocolHandler"])]
     } else {
         &[("xdg-open", &[]), ("gio", &["open"]), ("wslview", &[])]
     };
