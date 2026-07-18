@@ -338,7 +338,7 @@ impl HttpServer {
                                     HttpCommand::QueryResultCompleted => format!("HttpCommand::QueryResultCompleted"),
                                 };
                                 if is_rate_limit_error(&e) {
-                                    log::debug!(
+                                    log::warn!(
                                         "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
                                         if let Some(c) = connection_id.as_ref() { c.as_str() } else { "(None)" },
                                         e.display_with_backtrace(),
@@ -442,7 +442,7 @@ impl HttpServer {
                             },
                             Err(e) => {
                                 if is_rate_limit_error(&e) {
-                                    log::debug!(
+                                    log::warn!(
                                         "Error processing HTTP command: {}\nThe command: {}",
                                         e.display_with_backtrace(),
                                         command_text,
