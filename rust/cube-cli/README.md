@@ -106,7 +106,6 @@ Every endpoint of the Console Server public API is covered:
 | `integrations` | list, get, create, update, delete, tokens list/get/revoke/initiate |
 | `oidc` | list, get, create, update, delete |
 | `agents` | list, skills |
-| `ai-engineer` | settings |
 | `app` | config, theme |
 | `meta` | POST /api/v1/meta/ |
 | `scim` | Users/Groups CRUD + patch, resource-types, schemas, service-provider-config |

@@ -170,8 +170,6 @@ enum Command {
     /// List agents and agent skills
     #[command(alias = "agent")]
     Agents(commands::agents::Args),
-    /// AI Engineer settings and active region
-    AiEngineer(commands::ai_engineer::Args),
     /// App-level config and theme
     App(commands::app::Args),
     /// Fetch data-model metadata
@@ -227,7 +225,6 @@ async fn run(cli: Cli) -> Result<()> {
         Integrations(args) => commands::integrations::command(args, &ctx).await,
         Oidc(args) => commands::oidc::command(args, &ctx).await,
         Agents(args) => commands::agents::command(args, &ctx).await,
-        AiEngineer(args) => commands::ai_engineer::command(args, &ctx).await,
         App(args) => commands::app::command(args, &ctx).await,
         Meta(args) => commands::meta::command(args, &ctx).await,
         Scim(args) => commands::scim::command(args, &ctx).await,
