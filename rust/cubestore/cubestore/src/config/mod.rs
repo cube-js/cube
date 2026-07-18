@@ -2107,7 +2107,7 @@ impl Config {
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
                 stale_stream_timeout: 60,
-                streaming_lag_timeout_ms: 2000,
+                streaming_lag_timeout_ms: 5000,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,
