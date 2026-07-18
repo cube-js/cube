@@ -78,8 +78,7 @@ impl Config {
             file.write_all(raw.as_bytes())?;
             file.sync_all()?;
         }
-        fs::rename(&tmp, &path)
-            .with_context(|| format!("failed to write {}", path.display()))?;
+        fs::rename(&tmp, &path).with_context(|| format!("failed to write {}", path.display()))?;
         Ok(())
     }
 
