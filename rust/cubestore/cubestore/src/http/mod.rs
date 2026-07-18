@@ -72,6 +72,12 @@ impl From<CubeError> for warp::reject::Rejection {
     }
 }
 
+/// Rate limit errors are expected under load and are still returned to the client,
+/// so they shouldn't pollute the error log.
+fn is_rate_limit_error(e: &CubeError) -> bool {
+    e.message.contains("rate limit")
+}
+
 #[derive(Deserialize)]
 pub struct UploadQuery {
     name: String,
@@ -331,12 +337,21 @@ impl HttpServer {
                                     HttpCommand::QueryResultArrow { .. } => format!("HttpCommand::QueryResultArrow {{}}"),
                                     HttpCommand::QueryResultCompleted => format!("HttpCommand::QueryResultCompleted"),
                                 };
-                                log::error!(
-                                    "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
-                                    if let Some(c) = connection_id.as_ref() { c.as_str() } else { "(None)" },
-                                    e.display_with_backtrace(),
-                                    command_text,
-                                );
+                                if is_rate_limit_error(&e) {
+                                    log::debug!(
+                                        "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
+                                        if let Some(c) = connection_id.as_ref() { c.as_str() } else { "(None)" },
+                                        e.display_with_backtrace(),
+                                        command_text,
+                                    );
+                                } else {
+                                    log::error!(
+                                        "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
+                                        if let Some(c) = connection_id.as_ref() { c.as_str() } else { "(None)" },
+                                        e.display_with_backtrace(),
+                                        command_text,
+                                    );
+                                }
                                 let command = if e.is_wrong_connection() {
                                     HttpCommand::CloseConnection {
                                         error: e.to_string(),
@@ -426,11 +441,19 @@ impl HttpServer {
                                 command,
                             },
                             Err(e) => {
-                                log::error!(
-                                    "Error processing HTTP command: {}\nThe command: {}",
-                                    e.display_with_backtrace(),
-                                    command_text,
-                                );
+                                if is_rate_limit_error(&e) {
+                                    log::debug!(
+                                        "Error processing HTTP command: {}\nThe command: {}",
+                                        e.display_with_backtrace(),
+                                        command_text,
+                                    );
+                                } else {
+                                    log::error!(
+                                        "Error processing HTTP command: {}\nThe command: {}",
+                                        e.display_with_backtrace(),
+                                        command_text,
+                                    );
+                                }
                                 HttpMessage {
                                     message_id,
                                     connection_id,
