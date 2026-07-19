@@ -58,7 +58,6 @@ const schemaOptions = Joi.object().keys({
   processSubscriptionsInterval: Joi.number(),
   webSocketsBasePath: Joi.string(),
   // server-core CoreCreateOptions
-  dbType: dbTypes,
   externalDbType: dbTypes,
   schemaPath: Joi.string(),
   basePath: Joi.string(),
@@ -75,7 +74,6 @@ const schemaOptions = Joi.object().keys({
   //
   cacheAndQueueDriver: Joi.string().valid('cubestore', 'memory'),
   contextToAppId: Joi.func(),
-  contextToRoles: Joi.func(),
   contextToGroups: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToCubeStoreRouterId: Joi.func(),

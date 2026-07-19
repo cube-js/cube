@@ -287,14 +287,14 @@ over the view's default. When `auto_run` is not set, auto-run is on.
 #### `default_ui_filters`
 
 In the Cube cloud platform, you can use the `default_ui_filters` key in a
-view's `meta` to define default filters for [workbooks][ref-workbook-filtering].
-When the view is selected in a new workbook tab, these filters are
-pre-populated as regular, fully editable filters — data consumers can change
-their values, switch operators, or remove them entirely.
+view's `meta` to define default filters for [workbooks][ref-workbook-filtering]
+and views embedded via the React Embed SDK. When the view is selected, these
+filters are pre-populated as regular, fully editable filters — data consumers
+can change their values, switch operators, or remove them entirely.
 
-Each entry has the same shape as a [`default_filters`](#default_filters) entry:
-a `member` (a dimension or measure exposed by the view), an `operator`, and a
-list of `values`.
+Each entry has a `member` (a dimension or measure exposed by the view), an
+`operator`, and a list of `values` — or a single `value`, which is natural for
+single-value operators. Null-check operators take no value.
 
 <Info>
 
@@ -315,15 +315,17 @@ views:
 
     meta:
       default_ui_filters:
-        - member: status
-          operator: equals
-          values:
-            - completed
+        # "is yesterday" → equality at day grain, shows yesterday's data
         - member: created_at
-          operator: inDateRange
-          values:
-            - 2024-01-01
-            - 2024-12-31
+          operator: is
+          value: yesterday
+        # Rolling window → use "between" with two bounds
+        - member: updated_at
+          operator: between
+          values: ["7 days ago", "today"]
+        - member: status
+          operator: is
+          values: ["completed", "shipped"]
 ```
 
 ```javascript title="JavaScript"
@@ -337,15 +339,22 @@ view(`orders_view`, {
 
   meta: {
     default_ui_filters: [
-      {
-        member: `status`,
-        operator: `equals`,
-        values: [`completed`]
-      },
+      // "is yesterday" → equality at day grain, shows yesterday's data
       {
         member: `created_at`,
-        operator: `inDateRange`,
-        values: [`2024-01-01`, `2024-12-31`]
+        operator: `is`,
+        value: `yesterday`
+      },
+      // Rolling window → use "between" with two bounds
+      {
+        member: `updated_at`,
+        operator: `between`,
+        values: [`7 days ago`, `today`]
+      },
+      {
+        member: `status`,
+        operator: `is`,
+        values: [`completed`, `shipped`]
       }
     ]
   }
@@ -353,6 +362,50 @@ view(`orders_view`, {
 ```
 
 </CodeGroup>
+
+##### Operators
+
+Operators use the same labels data consumers see in the workbook filter bar —
+what you see in the filter bar is what you type: `is`, `is not`, `after date`,
+`after or on date`, `before date`, `before or on date`, `between`, `contains`,
+`not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
+`is null`, `is not null`.
+
+Operators are case-insensitive and whitespace-tolerant. Internal type names and
+REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.
+
+On a date or time member, `is` with a relative value is an **equality** at that
+value's grain, not a range — `is yesterday` matches yesterday only (e.g.
+`DATE_TRUNC('day', created_at) = CURRENT_DATE - INTERVAL '1 day'`), and
+`is this month` matches the current month. For a rolling window, use `between`
+with two bounds.
+
+##### Relative date values
+
+A `between` filter always takes an explicit two-element `[start, end]` pair.
+Each bound is one of:
+
+- **A relative value**: `today`, `yesterday`,
+  `N days|weeks|months|quarters|years ago` (e.g. `7 days ago`),
+  `N ... from now` (e.g. `2 weeks from now`), or
+  `this week|month|quarter|year`. `now` is accepted as an alias for `today`.
+- **A fixed ISO date**: `"2026-01-15"`, meaning that whole day.
+- **A number**, for numeric members.
+
+Relative values also work with `is` and the open-ended comparison operators —
+for example, `after date` with `value: 7 days ago`.
+
+Relative bounds resolve when a query runs, not when the filter is seeded:
+`["7 days ago", "today"]` produces SQL based on the current date (e.g.
+`BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE`), so the window
+rolls forward day over day. Both bounds are inclusive — `["7 days ago",
+"today"]` covers 8 calendar days for daily data. In the workbook, the seeded
+filter opens the date editor on the **Relative** tab showing its bounds.
+
+Values are case- and whitespace-insensitive. Entries are validated: an
+unrecognized operator or value, or a `between` filter without exactly two
+bounds, drops that filter entry with a browser-console warning — the remaining
+entries still apply, and view selection never breaks.
 
 Unlike [`default_filters`](#default_filters), which are enforced on every query
 against the view, `default_ui_filters` only provide a starting point for the
@@ -916,7 +969,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control
-[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-apis]: /reference
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-ref-hierarchies]: /reference/data-modeling/hierarchies

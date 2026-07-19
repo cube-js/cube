@@ -140,7 +140,7 @@ impl QueryResult {
         };
 
         cube_ext::spawn_blocking(move || -> Result<Vec<u8>, CubeError> {
-            use datafusion::arrow::ipc::writer::StreamWriter;
+            use datafusion::arrow::ipc::writer::{IpcWriteOptions, StreamWriter};
             use std::io::Cursor;
 
             let (schema, batches) = match pending {
@@ -153,7 +153,21 @@ impl QueryResult {
                 Pending::Batches { schema, batches } => (schema, batches),
             };
 
-            let mut writer = StreamWriter::try_new(Cursor::new(Vec::new()), schema.as_ref())?;
+            // Our arrow-rs fork advertises a non-standard `bitWidth` (64/96)
+            // in IPC schemas for `Decimal128` fields with precision <= 27, so
+            // parquet-embedded schemas and inter-node IPC stay readable by
+            // older CubeStore versions (cube-js/arrow-rs#48). The buffers
+            // still hold 16 bytes per value, and standard Arrow readers trust
+            // the advertised width: the JS orchestrator (upstream arrow)
+            // reads bitWidth 64 with an 8-byte stride — interleaving real
+            // values with zeros — and rejects bitWidth 96 outright. This
+            // stream only feeds standard readers, so write the honest width.
+            let options = IpcWriteOptions::default().with_standard_decimal_bit_width(true);
+            let mut writer = StreamWriter::try_new_with_options(
+                Cursor::new(Vec::new()),
+                schema.as_ref(),
+                options,
+            )?;
 
             // Writes multiple batches, because it's Arrow IPC stream format, client should handle it
             for batch in &batches {
@@ -1952,6 +1966,152 @@ mod tests {
     use crate::table::TableValue;
     use regex::Regex;
 
+    /// Reads `(precision, scale, bitWidth)` of a decimal field from the schema
+    /// message (the first encapsulated message of an Arrow IPC stream).
+    fn ipc_schema_decimal_field(
+        data: &[u8],
+        field_index: usize,
+    ) -> Result<(i32, i32, i32), CubeError> {
+        use datafusion::arrow::ipc;
+
+        // Encapsulated message: optional 0xFFFFFFFF continuation marker,
+        // i32 metadata length, then the flatbuffer message itself.
+        let offset = if data[0..4] == [0xff, 0xff, 0xff, 0xff] {
+            8
+        } else {
+            4
+        };
+        let metadata_len_bytes: [u8; 4] = data[offset - 4..offset]
+            .try_into()
+            .map_err(|e| CubeError::internal(format!("Malformed IPC message header: {}", e)))?;
+        let metadata_len = i32::from_le_bytes(metadata_len_bytes) as usize;
+        let message = ipc::root_as_message(&data[offset..offset + metadata_len])
+            .map_err(|e| CubeError::internal(format!("Failed to parse IPC message: {}", e)))?;
+        let schema = message
+            .header_as_schema()
+            .ok_or_else(|| CubeError::internal("IPC message is not a schema".to_string()))?;
+        let field = schema
+            .fields()
+            .ok_or_else(|| CubeError::internal("IPC schema has no fields".to_string()))?
+            .get(field_index);
+        let decimal = field.type_as_decimal().ok_or_else(|| {
+            CubeError::internal(format!("Field {:?} is not a decimal", field.name()))
+        })?;
+        Ok((decimal.precision(), decimal.scale(), decimal.bitWidth()))
+    }
+
+    /// Our arrow-rs fork advertises bitWidth 64/96 in IPC schemas for
+    /// Decimal128 fields with precision <= 27 (cube-js/arrow-rs#48) while the
+    /// buffers stay 16 bytes per value. Standard readers (the JS orchestrator
+    /// uses upstream arrow) mis-stride such data: bitWidth 64 interleaves real
+    /// values with zeros. The response stream must advertise the standard 128.
+    #[tokio::test]
+    async fn arrow_ipc_stream_advertises_standard_decimal_bit_width() -> Result<(), CubeError> {
+        use datafusion::arrow::datatypes::DataType;
+        use datafusion::arrow::ipc::reader::StreamReader;
+
+        let df = DataFrame::new(
+            vec![
+                Column::new("name".to_string(), ColumnType::String, 0),
+                Column::new(
+                    "totalSales".to_string(),
+                    ColumnType::Decimal {
+                        scale: 2,
+                        precision: 18,
+                    },
+                    1,
+                ),
+            ],
+            vec![
+                Row::new(vec![TableValue::String("a".to_string()), TableValue::Null]),
+                Row::new(vec![
+                    TableValue::String("b".to_string()),
+                    TableValue::Decimal(Decimal::new(239996)),
+                ]),
+                Row::new(vec![
+                    TableValue::String("c".to_string()),
+                    TableValue::Decimal(Decimal::new(224991)),
+                ]),
+            ],
+        );
+        let data = QueryResult::Frame(Arc::new(df))
+            .to_arrow_ipc_stream()
+            .await?;
+
+        assert_eq!(ipc_schema_decimal_field(&data, 1)?, (18, 2, 128));
+
+        // Values, precision and scale come through unchanged.
+        let mut reader = StreamReader::try_new(std::io::Cursor::new(data.as_slice()), None)?;
+        let batch = reader
+            .next()
+            .transpose()?
+            .ok_or_else(|| CubeError::internal("Empty IPC stream".to_string()))?;
+
+        let column = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Expected Decimal128Array, got {:?}",
+                    batch.column(1).data_type()
+                ))
+            })?;
+
+        assert_eq!(column.data_type(), &DataType::Decimal128(18, 2));
+        assert!(column.is_null(0));
+        assert_eq!(column.value(1), 239996);
+        assert_eq!(column.value(2), 224991);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn arrow_ipc_stream_advertises_standard_decimal_bit_width_for_batches(
+    ) -> Result<(), CubeError> {
+        use datafusion::arrow::datatypes::{DataType, Field, Schema as ArrowSchema};
+        use datafusion::arrow::ipc::reader::StreamReader;
+        use futures::StreamExt;
+
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "v",
+            DataType::Decimal128(20, 3),
+            true,
+        )]));
+        let array = Decimal128Array::from(vec![Some(1500_i128), None, Some(-250)])
+            .with_precision_and_scale(20, 3)?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)])?;
+        let result = QueryResult::Stream {
+            schema,
+            batches: futures::stream::iter(vec![Ok(batch)]).boxed(),
+        };
+        let data = result.to_arrow_ipc_stream().await?;
+
+        assert_eq!(ipc_schema_decimal_field(&data, 0)?, (20, 3, 128));
+
+        let mut reader = StreamReader::try_new(std::io::Cursor::new(data.as_slice()), None)?;
+        let batch = reader
+            .next()
+            .transpose()?
+            .ok_or_else(|| CubeError::internal("Empty IPC stream".to_string()))?;
+        let column = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Expected Decimal128Array, got {:?}",
+                    batch.column(0).data_type()
+                ))
+            })?;
+        assert_eq!(column.data_type(), &DataType::Decimal128(20, 3));
+        assert_eq!(column.value(0), 1500);
+        assert!(column.is_null(1));
+        assert_eq!(column.value(2), -250);
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn create_schema_test() -> Result<(), CubeError> {
         let config = Config::test("create_schema_test");
@@ -3307,6 +3467,123 @@ mod tests {
 
             Ok::<(), CubeError>(())
         }).await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn topk_full_merge() -> Result<(), CubeError> {
+        // The full-merge strategy replaces the streaming top-k node with a router-side
+        // re-aggregation + fetch-limited sort. Exercise it end-to-end (UNION -> multi-partition
+        // ClusterSend, which is what required the explicit CoalescePartitions fan-in) and check it
+        // returns the same top-k as the default streaming merge across Sum/Min/Max, both directions,
+        // and HAVING.
+        Config::test("topk_full_merge")
+            .update_config(|mut c| {
+                c.topk_aggregate_strategy = crate::config::TopKAggregateStrategy::FullMerge;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                fn url_hits(df: &crate::store::DataFrame) -> Vec<(String, i64)> {
+                    df.get_rows()
+                        .iter()
+                        .map(|r| {
+                            let url = match &r.values()[0] {
+                                TableValue::String(s) => s.clone(),
+                                v => panic!("unexpected url value: {:?}", v),
+                            };
+                            let hits = match &r.values()[1] {
+                                TableValue::Int(i) => *i,
+                                v => panic!("unexpected hits value: {:?}", v),
+                            };
+                            (url, hits)
+                        })
+                        .collect()
+                }
+
+                service.exec_query("CREATE SCHEMA s").await?.collect().await?;
+                service
+                    .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let union = "(SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) AS Data";
+
+                // SUM, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 52)]
+                );
+
+                // SUM, ascending.
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 ASC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("a".to_string(), 1), ("e".to_string(), 40), ("d".to_string(), 44)]
+                );
+
+                // MIN, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, MIN(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("e".to_string(), 5)]
+                );
+
+                // MAX, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, MAX(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 50)]
+                );
+
+                // HAVING (exercises the router-side FilterExec above the re-aggregate).
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 HAVING SUM(hits) > 50 ORDER BY 2 DESC LIMIT 5"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 52)]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
         Ok(())
     }
 
@@ -6487,7 +6764,9 @@ mod tests {
                                     }
                                 }
 
-                                // Test 4: ORDER BY 1 DESC with LIMIT on non-prefix column
+                                // Test 4: ORDER BY DESC + LIMIT on a non-prefix column, grouped by a
+                                // non-prefix column (hash aggregate). The hash path bounds the worker
+                                // output with the trimming aggregate, not a Sort.
                                 {
                                     let result = service
                                         .exec_query(
@@ -6503,9 +6782,14 @@ mod tests {
                                         TableValue::String(s) => s.clone(),
                                         _ => panic!("expected string"),
                                     };
+                                    // Pin that the trim is actually configured to bound (fetch k=2,
+                                    // factor>0), not merely that the node is present -- a factor of 0
+                                    // would leave it a passthrough and reintroduce the memory pressure
+                                    // this path exists to avoid.
                                     assert!(
-                                        worker_plan.contains("Sort, fetch: 2"),
-                                        "Worker should have Sort with fetch=2 for DESC. Plan: {}",
+                                        worker_plan.contains("GroupByLimitAggregate, k: 2, factor: 2"),
+                                        "Hash-aggregate worker should bound output with a configured \
+                                         GroupByLimitAggregate (k=2, factor=2). Plan: {}",
                                         worker_plan
                                     );
                                 }

@@ -9,6 +9,7 @@ import { Environment } from '../types/Environment';
 import {
   getFixtures,
   getCreateQueries,
+  getRefreshQueries,
   getDriver,
   runEnvironment,
   buildPreaggs,
@@ -113,7 +114,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = randomBytes(8).toString('hex');
+    // Pinot uses a fixed suffix so the model lines up with the committed
+    // `<table>_pinot` resources; every other driver isolates runs with random hex.
+    const suffix = type === 'pinot' ? 'pinot' : randomBytes(8).toString('hex');
     const tables = Object
       .keys(fixtures.tables)
       .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
@@ -127,36 +130,51 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       process.env.CUBEJS_CUBESTORE_PASS = 'root';
       process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER = 'cubestore'; // memory
       if (env.data) {
-        process.env.CUBEJS_DB_HOST = '127.0.0.1';
+        process.env.CUBEJS_DB_HOST = type === 'pinot' ? 'http://127.0.0.1' : '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
       }
       client = cubejs(apiToken, {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
       driver = (await getDriver(type)).source;
-      queries = getCreateQueries(type, suffix);
-      console.log(`Creating ${queries.length} fixture tables`);
-      try {
-        for (const q of queries) {
-          await driver.createTableRaw(q);
-          if (type.includes('redshift')) {
-            await delay(10 * OP_DELAY);
+
+      // Pinot has no SQL DDL — runEnvironment already ingested the fixture tables
+      // via the controller. Every other driver seeds via CREATE TABLE here.
+      if (type !== 'pinot') {
+        queries = getCreateQueries(type, suffix);
+        console.log(`Creating ${queries.length} fixture tables`);
+        try {
+          for (const q of queries) {
+            await driver.createTableRaw(q);
+            if (type.includes('redshift')) {
+              await delay(10 * OP_DELAY);
+            }
           }
+          // CrateDB is eventually consistent: make the freshly loaded rows visible
+          // before any queries run against the fixture tables.
+          if (type === 'crate') {
+            for (const q of getRefreshQueries(type, suffix)) {
+              await driver.query(q);
+            }
+          }
+          console.log(`Creating ${queries.length} fixture tables completed`);
+        } catch (e: any) {
+          console.log('Error creating fixtures', e.stack);
+          throw e;
         }
-        console.log(`Creating ${queries.length} fixture tables completed`);
-      } catch (e: any) {
-        console.log('Error creating fixtures', e.stack);
-        throw e;
       }
     });
 
     afterAll(async () => {
       try {
-        console.log(`Dropping ${tables.length} fixture tables`);
-        for (const t of tables) {
-          await driver.dropTable(t);
+        // Pinot has no dropTable; the cluster is torn down with the environment.
+        if (type !== 'pinot') {
+          console.log(`Dropping ${tables.length} fixture tables`);
+          for (const t of tables) {
+            await driver.dropTable(t);
+          }
+          console.log(`Dropping ${tables.length} fixture tables completed`);
         }
-        console.log(`Dropping ${tables.length} fixture tables completed`);
       } finally {
         await driver.release();
         await env.stop();
@@ -227,17 +245,22 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         await delay(OP_DELAY);
       }
 
-      // Exercise pre-aggregation build with a custom granularity for every
-      // driver. The granularity name `build_only_half_year` is unique to this
-      // rollup — no query test references it, so the rollup cannot match any
-      // test query and only the build path is exercised.
-      await buildPreaggs(env.cube.port, apiToken, {
-        timezones: ['UTC'],
-        preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
-        contexts: [{ securityContext: { tenant: 't1' } }],
-      });
+      // Exercise pre-aggregation build with a custom granularity. The
+      // granularity name `build_only_half_year` is unique to this rollup — no
+      // query test references it, so the rollup cannot match any test query and
+      // only the build path is exercised.
+      // QuestDB is skipped: its dialect has no date_bin implementation, so
+      // custom time-dimension granularities cannot be materialized (the
+      // corresponding query cases are skipped in fixtures/questdb.json too).
+      if (type !== 'questdb') {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['ECommerce.TBuildOnlyHalfYearExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
 
-      await delay(OP_DELAY);
+        await delay(OP_DELAY);
+      }
     });
 
     execute('must not fetch a hidden cube', async () => {
@@ -2686,6 +2709,23 @@ from
         FROM BigECommerce
         WHERE date_trunc('day', BigECommerce.orderDate) < CAST('2021-01-01' AS TIMESTAMP) AND
               LOWER("city") = 'columbus'
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: Window function over measure (running total)', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('quarter', orderDate) AS "orderDateQ",
+          MEASURE(count) AS "count",
+          SUM(MEASURE(count)) OVER (
+            ORDER BY DATE_TRUNC('quarter', orderDate)
+            ROWS UNBOUNDED PRECEDING
+          ) AS "runningTotal"
+        FROM "BigECommerce"
+        WHERE DATE_TRUNC('year', orderDate) = CAST('2020-01-01' AS DATE)
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST;
       `);
       expect(res.rows).toMatchSnapshot();
     });

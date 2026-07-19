@@ -294,7 +294,7 @@ impl MultiStageQueryPlanner {
     ) -> Vec<Rc<MemberSymbol>> {
         let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &grain.exclude {
             dims.iter()
-                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| !exclude.iter().any(|m| d.matches_grain_reference(m)))
                 .cloned()
                 .collect()
         } else {
@@ -302,7 +302,7 @@ impl MultiStageQueryPlanner {
         };
         if let Some(keep_only) = &grain.keep_only {
             dims.into_iter()
-                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| keep_only.iter().any(|m| d.matches_grain_reference(m)))
                 .collect()
         } else {
             dims
@@ -475,10 +475,14 @@ impl MultiStageQueryPlanner {
         };
 
         let member_name = member.full_name();
-        if let Some(exists) = descriptions
-            .iter()
-            .find(|q| q.is_match_member_and_state(&member, &state))
-        {
+        // Skip without-member leaves: they carry the rank/similar member's
+        // own name only to select its dimension grid, so `(member, state)`
+        // alone can't tell them apart from the member's real inode CTE. A
+        // `{member}` reference must always resolve to the computing inode,
+        // never to the bare-grid leaf.
+        if let Some(exists) = descriptions.iter().find(|q| {
+            !q.member().is_without_member_leaf() && q.is_match_member_and_state(&member, &state)
+        }) {
             return Ok(exists.clone());
         };
 
@@ -767,9 +771,7 @@ impl MultiStageQueryPlanner {
 
                 let alias = scope.next_cte_name();
 
-                let rolling_window_descr = if measure.is_running_total() {
-                    RollingWindowDescription::new_running_total(time_dimension, base_time_dimension)
-                } else if let Some(granularity) =
+                let rolling_window_descr = if let Some(granularity) =
                     self.get_to_date_rolling_granularity(&rolling_window)?
                 {
                     RollingWindowDescription::new_to_date(

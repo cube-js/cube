@@ -54,6 +54,24 @@ export function rowsToColumnar(rawData: any): JsRawColumnarData {
   return { members, columns };
 }
 
+/**
+ * Pivot to columnar before serializing: the row-oriented form repeats
+ * every column name on every row, which inflates JSON size and forces
+ * the Rust side to allocate a per-row map before transposing back to
+ * its native columnar `QueryResult` representation.
+ *
+ * Serialize to a Buffer so the Rust side can decode via
+ * serde_json::from_slice instead of walking a JsValue through the
+ * Neon bridge with JsValueDeserializer. On 5 MB of AoO rows
+ * (~21k rows × 8 fields) the JsValue walk costs ~80 ms locally;
+ * Buffer + serde_json is ~7× faster (M3 MAX) and tracks V8's JSON.parse
+ * (~11 ms on the same payload). On a real server it should be 3-6× slower,
+ * so avoiding the JsValue walk matters even more there.
+ */
+export function rowsToColumnarBuffer(rawData: any): Buffer {
+  return Buffer.from(JSON.stringify(rowsToColumnar(rawData)));
+}
+
 class BaseWrapper {
   public readonly isWrapper: boolean = true;
 }
@@ -191,19 +209,7 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
       return [this[NATIVE_REFERENCE]];
     }
 
-    // Pivot to columnar before serializing: the row-oriented form repeats
-    // every column name on every row, which inflates JSON size and forces
-    // the Rust side to allocate a per-row map before transposing back to
-    // its native columnar `QueryResult` representation.
-    //
-    // Serialize to a Buffer so the Rust side can decode via
-    // serde_json::from_slice instead of walking a JsValue through the
-    // Neon bridge with JsValueDeserializer. On 5 MB of AoO rows
-    // (~21k rows × 8 fields) the JsValue walk costs ~80 ms locally;
-    // Buffer + serde_json is ~7× faster (M3 MAX) and tracks V8's JSON.parse
-    // (~11 ms on the same payload). On a real server it should be 3-6× slower,
-    // so avoiding the JsValue walk matters even more there.
-    return [Buffer.from(JSON.stringify(rowsToColumnar(this.jsResult)))];
+    return [rowsToColumnarBuffer(this.jsResult)];
   }
 
   public setTransformData(td: any) {

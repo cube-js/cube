@@ -130,10 +130,8 @@ Object {
 FROM (
   SELECT AVG(\\"t\\".\\"total\\") \\"avg_t_total_\\" 
   FROM (
-    SELECT
-          \\"orders\\".status \\"status\\", sum(\\"orders\\".amount) \\"total\\"
-        FROM
-          (
+    SELECT \\"orders\\".status \\"status\\", sum(\\"orders\\".amount) \\"total\\" 
+    FROM  (
       select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at, '2025-01-01'::timestamptz updated_at
       UNION ALL
       select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at, '2025-01-02'::timestamptz updated_at
@@ -143,7 +141,8 @@ FROM (
       select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at, '2025-01-04'::timestamptz updated_at
       UNION ALL
       select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at, '2025-01-05'::timestamptz updated_at
-      ) AS \\"orders\\"  GROUP BY 1
+      )  AS \\"orders\\"
+    GROUP BY 1
   ) AS \\"t\\"
 ) AS \\"t\\"",
         Array [],
@@ -160,7 +159,7 @@ FROM (
         "keep-alive",
       ],
       "content-length": Array [
-        "1068",
+        "1049",
       ],
       "content-type": Array [
         "application/json; charset=utf-8",
@@ -184,10 +183,8 @@ Object {
     "sql": Object {
       "query_type": "regular",
       "sql": Array [
-        "SELECT
-      sum(\\"orders\\".amount) \\"total\\"
-    FROM
-      (
+        "SELECT sum(\\"orders\\".amount) \\"total\\" 
+FROM  (
   select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at, '2025-01-01'::timestamptz updated_at
   UNION ALL
   select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at, '2025-01-02'::timestamptz updated_at
@@ -197,7 +194,7 @@ Object {
   select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at, '2025-01-04'::timestamptz updated_at
   UNION ALL
   select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at, '2025-01-05'::timestamptz updated_at
-  ) AS \\"orders\\" ",
+  )  AS \\"orders\\"",
         Array [],
       ],
       "status": "ok",
@@ -212,7 +209,7 @@ Object {
         "keep-alive",
       ],
       "content-length": Array [
-        "828",
+        "812",
       ],
       "content-type": Array [
         "application/json; charset=utf-8",
@@ -269,10 +266,8 @@ Object {
     "sql": Object {
       "query_type": "regular",
       "sql": Array [
-        "SELECT
-      sum(\\"orders\\".amount) \\"total\\"
-    FROM
-      (
+        "SELECT sum(\\"orders\\".amount) \\"total\\" 
+FROM  (
   select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at, '2025-01-01'::timestamptz updated_at
   UNION ALL
   select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at, '2025-01-02'::timestamptz updated_at
@@ -282,7 +277,8 @@ Object {
   select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at, '2025-01-04'::timestamptz updated_at
   UNION ALL
   select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at, '2025-01-05'::timestamptz updated_at
-  ) AS \\"orders\\"  WHERE (\\"orders\\".status = $1)",
+  )  AS \\"orders\\"
+WHERE (\\"orders\\".status = $1)",
         Array [
           "foo",
         ],
@@ -299,7 +295,7 @@ Object {
         "keep-alive",
       ],
       "content-length": Array [
-        "864",
+        "849",
       ],
       "content-type": Array [
         "application/json; charset=utf-8",
@@ -430,10 +426,8 @@ Object {
       "sql": Array [
         "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\" 
 FROM (
-  SELECT
-        sum(\\"orders\\".amount) \\"sum_orders_total\\"
-      FROM
-        (
+  SELECT sum(\\"orders\\".amount) \\"sum_orders_total\\" 
+  FROM  (
     select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at, '2025-01-01'::timestamptz updated_at
     UNION ALL
     select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at, '2025-01-02'::timestamptz updated_at
@@ -443,66 +437,10 @@ FROM (
     select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at, '2025-01-04'::timestamptz updated_at
     UNION ALL
     select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at, '2025-01-05'::timestamptz updated_at
-    ) AS \\"orders\\"  WHERE ((LOWER(\\"orders\\".status) = UPPER(\\"orders\\".status)))
+    )  AS \\"orders\\"
+  WHERE ((LOWER(\\"orders\\".status) = UPPER(\\"orders\\".status)))
 ) AS \\"Orders\\"",
         Array [],
-      ],
-      "status": "ok",
-    },
-  },
-  "headers": Headers {
-    Symbol(map): Object {
-      "access-control-allow-origin": Array [
-        "*",
-      ],
-      "connection": Array [
-        "keep-alive",
-      ],
-      "content-length": Array [
-        "1006",
-      ],
-      "content-type": Array [
-        "application/json; charset=utf-8",
-      ],
-      "keep-alive": Array [
-        "timeout=5",
-      ],
-      "x-powered-by": Array [
-        "Express",
-      ],
-    },
-  },
-  "status": 200,
-  "statusText": "OK",
-}
-`;
-
-exports[`SQL API Cube SQL over HTTP sql4sql wrapper with parameters 1`] = `
-Object {
-  "body": Object {
-    "sql": Object {
-      "query_type": "pushdown",
-      "sql": Array [
-        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\" 
-FROM (
-  SELECT
-        sum(\\"orders\\".amount) \\"sum_orders_total\\"
-      FROM
-        (
-    select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at, '2025-01-01'::timestamptz updated_at
-    UNION ALL
-    select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at, '2025-01-02'::timestamptz updated_at
-    UNION ALL
-    select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at, '2025-01-03'::timestamptz updated_at
-    UNION ALL
-    select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at, '2025-01-04'::timestamptz updated_at
-    UNION ALL
-    select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at, '2025-01-05'::timestamptz updated_at
-    ) AS \\"orders\\"  WHERE ((LOWER(\\"orders\\".status) = $1))
-) AS \\"Orders\\"",
-        Array [
-          "foo",
-        ],
       ],
       "status": "ok",
     },
@@ -534,6 +472,62 @@ FROM (
 }
 `;
 
+exports[`SQL API Cube SQL over HTTP sql4sql wrapper with parameters 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "query_type": "pushdown",
+      "sql": Array [
+        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\" 
+FROM (
+  SELECT sum(\\"orders\\".amount) \\"sum_orders_total\\" 
+  FROM  (
+    select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at, '2025-01-01'::timestamptz updated_at
+    UNION ALL
+    select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at, '2025-01-02'::timestamptz updated_at
+    UNION ALL
+    select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at, '2025-01-03'::timestamptz updated_at
+    UNION ALL
+    select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at, '2025-01-04'::timestamptz updated_at
+    UNION ALL
+    select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at, '2025-01-05'::timestamptz updated_at
+    )  AS \\"orders\\"
+  WHERE ((LOWER(\\"orders\\".status) = $1))
+) AS \\"Orders\\"",
+        Array [
+          "foo",
+        ],
+      ],
+      "status": "ok",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "972",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
 exports[`SQL API Postgres (Data) SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC: sql_orders 1`] = `
 Array [
   Object {
@@ -547,6 +541,14 @@ Array [
   Object {
     "cn": "1",
     "status": "shipped",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) current_timestamp subquery filter push down: current_timestamp_push_down 1`] = `
+Array [
+  Object {
+    "cn": "5",
   },
 ]
 `;

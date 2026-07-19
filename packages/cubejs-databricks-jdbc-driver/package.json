@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/databricks-jdbc-driver",
   "description": "Cube.js Databricks database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.64",
+  "version": "1.7.4",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -10,7 +10,7 @@
     "directory": "packages/cubejs-databricks-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -30,19 +30,19 @@
     "bin"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.6.64",
-    "@cubejs-backend/jdbc-driver": "1.6.64",
-    "@cubejs-backend/schema-compiler": "1.6.64",
-    "@cubejs-backend/shared": "1.6.64",
+    "@cubejs-backend/base-driver": "1.7.4",
+    "@cubejs-backend/jdbc-driver": "1.7.4",
+    "@cubejs-backend/schema-compiler": "1.7.4",
+    "@cubejs-backend/shared": "1.7.4",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.2",
     "source-map-support": "^0.5.19",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.64",
+    "@cubejs-backend/linter": "1.7.4",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/ramda": "^0.27.34",
     "@types/uuid": "^8.3.4",
     "jest": "^29",

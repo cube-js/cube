@@ -310,6 +310,26 @@ views:
   },
 
   [{ count: 1, city: 'New York', cubejoinfield: 'NULL' }, { count: 1, city: 'New York', cubejoinfield: 'NULL' }]));
+
+  it('dimension-only measure expression over multiple dimensions of the same cube', async () => runQueryTest({
+    measures: [
+      {
+        // eslint-disable-next-line no-new-func
+        expression: new Function(
+          'customers',
+          // eslint-disable-next-line no-template-curly-in-string
+          'return `SUM(CASE WHEN ${customers.state} = ${customers.city} THEN 1 ELSE 0 END)`'
+        ),
+        // eslint-disable-next-line no-template-curly-in-string
+        definition: 'SUM(CASE WHEN ${customers.state} = ${customers.city} THEN 1 ELSE 0 END)',
+        expressionName: 'same_state_city_count',
+        cubeName: 'customers',
+      },
+    ],
+  },
+
+  [{ same_state_city_count: '0' }]));
+
   if (getEnv('nativeSqlPlanner')) {
     it('member expression multi stage', async () => runQueryTest({
       measures: [

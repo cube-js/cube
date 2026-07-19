@@ -210,9 +210,7 @@ CTEs in the generated SQL query.
 <Warning>
 
 Multi-stage measures are powered by Tesseract, the [next-generation data
-modeling engine][link-tesseract]. Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
-enable it.
+modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
 
@@ -363,13 +361,6 @@ measures:
     format: percent
 ```
 
-<Note>
-
-The `filter` parameter requires the [Tesseract SQL planner][ref-tesseract-env]
-(`CUBEJS_TESSERACT_SQL_PLANNER=true`).
-
-</Note>
-
 ### Nested aggregates
 
 Use the [`grain`][ref-grain] parameter with `include` to compute an aggregate
@@ -389,6 +380,54 @@ measures:
       include:
         - customer_id
 ```
+
+When a nested aggregate combines two or more other multi-stage measures that
+share the same grain, set [`grain`][ref-grain] on the **combining** measure —
+not on each of its inputs. For example, to average a per-day ratio, group the
+per-day components by day through the combining measure:
+
+```yaml
+measures:
+  - name: total_amount
+    sql: amount
+    type: sum
+
+  - name: total_count
+    sql: id
+    type: count
+
+  # Intermediate multi-stage measures — the grain is set on the combining
+  # measure below, so these inherit it and are joined on the shared grain.
+  - name: daily_amount
+    multi_stage: true
+    sql: "{total_amount}"
+    type: number
+
+  - name: daily_count
+    multi_stage: true
+    sql: "{total_count}"
+    type: number
+
+  - name: avg_daily_order_value
+    multi_stage: true
+    sql: "1.0 * {daily_amount} / NULLIF({daily_count}, 0)"
+    type: avg
+    grain:
+      include:
+        - created_at
+```
+
+<Warning>
+
+`grain` fixes the inner grain of the measure it's declared on and does not
+expose the added dimension to a measure built on top of it. If each input
+measure declares the same `grain.include` (rather than the combining measure),
+the inputs no longer carry a shared grouping key, so they are combined with a
+cross join instead of being joined on that key — producing incorrect results.
+Declare `grain` on the combining measure so its inputs are joined on the shared
+grain.
+
+</Warning>
 
 ### Ranking
 
@@ -479,7 +518,6 @@ measures:
 [ref-filter]: /reference/data-modeling/measures#filter
 [ref-case]: /reference/data-modeling/measures#case
 [ref-switch-dim]: /reference/data-modeling/dimensions#type
-[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-pop-recipe]: /recipes/data-modeling/period-over-period
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine

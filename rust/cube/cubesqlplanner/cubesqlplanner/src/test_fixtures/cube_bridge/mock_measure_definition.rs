@@ -7,7 +7,6 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::multi_stage_filter::MultiStageFilterReferences;
 use crate::cube_bridge::multi_stage_grain::MultiStageGrainReferences;
 use crate::cube_bridge::struct_with_sql_member::StructWithSqlMember;
-use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::yaml::measure::YamlMeasureDefinition;
 use crate::test_fixtures::cube_bridge::{
     MockMemberOrderBy, MockMemberSql, MockMultiStageFilterReferences,
@@ -68,6 +67,10 @@ impl_static_data!(
 );
 
 impl MockMeasureDefinition {
+    pub fn raw_order_by(&self) -> Option<Vec<Rc<MockMemberOrderBy>>> {
+        self.order_by.clone()
+    }
+
     pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
         let yaml_def: YamlMeasureDefinition = serde_yaml::from_str(yaml)
             .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;

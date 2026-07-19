@@ -11,6 +11,7 @@ import { getComposePath } from './getComposePath';
 import { getCubeJsPath } from './getCubeJsPath';
 import { getPackageJsonPath } from './getPackageJsonPath';
 import { getSchemaPath } from './getSchemaPath';
+import { seedPinot } from './seedPinot';
 import { Environment } from '../types/Environment';
 
 interface CubeEnvironment {
@@ -160,6 +161,30 @@ export async function runEnvironment(
   if (type === 'clickhouse') {
     compose.withWaitStrategy('data', Wait.forHealthCheck());
   }
+  // Oracle takes noticeably longer to become ready than the global startup
+  // timeout allows, and it only registers the FREEPDB1 service once fully up,
+  // so wait on the container HEALTHCHECK (defined in the oracle fixture) with
+  // an extended timeout before connecting.
+  if (type === 'oracle') {
+    compose.withWaitStrategy('data', Wait.forHealthCheck().withStartupTimeout(240 * 1000));
+  }
+  // Pinot is a 4-container cluster (zookeeper/controller/broker/server). Wait on the
+  // server HEALTHCHECK (last in the dependency chain) before seeding/connecting.
+  if (type === 'pinot') {
+    compose.withWaitStrategy('pinot-server', Wait.forHealthCheck().withStartupTimeout(180 * 1000));
+  }
+  // QuestDB opens its Postgres-wire port before it is ready to serve queries, so
+  // wait on the container HEALTHCHECK (defined in the questdb fixture, hitting the
+  // HTTP min-health endpoint on port 9003) before connecting.
+  if (type === 'questdb') {
+    compose.withWaitStrategy('data', Wait.forHealthCheck());
+  }
+  // CrateDB opens its Postgres-wire port before the cluster is ready to serve
+  // queries, so wait on the "started" startup log line (matching CrateDBRunner in
+  // testing-shared) before connecting.
+  if (type === 'crate') {
+    compose.withWaitStrategy('data', Wait.forLogMessage('started').withStartupTimeout(120 * 1000));
+  }
 
   const environment = await compose.up();
 
@@ -168,10 +193,24 @@ export async function runEnvironment(
     logs: await environment.getContainer('store').logs(),
   };
 
+  // Pinot has no SQL DDL: register tables + ingest CSV via the controller before
+  // anything queries, and expose the broker as the driver connection endpoint.
+  let data: Environment['data'];
+  if (type === 'pinot') {
+    await seedPinot(environment);
+    data = {
+      port: environment.getContainer('pinot-broker').getMappedPort(8099),
+      logs: await environment.getContainer('pinot-broker').logs(),
+    };
+  }
+
   const cliEnv = isLocal ? new CubeCliEnvironment(composePath) : null;
-  const mappedDataPort = fixture.data ? environment.getContainer('data').getMappedPort(
-    parseInt(fixture.data.ports[0], 10),
-  ) : null;
+  let mappedDataPort: number | null = null;
+  if (fixture.data) {
+    mappedDataPort = environment.getContainer('data').getMappedPort(parseInt(fixture.data.ports[0], 10));
+  } else if (data) {
+    mappedDataPort = data.port;
+  }
   if (cliEnv) {
     cliEnv.withEnvironment({
       CUBEJS_CUBESTORE_HOST: '127.0.0.1',
@@ -206,25 +245,16 @@ export async function runEnvironment(
   };
 
   if (fixture.data) {
-    const data = {
+    data = {
       port: mappedDataPort!,
       logs: await environment.getContainer('data').logs(),
     };
-    return {
-      cube,
-      store,
-      data,
-      stop: async () => {
-        await environment.down({ timeout: 30 * 1000 });
-        if (cliEnv) {
-          await cliEnv.down();
-        }
-      },
-    };
   }
+
   return {
     cube,
     store,
+    ...(data ? { data } : {}),
     stop: async () => {
       await environment.down({ timeout: 30 * 1000 });
       if (cliEnv) {

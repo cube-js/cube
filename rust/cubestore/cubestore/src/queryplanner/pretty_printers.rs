@@ -28,6 +28,7 @@ use std::sync::Arc;
 
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::group_by_limit_aggregate::GroupByLimitAggregateExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
@@ -616,6 +617,16 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
             if let Some(limit) = agg.limit() {
                 *out += &format!(", limit: {}", limit)
+            }
+        } else if let Some(agg) = a.downcast_ref::<GroupByLimitAggregateExec>() {
+            *out += &format!(
+                "GroupByLimitAggregate, k: {}, factor: {}, order: {:?}",
+                agg.k(),
+                agg.factor(),
+                agg.order()
+            );
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
         } else if let Some(l) = a.downcast_ref::<LocalLimitExec>() {
             *out += &format!("LocalLimit, n: {}", l.fetch());

@@ -52,23 +52,24 @@ features:
 | Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
 | Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
-| Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
+| Removed    | [`dbType`](#dbtype)                                                                                                               | v0.30.30   | v1.7.0    |
 | Removed    | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
 | Deprecated | [`SECURITY_CONTEXT`](#security_context)                                                                                           | v0.33.0    |           |
-| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
+| Removed    | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   | v1.7.0    |
 | Removed    | [Top-level `includes` parameter in views](#top-level-includes-parameter-in-views)                                                 | v0.34.34   | v1.3.0    |
 | Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
 | Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
 | Removed    | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    | v1.3.0    |
-| Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7    |           |
-| Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
-| Deprecated | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   |           |
-| Deprecated | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     |           |
-| Deprecated | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     |           |
+| Removed    | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7     | v1.7.0    |
+| Removed    | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    | v1.7.0    |
+| Removed    | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   | v1.7.0    |
+| Removed    | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     | v1.7.0    |
+| Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
+| Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 
 ### Node.js 8
 
@@ -312,9 +313,11 @@ recommend [using Cube Store as a solution][ref-caching-in-prod].
 
 **Deprecated in Release: v0.30.30**
 
-Using `dbType` is now deprecated, and we recommend using
-[`driverFactory`][self-driver-factory] to return a `DriverConfig` object
-instead.
+**Removed in Release: v1.7.0**
+
+`dbType` has been removed. Passing `CreateOptions.dbType` now throws an error.
+Use [`driverFactory`][self-driver-factory] to return a `DriverConfig` object
+(`{ type, ... }`) instead, or set the `CUBEJS_DB_TYPE` environment variable.
 
 ### Serverless Deployments
 
@@ -348,9 +351,11 @@ instead.
 
 **Deprecated in Release: v0.33.39**
 
-The `running_total` measure type is now deprecated, and we recommend using
+**Removed in Release: v1.7.0**
+
+The `running_total` measure type has been removed. Use a
 [`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
-to calculate running totals instead.
+with an `unbounded` trailing window to calculate running totals instead.
 
 ### Top-level `includes` parameter in views
 
@@ -401,6 +406,8 @@ no more updates. Please upgrade to Node.js 20 or higher.
 
 **Deprecated in Release: v1.2.7**
 
+**Removed in Release: v1.7.0**
+
 This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
 
 ### Node.js 18
@@ -411,27 +418,39 @@ This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_
 
 ### Node.js 20
 
-**Deprecated in Release: v1.3.0**
+**Removed in Release: v1.7.0**
 
-Node.js 20 is in maintenance mode from [November 22, 2024][link-nodejs-eol]. This means
-no more new features, only security updates. Please upgrade to Node.js 22 or higher.
+Node.js 20 reached [End of Life on April 30, 2026][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 22 or higher.
 
 ### `renewQuery` parameter of the `/v1/load` endpoint
 
 **Deprecated in Release: v1.3.73**
 
-This parameter is deprecated and will be removed in future releases. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
-options and use the new `cache` parameter of the `/v1/load` endpoint instead.
+**Removed in Release: v1.7.0**
+
+This parameter has been removed. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
+options and use the `cache` parameter of the `/v1/load` endpoint instead.
 
 ### Elasticsearch driver
 
 **Deprecated in Release: v1.6.0**
 
-The Elasticsearch driver is deprecated and will be removed in a future release.
+**Removed in Release: v1.7.0**
+
+The Elasticsearch driver has been removed.
 
 ### `context_to_roles`
 
 **Deprecated in Release: v1.6.4**
 
-The `context_to_roles` configuration option is deprecated and will be removed in a future
-release. Please use `context_to_groups` instead.
+**Removed in Release: v1.7.0**
+
+The `context_to_roles` configuration option has been removed. Please use `context_to_groups` instead.
+
+### Node.js 22
+
+**Deprecated in Release: v1.7.0**
+
+Node.js 22 is in maintenance mode from [October 21, 2025][link-nodejs-eol]. This means
+no more new features, only security updates. Please upgrade to Node.js 24 or higher.

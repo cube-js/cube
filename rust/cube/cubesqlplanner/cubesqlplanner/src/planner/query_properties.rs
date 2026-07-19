@@ -167,6 +167,13 @@ pub struct QueryProperties {
     ungrouped: bool,
     #[builder(default)]
     pre_aggregation_query: bool,
+    /// Pre-aggregation matching only: run the pre-aggregation optimizer to determine
+    /// which pre-aggregation a query would use, but skip building the outer query's
+    /// physical SQL. Used by the refresh/metadata path, which needs the match (and the
+    /// pre-agg's own load SQL) but not the outer query — that outer query may include a
+    /// rolling-window time series which requires a date range the refresh path doesn't have.
+    #[builder(default)]
+    pre_aggregations_match_only: bool,
     /// When building a rollup pre-aggregation, source it from the cube's
     /// `originalSql` pre-aggregation table instead of the raw cube SQL.
     #[builder(default)]
@@ -356,6 +363,10 @@ impl QueryProperties {
 
     pub fn is_pre_aggregation_query(&self) -> bool {
         self.pre_aggregation_query
+    }
+
+    pub fn is_pre_aggregations_match_only(&self) -> bool {
+        self.pre_aggregations_match_only
     }
 
     pub fn use_original_sql_pre_aggregations_in_pre_aggregation(&self) -> bool {
@@ -1115,6 +1126,7 @@ impl PartialEq for QueryProperties {
             ungrouped,
             ignore_cumulative,
             pre_aggregation_query,
+            pre_aggregations_match_only,
             use_original_sql_pre_aggregations_in_pre_aggregation,
             total_query,
             allow_multi_stage,
@@ -1141,6 +1153,7 @@ impl PartialEq for QueryProperties {
             && *ungrouped == other.ungrouped
             && *ignore_cumulative == other.ignore_cumulative
             && *pre_aggregation_query == other.pre_aggregation_query
+            && *pre_aggregations_match_only == other.pre_aggregations_match_only
             && *use_original_sql_pre_aggregations_in_pre_aggregation
                 == other.use_original_sql_pre_aggregations_in_pre_aggregation
             && *total_query == other.total_query

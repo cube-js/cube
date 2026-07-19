@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use datafusion::{
-    arrow::datatypes::DataType,
+    arrow::datatypes::{DataType, TimeUnit},
     error::{DataFusionError, Result},
     logical_expr::{BuiltinScalarFunction, Expr, GroupingSet, Like},
     logical_plan::{
@@ -22,7 +22,9 @@ use datafusion::{
     sql::planner::ContextProvider,
 };
 
-use crate::compile::{engine::CubeContext, rewrite::rules::utils::DatePartToken};
+use crate::compile::{
+    date_parser::parse_date_str, engine::CubeContext, rewrite::rules::utils::DatePartToken,
+};
 
 /// PlanNormalize optimizer rule walks through the query and applies transformations
 /// to normalize the logical plan structure and expressions.
@@ -1412,18 +1414,49 @@ fn binary_expr_normalize(
     };
 
     if literal_on_the_left {
-        Ok(Box::new(Expr::BinaryExpr {
-            left: evaluate_expr(optimizer, left.cast_to(&cast_type, schema)?)?,
-            op,
-            right,
-        }))
-    } else {
-        Ok(Box::new(Expr::BinaryExpr {
-            left,
-            op,
-            right: evaluate_expr(optimizer, right.cast_to(&cast_type, schema)?)?,
-        }))
+        if let Some(left) = cast_string_literal_expr(optimizer, &left, &cast_type, schema) {
+            return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
+        }
+    } else if let Some(right) = cast_string_literal_expr(optimizer, &right, &cast_type, schema) {
+        return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
     }
+
+    // The literal can't be casted to the target type; keep the expression as is
+    // instead of failing the whole plan normalization.
+    Ok(Box::new(Expr::BinaryExpr { left, op, right }))
+}
+
+/// Casts a string literal expression to the given type, evaluating it to a constant.
+/// Timestamp targets are parsed with Cube's date parser, which accepts date-only
+/// strings (e.g. `'2026-06-01'`) that the Arrow cast kernel rejects.
+/// Returns `None` when the literal can't be casted.
+fn cast_string_literal_expr(
+    optimizer: &PlanNormalize,
+    expr: &Expr,
+    cast_type: &DataType,
+    schema: &DFSchema,
+) -> Option<Box<Expr>> {
+    if let (Expr::Literal(ScalarValue::Utf8(Some(value))), DataType::Timestamp(unit, tz)) =
+        (expr, cast_type)
+    {
+        let parsed = parse_date_str(value).ok()?.and_utc();
+        let scalar = match unit {
+            TimeUnit::Second => ScalarValue::TimestampSecond(Some(parsed.timestamp()), tz.clone()),
+            TimeUnit::Millisecond => {
+                ScalarValue::TimestampMillisecond(Some(parsed.timestamp_millis()), tz.clone())
+            }
+            TimeUnit::Microsecond => {
+                ScalarValue::TimestampMicrosecond(Some(parsed.timestamp_micros()), tz.clone())
+            }
+            TimeUnit::Nanosecond => {
+                ScalarValue::TimestampNanosecond(Some(parsed.timestamp_nanos_opt()?), tz.clone())
+            }
+        };
+        return Some(Box::new(Expr::Literal(scalar)));
+    }
+
+    let casted = expr.clone().cast_to(cast_type, schema).ok()?;
+    evaluate_expr(optimizer, casted).ok()
 }
 
 /// Returns the type a literal string should be casted to based on the operator
@@ -1694,6 +1727,95 @@ mod tests {
 
             let optimizer = PlanNormalize::new(&cube_ctx);
             optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+        });
+
+        Ok(())
+    }
+
+    // Date-only strings (e.g. '2026-06-01') are rejected by the Arrow cast kernel,
+    // so they must be parsed with Cube's date parser instead.
+    #[test]
+    fn test_binary_expr_date_only_string_to_timestamp() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
+
+            let schema = Schema::new(vec![Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            )]);
+
+            let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
+
+            let plan = LogicalPlanBuilder::from(table_scan)
+                .filter(col("ts").gt_eq(lit("2026-06-01")))
+                .expect("Failed to add filter")
+                .build()
+                .expect("Failed to build plan");
+
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            let optimized = optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+
+            let LogicalPlan::Filter(Filter { predicate, .. }) = &optimized else {
+                panic!("Expected Filter plan, got: {:?}", optimized);
+            };
+            let expected_nanos = parse_date_str("2026-06-01")
+                .unwrap()
+                .and_utc()
+                .timestamp_nanos_opt()
+                .unwrap();
+            assert_eq!(
+                *predicate,
+                col("test_table.ts").gt_eq(Expr::Literal(ScalarValue::TimestampNanosecond(
+                    Some(expected_nanos),
+                    None
+                )))
+            );
+        });
+
+        Ok(())
+    }
+
+    // A string literal that can't be casted must not fail the whole plan
+    // normalization; the expression is kept as is.
+    #[test]
+    fn test_binary_expr_uncastable_string_keeps_plan() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
+
+            let schema = Schema::new(vec![Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            )]);
+
+            let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
+
+            let plan = LogicalPlanBuilder::from(table_scan)
+                .filter(col("ts").gt_eq(lit("not-a-date")))
+                .expect("Failed to add filter")
+                .build()
+                .expect("Failed to build plan");
+
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            let optimized = optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+
+            let LogicalPlan::Filter(Filter { predicate, .. }) = &optimized else {
+                panic!("Expected Filter plan, got: {:?}", optimized);
+            };
+            assert_eq!(*predicate, col("test_table.ts").gt_eq(lit("not-a-date")));
         });
 
         Ok(())

@@ -211,7 +211,7 @@ describe('API Gateway', () => {
       .expect(200);
 
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
 
     expect(queryRewrite.mock.calls.length).toEqual(1);
   });
@@ -252,7 +252,7 @@ describe('API Gateway', () => {
       .expect(200);
 
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
 
     expect(queryRewrite.mock.calls.length).toEqual(1);
   });
@@ -300,7 +300,7 @@ describe('API Gateway', () => {
       .expect(200);
 
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
 
     expect(queryRewrite.mock.calls.length).toEqual(1);
   });
@@ -315,7 +315,7 @@ describe('API Gateway', () => {
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
   });
 
   test('custom granularities in annotation from timeDimensions', async () => {
@@ -328,7 +328,7 @@ describe('API Gateway', () => {
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
     expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
       .toStrictEqual({
         granularity: {
@@ -350,7 +350,7 @@ describe('API Gateway', () => {
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
     expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
       .toStrictEqual({
         granularity: {
@@ -851,7 +851,7 @@ describe('API Gateway', () => {
           measures: ['Foo.bar'],
           timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }],
         },
-        data: [{ 'Foo.bar': 42 }],
+        data: [{ 'Foo.bar': '42' }],
       });
     });
   });

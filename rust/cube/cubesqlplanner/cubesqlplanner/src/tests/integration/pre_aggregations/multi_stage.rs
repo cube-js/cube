@@ -26,6 +26,8 @@ async fn test_multi_stage_time_shift_pre_agg_with_leaf_measure() {
             dateRange:
               - "2024-01-01"
               - "2024-03-31"
+        order:
+          - id: returns.created_at
     "#};
 
     let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
@@ -66,7 +68,7 @@ async fn test_multi_stage_time_shift_pre_agg_with_leaf_measure() {
         "Shifted and unshifted usages must have different usage indexes"
     );
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }
@@ -86,6 +88,8 @@ async fn test_multi_stage_time_shift_pre_agg_with_multi_stage_measure() {
             dateRange:
               - "2024-01-01"
               - "2024-03-31"
+        order:
+          - id: returns.created_at
     "#};
 
     let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
@@ -99,7 +103,7 @@ async fn test_multi_stage_time_shift_pre_agg_with_multi_stage_measure() {
     );
     assert_eq!(pre_aggrs[0].name(), "customers_lifetime_prev_month_pre_agg");
 
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+    if let Some(result) = ctx.try_execute(query, SEED).await {
         insta::assert_snapshot!(result);
     }
 }

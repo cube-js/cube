@@ -94,6 +94,13 @@ impl QueryTools {
         self.masked_members.contains(member_path)
     }
 
+    /// Whether the query has any masked members at all. `masked_members` is
+    /// fixed at `try_new`, so this is a cheap, stable signal used to skip
+    /// building the unmasked reference tree for queries with no masking.
+    pub fn has_masked_members(&self) -> bool {
+        !self.masked_members.is_empty()
+    }
+
     pub fn member_mask_filter(&self, member_path: &str) -> Option<FilterItem> {
         self.member_mask_filters.borrow().get(member_path).cloned()
     }

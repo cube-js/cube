@@ -487,7 +487,7 @@ You can pass this object to set advanced options for the query orchestrator.
 
 | Option                                         | Description                                                                                                                                                                                                                                                                                                                                                                                       | Default Value           |
 |------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| `continueWaitTimeout`                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `5`                     |
+| `continueWaitTimeout`                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `10`                    |
 | `rollupOnlyMode`                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                  | `false`                 |
 | `queryCacheOptions`                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
 | `queryCacheOptions.refreshKeyRenewalThreshold` | Time in seconds to cache the result of [`refresh_key`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                     | `defined by DB dialect` |
@@ -1485,70 +1485,6 @@ module.exports = {
 
 </CodeGroup>
 
-## Deprecated
-
-### `dbType`
-
-<Warning>
-
-`dbType` is deprecated and will be removed in a future release.
-Use [`driverFactory`][self-driver-factory] instead.
-
-</Warning>
-
-Data source type. Called only once per [`appId`][self-opts-ctx-to-appid].
-
-```javascript
-module.exports = {
-  // string
-  dbType: 'snowflake',
-
-  // function
-  dbType: ({ securityContext }) => 'databricks'
-}
-```
-
-Either `string` or `function` could be passed. Providing a `Function` allows
-to dynamically select a database type depending on the security context.
-Usually used for [multitenancy][ref-multitenancy].
-
-If not defined, Cube will lookup for environment variable
-[`CUBEJS_DB_TYPE`](/reference/configuration/environment-variables#cubejs_db_type) to resolve the data source type.
-
-### `context_to_roles`
-
-<Warning>
-
-`context_to_roles` is deprecated and will be removed in a future release.
-Use [`context_to_groups`](#context_to_groups) instead.
-
-</Warning>
-
-Used by [access policies][ref-dap]. This option is used to derive a list of
-[data access roles][ref-dap-roles] from the [security context][ref-sec-ctx].
-
-<CodeGroup>
-
-```python title="Python"
-from cube import config
-
-@config('context_to_roles')
-def context_to_roles(ctx: dict) -> list[str]:
-  return ctx['securityContext'].get('roles', ['default'])
-```
-
-```javascript title="JavaScript"
-
-module.exports = {
-  contextToRoles: ({ securityContext }) => {
-    return securityContext.roles || ['default']
-  }
-}
-```
-
-</CodeGroup>
-
-
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
 [link-express-cors-opts]:
@@ -1568,7 +1504,6 @@ module.exports = {
 [ref-sec-ctx]: /docs/data-modeling/access-control/context
 [self-pre-aggregations-schema]: #pre_aggregations_schema
 [self-opts-ctx-to-appid]: #context_to_app_id
-[self-driver-factory]: #driver_factory
 [ref-schema-ref-datasource]: /reference/data-modeling/cube#data_source
 [self-repofactory]: #repository_factory
 [ref-exec-environment-globals]: /docs/data-modeling/dynamic/schema-execution-environment#nodejs-globals-processenv-consolelog-and-others
@@ -1577,7 +1512,7 @@ module.exports = {
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
-[ref-websockets]: /reference/core-data-apis/rest-api/real-time-data-fetch
+[ref-websockets]: /recipes/core-data-api/real-time-data-fetch
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
@@ -1586,6 +1521,6 @@ module.exports = {
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-dap-roles]: /docs/data-modeling/data-access-policies#data-access-roles
 [ref-auth-integration]: /docs/data-modeling/access-control#authentication-integration
-[ref-dax-api]: /reference/dax-api
+[ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-ntlm]: /docs/integrations/power-bi/ntlm
 [ref-environments]: /admin/deployment/environments

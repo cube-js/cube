@@ -43,9 +43,7 @@ No fanout, no manual workarounds.
 <Warning>
 
 Multi-fact views are powered by Tesseract, the [next-generation data modeling
-engine][link-tesseract]. Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
-enable it.
+engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
 
@@ -338,8 +336,6 @@ separate-subquery-then-join strategy described
 
 This rewrite applies only when:
 
-- The Tesseract SQL planner is enabled via
-  [`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env].
 - Both sides of the join condition resolve to the **same underlying cube
   member** (a shared dimension), and the join key is composed only of
   dimensions.
@@ -542,5 +538,4 @@ to that fact's subquery.
 [ref-view-ref]: /reference/data-modeling/view
 [ref-segments]: /reference/data-modeling/segments
 [ref-sql-api]: /reference/core-data-apis/sql-api
-[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
 [link-tesseract]: https://cube.dev/blog/introducing-tesseract

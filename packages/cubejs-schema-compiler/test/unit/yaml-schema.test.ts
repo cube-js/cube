@@ -859,7 +859,7 @@ cubes:
             - name: count
               type: count
           accessPolicy:
-            - role: admin
+            - group: admin
               conditions:
                 - if: "{ security_context.isNotBlocked }"
               rowLevel:
@@ -888,7 +888,7 @@ cubes:
               memberLevel:
                 includes:
                   - status
-            - role: manager
+            - group: manager
               memberLevel:
                 excludes:
                   - status
@@ -1742,7 +1742,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -1792,7 +1792,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -1825,7 +1825,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -2192,7 +2192,8 @@ cubes:
       const [sql] = query.buildSqlAndParams();
       expect(sql).not.toMatch(/CASE\s+WHEN/);
       expect(sql).not.toMatch(/owner_id\s*=/);
-      expect(sql).toMatch(/-1\s+"transactions__total_cost"/);
+      // The Tesseract planner parenthesizes the masked literal, e.g. `(-1)`.
+      expect(sql).toMatch(/\(?-1\)?\s+"transactions__total_cost"/);
     });
 
     it('still applies conditional CASE WHEN masking for aggregate measures when the filter member is in the group by', async () => {
@@ -2230,6 +2231,48 @@ cubes:
             values: ['42'],
           }
         }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/owner_id/);
+    });
+
+    it('tesseract: still applies conditional CASE WHEN masking for aggregate measures when the filter member is in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id', 'transactions.owner_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+        useNativeSqlPlanner: true,
       });
       const [sql] = query.buildSqlAndParams();
       expect(sql).toMatch(/CASE\s+WHEN/);
@@ -2274,6 +2317,53 @@ cubes:
           },
         ],
       });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/product_id/);
+      expect(sql).not.toMatch(/Maximum call stack/);
+    });
+
+    it('tesseract: does not recurse when filter member is also masked', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: items
+    sql_table: public.items
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: product_id
+        sql: product_id
+        type: number
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['items.count'],
+        dimensions: ['items.product_id', 'items.price'],
+        maskedMembers: [
+          {
+            member: 'items.product_id',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+          {
+            member: 'items.price',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+        ],
+        useNativeSqlPlanner: true,
+      });
+      // The filter member (product_id) is itself masked; rendering the mask filter
+      // through the "skip"-masking unmasked tree must not recurse back into masking.
       const [sql] = query.buildSqlAndParams();
       expect(sql).toMatch(/CASE\s+WHEN/);
       expect(sql).toMatch(/product_id/);

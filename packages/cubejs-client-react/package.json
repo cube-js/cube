@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "1.6.64",
+  "version": "1.7.4",
   "author": "Cube Dev, Inc.",
   "license": "MIT",
   "engines": {},
@@ -24,11 +24,13 @@
   ],
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "1.6.64",
+    "@cubejs-client/core": "1.7.4",
     "core-js": "^3.6.5",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.13.8",
+    "@babel/eslint-parser": "^7",
     "@types/ramda": "^0.27.40",
     "@types/react": "^16.9.41",
     "eslint": "^7.21.0",

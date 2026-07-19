@@ -5,21 +5,18 @@ use std::rc::Rc;
 use cubenativeutils::CubeError;
 use typed_builder::TypedBuilder;
 
-use crate::{
-    cube_bridge::{
-        base_query_options::{
-            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, FilterValue, MaskedMemberItem,
-            OrderByItem, TimeDimension,
-        },
-        base_tools::BaseTools,
-        evaluator::CubeEvaluator,
-        join_graph::JoinGraph,
-        join_hints::JoinHintItem,
-        options_member::OptionsMember,
-        security_context::SecurityContext,
-        subquery_join::SubqueryJoin,
+use crate::cube_bridge::{
+    base_query_options::{
+        BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, FilterValue, MaskedMemberItem,
+        OrderByItem, TimeDimension,
     },
-    impl_static_data,
+    base_tools::BaseTools,
+    evaluator::CubeEvaluator,
+    join_graph::JoinGraph,
+    join_hints::JoinHintItem,
+    options_member::OptionsMember,
+    security_context::SecurityContext,
+    subquery_join::SubqueryJoin,
 };
 
 /// Mock implementation of BaseQueryOptions for testing
@@ -65,6 +62,8 @@ pub struct MockBaseQueryOptions {
     #[builder(default)]
     pre_aggregation_query: Option<bool>,
     #[builder(default)]
+    pre_aggregations_match_only: Option<bool>,
+    #[builder(default)]
     use_original_sql_pre_aggregations_in_pre_aggregation: Option<bool>,
     #[builder(default)]
     total_query: Option<bool>,
@@ -95,6 +94,7 @@ impl_static_data!(
     ungrouped,
     export_annotated_sql,
     pre_aggregation_query,
+    pre_aggregations_match_only,
     use_original_sql_pre_aggregations_in_pre_aggregation,
     total_query,
     cubestore_support_multistage,

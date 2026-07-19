@@ -60,6 +60,9 @@ export class DruidQuery extends BaseQuery {
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    // Druid evaluates CURRENT_TIMESTAMP in the sqlTimeZone query context, which
+    // defaults to UTC — assumes the connection does not override sqlTimeZone
+    templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP';
 
     return templates;
   }

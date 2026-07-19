@@ -91,6 +91,12 @@ cubes:
     expect(fullNameDim!.links![0].icon).toBe('brand-google');
     expect(fullNameDim!.links![0].target).toBe('blank');
 
+    // The send_email link does not set a target in the model, so target
+    // must not be stamped into the meta (no implicit 'blank' default).
+    expect(fullNameDim!.links![1].label).toBe('Write an email');
+    expect(fullNameDim!.links![1].target).toBeUndefined();
+    expect('target' in fullNameDim!.links![1]).toBe(false);
+
     const syntheticDim = usersCube!.config.dimensions.find(
       (d: any) => d.name === 'users.full_name___link_google_search_url'
     );
@@ -266,6 +272,25 @@ cubes:
       expect(fullNameDim!.links![0].dashboard).toBe('abc123');
     });
 
+    it('should not stamp a default target on dashboard links', async () => {
+      const compilers = prepareYamlCompiler(schemaWithDashboardLink);
+      await compilers.compiler.compile();
+
+      const { metaTransformer } = compilers;
+      const { cubes } = metaTransformer;
+      const usersCube = cubes.find((c: any) => c.config.name === 'users');
+      expect(usersCube).toBeDefined();
+
+      const fullNameDim = usersCube!.config.dimensions.find(
+        (d: any) => d.name === 'users.full_name'
+      );
+      expect(fullNameDim).toBeDefined();
+      // The dashboard link does not specify a target, so meta must not
+      // force target: 'blank' onto it.
+      expect(fullNameDim!.links![0].target).toBeUndefined();
+      expect('target' in fullNameDim!.links![0]).toBe(false);
+    });
+
     it('should not allow both url and dashboard on same link', async () => {
       const invalidSchema = `
 cubes:
@@ -434,7 +459,7 @@ views:
           - full_name
           - email
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - full_name
@@ -485,7 +510,7 @@ views:
           - full_name
           - email
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes:
             - full_name
@@ -535,7 +560,7 @@ views:
       - join_path: users
         includes: "*"
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: "*"
 `;

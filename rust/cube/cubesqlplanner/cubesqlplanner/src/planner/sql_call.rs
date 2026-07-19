@@ -337,6 +337,26 @@ impl SqlCall {
             .collect::<Result<Vec<_>, _>>()?;
 
         let context_values = self.eval_security_context_values(&query_tools);
+
+        // A FILTER_PARAMS column can itself be a template referencing this
+        // call's members (e.g. `.filter(`${CUBE.col}`)`), so the rendered
+        // predicate may still carry `{arg:N}`/`{sv:N}` placeholders. Resolve
+        // them against the just-computed dependencies before the predicate is
+        // spliced into the outer template, which would otherwise leave them
+        // untouched (the outer pass never rescans substituted values).
+        let filter_params = filter_params
+            .iter()
+            .map(|s| {
+                Self::substitute_template(s, &deps, &filter_params, &filter_groups, &context_values)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let filter_groups = filter_groups
+            .iter()
+            .map(|s| {
+                Self::substitute_template(s, &deps, &filter_params, &filter_groups, &context_values)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         Ok((filter_params, filter_groups, deps, context_values))
     }
 
@@ -441,6 +461,7 @@ impl SqlCall {
                         query_tools.clone(),
                         &SqlNodesFactory::new(),
                         filter_params_columns,
+                        visitor.time_shifts().clone(),
                     );
                     return crate::physical_plan::filter::render_filter_item(
                         &context, &subtree, templates,

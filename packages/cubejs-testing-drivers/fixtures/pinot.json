@@ -1,0 +1,298 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+      "CUBEJS_DB_TYPE": "pinot",
+      "CUBEJS_DB_HOST": "pinot-broker",
+      "CUBEJS_DB_PORT": "8099",
+      "CUBEJS_DB_USER": "admin",
+      "CUBEJS_DB_PASS": "mysecret",
+      "CUBEJS_DB_PINOT_NULL_HANDLING": "true",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
+    },
+    "depends_on": ["pinot-broker"],
+    "links": ["pinot-broker"],
+    "ports" : ["4000", "5656"]
+  },
+  "services": {
+    "zookeeper": {
+      "image": "zookeeper:latest",
+      "hostname": "zookeeper",
+      "ports": ["2181"],
+      "environment": {
+        "ZOO_MY_ID": "1",
+        "ZOO_PORT": "2181",
+        "ZOO_SERVERS": "server.1=zookeeper:2888:3888;2181"
+      },
+      "healthcheck": {
+        "test": "nc -z localhost 2181 || exit -1",
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 3,
+        "start_period": "2s"
+      }
+    },
+    "pinot-controller": {
+      "image": "apachepinot/pinot:1.4.0",
+      "hostname": "pinot-controller",
+      "restart": "unless-stopped",
+      "command": "StartController -configFileName /tmp/data/test-resources/controller.conf",
+      "ports": ["9000"],
+      "depends_on": { "zookeeper": { "condition": "service_healthy" } },
+      "healthcheck": {
+        "test": "curl -f \"http://localhost:9000/health\"",
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 3,
+        "start_period": "10s"
+      },
+      "volumes": ["../fixtures/pinot:/tmp/data/test-resources:ro"]
+    },
+    "pinot-broker": {
+      "image": "apachepinot/pinot:1.4.0",
+      "hostname": "pinot-broker",
+      "restart": "unless-stopped",
+      "command": "StartBroker -zkAddress zookeeper:2181 -configFileName /tmp/data/test-resources/broker.conf",
+      "ports": ["8099"],
+      "depends_on": { "pinot-controller": { "condition": "service_healthy" } },
+      "healthcheck": {
+        "test": "curl -f \"http://localhost:8099/health\"",
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 3,
+        "start_period": "10s"
+      },
+      "volumes": ["../fixtures/pinot:/tmp/data/test-resources:ro"]
+    },
+    "pinot-server": {
+      "image": "apachepinot/pinot:1.4.0",
+      "hostname": "pinot-server",
+      "restart": "unless-stopped",
+      "command": "StartServer -zkAddress zookeeper:2181",
+      "ports": ["8098", "8097"],
+      "depends_on": { "pinot-broker": { "condition": "service_healthy" } },
+      "healthcheck": {
+        "test": "curl -f \"http://localhost:8097/health\"",
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 3,
+        "start_period": "10s"
+      }
+    }
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "",
+    "DATE_SUFFIX": "",
+    "CREATE_TBL_PREFIX": "",
+    "CREATE_TBL_SUFFIX": "",
+    "CREATE_SUB_PREFIX": "",
+    "CREATE_SUB_SUFFIX": "",
+    "USE_SCHEMA": ""
+  },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce",
+    "bigecommerce": "bigecommerce",
+    "retailcalendar": "retailcalendar"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TBuildOnlyHalfYear",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "build_only_half_year",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity"
+        ]
+      }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
+        "measures": [
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ],
+        "sqlAlias": "mtdfc"
+      }
+    ]
+  },
+  "skip": [
+    "---------------------------------------",
+    "SKIPPED FOR PINOT (query-only driver: no SQL DDL, no streaming download).",
+    "Seeding + teardown are handled by controller ingestion in runEnvironment.",
+    "---------------------------------------",
+    "must creates a data source",
+    "must download query from the data source via stream",
+    "must delete the data source",
+
+    "---------------------------------------",
+    "Internal (source-materialized) pre-aggregations: Pinot cannot CREATE TABLE,",
+    "so only the External (Cube Store) rollups are exercised.",
+    "---------------------------------------",
+    "for the Customers.RollingInternal",
+    "for the ECommerce.SimpleAnalysisInternal",
+    "for the ECommerce.TimeAnalysisInternal",
+
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
+    "---------------------------------------",
+    "Requires Tesseract (planner-level, not driver-specific).",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
+
+    "---------------------------------------",
+    "TODO(pinot): driver-specific skips to be finalized after the first local",
+    "`yarn pinot-full --mode=local` run against a live Pinot cluster (rolling",
+    "windows / window functions, multi-stage & time-shift measures, month/quarter/",
+    "year interval arithmetic, and any timestamp/timezone rendering differences the",
+    "Pinot dialect does not yet cover).",
+    "---------------------------------------"
+  ],
+  "tesseractSkip": [
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
+    "---------------------------------------",
+    "Rolling windows without an explicit date range still rely on Tesseract-generated",
+    "time series bounds, which the Pinot dialect does not emit yet -- follow-up.",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+
+    "---------------------------------------",
+    "Custom granularity + rolling window without an explicit date range needs the",
+    "Tesseract-generated time series bounds (see above) -- follow-up.",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+
+    "---------------------------------------",
+    "Multi-stage & time-shift measures -- not yet supported by the Pinot dialect.",
+    "---------------------------------------",
+    "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+
+    "---------------------------------------",
+    "SQL API push-down (rollups / rolling windows / window functions) not supported",
+    "on Pinot yet.",
+    "---------------------------------------",
+    "SQL API: Timeshift measure from cube",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: SQL push down push to cube quoted alias",
+
+    "---------------------------------------",
+    "Additional advanced-query dialect gaps surfaced under Tesseract on Pinot.",
+    "---------------------------------------",
+    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
+    "querying BigECommerce: null sum",
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "Tesseract: SQL API: Timeshift measure from cube"
+  ]
+}

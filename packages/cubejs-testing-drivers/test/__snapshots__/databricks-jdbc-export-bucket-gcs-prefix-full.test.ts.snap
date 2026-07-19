@@ -13174,12 +13174,12 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.totalSales": 48.896,
+    "BigECommerce.totalSales": "48.896",
   },
   Object {
     "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.totalSales": 232.88,
+    "BigECommerce.totalSales": "232.88",
   },
 ]
 `;
@@ -19961,6 +19961,657 @@ Array [
     "ECommerce.count": "7",
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T00:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.month": "2020-12-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix SQL API: Extended nested Rollup over asterisk 1`] = `
+Array [
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-100811",
+    "row": 4012,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-102379",
+    "row": 6272,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-102554",
+    "row": 3448,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-102925",
+    "row": 9473,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-105620",
+    "row": 8958,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-107503",
+    "row": 849,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-109183",
+    "row": 7293,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-112172",
+    "row": 7310,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-112515",
+    "row": 2655,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-115546",
+    "row": 4161,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-116127",
+    "row": 9584,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-118437",
+    "row": 1013,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-119284",
+    "row": 8697,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-120327",
+    "row": 4227,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-123001",
+    "row": 3934,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-123372",
+    "row": 2661,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-124296",
+    "row": 4031,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-126928",
+    "row": 8878,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-131492",
+    "row": 3060,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-131492",
+    "row": 3059,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-133648",
+    "row": 1995,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-134915",
+    "row": 2952,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-135069",
+    "row": 7425,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-138422",
+    "row": 2329,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-139661",
+    "row": 1494,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-140949",
+    "row": 2455,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-143567",
+    "row": 4882,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-144568",
+    "row": 3717,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145142",
+    "row": 523,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145653",
+    "row": 5220,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145660",
+    "row": 6205,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145772",
+    "row": 6125,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-147333",
+    "row": 5277,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-149048",
+    "row": 2595,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-150091",
+    "row": 8425,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-151799",
+    "row": 7698,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-160633",
+    "row": 9619,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-160633",
+    "row": 9618,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-163265",
+    "row": 8673,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-119319",
+    "row": 8621,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-124779",
+    "row": 6651,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-132297",
+    "row": 3083,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-133361",
+    "row": 6459,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-141677",
+    "row": 7174,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying BigECommerce with Retail Calendar: totalCountRetailYearAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "42",
+    "BigECommerce.totalCountRetailYearAgo": "2",
+    "RetailCalendar.retail_date": "2020-02-02",
+    "RetailCalendar.retail_date.year": "2020-02-02",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying BigECommerce: multi-stage group by time dimension 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "29.6548",
+    "BigECommerce.totalProfitForQuarter": "619.4485",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "6.1992",
+    "BigECommerce.totalProfitForQuarter": "619.4485",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "583.5945",
+    "BigECommerce.totalProfitForQuarter": "619.4485",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "6.4176",
+    "BigECommerce.totalProfitForQuarter": "394.3386",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "353.6849",
+    "BigECommerce.totalProfitForQuarter": "394.3386",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "34.2361",
+    "BigECommerce.totalProfitForQuarter": "394.3386",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-07-01T00:00:00.000",
+    "BigECommerce.totalProfit": "461.1332",
+    "BigECommerce.totalProfitForQuarter": "461.1332",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "139.997",
+    "BigECommerce.totalProfitForQuarter": "1576.6324",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "1132.6617",
+    "BigECommerce.totalProfitForQuarter": "1576.6324",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "303.9737",
+    "BigECommerce.totalProfitForQuarter": "1576.6324",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying BigECommerce: rolling window YTD without date range 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "11",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "24",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "28",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "37",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "44",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying BigECommerce: rolling window by 2 day without date range 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying BigECommerce: rolling window by 2 month without date range 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "12",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "7",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "10",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "13",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "16",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying SwitchSourceTest: filter by switch dimensions 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "210.98",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "48.896",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "18.368",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "2399.96",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "71.6",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying SwitchSourceTest: full cross join 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "1265.88",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "293.376",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "110.208",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "14399.76",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "429.6",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying SwitchSourceTest: simple cross join 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "421.96",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "97.792",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "36.736",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "4799.92",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "143.2",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-gcs-prefix querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range 1`] = `
+Array [
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "8",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "12",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "6",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "19",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "16",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
   },
 ]
 `;

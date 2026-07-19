@@ -54,6 +54,7 @@ const BRIDGES: BridgeSpec[] = [
       'order',
       'pre_aggregation_id',
       'pre_aggregation_query',
+      'pre_aggregations_match_only',
       'row_limit',
       'security_context',
       'segments',

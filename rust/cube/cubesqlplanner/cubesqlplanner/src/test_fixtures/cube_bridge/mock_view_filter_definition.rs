@@ -1,7 +1,6 @@
 use crate::cube_bridge::view_filter_definition::{
     ViewFilterDefinition, ViewFilterDefinitionStatic,
 };
-use crate::impl_static_data;
 use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;

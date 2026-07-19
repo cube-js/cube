@@ -46,7 +46,7 @@ mod tests {
     use chrono::{Datelike, Duration, Utc};
     use cubeclient::models::{
         V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
-        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
+        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation, V1LoadResultDataColumnar,
     };
     use datafusion::{arrow::datatypes::DataType, physical_plan::displayable};
     use itertools::Itertools;
@@ -6431,24 +6431,18 @@ ORDER BY
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-01-01T00:00:00",
-                        "MultiTypeCube.count": "3",
-                    }),
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-02-01T00:00:00",
-                        "MultiTypeCube.count": "2",
-                    }),
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-03-01T00:00:00",
-                        "MultiTypeCube.count": "1",
-                    }),
-                    json!({
-                        "MultiTypeCube.dim_date0.month": "2024-04-01T00:00:00",
-                        "MultiTypeCube.count": "10",
-                    }),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_date0.month", "MultiTypeCube.count"],
+                    vec![
+                        vec![
+                            json!("2024-01-01T00:00:00"),
+                            json!("2024-02-01T00:00:00"),
+                            json!("2024-03-01T00:00:00"),
+                            json!("2024-04-01T00:00:00"),
+                        ],
+                        vec![json!("3"), json!("2"), json!("1"), json!("10")],
+                    ],
+                ),
             )
             .await;
 
@@ -13586,9 +13580,10 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({"MultiTypeCube.dim_date0": "2024-12-31T01:02:03.500"}),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_date0"],
+                    vec![vec![json!("2024-12-31T01:02:03.500")]],
+                ),
             )
             .await;
 
@@ -13668,9 +13663,10 @@ ORDER BY "source"."str0" ASC
             context
                 .add_cube_load_mock(
                     expected_cube_scan.clone(),
-                    simple_load_response(vec![
-                        json!({format!("MultiTypeCube.dim_date0.{expected_granularity}"): base_date}),
-                    ]),
+                    simple_load_response(
+                        vec![format!("MultiTypeCube.dim_date0.{expected_granularity}")],
+                        vec![vec![json!(base_date)]],
+                    ),
                 )
                 .await;
 
@@ -13714,9 +13710,10 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({"MultiTypeCube.dim_date0": "2024-12-31T01:02:03.500"}),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_date0"],
+                    vec![vec![json!("2024-12-31T01:02:03.500")]],
+                ),
             )
             .await;
 
@@ -13795,9 +13792,10 @@ ORDER BY "source"."str0" ASC
             context
                 .add_cube_load_mock(
                     expected_cube_scan.clone(),
-                    simple_load_response(vec![
-                        json!({format!("MultiTypeCube.dim_date0.{expected_granularity}"): base_date}),
-                    ]),
+                    simple_load_response(
+                        vec![format!("MultiTypeCube.dim_date0.{expected_granularity}")],
+                        vec![vec![json!(base_date)]],
+                    ),
                 )
                 .await;
 
@@ -13841,13 +13839,16 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan.clone(),
-                simple_load_response(vec![
-                    json!({"MultiTypeCube.dim_str0": "foo"}),
-                    json!({"MultiTypeCube.dim_str0": null}),
-                    json!({"MultiTypeCube.dim_str0": "(none)"}),
-                    json!({"MultiTypeCube.dim_str0": "abcd"}),
-                    json!({"MultiTypeCube.dim_str0": "ab__cd"}),
-                ]),
+                simple_load_response(
+                    vec!["MultiTypeCube.dim_str0"],
+                    vec![vec![
+                        json!("foo"),
+                        json!(null),
+                        json!("(none)"),
+                        json!("abcd"),
+                        json!("ab__cd"),
+                    ]],
+                ),
             )
             .await;
 
@@ -13921,8 +13922,19 @@ ORDER BY "source"."str0" ASC
         V1LoadResultAnnotation::new(json!([]), json!([]), json!([]), json!([]))
     }
 
-    pub(crate) fn simple_load_response(data: Vec<serde_json::Value>) -> V1LoadResponse {
-        V1LoadResponse::new(vec![V1LoadResult::new(empty_annotation(), data)])
+    // Build a columnar `{ members, columns }` load response from the mock's members
+    // and one primitive array per member, matching the wire format the transport
+    // consumes.
+    pub(crate) fn simple_load_response<M: Into<String>>(
+        members: Vec<M>,
+        columns: Vec<Vec<serde_json::Value>>,
+    ) -> V1LoadResponse<V1LoadResultDataColumnar> {
+        let members = members.into_iter().map(Into::into).collect();
+
+        V1LoadResponse::new(vec![V1LoadResult::new(
+            empty_annotation(),
+            V1LoadResultDataColumnar::new(members, columns),
+        )])
     }
 
     #[tokio::test]
@@ -13960,7 +13972,7 @@ ORDER BY "source"."str0" ASC
         context
             .add_cube_load_mock(
                 expected_cube_scan,
-                simple_load_response(vec![json!({"MultiTypeCube.dim_str0": "foo"})]),
+                simple_load_response(vec!["MultiTypeCube.dim_str0"], vec![vec![json!("foo")]]),
             )
             .await;
 
@@ -16085,8 +16097,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        // WHY NOT "2025-01-01T00:00:00.000Z".to_string(), ?
-                        "2025-01-01".to_string(),
+                        "2025-01-01T00:00:00.000Z".to_string(),
                         "2025-01-31T23:59:59.999Z".to_string()
                     ])),
                 }]),
@@ -17047,8 +17058,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2024-01-01".to_string(),
-                        "2024-02-29".to_string()
+                        "2024-01-01T00:00:00.000Z".to_string(),
+                        "2024-02-29T00:00:00.000Z".to_string()
                     ]))
                 }]),
                 order: Some(vec![]),
@@ -17277,6 +17288,21 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_pg_catalog_array_agg() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_catalog_array_agg",
+            execute_query(
+                r#"SELECT pg_catalog.array_agg(a) AS labels FROM (VALUES (1), (2), (3)) AS t(a)"#
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_format_function() -> Result<(), CubeError> {
         // Test: Basic usage with a single string
         let result = execute_query(
@@ -17379,6 +17405,56 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("OVER (PARTITION BY"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sort_by_window_expr_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            WITH monthly AS (
+                SELECT
+                    customer_gender,
+                    DATE_TRUNC('month', order_date) AS order_date_month,
+                    MEASURE(sumPrice) AS monthly_spend
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1, 2
+                LIMIT 5000
+            )
+            SELECT
+                customer_gender,
+                order_date_month,
+                monthly_spend,
+                SUM(monthly_spend) OVER (PARTITION BY customer_gender) AS ytd_total
+            FROM monthly
+            ORDER BY ytd_total DESC, customer_gender, order_date_month
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        // ORDER BY must reference the window expression by its generated alias,
+        // not by the raw DataFusion expression name
+        assert!(!sql.contains("PARTITION BY [#"));
+        let window_alias = &regex::Regex::new(r#"OVER \(PARTITION BY [^)]+\) "([^"]+)""#)
+            .unwrap()
+            .captures(&sql)
+            .expect("window expression with alias must be present in generated SQL")[1];
+        assert!(sql.contains(&format!(r#"ORDER BY "{window_alias}" DESC"#)));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -18898,6 +18974,144 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         assert!(error.to_string().contains("required to be pushed down"));
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_order_by_ungrouped_column_returns_error() {
+        init_testing_logger();
+
+        // ORDER BY expression references a column consumed by the Aggregate and not
+        // present in GROUP BY — the query is invalid and must be rejected during
+        // planning instead of producing unresolvable SQL for the data source
+        let error = TestContext::new(DatabaseProtocol::PostgreSQL)
+            .await
+            .convert_sql_to_cube_query(
+                r#"
+                SELECT
+                    CASE
+                        WHEN order_date >= '2024-06-01' THEN 'recent'
+                        ELSE 'older'
+                    END AS time_period,
+                    MEASURE(count) AS cnt
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1
+                ORDER BY CASE WHEN order_date >= '2024-06-01' THEN 1 ELSE 2 END
+                "#,
+            )
+            .await
+            .expect_err("query with ORDER BY over ungrouped column should not plan");
+
+        assert!(error
+            .to_string()
+            .contains("must appear in the GROUP BY clause or be used in an aggregate function"));
+    }
+
+    #[tokio::test]
+    async fn test_cte_order_by_unprojected_column() {
+        init_testing_logger();
+
+        // The CTE's ORDER BY references `cnt`, which is not in the CTE's projection;
+        // the sort column must be resolved through the CTE's aliased projection
+        // during DF post-processing planning
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"
+            WITH t1 AS (
+                SELECT
+                    customer_gender,
+                    taxful_total_price AS price,
+                    MEASURE(count) AS cnt
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1, 2
+            ),
+            t2 AS (
+                SELECT customer_gender, price
+                FROM t1
+                ORDER BY customer_gender, cnt DESC
+            )
+            SELECT * FROM t2
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let request = logical_plan.find_cube_scan().request;
+        assert_eq!(
+            request.dimensions,
+            Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+            ])
+        );
+        assert_eq!(
+            request.order,
+            Some(vec![
+                vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ],
+                vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string(),
+                ],
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn test_distinct_on_cte() {
+        init_testing_logger();
+
+        // DISTINCT ON was silently dropped during planning; it must dedupe,
+        // keeping the first row per group, in DF post-processing over the
+        // inner cube scan
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"
+            WITH t1 AS (
+                SELECT
+                    customer_gender,
+                    taxful_total_price AS price,
+                    MEASURE(count) AS cnt
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1, 2
+            ),
+            t2 AS (
+                SELECT DISTINCT ON (customer_gender) customer_gender, cnt
+                FROM t1
+                ORDER BY customer_gender, cnt DESC
+            )
+            SELECT * FROM t2
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let request = logical_plan.find_cube_scan().request;
+        assert_eq!(
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
+        );
+        assert_eq!(
+            request.dimensions,
+            Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+            ])
+        );
+        // The dedupe must be present in the plan; previously DISTINCT ON was
+        // silently dropped
+        assert!(
+            format!("{:?}", logical_plan).contains("ROW_NUMBER() PARTITION BY"),
+            "plan must contain the DISTINCT ON window: {:?}",
+            logical_plan
+        );
     }
 
     #[tokio::test]

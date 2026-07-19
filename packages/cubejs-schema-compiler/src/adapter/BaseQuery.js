@@ -345,12 +345,10 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
-    if (this.useNativeSqlPlanner && !this.canUseNativeSqlPlannerPreAggregation && !this.neverUseSqlPlannerPreaggregation()) {
-      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
-
-      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
-    }
+    // Tesseract pre-aggregation planning always follows the SQL planner and can't be
+    // toggled independently. The neverUseSqlPlannerPreaggregation() guard still opts
+    // specific query types (e.g. CubeStoreQuery) out for correctness.
+    this.canUseNativeSqlPlannerPreAggregation = this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation();
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -967,7 +965,9 @@ export class BaseQuery {
     };
 
     try {
-      const buildResult = nativeBuildSqlAndParams(queryParams);
+      // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
+      // during the member-SQL callbacks the native planner makes back into JS.
+      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -1009,8 +1009,14 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      // We only consume the pre-aggregation match result here (sql/params are discarded
+      // below), so tell the native planner to skip building the outer query SQL. Otherwise
+      // a rolling-window measure without a date range would throw while rendering its time
+      // series, even though matching itself doesn't need it.
+      preAggregationsMatchOnly: true,
       preAggregationId: this.options.preAggregationId || null,
       securityContext: this.contextSymbols.securityContext,
+      joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       subqueryJoins: this.options.subqueryJoins,
@@ -1113,16 +1119,6 @@ export class BaseQuery {
       ...this.options,
       externalQueryClass: null
     });
-  }
-
-  runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
-        ]
-      );
   }
 
   rollingWindowToDateJoinCondition(granularity) {
@@ -3371,7 +3367,12 @@ export class BaseQuery {
           }
         }
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+        // order_by templates reference members of the measure's owning cube. When
+        // the measure is exposed through a view, those members may be absent or
+        // exposed only under an alias, so resolve them against the owning cube
+        // (from aliasMember, the underlying reference) instead of the view.
+        const orderByCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(orderByCubeName, o.sql), dir: o.dir }));
         let sql;
         let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
@@ -3880,8 +3881,6 @@ export class BaseQuery {
         this.countDistinctApprox(evaluateSql);
     } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
       return `count(distinct ${evaluateSql})`;
-    } else if (symbol.type === 'runningTotal') {
-      return `sum(${evaluateSql})`; // TODO
     }
     if (multiplied) {
       if (symbol.type === 'number' && evaluateSql === 'count(*)') {
@@ -4032,7 +4031,7 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    return localTimestampToUtc(this.timezone, this.timestampFormat(), date);
+    return localTimestampToUtc(this.timezone || 'UTC', this.timestampFormat(), date);
   }
 
   /**
@@ -5397,7 +5396,25 @@ export class BaseQuery {
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
-          { aliasGathering: true }
+          {
+            aliasGathering: true,
+            // Alias gathering may be triggered in the middle of some collection
+            // (e.g. join hints collection for a member whose sql uses FILTER_PARAMS).
+            // Inherited collectors must be shadowed here, otherwise members of the
+            // current query traversed during alias gathering leak into the outer
+            // collection result. Some of those results are cached in the long-lived
+            // compilerCache and would poison unrelated queries (e.g. with extra joins).
+            cubeNames: undefined,
+            joinHints: undefined,
+            memberNames: undefined,
+            subQueryDimensions: undefined,
+            leafMeasures: undefined,
+            compositeCubeMeasures: undefined,
+            foundCompositeCubeMeasures: undefined,
+            memberChildren: undefined,
+            inlineWhereConditions: undefined,
+            collectOriginalSqlPreAggregations: undefined,
+          }
         );
         const memberPath = member.expressionPath();
         let nonAliasSeen = false;

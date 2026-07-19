@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/rank.rs
+expression: result
+---
+orders__balance_eop_a | orders__balance_eop_b
+----------------------+----------------------
+350.00                | 350.00

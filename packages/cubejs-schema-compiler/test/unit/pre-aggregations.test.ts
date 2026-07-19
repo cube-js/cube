@@ -3,6 +3,7 @@ import path from 'path';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
+import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
 
 describe('pre-aggregations', () => {
   it('rollupJoin scheduledRefresh', async () => {
@@ -977,6 +978,181 @@ describe('pre-aggregations', () => {
       expect(originalSqlDesc.sql[0]).toMatch(/SELECT \* FROM public\.orders/);
       expect(originalSqlDesc.loadSql[0]).toMatch(/CREATE TABLE/);
       expect(originalSqlDesc.loadSql[0]).toMatch(/SELECT \* FROM public\.orders/);
+    });
+  });
+
+  // Regression for the pre-aggregation refresh/metadata path: it builds a query from a
+  // rolling pre-agg's references (rolling measure + a time dimension with granularity, but
+  // NO date range) just to find the matching pre-aggregation. Matching must succeed without
+  // building the outer query's rolling-window time series — which can't render without a date
+  // range on dialects that lack generated time series (e.g. Redshift). Pure matching, no DB.
+  describe('rolling pre-aggregation matching without a date range', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+      cube(\`visitors\`, {
+        sql: \`SELECT * FROM visitors\`,
+
+        measures: {
+          count: {
+            type: \`count\`,
+          },
+          rollingCount: {
+            type: \`count\`,
+            rollingWindow: {
+              trailing: \`unbounded\`,
+            },
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          source: {
+            sql: \`source\`,
+            type: \`string\`,
+          },
+          createdAt: {
+            sql: \`created_at\`,
+            type: \`time\`,
+          },
+        },
+
+        preAggregations: {
+          partitionedRolling: {
+            type: \`rollup\`,
+            measures: [CUBE.rollingCount],
+            dimensions: [CUBE.source],
+            timeDimension: CUBE.createdAt,
+            granularity: \`hour\`,
+            partitionGranularity: \`month\`,
+          },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    [PostgresQuery, RedshiftQuery].forEach((QueryClass) => {
+      it(`matches the rolling pre-aggregation (${QueryClass.name})`, async () => {
+        const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+          measures: ['visitors.rollingCount'],
+          dimensions: ['visitors.source'],
+          timeDimensions: [{
+            dimension: 'visitors.createdAt',
+            granularity: 'day',
+            // no dateRange — the shape the refresh/metadata path builds
+          }],
+          timezone: 'UTC',
+          preAggregationsSchema: '',
+        });
+
+        // Must not throw while determining the matching pre-aggregation.
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const ids = (preAggregationsDescription || []).map((d: any) => d.preAggregationId);
+        expect(ids).toContain('visitors.partitionedRolling');
+        expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+      });
+    });
+  });
+
+  // Regression: the SQL API sends query-level joinHints when the queried members alone
+  // don't determine the join root (e.g. dimensions from `products` and a filter on
+  // `customers`, both reachable only through `orders`). Native pre-aggregation matching
+  // re-plans the query and must receive those hints too — without them it fails with
+  // "Can't find join path to join 'products', 'customers'".
+  describe('pre-aggregation matching with query-level join hints', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+      cube(\`orders\`, {
+        sql: \`SELECT * FROM orders\`,
+
+        joins: {
+          customers: {
+            relationship: \`many_to_one\`,
+            sql: \`\${CUBE.customerId} = \${customers.id}\`,
+          },
+          products: {
+            relationship: \`many_to_one\`,
+            sql: \`\${CUBE.productId} = \${products.id}\`,
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          customerId: {
+            sql: \`customer_id\`,
+            type: \`number\`,
+          },
+          productId: {
+            sql: \`product_id\`,
+            type: \`number\`,
+          },
+        },
+      });
+
+      cube(\`customers\`, {
+        sql: \`SELECT * FROM customers\`,
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          state: {
+            sql: \`state\`,
+            type: \`string\`,
+          },
+        },
+      });
+
+      cube(\`products\`, {
+        sql: \`SELECT * FROM products\`,
+
+        dimensions: {
+          id: {
+            sql: \`id\`,
+            type: \`number\`,
+            primaryKey: true,
+          },
+          name: {
+            sql: \`name\`,
+            type: \`string\`,
+          },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it('matching does not lose query-level join hints', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: ['products.name'],
+        filters: [{
+          member: 'customers.state',
+          operator: 'set',
+        }],
+        joinHints: [
+          ['orders', 'products'],
+          ['orders', 'customers'],
+        ],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+      });
+
+      // Must not throw while determining the matching pre-aggregation.
+      expect(query.preAggregations?.preAggregationsDescription()).toEqual([]);
+      expect(query.buildSqlAndParams()[0]).toMatch(/orders/);
     });
   });
 });

@@ -168,6 +168,7 @@ export class DatabricksQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.UTCTIMESTAMP = 'TO_UTC_TIMESTAMP(CURRENT_TIMESTAMP(), CURRENT_TIMEZONE())';
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.BTRIM = 'TRIM({% if args[1] is defined %}{{ args[1] }} FROM {% endif %}{{ args[0] }})';
@@ -177,6 +178,22 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.TRUNC = 'CASE WHEN ({{ args[0] }}) >= 0 THEN FLOOR({{ args_concat }}) ELSE CEIL({{ args_concat }}) END';
+    // Databricks uses Spark datetime patterns (case-sensitive, e.g. `yyyy-MM-dd`) instead of
+    // PostgreSQL TO_CHAR tokens, so translate the common tokens; `MM` (month) is shared by both.
+    // The format arrives as a bound parameter, so translation must happen in SQL via REPLACE;
+    // the nesting order matters: `HH24` is stashed as `@H24@` so that bare `HH` (12-hour in
+    // PostgreSQL, 24-hour in Spark) can be rewritten to `hh` without clobbering it, `DDD`
+    // (day-of-year, same in both) is stashed as `@DOY@` to protect it from the `DD` rule,
+    // `SS` before `MS`/`US` (which emit `S`), `Month`/`Mon`/`Day`/`Dy` before `DD`.
+    // Untranslatable tokens (e.g. `SSSS`, `IYYY`) are left as is and rejected by Databricks
+    templates.functions.TO_CHAR = 'TO_CHAR({{ args[0] }}, ' +
+      'REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(' +
+      '{{ args[1] }}, ' +
+      "'HH12', 'hh'), 'HH24', '@H24@'), 'HH', 'hh'), '@H24@', 'HH'), " +
+      "'MI', 'mm'), 'SS', 'ss'), 'MS', 'SSS'), 'US', 'SSSSSS'), " +
+      "'YYYY', 'yyyy'), 'YY', 'yy'), 'Month', 'MMMM'), 'Mon', 'MMM'), " +
+      "'DDD', '@DOY@'), 'Day', 'EEEE'), 'Dy', 'EEE'), 'DD', 'dd'), '@DOY@', 'DDD'), " +
+      "'AM', 'a'), 'PM', 'a'))";
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
     templates.expressions.extract = '{% if date_part|lower == "epoch" %}unix_timestamp({{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';

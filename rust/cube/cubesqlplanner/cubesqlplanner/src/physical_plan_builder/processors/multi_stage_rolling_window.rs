@@ -72,13 +72,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
                     query_tools.clone(),
                 )
             }
-            MultiStageRollingWindowType::RunningTotal => JoinCondition::new_rolling_total_join(
-                root_alias.clone(),
-                Expr::Reference(QualifiedColumnName::new(
-                    Some(measure_input_alias.clone()),
-                    base_time_dimension_alias,
-                )),
-            ),
         };
 
         join_builder.left_join_table_reference(

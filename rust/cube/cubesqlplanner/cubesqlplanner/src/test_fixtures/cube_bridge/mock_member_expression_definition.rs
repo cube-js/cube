@@ -1,7 +1,6 @@
 use crate::cube_bridge::member_expression::{
     MemberExpressionDefinition, MemberExpressionDefinitionStatic, MemberExpressionExpressionDef,
 };
-use crate::impl_static_data;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;

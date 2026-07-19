@@ -1,5 +1,6 @@
 use std::{
     any::type_name,
+    collections::BTreeSet,
     convert::TryInto,
     mem::swap,
     sync::{Arc, LazyLock},
@@ -11,9 +12,9 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Array,
-            Int32Builder, Int64Array, Int64Builder, IntervalMonthDayNanoArray, ListArray,
-            ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            Date32Array, Date32Builder, Float64Array, Float64Builder, GenericStringArray,
+            Int32Array, Int32Builder, Int64Array, Int64Builder, IntervalMonthDayNanoArray,
+            ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
             StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
             TimestampNanosecondArray, TimestampNanosecondBuilder, TimestampSecondArray,
             UInt32Builder, UInt64Builder,
@@ -31,8 +32,7 @@ use datafusion::{
     logical_plan::create_udf,
     physical_plan::{
         functions::{
-            datetime_expressions::date_trunc, make_scalar_function, make_table_function, Signature,
-            TypeSignature, Volatility,
+            make_scalar_function, make_table_function, Signature, TypeSignature, Volatility,
         },
         udaf::AggregateUDF,
         udf::ScalarUDF,
@@ -47,10 +47,13 @@ use regex::Regex;
 use sha1_smol::Sha1;
 
 use crate::{
-    compile::engine::{
-        df::{coerce::common_type_coercion, columar::if_then_else},
-        information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
-        udf::utils::*,
+    compile::{
+        date_parser::parse_date_str,
+        engine::{
+            df::{coerce::common_type_coercion, columar::if_then_else},
+            information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
+            udf::utils::*,
+        },
     },
     sql::SessionState,
 };
@@ -786,24 +789,46 @@ pub fn create_ends_with_udf() -> ScalarUDF {
 
 pub fn create_to_date_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 2 || args.len() == 3);
+        assert!(args.len() == 2);
 
-        return Err(DataFusionError::NotImplemented(format!(
-            "to_date is not implemented, it's stub"
-        )));
+        let dates = downcast_string_arg!(args[0], "date", i32);
+        let formats = downcast_string_arg!(args[1], "format", i32);
+
+        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+        let mut builder = Date32Builder::new(dates.len());
+        for i in 0..dates.len() {
+            if dates.is_null(i) || formats.is_null(i) {
+                builder.append_null()?;
+                continue;
+            }
+
+            let chrono_format = match formats.value(i) {
+                "YYYY-MM-DD" | "yyyy-MM-dd" => "%Y-%m-%d",
+                format => {
+                    return Err(DataFusionError::NotImplemented(format!(
+                        "TO_DATE format is not supported: {}",
+                        format
+                    )))
+                }
+            };
+            let date = NaiveDate::parse_from_str(dates.value(i), chrono_format).map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Error parsing {:?} in TO_DATE: {}",
+                    dates.value(i),
+                    e
+                ))
+            })?;
+            builder.append_value(date.signed_duration_since(epoch).num_days() as i32)?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
     });
 
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
 
     ScalarUDF::new(
         "to_date",
-        &Signature::one_of(
-            vec![
-                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
-                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Boolean]),
-            ],
-            Volatility::Immutable,
-        ),
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
     )
@@ -875,46 +900,39 @@ pub fn create_date_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
-        let mut args = args
-            .iter()
-            .map(|i| -> Result<ColumnarValue> {
-                if let Some(strings) = i.as_any().downcast_ref::<StringArray>() {
-                    let mut builder = TimestampNanosecondArray::builder(strings.len());
-                    for i in 0..strings.len() {
-                        builder.append_value(
-                            NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
-                                .map_err(|e| DataFusionError::Execution(e.to_string()))?
-                                .and_utc()
-                                .timestamp_nanos_opt()
-                                .unwrap(),
-                        )?;
-                    }
-                    Ok(ColumnarValue::Array(Arc::new(builder.finish())))
-                } else {
-                    assert!(i
-                        .as_any()
-                        .downcast_ref::<TimestampNanosecondArray>()
-                        .is_some());
-                    Ok(ColumnarValue::Array(i.clone()))
-                }
-            })
-            .collect::<Result<Vec<_>>>()?;
-        args.insert(
-            0,
-            ColumnarValue::Scalar(ScalarValue::Utf8(Some("day".to_string()))),
-        );
+        const NANOS_PER_DAY: i64 = 86_400_000_000_000;
+        let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
-        let res = date_trunc(args.as_slice())?;
-        match res {
-            ColumnarValue::Array(a) => Ok(a),
-            ColumnarValue::Scalar(_) => Err(DataFusionError::Internal(
-                "Date trunc returned scalar value for array input".to_string(),
-            )),
+        let mut builder = Date32Builder::new(args[0].len());
+        if let Some(strings) = args[0].as_any().downcast_ref::<StringArray>() {
+            for i in 0..strings.len() {
+                if strings.is_null(i) {
+                    builder.append_null()?;
+                } else {
+                    let date = parse_date_str(strings.value(i))?.date();
+                    builder.append_value(date.signed_duration_since(epoch).num_days() as i32)?;
+                }
+            }
+        } else if let Some(timestamps) = args[0].as_any().downcast_ref::<TimestampNanosecondArray>()
+        {
+            for i in 0..timestamps.len() {
+                if timestamps.is_null(i) {
+                    builder.append_null()?;
+                } else {
+                    builder.append_value(timestamps.value(i).div_euclid(NANOS_PER_DAY) as i32)?;
+                }
+            }
+        } else {
+            return Err(DataFusionError::Execution(format!(
+                "DATE expects a string or timestamp argument, actual: {}",
+                args[0].data_type()
+            )));
         }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
     });
 
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
 
     ScalarUDF::new(
         "date",
@@ -934,8 +952,7 @@ pub fn create_date_udf() -> ScalarUDF {
 pub fn create_makedate_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
 
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Millisecond, None))));
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
 
     ScalarUDF::new(
         "makedate",
@@ -2231,6 +2248,177 @@ pub fn create_patch_measure_udaf() -> AggregateUDF {
         &accumulator,
         &state_type,
     )
+}
+
+pub fn create_string_agg_udaf() -> AggregateUDF {
+    // The bytea variant is advertised to match Postgres' signatures, but only
+    // text values are supported; the accumulator errors on binary input
+    let signature = Signature::one_of(
+        vec![
+            TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+            TypeSignature::Exact(vec![DataType::Binary, DataType::Binary]),
+        ],
+        Volatility::Immutable,
+    );
+    let return_type: ReturnTypeFunction =
+        Arc::new(|inputs| Ok(Arc::new(inputs.first().cloned().unwrap_or(DataType::Utf8))));
+    let accumulator: AccumulatorFunctionImplementation =
+        Arc::new(|distinct| Ok(Box::new(StringAggAccumulator::new(distinct))));
+    let state_type: StateTypeFunction = Arc::new(|_, _| {
+        Ok(Arc::new(vec![
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+        ]))
+    });
+    AggregateUDF::new(
+        "string_agg",
+        &signature,
+        &return_type,
+        &accumulator,
+        &state_type,
+    )
+}
+
+#[derive(Debug)]
+struct StringAggAccumulator {
+    values: Vec<String>,
+    delimiter: Option<String>,
+    distinct: bool,
+}
+
+impl StringAggAccumulator {
+    fn new(distinct: bool) -> Self {
+        Self {
+            values: vec![],
+            delimiter: None,
+            distinct,
+        }
+    }
+}
+
+impl Accumulator for StringAggAccumulator {
+    fn state(&self) -> Result<Vec<ScalarValue>> {
+        let values = self
+            .values
+            .iter()
+            .map(|v| ScalarValue::Utf8(Some(v.clone())))
+            .collect::<Vec<_>>();
+        let delimiter = match &self.delimiter {
+            Some(delimiter) => vec![ScalarValue::Utf8(Some(delimiter.clone()))],
+            None => vec![],
+        };
+        Ok(vec![
+            ScalarValue::List(Some(Box::new(values)), Box::new(DataType::Utf8)),
+            ScalarValue::List(Some(Box::new(delimiter)), Box::new(DataType::Utf8)),
+        ])
+    }
+
+    fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
+        if matches!(
+            values[0].data_type(),
+            DataType::Binary | DataType::LargeBinary
+        ) {
+            return Err(DataFusionError::NotImplemented(
+                "STRING_AGG over bytea values is not supported".to_string(),
+            ));
+        }
+        let value_array = cast(&values[0], &DataType::Utf8)?;
+        let value_array = value_array
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("cast to Utf8 must produce a StringArray");
+        let delimiter_array = cast(&values[1], &DataType::Utf8)?;
+        let delimiter_array = delimiter_array
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("cast to Utf8 must produce a StringArray");
+        for (value, delimiter) in value_array.iter().zip(delimiter_array.iter()) {
+            if self.delimiter.is_none() {
+                if let Some(delimiter) = delimiter {
+                    self.delimiter = Some(delimiter.to_string());
+                }
+            }
+            if let Some(value) = value {
+                self.values.push(value.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        let values_list = states[0]
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .ok_or_else(|| {
+                DataFusionError::Execution(
+                    "STRING_AGG state `values` must be a ListArray".to_string(),
+                )
+            })?;
+        for i in 0..values_list.len() {
+            if values_list.is_null(i) {
+                continue;
+            }
+            let row = values_list.value(i);
+            let row = cast(&row, &DataType::Utf8)?;
+            let row = row
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("cast to Utf8 must produce a StringArray");
+            for value in row.iter().flatten() {
+                self.values.push(value.to_string());
+            }
+        }
+
+        let delimiters_list = states[1]
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .ok_or_else(|| {
+                DataFusionError::Execution(
+                    "STRING_AGG state `delimiter` must be a ListArray".to_string(),
+                )
+            })?;
+        for i in 0..delimiters_list.len() {
+            if self.delimiter.is_some() {
+                break;
+            }
+            if delimiters_list.is_null(i) {
+                continue;
+            }
+            let row = delimiters_list.value(i);
+            let row = cast(&row, &DataType::Utf8)?;
+            let row = row
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("cast to Utf8 must produce a StringArray");
+            if let Some(delimiter) = row.iter().flatten().next() {
+                self.delimiter = Some(delimiter.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    fn evaluate(&self) -> Result<ScalarValue> {
+        if self.values.is_empty() {
+            return Ok(ScalarValue::Utf8(None));
+        }
+        let delimiter = self.delimiter.as_deref().unwrap_or("");
+        let result = if self.distinct {
+            self.values
+                .iter()
+                .map(|v| v.as_str())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(delimiter)
+        } else {
+            self.values
+                .iter()
+                .map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(delimiter)
+        };
+        Ok(ScalarValue::Utf8(Some(result)))
+    }
 }
 
 macro_rules! generate_series_udtf {
@@ -5208,11 +5396,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     register_fun_stub!(udaf, "bit_xor", tsigs = [[Int16], [Int32], [Int64],]);
     register_fun_stub!(udaf, "every", tsig = [Boolean], rettyp = Boolean);
     register_fun_stub!(udaf, "median", argc = 1);
-    register_fun_stub!(
-        udaf,
-        "string_agg",
-        tsigs = [[Utf8, Utf8], [Binary, Binary],]
-    );
     register_fun_stub!(
         udaf,
         "regr_avgx",

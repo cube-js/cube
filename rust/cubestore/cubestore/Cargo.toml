@@ -1,6 +1,6 @@
 [package]
 name = "cubestore"
-version = "1.6.64"
+version = "1.7.4"
 authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -63,7 +63,8 @@ bigdecimal = { version = "0.2.0", features = ["serde"] }
 # Tracking PR with backports: https://github.com/cube-js/rust-s3/pull/1
 # The fork also includes a fix for AWS_STS_REGIONAL_ENDPOINTS
 # See https://github.com/cube-js/rust-s3/pull/1/commits for more details
-rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", rev = "c662b9c66c2929da185c46084fc5f455030ad75f", default-features = false, features = ["tokio", "tokio-native-tls"] }
+# rev = cubestore-0.32.3-backport tip incl. per-operation SSE header (https://github.com/cube-js/rust-s3/pull/2)
+rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", rev = "9deb3475c7963deaa6c30de59771e61af5b15b8f", default-features = false, features = ["tokio", "tokio-native-tls"] }
 deadqueue = "0.2.4"
 reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"

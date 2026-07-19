@@ -43,15 +43,24 @@ views:
 
     meta:
       default_ui_filters:
+        - member: created_at
+          operator: between
+          values: ["7 days ago", "today"]
         - member: status
-          operator: equals
-          values:
-            - completed
+          operator: is
+          values: ["completed"]
 ```
 
 When you select such a view in a new tab, those filters are added to the query
 automatically. They behave exactly like filters you add yourself: you can
 change their values, switch operators, or remove them.
+
+Date range filters can use relative bounds like `7 days ago` or `this month`.
+A relative range resolves each time the query runs, so the window rolls
+forward day over day, and the filter's date editor opens on the **Relative**
+tab showing its bounds. See
+[`default_ui_filters`][ref-default-ui-filters] for the full list of accepted
+operators and values.
 
 Resetting the tab or going back to the view list clears default filters
 along with the rest of the query; they are seeded again the next time you
@@ -62,6 +71,46 @@ select a view.
 You can add dimensions to the pivot by right-clicking on the left pane or in the results header.
 
 Note that chart tables are different from results tables. You can configure pivots in chart tables separately.
+
+## Totals
+
+The totals menu (the **Σ** button) in the results toolbar adds summary rows
+and columns to the results table: **Column Totals** (a pinned row at the
+bottom with a total for each measure column), **Row Totals** (a total for
+each row across the pivoted columns), and **Subtotals** (see below). All
+three can be enabled at once; each setting is saved with the report and
+carries over when you switch the chart type to [Table][ref-table-chart].
+
+### Subtotals
+
+When the table is [pivoted](#pivoting) by two or more dimensions,
+**Subtotals** appends a bold **Total for ‹value›** column after each pivot
+group's columns, at every nesting level — for example, pivoting by year and
+then status adds a **Total for 2024** column after 2024's status columns.
+With fewer than two pivot dimensions the menu item is disabled, and if the
+query changes so the pivot no longer qualifies, subtotals switch off
+automatically.
+
+<Frame>
+  <img src="https://ucarecdn.com/61d36ecc-020f-4d04-b449-b7c983e269ea/92a1bd7f-light.png" alt="Pivoted results table with subtotal columns" />
+</Frame>
+
+Subtotal values are computed by the database — one extra query per pivot
+level — rather than by summing the visible cells, so they are correct for
+non-additive measures such as counts of distinct values and averages, and
+when the [row limit](#limiting) truncates the table. With **Column Totals**
+also enabled, the pinned totals row shows a grand total for each pivot group.
+
+<Note>
+
+- The toggle adds subtotals for all pivot levels at once; there is no
+  per-group control.
+- Subtotals are not available for flat (non-pivoted) tables or in the
+  values-as-rows table layout.
+- [Calculations][ref-calculated-fields] based on window functions, such as
+  **Running total**, are excluded — same as for row and column totals.
+
+</Note>
 
 ## Limiting
 
@@ -109,6 +158,40 @@ change the sort order for any member. Drag and drop members within the sorting c
 </Frame>
 
 When a [pivot](#pivoting) is applied, an additional section with pivot dimensions appears.
+
+## Filling in missing rows
+
+A time-series query only returns rows for date buckets that actually contain
+data. If no orders were created in a given month, that month is simply absent
+from the result — which reads as a misleading gap in tables and charts. Fill
+in missing rows densifies the result so every date bucket in the range is
+present.
+
+To apply it, hover over the header of a time dimension column in the results
+table, expand the context menu, and select **Fill in missing rows**. To turn
+it off, select **Stop filling missing rows** from the same menu. While the
+fill is active, an icon on the column header indicates it.
+
+<Frame>
+  <img src="https://ucarecdn.com/f32deed8-ae99-4582-820e-6d5742330a9e/55f9deba-light.png" alt="Results table column menu with the Fill in missing rows action" />
+</Frame>
+
+The fill works on time dimensions with a year, quarter, month, week, or day
+granularity. The date range comes from the date filters on that dimension, or
+from the earliest and latest dates in the data. In added rows, additive
+measures such as counts and sums are set to `0`; other measures are left
+empty.
+
+The fill doesn't change the query or the generated SQL — the missing rows are
+added when the report is rendered. It is saved with the report and applies
+everywhere it appears, including [dashboards][ref-dashboards].
+
+<Info>
+
+The fill is skipped when it would produce more than 10,000 rows. When that
+happens, the column header indicator warns you.
+
+</Info>
 
 ## Inspecting queries
 
@@ -222,8 +305,11 @@ behaves as intended.
 [ref-configuration]: /docs/data-modeling/configuration
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
+[ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
+[ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
+[ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 

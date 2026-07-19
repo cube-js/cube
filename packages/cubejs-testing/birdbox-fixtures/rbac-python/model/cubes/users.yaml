@@ -18,13 +18,13 @@ cubes:
         primary_key: true
 
     access_policy:
-      - role: "*"
+      - group: "*"
         row_level:
           filters:
             - member: "{CUBE}.city"
               operator: equals
               values: ["{ security_context.auth.userAttributes.city }"]
-      - role: admin
+      - group: admin
         conditions:
           # This thing will fail if there's no auth info in the context
           # Unfortunately, as of now, there's no way to write more complex expressions

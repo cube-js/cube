@@ -68,6 +68,20 @@ cubes:
             type: time
             sql: updated_at
 
+          # CORE-549 neighbor: a dimension `case` referencing a member
+          # (category) not exposed by orders_ms_view. Unlike order_by, `case`
+          # is not re-exported onto the view member, so it is reached through
+          # the view member's direct sql reference and resolves against the
+          # owning cube — it must keep building through the view.
+          - name: category_label
+            type: string
+            case:
+                when:
+                    - sql: "{CUBE.category} = 'books'"
+                      label: Literature
+                else:
+                    label: Other
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -186,6 +200,17 @@ cubes:
             reduce_by:
                 - orders.status
 
+          # reduce_by targets the time dimension itself (bare, no
+          # granularity). When the query selects created_at at some
+          # granularity, that granular dimension must be dropped from the
+          # partition regardless of its granularity suffix (CORE-550).
+          - name: amount_reduce_time
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+
           - name: amount_reduce_all
             type: sum
             sql: "{CUBE.total_amount}"
@@ -290,6 +315,44 @@ cubes:
                 - sql: "{CUBE.total_amount}"
                   dir: desc
 
+          # CORE-549: order_by references a measure (avg_amount) that
+          # orders_ms_view does not expose. Through the view the order_by
+          # SqlCall must resolve against the owning cube (orders), not the
+          # view — otherwise planning fails with "Cannot resolve: avg_amount".
+          - name: amount_rank_order_by_hidden
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.status
+            order_by:
+                - sql: "{CUBE.avg_amount}"
+                  dir: desc
+
+          # CORE-549 neighbor: a measure `filters` referencing a member
+          # (category) not exposed by orders_ms_view. `filters` is not
+          # re-exported onto the view member, so it is reached through the
+          # view member's direct sql reference and resolves against the
+          # owning cube — it must keep building through the view.
+          - name: amount_filtered_hidden
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE.category} = 'books'"
+
+          # Rank reduced by the time dimension (bare) while ordered by a
+          # measure. With created_at selected at a granularity the partition
+          # must be "all outer dims except created_at" (CORE-550); the buggy
+          # planner left created_at_<gran> in PARTITION BY so every partition
+          # held one row and all ranks collapsed to 1.
+          - name: amount_rank_reduce_time
+            type: rank
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+
           # Rank by the raw time dimension itself (order_by is a
           # dimension, not a measure) reduced by created_at — partition
           # is "all outer dims except created_at". First link in the
@@ -332,6 +395,45 @@ cubes:
                 - sql: "{CUBE.adjusted_amount_rank} = 1"
             add_group_by:
                 - orders.created_at
+
+          # CORE-602: end-of-period rank shared by two sibling consumers.
+          # `eop_rank` keeps the last snapshot per status; both consumers
+          # filter on `{eop_rank} = 1`, so a query selecting both must plan
+          # the rank stage once and join both consumers to it.
+          - name: eop_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.created_at}"
+                  dir: desc
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+                keep_only:
+                    - orders.status
+
+          - name: balance_eop_a
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.total_amount}"
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+            filters:
+                - sql: "{CUBE.eop_rank} = 1"
+
+          - name: balance_eop_b
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.total_amount}"
+            grain:
+                include:
+                    - orders.status
+                    - orders.created_at
+            filters:
+                - sql: "{CUBE.eop_rank} = 1"
 
           - name: status_weighted_amount
             type: sum
@@ -529,7 +631,18 @@ views:
           - join_path: orders
             includes:
                 - status
+                - category
                 - created_at
+                - completed_orders
                 - total_amount
+                - amount_exclude_status
+                - amount_keep_only_status
+                - amount_exclude_segment
+                - amount_keep_only_segment
                 - amount_prev_month
                 - mom_growth
+                - amount_reduce_time
+                - amount_rank_reduce_time
+                - amount_rank_order_by_hidden
+                - amount_filtered_hidden
+                - category_label

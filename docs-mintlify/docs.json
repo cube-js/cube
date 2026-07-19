@@ -194,7 +194,8 @@
               "docs/pre-aggregations/using-pre-aggregations",
               "docs/pre-aggregations/matching-pre-aggregations",
               "docs/pre-aggregations/refreshing-pre-aggregations",
-              "docs/pre-aggregations/lambda-pre-aggregations"
+              "docs/pre-aggregations/lambda-pre-aggregations",
+              "docs/pre-aggregations/cube-store-architecture"
             ]
           },
           {
@@ -245,7 +246,6 @@
                   "admin/connect-to-data/data-sources/databricks-jdbc",
                   "admin/connect-to-data/data-sources/druid",
                   "admin/connect-to-data/data-sources/duckdb",
-                  "admin/connect-to-data/data-sources/elasticsearch",
                   "admin/connect-to-data/data-sources/firebolt",
                   "admin/connect-to-data/data-sources/google-bigquery",
                   "admin/connect-to-data/data-sources/hive",
@@ -437,6 +437,8 @@
               "embedding/iframe/analytics-chat",
               "embedding/iframe/creator-mode",
               "embedding/iframe/customization",
+              "embedding/iframe/localization",
+              "embedding/iframe/events",
               {
                 "group": "Authentication",
                 "pages": [
@@ -615,27 +617,48 @@
               {
                 "group": "Data Modeling",
                 "pages": [
+                  {
+                    "group": "Calculations & Metrics",
+                    "pages": [
+                      "recipes/data-modeling/percentiles",
+                      "recipes/data-modeling/nested-aggregates",
+                      "recipes/data-modeling/filtered-aggregates",
+                      "recipes/data-modeling/share-of-total",
+                      "recipes/data-modeling/period-over-period"
+                    ]
+                  },
+                  {
+                    "group": "Query-time parameters",
+                    "pages": [
+                      "recipes/data-modeling/dynamic-rolling-windows",
+                      "recipes/data-modeling/passing-dynamic-parameters-in-a-query"
+                    ]
+                  },
+                  {
+                    "group": "Time Series & Calendars",
+                    "pages": [
+                      "recipes/data-modeling/string-time-dimensions",
+                      "recipes/data-modeling/custom-granularity",
+                      "recipes/data-modeling/custom-calendar",
+                      "recipes/data-modeling/snapshots"
+                    ]
+                  },
+                  {
+                    "group": "User & Event Analytics",
+                    "pages": [
+                      "recipes/data-modeling/active-users",
+                      "recipes/data-modeling/event-analytics",
+                      "recipes/data-modeling/cohort-retention"
+                    ]
+                  },
                   "recipes/data-modeling/style-guide",
                   "recipes/data-modeling/designing-metrics",
-                  "recipes/data-modeling/percentiles",
-                  "recipes/data-modeling/nested-aggregates",
-                  "recipes/data-modeling/filtered-aggregates",
-                  "recipes/data-modeling/share-of-total",
-                  "recipes/data-modeling/period-over-period",
-                  "recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+                  "recipes/data-modeling/entity-attribute-value",
+                  "recipes/data-modeling/dbt",
                   "recipes/data-modeling/using-dynamic-measures",
                   "recipes/data-modeling/dynamic-union-tables",
-                  "recipes/data-modeling/string-time-dimensions",
-                  "recipes/data-modeling/custom-granularity",
-                  "recipes/data-modeling/custom-calendar",
-                  "recipes/data-modeling/entity-attribute-value",
-                  "recipes/data-modeling/snapshots",
-                  "recipes/data-modeling/active-users",
-                  "recipes/data-modeling/event-analytics",
-                  "recipes/data-modeling/cohort-retention",
-                  "recipes/data-modeling/dbt",
-                  "recipes/data-modeling/custom-order",
-                  "recipes/data-modeling/polymorphic-cubes"
+                  "recipes/data-modeling/polymorphic-cubes",
+                  "recipes/data-modeling/custom-order"
                 ]
               },
               {
@@ -705,7 +728,8 @@
             "group": "AI Endpoints",
             "openapi": "/api-reference/chat.yaml",
             "pages": [
-              "POST /chat/stream-chat-state"
+              "POST /chat/stream-chat-state",
+              "POST /chat/abort"
             ]
           },
           {

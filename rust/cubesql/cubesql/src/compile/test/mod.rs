@@ -14,7 +14,7 @@ use crate::{
     transport::{
         CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
         CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
-        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponse, TransportService,
+        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponseColumnar, TransportService,
     },
     CubeError, CubeErrorCauseType,
 };
@@ -694,6 +694,7 @@ pub fn sql_generator(
                     ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
                     ("functions/CURRENTDATE".to_string(), "CURRENT_DATE({{ args_concat }})".to_string()),
                     ("functions/NOW".to_string(), "NOW({{ args_concat }})".to_string()),
+                    ("functions/UTCTIMESTAMP".to_string(), "(NOW() AT TIME ZONE 'UTC')".to_string()),
                     ("functions/DATE_ADD".to_string(), "DATE_ADD({{ args_concat }})".to_string()),
                     ("functions/CONCAT".to_string(), "CONCAT({{ args_concat }})".to_string()),
                     ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
@@ -916,7 +917,7 @@ pub struct TestTransportLoadCall {
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
-    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponse)>>,
+    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponseColumnar)>>,
     load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
 }
 
@@ -936,7 +937,7 @@ impl TestConnectionTransport {
     pub async fn add_cube_load_mock(
         &self,
         req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         self.load_mocks.lock().await.push((req, res));
     }
@@ -1146,7 +1147,7 @@ impl TestContext {
     pub async fn add_cube_load_mock(
         &self,
         mut req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         // Fill in default limit to simplify passing queries as they were in logical plan
         let config_limit = self.config_obj.non_streaming_query_max_row_limit();

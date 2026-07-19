@@ -1,6 +1,5 @@
 use crate::cube_bridge::member_expression::MemberExpressionDefinition;
 use crate::cube_bridge::subquery_join::{SubqueryJoin, SubqueryJoinStatic};
-use crate::impl_static_data;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;

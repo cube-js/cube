@@ -25,7 +25,6 @@ pub type CubeMetaDimensionOrder = cubeclient::models::V1CubeMetaDimensionOrder;
 
 pub type CubeMetaFormat = cubeclient::models::V1CubeMetaFormat;
 // Request/Response
-pub type TransportLoadResponse = cubeclient::models::V1LoadResponse;
 pub type TransportLoadResponseColumnar =
     cubeclient::models::V1LoadResponse<cubeclient::models::V1LoadResultDataColumnar>;
 pub type TransportLoadRequestQuery = cubeclient::models::V1LoadRequestQuery;

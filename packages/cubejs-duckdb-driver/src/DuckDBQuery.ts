@@ -47,7 +47,7 @@ export class DuckDBQuery extends BaseQuery {
     const timeUnit = this.diffTimeUnitForInterval(interval);
     const beginOfTime = this.dateTimeCast('\'1970-01-01 00:00:00.000\'');
 
-    return `${this.dateTimeCast(`'${origin}'`)}' + INTERVAL '${interval}' *
+    return `${this.dateTimeCast(`'${origin}'`)} + INTERVAL '${interval}' *
       floor(
         date_diff('${timeUnit}', ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
         date_diff('${timeUnit}', ${beginOfTime}, ${beginOfTime} + INTERVAL '${interval}')
@@ -61,6 +61,9 @@ export class DuckDBQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    // AT TIME ZONE on TIMESTAMPTZ yields a naive TIMESTAMP in UTC (requires the ICU
+    // extension, which is bundled and autoloaded in the DuckDB builds used by the driver)
+    templates.functions.UTCTIMESTAMP = '(NOW() AT TIME ZONE \'UTC\')';
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.STRING_AGG = 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}, COALESCE({{ args[1] }}, \'\'))';

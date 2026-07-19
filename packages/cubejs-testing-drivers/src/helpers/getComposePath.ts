@@ -57,6 +57,16 @@ export function getComposePath(type: string, fixture: Fixture, isLocal: boolean)
     };
   }
 
+  // Multi-container backends (e.g. Pinot) declare their data-plane services here.
+  if (fixture.services) {
+    Object.keys(fixture.services).forEach((name) => {
+      compose.services[name] = {
+        ...fixture.services![name],
+        container_name: name,
+      };
+    });
+  }
+
   fs.writeFileSync(
     path.resolve(_path, _file),
     YAML.stringify(compose),

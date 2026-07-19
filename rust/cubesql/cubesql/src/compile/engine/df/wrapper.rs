@@ -575,18 +575,29 @@ impl Remapper {
         }
 
         if let Some(from_alias) = &self.from_alias {
-            // Always map the column under the new from_alias so plans above (which see
-            // this remapper's output through `from_alias`) can resolve it. When the
-            // source column already had a different relation, also keep a mapping under
-            // that original relation, so plans that still reference the inner qualifier
-            // continue to resolve.
-            self.remapping.insert(
-                Column {
-                    name: original_column.name.clone(),
-                    relation: Some(from_alias.clone()),
-                },
-                target_column.clone(),
-            );
+            // Map the column under the new from_alias so plans above (which see
+            // this remapper's output through `from_alias`) can resolve it. When join sides
+            // project colliding column names, the column actually qualified with `from_alias`
+            // owns this mapping; a column from another relation only fills a vacancy, so it
+            // cannot clobber the from-side column's mapping. When the source column has a
+            // different relation, also keep a mapping under that original relation, so plans
+            // that still reference the inner qualifier continue to resolve.
+            //
+            // NOTE: this relies on the from-side column being added before a colliding
+            // column from another relation. If the other side is added first, its vacancy
+            // fill maps `{from_alias}.{name}` to its own target, and a later add of the
+            // actual from-side column short-circuits on that entry in `add_column`/`add_expr`,
+            // returning the other side's alias. Callers iterate the from side's columns
+            // before joined sides' ones, preserving this invariant.
+            let from_alias_column = Column {
+                name: original_column.name.clone(),
+                relation: Some(from_alias.clone()),
+            };
+            let original_is_from_side = original_column.relation.as_ref() == Some(from_alias);
+            if original_is_from_side || !self.remapping.contains_key(&from_alias_column) {
+                self.remapping
+                    .insert(from_alias_column, target_column.clone());
+            }
             if let Some(original_relation) = &original_column.relation {
                 if original_relation != from_alias {
                     self.remapping
@@ -1624,9 +1635,33 @@ impl WrappedSelectNode {
         )
         .await?;
 
+        // Sort expressions can reference window expressions computed in this same select
+        // by their full DataFusion name. Those columns don't exist in the source SQL, so
+        // rewrite them to the generated window aliases, which ORDER BY can reference by name.
+        let order_expr = if window.is_empty() {
+            self.order_expr.clone()
+        } else {
+            let window_columns = self
+                .window_expr
+                .iter()
+                .zip(window.iter())
+                .map(|(window_expr, (aliased_column, _))| {
+                    Ok((
+                        Column::from_name(expr_name(window_expr, schema)?),
+                        Column::from_name(&aliased_column.alias),
+                    ))
+                })
+                .collect::<result::Result<HashMap<_, _>, CubeError>>()?;
+            let window_columns_ref = window_columns.iter().collect();
+            self.order_expr
+                .iter()
+                .map(|e| replace_col(e.clone(), &window_columns_ref))
+                .collect::<Result<Vec<_>>>()?
+        };
+
         let (order, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.order_expr.iter().cloned(),
+            order_expr,
             sql,
             generator.clone(),
             column_remapping,
@@ -3752,13 +3787,15 @@ impl WrappedSelectNode {
                                 let aliased_column = find_column(&self.aggr_expr, &aggregate)
                                     .or_else(|| find_column(&self.projection_expr, &projection))
                                     .or_else(|| find_column(&flat_group_expr, &group_by))
+                                    .or_else(|| find_column(&self.window_expr, &window))
                                     .ok_or_else(|| {
                                         DataFusionError::Execution(format!(
-                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
+                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?} or window {:?}",
                                             col_name,
                                             self.projection_expr,
                                             self.aggr_expr,
-                                            flat_group_expr
+                                            flat_group_expr,
+                                            self.window_expr
                                         ))
                                     })?;
                                 Ok(vec![

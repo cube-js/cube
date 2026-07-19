@@ -1,0 +1,36 @@
+[package]
+name = "cube-cli"
+# Kept in lockstep with the Cube monorepo version (lerna.json). The release
+# workflow overrides this from the pushed `v*` tag at build time.
+version = "1.7.2"
+edition = "2021"
+description = "Cube Cloud command line interface"
+license = "Apache-2.0"
+repository = "https://github.com/cube-js/cube"
+homepage = "https://cube.dev"
+
+[[bin]]
+name = "cube"
+path = "src/main.rs"
+
+# Standalone workspace: this crate is released on its own cadence and
+# intentionally does not join the rust/cube workspace.
+[workspace]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+inquire = "0.7"
+owo-colors = "4"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+toml = "0.8"
+etcetera = "0.8"
+
+[profile.release]
+lto = "thin"
+strip = true
+codegen-units = 1

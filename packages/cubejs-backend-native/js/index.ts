@@ -5,6 +5,7 @@ import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
 import { CacheMode } from '@cubejs-backend/shared';
 import { NativeQueryResultRef, ResultWrapper } from './ResultWrapper';
+import { ColumnarChunkBuilder } from './ColumnarChunkBuilder';
 
 export * from './ResultWrapper';
 
@@ -285,17 +286,17 @@ function wrapNativeFunctionWithStream(
       if (response && response.stream) {
         writerOrChannel.start();
 
-        let chunkBuffer: any[] = [];
+        const chunkBuilder = new ColumnarChunkBuilder(chunkLength);
         const writable = new Writable({
           objectMode: true,
           highWaterMark: chunkLength,
           write(row: any, encoding: BufferEncoding, callback: (error?: (Error | null)) => void) {
-            chunkBuffer.push(row);
-            if (chunkBuffer.length < chunkLength) {
+            chunkBuilder.push(row);
+            if (chunkBuilder.count() < chunkLength) {
               callback(null);
             } else {
-              const toSend = chunkBuffer;
-              chunkBuffer = [];
+              const toSend = chunkBuilder.toBuffer();
+              chunkBuilder.reset();
               writerOrChannel.chunk(toSend, callback);
             }
           },
@@ -307,9 +308,9 @@ function wrapNativeFunctionWithStream(
                 writerOrChannel.end(callback);
               }
             };
-            if (chunkBuffer.length > 0) {
-              const toSend = chunkBuffer;
-              chunkBuffer = [];
+            if (!chunkBuilder.isEmpty()) {
+              const toSend = chunkBuilder.toBuffer();
+              chunkBuilder.reset();
               writerOrChannel.chunk(toSend, end);
             } else {
               end(null);
@@ -535,7 +536,6 @@ export interface PyConfiguration {
   contextToApiScopes?: () => Promise<string[]>
   scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
   scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
-  contextToRoles?: (ctx: unknown) => Promise<string[]>
   contextToGroups?: (ctx: unknown) => Promise<string[]>
 }
 
