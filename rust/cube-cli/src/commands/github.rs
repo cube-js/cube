@@ -35,7 +35,8 @@ enum Cmd {
     Connect {
         /// Deployment id
         deployment: i64,
-        /// Repository as owner/repo, e.g. cube-js/cube
+        /// Repository name, e.g. cube (an owner/repo form is also
+        /// accepted; the owner is implied by the installation)
         repo: String,
         /// GitHub App installation id the repository belongs to
         #[arg(long)]
@@ -102,11 +103,15 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             branch,
             data,
         } => {
-            let (owner, name) = split_repo(&repo)?;
+            // Accept either a plain repo name or owner/repo; the owner is
+            // implied by the installation, so only the name is sent.
+            let name = match repo.rsplit_once('/') {
+                Some((_, name)) => name,
+                None => repo.as_str(),
+            };
             let mut body = serde_json::Map::new();
             body.insert("installationId".into(), serde_json::json!(installation));
-            body.insert("owner".into(), serde_json::json!(owner));
-            body.insert("repo".into(), serde_json::json!(name));
+            body.insert("name".into(), serde_json::json!(name));
             util::set(&mut body, "branch", &branch);
             for (k, v) in util::parse_data(data.as_deref())? {
                 body.insert(k, v);
