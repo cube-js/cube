@@ -204,6 +204,12 @@ describe('transformMetaExtended helpers', () => {
     expect(handledCube).toHaveProperty('sql_table');
     expect(handledCube.sql_table).toBe('public.users');
   });
+
+  test('transformCube - sql_table is undefined when not defined', () => {
+    const handledCube = transformCube(MOCK_USERS_CUBE, { MockUsersCube: MOCK_USERS_CUBE });
+    expect(handledCube).toBeDefined();
+    expect(handledCube.sql_table).toBeUndefined();
+  });
   
   test('transformDimension', () => {
     const handledDimension = transformDimension(MOCK_USERS_CUBE.dimensions.id, MOCK_USERS_CUBE);
