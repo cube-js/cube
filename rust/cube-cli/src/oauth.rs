@@ -133,7 +133,12 @@ pub async fn poll_for_token(
         if let Some(secret) = &cfg.client_secret {
             form.push(("client_secret", secret));
         }
-        let res = http.post(&endpoint).form(&form).send().await?;
+        // Transient network failures (server redeploy, flaky connection) must
+        // not abort the login — keep polling until the device code expires.
+        let res = match http.post(&endpoint).form(&form).send().await {
+            Ok(res) => res,
+            Err(_) => continue,
+        };
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
 

@@ -9,6 +9,7 @@ pub mod deployments;
 pub mod embed;
 pub mod environments;
 pub mod folders;
+pub mod github;
 pub mod groups;
 pub mod integrations;
 pub mod login;
