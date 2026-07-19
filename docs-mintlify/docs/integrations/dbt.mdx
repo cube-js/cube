@@ -49,8 +49,9 @@ the underlying tables were already built by your own production `dbt run`.
 ## Prerequisites
 
 - **A supported data warehouse.** dbt pull supports **Snowflake**,
-  **Amazon Redshift**, **PostgreSQL**, and **Google BigQuery**. If your deployment
-  uses any other database type, the pull dialog will tell you it's unsupported.
+  **Amazon Redshift**, **PostgreSQL**, **Google BigQuery**, **Databricks**, and
+  **Amazon Athena**. If your deployment uses any other database type, the pull
+  dialog will tell you it's unsupported.
 - **A Git repository** containing your dbt project, reachable over **HTTPS** or
   **SSH**. GitHub, GitLab, Bitbucket, Azure DevOps, and self-hosted Git servers all
   work.
@@ -237,8 +238,10 @@ For each dbt model in your project:
 - **One cube** is created (one `.yml` file per model), named
   `<name prefix><model name>` with title `<title prefix><model alias or name>`.
 - **`sql_table`** is set to the model's fully-qualified relation,
-  `database.schema.model` (empty parts are dropped, so e.g. Postgres yields
-  `schema.model`).
+  `database.schema.model` (empty parts are dropped, so e.g. Postgres and Athena
+  yield `schema.model`). On Databricks, the first segment is the catalog: the
+  value of the deployment's `CUBEJS_DB_DATABRICKS_CATALOG` environment variable,
+  or `hive_metastore` if it isn't set.
 - **Each column becomes a dimension.** The dimension type is inferred from the
   column's `data_type` where available, otherwise from the column name:
 
@@ -324,8 +327,8 @@ pull. Keep customizations in a separate cube that `extends` the generated one �
 
 ## Limitations
 
-- **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, and Google
-  BigQuery.
+- **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, Google
+  BigQuery, Databricks, and Amazon Athena.
 - **Imports models, columns, and relationships only** — not dbt metrics, semantic
   models, tests, or exposures.
 - **One-directional** — Cube never pushes anything back to your dbt repository.
@@ -347,7 +350,7 @@ pull only runs against a dev branch.
 <Accordion title="The pull dialog says the database type is unsupported">
 
 Your deployment uses a database other than Snowflake, Amazon Redshift, PostgreSQL,
-or Google BigQuery. dbt pull isn't available for it.
+Google BigQuery, Databricks, or Amazon Athena. dbt pull isn't available for it.
 
 </Accordion>
 
@@ -425,6 +428,11 @@ into the **dbt models schema** you configured, and that the schema matches.
 The `sql_table` is derived from your dbt project and the **dbt models schema**
 setting. Verify that **dbt models schema** matches where your models actually land,
 and that any per-model schema/database overrides in dbt are what you expect.
+
+On Databricks, the catalog segment comes from the deployment's
+`CUBEJS_DB_DATABRICKS_CATALOG` environment variable and defaults to
+`hive_metastore`. If your models live in a Unity Catalog catalog, set
+`CUBEJS_DB_DATABRICKS_CATALOG` to that catalog so generated cubes point at it.
 
 </Accordion>
 
