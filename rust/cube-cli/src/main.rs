@@ -194,6 +194,13 @@ pub fn cli_command() -> clap::Command {
 
 #[tokio::main]
 async fn main() {
+    // Rust ignores SIGPIPE by default, turning `cube ... | head` into a
+    // broken-pipe panic. Restore the default disposition so the process
+    // exits quietly when the reader goes away, like other CLI tools.
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
     let cli = Cli::parse();
     if let Err(err) = run(cli).await {
         eprintln!("error: {err:#}");

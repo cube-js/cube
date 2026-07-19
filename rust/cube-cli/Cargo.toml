@@ -30,6 +30,9 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 toml = "0.8"
 etcetera = "0.8"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [profile.release]
 lto = "thin"
 strip = true

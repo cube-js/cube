@@ -68,11 +68,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             output::print_list(
                 ctx.json,
                 &res,
-                &[
-                    ("ID", "id"),
-                    ("ACCOUNT", "accountLogin"),
-                    ("TYPE", "accountType"),
-                ],
+                &[("INSTALLATION", "installationId"), ("ACCOUNT", "login")],
             );
         }
         Cmd::Repos { installation } => {
@@ -82,15 +78,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     &Vec::new(),
                 )
                 .await?;
-            output::print_list(
-                ctx.json,
-                &res,
-                &[
-                    ("NAME", "fullName"),
-                    ("PRIVATE", "private"),
-                    ("DEFAULT BRANCH", "defaultBranch"),
-                ],
-            );
+            output::print_list(ctx.json, &res, &[("NAME", "name"), ("URL", "htmlUrl")]);
         }
         Cmd::Branches { repo, installation } => {
             let (owner, name) = split_repo(&repo)?;
@@ -101,7 +89,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     &query,
                 )
                 .await?;
-            output::print_list(ctx.json, &res, &[("BRANCH", "name")]);
+            output::print_list(
+                ctx.json,
+                &res,
+                &[("BRANCH", "name"), ("DEFAULT", "isDefault")],
+            );
         }
         Cmd::Connect {
             deployment,

@@ -231,6 +231,7 @@ dependencies = [
  "clap_complete",
  "etcetera",
  "inquire",
+ "libc",
  "owo-colors",
  "reqwest",
  "serde",
