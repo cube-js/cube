@@ -55,6 +55,21 @@ const queryCancelledError = (): Error & { code: string } => Object.assign(
   { code: '57014' }
 );
 
+const disposeAfterCancellation = async (
+  cancellationPromise: Promise<void> | null,
+  disposeConnection: () => Promise<void>
+): Promise<void> => {
+  if (cancellationPromise) {
+    try {
+      await cancellationPromise;
+    } catch {
+      // A failed CancelRequest destroys the connection in the cancellation path.
+    }
+  }
+
+  await disposeConnection();
+};
+
 export type PostgresDriverConfiguration = PgClientConfig & PoolUserOptions & {
   // @deprecated Please use maxPoolSize
   max?: number | undefined;
@@ -426,12 +441,12 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
           types: this.mapFields(fields),
           release: async () => {
             await closeStream();
-            await disposeConnection(false);
+            await disposeAfterCancellation(cancellationPromise, () => disposeConnection(false));
           }
         };
       } catch (error) {
         await closeStream();
-        await disposeConnection(false);
+        await disposeAfterCancellation(cancellationPromise, () => disposeConnection(false));
         throw error;
       }
     })() as MaybeCancelablePromise<StreamTableDataWithTypes>;
@@ -540,7 +555,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       } finally {
         settled = true;
         activeQuery = null;
-        await disposeConnection(false);
+        await disposeAfterCancellation(cancellationPromise, () => disposeConnection(false));
       }
     })() as MaybeCancelablePromise<PgQueryResult<R>>;
 

@@ -1,6 +1,6 @@
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import { StartedTestContainer } from 'testcontainers';
-import { PostgresDriver } from '../src';
+import { PgClient, PostgresDriver } from '../src';
 
 const streamToArray = require('stream-to-array');
 
@@ -324,6 +324,91 @@ describe('PostgresDriver', () => {
     expect((await cancelledResult)?.code).toBe('57014');
     await expect(survivingQuery).resolves.toEqual([{ pg_sleep: '', value: 42 }]);
     await expect(driver.query('SELECT 1 AS value', [])).resolves.toEqual([{ value: 1 }]);
+  });
+
+  test('does not reuse a connection while its cancel request is in flight', async () => {
+    const singleConnectionDriver = new PostgresDriver({
+      host: container.getHost(),
+      port: container.getMappedPort(5432),
+      user: 'test',
+      password: 'test',
+      database: 'test',
+      maxPoolSize: 1,
+    });
+    const marker = `cube-postgres-delayed-cancel-${Date.now()}`;
+    let completeCancelRequest!: () => void;
+    const cancelRequest = new Promise<void>((resolve) => {
+      completeCancelRequest = resolve;
+    });
+    const cancelSpy = jest.spyOn(PgClient.prototype, 'cancelQuery').mockImplementation(
+      async () => cancelRequest
+    );
+    const runningQuery = singleConnectionDriver.query(
+      `SELECT pg_sleep(0.2) /* ${marker} */`,
+      []
+    );
+    let cancelPromise: Promise<void> | null = null;
+    let nextQuery: Promise<Array<{ value: number }>> | null = null;
+
+    try {
+      let observedActiveQuery = false;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const [{ active }] = await driver.query<{ active: string }>(
+          `SELECT count(*)::text AS active
+           FROM pg_stat_activity
+           WHERE state = 'active' AND query LIKE $1`,
+          [`%${marker}%`]
+        );
+        if (active === '1') {
+          observedActiveQuery = true;
+          break;
+        }
+        await pause(50);
+      }
+      expect(observedActiveQuery).toBe(true);
+
+      cancelPromise = runningQuery.cancel!();
+      let nextQuerySettled = false;
+      nextQuery = singleConnectionDriver.query<{ value: number }>('SELECT 42 AS value', []).finally(() => {
+        nextQuerySettled = true;
+      });
+
+      let observedCompletedQuery = false;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const [{ active }] = await driver.query<{ active: string }>(
+          `SELECT count(*)::text AS active
+           FROM pg_stat_activity
+           WHERE state = 'active' AND query LIKE $1`,
+          [`%${marker}%`]
+        );
+        if (active === '0') {
+          observedCompletedQuery = true;
+          break;
+        }
+        await pause(50);
+      }
+      expect(observedCompletedQuery).toBe(true);
+
+      await pause(50);
+      expect(nextQuerySettled).toBe(false);
+
+      completeCancelRequest();
+      await cancelPromise;
+      await expect(runningQuery).resolves.toEqual([{ pg_sleep: '' }]);
+      await expect(nextQuery).resolves.toEqual([{ value: 42 }]);
+    } finally {
+      completeCancelRequest();
+      const cleanupPromises: Promise<unknown>[] = [runningQuery];
+      if (cancelPromise) {
+        cleanupPromises.push(cancelPromise);
+      }
+      if (nextQuery) {
+        cleanupPromises.push(nextQuery);
+      }
+      await Promise.allSettled(cleanupPromises);
+      cancelSpy.mockRestore();
+      await singleConnectionDriver.release();
+    }
   });
 
   // Note: This test MUST be the last in the list.
