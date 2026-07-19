@@ -150,6 +150,19 @@ impl Client {
         if text.trim().is_empty() {
             return Ok(Value::Null);
         }
+        // Cube Cloud serves the web app (200 + HTML) for unknown routes.
+        // Surface that as "endpoint not available" instead of returning the
+        // HTML as a JSON string, which downstream renders as an empty table.
+        let trimmed = text.trim_start();
+        let looks_like_html =
+            trimmed.len() >= 2 && trimmed.starts_with('<') && !trimmed.starts_with("<?xml");
+        if looks_like_html {
+            bail!(
+                "{method} {path} returned the Cube Cloud web app instead of JSON — \
+                 this endpoint is not available on this tenant (the server may be \
+                 running an older version)"
+            );
+        }
         Ok(serde_json::from_str(&text).unwrap_or(Value::String(text)))
     }
 
