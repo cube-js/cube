@@ -4,8 +4,10 @@
  * @fileoverview The `PostgresDriver` and related types declaration.
  */
 
-import { getEnv, assertDataSource, Pool, type PoolUserOptions } from '@cubejs-backend/shared';
-import { types, FieldDef } from 'pg';
+import {
+  getEnv, assertDataSource, Pool, type PoolUserOptions, MaybeCancelablePromise,
+} from '@cubejs-backend/shared';
+import { types, FieldDef, Query, QueryResultRow } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
 import {
@@ -15,7 +17,7 @@ import {
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
-import { PgClient, PgClientConfig } from './PgClient';
+import { PgClient, PgClientConfig, PgQueryResult } from './PgClient';
 import { ConnectionError, PostgresError } from './errors';
 import { dateTypeParser, timestampTypeParser, timestampTzTypeParser } from './type-parsers';
 
@@ -47,6 +49,11 @@ const hllTypeParser = (val: string) => Buffer.from(
   val.slice(2),
   'hex'
 ).toString('base64');
+
+const queryCancelledError = (): Error & { code: string } => Object.assign(
+  new Error('Query was cancelled'),
+  { code: '57014' }
+);
 
 export type PostgresDriverConfiguration = PgClientConfig & PoolUserOptions & {
   // @deprecated Please use maxPoolSize
@@ -350,39 +357,108 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     });
   }
 
-  public async stream(
+  public stream(
     query: string,
     values: unknown[],
     { highWaterMark }: StreamOptions
-  ): Promise<StreamTableDataWithTypes> {
-    PostgresDriver.checkValuesLimit(values);
+  ): MaybeCancelablePromise<StreamTableDataWithTypes> {
+    let connection: PgClient | null = null;
+    let queryStream: QueryStream | null = null;
+    let streamClosedPromise: Promise<void> | null = null;
+    let cancelled = false;
+    let cancellationPromise: Promise<void> | null = null;
+    let disposalPromise: Promise<void> | null = null;
 
-    const conn = await this.pool.acquire();
+    const disposeConnection = (destroy: boolean): Promise<void> => {
+      if (!connection || disposalPromise) {
+        return disposalPromise || Promise.resolve();
+      }
 
-    try {
-      await this.prepareConnection(conn);
+      const operation = destroy ? this.pool.destroy(connection) : this.pool.release(connection);
+      disposalPromise = operation;
+      return operation;
+    };
 
-      const queryStream = new QueryStream(query, values, {
-        types: {
-          getTypeParser: this.getTypeParser,
-        },
-        highWaterMark
-      });
-      const rowStream: QueryStream = await conn.query(queryStream);
-      const fields = await rowStream.fields();
+    const closeStream = async (): Promise<void> => {
+      if (queryStream && streamClosedPromise) {
+        queryStream.destroy();
+        await streamClosedPromise;
+      }
+    };
 
-      return {
-        rowStream,
-        types: this.mapFields(fields),
-        release: async () => {
-          await this.pool.release(conn);
+    const promise = (async () => {
+      PostgresDriver.checkValuesLimit(values);
+      connection = await this.pool.acquire();
+
+      try {
+        if (cancelled) {
+          throw queryCancelledError();
         }
-      };
-    } catch (e) {
-      await this.pool.release(conn);
 
-      throw e;
-    }
+        const conn = connection;
+        await this.prepareConnection(conn);
+        if (cancelled) {
+          throw queryCancelledError();
+        }
+
+        queryStream = new QueryStream(query, values, {
+          types: {
+            getTypeParser: this.getTypeParser,
+          },
+          highWaterMark
+        });
+        streamClosedPromise = new Promise<void>((resolve) => {
+          queryStream!.once('end', resolve);
+          queryStream!.once('close', resolve);
+          // Consumers still receive the error; this listener prevents cancellation
+          // from creating an unhandled stream error before they attach their own.
+          queryStream!.once('error', () => undefined);
+        });
+
+        const rowStream: QueryStream = conn.query(queryStream);
+        const fields = await rowStream.fields();
+        if (cancelled) {
+          throw queryCancelledError();
+        }
+
+        return {
+          rowStream,
+          types: this.mapFields(fields),
+          release: async () => {
+            await closeStream();
+            await disposeConnection(false);
+          }
+        };
+      } catch (error) {
+        await closeStream();
+        await disposeConnection(false);
+        throw error;
+      }
+    })() as MaybeCancelablePromise<StreamTableDataWithTypes>;
+
+    promise.cancel = () => {
+      cancelled = true;
+
+      if (!cancellationPromise) {
+        cancellationPromise = (async () => {
+          if (connection && queryStream) {
+            try {
+              await connection.cancelQuery(queryStream);
+            } catch (error) {
+              await disposeConnection(true);
+              throw error;
+            }
+
+            await closeStream();
+            await disposeConnection(false);
+          }
+        })();
+      }
+
+      return cancellationPromise;
+    };
+
+    return promise;
   }
 
   protected static checkValuesLimit(values?: unknown[]) {
@@ -408,21 +484,88 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
-  protected async queryResponse(query: string, values: unknown[]) {
-    PostgresDriver.checkValuesLimit(values);
+  protected queryResponse<R extends QueryResultRow = any>(
+    query: string,
+    values: unknown[]
+  ): MaybeCancelablePromise<PgQueryResult<R>> {
+    let connection: PgClient | null = null;
+    let activeQuery: Query<R> | null = null;
+    let cancelled = false;
+    let settled = false;
+    let cancellationPromise: Promise<void> | null = null;
+    let disposalPromise: Promise<void> | null = null;
 
-    return this.withConnection(async (conn) => {
-      await this.prepareConnection(conn);
+    const disposeConnection = (destroy: boolean): Promise<void> => {
+      if (!connection || disposalPromise) {
+        return disposalPromise || Promise.resolve();
+      }
 
-      const res = await conn.query({
-        text: query,
-        values: values || [],
-        types: {
-          getTypeParser: this.getTypeParser,
-        },
-      });
-      return res;
-    });
+      const operation = destroy ? this.pool.destroy(connection) : this.pool.release(connection);
+      disposalPromise = operation;
+      return operation;
+    };
+
+    const promise = (async () => {
+      PostgresDriver.checkValuesLimit(values);
+      connection = await this.pool.acquire();
+
+      try {
+        if (cancelled) {
+          throw queryCancelledError();
+        }
+
+        const conn = connection;
+        await this.prepareConnection(conn);
+        if (cancelled) {
+          throw queryCancelledError();
+        }
+
+        return await new Promise<PgQueryResult<R>>((resolve, reject) => {
+          activeQuery = new Query<R>({
+            text: query,
+            values: values || [],
+            types: {
+              getTypeParser: this.getTypeParser,
+            },
+          }, (error, result) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(result);
+            }
+          });
+
+          conn.query(activeQuery);
+        });
+      } finally {
+        settled = true;
+        activeQuery = null;
+        await disposeConnection(false);
+      }
+    })() as MaybeCancelablePromise<PgQueryResult<R>>;
+
+    promise.cancel = () => {
+      cancelled = true;
+
+      if (!cancellationPromise) {
+        cancellationPromise = (async () => {
+          if (!settled && connection && activeQuery) {
+            try {
+              await connection.cancelQuery(activeQuery);
+            } catch (error) {
+              // A failed CancelRequest leaves the backend operation's state unknown.
+              // Destroy the borrowed connection so it can never be returned to the pool.
+              await disposeConnection(true);
+              throw error;
+            }
+          }
+        })();
+      }
+
+      return cancellationPromise;
+    };
+
+    return promise;
   }
 
   public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
@@ -434,21 +577,38 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
-    const result = await this.queryResponse(query, values);
-    return result.rows;
+  public query<R = unknown>(
+    query: string,
+    values: unknown[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    options?: QueryOptions
+  ): MaybeCancelablePromise<R[]> {
+    const responsePromise = this.queryResponse(query, values);
+    const promise = responsePromise.then(result => result.rows as R[]) as MaybeCancelablePromise<R[]>;
+
+    // Do not make this method async: async wrapping strips the custom cancel property
+    // before QueryCache has a chance to register it as the cancellation handle.
+    promise.cancel = responsePromise.cancel;
+    return promise;
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+  public downloadQueryResults(
+    query: string,
+    values: unknown[],
+    options: DownloadQueryResultsOptions
+  ): MaybeCancelablePromise<DownloadQueryResultsResult> {
     if (options.streamImport) {
       return this.stream(query, values, options);
     }
 
-    const res = await this.queryResponse(query, values);
-    return {
+    const responsePromise = this.queryResponse(query, values);
+    const promise = responsePromise.then(res => ({
       rows: res.rows,
       types: this.mapFields(res.fields),
-    };
+    })) as MaybeCancelablePromise<DownloadQueryResultsResult>;
+
+    promise.cancel = responsePromise.cancel;
+    return promise;
   }
 
   public override async tableColumnTypes(table: string): Promise<TableStructure> {
