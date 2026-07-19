@@ -87,7 +87,7 @@ Every endpoint of the Console Server public API is covered:
 
 | Group | Endpoints |
 |---|---|
-| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token |
+| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token, advance-step, reset-step |
 | `regions` | list available deployment regions |
 | `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
 | `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, dev-mode, exit-dev-mode, commit, pull |

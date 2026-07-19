@@ -86,6 +86,18 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
     },
+    /// Advance onboarding to a target creation step
+    AdvanceStep {
+        /// Deployment id
+        deployment: i64,
+        /// Target step: project, upload, schema, github, ssh, databases, ready, demo
+        step: String,
+    },
+    /// Reset onboarding back to the first creation step (project)
+    ResetStep {
+        /// Deployment id
+        deployment: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -184,6 +196,24 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             } else {
                 output::success(&format!("Deleted deployment {deployment}"));
             }
+        }
+        Cmd::AdvanceStep { deployment, step } => {
+            let res = api
+                .post(
+                    &format!("/api/v1/deployments/{deployment}/creation-step/advance"),
+                    Some(&serde_json::json!({ "creationStep": step })),
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::ResetStep { deployment } => {
+            let res = api
+                .post(
+                    &format!("/api/v1/deployments/{deployment}/creation-step/reset"),
+                    None,
+                )
+                .await?;
+            output::print_json(&res);
         }
         Cmd::Token { deployment } => {
             let res = api

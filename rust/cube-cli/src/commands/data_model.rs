@@ -105,13 +105,16 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
     },
-    /// Commit and push the active branch
+    /// Commit and push a branch
     Commit {
         /// Deployment id
         deployment: i64,
         /// Commit message
         #[arg(long, short = 'm')]
         message: Option<String>,
+        /// Branch to commit (defaults to the active dev-mode branch)
+        #[arg(long)]
+        branch: Option<String>,
     },
     /// Sync a branch from its remote and rebuild if it moved
     Pull {
@@ -367,9 +370,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         Cmd::Commit {
             deployment,
             message,
+            branch,
         } => {
             let mut body = serde_json::Map::new();
             util::set(&mut body, "message", &message);
+            util::set(&mut body, "branchName", &branch);
             let res = api
                 .post(
                     &format!("/build/api/v1/deployments/{deployment}/commit"),
