@@ -27,10 +27,13 @@ class MysqlFilter extends BaseFilter {
 export class MysqlQuery extends BaseQuery {
   private readonly useNamedTimezones: boolean;
 
+  private readonly useGeneratedTimeSeries: boolean;
+
   public constructor(compilers: any, options: any) {
     super(compilers, options);
 
     this.useNamedTimezones = getEnv('mysqlUseNamedTimezones', { dataSource: this.dataSource });
+    this.useGeneratedTimeSeries = getEnv('mysqlUseGeneratedTimeSeries', { dataSource: this.dataSource });
   }
 
   public newFilter(filter) {
@@ -173,7 +176,7 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public supportGeneratedSeriesForCustomTd(): boolean {
-    return true;
+    return this.useGeneratedTimeSeries;
   }
 
   public intervalString(interval: string): string {
@@ -183,6 +186,7 @@ export class MysqlQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.STRING_AGG = 'GROUP_CONCAT({% if distinct %}DISTINCT {% endif %}{{ args[0] }} SEPARATOR {{ args[1] }})';
+    templates.functions.UTCTIMESTAMP = 'UTC_TIMESTAMP()';
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     templates.quotes.identifiers = '`';
@@ -195,6 +199,8 @@ export class MysqlQuery extends BaseQuery {
     templates.types.timestamp = 'DATETIME';
     delete templates.types.interval;
     templates.types.binary = 'BLOB';
+    // MySQL has no FULL OUTER JOIN
+    delete templates.join_types.full;
 
     templates.expressions.concat_strings = 'CONCAT({{ strings | join(\',\' ) }})';
 
@@ -209,31 +215,45 @@ export class MysqlQuery extends BaseQuery {
       '{% endfor %}' +
       ') AS dates';
 
-    templates.statements.generated_time_series_select =
-      'WITH RECURSIVE date_series AS (\n' +
-      '  SELECT TIMESTAMP({{ start }}) AS date_from\n' +
-      '  UNION ALL\n' +
-      '  SELECT DATE_ADD(date_from, INTERVAL {{ granularity }})\n' +
-      '  FROM date_series\n' +
-      '  WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})\n' +
-      ')\n' +
-      'SELECT CAST(date_from AS DATETIME) AS date_from,\n' +
-      '       CAST(DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME) AS date_to\n' +
-      'FROM date_series';
+    // Generated (recursive CTE based) time series. Recursive CTEs require
+    // MySQL 8.0+, so they are only registered when explicitly enabled via
+    // CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES. When absent, the Tesseract
+    // planner falls back to the portable VALUES/UNION ALL `time_series_select`
+    // template, which also works on MySQL 5.6/5.7.
+    //
+    // The template body becomes the content of `time_series AS (...)` CTE, so
+    // it self-references `time_series` for recursion (no nested WITH). The
+    // outer WITH is emitted as `WITH RECURSIVE` because the
+    // `generated_time_series_recursive` marker below is present.
+    if (this.useGeneratedTimeSeries) {
+      templates.statements.generated_time_series_select =
+        'SELECT CAST(TIMESTAMP({{ start }}) AS DATETIME(6)) AS date_from,\n' +
+        '       CAST(DATE_SUB(DATE_ADD(TIMESTAMP({{ start }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)) AS date_to\n' +
+        'UNION ALL\n' +
+        'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
+        '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6))\n' +
+        'FROM time_series\n' +
+        'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})';
 
-    templates.statements.generated_time_series_with_cte_range_source =
-      'WITH RECURSIVE date_series AS (\n' +
-      '  SELECT {{ range_source }}.{{ min_name }} AS date_from,\n' +
-      '         {{ range_source }}.{{ max_name }} AS max_date\n' +
-      '  FROM {{ range_source }}\n' +
-      '  UNION ALL\n' +
-      '  SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}), max_date\n' +
-      '  FROM date_series\n' +
-      '  WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date\n' +
-      ')\n' +
-      'SELECT CAST(date_from AS DATETIME) AS date_from,\n' +
-      '       CAST(DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME) AS date_to\n' +
-      'FROM date_series';
+      templates.statements.generated_time_series_with_cte_range_source =
+        'SELECT CAST({{ range_source }}.{{ min_name }} AS DATETIME(6)) AS date_from,\n' +
+        '       CAST(DATE_SUB(DATE_ADD({{ range_source }}.{{ min_name }}, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)) AS date_to,\n' +
+        '       {{ range_source }}.{{ max_name }} AS max_date\n' +
+        'FROM {{ range_source }}\n' +
+        'UNION ALL\n' +
+        'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
+        '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)),\n' +
+        '       max_date\n' +
+        'FROM time_series\n' +
+        'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date';
+
+      // Marker (presence-only) telling the Tesseract planner that the generated
+      // time series is a self-referencing recursive CTE and the outer WITH must
+      // be emitted as `WITH RECURSIVE`.
+      templates.statements.generated_time_series_recursive = 'true';
+    }
+    templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
 
     return templates;
   }

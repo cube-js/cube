@@ -350,7 +350,7 @@ export class PreAggregationPartitionRangeLoader {
         usageTargetTableNames,
       };
     } else {
-      return new PreAggregationLoader(
+      const result = await new PreAggregationLoader(
         this.driverFactory,
         this.logger,
         this.queryCache,
@@ -360,6 +360,14 @@ export class PreAggregationPartitionRangeLoader {
         this.loadCache,
         this.options
       ).loadPreAggregation(true);
+      if (result && this.preAggregation.usageMapping) {
+        const usageTargetTableNames: Record<string, string> = {};
+        for (const suffix of Object.keys(this.preAggregation.usageMapping)) {
+          usageTargetTableNames[suffix] = result.targetTableName;
+        }
+        return { ...result, usageTargetTableNames };
+      }
+      return result;
     }
   }
 

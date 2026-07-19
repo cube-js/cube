@@ -103,43 +103,43 @@ exports[`Cube RBAC Engine RBAC via REST API line_items hidden price_dim: line_it
 Array [
   Object {
     "line_items_view_no_policy.count": "3",
-    "line_items_view_no_policy.price_dim": 33,
+    "line_items_view_no_policy.price_dim": "33",
   },
   Object {
     "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.price_dim": 34,
+    "line_items_view_no_policy.price_dim": "34",
   },
   Object {
     "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.price_dim": 35,
+    "line_items_view_no_policy.price_dim": "35",
   },
   Object {
     "line_items_view_no_policy.count": "7",
-    "line_items_view_no_policy.price_dim": 36,
+    "line_items_view_no_policy.price_dim": "36",
   },
   Object {
     "line_items_view_no_policy.count": "3",
-    "line_items_view_no_policy.price_dim": 37,
+    "line_items_view_no_policy.price_dim": "37",
   },
   Object {
     "line_items_view_no_policy.count": "3",
-    "line_items_view_no_policy.price_dim": 38,
+    "line_items_view_no_policy.price_dim": "38",
   },
   Object {
     "line_items_view_no_policy.count": "2",
-    "line_items_view_no_policy.price_dim": 39,
+    "line_items_view_no_policy.price_dim": "39",
   },
   Object {
     "line_items_view_no_policy.count": "3",
-    "line_items_view_no_policy.price_dim": 40,
+    "line_items_view_no_policy.price_dim": "40",
   },
   Object {
     "line_items_view_no_policy.count": "5",
-    "line_items_view_no_policy.price_dim": 41,
+    "line_items_view_no_policy.price_dim": "41",
   },
   Object {
     "line_items_view_no_policy.count": "2",
-    "line_items_view_no_policy.price_dim": 42,
+    "line_items_view_no_policy.price_dim": "42",
   },
 ]
 `;

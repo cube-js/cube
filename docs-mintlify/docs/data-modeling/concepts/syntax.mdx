@@ -17,7 +17,8 @@ option][ref-config-repository-factory] to dynamically define the folder name and
 data model file contents.
 
 It's recommended to place each cube or view in a separate file, in `model/cubes`
-and `model/views` folders, respectively. Example:
+and `model/views` folders, respectively. [View groups][ref-view-groups] can be
+defined alongside views or in their own files. Example:
 
 ```tree
 model
@@ -26,7 +27,8 @@ model
 │   ├── products.yml
 │   └── users.yml
 └── views
-    └── revenue.yml
+    ├── revenue.yml
+    └── view_groups.yml
 ```
 
 ## Model syntax
@@ -83,6 +85,10 @@ Common rules apply to names of entities within the data model. All names must:
 - Consist of letters, numbers, and underscore (`_`) symbols only.
 - Not be a [reserved keyword in Python][link-python-reserved-words], e.g., `from`, `return`, or `yield`.
 - When using the DAX API, not clash with the names of columns in [date hierarchies][ref-dax-api-date-hierarchies].
+- Be unique within their scope. Cube and view names must be unique across the data
+  model; members (measures, dimensions, segments, pre-aggregations, hierarchies) must
+  be unique within their cube; and folder names must be unique within their view. Cube
+  will report an error for duplicates.
 
 It is also recommended that names use [snake case][wiki-snake-case].
 
@@ -275,6 +281,19 @@ cube(`users`, {
 ```
 
 </CodeGroup>
+
+<Note>
+
+You can safely reference a member whose `sql` is a compound expression, such as
+arithmetic (`{price} + {tax}`) or boolean logic (`{is_paid} OR {is_pending}`). When you
+reference such a member inside an arithmetic or logical expression, Cube wraps it in
+parentheses automatically, so operator precedence is preserved. For example, if
+`price_with_tax` is defined as `{price} + {tax}`, then referencing it as
+`{price_with_tax} * {quantity}` generates `(price + tax) * quantity`. Cube only adds these
+parentheses where they are needed — a reference that already sits in a safe position, such as
+a function argument (`ABS({price_with_tax})`) or a `CAST(...)`, is left unwrapped.
+
+</Note>
 
 This syntax works great for simple use cases. However, there are cases
 (like [subquery][ref-subquery]) when you'd like to reference members of
@@ -995,9 +1014,10 @@ string values in time dimensions.
 [ref-data-blending]: /docs/data-modeling/concepts/data-blending
 [link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
 [link-python-reserved-words]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
-[ref-dax-api-date-hierarchies]: /reference/dax-api#date-hierarchies
+[ref-dax-api-date-hierarchies]: /reference/core-data-apis/dax-api#date-hierarchies
 [ref-time-dimension]: /docs/data-modeling/dimensions#time-dimensions
 [ref-recipe-string-time-dimensions]: /recipes/data-modeling/string-time-dimensions
+[ref-view-groups]: /reference/data-modeling/view-group
 [ref-views]: /docs/data-modeling/views
 [ref-preaggs]: /reference/data-modeling/pre-aggregations
 [ref-join-paths]: /docs/data-modeling/joins#join-paths

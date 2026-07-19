@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { internalDayjs } from '../src/time';
+import { internalDayjs } from '../src/time.js';
 
 describe('Dayjs Instance Isolation', () => {
   test('internalDayjs should not affect global dayjs instance week start', () => {

@@ -1,0 +1,64 @@
+---
+title: Bring-Your-Own Pre-aggregation Storage
+sidebarTitle: Pre-aggregation Storage
+description: Supply your own object storage bucket as the backend for Cube Store pre-aggregated data so that all data at rest stays within your infrastructure.
+---
+
+On the Enterprise plan, Dedicated Infrastructure customers can supply their
+own object storage bucket to be used as the underlying storage for Cube Store
+pre-aggregated data. This lets you keep all data at rest fully within your
+own infrastructure while still leveraging the managed compute and operations
+of Dedicated Infrastructure.
+
+<Note>
+
+Available on the [Enterprise plan](https://cube.dev/pricing) with Dedicated
+Infrastructure. [Contact us](https://cube.dev/contact) to enable this option
+for your tenant.
+
+</Note>
+
+## AWS — S3
+
+To activate this option on AWS:
+
+1. Create an S3 bucket in the same region as your Cube Region.
+2. Generate a new AWS Access Key with full access to that bucket.
+3. Request activation from your Customer Success Manager and share the
+   following:
+   - **AWS Access Key ID**
+   - **AWS Secret Access Key**
+   - **S3 Bucket ARN**
+
+## GCP — Cloud Storage
+
+To activate this option on GCP:
+
+1. Create a Cloud Storage bucket in the same region as your Cube Region.
+2. Create a service account with full access to that bucket and generate a
+   JSON service-account key.
+3. Request activation from your Customer Success Manager and share the
+   following:
+   - **GCS Bucket Name**
+   - **Service-account JSON key** (transferred securely)
+
+## Azure — Blob Storage
+
+To activate this option on Azure:
+
+1. Create a Storage Account and Blob container in the same region as your
+   Cube Region.
+2. Create a SAS token (or service principal) with full read/write/delete
+   access to the container.
+3. Request activation from your Customer Success Manager and share the
+   following:
+   - **Storage Account name**
+   - **Container name**
+   - **Access credentials** (SAS token or service-principal details)
+
+## Supported Regions
+
+Bring-Your-Own Pre-aggregation Storage is available wherever Dedicated
+Infrastructure is supported on the corresponding cloud — see the per-provider
+[Supported Regions](#supported-regions) sections in the connectivity docs for
+the exact list. Government and China regions are not supported.

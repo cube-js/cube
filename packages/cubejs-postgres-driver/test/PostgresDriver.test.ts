@@ -114,6 +114,39 @@ describe('PostgresDriver', () => {
     }
   });
 
+  test('stream (array-typed columns)', async () => {
+    // Streaming must not fail when a query returns array-typed columns.
+    // Array types are reported as `text` and node-postgres parses them into
+    // JS arrays. See CORE-522.
+    const tableData = await driver.stream(
+      `SELECT
+        ARRAY['oops', 'test']::text[] as text_array,
+        ARRAY[1, 2, 3]::int[] as int_array`,
+      [],
+      {
+        highWaterMark: 1000,
+      }
+    );
+
+    try {
+      expect(await tableData.types).toEqual([
+        {
+          name: 'text_array',
+          type: 'text'
+        },
+        {
+          name: 'int_array',
+          type: 'text'
+        },
+      ]);
+      expect(await streamToArray(tableData.rowStream)).toEqual([
+        { text_array: ['oops', 'test'], int_array: [1, 2, 3] },
+      ]);
+    } finally {
+      await (<any> tableData).release();
+    }
+  });
+
   test('stream (exception)', async () => {
     try {
       await driver.stream('select * from test.random_name_for_table_that_doesnot_exist_sql_must_fail', [], {

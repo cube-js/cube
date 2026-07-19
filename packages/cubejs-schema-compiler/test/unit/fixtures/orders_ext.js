@@ -46,7 +46,7 @@ cube('ordersExt', {
 
   accessPolicy: [
     {
-      role: 'manager',
+      group: 'manager',
       conditions: [
         {
           if: security_context.userId === 1,

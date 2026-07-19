@@ -1,0 +1,209 @@
+use super::ParamsAllocator;
+use crate::cube_bridge::base_query_options::{FilterValue, MaskedMemberItem};
+use crate::cube_bridge::base_tools::BaseTools;
+use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::cube_bridge::join_graph::JoinGraph;
+use crate::cube_bridge::join_item::JoinItemStatic;
+use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
+use crate::planner::filter::FilterItem;
+use crate::planner::join_hints::JoinHints;
+use crate::planner::sql_templates::PlanSqlTemplates;
+use chrono_tz::Tz;
+use cubenativeutils::CubeError;
+use itertools::Itertools;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct JoinKey {
+    root: String,
+    joins: Vec<JoinItemStatic>,
+}
+
+pub struct QueryTools {
+    cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
+    join_graph: Rc<dyn JoinGraph>,
+    templates_render: Rc<dyn SqlTemplatesRender>,
+    params_allocator: Rc<RefCell<ParamsAllocator>>,
+    timezone: Tz,
+    convert_tz_for_raw_time_dimension: bool,
+    masked_members: HashSet<String>,
+    // Compiled mask filters keyed by member full path. Populated once by
+    // `State` after the `Rc<QueryTools>` exists (the FilterCompiler needs it),
+    // then read-only — the `RefCell` only carries the construction phase.
+    // Nothing reachable from a stored `FilterItem` holds an `Rc<QueryTools>`,
+    // so this cache forms no reference cycle. It stays here only until the
+    // early-compilation refactor resolves mask filters up front.
+    member_mask_filters: RefCell<HashMap<String, FilterItem>>,
+}
+
+impl QueryTools {
+    /// Builds the per-query leaf. The mutable per-query state (the
+    /// `Compiler` and the join-tree cache) lives in `State`, which owns
+    /// this and fills `member_mask_filters` once it has a `Compiler`.
+    /// Keeping `QueryTools` free of any cache that can hold an
+    /// `Rc<QueryTools>` is what prevents the planner's reference-cycle leaks.
+    pub fn try_new(
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
+        join_graph: Rc<dyn JoinGraph>,
+        timezone_name: Option<String>,
+        export_annotated_sql: bool,
+        convert_tz_for_raw_time_dimension: bool,
+        masked_members: Option<Vec<MaskedMemberItem>>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let templates_render = base_tools.sql_templates()?;
+        let timezone = if let Some(timezone) = timezone_name {
+            timezone
+                .parse::<Tz>()
+                .map_err(|_| CubeError::user(format!("Incorrect timezone {}", timezone)))?
+        } else {
+            Tz::UTC
+        };
+
+        let mut masked_set = HashSet::new();
+        if let Some(items) = &masked_members {
+            for item in items {
+                masked_set.insert(item.member.clone());
+            }
+        }
+
+        Ok(Rc::new(Self {
+            cube_evaluator,
+            base_tools,
+            join_graph,
+            templates_render,
+            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
+            timezone,
+            convert_tz_for_raw_time_dimension,
+            masked_members: masked_set,
+            member_mask_filters: RefCell::new(HashMap::new()),
+        }))
+    }
+
+    /// Installs the compiled mask filters. Called once by `State` after it
+    /// has compiled them (it owns the `Compiler` needed to do so).
+    pub(crate) fn set_member_mask_filters(&self, filters: HashMap<String, FilterItem>) {
+        *self.member_mask_filters.borrow_mut() = filters;
+    }
+
+    pub fn is_member_masked(&self, member_path: &str) -> bool {
+        self.masked_members.contains(member_path)
+    }
+
+    /// Whether the query has any masked members at all. `masked_members` is
+    /// fixed at `try_new`, so this is a cheap, stable signal used to skip
+    /// building the unmasked reference tree for queries with no masking.
+    pub fn has_masked_members(&self) -> bool {
+        !self.masked_members.is_empty()
+    }
+
+    pub fn member_mask_filter(&self, member_path: &str) -> Option<FilterItem> {
+        self.member_mask_filters.borrow().get(member_path).cloned()
+    }
+
+    pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
+        &self.cube_evaluator
+    }
+
+    pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
+        let driver_tools = self.base_tools.driver_tools(external)?;
+        PlanSqlTemplates::try_new(driver_tools, external)
+    }
+
+    pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
+        &self.base_tools
+    }
+
+    pub fn join_graph(&self) -> &Rc<dyn JoinGraph> {
+        &self.join_graph
+    }
+
+    pub fn timezone(&self) -> Tz {
+        self.timezone
+    }
+
+    pub fn convert_tz_for_raw_time_dimension(&self) -> bool {
+        self.convert_tz_for_raw_time_dimension
+    }
+
+    pub fn join_for_hints(
+        &self,
+        hints: &JoinHints,
+    ) -> Result<(JoinKey, Rc<dyn JoinDefinition>), CubeError> {
+        let join = self
+            .base_tools
+            .join_tree_for_hints(hints.items().to_vec())?;
+        let join_key = JoinKey {
+            root: join.static_data().root.to_string(),
+            joins: join
+                .joins()?
+                .iter()
+                .map(|i| i.static_data().clone())
+                .collect(),
+        };
+        Ok((join_key, join))
+    }
+
+    pub fn alias_name(&self, name: &str) -> String {
+        PlanSqlTemplates::alias_name(name)
+    }
+
+    pub fn cube_alias_name(&self, name: &str, prefix: &Option<String>) -> String {
+        if let Some(prefix) = prefix {
+            self.alias_name(&format!("{}__{}", prefix, self.alias_name(name)))
+        } else {
+            self.alias_name(name)
+        }
+    }
+
+    pub fn parse_member_path(&self, name: &str) -> Result<(String, String), CubeError> {
+        let path = name.split('.').collect_vec();
+        if path.len() == 2 {
+            Ok((path[0].to_string(), path[1].to_string()))
+        } else {
+            Err(CubeError::internal(format!(
+                "Invalid member name: '{}'",
+                name
+            )))
+        }
+    }
+
+    pub fn alias_for_cube(&self, cube_name: &String) -> Result<String, CubeError> {
+        let cube_definition = self.cube_evaluator().cube_from_path(cube_name.clone())?;
+        let res = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
+            sql_alias.clone()
+        } else {
+            cube_name.clone()
+        };
+        Ok(res)
+    }
+
+    pub fn templates_render(&self) -> Rc<dyn SqlTemplatesRender> {
+        self.templates_render.clone()
+    }
+
+    pub fn allocate_param(&self, name: &str) -> String {
+        self.params_allocator.borrow_mut().allocate_param(name)
+    }
+    pub fn get_allocated_params(&self) -> Vec<FilterValue> {
+        self.params_allocator.borrow().get_params().clone()
+    }
+    pub fn build_sql_and_params(
+        &self,
+        sql: &str,
+        should_reuse_params: bool,
+        templates: &PlanSqlTemplates,
+    ) -> Result<(String, Vec<FilterValue>), CubeError> {
+        let native_allocated_params = self.base_tools.get_allocated_params()?;
+        self.params_allocator.borrow().build_sql_and_params(
+            sql,
+            native_allocated_params,
+            should_reuse_params,
+            templates,
+        )
+    }
+}

@@ -31,8 +31,6 @@ class CubejsServerCoreOpen extends CubejsServerCore {
 
 // Mock to expose protected methods for testing
 class CompilerApiOpen extends CompilerApi {
-  public getRolesFromContext = super.getRolesFromContext;
-
   public getGroupsFromContext = super.getGroupsFromContext;
 }
 
@@ -103,29 +101,18 @@ describe('index.test', () => {
     process.env.CUBEJS_API_SECRET = 'api-secret';
   });
 
-  test('Should create instance of CubejsServerCore, dbType as string', () => {
-    expect(new CubejsServerCore({
-      dbType: 'mysql'
-    })).toBeInstanceOf(CubejsServerCore);
+  test('Should throw error, dbType has been removed (string)', () => {
+    expect(() => new CubejsServerCore(<any>{ dbType: 'mysql' }))
+      .toThrowError(/CreateOptions.dbType was removed in v1\.7\.0/);
   });
 
-  test('Should create instance of CubejsServerCore, dbType as func', () => {
-    const options = { dbType: () => <DatabaseType>'postgres' };
-
-    expect(new CubejsServerCore(options))
-      .toBeInstanceOf(CubejsServerCore);
-  });
-
-  test('Should throw error, unknown dbType', () => {
-    const options = { dbType: <any>'unknown-db' };
-
-    expect(() => new CubejsServerCore(options))
-      .toThrowError(/"dbType" must be one of/);
+  test('Should throw error, dbType has been removed (func)', () => {
+    expect(() => new CubejsServerCore(<any>{ dbType: () => 'postgres' }))
+      .toThrowError(/CreateOptions.dbType was removed in v1\.7\.0/);
   });
 
   test('Should throw error, invalid options', () => {
     const options = {
-      dbType: <DatabaseType>'mysql',
       externalDbType: <DatabaseType>'mysql',
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
@@ -139,7 +126,10 @@ describe('index.test', () => {
   });
 
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {
-    const options = { dbType: <DatabaseType>'mysql', orchestratorOptions: () => <any>{} };
+    const options = {
+      driverFactory: () => <any>({ type: 'mysql' }),
+      orchestratorOptions: () => <any>{}
+    };
 
     expect(new CubejsServerCore(options))
       .toBeInstanceOf(CubejsServerCore);
@@ -160,23 +150,8 @@ describe('index.test', () => {
     return createOrchestratorApiSpy.mock.calls[0];
   };
 
-  test('dbType should return string, failure', async () => {
-    const options: CreateOptions = { dbType: () => <any>null };
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
-
-    try {
-      await driverFactory('mongo');
-
-      throw new Error('driverFactory will call dbType and dbType must throw an exception');
-    } catch (e: any) {
-      expect(e.message).toEqual('Unexpected CreateOptions.dbType result type: <object>null');
-    }
-  });
-
   test('driverFactory should return driver, failure', async () => {
-    const options: CreateOptions = { dbType: () => <any>'mongo', driverFactory: () => <any>null, };
+    const options: CreateOptions = { driverFactory: () => <any>null, };
 
     const [driverFactory, _orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
@@ -190,7 +165,7 @@ describe('index.test', () => {
   });
 
   test('externalDriverFactory should return driver, failure', async () => {
-    const options: CreateOptions = { dbType: () => <any>'mongo', externalDriverFactory: () => <any>null, };
+    const options: CreateOptions = { externalDriverFactory: () => <any>null, };
 
     const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
@@ -215,7 +190,6 @@ describe('index.test', () => {
     };
 
     const options = {
-      dbType: <any>'mysql',
       externalDbType: 'cubestore',
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
@@ -224,11 +198,7 @@ describe('index.test', () => {
       devServer: false,
       apiSecret: 'randomstring',
       logger: () => {},
-      driverFactory: () => <any>{
-        setLogger: () => {},
-        testConnection: async () => {},
-        release: () => {}
-      },
+      driverFactory: () => <any>({ type: 'mysql' }),
       dialectFactory: () => {},
       externalDriverFactory: () => <any>{
         setLogger: () => {},
@@ -369,6 +339,16 @@ describe('index.test', () => {
       metaConfigSpy.mockClear();
     });
 
+    test('CompilerApi metaConfig with includeViewGroups', async () => {
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX', includeViewGroups: true });
+      expect(metaConfig).toHaveProperty('cubes');
+      expect(metaConfig).toHaveProperty('viewGroups');
+      expect((<any[]>metaConfig.cubes)?.length).toBeGreaterThan(0);
+      expect(metaConfig.cubes[0]).toHaveProperty('config');
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
     test('CompilerApi metaConfigExtended', async () => {
       const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
@@ -396,6 +376,16 @@ describe('index.test', () => {
       metaConfigSpy.mockClear();
     });
 
+    test('CompilerApi metaConfig with includeViewGroups', async () => {
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX', includeViewGroups: true });
+      expect(metaConfig).toHaveProperty('cubes');
+      expect(metaConfig).toHaveProperty('viewGroups');
+      expect(metaConfig.cubes).toEqual([]);
+      expect(metaConfig.viewGroups).toEqual([]);
+      expect(metaConfigSpy).toHaveBeenCalled();
+      metaConfigSpy.mockClear();
+    });
+
     test('CompilerApi metaConfigExtended', async () => {
       const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
@@ -417,33 +407,6 @@ describe('index.test', () => {
   });
 
   describe('CompilerApi validation', () => {
-    test('Should allow both contextToRoles and contextToGroups together', () => {
-      const logger = jest.fn(() => {});
-
-      expect(() => new CompilerApi(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles: async () => ['admin'],
-          contextToGroups: async () => ['analytics']
-        }
-      )).not.toThrow();
-    });
-
-    test('Should allow only contextToRoles', () => {
-      const logger = jest.fn(() => {});
-
-      expect(() => new CompilerApi(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles: async () => ['admin']
-        }
-      )).not.toThrow();
-    });
-
     test('Should allow only contextToGroups', () => {
       const logger = jest.fn(() => {});
 
@@ -455,24 +418,6 @@ describe('index.test', () => {
           contextToGroups: async () => ['analytics']
         }
       )).not.toThrow();
-    });
-
-    test('contextToRoles should be called and return expected roles', async () => {
-      const logger = jest.fn(() => {});
-      const contextToRoles = jest.fn(async () => ['admin', 'manager']);
-
-      const compilerApi = new CompilerApiOpen(
-        repositoryWithoutPreAggregations,
-        async () => 'mysql',
-        {
-          logger,
-          contextToRoles
-        }
-      );
-
-      const roles = await compilerApi.getRolesFromContext({ securityContext: { userId: 123 } });
-      expect(contextToRoles).toHaveBeenCalledWith({ securityContext: { userId: 123 } });
-      expect(roles).toEqual(new Set(['admin', 'manager']));
     });
 
     test('contextToGroups should be called and return expected groups', async () => {
@@ -575,21 +520,6 @@ describe('index.test', () => {
     ]);
   });
 
-  // TODO (buntarb): This test doesn't have any sense anymore, because dbType
-  // property is deprecated and doesn't required in any mode. Need to be removed
-  test.skip('Should throw error, options are required (dev mode)', () => {
-    delete process.env.CUBEJS_API_SECRET;
-    process.env.CUBEJS_DEV_MODE = 'true';
-
-    expect(() => {
-      jest.spyOn(CubejsServerCoreOpen.prototype, 'isReadyForQueryProcessing').mockImplementation(() => true);
-      // eslint-disable-next-line
-      new CubejsServerCoreOpen({});
-      jest.restoreAllMocks();
-    })
-      .toThrowError(/dbType is required/);
-  });
-
   test('Pass all required (dev mode) without apiSecret (should be autogenerated)', () => {
     delete process.env.CUBEJS_API_SECRET;
 
@@ -609,7 +539,7 @@ describe('index.test', () => {
       new CubejsServerCoreOpen({});
       jest.restoreAllMocks();
     })
-      .toThrowError('Either CUBEJS_DB_TYPE, CreateOptions.dbType or CreateOptions.driverFactory must be specified');
+      .toThrowError('Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified');
   });
 
   test('Should throw error, options are required (production mode with jwkUrl)', () => {
@@ -621,7 +551,7 @@ describe('index.test', () => {
       new CubejsServerCoreOpen({ jwt: { jwkUrl: 'https://test.com/j.json' } });
       jest.restoreAllMocks();
     })
-      .toThrowError('Either CUBEJS_DB_TYPE, CreateOptions.dbType or CreateOptions.driverFactory must be specified');
+      .toThrowError('Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified');
   });
 
   test('Pass all required props (production mode with JWK URL)', () => {
@@ -650,7 +580,7 @@ describe('index.test', () => {
       }
 
       const cubejsServerCore = new CubejsServerCoreOpen({
-        dbType: 'mysql',
+        driverFactory: () => (<any>{ type: 'mysql' }),
         apiSecret: 'secret',
         scheduledRefreshTimer: input
       });
@@ -679,7 +609,7 @@ describe('index.test', () => {
     process.env.CUBEJS_REFRESH_WORKER = 'false';
 
     const cubejsServerCore = new CubejsServerCoreOpen({
-      dbType: 'mysql',
+      driverFactory: () => (<any>{ type: 'mysql' }),
       apiSecret: 'secret',
     });
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
@@ -725,7 +655,7 @@ describe('index.test', () => {
       process.env.CUBEJS_ROLLUP_ONLY = rollupOnlyMode.toString();
 
       const cubejsServerCore = new CubejsServerCoreOpen({
-        dbType: 'mysql',
+        driverFactory: () => (<any>{ type: 'mysql' }),
         apiSecret: 'secret',
         ...options,
       });
@@ -844,7 +774,7 @@ describe('index.test', () => {
     );
 
     const cubejsServerCore = new CubejsServerCoreOpen({
-      dbType: 'mysql',
+      driverFactory: () => (<any>{ type: 'mysql' }),
       apiSecret: 'secret',
       // 250ms
       scheduledRefreshTimer: 1,
@@ -944,7 +874,7 @@ describe('index.test', () => {
     let counter = 0;
 
     const cubejsServerCore = new CubejsServerCoreOpen({
-      dbType: 'mysql',
+      driverFactory: () => (<any>{ type: 'mysql' }),
       apiSecret: 'secret',
       // 250ms
       scheduledRefreshTimer: 1,

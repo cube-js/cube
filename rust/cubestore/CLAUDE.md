@@ -143,8 +143,8 @@ The codebase uses a custom dependency injection system defined in `config/inject
 
 The project includes Docker configurations for building and deploying CubeStore:
 
-- **`builder.Dockerfile`**: Defines the base build image with Rust nightly-2025-08-01, LLVM 18, and build dependencies
-- **`Dockerfile`**: Production Dockerfile that uses `cubejs/rust-builder:bookworm-llvm-18` base image and copies rust-toolchain.toml
+- **`builder.Dockerfile`**: Defines the base build image with Rust nightly-2025-08-01, LLVM 22, and build dependencies
+- **`Dockerfile`**: Production Dockerfile that uses `cubejs/rust-builder:trixie-llvm-22` base image (Debian 13 trixie) and copies rust-toolchain.toml
 - **GitHub Actions**: Multiple CI/CD workflows use the same Rust version
 
 ## Updating Rust Version
@@ -156,4 +156,4 @@ When updating the Rust version, ensure ALL these files are kept in sync:
 3. **`Dockerfile`** - Copies rust-toolchain.toml (no manual update needed if builder image is updated)
 4. **GitHub Workflows** - Update all occurrences of the Rust nightly version in `.github/workflows/` directory
 
-**Note**: The `cubejs/rust-builder:bookworm-llvm-18` Docker image tag may also need updating if the builder.Dockerfile changes significantly.
+**Note**: The `cubejs/rust-builder:trixie-llvm-22` Docker image tag may also need updating if the builder.Dockerfile changes significantly.

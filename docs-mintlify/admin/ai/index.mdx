@@ -5,6 +5,12 @@ title: Overview
 
 Every Cube deployment ships with an agent that powers AI features such as [Analytics Chat](/docs/explore-analyze/analytics-chat). You can customize the agent's behavior with rules, certified queries, accessible views, model selection, and memory configuration.
 
+<Warning>
+  Configuring the agent in the UI is **deprecated** in favor of code-first configuration. Cube version 1.6.5 or above is required.
+
+  Deployments created after **April 30, 2026** have code-first agent configuration enabled by default. Existing deployments need to opt in by setting `CUBE_CLOUD_AGENTS_CONFIG_ENABLED=true`. The directory path defaults to `agents` and can be overridden with `CUBE_CLOUD_AGENTS_CONFIG_PATH`.
+</Warning>
+
 ## Agent configuration
 
 Agent configuration lives in your **Cube data model repository**, alongside your cubes and views. Configuration is defined as YAML and Markdown files under an `agents/` directory in your project:
@@ -24,10 +30,6 @@ your-cube-project/
 ```
 
 Storing configuration as code in your repository enables version control, code review, and consistent behavior across environments.
-
-<Info>
-  Cube version 1.6.5 or above is required. Agent configuration is enabled by setting `CUBE_CLOUD_AGENTS_CONFIG_ENABLED=true`. The directory path defaults to `agents` and can be overridden with `CUBE_CLOUD_AGENTS_CONFIG_PATH`.
-</Info>
 
 ## Configure the agent
 
@@ -50,13 +52,14 @@ memory_mode: user
 | `llm`               | string or object | `auto`                   | LLM provider — `auto`, a [predefined model](#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference.          |
 | `embedding_llm`     | string or object | `text-embedding-3-large` | Embedding model — a predefined name or a BYOM reference.                                                                |
 | `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
-| `accessible_views`  | array            | _all views_              | List of view names the agent is allowed to query. If omitted or empty, the agent has access to all views.               |
+| `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
 
 Rules and certified queries have their own dedicated pages:
 
 - [Rules](/admin/ai/rules) — instructions that guide the agent's behavior
 - [Certified queries](/admin/ai/certified-queries) — a library of trusted SQL examples for the agent
+- [Skills](/admin/ai/skills) — reusable, named agent workflows users can run on demand from chat
 
 ## LLM
 
@@ -131,6 +134,9 @@ See [Memories](/admin/ai/memory-isolation) for details on how memories are store
   </Card>
   <Card title="Certified queries" icon="certificate" href="/admin/ai/certified-queries">
     Provide a library of trusted SQL queries for the agent to reference.
+  </Card>
+  <Card title="Skills" icon="wand-magic-sparkles" href="/admin/ai/skills">
+    Package reusable, named agent workflows that users can run on demand from chat.
   </Card>
   <Card title="Bring your own model" icon="brain" href="/admin/ai/bring-your-own-model">
     Configure the agent to use your own LLM provider or model.

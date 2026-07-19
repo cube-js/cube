@@ -837,8 +837,18 @@ export class DatabricksDriver extends JDBCDriver {
       const azureBucketPath = `${bucketName}/${username}`;
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      // Pass `undefined` (not empty strings) for unset values so the Azure SDK
+      // falls back to `DefaultAzureCredential` — which resolves a federated
+      // (workload identity) token from `AZURE_FEDERATED_TOKEN_FILE` together
+      // with `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` when no static key/secret
+      // is configured (OIDC).
       return this.extractFilesFromAzure(
-        { azureKey, clientId, tenantId, clientSecret },
+        {
+          azureKey: azureKey || undefined,
+          clientId: clientId || undefined,
+          tenantId: tenantId || undefined,
+          clientSecret: clientSecret || undefined,
+        },
         // Databricks uses different bucket address form, so we need to transform it
         // to the one understandable by extractFilesFromAzure implementation
         azureBucketPath,
@@ -848,13 +858,24 @@ export class DatabricksDriver extends JDBCDriver {
       const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      // Only pass static credentials when both key and secret are configured.
+      // Otherwise omit them (and a blank region) so the AWS SDK resolves
+      // credentials from its default provider chain — e.g. the web identity
+      // token file (`AWS_WEB_IDENTITY_TOKEN_FILE`) used for OIDC / workload
+      // identity. Passing empty strings makes S3 fail with
+      // `AuthorizationHeaderMalformed`.
+      const credentials =
+        this.config.awsKey && this.config.awsSecret
+          ? {
+            accessKeyId: this.config.awsKey,
+            secretAccessKey: this.config.awsSecret,
+          }
+          : undefined;
+
       return this.extractUnloadedFilesFromS3(
         {
-          credentials: {
-            accessKeyId: this.config.awsKey || '',
-            secretAccessKey: this.config.awsSecret || '',
-          },
-          region: this.config.awsRegion || '',
+          ...(credentials ? { credentials } : {}),
+          ...(this.config.awsRegion ? { region: this.config.awsRegion } : {}),
         },
         bucketName,
         exportPrefix,
@@ -863,8 +884,11 @@ export class DatabricksDriver extends JDBCDriver {
       const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      // Omit credentials when none are configured so the Google SDK falls back
+      // to Application Default Credentials (honors `GOOGLE_APPLICATION_CREDENTIALS`,
+      // including workload-identity-federation `external_account` configs).
       return this.extractFilesFromGCS(
-        { credentials: this.config.gcsCredentials },
+        { credentials: this.config.gcsCredentials || undefined },
         bucketName,
         exportPrefix,
       );

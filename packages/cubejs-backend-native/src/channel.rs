@@ -156,7 +156,7 @@ where
                 Ok(json) => Ok(json),
                 Err(err) => Err(CubeError::internal(err.to_string())),
             },
-            Err(err) => Err(CubeError::internal(err.to_string())),
+            Err(err) => Err(err),
         };
 
         if tx.send(to_channel).is_err() {

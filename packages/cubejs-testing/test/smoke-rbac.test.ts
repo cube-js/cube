@@ -20,7 +20,6 @@ const DEFAULT_API_TOKEN = sign({
   auth: {
     username: 'nobody',
     userAttributes: {},
-    roles: [],
   },
 }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
   expiresIn: '2 days'
@@ -145,6 +144,16 @@ describe('Cube RBAC Engine', () => {
       // Querying the line_items cube with joined orders should take into account
       // orders row level policy and return only a few rows with select ids
       expect(res.rows).toMatchSnapshot('orders_view');
+    });
+
+    test('row-level filters from cube AND view layers are both applied', async () => {
+      // The underlying `orders` cube policy restricts rows to id IN {1, 10, 11}
+      // (group "*" → id = 1, group admin → id = 10 OR id = 11). The view adds its
+      // own row filter id < 11. Both layers must apply (AND), so the visible ids
+      // are the intersection: {1, 10}.
+      const res = await connection.query('SELECT id FROM orders_two_layer_test ORDER BY id');
+      const ids = res.rows.map(row => Number(row.id)).sort((a, b) => a - b);
+      expect(ids).toEqual([1, 10]);
     });
 
     test('SELECT * from users', async () => {
@@ -292,8 +301,8 @@ describe('Cube RBAC Engine', () => {
   /**
    * Two-dimensional policy overlap test (matches diagram in CompilerApi.ts:559-647)
    *
-   * Policy 1 (role "*"): covers members a, b, id with row filter R1 (id < 500)
-   * Policy 2 (role "policy2_role"): covers members b, c, id with row filter R2 (id >= 500)
+   * Policy 1 (group "*"): covers members a, b, id with row filter R1 (id < 500)
+   * Policy 2 (group "policy2_group"): covers members b, c, id with row filter R2 (id >= 500)
    *
    *   Members
    *     ^
@@ -311,7 +320,7 @@ describe('Cube RBAC Engine', () => {
     let connection: PgClient;
 
     beforeAll(async () => {
-      // User has policy2_role, so both Policy 1 (*) and Policy 2 apply
+      // User is in group policy2_group, so both Policy 1 (*) and Policy 2 apply
       connection = await createPostgresClient('policy_test', 'policy_test_password');
     });
 
@@ -379,6 +388,54 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
+   * Multi-group member-level access union (CUB-2758).
+   *
+   * multi_group_test view has two access policies, each matched by a different
+   * group, granting DIFFERENT members and WITHOUT any row_level filter (so row
+   * access defaults to allow-all):
+   *   - group mg_group_a → member_a
+   *   - group mg_group_c → member_c
+   *
+   * multi_group_user belongs to BOTH groups. Because neither policy has a
+   * row-level filter, member-level access must be the UNION across the matching
+   * policies: querying member_a together with member_c must return data.
+   */
+  describe('RBAC multi-group member-level access union (no row filters)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('multi_group_user', 'multi_group_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('single-policy member is accessible (member_a)', async () => {
+      const res = await connection.query(
+        'SELECT member_a FROM multi_group_test LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('single-policy member is accessible (member_c)', async () => {
+      const res = await connection.query(
+        'SELECT member_c FROM multi_group_test LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+
+    test('union of member access across groups returns data (member_a + member_c)', async () => {
+      const res = await connection.query(
+        'SELECT member_a, member_c FROM multi_group_test LIMIT 10'
+      );
+      // Both policies are allow-all (no row_level filter), so the member-level
+      // access is the union: the cross-group query must return rows.
+      expect(res.rows.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
    * Data masking tests via member_masking access policies.
    *
    * masking_test cube has dimensions and measures with mask definitions:
@@ -389,9 +446,9 @@ describe('Cube RBAC Engine', () => {
    *   - count_d measure: mask with 34567
    *
    * Three user profiles:
-   *   - masking_viewer: role "*" only → all members masked (memberLevel includes=[])
-   *   - masking_full: has masking_full_access role → full access to all members
-   *   - masking_partial: has masking_partial role → id, public_dim, total_quantity unmasked; rest masked
+   *   - masking_viewer: group "*" only → all members masked (memberLevel includes=[])
+   *   - masking_full: has masking_full_access group → full access to all members
+   *   - masking_partial: has masking_partial group → id, public_dim, total_quantity unmasked; rest masked
    */
   describe('RBAC data masking via SQL API (masking_viewer)', () => {
     let connection: PgClient;
@@ -492,6 +549,206 @@ describe('Cube RBAC Engine', () => {
   });
 
   /**
+   * Conditional masking: when a policy grants full member_level access WITH
+   * row_level filters, the masking is conditional on the row filter.
+   * Rows matching the filter see unmasked values; other rows see masked values.
+   *
+   * conditional_masking_test cube:
+   *   - group "*": member_level includes=[], member_masking includes="*"
+   *   - group "conditional_mask_group": member_level includes="*", row_level filter product_id <= 3
+   *
+   * For conditional_mask_user (group: conditional_mask_group):
+   *   - product_id dimension: rows with product_id <= 3 show real value, others show masked (-1 for price)
+   */
+  describe('RBAC conditional masking with row-level filters via SQL API', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('conditional_mask_user', 'conditional_mask_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('conditional_masking_test returns CASE WHEN masked values based on row filter', async () => {
+      const res = await connection.query(
+        'SELECT product_id, price FROM conditional_masking_test ORDER BY product_id LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        if (Number(row.product_id) <= 3) {
+          // Rows matching the row filter should have real (unmasked) price
+          expect(Number(row.price)).not.toBe(-1);
+        } else {
+          // Rows NOT matching the row filter should have masked price (-1)
+          expect(Number(row.price)).toBe(-1);
+        }
+      }
+    });
+
+    // Smoke test: only one filter policy matches (conditional_mask_group). For an
+    // aggregate measure (total_price), a per-row CASE WHEN over the row filter would
+    // reference product_id at row grain while the measure is aggregated. Since
+    // product_id is not in the GROUP BY, the conditional CASE must NOT be triggered —
+    // the measure renders the mask value (NULL) and the query compiles successfully.
+    test('aggregate measure: single filter policy does not trigger CASE when filter member is not in the group by', async () => {
+      const res = await connection.query(
+        'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // product_id (the row filter member) is not in the GROUP BY, so total_price
+        // is masked (NULL) rather than rendered as an invalid CASE WHEN over the
+        // aggregate.
+        expect(row.total_price).toBeNull();
+      }
+    });
+
+    // Smoke test: when the query itself is already at least as restrictive as the
+    // conditional mask's row filter (here `product_id <= 3`, identical to the
+    // policy filter), every returned row satisfies the filter, so the conditional
+    // mask is unnecessary. The member is unmasked — and the aggregate measure
+    // renders its real value instead of being masked to NULL.
+    test('query filter equal to the row-security filter unmasks the aggregate measure', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test WHERE product_id <= 3'
+      );
+      expect(res.rows.length).toBe(1);
+      // Unmasked: the query is already scoped to the mask filter's rows.
+      expect(res.rows[0].total_price).not.toBeNull();
+      expect(Number(res.rows[0].total_price)).toBeGreaterThan(0);
+    });
+
+    // Conversely, a more restrictive query filter (a subset of the mask filter's
+    // rows) also unmasks the dimension — no CASE WHEN, just real values.
+    test('query filter more restrictive than the row-security filter unmasks the dimension', async () => {
+      const res = await connection.query(
+        'SELECT product_id, price FROM conditional_masking_test WHERE product_id <= 2 ORDER BY product_id LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        // All rows are within product_id <= 2 ⊆ product_id <= 3, so price is real.
+        expect(Number(row.price)).not.toBe(-1);
+      }
+    });
+
+    // Negative case (soundness): a query filter that is NOT at least as
+    // restrictive as the mask filter (product_id <= 10 is broader than the
+    // mask's product_id <= 3) must NOT unmask. The conditionally-masked
+    // aggregate measure stays masked (NULL) because product_id is not in the
+    // GROUP BY — the optimization only applies when the query is provably at
+    // least as restrictive as the row-security filter.
+    test('query filter less restrictive than the row-security filter does not unmask the measure', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test WHERE product_id <= 10'
+      );
+      // Not unmasked: product_id <= 10 is broader than the mask filter
+      // product_id <= 3, so the measure stays masked (NULL) for every row.
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.total_price).toBeNull();
+      }
+    });
+  });
+
+  /**
+   * Multiple conditional policies use OR across policies:
+   *   - group "conditional_mask_group": product_id <= 3
+   *   - group "conditional_mask_group_extra": product_id = 5
+   *
+   * For conditional_mask_multi_user (both groups):
+   *   Unmasked when product_id <= 3 OR product_id = 5, masked otherwise.
+   */
+  describe('RBAC conditional masking with multiple policies (OR across policies)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('conditional_mask_multi_user', 'conditional_mask_multi_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('unmasked when any policy filter matches (OR across policies)', async () => {
+      const res = await connection.query(
+        'SELECT product_id, price FROM conditional_masking_test ORDER BY product_id LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        const pid = Number(row.product_id);
+        if (pid <= 3 || pid === 5) {
+          // Matches either policy filter → unmasked
+          expect(Number(row.price)).not.toBe(-1);
+        } else {
+          // Matches neither policy filter → masked
+          expect(Number(row.price)).toBe(-1);
+        }
+      }
+    });
+
+    // Smoke test: two filter policies match, so conditional masking is engaged and a
+    // CASE WHEN would normally be triggered (the OR of both row filters). But for an
+    // aggregate measure (total_price), the row filter members (product_id) are not in
+    // the GROUP BY, so a per-row CASE WHEN over the aggregate would be invalid SQL.
+    // The measure must render the mask (NULL) instead of the measure, and the query
+    // must compile successfully.
+    test('aggregate measure: multiple policies render mask instead of measure when row filter members are not in the group by', async () => {
+      const res = await connection.query(
+        'SELECT price, MEASURE("conditional_masking_test"."total_price") AS total_price FROM conditional_masking_test GROUP BY 1 ORDER BY 1 LIMIT 10'
+      );
+      expect(res.rows.length).toBeGreaterThan(0);
+      for (const row of res.rows) {
+        expect(row.total_price).toBeNull();
+      }
+    });
+  });
+
+  /**
+   * Single matching policy granting full (unmasked) access to a measure.
+   *
+   * single_policy_measure_test cube has two policies:
+   *   - spm_mask_group  → masks all members (member_masking)
+   *   - spm_full_group  → full member access + row filter product_id <= 3
+   *
+   * single_policy_measure_user belongs ONLY to spm_full_group, so only the
+   * full-access policy matches. Because no matching policy masks the measure,
+   * the masked measure must render its REAL aggregated value (not the mask),
+   * and the row-level filter must still be applied — even for a measure-only
+   * query with NO GROUP BY.
+   */
+  describe('RBAC single matching policy: unmasked measure with row filter (no group by)', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('single_policy_measure_user', 'single_policy_measure_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('measure renders unmasked and row filter is applied with no group by', async () => {
+      const res = await connection.query(
+        'SELECT MEASURE("single_policy_measure_test"."total_quantity") AS total_quantity, ' +
+        'MEASURE("single_policy_measure_test"."max_product_id") AS max_product_id ' +
+        'FROM single_policy_measure_test'
+      );
+      // Measure-only query with no GROUP BY returns a single aggregated row.
+      expect(res.rows.length).toBe(1);
+      const row = res.rows[0];
+      // Only the full-access policy matches (the masking policy targets a group
+      // the user is not in), so the measure renders its real aggregated value,
+      // not the mask (-1).
+      expect(Number(row.total_quantity)).toBeGreaterThan(0);
+      expect(Number(row.total_quantity)).not.toBe(-1);
+      // The full-access policy's row-level filter (product_id <= 3) is applied.
+      expect(Number(row.max_product_id)).toBeLessThanOrEqual(3);
+    });
+  });
+
+  /**
    * View masking tests — masking follows the RLS pattern and is applied at
    * both cube and view levels. If a cube masks a member, it stays masked
    * even when accessed through a view that grants full access.
@@ -514,7 +771,7 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('masking_view_masked returns masked values for default role', async () => {
+    test('masking_view_masked returns masked values for default group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
@@ -525,7 +782,7 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    test('masking_view_over_hidden_cube returns masked values for default role', async () => {
+    test('masking_view_over_hidden_cube returns masked values for default group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
@@ -548,7 +805,7 @@ describe('Cube RBAC Engine', () => {
       await connection.end();
     }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-    test('masking_view_masked returns real values for masking_full_access role', async () => {
+    test('masking_view_masked returns real values for masking_full_access group', async () => {
       const res = await connection.query('SELECT * FROM masking_view_masked LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
       for (const row of res.rows) {
@@ -557,8 +814,8 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    test('masking_view_over_hidden_cube returns real values for masking_full_access role', async () => {
-      // The underlying cube hides all members, but masking_full_access role
+    test('masking_view_over_hidden_cube returns real values for masking_full_access group', async () => {
+      // The underlying cube hides all members, but masking_full_access group
       // gets full access through the view's own policy.
       const res = await connection.query('SELECT * FROM masking_view_over_hidden_cube LIMIT 5');
       expect(res.rows.length).toBeGreaterThan(0);
@@ -578,7 +835,6 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'masking_viewer',
         userAttributes: {},
-        roles: [],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -588,7 +844,7 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'masking_full',
         userAttributes: {},
-        roles: ['masking_full_access'],
+        groups: ['masking_full_access'],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -598,7 +854,7 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'masking_partial',
         userAttributes: {},
-        roles: ['masking_partial'],
+        groups: ['masking_partial'],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -624,8 +880,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_test.secret_number']).toBe(-1);
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.secret_number']).toBe('-1');
+        expect(row['masking_test.count']).toBe('12345');
       }
     });
 
@@ -639,7 +895,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_test.count']).not.toBe(12345);
+        expect(row['masking_test.count']).not.toBe('12345');
       }
     });
 
@@ -654,7 +910,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['masking_test.total_quantity']).not.toBeNull();
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.count']).toBe('12345');
         expect(row['masking_test.public_dim']).not.toBeNull();
       }
     });
@@ -668,8 +924,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_test.secret_number']).toBe(-1);
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.secret_number']).toBe('-1');
+        expect(row['masking_test.count']).toBe('12345');
       }
     });
 
@@ -684,7 +940,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         expect(row['masking_test.public_dim']).not.toBeNull();
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.count']).toBe('12345');
       }
     });
 
@@ -700,7 +956,7 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         expect(row['masking_test.public_dim']).not.toBeNull();
         // count is masked, total_quantity is real
-        expect(row['masking_test.count']).toBe(12345);
+        expect(row['masking_test.count']).toBe('12345');
         expect(row['masking_test.total_quantity']).not.toBeNull();
       }
     });
@@ -713,8 +969,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view_masked.secret_number']).toBe(-1);
-        expect(row['masking_view_masked.count']).toBe(12345);
+        expect(row['masking_view_masked.secret_number']).toBe('-1');
+        expect(row['masking_view_masked.count']).toBe('12345');
       }
     });
 
@@ -728,13 +984,13 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view_masked.count']).not.toBe(12345);
+        expect(row['masking_view_masked.count']).not.toBe('12345');
       }
     });
 
     test('view: masking_view — cube masking still applied through view', async () => {
       // masking_view grants full access at view level, but the underlying
-      // cube masks all members for role "*". Masking follows RLS pattern.
+      // cube masks all members for group "*". Masking follows RLS pattern.
       const result = await maskingViewerClient.load({
         measures: ['masking_view.count'],
         dimensions: ['masking_view.secret_number'],
@@ -743,8 +999,8 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view.secret_number']).toBe(-1);
-        expect(row['masking_view.count']).toBe(12345);
+        expect(row['masking_view.secret_number']).toBe('-1');
+        expect(row['masking_view.count']).toBe('12345');
       }
     });
 
@@ -763,7 +1019,7 @@ describe('Cube RBAC Engine', () => {
         expect(row['masking_view_over_hidden_cube.total_quantity']).not.toBeNull();
         expect(row['masking_view_over_hidden_cube.public_dim']).not.toBeNull();
         // count not in view memberLevel → masked
-        expect(row['masking_view_over_hidden_cube.count']).toBe(12345);
+        expect(row['masking_view_over_hidden_cube.count']).toBe('12345');
       }
     });
 
@@ -777,7 +1033,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['masking_view_over_hidden_cube.count']).not.toBe(12345);
+        expect(row['masking_view_over_hidden_cube.count']).not.toBe('12345');
       }
     });
   });
@@ -908,7 +1164,6 @@ describe('Cube RBAC Engine', () => {
       auth: {
         username: 'sc_test',
         userAttributes: {},
-        roles: [],
         groups: [],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
@@ -967,7 +1222,7 @@ describe('Cube RBAC Engine', () => {
       for (const row of rows) {
         // mask.sql is CAST(${userAttributes.tenantId} AS INTEGER)
         // sc_test user has tenantId = '1', so masked_price should be 1
-        expect(row['sc_ua_mask_test.masked_price']).toBe(1);
+        expect(row['sc_ua_mask_test.masked_price']).toBe('1');
       }
     });
 
@@ -980,7 +1235,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         // mask.sql is ${CUBE}.product_id * -1, so masked_product should be negative
-        expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
+        expect(Number(row['sc_cube_mask_test.masked_product'])).toBeLessThan(0);
       }
     });
 
@@ -993,7 +1248,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         // sc_test user has tenantId = '1', so masked_status should be actual product_id
-        expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
+        expect(Number(row['yaml_ua_mask_test.masked_status'])).toBeGreaterThan(0);
       }
     });
 
@@ -1006,7 +1261,7 @@ describe('Cube RBAC Engine', () => {
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
         // mask.sql references ${orders.id} from a joined cube — the join must be resolved
-        expect(row['sc_joined_mask_test.masked_order_id']).toBeGreaterThan(0);
+        expect(Number(row['sc_joined_mask_test.masked_order_id'])).toBeGreaterThan(0);
       }
     });
 
@@ -1018,7 +1273,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_full']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_full']).toBe('-1');
       }
     });
 
@@ -1030,7 +1285,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe('-1');
       }
     });
 
@@ -1042,7 +1297,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe('-1');
       }
     });
 
@@ -1054,7 +1309,7 @@ describe('Cube RBAC Engine', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe('-1');
       }
     });
   });
@@ -1143,7 +1398,7 @@ describe('Cube RBAC Engine', () => {
           canHaveAdmin: true,
           minDefaultId: 10000,
         },
-        roles: ['admin', 'ownder', 'hr'],
+        groups: ['admin'],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
       expiresIn: '2 days'
@@ -1353,7 +1608,6 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       auth: {
         username: 'sc_test',
         userAttributes: {},
-        roles: [],
         groups: [],
       },
     }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
@@ -1374,7 +1628,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['sc_ua_mask_test.masked_price']).toBe(1);
+        expect(row['sc_ua_mask_test.masked_price']).toBe('1');
       }
     });
 
@@ -1386,7 +1640,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['sc_cube_mask_test.masked_product']).toBeLessThan(0);
+        expect(Number(row['sc_cube_mask_test.masked_product'])).toBeLessThan(0);
       }
     });
 
@@ -1398,7 +1652,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['yaml_ua_mask_test.masked_status']).toBeGreaterThan(0);
+        expect(Number(row['yaml_ua_mask_test.masked_status'])).toBeGreaterThan(0);
       }
     });
 
@@ -1410,7 +1664,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['sc_joined_mask_test.masked_order_id']).toBeGreaterThan(0);
+        expect(Number(row['sc_joined_mask_test.masked_order_id'])).toBeGreaterThan(0);
       }
     });
 
@@ -1422,7 +1676,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_full']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_full']).toBe('-1');
       }
     });
 
@@ -1434,7 +1688,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_ref']).toBe('-1');
       }
     });
 
@@ -1446,7 +1700,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_col']).toBe('-1');
       }
     });
 
@@ -1458,7 +1712,7 @@ describe('Cube RBAC Engine [Tesseract]', () => {
       const rows = result.rawData();
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe(-1);
+        expect(row['view_mask_test.view_mask_base_pid_cube_name']).toBe('-1');
       }
     });
   });

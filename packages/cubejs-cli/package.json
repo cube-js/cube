@@ -2,14 +2,14 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.39",
+  "version": "1.7.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-cli"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "bin": {
     "cubejs": "dist/src/index.js"
@@ -30,10 +30,10 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@cubejs-backend/cloud": "1.6.39",
+    "@cubejs-backend/cloud": "1.7.4",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/schema-compiler": "1.6.39",
-    "@cubejs-backend/shared": "1.6.39",
+    "@cubejs-backend/schema-compiler": "1.7.4",
+    "@cubejs-backend/shared": "1.7.4",
     "chalk": "^2.4.2",
     "cli-progress": "^3.10",
     "commander": "^2.19.0",
@@ -50,8 +50,8 @@
     "colors": "1.4.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.39",
-    "@cubejs-backend/server": "1.6.39",
+    "@cubejs-backend/linter": "1.7.4",
+    "@cubejs-backend/server": "1.7.4",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
@@ -59,7 +59,7 @@
     "@types/inquirer": "^7.3.1",
     "@types/jest": "^29",
     "@types/jsonwebtoken": "^9.0.2",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/semver": "^7.5.8",
     "husky": "^4.2.3",
     "jest": "^29",

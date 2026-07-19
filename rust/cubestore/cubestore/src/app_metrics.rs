@@ -13,10 +13,16 @@ pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors"
 /// Incoming SQL queries that do data reads.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
+pub static DATA_QUERIES_CACHE_STALE_HIT: Counter =
+    metrics::counter("cs.sql.query.data.cache.stale_hit");
 // Approximate number of entries in this cache.
 pub static DATA_QUERIES_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.data.cache.size");
 // Approximate total weighted size of entries in this cache.
 pub static DATA_QUERIES_CACHE_WEIGHT: Gauge = metrics::gauge("cs.sql.query.data.cache.weight");
+pub static DATA_QUERIES_STALE_CACHE_SIZE: Gauge =
+    metrics::gauge("cs.sql.query.data.cache.stale.size");
+pub static DATA_QUERIES_STALE_CACHE_WEIGHT: Gauge =
+    metrics::gauge("cs.sql.query.data.cache.stale.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
 pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");
@@ -131,6 +137,10 @@ pub static JOBS_REPARTITION_CHUNK_COMPLETED: Counter =
     metrics::counter("cs.jobs.repartition_chunk.completed");
 pub static JOBS_REPARTITION_CHUNK_FAILURES: Counter =
     metrics::counter("cs.jobs.repartition_chunk.failures");
+/// Jobs removed by the cleanup sweep because their type is unknown to this
+/// binary. Non-zero means a newer binary wrote a job type this one cannot run
+/// (version skew across `latest`/`release` channels).
+pub static JOBS_UNKNOWN_DELETED: Counter = metrics::counter("cs.jobs.unknown.deleted");
 
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");

@@ -1914,6 +1914,31 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/clickhouse-driver SQL API: Window function over measure (running total) 1`] = `
+Array [
+  Object {
+    "count": "5",
+    "orderDateQ": 2020-01-01T00:00:00.000Z,
+    "runningTotal": "5",
+  },
+  Object {
+    "count": "13",
+    "orderDateQ": 2020-04-01T00:00:00.000Z,
+    "runningTotal": "18",
+  },
+  Object {
+    "count": "6",
+    "orderDateQ": 2020-07-01T00:00:00.000Z,
+    "runningTotal": "24",
+  },
+  Object {
+    "count": "20",
+    "orderDateQ": 2020-10-01T00:00:00.000Z,
+    "runningTotal": "44",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/clickhouse-driver SQL API: metabase count cast to float32 from push down: metabase_count_cast_to_float32_from_push_down 1`] = `
 Array [
   Object {
@@ -10016,6 +10041,61 @@ Array [
     "ECommerce.count": "2",
     "ECommerce.customOrderDateNoPreAgg": "2020-12-19T09:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.three_months_by_march": "2020-12-19T09:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/clickhouse-driver querying ECommerce: count by month + order with non-UTC timezone (Asia/Kolkata) 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-03-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "5",
+    "ECommerce.customOrderDateNoPreAgg": "2020-05-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "7",
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "2020-09-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "9",
+    "ECommerce.customOrderDateNoPreAgg": "2020-11-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "7",
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.month": "2020-12-01T00:00:00.000",
   },
 ]
 `;

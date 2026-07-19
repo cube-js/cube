@@ -8,11 +8,11 @@ With SCIM (System for Cross-domain Identity Management) enabled, you can
 automate user provisioning in Cube and keep user groups synchronized
 with Microsoft Entra ID (formerly Azure Active Directory).
 
-<Info>
+<Note>
 
-Available on [Enterprise and above plans](https://cube.dev/pricing).
+Available on [Enterprise plan](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 ## Prerequisites
 
@@ -73,11 +73,30 @@ Cube:
 
 <Info>
 
-Users provisioned via SCIM will receive the Explorer role.
-To grant admin permissions, update the user's role manually in
-Cube under **Team & Security**.
+Users provisioned via SCIM receive the **Viewer** role by default. To
+choose a different default role (including [custom roles][ref-custom-roles]),
+see [Default role for new users][ref-saml-default-role] on the SAML setup
+page — the setting is shared between SAML and SCIM.
+
+Admin permissions cannot be assigned through this setting. To grant admin
+permissions, update the user's role manually in Cube under **Admin →
+Users**.
 
 </Info>
+
+## Map roles by SCIM group
+
+If you have configured [Map roles by group][ref-saml-map-roles-by-group]
+on the SAML setup page, the same mapping is applied when SCIM provisions
+group memberships from Entra — when Entra adds a user to a synchronized
+group, Cube assigns the mapped role to that user. Role assignment is
+**additive**: removing a user from an Entra group does not strip the
+corresponding role; adjust the user's roles in Cube manually.
+
+No separate configuration is required on the SCIM side — once the
+mapping is defined on the SAML page, it drives both SAML SSO and SCIM
+group sync. Match is on the group **display name** Entra pushes (the
+`displayName` attribute in the **Group** mapping, case-insensitive).
 
 ## Syncing user attributes
 
@@ -120,4 +139,7 @@ The next time the Entra application syncs, the attribute values will be
 provisioned as [user attributes][ref-user-attributes] in Cube.
 
 [ref-saml]: /admin/sso/microsoft-entra-id/saml
+[ref-saml-default-role]: /admin/sso/microsoft-entra-id/saml#default-role-for-new-users
+[ref-saml-map-roles-by-group]: /admin/sso/microsoft-entra-id/saml#map-roles-by-group
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes

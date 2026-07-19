@@ -19,6 +19,7 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
     BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
+    TracedMetaStore,
 };
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
@@ -360,6 +361,37 @@ pub struct Config {
     injector: Arc<Injector>,
 }
 
+/// How an inactive parent's persisted chunks are repartitioned into its children.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepartitionStrategy {
+    /// One chunk at a time, each split independently into the children.
+    PerChunk,
+    /// One job per partition that k-way merges all its chunks in groups and splits the
+    /// merged stream into the children at the wal-split limit.
+    PerPartition,
+    /// Many jobs sliced at schedule time, each merging an inclusive chunk-id range;
+    /// spreads across workers by the hash of the range bounds.
+    Range,
+}
+
+impl FromStr for RepartitionStrategy {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "per_chunk" | "perchunk" | "per-chunk" => Ok(RepartitionStrategy::PerChunk),
+            "per_partition" | "perpartition" | "per-partition" => {
+                Ok(RepartitionStrategy::PerPartition)
+            }
+            "range" => Ok(RepartitionStrategy::Range),
+            _ => Err(format!(
+                "unknown repartition strategy '{}' (expected per_chunk, per_partition or range)",
+                s
+            )),
+        }
+    }
+}
+
 #[automock]
 pub trait ConfigObj: DIService {
     fn partition_split_threshold(&self) -> u64;
@@ -392,6 +424,11 @@ pub trait ConfigObj: DIService {
 
     fn wal_split_threshold(&self) -> u64;
 
+    /// Optional in-flight WAL data frame byte size at which an import splits the frame, in
+    /// addition to the row count threshold. `None` (env unset or `0`) disables the size check,
+    /// leaving the row-count split as the only trigger.
+    fn wal_split_size_threshold_bytes(&self) -> Option<u64>;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn select_worker_idle_timeout(&self) -> u64;
@@ -399,6 +436,8 @@ pub trait ConfigObj: DIService {
     fn job_runners_count(&self) -> usize;
 
     fn long_term_job_runners_count(&self) -> usize;
+
+    fn csv_import_job_runners_count(&self) -> usize;
 
     fn bind_address(&self) -> &Option<String>;
 
@@ -423,6 +462,8 @@ pub trait ConfigObj: DIService {
     fn gc_loop_interval(&self) -> u64;
 
     fn stale_stream_timeout(&self) -> u64;
+
+    fn streaming_lag_timeout_ms(&self) -> u64;
 
     fn select_workers(&self) -> &Vec<String>;
 
@@ -496,6 +537,74 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    /// When enabled, a TableImportCSV job is placed on the worker with the fewest in-flight
+    /// CSV imports (load-aware), instead of by stateless hash of (table_id, location). Off by
+    /// default (hash placement); kept as a flag for rollout/rollback.
+    fn load_aware_import_placement_enabled(&self) -> bool;
+
+    /// Time budget for a single batch repartition job. The job yields its runner
+    /// slot once the budget is exceeded (after the current chunk); the remainder
+    /// is drained by a follow-up job via the cascade. Kept separate from
+    /// import_job_timeout, which is the hard stuck-job kill, not a fairness knob.
+    fn repartition_chunks_time_budget_secs(&self) -> u64;
+
+    /// When enabled (default), the sorted partial aggregate is pushed below the partition merge
+    /// so the merge carries partial aggregate states instead of all raw rows. Kept as a flag for
+    /// emergency rollback to the pre-push plan shape.
+    fn push_partial_aggregate_below_merge_enabled(&self) -> bool;
+
+    /// When enabled, compaction sizes the partition split by the bytes actually being written
+    /// (existing main table plus the pending chunks merged in this pass) instead of the main
+    /// table alone, so a partition with large accumulated chunks splits in a single pass. Off
+    /// by default; kept as a flag for rollout/rollback.
+    fn compaction_split_by_total_file_size_enabled(&self) -> bool;
+
+    /// When enabled, the worker trims in-memory chunks by the dedup-safe pushable predicate
+    /// before they cross IPC to the select subprocess (which re-applies the same predicate).
+    /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
+    fn prefilter_in_memory_chunks_enabled(&self) -> bool;
+
+    /// When enabled, a merge group's chunk parquets (PerPartition / Range strategies) are
+    /// downloaded concurrently before building the merge inputs, instead of one at a time.
+    /// The group is already bounded by repartition_merge_max_input_files and the download
+    /// pool by download_concurrency, so no extra budget is needed. Off by default.
+    fn repartition_concurrent_download(&self) -> bool;
+
+    /// Which repartition strategy to use for an inactive parent's persisted chunks.
+    /// Defaults to PerChunk.
+    fn repartition_strategy(&self) -> RepartitionStrategy;
+
+    /// Cap on the number of chunks merged together in one Merge group / RepartitionRange.
+    /// Bounds the concurrent parquet readers, the k-way merge width, the swap size and
+    /// (since a range downloads its chunks sequentially) the per-job download time.
+    fn repartition_merge_max_input_files(&self) -> usize;
+
+    /// Cap on the total rows merged together in one Merge group / RepartitionRange.
+    fn repartition_merge_max_rows(&self) -> u64;
+
+    /// When enabled, the merge repartition path deactivates a table as corrupt if the
+    /// active children resolved for an inactive parent overlap. Off by default: the
+    /// streaming split never drops rows (the first child is the low catch-all, the last
+    /// the high one), and the legacy per-chunk path performed no such metadata check.
+    fn repartition_check_overlapping_children(&self) -> bool;
+    /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
+    /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
+    /// `k = limit + offset`. `0` disables the optimization.
+    fn group_by_limit_factor(&self) -> usize;
+
+    /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
+    /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
+    /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
+    /// partition ("under merge").
+    fn group_by_limit_per_partition(&self) -> bool;
+
+    /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
+    /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
+    fn coalesce_under_hash_aggregate(&self) -> bool;
+
+    /// Router-side merge strategy for distributed value-ordered top-k.
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
+
     fn allow_decimal128(&self) -> bool;
 
     fn enable_remove_orphaned_remote_files(&self) -> bool;
@@ -509,6 +618,8 @@ pub trait ConfigObj: DIService {
     fn query_queue_cache_max_capacity(&self) -> u64;
 
     fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
+
+    fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64>;
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
 
@@ -541,6 +652,10 @@ pub trait ConfigObj: DIService {
 
     fn disk_space_cache_duration_secs(&self) -> u64;
 
+    fn disk_space_compute_lock_timeout_ms(&self) -> u64;
+
+    fn metastore_batch_rpc(&self) -> bool;
+
     fn transport_max_message_size(&self) -> usize;
     fn transport_max_frame_size(&self) -> usize;
 
@@ -571,6 +686,7 @@ pub struct ConfigObjImpl {
     pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub compaction_chunks_threshold_multiplier: f64,
     pub compaction_chunks_in_memory_size_threshold: u64,
     pub compaction_chunks_max_lifetime_threshold: u64,
     pub compaction_in_memory_chunks_max_lifetime_threshold: u64,
@@ -581,6 +697,7 @@ pub struct ConfigObjImpl {
     pub compaction_in_memory_chunks_ratio_check_threshold: u64,
     pub compaction_in_memory_chunks_schedule_period_secs: u64,
     pub wal_split_threshold: u64,
+    pub wal_split_size_threshold_bytes: Option<u64>,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
@@ -588,6 +705,7 @@ pub struct ConfigObjImpl {
     pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
     pub long_term_job_runners_count: usize,
+    pub csv_import_job_runners_count: usize,
     pub bind_address: Option<String>,
     pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
@@ -601,6 +719,7 @@ pub struct ConfigObjImpl {
     pub meta_store_snapshot_interval: u64,
     pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
+    pub streaming_lag_timeout_ms: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
@@ -636,6 +755,20 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub load_aware_import_placement_enabled: bool,
+    pub repartition_chunks_time_budget_secs: u64,
+    pub push_partial_aggregate_below_merge_enabled: bool,
+    pub compaction_split_by_total_file_size_enabled: bool,
+    pub prefilter_in_memory_chunks_enabled: bool,
+    pub repartition_concurrent_download: bool,
+    pub repartition_strategy: RepartitionStrategy,
+    pub repartition_merge_max_input_files: usize,
+    pub repartition_merge_max_rows: u64,
+    pub repartition_check_overlapping_children: bool,
+    pub group_by_limit_factor: usize,
+    pub group_by_limit_per_partition: bool,
+    pub coalesce_under_hash_aggregate: bool,
+    pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
@@ -643,6 +776,7 @@ pub struct ConfigObjImpl {
     pub query_cache_max_capacity_bytes: u64,
     pub query_queue_cache_max_capacity: u64,
     pub query_cache_time_to_idle_secs: Option<u64>,
+    pub query_cache_stale_while_revalidate_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
@@ -658,6 +792,8 @@ pub struct ConfigObjImpl {
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
+    pub disk_space_compute_lock_timeout_ms: u64,
+    pub metastore_batch_rpc: bool,
     pub transport_max_message_size: usize,
     pub transport_max_frame_size: usize,
     pub local_files_cleanup_interval_secs: u64,
@@ -689,11 +825,15 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn compaction_chunks_total_size_threshold(&self) -> u64 {
-        self.compaction_chunks_total_size_threshold
+        (self.compaction_chunks_total_size_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
-        self.compaction_chunks_count_threshold
+        (self.compaction_chunks_count_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
     fn compaction_chunks_in_memory_size_threshold(&self) -> u64 {
@@ -736,6 +876,10 @@ impl ConfigObj for ConfigObjImpl {
         self.wal_split_threshold
     }
 
+    fn wal_split_size_threshold_bytes(&self) -> Option<u64> {
+        self.wal_split_size_threshold_bytes
+    }
+
     fn select_worker_pool_size(&self) -> usize {
         self.select_worker_pool_size
     }
@@ -750,6 +894,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn long_term_job_runners_count(&self) -> usize {
         self.long_term_job_runners_count
+    }
+
+    fn csv_import_job_runners_count(&self) -> usize {
+        self.csv_import_job_runners_count
     }
 
     fn bind_address(&self) -> &Option<String> {
@@ -798,6 +946,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn stale_stream_timeout(&self) -> u64 {
         self.stale_stream_timeout
+    }
+
+    fn streaming_lag_timeout_ms(&self) -> u64 {
+        self.streaming_lag_timeout_ms
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -932,6 +1084,52 @@ impl ConfigObj for ConfigObjImpl {
     fn enable_topk(&self) -> bool {
         self.enable_topk
     }
+    fn load_aware_import_placement_enabled(&self) -> bool {
+        self.load_aware_import_placement_enabled
+    }
+    fn repartition_chunks_time_budget_secs(&self) -> u64 {
+        self.repartition_chunks_time_budget_secs
+    }
+    fn push_partial_aggregate_below_merge_enabled(&self) -> bool {
+        self.push_partial_aggregate_below_merge_enabled
+    }
+    fn compaction_split_by_total_file_size_enabled(&self) -> bool {
+        self.compaction_split_by_total_file_size_enabled
+    }
+    fn prefilter_in_memory_chunks_enabled(&self) -> bool {
+        self.prefilter_in_memory_chunks_enabled
+    }
+    fn repartition_concurrent_download(&self) -> bool {
+        self.repartition_concurrent_download
+    }
+    fn repartition_strategy(&self) -> RepartitionStrategy {
+        self.repartition_strategy
+    }
+    fn repartition_merge_max_input_files(&self) -> usize {
+        self.repartition_merge_max_input_files
+    }
+    fn repartition_merge_max_rows(&self) -> u64 {
+        self.repartition_merge_max_rows
+    }
+    fn repartition_check_overlapping_children(&self) -> bool {
+        self.repartition_check_overlapping_children
+    }
+
+    fn group_by_limit_factor(&self) -> usize {
+        self.group_by_limit_factor
+    }
+
+    fn group_by_limit_per_partition(&self) -> bool {
+        self.group_by_limit_per_partition
+    }
+
+    fn coalesce_under_hash_aggregate(&self) -> bool {
+        self.coalesce_under_hash_aggregate
+    }
+
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy {
+        self.topk_aggregate_strategy
+    }
 
     fn allow_decimal128(&self) -> bool {
         self.allow_decimal128
@@ -955,6 +1153,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
         self.query_cache_time_to_idle_secs
+    }
+    fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64> {
+        self.query_cache_stale_while_revalidate_secs
     }
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
@@ -1019,6 +1220,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn disk_space_cache_duration_secs(&self) -> u64 {
         self.disk_space_cache_duration_secs
+    }
+
+    fn disk_space_compute_lock_timeout_ms(&self) -> u64 {
+        self.disk_space_compute_lock_timeout_ms
+    }
+
+    fn metastore_batch_rpc(&self) -> bool {
+        self.metastore_batch_rpc
     }
 
     fn transport_max_message_size(&self) -> usize {
@@ -1097,6 +1306,43 @@ pub async fn init_test_logger() {
     }
 }
 
+/// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
+/// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopKAggregateStrategy {
+    /// Original streaming NRA merge with per-row state (default).
+    Streaming,
+    /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
+    VectorizedStreaming,
+    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
+    /// termination, so the router materializes every distinct group.
+    FullMerge,
+}
+
+/// Parses [`TopKAggregateStrategy`] from an env var. Lenient: an unset or unrecognized value falls
+/// back to the default (`Streaming`) with a warning rather than panicking -- a malformed perf toggle
+/// must never take a node down.
+fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
+    match env::var(name) {
+        Err(_) => TopKAggregateStrategy::Streaming,
+        Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
+            "" | "streaming" | "default" | "v1" => TopKAggregateStrategy::Streaming,
+            "vectorized" | "vectorized_streaming" | "v2" => {
+                TopKAggregateStrategy::VectorizedStreaming
+            }
+            "full_merge" | "full-merge" | "fullmerge" => TopKAggregateStrategy::FullMerge,
+            other => {
+                log::warn!(
+                    "unknown {} value '{}', using default (streaming)",
+                    name,
+                    other
+                );
+                TopKAggregateStrategy::Streaming
+            }
+        },
+    }
+}
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
@@ -1108,12 +1354,43 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+/// Lenient boolean env read for opt-in toggles: only `1`/`true` enable it, anything else (including a
+/// typo) is treated as off. Unlike [`env_bool`] it never panics -- a malformed value on a
+/// performance flag must not take a node down on startup.
+fn env_flag(name: &str) -> bool {
+    env::var(name).map_or(false, |v| v == "true" || v == "1")
+}
+
 pub fn env_parse<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
 {
     env_optparse(name).unwrap_or(default)
+}
+
+/// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
+/// falls back to the default instead of panicking, so a typo can't take a node down on startup.
+pub fn env_parse_lenient<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    match env::var(name) {
+        Ok(v) => match v.parse::<T>() {
+            Ok(n) => n,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring environment variable '{}' with '{}' value: {}; using default",
+                    name,
+                    v,
+                    e
+                );
+                default
+            }
+        },
+        Err(_) => default,
+    }
 }
 
 pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
@@ -1203,6 +1480,50 @@ pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Optio
     n
 }
 
+/// Parses a human-readable byte size env var into `Some(bytes)`. Returns `None` when the var is
+/// unset or set to `0`, which callers treat as "disabled".
+pub fn env_parse_optional_size(
+    name: &str,
+    max: Option<usize>,
+    min: Option<usize>,
+) -> Option<usize> {
+    let v = env::var(name).ok()?;
+
+    let n = match parse_size::parse_size(&v) {
+        Ok(n) => n as usize,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if n == 0 {
+        return None;
+    }
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                humansize::format_size(max, humansize::DECIMAL)
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                humansize::format_size(min, humansize::DECIMAL)
+            )
+        }
+    };
+
+    Some(n)
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -1215,6 +1536,24 @@ where
             name, x, e
         ),
     })
+}
+
+// Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
+// back to per_chunk, so a typo in the strategy env never takes the process down.
+fn env_repartition_strategy() -> RepartitionStrategy {
+    match env::var("CUBESTORE_REPARTITION_STRATEGY") {
+        Ok(v) => match v.parse::<RepartitionStrategy>() {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using per_chunk",
+                    e
+                );
+                RepartitionStrategy::PerChunk
+            }
+        },
+        Err(_) => RepartitionStrategy::PerChunk,
+    }
 }
 
 impl Config {
@@ -1233,6 +1572,8 @@ impl Config {
 
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
+        let query_cache_stale_while_revalidate_secs: u64 =
+            env_parse("CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE", 0);
         let query_cache_time_to_idle_secs = env_parse(
             "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
             // 1 hour
@@ -1295,6 +1636,10 @@ impl Config {
                     1048576 * 8,
                 ),
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
+                compaction_chunks_threshold_multiplier: env_parse(
+                    "CUBESTORE_COMPACTION_CHUNKS_THRESHOLD_MULTIPLIER",
+                    1.0_f64,
+                ),
                 compaction_chunks_in_memory_size_threshold: env_parse_size(
                     "CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD",
                     1 * 1024 * 1024 * 1024,
@@ -1396,6 +1741,7 @@ impl Config {
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stale_stream_timeout: env_parse("CUBESTORE_STALE_STREAM_TIMEOUT", 600),
+                streaming_lag_timeout_ms: env_parse("CUBESTORE_STREAMING_LAG_TIMEOUT_MS", 5000),
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -1498,14 +1844,62 @@ impl Config {
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
+                wal_split_size_threshold_bytes: env_parse_optional_size(
+                    "CUBESTORE_WAL_SPLIT_SIZE_THRESHOLD",
+                    None,
+                    None,
+                )
+                .map(|v| v as u64),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
+                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 0),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                load_aware_import_placement_enabled: env_bool(
+                    "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
+                    false,
+                ),
+                repartition_chunks_time_budget_secs: env_parse(
+                    "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
+                    60,
+                ),
+                push_partial_aggregate_below_merge_enabled: env_bool(
+                    "CUBESTORE_PUSH_PARTIAL_AGGREGATE_BELOW_MERGE",
+                    true,
+                ),
+                compaction_split_by_total_file_size_enabled: env_bool(
+                    "CUBESTORE_COMPACTION_SPLIT_BY_TOTAL_FILE_SIZE",
+                    false,
+                ),
+                prefilter_in_memory_chunks_enabled: env_bool(
+                    "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
+                    false,
+                ),
+                repartition_concurrent_download: env_bool(
+                    "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
+                    false,
+                ),
+                repartition_strategy: env_repartition_strategy(),
+                repartition_merge_max_input_files: env_parse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_INPUT_FILES",
+                    50,
+                ),
+                repartition_merge_max_rows: env_parse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
+                    4_000_000,
+                ),
+                repartition_check_overlapping_children: env_bool(
+                    "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
+                    false,
+                ),
+                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
+                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
+                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
+                topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
                     "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
@@ -1527,6 +1921,13 @@ impl Config {
                     None
                 } else {
                     Some(query_cache_time_to_idle_secs)
+                },
+                query_cache_stale_while_revalidate_secs: if query_cache_stale_while_revalidate_secs
+                    == 0
+                {
+                    None
+                } else {
+                    Some(query_cache_stale_while_revalidate_secs)
                 },
                 metadata_cache_max_capacity_bytes: env_parse(
                     "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
@@ -1580,6 +1981,13 @@ impl Config {
                     * 1024
                     * 1024,
                 disk_space_cache_duration_secs: 300,
+                disk_space_compute_lock_timeout_ms: env_parse_duration(
+                    "CUBESTORE_DISK_SPACE_LOCK_WAIT_MS",
+                    1000,
+                    Some(60_000),
+                    None,
+                ),
+                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", false),
                 transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
@@ -1672,6 +2080,7 @@ impl Config {
                 partition_size_split_threshold_bytes: 2 * 1024,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
+                compaction_chunks_threshold_multiplier: 1.0,
                 compaction_chunks_in_memory_size_threshold: 3 * 1024 * 1024 * 1024,
                 compaction_chunks_total_size_threshold: 10,
                 compaction_chunks_max_lifetime_threshold: 600,
@@ -1689,6 +2098,7 @@ impl Config {
                 select_worker_idle_timeout: 600,
                 job_runners_count: 4,
                 long_term_job_runners_count: 8,
+                csv_import_job_runners_count: 2,
                 bind_address: None,
                 status_bind_address: None,
                 http_bind_address: None,
@@ -1697,6 +2107,7 @@ impl Config {
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
                 stale_stream_timeout: 60,
+                streaming_lag_timeout_ms: 5000,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,
@@ -1729,10 +2140,27 @@ impl Config {
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
                 wal_split_threshold: 262144,
+                wal_split_size_threshold_bytes: None,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                load_aware_import_placement_enabled: false,
+                repartition_chunks_time_budget_secs: 60,
+                push_partial_aggregate_below_merge_enabled: true,
+                compaction_split_by_total_file_size_enabled: false,
+                // Production default is off; kept on in tests so prefilter_chunks_shared_scan
+                // and the rest of the suite keep exercising the worker-side trim path.
+                prefilter_in_memory_chunks_enabled: true,
+                repartition_concurrent_download: false,
+                repartition_strategy: RepartitionStrategy::PerChunk,
+                repartition_merge_max_input_files: 50,
+                repartition_merge_max_rows: 4_000_000,
+                repartition_check_overlapping_children: false,
+                group_by_limit_factor: 2,
+                group_by_limit_per_partition: false,
+                coalesce_under_hash_aggregate: false,
+                topk_aggregate_strategy: TopKAggregateStrategy::Streaming,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
@@ -1740,6 +2168,7 @@ impl Config {
                 query_cache_max_capacity_bytes: 512 << 20,
                 query_queue_cache_max_capacity: 10000,
                 query_cache_time_to_idle_secs: Some(600),
+                query_cache_stale_while_revalidate_secs: None,
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
@@ -1759,6 +2188,8 @@ impl Config {
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
+                disk_space_compute_lock_timeout_ms: 1000,
+                metastore_batch_rpc: false,
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
                 local_files_cleanup_interval_secs: 600,
@@ -1804,7 +2235,7 @@ impl Config {
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options::<_, T, _, _>(
             true,
@@ -1822,7 +2253,7 @@ impl Config {
 
     pub async fn start_migration_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_migration_test_with_options::<_, T, _, _>(
             Option::<
@@ -1839,7 +2270,7 @@ impl Config {
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options::<_, T, _, _>(
             false,
@@ -1861,7 +2292,7 @@ impl Config {
         test_fn: impl FnOnce(CubeServices) -> T2,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options(true, Some(configure_injector), test_fn)
             .await
@@ -1874,7 +2305,7 @@ impl Config {
         test_fn: F,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
@@ -1900,8 +2331,10 @@ impl Config {
 
             // Should be long enough even for CI.
             let timeout = Duration::from_secs(600);
-            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
-                panic!("Test timed out after {} seconds", timeout.as_secs());
+            match timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                Err(_) => panic!("Test timed out after {} seconds", timeout.as_secs()),
+                Ok(Err(e)) => panic!("Test failed: {}", e.display_with_backtrace()),
+                Ok(Ok(())) => {}
             }
 
             services.stop_processing_loops().await.unwrap();
@@ -1924,7 +2357,7 @@ impl Config {
         test_fn: F,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
@@ -1943,8 +2376,10 @@ impl Config {
 
             // Should be long enough even for CI.
             let timeout = Duration::from_secs(600);
-            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
-                panic!("Test timed out after {} seconds", timeout.as_secs());
+            match timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                Err(_) => panic!("Test timed out after {} seconds", timeout.as_secs()),
+                Ok(Err(e)) => panic!("Test failed: {}", e.display_with_backtrace()),
+                Ok(Ok(())) => {}
             }
 
             services.stop_processing_loops().await.unwrap();
@@ -1962,14 +2397,14 @@ impl Config {
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         Self::test(name).start_test(test_fn).await;
     }
 
     pub async fn run_migration_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         Self::migration_test(name)
             .start_migration_test(test_fn)
@@ -2135,7 +2570,10 @@ impl Config {
     }
 
     pub async fn configure_meta_store(&self) {
-        let (metastore_event_sender, _) = broadcast::channel(8192); // TODO config
+        // Bounded broadcast of metastore events; sized for bursts (e.g. orphaned-job cleanup
+        // emitting hundreds of UpdateJob events at once). Listeners that still lag past this fall
+        // back to authoritative metastore re-checks rather than failing.
+        let (metastore_event_sender, _) = broadcast::channel(32768);
         let metastore_event_sender_to_move = metastore_event_sender.clone();
 
         if let Some(_) = self.config_obj.metastore_remote_address() {
@@ -2150,7 +2588,7 @@ impl Config {
             self.injector
                 .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
                     let transport = ClusterMetaStoreClient::new(i.get_service_typed().await);
-                    Arc::new(MetaStoreRpcClient::new(transport))
+                    TracedMetaStore::new(Arc::new(MetaStoreRpcClient::new(transport)))
                 })
                 .await;
         } else {
@@ -2168,29 +2606,35 @@ impl Config {
                 })
                 .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
+            // Register the concrete RocksMetaStore (some code fetches it by type),
+            // then expose `dyn MetaStore` wrapped in TracedMetaStore so local calls
+            // are traced too.
             self.injector
-                .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
-                    async move |i| {
-                        let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        let metastore_fs = i.get_service("metastore_fs").await;
-                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksMetaStore::load_from_dump(
-                                &Path::new(&path),
-                                dump_dir,
-                                metastore_fs,
-                                config,
-                            )
+                .register_typed::<RocksMetaStore, RocksMetaStore, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
+                    let metastore_fs = i.get_service("metastore_fs").await;
+                    let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                        RocksMetaStore::load_from_dump(
+                            &Path::new(&path),
+                            dump_dir,
+                            metastore_fs,
+                            config,
+                        )
+                        .await
+                        .unwrap()
+                    } else {
+                        RocksMetaStore::load_from_remote(&path, metastore_fs, config)
                             .await
                             .unwrap()
-                        } else {
-                            RocksMetaStore::load_from_remote(&path, metastore_fs, config)
-                                .await
-                                .unwrap()
-                        };
-                        meta_store.add_listener(metastore_event_sender).await;
-                        meta_store
-                    },
-                )
+                    };
+                    meta_store.add_listener(metastore_event_sender).await;
+                    meta_store
+                })
+                .await;
+            self.injector
+                .register_typed::<dyn MetaStore, TracedMetaStore, _, _>(async move |i| {
+                    TracedMetaStore::new(i.get_service_typed::<RocksMetaStore>().await)
+                })
                 .await;
         };
 
@@ -2389,6 +2833,7 @@ impl Config {
             self.config_obj.query_cache_max_capacity_bytes(),
             self.config_obj.query_cache_time_to_idle_secs(),
             self.config_obj.query_queue_cache_max_capacity(),
+            self.config_obj.query_cache_stale_while_revalidate_secs(),
         ));
 
         let query_cache_to_move = query_cache.clone();
@@ -2418,6 +2863,7 @@ impl Config {
                         .clone(),
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed::<dyn ConfigObj>().await,
                 )
             })
             .await;
@@ -2470,6 +2916,7 @@ impl Config {
         self.injector
             .register_typed::<dyn JobProcessor, _, _, _>(async move |i| {
                 JobProcessorImpl::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2577,4 +3024,26 @@ pub async fn uses_remote_metastore(i: &Injector) -> bool {
 
 pub fn is_router(c: &dyn ConfigObj) -> bool {
     !c.worker_bind_address().is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repartition_strategy_from_str() {
+        assert_eq!(
+            "per_chunk".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerChunk
+        );
+        assert_eq!(
+            "per_partition".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerPartition
+        );
+        assert_eq!(
+            "RANGE".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::Range
+        );
+        assert!("nonsense".parse::<RepartitionStrategy>().is_err());
+    }
 }

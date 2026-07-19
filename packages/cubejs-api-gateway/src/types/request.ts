@@ -95,7 +95,7 @@ type ErrorResponse = {
   error: string,
 };
 
-type MetaResponse = { cubes: any[], compilerId?: string };
+type MetaResponse = { cubes: any[], viewGroups?: any[], compilerId?: string };
 type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
 
 /**
@@ -121,7 +121,6 @@ type BaseRequest = {
 };
 
 type RequestQuery = Record<string, any> | Record<string, any>[] & {
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
 };
 

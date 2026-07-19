@@ -15,32 +15,32 @@ describe('formatValue without Intl', () => {
   });
 
   it('detectLocale falls back to en-US and formatting works', async () => {
-    const { formatValue } = await import('../src/format');
+    const { formatValue } = await import('../src/format.js');
 
     // number type uses the detected locale (should be en-US fallback)
     expect(formatValue(1234.56, { type: 'number' })).toBe('1,234.56');
   });
 
   it('currency formatting falls back to en-US locale definition', async () => {
-    const { formatValue } = await import('../src/format');
+    const { formatValue } = await import('../src/format.js');
 
     expect(formatValue(1234.56, { type: 'number', format: 'currency' })).toBe('$1,234.56');
   });
 
   it('percent formatting works without Intl', async () => {
-    const { formatValue } = await import('../src/format');
+    const { formatValue } = await import('../src/format.js');
 
     expect(formatValue(0.1234, { type: 'number', format: 'percent' })).toBe('12.34%');
   });
 
   it('time formatting works without Intl', async () => {
-    const { formatValue } = await import('../src/format');
+    const { formatValue } = await import('../src/format.js');
 
     expect(formatValue('2024-03-15T00:00:00.000', { type: 'time', granularity: 'day' })).toBe('2024-03-15');
   });
 
   it('null/undefined still return emptyPlaceholder', async () => {
-    const { formatValue } = await import('../src/format');
+    const { formatValue } = await import('../src/format.js');
 
     expect(formatValue(null, { type: 'number' })).toBe('∅');
     expect(formatValue(undefined, { type: 'number' })).toBe('∅');
@@ -49,7 +49,7 @@ describe('formatValue without Intl', () => {
   // Known locale (de-DE) — pre-built d3 definition is used,
   // getCurrencySymbol falls back to the static currencySymbols map.
   it('known locale (de-DE) uses pre-built locale definition', async () => {
-    const { formatValue } = await import('../src/format');
+    const { formatValue } = await import('../src/format.js');
 
     expect(formatValue(1234.56, { type: 'number', format: 'number', locale: 'de-DE' })).toBe('1.234,56');
     expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'EUR', locale: 'de-DE' })).toBe('€1.234,56');
@@ -59,7 +59,7 @@ describe('formatValue without Intl', () => {
   // Unknown locale (sv-SE) — getD3NumericLocaleFromIntl throws,
   // falls back entirely to en-US.
   it('unknown locale (sv-SE) falls back to en-US', async () => {
-    const { formatValue } = await import('../src/format');
+    const { formatValue } = await import('../src/format.js');
 
     expect(formatValue(1234.56, { type: 'number', format: 'number', locale: 'sv-SE' })).toBe('1,234.56');
     expect(formatValue(1234.56, { type: 'number', format: 'currency', currency: 'USD', locale: 'sv-SE' })).toBe('$1,234.56');

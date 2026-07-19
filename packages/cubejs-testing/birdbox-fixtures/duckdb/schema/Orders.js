@@ -60,6 +60,12 @@ cube(`Orders`, {
     createdAt: {
       sql: `created_at`,
       type: `time`,
+      granularities: {
+        twoDayByOrigin: {
+          interval: `2 day`,
+          origin: `2020-01-01`,
+        },
+      },
     },
   },
 });

@@ -27,7 +27,7 @@ const bundle = (
       babel({
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
         exclude: ['node_modules/**', /\/core-js\//],
-        babelHelpers: 'runtime',
+        babelHelpers: 'bundled',
         presets: [
           '@babel/preset-react',
           '@babel/preset-typescript',
@@ -37,17 +37,6 @@ const bundle = (
               shippedProposals: true,
               useBuiltIns: 'usage',
               corejs: 3,
-            },
-          ],
-        ],
-        plugins: [
-          [
-            '@babel/plugin-transform-runtime',
-            {
-              corejs: false,
-              helpers: true,
-              regenerator: true,
-              useESModules: false,
             },
           ],
         ],
@@ -62,6 +51,10 @@ const bundle = (
 
   // Will be built with typescript
   const skipEsModule = name === 'cubejs-client-core';
+
+  // Packages with "type": "module" need a .cjs extension so Node treats the
+  // CJS bundle as CommonJS regardless of the package's module type.
+  const cjsExtension = name === 'cubejs-client-core' ? 'cjs' : 'cjs.js';
 
   const config = [
     // browser-friendly UMD build
@@ -92,7 +85,7 @@ const bundle = (
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
-          babelHelpers: 'runtime',
+          babelHelpers: 'bundled',
           presets: [
             '@babel/preset-react',
             '@babel/preset-typescript',
@@ -105,22 +98,11 @@ const bundle = (
               },
             ],
           ],
-          plugins: [
-            [
-              '@babel/plugin-transform-runtime',
-              {
-                corejs: false,
-                helpers: true,
-                regenerator: true,
-                useESModules: false,
-              },
-            ],
-          ],
         }),
       ],
       output: [
         {
-          file: `packages/${name}/dist/${name}.cjs.js`,
+          file: `packages/${name}/dist/${name}.${cjsExtension}`,
           format: 'cjs',
           sourcemap: true,
         },
@@ -189,4 +171,42 @@ export default bundle(
         vue: 'Vue',
       },
     })
-  );
+  )
+  .concat([
+    {
+      input: 'packages/cubejs-client-core/src/format.ts',
+      plugins: [
+        json(),
+        tsconfigPaths(),
+        resolve({
+          extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
+          resolveOnly: [/^\.\.?/, /^d3-format/, /^d3-time-format/, /^d3-time/, /^d3-array/, /^internmap/],
+        }),
+        commonjs(),
+        babel({
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+          exclude: 'node_modules/**',
+          babelHelpers: 'bundled',
+          presets: [
+            '@babel/preset-typescript',
+            [
+              '@babel/preset-env',
+              {
+                shippedProposals: true,
+                useBuiltIns: 'usage',
+                corejs: 3,
+              },
+            ],
+          ],
+        }),
+      ],
+      output: [
+        {
+          file: 'packages/cubejs-client-core/dist/format.cjs',
+          format: 'cjs',
+          exports: 'named',
+          sourcemap: true,
+        },
+      ],
+    },
+  ]);

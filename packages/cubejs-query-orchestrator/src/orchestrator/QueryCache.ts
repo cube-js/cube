@@ -24,7 +24,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
-import { getCacheHash } from './utils';
+import { getCacheHash, extractRequestUUID } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 export type CacheQueryResultOptions = {
@@ -70,8 +70,6 @@ export type Query = {
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
@@ -83,8 +81,6 @@ export type QueryBody = {
   values?: string[];
   loadRefreshKeysOnly?: boolean;
   scheduledRefresh?: boolean;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode;
   requestId?: string;
   external?: boolean;
@@ -286,8 +282,7 @@ export class QueryCache {
       }
     }
 
-    // renewQuery has been deprecated, but keeping it for now
-    if (queryBody.cacheMode === 'must-revalidate' || queryBody.renewQuery) {
+    if (queryBody.cacheMode === 'must-revalidate') {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(
         query,
@@ -408,9 +403,7 @@ export class QueryCache {
   }
 
   public static extractRequestUUID(requestId: string): string {
-    const idx = requestId.lastIndexOf('-span-');
-
-    return idx !== -1 ? requestId.substring(0, idx) : requestId;
+    return extractRequestUUID(requestId);
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
@@ -428,10 +421,24 @@ export class QueryCache {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
       : [queryAndParams, []];
-    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
-      keyQuery
+    // Single-pass replacement with longest-first alternation: sequential
+    // per-name replacement would corrupt names that are prefixes of other
+    // names (e.g. `name1` vs `name10`) and rescan already inserted target
+    // names, which contain the source name as a prefix
+    const sorted = [...preAggregationsTablesToTempTables]
+      .sort(([a], [b]) => b.length - a.length);
+    const replacements = new Map(
+      sorted.map(([tableName, { targetTableName }]) => [tableName, targetTableName])
     );
+    const replaceRegex = new RegExp(
+      sorted
+        .map(([tableName]) => tableName.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'))
+        .join('|'),
+      'g'
+    );
+    const replacedKeyQuery: string = sorted.length
+      ? keyQuery.replace(replaceRegex, (match) => replacements.get(match) as string)
+      : keyQuery;
     return Array.isArray(queryAndParams)
       ? [replacedKeyQuery, params, queryOptions]
       : replacedKeyQuery;

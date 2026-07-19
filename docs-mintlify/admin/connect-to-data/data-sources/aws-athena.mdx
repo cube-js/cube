@@ -10,6 +10,20 @@ description: Give Cube IAM access to Athena, an S3 query-results path, region an
 - [The AWS region][aws-docs-regions]
 - [The S3 bucket][aws-s3] on AWS to [store query results][aws-docs-athena-query]
 
+<Info>
+
+**Read-only access to your source data is sufficient.** Cube reads it with
+`athena:*QueryExecution`/`GetQueryResults`/`GetWorkGroup`, `glue:Get*` metadata,
+and `s3:GetObject`/`ListBucket`. Athena also **always** writes query results to
+[`CUBEJS_AWS_S3_OUTPUT_LOCATION`](#environment-variables) — even for `SELECT`s —
+so that location needs `s3:PutObject` (plus the multipart actions), but this is
+Athena's own staging bucket, not your source data. Writes to source data are
+only needed for [pre-aggregations](#pre-aggregation-build-strategies) built
+inside Athena. For a ready-to-use IAM policy, see the
+[AWS OIDC guide][ref-oidc-aws-athena].
+
+</Info>
+
 ## Setup
 
 ### Manual
@@ -58,19 +72,37 @@ Configuration** in your deployment.
 
 </Info>
 
-In Cube Cloud, select AWS Athena** when creating a new deployment and fill in
+In Cube Cloud, select **AWS Athena** when creating a new deployment and fill in
 the required fields:
 
 <Frame>
   <img src="https://ucarecdn.com/d30fa31d-e6ea-4a73-9950-1786634a1e32/" alt="Cube Cloud AWS Athena Configuration Screen" />
 </Frame>
 
+#### OIDC workload identity
+
+Instead of static credentials, Cube Cloud deployments can authenticate to
+Athena with [OIDC workload identity][ref-oidc-aws-athena]: an IAM role in
+your account trusts Cube's OIDC issuer, and the driver assumes it through
+the AWS SDK's default credential chain — no access keys to provision or
+rotate.
+
+```dotenv
+CUBEJS_DB_TYPE=athena
+AWS_ROLE_ARN=arn:aws:iam::123456789012:role/cube-deployment-acme
+CUBEJS_AWS_REGION=us-east-1
+CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
+```
+
+See the [AWS OIDC guide][ref-oidc-aws-athena] for the IAM role, trust
+policy, and permissions setup.
+
 Cube Cloud also supports connecting to data sources within private VPCs
-if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
+if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 [VPC connectivity guide][ref-cloud-conf-vpc] for details.
 
-[ref-dedicated-infra]: /docs/deployment/cloud/infrastructure#dedicated-infrastructure
-[ref-cloud-conf-vpc]: /docs/deployment/cloud/vpc
+[ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
+[ref-cloud-conf-vpc]: /admin/deployment/dedicated
 ## Environment Variables
 
 | Environment Variable                            | Description                                                                                                            | Possible Values                                  | Required |
@@ -87,7 +119,7 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | [`CUBEJS_DB_SCHEMA`](/reference/configuration/environment-variables#cubejs_db_schema)                              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)                            | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                     | A valid number                                   |    ❌    |
 
-<sup>1</sup> Either provide [`CUBEJS_AWS_KEY`](/reference/configuration/environment-variables#cubejs_aws_key) and [`CUBEJS_AWS_SECRET`](/reference/configuration/environment-variables#cubejs_aws_secret) for static credentials, or use [`CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN`](/reference/configuration/environment-variables#cubejs_aws_athena_assume_role_arn) for role-based authentication. When using role assumption without static credentials, the driver will use the AWS SDK's default credential chain (IAM instance profile, EKS IRSA, etc.).
+<sup>1</sup> Either provide [`CUBEJS_AWS_KEY`](/reference/configuration/environment-variables#cubejs_aws_key) and [`CUBEJS_AWS_SECRET`](/reference/configuration/environment-variables#cubejs_aws_secret) for static credentials, or use [`CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN`](/reference/configuration/environment-variables#cubejs_aws_athena_assume_role_arn) for role-based authentication. When using role assumption without static credentials, the driver will use the AWS SDK's default credential chain (IAM instance profile, EKS IRSA, or [OIDC workload identity][ref-oidc-aws-athena] in Cube Cloud).
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 ## Pre-Aggregation Feature Support
@@ -121,6 +153,14 @@ build pre-aggregations.
 
 No extra configuration is required to configure batching for AWS Athena.
 
+<Info>
+
+Batching builds pre-aggregations inside Athena via `CREATE TABLE AS SELECT`, the
+only case needing more than read-only access: `glue:CreateTable` on the
+pre-aggregations schema plus `s3:PutObject` on its S3 location.
+
+</Info>
+
 ### Export Bucket
 
 <Warning>
@@ -139,6 +179,10 @@ configuring Cube with the following environment variables:
 
 Ensure the AWS credentials are correctly configured in IAM to allow reads and
 writes to the export bucket in S3.
+
+The export bucket strategy uses Athena's `UNLOAD` to write directly to the
+bucket — no temporary tables, no Glue Data Catalog writes. The only extra
+permission beyond read-only querying is `s3:PutObject` on the export bucket.
 
 </Info>
 
@@ -171,5 +215,6 @@ connections are made over HTTPS.
   https://prestodb.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
 [ref-caching-large-preaggs]: /docs/pre-aggregations/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-oidc-aws-athena]: /admin/deployment/oidc/aws#athena
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [self-preaggs-batching]: #batching

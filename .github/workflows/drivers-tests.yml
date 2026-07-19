@@ -19,17 +19,20 @@ on:
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-crate-driver/**'
       - 'packages/cubejs-databricks-jdbc-driver/**'
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
+      - 'packages/cubejs-pinot-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -46,23 +49,26 @@ on:
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-crate-driver/**'
       - 'packages/cubejs-databricks-jdbc-driver/**'
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
+      - 'packages/cubejs-pinot-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-questdb-driver/**'
       - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
-      - 'rust/cubesqlplanner/**'
+      - 'rust/cube/**'
   workflow_dispatch:
     inputs:
       use_tesseract_sql_planner:
         description: 'Enable TESSERACT_SQL_PLANNER?'
         required: true
-        default: 'false'
+        default: 'true'
         type: choice
         options:
           - 'true'
@@ -98,12 +104,12 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [ 22 ]
+        node-version: [ 24.18.0 ]
         python-version: [ "fallback" ]
         target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-15082024
+      image: cubejs/rust-cross:${{ matrix.target }}-31072025
 
     steps:
       - name: Checkout
@@ -256,6 +262,7 @@ jobs:
           - clickhouse
           - clickhouse-export-bucket-s3
           - clickhouse-export-bucket-s3-prefix
+          - crate
           - databricks-jdbc
           - databricks-jdbc-export-bucket-s3
           - databricks-jdbc-export-bucket-s3-prefix
@@ -265,8 +272,11 @@ jobs:
           - databricks-jdbc-export-bucket-gcs-prefix
           - mssql
           - mysql
+          - oracle
+          - pinot
           - postgres
           - postgres-pre-agg-credentials
+          - questdb
           - redshift
           - redshift-export-bucket-s3
           - snowflake
@@ -279,36 +289,42 @@ jobs:
           - snowflake-export-bucket-azure-via-storage-integration
           - snowflake-export-bucket-gcs
           - snowflake-export-bucket-gcs-prefix
-        use_tesseract_sql_planner: [ false ]
+        use_tesseract_sql_planner: [ true ]
         include:
           - database: postgres
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
+          - database: crate
+            use_tesseract_sql_planner: false
           - database: snowflake
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: redshift
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: bigquery-export-bucket-gcs
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: athena-export-bucket-s3
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: databricks-jdbc
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: mysql
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: clickhouse
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
           - database: mssql
-            use_tesseract_sql_planner: true
+            use_tesseract_sql_planner: false
+          - database: oracle
+            use_tesseract_sql_planner: false
+          - database: questdb
+            use_tesseract_sql_planner: false
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js 22.x
+      - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version-file: '.nvmrc'
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.22

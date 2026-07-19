@@ -149,7 +149,7 @@ view(`orders`, {
 
 You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check
 out our
-[Controlling access to cubes and views ](/docs/data-modeling/access-control/recipes/controlling-access-to-cubes-and-views)
+[Controlling access to cubes and views ](/docs/data-modeling/access-control)
 recipe.
 
 <CodeGroup>
@@ -229,6 +229,190 @@ view(`active_users`, {
 ```
 
 </CodeGroup>
+
+#### `auto_run`
+
+In the Cube cloud platform, you can use the `auto_run` key in a view's `meta`
+to control whether [workbook][ref-workbook-running] queries against the view
+run automatically. By default, a workbook re-runs the query every time a data
+consumer changes it — adds a member, edits a filter, and so on. Setting
+`auto_run: false` turns this off for the view: the query only runs when the
+user clicks **Run query**.
+
+This is useful for views backed by heavy or expensive queries, where running
+on every change would be wasteful.
+
+<Info>
+
+Please note, currently `auto_run` is defined inside the `meta` property; this
+may change in the future.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      auto_run: false
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    auto_run: false
+  }
+});
+```
+
+</CodeGroup>
+
+The setting only provides the default for the view. Data consumers can toggle
+auto-run on or off in each workbook tab, and their choice takes precedence
+over the view's default. When `auto_run` is not set, auto-run is on.
+
+#### `default_ui_filters`
+
+In the Cube cloud platform, you can use the `default_ui_filters` key in a
+view's `meta` to define default filters for [workbooks][ref-workbook-filtering]
+and views embedded via the React Embed SDK. When the view is selected, these
+filters are pre-populated as regular, fully editable filters — data consumers
+can change their values, switch operators, or remove them entirely.
+
+Each entry has a `member` (a dimension or measure exposed by the view), an
+`operator`, and a list of `values` — or a single `value`, which is natural for
+single-value operators. Null-check operators take no value.
+
+<Info>
+
+Please note, currently default UI filters are defined inside the `meta`
+property; this may change in the future.
+
+</Info>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    meta:
+      default_ui_filters:
+        # "is yesterday" → equality at day grain, shows yesterday's data
+        - member: created_at
+          operator: is
+          value: yesterday
+        # Rolling window → use "between" with two bounds
+        - member: updated_at
+          operator: between
+          values: ["7 days ago", "today"]
+        - member: status
+          operator: is
+          values: ["completed", "shipped"]
+```
+
+```javascript title="JavaScript"
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  meta: {
+    default_ui_filters: [
+      // "is yesterday" → equality at day grain, shows yesterday's data
+      {
+        member: `created_at`,
+        operator: `is`,
+        value: `yesterday`
+      },
+      // Rolling window → use "between" with two bounds
+      {
+        member: `updated_at`,
+        operator: `between`,
+        values: [`7 days ago`, `today`]
+      },
+      {
+        member: `status`,
+        operator: `is`,
+        values: [`completed`, `shipped`]
+      }
+    ]
+  }
+});
+```
+
+</CodeGroup>
+
+##### Operators
+
+Operators use the same labels data consumers see in the workbook filter bar —
+what you see in the filter bar is what you type: `is`, `is not`, `after date`,
+`after or on date`, `before date`, `before or on date`, `between`, `contains`,
+`not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
+`is null`, `is not null`.
+
+Operators are case-insensitive and whitespace-tolerant. Internal type names and
+REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.
+
+On a date or time member, `is` with a relative value is an **equality** at that
+value's grain, not a range — `is yesterday` matches yesterday only (e.g.
+`DATE_TRUNC('day', created_at) = CURRENT_DATE - INTERVAL '1 day'`), and
+`is this month` matches the current month. For a rolling window, use `between`
+with two bounds.
+
+##### Relative date values
+
+A `between` filter always takes an explicit two-element `[start, end]` pair.
+Each bound is one of:
+
+- **A relative value**: `today`, `yesterday`,
+  `N days|weeks|months|quarters|years ago` (e.g. `7 days ago`),
+  `N ... from now` (e.g. `2 weeks from now`), or
+  `this week|month|quarter|year`. `now` is accepted as an alias for `today`.
+- **A fixed ISO date**: `"2026-01-15"`, meaning that whole day.
+- **A number**, for numeric members.
+
+Relative values also work with `is` and the open-ended comparison operators —
+for example, `after date` with `value: 7 days ago`.
+
+Relative bounds resolve when a query runs, not when the filter is seeded:
+`["7 days ago", "today"]` produces SQL based on the current date (e.g.
+`BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE`), so the window
+rolls forward day over day. Both bounds are inclusive — `["7 days ago",
+"today"]` covers 8 calendar days for daily data. In the workbook, the seeded
+filter opens the date editor on the **Relative** tab showing its bounds.
+
+Values are case- and whitespace-insensitive. Entries are validated: an
+unrecognized operator or value, or a `between` filter without exactly two
+bounds, drops that filter entry with a browser-console warning — the remaining
+entries still apply, and view selection never breaks.
+
+Unlike [`default_filters`](#default_filters), which are enforced on every query
+against the view, `default_ui_filters` only provide a starting point for the
+workbook UI: they don't apply to queries made through APIs or other
+visualization tools, and workbook users can freely modify or remove them.
+They also only apply to new queries — defining or changing them in the data
+model does not add them to existing queries.
 
 ### `cubes`
 
@@ -325,7 +509,8 @@ above for `base_orders`.
 #### `includes` and `excludes`
 
 The other required parameter inside the `cubes` block is `includes`. Use it
-to list measures, dimensions, or segments you'd like to include into the view.
+to list measures, dimensions, [hierarchies][ref-ref-hierarchies], or segments
+you'd like to include into the view.
 
 To include all members from a cube, use the _includes all_ shorthand: `includes: "*"`.
 In that case, you can also use the `excludes` parameter to list members that
@@ -647,19 +832,154 @@ You can also set the [`CUBEJS_NESTED_FOLDERS_DELIMITER`](/reference/configuratio
 nested folders and give them path-like names, e.g., `Customer Information / Personal
 Details`.
 
+### `default_filters`
+
+The `default_filters` parameter is used to define default filters on a view.
+These filters are applied to every query against the view, narrowing down the
+result set to a specific subset of data without requiring data consumers to
+specify the filter explicitly.
+
+Default filters are useful for governance scenarios where a view should
+always be scoped to a particular value (e.g., a tenant, region, or currency).
+To provide sensible defaults that data consumers can edit or remove in the UI,
+use [`meta.default_ui_filters`](#default_ui_filters) instead.
+
+<Note>
+
+`default_filters` are enforced on every query against the view, including
+filter suggestions.
+
+</Note>
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_us
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    default_filters:
+      - member: country
+        operator: equals
+        values:
+          - US
+```
+
+```javascript title="JavaScript"
+view(`orders_us`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  defaultFilters: [
+    {
+      member: `country`,
+      operator: `equals`,
+      values: [`US`]
+    }
+  ]
+});
+```
+
+</CodeGroup>
+
+Each default filter accepts the following parameters:
+
+#### `member`
+
+The name of the dimension to filter on. The member must be exposed by the view.
+
+#### `operator`
+
+The filter operator. Supported operators match the ones available in the
+[REST API query format][ref-rest-query-ops]: `equals`, `notEquals`, `contains`,
+`notContains`, `startsWith`, `notStartsWith`, `endsWith`, `notEndsWith`, `in`,
+`notIn`, `gt`, `gte`, `lt`, `lte`, `set`, `notSet`, `inDateRange`,
+`notInDateRange`, `onTheDate`, `beforeDate`, `beforeOrOnDate`, `afterDate`,
+`afterOrOnDate`.
+
+#### `values`
+
+A list of values for the filter operator. Required for all operators except
+`set` and `notSet`.
+
+#### `unless`
+
+The `unless` parameter optionally lists members that, when referenced in a
+query (either in the projection or in an explicit filter), will cause the
+default filter to be released. This allows consumers to override the
+default filter by querying or filtering by one of the listed members.
+
+If `unless` is not specified, the filter is always applied.
+
+<CodeGroup>
+
+```yaml title="YAML"
+views:
+  - name: orders_default_us
+
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+    default_filters:
+      - member: country
+        operator: equals
+        values:
+          - US
+        unless:
+          - country
+```
+
+```javascript title="JavaScript"
+view(`orders_default_us`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: `*`
+    }
+  ],
+
+  defaultFilters: [
+    {
+      member: `country`,
+      operator: `equals`,
+      values: [`US`],
+      unless: [`country`]
+    }
+  ]
+});
+```
+
+</CodeGroup>
+
+In the example above, the `country = US` filter is applied by default. However,
+if a query explicitly filters on `country` (e.g., `country = FR`), the default
+filter is released and the explicit filter is used instead.
+
 ### `access_policy`
 
 The `access_policy` parameter is used to configure [access policies][ref-ref-dap].
 
 [ref-ai-context]: /docs/data-modeling/ai-context
-[ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control/recipes/controlling-access-to-cubes-and-views
-[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control
+[ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-apis]: /reference
 [ref-ref-cubes]: /reference/data-modeling/cube
+[ref-ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
+[ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
 [ref-apis-support]: /reference#data-modeling
-[ref-playground]: /docs/workspace/playground#viewing-the-data-model
+[ref-playground]: /docs/explore-analyze/playground#viewing-the-data-model
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
+[ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
+[ref-workbook-running]: /docs/explore-analyze/workbooks/querying-data#running-queries
 [ref-extension]: /docs/data-modeling/extending-cubes
 [ref-dim-name]: /reference/data-modeling/dimensions#name
 [ref-dim-title]: /reference/data-modeling/dimensions#title

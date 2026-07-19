@@ -1,5 +1,9 @@
 use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
-use datafusion::{physical_plan::displayable, scalar::ScalarValue};
+use datafusion::{
+    logical_plan::{JoinType, LogicalPlan, PlanVisitor},
+    physical_plan::displayable,
+    scalar::ScalarValue,
+};
 use pretty_assertions::assert_eq;
 use regex::Regex;
 use serde_json::json;
@@ -17,6 +21,7 @@ use crate::{
     },
     config::ConfigObjImpl,
     transport::TransportLoadRequestQuery,
+    CubeError,
 };
 
 #[tokio::test]
@@ -278,6 +283,32 @@ async fn test_simple_subquery_wrapper_filter_empty_source() {
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     //println!("phys plan {:?}", physical_plan);
+}
+
+#[tokio::test]
+async fn test_wrapper_filter_subquery_current_timestamp() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT customer_gender, AVG(avgPrice) mp
+        FROM KibanaSampleDataEcommerce a
+        WHERE order_date >= (SELECT DATE_TRUNC('year', DATE_TRUNC('day', CURRENT_TIMESTAMP)))
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("NOW() AT TIME ZONE 'UTC'"));
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
 
 #[tokio::test]
@@ -1055,6 +1086,132 @@ async fn test_case_wrapper_escaping() {
         .contains("\\\\\\\\\\\\`"));
 }
 
+#[tokio::test]
+async fn test_wrapper_ilike_lowered_pushdown() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        "SELECT customer_gender ILIKE 'fem' AS g, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "expressions/ilike".to_string(),
+            "LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})".to_string(),
+        )],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains(") LIKE LOWER("),
+        "expected lowered ILIKE pushdown (LOWER(..) LIKE LOWER(..)), got: {}",
+        sql
+    );
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
+/// The TO_CHAR format string is passed to the dialect template as a bound parameter,
+/// not as an inline literal, so dialects that need to translate PostgreSQL format tokens
+/// (e.g. Databricks translating `YYYY-MM-DD` to Spark's `yyyy-MM-dd`) must do so in SQL,
+/// wrapping the parameter itself. The template below is a copy of the Databricks one
+/// (see `DatabricksQuery.sqlTemplates` in `@cubejs-backend/databricks-jdbc-driver`);
+/// the REPLACE chain is order-sensitive, so the translations it produces are verified
+/// here by simulating the sequential replace-all semantics of SQL REPLACE
+#[tokio::test]
+async fn test_wrapper_to_char_format_as_param() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    const TO_CHAR_TEMPLATE: &str = "TO_CHAR({{ args[0] }}, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({{ args[1] }}, 'HH12', 'hh'), 'HH24', '@H24@'), 'HH', 'hh'), '@H24@', 'HH'), 'MI', 'mm'), 'SS', 'ss'), 'MS', 'SSS'), 'US', 'SSSSSS'), 'YYYY', 'yyyy'), 'YY', 'yy'), 'Month', 'MMMM'), 'Mon', 'MMM'), 'DDD', '@DOY@'), 'Day', 'EEEE'), 'Dy', 'EEE'), 'DD', 'dd'), '@DOY@', 'DDD'), 'AM', 'a'), 'PM', 'a'))";
+
+    let query_plan = convert_select_to_query_plan_customized(
+        "SELECT TO_CHAR(DATE_TRUNC('week', order_date), 'YYYY-MM-DD') d1, TO_CHAR(DATE_TRUNC('day', order_date), 'HH24:MI:SS') d2, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "functions/TO_CHAR".to_string(),
+            TO_CHAR_TEMPLATE.to_string(),
+        )],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql;
+    assert!(
+        wrapped_sql.sql.contains("TO_CHAR(")
+            && wrapped_sql.sql.contains("'HH12', 'hh')")
+            && wrapped_sql.sql.contains("'PM', 'a'))"),
+        "expected TO_CHAR template with the REPLACE translation chain applied, got: {}",
+        wrapped_sql.sql
+    );
+    for format in ["YYYY-MM-DD", "HH24:MI:SS"] {
+        assert!(
+            wrapped_sql.values.contains(&Some(format.to_string())),
+            "expected format string '{}' to be passed as a bound parameter, got: {:?}",
+            format,
+            wrapped_sql.values
+        );
+    }
+
+    // Extract the ordered (from, to) REPLACE pairs from the template and verify that
+    // applying them sequentially translates PostgreSQL formats to correct Spark
+    // datetime patterns; expected values were validated against Databricks itself
+    let pair_regex = Regex::new(r"'([^']+)', '([^']+)'\)").unwrap();
+    let replacements = pair_regex
+        .captures_iter(TO_CHAR_TEMPLATE)
+        .map(|c| (c[1].to_string(), c[2].to_string()))
+        .collect::<Vec<_>>();
+    assert_eq!(replacements.len(), 19);
+
+    let translate = |format: &str| {
+        replacements
+            .iter()
+            .fold(format.to_string(), |acc, (from, to)| acc.replace(from, to))
+    };
+
+    for (postgres_format, spark_pattern) in [
+        ("YYYY-MM-DD", "yyyy-MM-dd"),
+        ("YYYY-MM-DD HH24:MI:SS", "yyyy-MM-dd HH:mm:ss"),
+        ("YYYY-MM-DD HH24:MI:SS.MS", "yyyy-MM-dd HH:mm:ss.SSS"),
+        ("YYYY-MM-DD HH24:MI:SS.US", "yyyy-MM-dd HH:mm:ss.SSSSSS"),
+        // Bare HH is a 12-hour clock in PostgreSQL while Spark's HH is 24-hour
+        ("HH:MI:SS AM", "hh:mm:ss a"),
+        ("HH12:MI PM", "hh:mm a"),
+        ("HH24:MI:SS", "HH:mm:ss"),
+        // DDD (day-of-year) must not be clobbered by the DD (day-of-month) rule
+        ("DDD", "DDD"),
+        ("YYYY-DDD", "yyyy-DDD"),
+        ("Day", "EEEE"),
+        ("Dy", "EEE"),
+        ("Month", "MMMM"),
+        ("Mon", "MMM"),
+        ("YYYY-Mon", "yyyy-MMM"),
+        ("MMDD", "MMdd"),
+        ("YY-MM", "yy-MM"),
+    ] {
+        let translated = translate(postgres_format);
+        assert_eq!(
+            translated, spark_pattern,
+            "expected '{}' to translate to '{}'",
+            postgres_format, spark_pattern
+        );
+        assert!(
+            !translated.contains('@'),
+            "expected no stash placeholders left in '{}'",
+            translated
+        );
+    }
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
 /// Test aliases for grouped CubeScan in wrapper
 /// qualifiers from join should get remapped to single from alias
 /// long generated aliases from Datafusion should get shortened
@@ -1191,6 +1348,490 @@ WHERE
     assert!(cube_user_re.is_match(&sql));
     let literal_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "literal""#).unwrap();
     assert!(literal_re.is_match(&sql));
+}
+
+/// Regression test for grouped-grouped joins with non-Inner/Left join types under SQL
+/// push down. Both sides are grouped subqueries joined with FULL OUTER JOIN (the shape
+/// produced by period-over-period queries). Before `join_types/full` was wired up, this
+/// failed with `Unsupported join type for join subquery: Full`.
+#[tokio::test]
+async fn test_grouped_join_wrapper_full_outer() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH first_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        last_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS last_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(f.customer_gender, l.customer_gender) AS customer_gender,
+            COALESCE(f.first_price, 0) AS first_price,
+            COALESCE(l.last_price, 0) AS last_price
+        FROM first_period f
+        FULL OUTER JOIN last_period l ON f.customer_gender = l.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a FULL JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("FULL JOIN"),
+        "wrapped SQL is missing FULL JOIN:\n{}",
+        sql
+    );
+}
+
+/// Same as [`test_grouped_join_wrapper_full_outer`], but for RIGHT JOIN.
+#[tokio::test]
+async fn test_grouped_join_wrapper_right() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH first_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        last_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS last_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(f.customer_gender, l.customer_gender) AS customer_gender,
+            COALESCE(f.first_price, 0) AS first_price,
+            COALESCE(l.last_price, 0) AS last_price
+        FROM first_period f
+        RIGHT JOIN last_period l ON f.customer_gender = l.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a RIGHT JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("RIGHT JOIN"),
+        "wrapped SQL is missing RIGHT JOIN:\n{}",
+        sql
+    );
+}
+
+/// When the data source has no `join_types/full` template, a grouped-grouped FULL JOIN
+/// must not be pushed down: the join stays in the DataFusion plan and the query is still
+/// plannable instead of failing with `Unsupported join type for join subquery`.
+#[tokio::test]
+async fn test_grouped_join_wrapper_full_outer_without_template() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        WITH first_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        last_period AS (
+            SELECT
+                customer_gender,
+                sum(sumPrice) AS last_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(f.customer_gender, l.customer_gender) AS customer_gender,
+            COALESCE(f.first_price, 0) AS first_price,
+            COALESCE(l.last_price, 0) AS last_price
+        FROM first_period f
+        FULL OUTER JOIN last_period l ON f.customer_gender = l.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        // Emulate a data source without FULL JOIN support: empty value removes the template
+        vec![("join_types/full".to_string(), "".to_string())],
+    )
+    .await;
+
+    // Query must still be plannable, with the join executed by DataFusion
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    struct FindJoinVisitor(Option<JoinType>);
+
+    impl PlanVisitor for FindJoinVisitor {
+        type Error = CubeError;
+
+        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+            if let LogicalPlan::Join(join) = plan {
+                self.0 = Some(join.join_type);
+            }
+            Ok(true)
+        }
+    }
+
+    let logical_plan = query_plan.as_logical_plan();
+    let mut visitor = FindJoinVisitor(None);
+    logical_plan.accept(&mut visitor).unwrap();
+    assert_eq!(
+        visitor.0,
+        Some(JoinType::Full),
+        "expected FULL JOIN to stay in the DataFusion plan, got:\n{}",
+        logical_plan.display_indent(),
+    );
+}
+
+/// FULL OUTER JOIN between grouped CTEs from two *different* cubes (no join relationship
+/// defined between them). Both sides are standalone grouped subqueries joined in SQL
+/// (non-push-to-Cube path), so FULL should be supported and pushed down.
+#[tokio::test]
+async fn test_grouped_join_wrapper_full_outer_cross_cube() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH m1 AS (
+            SELECT
+                id,
+                sum(sumPrice) AS first_price
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        m2 AS (
+            SELECT
+                dim0,
+                MEASURE(WideCube.count) AS cnt
+            FROM WideCube
+            GROUP BY 1
+        )
+        SELECT
+            COALESCE(m1.id, m2.dim0) AS id,
+            m1.first_price,
+            m2.cnt
+        FROM m1
+        FULL OUTER JOIN m2 ON m1.id = m2.dim0
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a FULL JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("FULL JOIN"),
+        "wrapped SQL is missing FULL JOIN:\n{}",
+        sql
+    );
+}
+
+/// LEFT JOIN between grouped CTEs from two *different* cubes (no join relationship
+/// defined between them), joined on multiple dimensions sharing the same output names.
+#[tokio::test]
+async fn test_grouped_join_wrapper_left_cross_cube_multi_condition() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH m1 AS (
+            SELECT
+                customer_gender,
+                notes,
+                sum(sumPrice) AS sum_price
+            FROM KibanaSampleDataEcommerce
+            WHERE
+                has_subscription = true
+                AND customer_gender IS NOT NULL
+                AND order_date BETWEEN '2024-01-01T00:00:00.000' AND '2024-01-31T23:59:59.999'
+            GROUP BY 1, 2
+        ),
+        m2 AS (
+            SELECT
+                dim0 AS customer_gender,
+                dim1 AS notes,
+                MEASURE(WideCube.count) AS cnt
+            FROM WideCube
+            WHERE
+                dim2 IN ('female')
+                AND dim3 IS NOT NULL
+            GROUP BY 1, 2
+        )
+        SELECT
+            COALESCE(m1.customer_gender, m2.customer_gender) AS customer_gender,
+            COALESCE(m1.notes, m2.notes) AS notes,
+            m1.sum_price,
+            m2.cnt
+        FROM m1
+        LEFT JOIN m2 ON m1.customer_gender = m2.customer_gender AND m1.notes = m2.notes
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Whole query must be pushed down to a single wrapped SQL with a LEFT JOIN
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("LEFT JOIN"),
+        "wrapped SQL is missing LEFT JOIN:\n{}",
+        sql
+    );
+    // Same-named columns from both join sides must keep distinct aliases in the outer
+    // projection: COALESCE over both sides must not reference the same (right-side) column
+    // twice, or LEFT JOIN rows without a match would coalesce to NULL.
+    assert!(
+        sql.contains(r#"COALESCE("m1"."customer_gender", "m1"."customer_gender_1")"#),
+        "left side of COALESCE was remapped to the right-side column:\n{}",
+        sql
+    );
+    assert!(
+        sql.contains(r#"COALESCE("m1"."notes", "m1"."notes_1")"#),
+        "left side of COALESCE was remapped to the right-side column:\n{}",
+        sql
+    );
+}
+
+/// Regression test for smoke test "select __user and literal grouped under wrapper".
+/// Inner CTE has unaliased DATE_TRUNC expressions; outer query references those columns
+/// through the SubqueryAlias qualifier (`cube_scan_subq`). The CTE-level Remapper must
+/// publish a mapping under the SubqueryAlias qualifier — otherwise the outer projection
+/// cannot remap `cube_scan_subq.datetrunc(Utf8("day"),...)` to the short alias, and the
+/// DataFusion-internal expression name leaks into the generated SQL.
+#[tokio::test]
+async fn test_single_cube_grouped_wrapper_with_join_field() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+WITH
+cube_scan_subq AS (
+    SELECT
+        customer_gender AS my_gender,
+        DATE_TRUNC('month', order_date) AS my_order_month,
+        __user AS my_user,
+        1 AS my_literal,
+        id,
+        DATE_TRUNC('day', order_date),
+        __cubeJoinField,
+        2
+    FROM KibanaSampleDataEcommerce
+    GROUP BY 1,2,3,4,5,6,7,8
+),
+filter_subq AS (
+    SELECT
+        customer_gender gender_filter
+    FROM KibanaSampleDataEcommerce
+    GROUP BY
+        gender_filter
+)
+SELECT
+    my_order_month,
+    my_gender,
+    my_user,
+    my_literal
+FROM cube_scan_subq
+WHERE
+    my_gender IN (
+        SELECT
+            gender_filter
+        FROM filter_subq
+    )
+GROUP BY 1,2,3,4
+ORDER BY 1,2,3,4
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        !sql.contains("datetrunc(Utf8"),
+        "wrapped SQL leaked DataFusion-rendered expr name (e.g. datetrunc(Utf8(\"day\"),...)):\n{}",
+        sql
+    );
+}
+
+/// Regression test for grouped-grouped join SQL push down (Tableau-style query).
+/// Join condition columns must be remapped to generated aliases of the joined
+/// subqueries — otherwise the generated ON clause references the original column
+/// name (e.g. `"t0"."My Notes"`) which does not exist in the aliased subqueries.
+#[tokio::test]
+async fn test_wrapper_grouped_join_grouped_condition_remapping() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT "t0"."Customer Gender" AS "Customer Gender",
+    SUM("t2"."__measure__1") AS "sum:measure:ok"
+FROM (
+    SELECT
+        customer_gender AS "Customer Gender",
+        notes AS "My Notes"
+    FROM KibanaSampleDataEcommerce
+    GROUP BY 1, 2
+) "t0"
+INNER JOIN (
+    SELECT
+        notes AS "My Notes",
+        AVG(avgPrice) AS "__measure__1"
+    FROM KibanaSampleDataEcommerce
+    GROUP BY 1
+) "t2" ON ("t0"."My Notes" = "t2"."My Notes")
+GROUP BY 1
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("INNER JOIN ("));
+    assert!(
+        !sql.contains(r#""My Notes""#),
+        "join condition leaked original column name instead of remapped alias:\n{}",
+        sql
+    );
+}
+
+/// Regression test for window expression on top of a grouped join subquery
+/// (Sigma-style query). Window expr rebase in converter must keep field names
+/// consistent with column references in plans above.
+#[tokio::test]
+async fn test_wrapper_window_over_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH
+        "qt_0" AS (
+            SELECT
+                "ta_1".content "ca_1",
+                DATE_TRUNC('month', "ta_2".order_date) "ca_2",
+                CASE
+                    WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
+                    ELSE 0
+                END "ca_3"
+            FROM KibanaSampleDataEcommerce "ta_2"
+            JOIN Logs "ta_1"
+                ON "ta_2".__cubeJoinField = "ta_1".__cubeJoinField
+            GROUP BY
+                "ca_1",
+                "ca_2"
+        ),
+        "qt_1" AS (
+            SELECT
+                RANK() OVER (
+                    PARTITION BY DATE_TRUNC('month', "ta_3"."ca_2")
+                    ORDER BY
+                        DATE_TRUNC('month', "ta_3"."ca_2"),
+                        CASE
+                            WHEN sum("ta_3"."ca_3") IS NOT NULL THEN sum("ta_3"."ca_3")
+                            ELSE 0
+                        END DESC,
+                        "ta_3"."ca_1"
+                ) "ca_4",
+                DATE_TRUNC('month', "ta_3"."ca_2") "ca_5",
+                "ta_3"."ca_1" "ca_6",
+                CASE
+                    WHEN sum("ta_3"."ca_3") IS NOT NULL THEN sum("ta_3"."ca_3")
+                    ELSE 0
+                END "ca_7"
+            FROM "qt_0" "ta_3"
+            GROUP BY
+                "ca_5",
+                "ca_6"
+        )
+        SELECT
+            "ta_4"."ca_5" "ca_8",
+            "ta_4"."ca_6" "ca_9",
+            "ta_4"."ca_7" "ca_10"
+        FROM "qt_1" "ta_4"
+        WHERE "ta_4"."ca_4" <= 1
+        ORDER BY
+            "ca_8" ASC,
+            "ca_10" DESC,
+            "ca_9" ASC
+        ;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
 
 /// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
@@ -1635,6 +2276,7 @@ FROM MultiTypeCube
 WHERE
     DATE_TRUNC('day', CAST(dim_date0 AS TIMESTAMP)) >=
      '2025-01-01'
+    AND LOWER(dim_str0) = 'some value'
 GROUP BY
     1
 ;
@@ -1948,4 +2590,167 @@ async fn test_wrapper_between() {
         .wrapped_sql
         .sql
         .contains("BETWEEN $1 AND $2"));
+}
+
+#[tokio::test]
+async fn test_wrapper_between_timestamp_date_bounds() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // `order_date` is a TIMESTAMP time dimension; the BETWEEN bounds are DATE-typed
+    // (`CURRENT_DATE` / `CURRENT_DATE - INTERVAL '52 weeks'`). PlanNormalize coerces the bounds
+    // to the tested TIMESTAMP so all three operands share one type; here they fold to TIMESTAMP
+    // literals. Without this, strict engines (e.g. BigQuery) reject the mixed-type BETWEEN.
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM KibanaSampleDataEcommerce
+        WHERE
+            KibanaSampleDataEcommerce.customer_gender = customer_gender
+            AND order_date BETWEEN CURRENT_DATE - INTERVAL '52 weeks' AND CURRENT_DATE
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    println!("Generated SQL: {sql}");
+
+    // Both bounds must end up as the same TIMESTAMP type as `order_date`: `CURRENT_DATE` and
+    // `CURRENT_DATE - INTERVAL '52 weeks'` are coerced and fold to TIMESTAMP literals. Assert the
+    // structural shape (rather than concrete dates) to stay independent of the wall clock.
+    let between_re = Regex::new(
+        r"\$\{KibanaSampleDataEcommerce\.order_date\} BETWEEN timestamptz '[^']+' AND timestamptz '[^']+'",
+    )
+    .unwrap();
+    assert!(
+        between_re.is_match(&sql),
+        "expected both BETWEEN bounds coerced to TIMESTAMP literals, got: {}",
+        sql
+    );
+    // No DATE / INTERVAL operands should leak through to the generated SQL.
+    let upper = sql.to_uppercase();
+    assert!(
+        !upper.contains("CURRENT_DATE") && !upper.contains("INTERVAL"),
+        "DATE/INTERVAL bound should have been coerced away, got: {}",
+        sql
+    );
+}
+
+#[tokio::test]
+async fn test_wrapper_subqueries_filter_params_not_mixed() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    customer_gender IN (
+        SELECT
+            customer_gender
+        FROM KibanaSampleDataEcommerce
+        WHERE LOWER(notes) = 'sub_notes'
+        GROUP BY 1
+    )
+    AND notes IN (
+        SELECT
+            notes
+        FROM KibanaSampleDataEcommerce
+        WHERE LOWER(notes) IN ('male_notes', 'female_notes', 'other_notes')
+        GROUP BY 1
+    )
+GROUP BY 1
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let wrapped_sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql;
+
+    // Each subquery is generated with its own params; on merge, placeholders must be
+    // remapped to the combined values so params don't mix between subqueries
+    let placeholder_re = Regex::new(r"\$(\d+)\b").unwrap();
+    let params_in_sql_order = placeholder_re
+        .captures_iter(&wrapped_sql.sql)
+        .map(|c| {
+            let index = c[1].parse::<usize>().unwrap() - 1;
+            wrapped_sql.values[index].clone().unwrap()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        params_in_sql_order,
+        vec!["sub_notes", "male_notes", "female_notes", "other_notes"]
+    );
+}
+
+/// Date-only string literals (e.g. `'2026-06-24'`) compared to a timestamp column
+/// inside an aggregated CASE expression must be normalized to timestamps
+/// so the whole query can be pushed down to the wrapper.
+#[tokio::test]
+async fn test_case_wrapper_sum_case_date_only_string() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT
+            customer_gender,
+            SUM(CASE WHEN order_date >= '2026-06-24' AND order_date < '2026-06-25' THEN sumPrice END) AS today_amount,
+            MEASURE(sumPrice) AS mtd_amount
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+            AND order_date >= '2026-06-01'
+            AND order_date <= '2026-06-24'
+        GROUP BY 1
+        HAVING MEASURE(sumPrice) != 0
+        ORDER BY 3 DESC
+        LIMIT 100
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("2026-06-24T00:00:00.000Z"),
+        "expected date-only string normalized to timestamp, got: {}",
+        sql
+    );
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
 }

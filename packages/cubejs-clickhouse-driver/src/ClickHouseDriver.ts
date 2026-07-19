@@ -21,7 +21,6 @@ import {
   StreamOptions,
   StreamTableDataWithTypes,
   TableColumn,
-  TableColumnQueryResult,
   TableQueryResult,
   TableStructure,
   UnloadOptions,
@@ -96,6 +95,12 @@ export interface ClickHouseDriverOptions {
    * Whether this driver is used for pre-aggregations.
    */
   preAggregations?: boolean,
+
+  /**
+   * Custom HTTP headers attached to every request sent to ClickHouse.
+   * @see https://clickhouse.com/docs/integrations/javascript#configuration
+   */
+  headers?: Record<string, string>,
 }
 
 interface ClickhouseDriverExportRequiredAWS {
@@ -122,6 +127,7 @@ type ClickHouseDriverConfig = {
   exportBucket: ClickhouseDriverExportAWS | null,
   compression: { response?: boolean; request?: boolean },
   clickhouseSettings: ClickHouseSettings,
+  headers: Record<string, string>,
 };
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
@@ -189,6 +195,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         // can not be changed
         ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
       },
+      // Custom HTTP headers can only be passed via driver_factory, not env vars.
+      headers: config.headers ?? {},
     };
 
     const maxPoolSize = config.maxPoolSize ?? getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ?? 8;
@@ -246,6 +254,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       clickhouse_settings: this.config.clickhouseSettings,
       request_timeout: this.config.requestTimeout,
       max_open_connections: maxPoolSize,
+      http_headers: this.config.headers,
     });
   }
 

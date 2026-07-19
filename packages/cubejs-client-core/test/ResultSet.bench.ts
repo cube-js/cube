@@ -1,6 +1,6 @@
 import { bench, describe } from 'vitest';
 
-import ResultSet from '../src/ResultSet';
+import ResultSet from '../src/ResultSet.js';
 
 const STATUSES = ['completed', 'processing', 'shipped'];
 

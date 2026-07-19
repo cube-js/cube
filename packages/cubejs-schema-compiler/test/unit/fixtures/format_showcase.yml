@@ -1,0 +1,162 @@
+cubes:
+  - name: format_showcase
+    sql: |
+      SELECT
+        1 as id,
+        1000000.50 as big_number,
+        50000.25 as revenue,
+        0.1567 as conversion_rate,
+        3.14159 as decimal_value,
+        42 as simple_count,
+        12.99 as price_usd,
+        45750.80 as price_eur,
+        3750000.75 as price_rub,
+        current_timestamp as sample_date,
+        'https://example.com/product/123' as url_link,
+        'PROD-12345' as product_id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: sample_date
+        sql: sample_date
+        type: time
+
+      - name: url_link
+        sql: url_link
+        type: string
+        format: link
+
+      - name: product_id
+        sql: product_id
+        type: string
+        format: id
+
+    measures:
+      # Currency formats (explicit currency specified)
+      - name: revenue_usd
+        sql: revenue
+        type: sum
+        format: currency
+        currency: USD
+
+      - name: revenue_eur
+        sql: price_eur
+        type: sum
+        format: currency
+        currency: EUR
+
+      - name: revenue_rub
+        sql: price_rub
+        type: sum
+        format: currency
+        currency: RUB
+
+      # Default currency format (no currency specified)
+      - name: revenue_default
+        sql: price_usd
+        type: sum
+        format: currency
+
+      # Percentage format
+      - name: conversion_rate
+        sql: conversion_rate
+        type: avg
+        format: percent
+
+      # Number format (default)
+      - name: total_count
+        sql: simple_count
+        type: sum
+        format: number
+
+      # Number formats with specific decimal places
+      - name: number_0_format
+        sql: big_number
+        type: avg
+        format: number_0
+
+      - name: number_1_format
+        sql: decimal_value
+        type: avg
+        format: number_1
+
+      - name: number_2_format
+        sql: decimal_value
+        type: avg
+        format: number_2
+
+      - name: number_3_format
+        sql: decimal_value
+        type: avg
+        format: number_3
+
+      - name: number_4_format
+        sql: decimal_value
+        type: avg
+        format: number_4
+
+      - name: number_5_format
+        sql: decimal_value
+        type: avg
+        format: number_5
+
+      # No format specified (default behavior)
+      - name: raw_count
+        type: count
+views:
+  - name: format_showcase_view
+    description: Comprehensive demonstration of all possible Cube formats including currency, percentage, number, id, link, and default formats with dummy data
+
+    cubes:
+      - join_path: format_showcase
+        includes:
+          # DIMENSIONS WITH VARIOUS FORMATS
+
+          # Time dimension (default time format)
+          - sample_date
+
+          # String dimensions with special formats
+          - name: url_link
+            alias: website_url
+          - name: product_id
+            alias: sku_identifier
+
+          # MEASURES WITH CURRENCY FORMAT (explicit currencies)
+          - name: revenue_usd
+            alias: total_sales_usd
+          - name: revenue_eur
+            alias: total_sales_eur
+          # Intentionally not aliased so we can verify format propagates without aliasing.
+          - revenue_rub
+          - name: revenue_default
+            alias: default_currency_revenue
+
+          # MEASURES WITH PERCENTAGE FORMAT
+          - name: conversion_rate
+            alias: success_rate
+
+          # MEASURES WITH NUMBER FORMAT
+          - name: total_count
+            alias: item_count
+
+          # MEASURES WITH SPECIFIC DECIMAL PLACES (number_N formats)
+          - name: number_0_format
+            alias: zero_decimal_places
+          - name: number_1_format
+            alias: one_decimal_place
+          - name: number_2_format
+            alias: two_decimal_places
+          - name: number_3_format
+            alias: three_decimal_places
+          - name: number_4_format
+            alias: four_decimal_places
+          - name: number_5_format
+            alias: five_decimal_places
+
+          # MEASURES WITH DEFAULT FORMAT (no format specified)
+          - name: raw_count
+            alias: basic_row_count

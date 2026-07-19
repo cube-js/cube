@@ -14,9 +14,9 @@ use crate::{
     transport::{
         CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
         CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
-        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponse, TransportService,
+        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponseColumnar, TransportService,
     },
-    CubeError,
+    CubeError, CubeErrorCauseType,
 };
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMetaType;
@@ -32,6 +32,8 @@ pub mod test_bi_workarounds;
 pub mod test_cube_join;
 #[cfg(test)]
 pub mod test_cube_join_grouped;
+#[cfg(test)]
+pub mod test_cube_join_views;
 #[cfg(test)]
 pub mod test_cube_scan;
 #[cfg(test)]
@@ -692,6 +694,7 @@ pub fn sql_generator(
                     ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
                     ("functions/CURRENTDATE".to_string(), "CURRENT_DATE({{ args_concat }})".to_string()),
                     ("functions/NOW".to_string(), "NOW({{ args_concat }})".to_string()),
+                    ("functions/UTCTIMESTAMP".to_string(), "(NOW() AT TIME ZONE 'UTC')".to_string()),
                     ("functions/DATE_ADD".to_string(), "DATE_ADD({{ args_concat }})".to_string()),
                     ("functions/CONCAT".to_string(), "CONCAT({{ args_concat }})".to_string()),
                     ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
@@ -700,6 +703,7 @@ pub fn sql_generator(
                     ("functions/LOWER".to_string(), "LOWER({{ args_concat }})".to_string()),
                     ("functions/UPPER".to_string(), "UPPER({{ args_concat }})".to_string()),
                     ("functions/PERCENTILECONT".to_string(), "PERCENTILE_CONT({{ args_concat }})".to_string()),
+                    ("expressions/query_aliased".to_string(), "{{ query }} AS {{ quoted_alias }}".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
@@ -708,12 +712,17 @@ pub fn sql_generator(
   {% if from %}
 FROM (
   {{ from | indent(2) }}
-) AS {{ from_alias }} {% endif %} {% if filter %}
+) AS {{ from_alias }} {% endif %}{% for join in joins %}
+{{ join }}{% endfor %}{% if filter %}
 WHERE {{ filter }}{% endif %}{% if group_by %}
 GROUP BY {{ group_by }}{% endif %}{% if order_by %}
 ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit is not none %}
 LIMIT {{ limit }}{% endif %}{% if offset is not none %}
 OFFSET {{ offset }}{% endif %}"#.to_string(),
+                    ),
+                    (
+                        "statements/join".to_string(),
+                        "{{ join_type }} JOIN {{ source }} ON {{ condition }}".to_string(),
                     ),
                     (
                         "statements/group_by_exprs".to_string(),
@@ -748,6 +757,8 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/between".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}".to_string()),
                     ("join_types/inner".to_string(), "INNER".to_string()),
                     ("join_types/left".to_string(), "LEFT".to_string()),
+                    ("join_types/right".to_string(), "RIGHT".to_string()),
+                    ("join_types/full".to_string(), "FULL".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string()),
@@ -772,6 +783,11 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("types/binary".to_string(), "BINARY".to_string()),
                 ]
                     .into_iter().chain(custom_templates)
+                    .collect::<HashMap<_, _>>()
+                    .into_iter()
+                    // Custom template with an empty value removes the base template,
+                    // allowing tests to check behavior of data sources without it
+                    .filter(|(_, value)| !value.is_empty())
                     .collect(),
                     false,
             )
@@ -901,7 +917,7 @@ pub struct TestTransportLoadCall {
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
-    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponse)>>,
+    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponseColumnar)>>,
     load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
 }
 
@@ -921,7 +937,7 @@ impl TestConnectionTransport {
     pub async fn add_cube_load_mock(
         &self,
         req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         self.load_mocks.lock().await.push((req, res));
     }
@@ -1131,7 +1147,7 @@ impl TestContext {
     pub async fn add_cube_load_mock(
         &self,
         mut req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         // Fill in default limit to simplify passing queries as they were in logical plan
         let config_limit = self.config_obj.non_streaming_query_max_row_limit();
@@ -1165,10 +1181,11 @@ impl TestContext {
         let mut output_flags = StatusFlags::empty();
 
         for query in queries {
-            let query = self
-                .convert_sql_to_cube_query(&query)
-                .await
-                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            let query = self.convert_sql_to_cube_query(&query).await.map_err(|e| {
+                let mut error = CubeError::from(e);
+                error.cause = CubeErrorCauseType::Planning(error.cause.meta().cloned());
+                error
+            })?;
             match query {
                 QueryPlan::DataFusionSelect(plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);

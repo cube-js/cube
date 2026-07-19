@@ -51,4 +51,19 @@ export class DruidQuery extends BaseQuery {
   public nowTimestampSql(): string {
     return 'CURRENT_TIMESTAMP';
   }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+
+    // Druid doesn't support ILIKE, so case-insensitive matching is emulated with LOWER(...) LIKE CONCAT(...)
+    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    delete templates.expressions.like_escape;
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    // Druid evaluates CURRENT_TIMESTAMP in the sqlTimeZone query context, which
+    // defaults to UTC — assumes the connection does not override sqlTimeZone
+    templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP';
+
+    return templates;
+  }
 }

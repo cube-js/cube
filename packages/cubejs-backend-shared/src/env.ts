@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
-import { displayCLIWarning } from './cli';
+import { displayCLIWarning, displayCLIWarningOnce } from './cli';
 import { isNativeSupported } from './platform';
 
 export class InvalidConfiguration extends Error {
@@ -266,23 +266,7 @@ const variables: Record<string, (...args: any) => any> = {
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
-  scheduledRefreshQueriesPerAppId: () => {
-    const refreshQueries = get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive();
-
-    if (refreshQueries) {
-      return refreshQueries;
-    }
-
-    const refreshConcurrency = get('CUBEJS_SCHEDULED_REFRESH_CONCURRENCY').asIntPositive();
-
-    if (refreshConcurrency) {
-      console.warn(
-        'The CUBEJS_SCHEDULED_REFRESH_CONCURRENCY is deprecated. Please, use the CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID instead.'
-      );
-    }
-
-    return refreshConcurrency;
-  },
+  scheduledRefreshQueriesPerAppId: () => get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive(),
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),
   // eslint-disable-next-line consistent-return
@@ -315,11 +299,19 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
-  nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
-  nativeSqlPlannerPreAggregations: () => get('CUBEJS_TESSERACT_PRE_AGGREGATIONS').default('false').asBool(),
-  nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
-    .default('true')
-    .asBoolStrict(),
+  nativeSqlPlanner: () => {
+    const explicitlySet = process.env.CUBEJS_TESSERACT_SQL_PLANNER !== undefined;
+    const enabled = get('CUBEJS_TESSERACT_SQL_PLANNER').default('true').asBool();
+
+    if (explicitlySet && !enabled) {
+      displayCLIWarningOnce(
+        'CUBEJS_TESSERACT_SQL_PLANNER',
+        'Tesseract planner is a default one, but you are trying to use a legacy planner which will be removed in the near future.'
+      );
+    }
+
+    return enabled;
+  },
   transpilationWorkerThreads: () => {
     const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
       .default('true')
@@ -714,6 +706,14 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Whether queries are executed automatically without requiring an
+   * explicit user confirmation. Only used in Cube Cloud.
+   */
+  autoRunMode: (): boolean => get('CUBEJS_AUTO_RUN_MODE')
+    .default('true')
+    .asBoolStrict(),
+
+  /**
    * Query stream `highWaterMark` value.
    */
   dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
@@ -1006,6 +1006,19 @@ const variables: Record<string, (...args: any) => any> = {
       .asBool()
   ),
 
+  /**
+   * Use the generated (recursive CTE based) time series for the Tesseract SQL
+   * planner instead of the portable VALUES/UNION ALL series. Defaults to TRUE.
+   * Recursive CTEs require MySQL 8.0+ — set this to FALSE for MySQL < 8.0,
+   * which has no CTE support. When disabled, time series are materialized as a
+   * VALUES list.
+   */
+  mysqlUseGeneratedTimeSeries: ({ dataSource, preAggregations }: DataSourceOpts) => (
+    get(keyByDataSource('CUBEJS_DB_MYSQL_USE_GENERATED_TIME_SERIES', dataSource, preAggregations))
+      .default('true')
+      .asBool()
+  ),
+
   /** ****************************************************************
    * MSSQL Driver                                                    *
    ***************************************************************** */
@@ -1259,50 +1272,6 @@ const variables: Record<string, (...args: any) => any> = {
     get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_COMPRESSION', dataSource, preAggregations))
       .default('false')
       .asBool()
-  ),
-
-  /** ****************************************************************
-   * ElasticSearch Driver                                            *
-   ***************************************************************** */
-
-  /**
-   * ElasticSearch API Id.
-   */
-  elasticApiId: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_APIKEY_ID', dataSource, preAggregations)).asString()
-  ),
-
-  /**
-   * ElasticSearch API Key.
-   */
-  elasticApiKey: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_APIKEY_KEY', dataSource, preAggregations)).asString()
-  ),
-
-  /**
-   * ElasticSearch OpenDistro flag.
-   */
-  elasticOpenDistro: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_OPENDISTRO', dataSource, preAggregations)).asString()
-  ),
-
-  /**
-   * ElasticSearch query format.
-   */
-  elasticQueryFormat: ({
-    dataSource,
-    preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_ELASTIC_QUERY_FORMAT', dataSource, preAggregations)).asString()
   ),
 
   /** ****************************************************************
@@ -1936,6 +1905,20 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   playgroundAuthSecret: () => get('CUBEJS_PLAYGROUND_AUTH_SECRET')
     .asString(),
+  apiSecret: () => get('CUBEJS_API_SECRET')
+    .asString(),
+  // Comma-separated rotation list. Trimmed, empties dropped, deduplicated.
+  // Takes precedence over the singular `apiSecret` when non-empty.
+  apiSecrets: (): string[] | undefined => {
+    const raw = get('CUBEJS_API_SECRETS').asString();
+    if (!raw) {
+      return undefined;
+    }
+    const unique = Array.from(
+      new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))
+    );
+    return unique.length > 0 ? unique : undefined;
+  },
   agentFrameSize: () => get('CUBEJS_AGENT_FRAME_SIZE')
     .default('200')
     .asInt(),

@@ -268,12 +268,14 @@ export class MssqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';
     // MSSQL ROUND requires 2 arguments: ROUND(number, length)
     templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
     // NOTE: MSSQL does not support DISTINCT clause. No workaround is available
     delete templates.functions.STRING_AGG;
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
     // MSSQL uses + for string concatenation instead of ||
     templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
@@ -345,6 +347,11 @@ export class MssqlQuery extends BaseQuery {
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
+    // MSSQL has no boolean type — a segment projected as a dimension must be a BIT.
+    templates.expressions.wrap_segment_select = 'CAST((CASE WHEN {{ expr }} THEN 1 ELSE 0 END) AS BIT)';
+    // Reading a segment back from a pre-aggregation: it is a stored BIT column,
+    // which MSSQL can't use as a bare predicate, so compare it explicitly.
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
     return templates;
   }
 }

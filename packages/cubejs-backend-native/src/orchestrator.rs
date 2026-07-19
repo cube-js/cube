@@ -2,18 +2,17 @@ use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    DBResponsePrimitive, DBResponseValue, RequestResultData, RequestResultDataMulti,
-    TransformedData,
+    DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
 };
-use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
-use cubesql::compile::engine::df::scan::{FieldValue, ValueObject};
+use cubeorchestrator::transport::{JsRawColumnarData, TransformDataRequest};
+use cubesql::compile::engine::df::scan::{ColumnarValueObject, FieldValue};
 use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::handle::Handle;
 use neon::object::Object;
 use neon::prelude::{
-    JsArray, JsArrayBuffer, JsBox, JsBuffer, JsFunction, JsObject, JsPromise, JsResult, JsValue,
-    NeonResult,
+    JsArray, JsArrayBuffer, JsBox, JsBuffer, JsFunction, JsObject, JsPromise, JsResult, JsString,
+    JsValue, NeonResult,
 };
 use neon::types::buffer::TypedArray;
 use serde::Deserialize;
@@ -38,6 +37,7 @@ pub struct ResultWrapper {
     data: Arc<QueryResult>,
     transformed_data: Option<TransformedData>,
     pub last_refresh_time: Option<String>,
+    pub external: bool,
 }
 
 impl ResultWrapper {
@@ -87,47 +87,34 @@ impl ResultWrapper {
 
         let raw_data_js = raw_data_js_arr.first().unwrap();
 
-        let query_result =
-            if let Ok(js_box) = raw_data_js.downcast::<JsBox<Arc<QueryResult>>, _>(cx) {
-                Arc::clone(&js_box)
-            } else if let Ok(js_buffer) = raw_data_js.downcast::<JsBuffer, _>(cx) {
-                let bytes = js_buffer.as_slice(cx);
-                let js_raw_data: JsRawData = serde_json::from_slice(bytes).map_err(|e| {
-                    CubeError::internal(format!(
-                        "Can't parse raw data JSON from JS ResultWrapper: {}",
-                        e
-                    ))
-                })?;
+        let query_result = if let Ok(js_box) =
+            raw_data_js.downcast::<JsBox<Arc<QueryResult>>, _>(cx)
+        {
+            Arc::clone(&js_box)
+        } else if let Ok(js_buffer) = raw_data_js.downcast::<JsBuffer, _>(cx) {
+            let bytes = js_buffer.as_slice(cx);
+            let js_raw_data: JsRawColumnarData = serde_json::from_slice(bytes).map_err(|e| {
+                CubeError::internal(format!(
+                    "Can't parse raw data JSON from JS ResultWrapper: {}",
+                    e
+                ))
+            })?;
 
-                QueryResult::from_js_raw_data(js_raw_data)
-                    .map(Arc::new)
-                    .map_cube_err("Can't build results data from JS rawData")?
-            } else if let Ok(js_array) = raw_data_js.downcast::<JsArray, _>(cx) {
-                let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
-                let js_raw_data: JsRawData = match Deserialize::deserialize(deserializer) {
-                    Ok(data) => data,
-                    Err(_) => {
-                        return Err(CubeError::internal(
-                            "Can't deserialize results raw data from JS ResultWrapper object"
-                                .to_string(),
-                        ));
-                    }
-                };
-
-                QueryResult::from_js_raw_data(js_raw_data)
-                    .map(Arc::new)
-                    .map_cube_err("Can't build results data from JS rawData")?
-            } else {
-                return Err(CubeError::internal(
-                    "Can't deserialize results raw data from JS ResultWrapper object".to_string(),
-                ));
-            };
+            QueryResult::from_js_raw_data(js_raw_data)
+                .map(Arc::new)
+                .map_cube_err("Can't build results data from JS rawData")?
+        } else {
+            return Err(CubeError::internal(
+                "Can't deserialize results raw data from JS ResultWrapper object".to_string(),
+            ));
+        };
 
         Ok(Self {
             transform_data: transform_request,
             data: query_result,
             transformed_data: None,
             last_refresh_time: None,
+            external: false,
         })
     }
 
@@ -141,69 +128,69 @@ impl ResultWrapper {
     }
 }
 
-impl ValueObject for ResultWrapper {
+fn db_primitive_to_field_value(value: &DBResponsePrimitive) -> FieldValue<'_> {
+    match value {
+        DBResponsePrimitive::String(s) => FieldValue::String(Cow::Borrowed(s)),
+        DBResponsePrimitive::Int64(n) => FieldValue::Number(*n as f64),
+        DBResponsePrimitive::UInt64(n) => FieldValue::Number(*n as f64),
+        DBResponsePrimitive::Float64(n) => FieldValue::Number(*n),
+        DBResponsePrimitive::Boolean(b) => FieldValue::Bool(*b),
+        DBResponsePrimitive::Timestamp(_) => FieldValue::String(Cow::Owned(value.to_string())),
+        DBResponsePrimitive::Uncommon(v) => FieldValue::String(Cow::Owned(
+            serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
+        )),
+        DBResponsePrimitive::Null => FieldValue::Null,
+    }
+}
+
+impl ColumnarValueObject for ResultWrapper {
     fn len(&mut self) -> Result<usize, CubeError> {
         if self.transformed_data.is_none() {
             self.transform_result()?;
         }
 
-        let data = self.transformed_data.as_ref().unwrap();
+        let TransformedData::Columnar { columns, .. } = self.transformed_data.as_ref().unwrap()
+        else {
+            return Err(CubeError::internal(
+                "ColumnarValueObject is only supported for columnar TransformedData".to_string(),
+            ));
+        };
 
-        match data {
-            TransformedData::Compact {
-                members: _members,
-                dataset,
-            } => Ok(dataset.len()),
-            TransformedData::Vanilla(dataset) => Ok(dataset.len()),
-        }
+        Ok(columns.first().map(|c| c.len()).unwrap_or(0))
     }
 
-    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue<'_>, CubeError> {
+    fn column<'a>(
+        &'a mut self,
+        field_name: &str,
+    ) -> Result<Box<dyn Iterator<Item = Result<FieldValue<'a>, CubeError>> + 'a>, CubeError> {
         if self.transformed_data.is_none() {
             self.transform_result()?;
         }
 
-        let data = self.transformed_data.as_ref().unwrap();
-
-        let value = match data {
-            TransformedData::Compact { members, dataset } => {
-                let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                let Some(member_index) = members.iter().position(|m| m == field_name) else {
-                    return Err(CubeError::user(format!(
-                        "Field name '{}' not found in members",
-                        field_name
-                    )));
-                };
-
-                row.get(member_index).unwrap_or(&DBResponsePrimitive::Null)
-            }
-            TransformedData::Vanilla(dataset) => {
-                let Some(row) = dataset.get(index) else {
-                    return Err(CubeError::user(format!(
-                        "Unexpected response from Cube, can't get {} row",
-                        index
-                    )));
-                };
-
-                row.get(field_name).unwrap_or(&DBResponsePrimitive::Null)
-            }
+        let TransformedData::Columnar { members, columns } =
+            self.transformed_data.as_ref().unwrap()
+        else {
+            return Err(CubeError::internal(
+                "ColumnarValueObject is only supported for columnar TransformedData".to_string(),
+            ));
         };
 
-        Ok(match value {
-            DBResponsePrimitive::String(s) => FieldValue::String(Cow::Borrowed(s)),
-            DBResponsePrimitive::Number(n) => FieldValue::Number(*n),
-            DBResponsePrimitive::Boolean(b) => FieldValue::Bool(*b),
-            DBResponsePrimitive::Uncommon(v) => FieldValue::String(Cow::Owned(
-                serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
-            )),
-            DBResponsePrimitive::Null => FieldValue::Null,
-        })
+        let Some(member_index) = members.iter().position(|m| m == field_name) else {
+            // Missing field → column of NULLs. See JsonColumnarValueObject::column.
+            let len = columns.first().map(|c| c.len()).unwrap_or(0);
+            return Ok(Box::new((0..len).map(|_| Ok(FieldValue::Null))));
+        };
+
+        let Some(column) = columns.get(member_index) else {
+            return Err(CubeError::user(format!(
+                "Unexpected response from Cube, missing column for '{}'",
+                field_name
+            )));
+        };
+
+        Ok(Box::new(
+            column.iter().map(|v| Ok(db_primitive_to_field_value(v))),
+        ))
     }
 }
 
@@ -236,21 +223,14 @@ fn extract_query_result(
         Ok(Arc::clone(&js_box))
     } else if let Ok(js_buffer) = data_arg.downcast::<JsBuffer, _>(cx) {
         let bytes = js_buffer.as_slice(cx);
-        let js_raw_data: JsRawData = serde_json::from_slice(bytes)?;
-
-        QueryResult::from_js_raw_data(js_raw_data)
-            .map(Arc::new)
-            .map_err(anyhow::Error::from)
-    } else if let Ok(js_array) = data_arg.downcast::<JsArray, _>(cx) {
-        let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
-        let js_raw_data: JsRawData = Deserialize::deserialize(deserializer)?;
+        let js_raw_data: JsRawColumnarData = serde_json::from_slice(bytes)?;
 
         QueryResult::from_js_raw_data(js_raw_data)
             .map(Arc::new)
             .map_err(anyhow::Error::from)
     } else {
         Err(anyhow::anyhow!(
-            "Second argument must be an Array of JsBox<Arc<QueryResult>> or JsArray"
+            "Second argument must be a JsBox<Arc<QueryResult>> or a JsBuffer with columnar JsRawColumnarData JSON"
         ))
     }
 }
@@ -273,25 +253,35 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     let result = cx.argument::<JsBox<Arc<QueryResult>>>(0)?;
 
     let js_array = cx.execute_scoped(|mut cx| {
-        let js_array = JsArray::new(&mut cx, result.rows.len());
+        let js_keys: Vec<Handle<JsString>> =
+            result.members().iter().map(|k| cx.string(k)).collect();
 
-        for (i, row) in result.rows.iter().enumerate() {
+        let row_count = result.row_count();
+        let columns: Vec<_> = (0..js_keys.len())
+            .map(|i| result.column(i))
+            .collect::<Result<_, _>>()
+            .or_else(|err| cx.throw_error(err.to_string()))?;
+        let js_array = JsArray::new(&mut cx, row_count);
+
+        for row_idx in 0..row_count {
             let js_row = cx.execute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
-                for (key, value) in result.columns.iter().zip(row.iter()) {
-                    let js_key = cx.string(key);
+
+                for (col_idx, js_key) in js_keys.iter().enumerate() {
+                    let value = &columns[col_idx][row_idx];
                     let js_value: Handle<'_, JsValue> = match value {
-                        DBResponseValue::Primitive(DBResponsePrimitive::Null) => cx.null().upcast(),
+                        DBResponsePrimitive::Null => cx.null().upcast(),
                         // For compatibility, we convert all primitives to strings
                         other => cx.string(other.to_string()).upcast(),
                     };
 
-                    js_row.set(&mut cx, js_key, js_value)?;
+                    js_row.set(&mut cx, *js_key, js_value)?;
                 }
+
                 Ok(js_row)
             })?;
 
-            js_array.set(&mut cx, i as u32, js_row)?;
+            js_array.set(&mut cx, row_idx as u32, js_row)?;
         }
 
         Ok(js_array)

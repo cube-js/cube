@@ -68,6 +68,33 @@ This works on both regular and published (embedded) dashboards. The filter is
 only applied if a matching filter widget for that dimension already exists on the
 dashboard.
 
+## Allow CSV export
+
+By default, embedded dashboards do not expose a download action on individual
+widgets. To let viewers download a chart widget's data as a CSV file, add the
+`allowExport=true` query parameter to the embed URL:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true
+```
+
+When enabled, each chart widget's ⋮ menu shows a **Download as CSV** action. The
+CSV is generated client-side from the data already loaded into the widget, so no
+additional query is issued. The parameter is opt-in — omit it (the default) to
+keep the download action hidden.
+
+## Set the language
+
+Embedded dashboards render their UI in the account's default language, which you can
+override per embed by adding the `?locale=` query parameter:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&locale=es-MX
+```
+
+See [Localization](/embedding/iframe/localization) for the list of supported languages
+and the other ways to set the language.
+
 ## Customize appearance
 
 You can style an embedded dashboard — background, padding, widget borders, titles, and fonts — from the **Styling** panel in the Dashboard Builder. See [Dashboards → Styling](/docs/explore-analyze/dashboards/styling) for the full list of options.

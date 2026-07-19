@@ -10,6 +10,40 @@ Create and revoke API keys for your Cube organization.
   muted
   loop
   playsInline
-  className="w-full aspect-video rounded-xl"
-  src="https://lgo0ecceic.ucarecd.net/4f31a10c-c77f-4185-873c-d6893379d6ad/"
-></video> 
+  className="w-full aspect-video rounded-xl block dark:hidden"
+  src="https://ucarecdn.com/75100f27-d155-421b-9910-19afbb2fa9fd/abf7f59d-light.mp4"
+></video>
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  className="w-full aspect-video rounded-xl hidden dark:block"
+  src="https://ucarecdn.com/aaa1eb9c-004d-417e-8c96-064ab0134ab1/523b2e1b-dark.mp4"
+></video>
+
+## Deployment scope
+
+By default, an API key is **not scoped** to any deployment—it can be used with
+every deployment in your organization (the **All deployments** option). When
+creating or editing a key, you can instead scope it to one or more **specific
+deployments**.
+
+The scope determines which requests a key can authorize:
+
+- **Deployment-scoped endpoints**—such as generating an embed session for a
+  deployment—require the key to be scoped either to that deployment or to all
+  deployments. A request targeting a deployment outside the key's scope is
+  rejected.
+- **Endpoints that aren't tied to a specific deployment** continue to work with
+  any key, regardless of its scope.
+
+Each key's scope—**All** or the specific deployments it's limited to—is shown in
+the API keys table.
+
+<Note>
+
+Scoping is optional and backward compatible. Existing keys remain unscoped (**All
+deployments**) until you change them.
+
+</Note>

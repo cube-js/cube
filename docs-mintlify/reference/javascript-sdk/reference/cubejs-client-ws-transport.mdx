@@ -7,7 +7,7 @@ description: WebSocket transport for Cube client
 
 ### constructor
 
->  **new WebSocketTransport**(**__namedParameters**: object): *[WebSocketTransport](#web-socket-transport)*
+>  **new WebSocketTransport**(**__namedParameters**: object): *[WebSocketTransport](#websockettransport)*
 
 ### `apiUrl`
 
@@ -23,11 +23,11 @@ description: WebSocket transport for Cube client
 
 ### `messageIdToSubscription`
 
-> **messageIdToSubscription**: *Record‹number, [Subscription](#types-subscription)›*
+> **messageIdToSubscription**: *Record‹number, [Subscription](#subscription)›*
 
 ### `messageQueue`
 
-> **messageQueue**: *[Message](#types-message)[]*
+> **messageQueue**: *[Message](#message)[]*
 
 ### `token`
 
@@ -85,7 +85,7 @@ requestId | any |
 Name | Type |
 ------ | ------ |
 callback |  (**result**: [WebSocketTransportResult](#result)) => *void* |
-message | [Message](#types-message) |
+message | [Message](#message) |
 
 ### `WebSocketTransportOptions`
 

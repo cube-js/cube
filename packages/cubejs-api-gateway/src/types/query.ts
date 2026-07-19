@@ -140,8 +140,6 @@ interface Query {
   totalQuery?: boolean;
   order?: any;
   timezone?: string;
-  // @deprecated
-  renewQuery?: boolean;
   cacheMode?: CacheMode; // used after query normalization
   cache?: CacheMode; // Used in public interface
   ungrouped?: boolean;
@@ -166,7 +164,7 @@ interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: null | number;
   order?: { id: string; desc: boolean }[];
-  maskedMembers?: string[];
+  maskedMembers?: { member: string; filter?: any }[];
 }
 
 export {

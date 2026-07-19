@@ -7,11 +7,11 @@ description: This page details the support for Tableau in Semantic Layer Sync.
 This page details the support for [Tableau](https://www.tableau.com)
 in [Semantic Layer Sync](/docs/integrations/semantic-layer-sync).
 
-<Info>
+<Note>
 
-Available on [Enterprise and above plans](https://cube.dev/pricing).
+Available on [Enterprise plan](https://cube.dev/pricing).
 
-</Info>
+</Note>
 
 Semantic Layer Sync works with Tableau Cloud, Tableau Desktop, and Tableau Server.
 
@@ -167,6 +167,40 @@ When connecting a Cube Cloud data source to your Tableau workbook, you will be p
 to enter the user name and password for Cube Cloud. You can find them at the&nbsp;**SQL
 API Connection** tab on the&nbsp;**IDE → Integrations** page in Cube Cloud.
 
+### Least-privilege mode
+
+By default, Semantic Layer Sync manages Tableau project permissions, which
+requires the personal access token to belong to a Site Administrator.
+
+Enable **Least-privilege mode** to run the sync without Site Administrator
+privileges. When enabled, Cube does not manage Tableau project permissions, so:
+
+- `userNamesWithAccess` and `groupNamesWithAccess` are ignored — manage access
+  to the synced project in Tableau instead.
+- The top-level project must already exist, unless the personal access token
+  has permission to create it.
+
+You can enable it with the **Least-privilege mode** checkbox in the sync wizard,
+or by setting `leastPrivilegeMode` in your configuration:
+
+<CodeGroup>
+
+```python title="Python"
+'config': {
+  # ...
+  'leastPrivilegeMode': True,
+},
+```
+
+```javascript title="JavaScript"
+config: {
+  // ...
+  leastPrivilegeMode: true
+}
+```
+
+</CodeGroup>
+
 ## Features
 
 Syncs with Tableau Cloud and Tableau Server run automatically via the [Tableau
@@ -189,6 +223,11 @@ Tableau Desktop. Click **Download .tds** to download a Tableau [data source][tds
 In the modal window, select one or more cubes or views and click **Download
 all selected** to download a ZIP archive with Tableau data source files, one
 per cube or view. You can open these files in Tableau to create data sources.
+
+<Info>
+  You must be logged in to Tableau Server or Tableau Cloud in your desktop
+  environment when you open the `.tds` file.
+</Info>
 
 
 [tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm

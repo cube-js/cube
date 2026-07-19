@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+expression: result
+---
+orders__status | orders__total_amount | orders__amount_keep_only_status
+---------------+----------------------+--------------------------------
+completed      | 600.00               | 1400.00

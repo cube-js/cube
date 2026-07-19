@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/base-driver",
   "description": "Cube.js Base Driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.39",
+  "version": "1.7.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-base-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -33,13 +33,13 @@
     "@aws-sdk/s3-request-presigner": "^3.49.0",
     "@azure/identity": "^4.4.1",
     "@azure/storage-blob": "^12.9.0",
-    "@cubejs-backend/shared": "1.6.39",
+    "@cubejs-backend/shared": "1.7.4",
     "@google-cloud/storage": "^7.13.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.39",
+    "@cubejs-backend/linter": "1.7.4",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "jest": "^29",
     "ts-jest": "^29",
     "typescript": "~5.2.2"

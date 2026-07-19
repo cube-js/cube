@@ -11,6 +11,7 @@ const GRANULARITY_VALUE = {
   minute: 'mm',
   second: 'ss',
   month: 'MM',
+  quarter: 'Q',
   year: 'YYYY'
 };
 
@@ -25,7 +26,7 @@ class OracleFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
-    return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s}`;
+    return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s} ESCAPE '\\'`;
   }
 }
 
@@ -94,6 +95,7 @@ export class OracleQuery extends BaseQuery {
     if (!granularity) {
       return dimension;
     }
+
     return `TRUNC(${dimension}, '${GRANULARITY_VALUE[granularity]}')`;
   }
 
@@ -177,6 +179,87 @@ export class OracleQuery extends BaseQuery {
     }
 
     return res;
+  }
+
+  public dateBin(interval: string, source: string, origin: string): string {
+    const parsed = parseSqlInterval(interval);
+    const originTs = `TO_TIMESTAMP('${origin}', 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
+
+    const totalMonths = (parsed.year || 0) * 12 + (parsed.quarter || 0) * 3 + (parsed.month || 0);
+    const totalSeconds = (parsed.week || 0) * 604800 + (parsed.day || 0) * 86400 +
+      (parsed.hour || 0) * 3600 + (parsed.minute || 0) * 60 + (parsed.second || 0);
+
+    // Pure month-based interval: bin with calendar-accurate month arithmetic.
+    if (totalMonths > 0 && totalSeconds === 0) {
+      return `ADD_MONTHS(${originTs}, FLOOR(MONTHS_BETWEEN(${source}, ${originTs}) / ${totalMonths}) * ${totalMonths})`;
+    }
+
+    // Pure fixed-length interval: bin with second arithmetic.
+    // (CAST(... AS DATE) - CAST(... AS DATE)) yields a day count; * 86400 → seconds.
+    if (totalSeconds > 0 && totalMonths === 0) {
+      const diffSeconds = `(CAST(${source} AS DATE) - CAST(${originTs} AS DATE)) * 86400`;
+      return `${originTs} + NUMTODSINTERVAL(FLOOR(${diffSeconds} / ${totalSeconds}) * ${totalSeconds}, 'SECOND')`;
+    }
+
+    throw new UserError(`Mixed month/second intervals are not supported for Oracle custom granularities: ${interval}`);
+  }
+
+  public seriesSql(timeDimension) {
+    const values = timeDimension.timeSeries().map(
+      ([from, to]) => `SELECT '${from}' f, '${to}' t FROM DUAL`
+    ).join(' UNION ALL ');
+    return `SELECT TO_TIMESTAMP(dates.f, 'YYYY-MM-DD"T"HH24:MI:SS.FF3') as ${this.escapeColumnName('date_from')}, ` +
+      `TO_TIMESTAMP(dates.t, 'YYYY-MM-DD"T"HH24:MI:SS.FF3') as ${this.escapeColumnName('date_to')} ` +
+      `FROM (${values}) dates`;
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.UTCTIMESTAMP = 'SYS_EXTRACT_UTC(SYSTIMESTAMP)';
+    // Oracle forbids `AS` before a table/subquery alias.
+    templates.expressions.query_aliased = '{{ query }} {{ quoted_alias }}';
+    // Oracle does not support positional GROUP BY — group by expressions.
+    templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
+    // No `AS` before the FROM subquery alias, and Oracle row-limiting syntax.
+    templates.statements.select = '{% if ctes %} WITH \n' +
+      '{{ ctes | join(\',\n\') }}\n' +
+      '{% endif %}' +
+      'SELECT {% if distinct %}DISTINCT {% endif %}' +
+      '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
+      'FROM (\n' +
+      '{{ from | indent(2, true) }}\n' +
+      ') {{ from_alias }}{% elif from_prepared %}\n' +
+      'FROM {{ from_prepared }}' +
+      '{% endif %}' +
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
+      '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+      '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+      '{% if having %}\nHAVING {{ having }}{% endif %}' +
+      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
+      '{% if offset is not none %}\nOFFSET {{ offset }} ROWS{% endif %}' +
+      '{% if limit is not none %}\nFETCH NEXT {{ limit }} ROWS ONLY{% endif %}';
+    // Oracle has no `::` cast and no `VALUES` row-constructor table source. Build the
+    // series with TO_TIMESTAMP + UNION ALL SELECT ... FROM DUAL, and no `AS` before
+    // the derived-table alias (Oracle forbids it). `seria` items are [from, to] pairs.
+    templates.statements.time_series_select = 'SELECT TO_TIMESTAMP(dates.f, \'YYYY-MM-DD"T"HH24:MI:SS.FF3\') AS "date_from",\n' +
+      'TO_TIMESTAMP(dates.t, \'YYYY-MM-DD"T"HH24:MI:SS.FF3\') AS "date_to" \n' +
+      'FROM (\n' +
+      '{% for time_item in seria %}' +
+      'SELECT \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t FROM DUAL' +
+      '{% if not loop.last %} UNION ALL\n{% endif %}' +
+      '{% endfor %}' +
+      ') dates';
+
+    templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    delete templates.expressions.ilike;
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}){% if default_escape %} ESCAPE \'\\\'{% endif %}';
+
+    // Oracle has no `STRING` type (used by the default in CAST(... AS STRING),
+    // e.g. the multi-column count() concatenation). CAST to VARCHAR2 requires a
+    // length, so use the max standard VARCHAR2 size.
+    templates.types.string = 'VARCHAR2(4000)';
+
+    return templates;
   }
 
   public newFilter(filter) {

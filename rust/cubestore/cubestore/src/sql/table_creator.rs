@@ -539,7 +539,12 @@ impl TableCreator {
                 .validate_table_location(table.get_id(), stream_location)
                 .await?;
         }
-        let imports = listener.wait_for_job_results(wait_for).await?;
+        // Poll job statuses from the metastore every 30s as a safety net: if an import
+        // completion event is lost/dropped by the broadcast channel, the periodic re-check still
+        // observes it so finalize doesn't hang and leave the table stuck "processing".
+        let imports = listener
+            .wait_for_job_results_with_poll(wait_for, Some(Duration::from_secs(30)))
+            .await?;
         for r in imports {
             if let JobEvent::Error(_, _, e) = r {
                 return Err(CubeError::user(format!("Create table failed: {}", e)));
@@ -548,23 +553,29 @@ impl TableCreator {
             }
         }
 
-        let mut futures = Vec::new();
-        let indexes = self.db.get_table_indexes(table.get_id()).await?;
-        let partitions = self
-            .db
-            .get_active_partitions_and_chunks_by_index_id_for_select(
-                indexes.iter().map(|i| i.get_id()).collect(),
-            )
-            .await?;
-        // Omit warming up chunks as those shouldn't affect select times much however will affect
-        // warming up time a lot in case of big tables when a lot of chunks pending for repartition
-        for (partition, _) in partitions.into_iter().flatten() {
-            futures.push(self.cluster.warmup_partition(partition, Vec::new()));
-        }
-        join_all(futures)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+        // Warming up partitions on finalize is not required for correctness: warmup only
+        // pre-downloads partition files to the local cache, and select still works without it.
+        // Under heavy import load this is the main candidate for finalize timeouts — it fetches
+        // every active partition across all indexes and waits for all downloads to complete, which
+        // is slow and unbounded for big multi-index tables, while imports/repartition are still in
+        // flight. Disabled so finalize doesn't block on it.
+        // let mut futures = Vec::new();
+        // let indexes = self.db.get_table_indexes(table.get_id()).await?;
+        // let partitions = self
+        //     .db
+        //     .get_active_partitions_and_chunks_by_index_id_for_select(
+        //         indexes.iter().map(|i| i.get_id()).collect(),
+        //     )
+        //     .await?;
+        // // Omit warming up chunks as those shouldn't affect select times much however will affect
+        // // warming up time a lot in case of big tables when a lot of chunks pending for repartition
+        // for (partition, _) in partitions.into_iter().flatten() {
+        //     futures.push(self.cluster.warmup_partition(partition, Vec::new()));
+        // }
+        // join_all(futures)
+        //     .await
+        //     .into_iter()
+        //     .collect::<Result<Vec<_>, _>>()?;
 
         let has_streaming_location = table
             .get_row()

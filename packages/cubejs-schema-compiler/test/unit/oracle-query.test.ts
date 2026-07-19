@@ -119,7 +119,8 @@ describe('OracleQuery', () => {
         'visitors.count'
       ],
       timeDimensions: [],
-      timezone: 'UTC'
+      timezone: 'UTC',
+      rowLimit: 10000,
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -157,8 +158,9 @@ describe('OracleQuery', () => {
     expect(sql).not.toMatch(/\bAS\s+q_\d+/i);
     expect(sql).not.toMatch(/\bas\s+q_\d+/);
     
-    // Should have q_0 alias (with space around it, indicating no AS)
-    expect(sql).toMatch(/\)\s+q_0\s+/);
+    // Should have q_0 alias (with space around it, indicating no AS).
+    // The native planner quotes the alias ("q_0").
+    expect(sql).toMatch(/\)\s+"?q_0"?/);
   });
 
   it('does not use AS keyword with multiple rolling window measures (YoY scenario)', async () => {
@@ -188,8 +190,8 @@ describe('OracleQuery', () => {
     expect(sql).not.toMatch(/\bAS\s+q_\d+/i);
     expect(sql).not.toMatch(/\bas\s+q_\d+/);
     
-    // Verify pattern is ) q_X not ) AS q_X
-    expect(sql).toMatch(/\)\s+q_\d+/);
+    // Verify pattern is ) q_X not ) AS q_X (the native planner quotes the alias)
+    expect(sql).toMatch(/\)\s+"?q_\d+"?/);
   });
 
   it('does not use AS keyword in INNER JOIN subqueries', async () => {
@@ -221,7 +223,7 @@ describe('OracleQuery', () => {
         'visitors.count'
       ],
       timezone: 'UTC',
-      limit: 100
+      rowLimit: 100
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -247,7 +249,7 @@ describe('OracleQuery', () => {
         dateRange: ['2020-01-01', '2020-12-31']
       }],
       timezone: 'UTC',
-      limit: 50
+      rowLimit: 50
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -276,9 +278,10 @@ describe('OracleQuery', () => {
     const queryAndParams = query.buildSqlAndParams();
     const sql = queryAndParams[0];
 
-    // Should have multiple subquery aliases
-    expect(sql).toMatch(/\)\s+q_0\s+,/);
-    expect(sql).toMatch(/\)\s+q_1\s+/);
+    // Should have multiple subquery aliases without AS (the native planner
+    // quotes the aliases and joins subqueries explicitly rather than with commas).
+    expect(sql).toMatch(/\)\s+"?q_0"?/);
+    expect(sql).toMatch(/\)\s+"?q_1"?/);
     
     // Should NOT have AS before q_ aliases
     expect(sql).not.toMatch(/\bAS\s+q_\d+/i);

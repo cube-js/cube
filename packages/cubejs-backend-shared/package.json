@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/shared",
-  "version": "1.6.39",
+  "version": "1.7.4",
   "description": "Shared code for Cube.js backend packages",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -17,7 +17,7 @@
     "dist/src/*"
   ],
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "author": "Cube Dev, Inc.",
   "repository": {
@@ -27,12 +27,12 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.39",
+    "@cubejs-backend/linter": "1.7.4",
     "@types/bytes": "^3.1.5",
     "@types/cli-progress": "^3.9.1",
     "@types/decompress": "^4.2.7",
     "@types/jest": "^29",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/node-fetch": "^2.5.8",
     "@types/shelljs": "^0.8.5",
     "@types/throttle-debounce": "^2.1.0",

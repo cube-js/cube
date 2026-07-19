@@ -30,7 +30,7 @@ subscription:
 card, and start using Cube Cloud right away. [Starter](#starter) and [Premium](#premium)
 product tiers are available on the on-demand payment plan.
 * _Commit payment plan_ allows you to have a contract with a CCU amount specified
-in an order form. [Premium](#premium) and [Enterprise](#enterprise) product tiers are available on the
+in that contract. [Premium](#premium) and [Enterprise](#enterprise) product tiers are available on the
 commit payment plan. [Contact us][link-contact-us] to learn more.
 
 ## Product tiers
@@ -94,16 +94,15 @@ of deployments within a Cube Cloud account. The consumption is measured in 5-min
 | [Shared deployment][ref-development-instance] | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
 | Cube API Instance | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
 | Cube Store Worker | <nobr>1..2</nobr> | Depends on a [chosen tier](#cube-store-worker-tiers) |
-| [Semantic Catalog][ref-semantic-catalog] | <nobr>2..4</nobr> | Depends on a [chosen tier](#semantic-catalog-tiers) |
 | [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
-| [Monitoring Integrations][ref-monitoring-integrations] | <nobr>1..4</nobr> | Depends on a [chosen tier](#monitoring-integrations-tiers) |
+| [Monitoring Integrations][ref-monitoring-integrations] | — | Available as an [add-on](#monitoring-integrations) on the Enterprise plan |
 
 The following resource types incur CCU consumption and apply to the _whole Cube Cloud
 account_:
 
 | Resource type | CCUs per hour | Notes |
 | --- | :---: | --- |
-| [Dedicated infrastructure][ref-dedicated-infra] | 3 | — |
+| [Single-tenant infrastructure][ref-dedicated-infra] | 3 | — |
 | [Audit Log][ref-audit-log] | <nobr>4..6</nobr> | Depends on the [chosen tier](#audit-log-tiers) |
 
 The following resource types incur cost and apply to the _whole Cube Cloud account_:
@@ -125,7 +124,7 @@ requests through [APIs & integrations][ref-apis] under the following tiers:
 
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
-Upgrading to the M tier is only available on [Enterprise and above][cube-pricing] product tiers.
+Upgrading to the M tier is only available on the [Enterprise][cube-pricing] product tier.
 
 ### Cube Store Worker tiers
 
@@ -136,19 +135,6 @@ pre-aggregations and executing queries against them under the following tiers:
 | ---- | :-----------: | ---------- | ------------------ |
 | S    | 1             | 100%       | —                  |
 | M    | 2             | 200%       | [Data-at-rest encryption][ref-data-at-rest-encryption] with [customer-managed keys][ref-customer-managed-keys] in Cube Store |
-
-You can upgrade to a chosen tier in the
-**Settings** of your deployment.
-
-### Semantic Catalog tiers
-
-[Semantic Catalog][ref-semantic-catalog] provides observability into other data
-tools interoperating with your data model under the following tiers:
-
-| Tier | <nobr>CCUs per hour</nobr> | Data assets |
-| ---- | :-----------: | ---------- |
-| S    | 2             | Up to 30,000 |
-| M    | 4             | Up to 100,000 |
 
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
@@ -169,18 +155,11 @@ features analyze and visualize the data available under the following tiers:
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
 
-### Monitoring Integrations tiers
+### Monitoring Integrations
 
-[Monitoring Integrations][ref-monitoring-integrations] feature has the following tiers:
-
-| Tier | CCUs per hour | Exported data  | Dependent features |
-| ---- | :-----------: | -------------- | --- |
-| XS   | 1             | Up to 10 GB/mo | — |
-| S    | 2             | Up to 25 GB/mo | — |
-| M    | 4             | Up to 50 GB/mo | [Query History export][ref-query-history-export] |
-
-You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
-**Settings** of your deployment.
+[Monitoring Integrations][ref-monitoring-integrations], including [Query History
+export][ref-query-history-export], are available as an add-on on the Enterprise
+plan. [Contact us][cube-contact-us] for pricing.
 
 ### Audit Log tiers
 
@@ -207,7 +186,7 @@ increase it to continue using AI features.
 The following examples provide insight into the total cost to use Cube Cloud:
 - [Small-scale deployment](#small-scale-deployment) (Dedicated deployment, Premium product tier, S deployment tier).
 - [Medium-scale deployment](#medium-scale-deployment) (Dedicated deployment with auto-scaling, Enterprise product tier, S deployment tier).
-- [Large-scale deployment](#large-scale-deployment) (Multi-cluster deployment with dedicated infrastructure, Enterprise product tier, M deployment tier).
+- [Large-scale deployment](#large-scale-deployment) (Multi-cluster deployment with single-tenant infrastructure, Enterprise product tier, M deployment tier).
 
 ### Small-scale deployment
 
@@ -267,7 +246,7 @@ its globally distributed workforce, customer base, and (or) partners to operate 
 
 This organization:
 * Uses the Enterprise product tier of Cube Cloud.
-* Uses [dedicated infrastructure][ref-dedicated-infra].
+* Uses [single-tenant infrastructure][ref-dedicated-infra].
 * Runs a Multi-cluster deployment that is active 24/7, includes 3 Dedicated deployments (M tier), with each
 Dedicated deployment auto-scaling up to 10 API instances during a few peak hours every day.
 * Operates on a large volume of data that requires the usage of 16 Cube Store Workers to run
@@ -280,7 +259,7 @@ of data engineers.
 
 | Resource                                       | Usage per month                                                                                | CCU per month                                         |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Dedicated infrastructure                       | 1 region ×<br/>24 hours per day ×<br/>30 days                                                  | 720 hours ×<br/>3 CCUs per hour =<br/>**2160 CCUs**   |
+| Single-tenant infrastructure                   | 1 region ×<br/>24 hours per day ×<br/>30 days                                                  | 720 hours ×<br/>3 CCUs per hour =<br/>**2160 CCUs**   |
 | Multi-cluster deployment                       | 3 Dedicated deployments ×<br/>24 hours per day ×<br/>30 days                                   | 2160 hours ×<br/>8 CCUs per hour =<br/>**17280 CCUs** |
 | Additional Cube API Instance                   | 3 Dedicated deployments ×<br/>(10 – 2) API Instances ×<br/>4 hours per day ×<br/>30 days       | 2880 hours ×<br/>2 CCU per hour =<br/>**5760 CCUs**   |
 | Cube Store Worker                              | 1 Multi-cluster deployment ×<br/>16 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days    | 5760 hours ×<br/>1 CCU per hour =<br/>**5760 CCUs**   |
@@ -326,33 +305,31 @@ for the AI token consumption at the **Billing** page of their Cube Cloud account
 
 [cube-pricing]: https://cube.dev/pricing
 [link-contact-us]: https://cube.dev/contact
-[ref-cloud-deployment-dev-instance]: /docs/deployment/cloud/deployment-types#shared
-[ref-cloud-deployment-prod-cluster]: /docs/deployment/cloud/deployment-types#dedicated
-[ref-cloud-limits]: /docs/deployment/cloud/limits
-[ref-monitoring-integrations]: /docs/monitoring/integrations
-[ref-monitoring-integrations-config]: /admin/deployment/monitoring-integrations#configuration
+[ref-cloud-deployment-dev-instance]: /admin/deployment/deployment-types#shared
+[ref-cloud-deployment-prod-cluster]: /admin/deployment/deployment-types#dedicated
+[ref-cloud-limits]: /admin/deployment/limits
+[ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-cloud-acl]: /admin/users-and-permissions/custom-roles
-[ref-cloud-deployment-prod-multicluster]: /docs/deployment/cloud/deployment-types#multi-cluster
-[ref-cloud-custom-domains]: /docs/deployment/cloud/custom-domains
-[ref-cloud-vpc-peering]: /docs/deployment/cloud/vpc
+[ref-cloud-deployment-prod-multicluster]: /admin/deployment/deployment-types#multi-cluster
+[ref-cloud-custom-domains]: /admin/deployment/custom-domains
+[ref-cloud-vpc-peering]: /admin/deployment/dedicated
 [ref-sls]: /docs/integrations/semantic-layer-sync
-[ref-support]: /docs/deployment/cloud/support
-[ref-free-tier-support]: /docs/deployment/cloud/support#free
-[ref-starter-tier-support]: /docs/deployment/cloud/support#starter
-[ref-premium-tier-support]: /docs/deployment/cloud/support#premium
-[ref-enterprise-tier-support]: /docs/deployment/cloud/support#enterprise
+[ref-support]: /admin/account-billing/support
+[ref-free-tier-support]: /admin/account-billing/support#free
+[ref-starter-tier-support]: /admin/account-billing/support#starter
+[ref-premium-tier-support]: /admin/account-billing/support#premium
+[ref-enterprise-tier-support]: /admin/account-billing/support#enterprise
 [ref-query-history]: /admin/monitoring/query-history
 [ref-performance-insights]: /admin/monitoring/performance
 [ref-audit-log]: /admin/monitoring/audit-log
-[ref-dedicated-infra]: /docs/deployment/cloud/infrastructure#dedicated-infrastructure
-[ref-sso]: /docs/workspace/sso
-[ref-production-cluster]: /docs/deployment/cloud/deployment-types#dedicated
-[ref-development-instance]: /docs/deployment/cloud/deployment-types#shared
+[ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
+[ref-sso]: /admin/sso
+[ref-production-cluster]: /admin/deployment/deployment-types#dedicated
+[ref-development-instance]: /admin/deployment/deployment-types#shared
 [ref-apis]: /reference
-[ref-mdx-api]: /reference/mdx-api
-[ref-dax-api]: /reference/dax-api
+[ref-mdx-api]: /reference/core-data-apis/mdx-api
+[ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-cube-store-architecture]: /docs/pre-aggregations/running-in-production#architecture
 [ref-data-at-rest-encryption]: /docs/pre-aggregations/running-in-production#data-at-rest-encryption
 [ref-customer-managed-keys]: /admin/deployment/encryption-keys
-[ref-semantic-catalog]: /docs/workspace/semantic-catalog
-[ref-query-history-export]: /admin/deployment/monitoring-integrations#query-history-export
+[ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export

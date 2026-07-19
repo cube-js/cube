@@ -14,6 +14,10 @@ yarn lerna run --concurrency 1 --stream --no-prefix integration:duckdb
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:duckdb
 echo "::endgroup::"
 
+echo "::group::View Groups"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:view-groups
+echo "::endgroup::"
+
 echo "::group::Postgres"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:postgres
 echo "::endgroup::"
@@ -37,13 +41,6 @@ echo "::endgroup::"
 echo "::group::Multidb"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:multidb
 echo "::endgroup::"
-
-#echo "::group::Prestodb"
-#docker rm -vf $(docker ps -aq)
-#docker rmi -f $(docker images -aq)
-#docker pull ahanaio/prestodb-sandbox:0.281
-#yarn lerna run --concurrency 1 --stream --no-prefix smoke:prestodb
-#echo "::endgroup::"
 
 echo "::group::Trino"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:trino
@@ -70,4 +67,8 @@ echo "::endgroup::"
 
 echo "::group::RBAC GraphQL"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:rbac-graphql
+echo "::endgroup::"
+
+echo "::group::Links"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:links
 echo "::endgroup::"

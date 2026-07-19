@@ -1,0 +1,252 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+      "CUBEJS_DB_TYPE": "oracle",
+      "CUBEJS_DB_HOST": "data",
+      "CUBEJS_DB_PORT": "1521",
+      "CUBEJS_DB_NAME": "FREEPDB1",
+      "CUBEJS_DB_USER": "test",
+      "CUBEJS_DB_PASS": "test",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
+    },
+    "depends_on": ["data"],
+    "links": ["data"],
+    "ports" : ["4000", "5656"]
+  },
+  "data": {
+    "image": "gvenzl/oracle-free:23-slim-faststart",
+    "environment": {
+      "ORACLE_PASSWORD": "test",
+      "APP_USER": "test",
+      "APP_USER_PASSWORD": "test"
+    },
+    "ports" : ["1521"],
+    "healthcheck": {
+      "test": ["CMD", "healthcheck.sh"],
+      "interval": "10s",
+      "timeout": "10s",
+      "retries": 30,
+      "start_period": "30s"
+    }
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "to_date(",
+    "DATE_SUFFIX": ", 'YYYY-MM-DD')",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "",
+    "CREATE_SUB_SUFFIX": ""
+  },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce",
+    "bigecommerce": "bigecommerce",
+    "retailcalendar": "retailcalendar"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TBuildOnlyHalfYear",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "build_only_half_year",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity"
+        ]
+      }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CategoryFlat",
+        "dimensions": ["CUBE.productName", "CUBE.id", "CUBE.category"],
+        "measures": [
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
+  },
+  "skip": [
+    "---------------------------------------",
+    "SKIPPED FOR ORACLE (streaming download not implemented)",
+    "downloadQueryResults ignores streamImport and always returns rows in memory,",
+    "so the stream test never gets a rowStream. The memory path IS implemented and tested.",
+    "---------------------------------------",
+    "must download query from the data source via stream",
+
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
+    "querying BigECommerce: two multi-stage branches sharing one pre-aggregation",
+    "querying BigECommerce: base measure plus multi-stage over non-partitioned pre-aggregation",
+
+    "---------------------------------------",
+    "Legacy planner only (native/Tesseract path passes). Multi-level rolling-window",
+    "queries reference an inner base-table alias from the outer expression-based",
+    "GROUP BY (Oracle has no positional GROUP BY) -> ORA-00904 out of scope.",
+    "---------------------------------------",
+    "querying BigECommerce: time series in rolling window",
+    "querying BigECommerce: rolling window by 2 day",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce: rolling window by 2 month",
+    "querying BigECommerce: rolling window YTD (month)",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD (month + week + day)",
+    "querying BigECommerce: rolling window YTD (month + week + day + no gran)",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
+
+    "---------------------------------------",
+    "Mixed month + fixed-length custom granularity intervals are not supported on Oracle.",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+
+    "---------------------------------------",
+    "SQL API push down not yet supported on Oracle (rollups / date_trunc rewrites).",
+    "---------------------------------------",
+    "SQL API: post-aggregate percentage of total",
+    "SQL API: Nested Rollup",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
+    "SQL API: SQL push down push to cube quoted alias",
+    "SQL API: Date/time comparison with date_trunc with SQL push down",
+    "SQL API: Window function over measure (running total)"
+  ],
+  "tesseractSkip": [
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "SQL API: Timeshift measure from cube",
+
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: SQL push down push to cube quoted alias",
+
+    "---- Rolling window without date range needs generated time series, which",
+    "---- Oracle does not implement (same as MSSQL). ----",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+
+    "---- Mixed month + fixed-length custom granularity intervals are not supported on Oracle ----",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+
+    "---- CubeSQL can't rewrite this query shape (date_trunc compared to a cast); mysql/mssql skip it too ----",
+    "SQL API: Date/time comparison with date_trunc with SQL push down",
+
+    "---- SQL API push down not yet supported on Oracle ----",
+    "SQL API: Window function over measure (running total)",
+
+    "---- Different results comparing to baseQuery version. Need to investigate ----",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD without granularity"
+  ]
+}

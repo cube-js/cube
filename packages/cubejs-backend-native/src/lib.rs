@@ -4,6 +4,8 @@
 extern crate findshlibs;
 
 pub mod auth;
+#[cfg(feature = "bridge-test-harness")]
+pub mod bridge_test_exports;
 pub mod channel;
 pub mod config;
 pub mod cross;

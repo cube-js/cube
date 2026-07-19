@@ -68,8 +68,20 @@ The DAX API only exposes [views][ref-views], not cubes.
 
 </InfoBox>
 
+## Cross-view filtering
+
+By default, each view is exposed as a separate perspective in Power BI, so
+visualizations from different views can't share the same filters. Cross-view
+filtering lets you build dashboards that span multiple views and apply filters
+consistently across visualizations, in both Live connection and DirectQuery
+modes.
+
+See [Cross-view filtering][ref-cross-view-filter] for details on how to enable
+and use it.
+
 
 [ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-cross-view-filter]: /product/apis-integrations/dax-api/cross-view-filter
 [link-dax]: https://learn.microsoft.com/en-us/dax/
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-ref-dax-api]: /product/apis-integrations/dax-api/reference

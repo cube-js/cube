@@ -6,6 +6,7 @@ src/models/v1_cube_meta_custom_numeric_format.rs
 src/models/v1_cube_meta_custom_time_format.rs
 src/models/v1_cube_meta_dimension.rs
 src/models/v1_cube_meta_dimension_granularity.rs
+src/models/v1_cube_meta_dimension_order.rs
 src/models/v1_cube_meta_folder.rs
 src/models/v1_cube_meta_format.rs
 src/models/v1_cube_meta_format_description.rs
@@ -29,4 +30,7 @@ src/models/v1_load_request_query_time_dimension.rs
 src/models/v1_load_response.rs
 src/models/v1_load_result.rs
 src/models/v1_load_result_annotation.rs
+src/models/v1_load_result_data.rs
+src/models/v1_load_result_data_columnar.rs
+src/models/v1_load_result_data_compact.rs
 src/models/v1_meta_response.rs

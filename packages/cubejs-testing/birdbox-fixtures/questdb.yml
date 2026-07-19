@@ -29,7 +29,7 @@ services:
 
   db:
     container_name: birdbox-db
-    image: questdb/questdb:6.2.1
+    image: questdb/questdb:9.4.3
     ports:
       - "8812"
       - "9000"

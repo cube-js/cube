@@ -1,4 +1,4 @@
-import ResultSet from '../src/ResultSet';
+import ResultSet from '../src/ResultSet.js';
 
 const loadResponses = [
   {

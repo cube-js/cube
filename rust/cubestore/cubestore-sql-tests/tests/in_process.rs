@@ -22,6 +22,7 @@ fn main() {
             }))
             .await
             .unwrap();
+            Ok(())
         }));
     });
 }

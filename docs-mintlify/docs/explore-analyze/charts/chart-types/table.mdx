@@ -1,9 +1,9 @@
 ---
 title: Table
-description: Display query results as a configurable table with pivots, conditional formatting, and inline visualizations.
+description: Display query results as a configurable table with pivots, conditional formatting, and custom styling.
 ---
 
-The table visualization presents query results in a structured grid. Unlike the raw results table in the query panel, the table visualization is designed for sharing — it supports pivots, column display overrides, conditional formatting, custom styling, and inline bar/link/image column rendering.
+The table visualization presents query results in a structured grid. Unlike the raw results table in the query panel, the table visualization is designed for sharing — it supports pivots, conditional formatting, custom styling, and a per-cell menu for links, copy, and drill-down.
 
 {/* TODO screenshot: styled table with pivot and conditional formatting (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -32,24 +32,61 @@ The **Table** tab in the configuration panel controls layout and display setting
 
 | Option | Description |
 |---|---|
-| **Column width** | **Stretch** fills the full table width; **Fixed** keeps column widths constant regardless of tile size |
 | **Header text** | Controls whether long column headers **truncate** or **wrap** to the next line |
 | **View names** | When enabled, the view/cube name is shown in the column header |
 | **Row numbers** | Adds a row number column on the left |
 | **Group dimensions** | Groups multiple dimensions per row into a collapsible section for subtotaling |
 
+Column widths are configured **per column** — see [Column width](#column-width) below.
+
 ## Column field options
 
-Click the dropdown arrow on any field in the **Fields** section to configure it:
+Configure individual columns in the **Columns** section of the **Style** tab (or via the dropdown arrow on a field in the **Fields** section):
 
 | Option | Description |
 |---|---|
 | **Label** | Override the column header text |
 | **Alignment** | Left, center, or right |
 | **Word wrap** | Allow cell content to wrap to multiple lines |
+| **Width** | **Flexible** (a weight) or **Fixed** (pixels) — see [Column width](#column-width) |
 | **Hide** | Show or hide the column |
 
-## Display tab — showing columns as links, images, or bars
+## Column width
+
+Each column's width is set independently in the **Columns** section of the **Style** tab. A column is in one of two modes:
+
+- **Flexible** (the default) — the column shares the table's available width with the other flexible columns, in proportion to its **weight**. A column with weight `2` is twice as wide as a column with weight `1`. New columns start at weight `1`, so by default all columns share the width equally and the table stretches to fill its tile.
+- **Fixed** — the column is locked to an exact pixel width and no longer participates in the weight-based distribution. Fixed columns keep their width regardless of the tile size; if the fixed columns don't fill the tile, the remaining space is left blank.
+
+You can mix the two: give a label column a fixed width and let the metric columns flex to share the rest.
+
+### Setting widths
+
+- **In the panel** — pick **Flexible** or **Fixed** for a column and enter its weight or pixel value.
+- **By dragging** — drag the border between two column headers on the table. The change is saved into the column's current mode (a flexible column keeps flexing at its new relative size; a fixed column updates its pixel width).
+- **Fit to content** — the **Fit to content** button next to a column's width sizes it to its content and switches it to **Fixed** at that width.
+
+  <Note>
+
+  Fit to content measures the rows currently rendered on screen. If a wider value is further down a long, scrolled table, fit to content again after scrolling to it.
+
+  </Note>
+
+### Bulk controls
+
+At the top of the **Columns** section:
+
+- **All flexible** — converts every column to flexible, deriving each weight from its current width (so the layout doesn't jump). Enabled only when at least one column is fixed.
+- **All fixed** — freezes every column at its current rendered pixel width. Enabled only when at least one column is flexible.
+- **All fit to content** — sizes every column to its content and fixes it at that width, in a single action (the bulk equivalent of the per-column **Fit to content**). Like per-column fit to content, it measures the rows currently rendered on screen.
+
+<Note>
+
+Under a column pivot, a width set on a measure applies to every column generated for that measure.
+
+</Note>
+
+## Display tab — showing columns as links, images, bars, or sparklines
 
 By default, columns display their raw value. The **Display** tab for each field lets you change this:
 
@@ -74,9 +111,98 @@ The URL must be publicly accessible without authentication.
 
 ### Inline bars
 
-Display a numeric column as a proportional bar by setting **Display as** to **Bar**. Bars scale relative to the max value in the column. Columns with negative values will split the bar in both directions.
+Display a numeric column as a proportional in-cell bar. In the column's per-column section on the **Style** tab, use the **Display as** control to add a bar. Each bar's length reflects the value's magnitude within the column's range.
+
+| Option | Description |
+|---|---|
+| **Display as** | Choose **Value**, **Inline bars**, or **Sparkline** — a single choice; the modes are mutually exclusive. Selecting **Inline bars** reveals the bar options below. |
+| **Show value** | Show the formatted number alongside the bar. Turn it off for a bar-only cell. |
+| **Positive bar color** | Fill color for non-negative bars |
+| **Negative bar color** | Fill color for negative bars (used when the column contains both positive and negative values) |
+| **Bar scale** | **Auto** anchors each bar at zero and scales to the column's largest value, so even the smallest value still shows a bar; **Manual** scales against the bounds you set |
+| **Lower / Higher bound** | The minimum and maximum (in the column's raw units) used when **Bar scale** is **Manual**. Pre-filled to match the Auto range, so switching modes doesn't shift the bars. |
+
+When a column contains both positive and negative values, bars are drawn in both directions from a centered zero baseline — positive values to the right, negative to the left — using the positive and negative bar colors. Values outside the scale are clamped to a full or empty bar, but the displayed number is always the true value.
 
 {/* TODO screenshot: table with inline bar column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+### Sparklines
+
+Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. In the column's per-column section on the **Style** tab, set **Display as** to **Sparkline**.
+
+A sparkline needs a time dimension to use as its horizontal axis. When you switch a column to **Sparkline** and pick its horizontal axis time dimension, that dimension is **removed from the table query** (if it was there): the table shows one row per remaining dimension, correctly aggregated, while the sparkline plots the measure's value across the time dimension. Values are always correct for any measure type, including counts of distinct values, averages, and custom measures.
+
+<Note>
+
+Internally, sparklines are powered by additional queries grouped by time dimension and granularity: measures sharing the same dimension and granularity are fetched together, so a chart with several sparklines runs at most one extra query per distinct dimension and granularity combination.
+
+</Note>
+
+| Option | Description |
+|---|---|
+| **Display as** | Set to **Sparkline**. Available only for numeric columns, and only when the query has a time dimension. |
+| **Horizontal axis** | The time dimension plotted along the sparkline. Auto-selected (the first time dimension in the query); change it here when the query has several. |
+| **Granularity** | The time bucket for the horizontal axis. Defaults to the dimension's granularity in the query if present, otherwise month. |
+| **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
+| **Line color** / **Area color** | Stroke color for line and bar; fill color for area. |
+| **Line width** | Stroke width in pixels (Line and Area types). |
+| **Show value** | Show the measure's value for the row — the same number the cell would show without a sparkline — as a headline next to it. Turn it off for a chart-only cell. |
+
+A row needs at least two data points to draw a sparkline; cells with fewer fall back to the formatted value.
+
+<Note>
+
+Choose a reasonable granularity for the data's time span. An overly fine granularity (e.g. by the second over several years) makes the background queries return many rows and can compromise the chart's performance.
+
+</Note>
+
+{/* TODO screenshot: table with a sparkline column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Cell menu
+
+Left-clicking a table cell opens a context menu with any [`links` defined on the
+dimension](/docs/data-modeling/dimensions#links) — drill into another dashboard
+(`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, where
+they apply, **Drill down** options.
+
+**Drill down** works in two ways:
+
+- On a **measure** cell whose data model defines drill members, it opens the
+  underlying rows behind that value.
+- On a **time-dimension** cell shown at a granularity, it opens a submenu of
+  finer granularities. Picking one re-buckets the **same measures** to that
+  granularity, scoped to the period you clicked — drilling `2024` to **Quarter**
+  shows the four quarters of 2024. You can keep drilling, then close the view to
+  return to the original table.
+
+Because a week can straddle two months or quarters, **Week** is never a drill
+target from a coarser granularity — a week cell drills only to **Day** and finer.
+
+## Selecting and copying cells
+
+You can copy a single cell or a rectangular block of cells straight out of the
+table — copied values paste cleanly into a spreadsheet or text editor.
+
+### Copy a single cell
+
+Click the cell to select it, then press **Cmd/Ctrl+C** or choose **Copy value**
+from the [cell menu](#cell-menu). Either way copies that cell's raw
+(unformatted) value.
+
+### Select and copy a range
+
+- **Click and drag** across the cells to sweep out a rectangle, or **Shift+click**
+  a second cell to extend the selection from the first.
+- Press **Cmd/Ctrl+C** to copy the selected cells. When more than one cell is
+  selected, the cell menu also offers **Copy values** and **Copy values with headers** — the
+  latter prepends a row of column titles.
+
+Copied cells use the raw (unformatted) values. A range is joined by tabs across
+columns and newlines across rows, so it lands in a spreadsheet as a matching
+grid; a single cell copies as just its value.
+
+The same single-cell and range selection works in the **Results** table on the query
+panel, not just the table visualization.
 
 ## Style options
 
@@ -105,6 +231,36 @@ Use the three-dot menu in the Colors section to **reset to defaults** or **copy 
 {"header":{"fontColor":"#fefefe","backgroundColor":"#5339CF"},"banding":{"backgroundColor":"#f5f3ff"}}
 ```
 
+### Borders
+
+The **Borders** section of the **Style** tab controls which table borders are drawn. Five borders are configurable, each with its own toggle, color, and width (1–10 pixels):
+
+| Border | Description | Default |
+|---|---|---|
+| **Horizontal borders** | Lines between value rows | On |
+| **Vertical borders** | Lines between columns, running through the header, values, and totals | Off |
+| **Header border** | The line under the header row | On |
+| **Totals border** | The line above the totals row | On |
+| **Outer border** | The frame around the whole table | Off |
+
+Each border is a row in the section: click the **icon button** to toggle the border on or off, and use the **color** swatch and **width** input next to it to style it. Color and width are only available while the border is on. When you don't pick a color, the border uses the theme's default border color, which adapts to light and dark mode automatically.
+
+Because every border has its own color and width, styles like a financial report — a thick line under the header, above the totals, and around the table, with thin lines between value rows — are a few clicks away. Or one: see presets below.
+
+{/* TODO screenshot: Borders section with the accounting preset applied (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+#### Border presets
+
+Open the menu in the corner of the Borders section to apply a preset — a one-shot configuration of all five borders that you can tweak further afterwards:
+
+- **Rows (default)** — horizontal row lines with header and totals separators; the standard look.
+- **Full grid** — all borders on; a spreadsheet look.
+- **Minimal** — dark lines under the header and above the totals, nothing else.
+- **Accounting** — thin light row lines with a thick dark header separator, totals separator, and outer frame; a financial-statement look.
+- **None** — no borders at all.
+
+Use **Reset to default** at the bottom of the section to clear all border settings.
+
 ## Conditional formatting
 
 The **Conditional formatting** tab applies cell or row styling based on conditions you define. Configure:
@@ -117,18 +273,45 @@ To make a background transparent, open the color picker and clear the hex value.
 
 {/* TODO screenshot: conditional formatting panel with a condition configured (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-### Gradient color scale
+### Color scale
 
-The **Color scale** tab applies a gradient across a column based on value ranges. Configure a minimum color, a midpoint color (optional), and a maximum color. The gradient is applied across all visible rows.
+A **color scale** (heat map) tints each cell of a numeric column with a gradient based on where its value falls in the column's range. It is a rule type in the **Formatting** tab, alongside conditional formatting — switch a rule between **Conditional formatting** and **Color scale** with the **Type** selector inside the rule.
 
-<Warning>
-If you don't set a mapping value for the scale, the gradient applies across visible rows only. This can produce unexpected results when row limits or pagination are active.
-</Warning>
+To add one quickly, open the menu next to **Add rule** and pick a color-scale preset:
 
-Use the **Treat as zero** toggle to handle null values in the gradient calculation.
+- **Outstanding values** — a two-color scale that highlights the highest values.
+- **Divergent values** — a three-color scale that distinguishes low, middle, and high values.
+- **Traffic light gradient** — a red–yellow–green three-color scale.
 
-{/* TODO screenshot: table with gradient color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+A color scale requires a **numeric source column**. For non-numeric columns (strings, dates, booleans), the **Scale** type is disabled — use conditional formatting instead.
+
+Configure the gradient with three stops, laid out top-to-bottom to mirror the column:
+
+- **Start** (low end) — anchored at the column **Minimum** by default, or a custom **Number** or **Percentile**.
+- **Center** (optional middle) — **Disabled** by default, which produces a two-color gradient. Enable it for a three-color gradient anchored at the **Midpoint**, **Average**, **Median**, or a custom **Number** / **Percentile**.
+- **End** (high end) — anchored at the column **Maximum** by default, or a custom **Number** or **Percentile**.
+
+Each stop has its own color. The anchor determines *which value* in the column the stop's color is pinned to:
+
+- **Minimum** / **Maximum** — the lowest / highest value in the column.
+- **Midpoint** — the halfway point of the range, i.e. `(minimum + maximum) / 2`. Independent of how the values are distributed.
+- **Average** — the mean of all values (sensitive to outliers).
+- **Median** — the middle value when sorted (robust to outliers).
+- **Number** — a fixed value you enter.
+- **Percentile** — a value at the given percentile (e.g. `90` = the 90th percentile).
+
+For the computed anchors (Minimum, Maximum, Midpoint, Average, Median), the dropdown previews the resolved value from your data.
+
+Use **Reverse color scale** to swap the Start and End colors. **Treat nulls as zero** is on by default, coloring null/blank cells as zero; turn it off to leave them uncolored.
+
+The scale is normalized **per column** — each targeted column uses its own value range.
+
+{/* TODO screenshot: table with a color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Totals
 
 Enable column totals and row totals from the **Table** configuration tab. Totals rows and columns are styled separately from body cells.
+
+### Subtotals
+
+When the table is pivoted by two or more dimensions, you can also enable **subtotals** — a bold **Total for ‹value›** column appended after each pivot group's columns, at every nesting level. Subtotals combine freely with column and row totals, work in workbooks and on dashboards, and — like the other totals — carry over from the results table when you switch the chart type to Table. See [Subtotals](/docs/explore-analyze/workbooks/querying-data#subtotals) for details and limitations.

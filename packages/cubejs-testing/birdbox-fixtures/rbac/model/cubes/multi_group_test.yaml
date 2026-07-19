@@ -1,0 +1,59 @@
+# Test view for validating multi-group member-level access union (CUB-2758).
+#
+# Two access policies, each matched by a different group, grant member-level
+# access to DIFFERENT members. Neither policy has a row_level filter, so row
+# access defaults to allow-all.
+#
+# A user that belongs to BOTH groups should see the UNION of member access:
+# querying member_a (granted by group mg_group_a) together with member_c
+# (granted by group mg_group_c) must return data.
+#
+# Before the fix, member-level access required a single policy to cover ALL
+# queried members, so a cross-policy query returned an empty (denied) result.
+
+cubes:
+  - name: multi_group_base
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      # Granted only by group mg_group_a
+      - name: member_a
+        sql: order_id
+        type: number
+
+      # Granted only by group mg_group_c
+      - name: member_c
+        sql: quantity
+        type: number
+
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: multi_group_test
+    cubes:
+      - join_path: multi_group_base
+        includes: "*"
+
+    access_policy:
+      # Group A: member_a (no row_level filter => allow-all rows)
+      - group: mg_group_a
+        member_level:
+          includes:
+            - id
+            - count
+            - member_a
+
+      # Group C: member_c (no row_level filter => allow-all rows)
+      - group: mg_group_c
+        member_level:
+          includes:
+            - id
+            - count
+            - member_c

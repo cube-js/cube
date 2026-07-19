@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "mintlify dev --port 3002",
     "build": "mintlify build",
-    "broken-links": "mintlify broken-links"
+    "broken-links": "mintlify broken-links --check-anchors --check-redirects --check-snippets"
   },
   "devDependencies": {
     "mintlify": "^4"

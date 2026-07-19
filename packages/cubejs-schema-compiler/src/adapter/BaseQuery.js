@@ -253,7 +253,14 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
-    this.maskedMembers = new Set(this.options.maskedMembers || []);
+    this.maskedMembers = new Set();
+    this.memberMaskFilters = {};
+    for (const item of this.options.maskedMembers || []) {
+      this.maskedMembers.add(item.member);
+      if (item.filter) {
+        this.memberMaskFilters[item.member] = item.filter;
+      }
+    }
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -338,12 +345,10 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
-    if (this.useNativeSqlPlanner && !this.canUseNativeSqlPlannerPreAggregation && !this.neverUseSqlPlannerPreaggregation()) {
-      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
-
-      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
-    }
+    // Tesseract pre-aggregation planning always follows the SQL planner and can't be
+    // toggled independently. The neverUseSqlPlannerPreaggregation() guard still opts
+    // specific query types (e.g. CubeStoreQuery) out for correctness.
+    this.canUseNativeSqlPlannerPreAggregation = this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation();
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -947,6 +952,8 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: exportAnnotatedSql === true,
       preAggregationQuery: this.options.preAggregationQuery,
+      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
+      preAggregationId: this.options.preAggregationId || null,
       totalQuery: this.options.totalQuery,
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
@@ -954,10 +961,13 @@ export class BaseQuery {
       convertTzForRawTimeDimension: !!this.options.convertTzForRawTimeDimension,
       maskedMembers: this.options.maskedMembers,
       memberToAlias: this.options.memberToAlias,
+      subqueryJoins: this.options.subqueryJoins,
     };
 
     try {
-      const buildResult = nativeBuildSqlAndParams(queryParams);
+      // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
+      // during the member-SQL callbacks the native planner makes back into JS.
+      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -999,10 +1009,17 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      // We only consume the pre-aggregation match result here (sql/params are discarded
+      // below), so tell the native planner to skip building the outer query SQL. Otherwise
+      // a rolling-window measure without a date range would throw while rendering its time
+      // series, even though matching itself doesn't need it.
+      preAggregationsMatchOnly: true,
       preAggregationId: this.options.preAggregationId || null,
       securityContext: this.contextSymbols.securityContext,
+      joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
+      subqueryJoins: this.options.subqueryJoins,
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
@@ -1102,16 +1119,6 @@ export class BaseQuery {
       ...this.options,
       externalQueryClass: null
     });
-  }
-
-  runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
-        ]
-      );
   }
 
   rollingWindowToDateJoinCondition(granularity) {
@@ -1241,9 +1248,9 @@ export class BaseQuery {
     if (this.multiStageQuery) {
       return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}`;
     }
-    return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}` +
-      this.groupByClause() +
-      this.baseHaving(this.measureFilters) +
+    const query = `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}` +
+      this.groupByClause();
+    return this.baseHaving(query, this.measureFilters) +
       this.orderBy() +
       this.groupByDimensionLimit();
   }
@@ -1780,6 +1787,11 @@ export class BaseQuery {
       multiStageDimensions: withQuery.multiStageDimensions,
       multiStageTimeDimensions: withQuery.multiStageTimeDimensions,
       filters: withQuery.filters,
+      // Propagate SQL API member aliases so dimension columns produced by this stage
+      // match how the outer aggregate (and renderedReference) reference them. Without it
+      // the stage names columns with full internal aliases while the consumer references
+      // them by memberToAlias, producing `invalid identifier` errors.
+      memberToAlias: this.options.memberToAlias,
       // TODO do we need it?
       multiStageQuery: true, // !!fromDimensions.find(d => this.newDimension(d).isMultiStage())
       disableExternalPreAggregations: true,
@@ -1802,6 +1814,8 @@ export class BaseQuery {
       multiStageTimeDimensions: withQuery.multiStageTimeDimensions,
       filters: withQuery.filters,
       segments: withQuery.segments,
+      // See note above: keep member aliases consistent across multi-stage CTEs.
+      memberToAlias: this.options.memberToAlias,
       from: fromSql && {
         sql: fromSql,
         alias: `${withQuery.alias}_join`,
@@ -1847,9 +1861,9 @@ export class BaseQuery {
     return filterClause.length ? ` WHERE ${filterClause.join(' AND ')}` : '';
   }
 
-  baseHaving(filters) {
+  baseHaving(query, filters) {
     const filterClause = filters.map(t => t.filterToWhere()).filter(R.identity).map(f => `(${f})`);
-    return filterClause.length ? ` HAVING ${filterClause.join(' AND ')}` : '';
+    return filterClause.length ? query + ` HAVING ${filterClause.join(' AND ')}` : query;
   }
 
   timeStampInClientTz(dateParam) {
@@ -1863,40 +1877,41 @@ export class BaseQuery {
       // Because of that it's not possible to correctly precalculate
       // granularities hierarchies on startup as they are specific for each timezone.
       ['granularityHierarchies', this.timezone],
-      () => R.reduce(
-        (hierarchies, cube) => R.reduce(
-          (acc, [tdName, td]) => {
+      () => {
+        // Mutating a single accumulator object instead of repeatedly spreading
+        // it keeps this O(n) in the number of dimensions/granularities. The
+        // previous `{ ...acc, ... }` approach copied the whole accumulator on
+        // every iteration, making it O(n^2) and extremely slow on large models.
+        const hierarchies = {};
+        const standardGranularityNames = R.keys(standardGranularitiesParents);
+
+        for (const cube of R.keys(this.cubeEvaluator.evaluatedCubes)) {
+          const timeDimensions = this.cubeEvaluator.timeDimensionsForCube(cube);
+
+          for (const tdName of Object.keys(timeDimensions)) {
+            const td = timeDimensions[tdName];
             const dimensionKey = `${cube}.${tdName}`;
 
             // constructing standard granularities for time dimension
-            const standardEntries = R.fromPairs(
-              R.keys(standardGranularitiesParents).map(gr => [
-                `${dimensionKey}.${gr}`,
-                standardGranularitiesParents[gr],
-              ]),
-            );
+            for (const gr of standardGranularityNames) {
+              hierarchies[`${dimensionKey}.${gr}`] = standardGranularitiesParents[gr];
+            }
 
             // If we have custom granularities in time dimension
-            const customEntries = td.granularities
-              ? R.fromPairs(
-                R.keys(td.granularities).map(granularityName => {
-                  const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
-                  return [
-                    `${dimensionKey}.${granularityName}`,
-                    [granularityName, ...standardGranularitiesParents[grObj.minGranularity()]],
-                  ];
-                }),
-              )
-              : {};
+            if (td.granularities) {
+              for (const granularityName of Object.keys(td.granularities)) {
+                const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
+                hierarchies[`${dimensionKey}.${granularityName}`] = [
+                  granularityName,
+                  ...standardGranularitiesParents[grObj.minGranularity()],
+                ];
+              }
+            }
+          }
+        }
 
-            return { ...acc, ...standardEntries, ...customEntries };
-          },
-          hierarchies,
-          R.toPairs(this.cubeEvaluator.timeDimensionsForCube(cube)),
-        ),
-        {},
-        R.keys(this.cubeEvaluator.evaluatedCubes),
-      ),
+        return hierarchies;
+      },
     );
   }
 
@@ -3299,13 +3314,31 @@ export class BaseQuery {
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
-      if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType) {
+      if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
+          !this.safeEvaluateSymbolContext().skipMasking) {
         // In ungrouped queries, only apply static masks to measures.
         // SQL masks (mask.sql) reference columns that don't apply per-row.
         const isMeasure = type === 'measure';
         const isUngrouped = this.options.ungrouped;
         const hasSqlMask = symbol.mask && typeof symbol.mask === 'object' && symbol.mask.sql;
         if (!isMeasure || !isUngrouped || !hasSqlMask) {
+          const maskFilter = this.memberMaskFilters && this.memberMaskFilters[memberPath];
+          if (maskFilter) {
+            // Conditional masking renders:
+            //   CASE WHEN {rowFilter} THEN {value} ELSE {maskedValue} END
+            // For aggregate measures this produces invalid SQL on strict GROUP BY
+            // engines whenever the row filter references members that are not part
+            // of the GROUP BY: the predicate is evaluated at row grain while the
+            // measure is aggregated. The same row-level filter is already enforced
+            // in the query WHERE clause, so for such measures we render the masked
+            // value directly instead of a per-row CASE WHEN. In ungrouped queries
+            // the measure is rendered at row grain, so the CASE WHEN is valid and
+            // is kept.
+            if (isMeasure && !isUngrouped && !this.maskFilterReferencesOnlyGroupByMembers(maskFilter)) {
+              return this.memberMaskSql(cubeName, name, symbol);
+            }
+            return this.conditionalMemberMaskSql(cubeName, name, symbol, maskFilter);
+          }
           return this.memberMaskSql(cubeName, name, symbol);
         }
       }
@@ -3334,7 +3367,12 @@ export class BaseQuery {
           }
         }
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+        // order_by templates reference members of the measure's owning cube. When
+        // the measure is exposed through a view, those members may be absent or
+        // exposed only under an alias, so resolve them against the owning cube
+        // (from aliasMember, the underlying reference) instead of the view.
+        const orderByCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(orderByCubeName, o.sql), dir: o.dir }));
         let sql;
         let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
@@ -3484,6 +3522,81 @@ export class BaseQuery {
       }
     }
     return this.defaultMaskSql(symbol.type);
+  }
+
+  conditionalMemberMaskSql(cubeName, name, symbol, maskFilter) {
+    const maskedSql = this.memberMaskSql(cubeName, name, symbol);
+    const result = this.evaluateSymbolSqlWithContext(
+      () => {
+        const filterSql = this.maskFilterToSql(maskFilter);
+        if (!filterSql) {
+          return maskedSql;
+        }
+        const originalSql = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+        return this.caseWhenStatement([{ sql: filterSql, label: originalSql }], maskedSql);
+      },
+      { skipMasking: true, currentMember: null }
+    );
+    return result;
+  }
+
+  // Collects all member paths (member/dimension/measure) referenced anywhere in a
+  // (possibly nested and/or) filter tree.
+  collectFilterMemberPaths(filter, acc = []) {
+    if (!filter) {
+      return acc;
+    }
+    if (Array.isArray(filter)) {
+      filter.forEach(f => this.collectFilterMemberPaths(f, acc));
+      return acc;
+    }
+    if (filter.and) {
+      this.collectFilterMemberPaths(filter.and, acc);
+    }
+    if (filter.or) {
+      this.collectFilterMemberPaths(filter.or, acc);
+    }
+    const member = filter.member || filter.dimension || filter.measure;
+    if (member) {
+      acc.push(member);
+    }
+    return acc;
+  }
+
+  // Returns true when every member referenced by the mask filter is part of the
+  // query GROUP BY (regular dimensions or time dimensions with a granularity).
+  // Conditional masking via CASE WHEN can only be applied to an aggregate measure
+  // when the filter predicate is evaluated against grouped columns; otherwise the
+  // generated SQL references ungrouped columns and fails on strict GROUP BY engines.
+  maskFilterReferencesOnlyGroupByMembers(maskFilter) {
+    const filterMembers = [...new Set(this.collectFilterMemberPaths(maskFilter))];
+    if (!filterMembers.length) {
+      return false;
+    }
+    const groupByMembers = new Set([
+      ...this.dimensions
+        .filter(d => !d.isMemberExpression && d.dimension)
+        .map(d => d.dimension),
+      ...this.timeDimensions
+        .filter(td => td.granularity && td.dimension)
+        .map(td => td.dimension),
+    ]);
+    return filterMembers.every(m => groupByMembers.has(m));
+  }
+
+  maskFilterToSql(filter) {
+    if (!filter) return null;
+    const filterItems = this.extractFiltersAsTree([filter]);
+    if (!filterItems.length) return null;
+    const initialized = filterItems.map(this.initFilter.bind(this));
+    if (initialized.length === 1) {
+      return initialized[0].filterToWhere();
+    }
+    const groupFilter = this.newGroupFilter({
+      operator: 'and',
+      values: initialized,
+    });
+    return groupFilter.filterToWhere();
   }
 
   defaultMaskSql(memberType) {
@@ -3768,8 +3881,6 @@ export class BaseQuery {
         this.countDistinctApprox(evaluateSql);
     } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
       return `count(distinct ${evaluateSql})`;
-    } else if (symbol.type === 'runningTotal') {
-      return `sum(${evaluateSql})`; // TODO
     }
     if (multiplied) {
       if (symbol.type === 'number' && evaluateSql === 'count(*)') {
@@ -3920,7 +4031,7 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    return localTimestampToUtc(this.timezone, this.timestampFormat(), date);
+    return localTimestampToUtc(this.timezone || 'UTC', this.timestampFormat(), date);
   }
 
   /**
@@ -3944,6 +4055,17 @@ export class BaseQuery {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   convertTz(field) {
     throw new Error('Not implemented');
+  }
+
+  /**
+   * URL-encode a SQL expression. Override in dialect-specific query classes
+   * for native URL encoding support. Default implementation uses REPLACE
+   * chains for the most common characters.
+   * @param {string} sql
+   * @return {string}
+   */
+  urlEncode(sql) {
+    return `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(CAST(${sql} as TEXT), '%', '%25'), '&', '%26'), '=', '%3D'), '+', '%2B'), ' ', '%20')`;
   }
 
   /**
@@ -4230,6 +4352,17 @@ export class BaseQuery {
           this.cubeEvaluator.isSegment(path)
         )
       ) {
+        if (path.length === 3 && this.cubeEvaluator.isDimension(path.slice(0, 2))) {
+          const dimensionDef = this.cubeEvaluator.dimensionByPath(path.slice(0, 2));
+          if (dimensionDef.type === 'time' &&
+            this.cubeEvaluator.resolveGranularity([path[0], path[1], 'granularities', path[2]])) {
+            const td = this.newTimeDimension({
+              dimension: `${path[0]}.${path[1]}`,
+              granularity: path[2],
+            });
+            return td.unescapedAliasName();
+          }
+        }
         return this.aliasName(column);
       } else {
         return column;
@@ -4261,8 +4394,14 @@ export class BaseQuery {
             cube,
             preAggregation
           );
+          const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
           return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
-            () => originalSqlPreAggregationQuery.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql),
+            () => {
+              if (cubeFromPath.sqlTable) {
+                return `SELECT * FROM ${originalSqlPreAggregationQuery.cubeSql(cube)}`;
+              }
+              return originalSqlPreAggregationQuery.evaluateSql(cube, cubeFromPath.sql);
+            },
             { preAggregationQuery: true, collectOriginalSqlPreAggregations }
           ));
         }
@@ -4419,7 +4558,7 @@ export class BaseQuery {
         PERCENTILECONT: 'PERCENTILE_CONT({{ args_concat }})',
       },
       statements: {
-        select: '{% if ctes %} WITH \n' +
+        select: '{% if ctes %} WITH {% if recursive %}RECURSIVE {% endif %}\n' +
           '{{ ctes | join(\',\n\') }}\n' +
           '{% endif %}' +
           'SELECT {% if distinct %}DISTINCT {% endif %}' +
@@ -4429,6 +4568,7 @@ export class BaseQuery {
           ') AS {{ from_alias }}{% elif from_prepared %}\n' +
           'FROM {{ from_prepared }}' +
           '{% endif %}' +
+          '{% for join in joins %}\n{{ join }}{% endfor %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if having %}\nHAVING {{ having }}{% endif %}' +
@@ -4490,6 +4630,8 @@ export class BaseQuery {
         like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
         within_group: '{{ fun_sql }} WITHIN GROUP (ORDER BY {{ within_group_concat }})',
         concat_strings: '{{ strings | join(\' || \' ) }}',
+        wrap_segment_select: '{{ expr }}',
+        wrap_segment_filter: '{{ expr }}',
         rolling_window_expr_timestamp_cast: '{{ value }}',
         timestamp_literal: '{{ value }}',
         between: '{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}',
@@ -4499,6 +4641,10 @@ export class BaseQuery {
         series_bounds_cast: '{{ expr }}',
         bool_param_cast: '{{ expr }}',
         number_param_cast: '{{ expr }}',
+        // Tesseract uses its own join type templates, decoupled from `join_types`
+        // which are used by the SQL API push down. FULL is opt-in per dialect.
+        join_types_inner: 'INNER',
+        join_types_left: 'LEFT',
       },
       filters: {
         equals: '{{ column }} = {{ value }}{{ is_null_check }}',
@@ -4529,6 +4675,8 @@ export class BaseQuery {
       join_types: {
         inner: 'INNER',
         left: 'LEFT',
+        right: 'RIGHT',
+        full: 'FULL',
       },
       window_frame_types: {
         rows: 'ROWS',
@@ -4946,7 +5094,8 @@ export class BaseQuery {
         filterParams: this.filtersProxy(),
         filterGroup: this.filterGroupFunction(),
         sqlUtils: {
-          convertTz: this.convertTz.bind(this)
+          convertTz: this.convertTz.bind(this),
+          urlEncode: this.urlEncode.bind(this)
         }
       }, R.map(
         (symbols) => this.contextSymbolsProxy(symbols),
@@ -4962,6 +5111,7 @@ export class BaseQuery {
       filterGroup: () => '1 = 1',
       sqlUtils: {
         convertTz: (field) => field,
+        urlEncode: (sql) => sql,
       },
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
     };
@@ -4973,8 +5123,19 @@ export class BaseQuery {
 
   sqlUtilsForRust() {
     return {
-      convertTz: this.convertTz.bind(this)
+      convertTz: this.convertTz.bind(this),
+      urlEncode: this.urlEncode.bind(this)
     };
+  }
+
+  // Invoked from the native planner to compile a member's `sql` function: runs
+  // it under recording proxies and returns the produced template plus the
+  // dependencies it touched. The recording logic is a standalone, stateless
+  // module so it can be unit-tested in isolation.
+  compileMemberSql(sqlFn, securityContext, argNames) {
+    // eslint-disable-next-line global-require
+    const { compileMemberSql } = require('./MemberSqlTemplateCompiler');
+    return compileMemberSql(sqlFn, argNames, securityContext, this.sqlUtilsForRust());
   }
 
   contextSymbolsProxy(symbols) {
@@ -5235,7 +5396,25 @@ export class BaseQuery {
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
-          { aliasGathering: true }
+          {
+            aliasGathering: true,
+            // Alias gathering may be triggered in the middle of some collection
+            // (e.g. join hints collection for a member whose sql uses FILTER_PARAMS).
+            // Inherited collectors must be shadowed here, otherwise members of the
+            // current query traversed during alias gathering leak into the outer
+            // collection result. Some of those results are cached in the long-lived
+            // compilerCache and would poison unrelated queries (e.g. with extra joins).
+            cubeNames: undefined,
+            joinHints: undefined,
+            memberNames: undefined,
+            subQueryDimensions: undefined,
+            leafMeasures: undefined,
+            compositeCubeMeasures: undefined,
+            foundCompositeCubeMeasures: undefined,
+            memberChildren: undefined,
+            inlineWhereConditions: undefined,
+            collectOriginalSqlPreAggregations: undefined,
+          }
         );
         const memberPath = member.expressionPath();
         let nonAliasSeen = false;

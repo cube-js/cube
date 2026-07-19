@@ -4,7 +4,7 @@
  * @fileoverview SqlQuery class unit tests.
  */
 
-import SqlQuery, { SqlQueryTuple, SqlData, SqlQueryWrapper } from '../src/SqlQuery';
+import SqlQuery, { SqlQueryTuple, SqlData, SqlQueryWrapper } from '../src/SqlQuery.js';
 
 describe('SqlQuery', () => {
   const mockCacheKeyQueriesTuple: SqlQueryTuple = [

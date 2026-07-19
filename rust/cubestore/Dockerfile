@@ -1,8 +1,8 @@
-FROM cubejs/rust-builder:bookworm-llvm-18 AS builder
+FROM cubejs/rust-builder:trixie-llvm-22 AS builder
 
 WORKDIR /build/cubestore
 
-COPY cubeshared /build/cubeshared
+COPY cube/cubeshared /build/cube/cubeshared
 
 COPY cubestore/rust-toolchain.toml .
 COPY cubestore/Cargo.toml .
@@ -28,13 +28,13 @@ COPY cubestore/cubestore cubestore
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
     cargo build --release -p cubestore
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 WORKDIR /cube
 
 RUN set -ex; \
     apt-get update; \
-    apt-get install -y libssl3 ca-certificates
+    apt-get install -y libssl3t64 ca-certificates
 
 COPY --from=builder /build/cubestore/target/release/cubestored .
 

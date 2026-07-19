@@ -3,7 +3,7 @@ use crate::cachestore::{
     QueueItem, QueueItemStatus, QueueKey, QueueListItem, QueueResult, QueueResultResponse,
     QueueRetrieveResponse,
 };
-use crate::metastore::job::{Job, JobStatus, JobType};
+use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::multi_index::{MultiIndex, MultiPartition};
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointer};
 use crate::metastore::snapshot_info::SnapshotInfo;
@@ -173,6 +173,13 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn create_partitions(
+        &self,
+        _partitions: Vec<Partition>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_partition(&self, _partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -327,6 +334,13 @@ impl MetaStore for MetaStoreMock {
         &self,
         _index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_active_partitions_for_indexes(
+        &self,
+        _index_ids: Vec<u64>,
+    ) -> Result<Vec<Vec<IdRow<Partition>>>, CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -596,6 +610,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn in_flight_import_jobs_by_node(&self) -> Result<HashMap<String, u64>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn add_job(&self, _job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -627,10 +645,14 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn delete_unknown_jobs(&self) -> Result<u64, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn start_processing_job(
         &self,
         _server_name: String,
-        _long_term: bool,
+        _pool: JobRunnerPool,
     ) -> Result<Option<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }

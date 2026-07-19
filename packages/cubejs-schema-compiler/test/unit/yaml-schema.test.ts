@@ -859,7 +859,7 @@ cubes:
             - name: count
               type: count
           accessPolicy:
-            - role: admin
+            - group: admin
               conditions:
                 - if: "{ security_context.isNotBlocked }"
               rowLevel:
@@ -888,7 +888,7 @@ cubes:
               memberLevel:
                 includes:
                   - status
-            - role: manager
+            - group: manager
               memberLevel:
                 excludes:
                   - status
@@ -1051,11 +1051,11 @@ cubes:
       const { measures } = metaTransformer.cubes[0].config;
       const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
       expect(totalAmount).toBeDefined();
-      expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2f', alias: 'accounting_2' });
+      expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2~f', alias: 'accounting_2' });
 
       const bytes = measures.find((m) => m.name === 'Orders.bytes');
       expect(bytes).toBeDefined();
-      expect(bytes!.format).toEqual({ type: 'custom-numeric', value: '.3s', alias: 'abbr_3' });
+      expect(bytes!.format).toEqual({ type: 'custom-numeric', value: '.3~s', alias: 'abbr_3' });
     });
 
     it('number dimension with named format in YAML', async () => {
@@ -1083,11 +1083,11 @@ cubes:
       const { dimensions } = metaTransformer.cubes[0].config;
       const price = dimensions.find((d) => d.name === 'Orders.price');
       expect(price).toBeDefined();
-      expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1f', alias: 'currency_1' });
+      expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1~f', alias: 'currency_1' });
 
       const population = dimensions.find((d) => d.name === 'Orders.population');
       expect(population).toBeDefined();
-      expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2s', alias: 'abbr' });
+      expect(population!.format).toEqual({ type: 'custom-numeric', value: '.2~s', alias: 'abbr' });
     });
 
     it('formatDescription for all format variants', async () => {
@@ -1200,6 +1200,528 @@ cubes:
     });
   });
 
+  describe('View groups', () => {
+    it('standalone view_groups definition', async () => {
+      const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    description: Sales related views
+    views:
+      - revenue
+      `);
+
+      await compiler.compile();
+
+      expect(viewGroupEvaluator.viewGroupList).toEqual(['sales']);
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        title: 'Sales',
+        description: 'Sales related views',
+        views: ['revenue'],
+        includes: ['revenue'],
+      }]);
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroups).toEqual(['sales']);
+    });
+
+    it('view_group property on individual views', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        views: ['revenue'],
+        includes: ['revenue'],
+      }]);
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroups).toEqual(['sales']);
+    });
+
+    it('merges standalone view_groups with view-level view_group', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: customers
+    sql_table: customers
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+  - name: customers_view
+    cubes:
+      - join_path: customers
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    description: Sales related views
+    views:
+      - customers_view
+      `);
+
+      await compiler.compile();
+
+      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      expect(salesGroup).toBeDefined();
+      expect(salesGroup?.title).toBe('Sales');
+      expect(salesGroup?.description).toBe('Sales related views');
+      expect(salesGroup?.views).toContain('customers_view');
+      expect(salesGroup?.views).toContain('revenue');
+    });
+
+    it('multiple view_groups', async () => {
+      const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: users
+    sql_table: users
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+  - name: users_view
+    cubes:
+      - join_path: users
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    views:
+      - revenue
+  - name: people
+    title: People
+    description: People related views
+    views:
+      - users_view
+      `);
+
+      await compiler.compile();
+
+      expect(viewGroupEvaluator.viewGroupList).toEqual(['sales', 'people']);
+      expect(metaTransformer.viewGroups).toHaveLength(2);
+
+      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      expect(salesGroup?.title).toBe('Sales');
+      expect(salesGroup?.views).toEqual(['revenue']);
+
+      const peopleGroup = metaTransformer.viewGroups.find(g => g.name === 'people');
+      expect(peopleGroup?.title).toBe('People');
+      expect(peopleGroup?.description).toBe('People related views');
+      expect(peopleGroup?.views).toEqual(['users_view']);
+    });
+
+    it('detects duplicate view group names', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+view_groups:
+  - name: sales
+    views:
+      - some_view
+  - name: sales
+    views:
+      - other_view
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain("Found duplicate view group name 'sales'");
+      }
+    });
+
+    it('empty view_groups section', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+view_groups:
+      `);
+
+      await compiler.compile();
+      expect(metaTransformer.viewGroups).toEqual([]);
+    });
+
+    it('view_group without title or description', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    views:
+      - revenue
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        views: ['revenue'],
+        includes: ['revenue'],
+      }]);
+    });
+
+    it('cubes are not assigned to view groups', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    views:
+      - revenue
+      `);
+
+      await compiler.compile();
+
+      const ordersCube = metaTransformer.cubes.find(c => c.config.name === 'orders');
+      expect(ordersCube?.config.viewGroups).toBeUndefined();
+    });
+
+    it('plural view_groups property on view in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    view_groups:
+      - sales
+      - finance
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+  - name: finance
+    title: Finance
+      `);
+
+      await compiler.compile();
+
+      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      expect(salesGroup?.title).toBe('Sales');
+      expect(salesGroup?.views).toContain('revenue');
+
+      const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
+      expect(financeGroup?.title).toBe('Finance');
+      expect(financeGroup?.views).toContain('revenue');
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
+    });
+
+    it('singular view_group sets viewGroups', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toHaveLength(1);
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroups).toEqual(['sales']);
+    });
+
+    it('merges singular view_group and plural view_groups in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    view_group: sales
+    view_groups:
+      - finance
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+  - name: finance
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toHaveLength(2);
+
+      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
+      expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
+      expect(metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
+    });
+
+    it('nested view groups via includes in YAML', async () => {
+      const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+  - name: enterprise_deals
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    includes:
+      - revenue
+      - name: ent_sales
+        title: Enterprise Sales
+        description: Enterprise deals
+        includes:
+          - enterprise_deals
+      `);
+
+      await compiler.compile();
+
+      expect(metaTransformer.viewGroups).toEqual([{
+        name: 'sales',
+        title: 'Sales',
+        views: ['revenue'],
+        includes: [
+          'revenue',
+          {
+            name: 'ent_sales',
+            title: 'Enterprise Sales',
+            description: 'Enterprise deals',
+            views: ['enterprise_deals'],
+            includes: ['enterprise_deals'],
+          },
+        ],
+      }]);
+
+      const entView = metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals');
+      expect(entView?.config.viewGroups).toEqual(['ent_sales']);
+    });
+
+    it('fails when a view group uses both views and includes in YAML', async () => {
+      const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    views:
+      - revenue
+    includes:
+      - revenue
+      `);
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('View group must use either "views" or "includes", but not both');
+      }
+    });
+  });
+
   describe('Mask SQL with shorthand', () => {
     it('userAttributes shorthand in mask sql should compile and resolve', async () => {
       const compilers = prepareYamlCompiler(`
@@ -1220,7 +1742,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -1240,7 +1762,7 @@ cubes:
         {
           measures: ['orders.count'],
           dimensions: ['orders.status'],
-          maskedMembers: ['orders.status'],
+          maskedMembers: [{ member: 'orders.status' }],
           contextSymbols: {
             securityContext: { cubeCloud: { userAttributes: { hasStatusAccess: true } } }
           }
@@ -1270,7 +1792,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -1303,7 +1825,7 @@ cubes:
       - name: count
         type: count
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: []
         member_masking:
@@ -1381,7 +1903,7 @@ views:
         const query = new PostgresQuery(compilers, {
           measures: ['users_secure_view.users_count'],
           dimensions: ['users_secure_view.users_city_sensitive_masked'],
-          maskedMembers: ['users_secure_view.users_city_sensitive_masked'],
+          maskedMembers: [{ member: 'users_secure_view.users_city_sensitive_masked' }],
           contextSymbols: {
             securityContext: { cubeCloud: { groups } }
           },
@@ -1418,6 +1940,487 @@ views:
         const [sql] = await runBaseQuery('{users.city}', [], true);
         expect(sql).not.toMatch(/IN\s*\(\s*\)/);
       });
+    });
+  });
+
+  describe('Conditional masking with row-level filters (memberMaskFilters)', () => {
+    it('generates CASE WHEN with row filter for masked members that have conditional full access', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: data_region
+        sql: data_region
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{
+          member: 'users.city',
+          filter: {
+            member: 'users.data_region',
+            operator: 'equals',
+            values: ['RESEARCH', 'DEMO'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*data_region.*THEN.*city.*ELSE.*NULL.*END/s);
+    });
+
+    it('generates CASE WHEN with AND row filter for multiple filter conditions', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: data_region
+        sql: data_region
+        type: string
+      - name: region_lock
+        sql: region_lock
+        type: number
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{
+          member: 'users.city',
+          filter: {
+            and: [
+              {
+                member: 'users.data_region',
+                operator: 'equals',
+                values: ['RESEARCH'],
+              },
+              {
+                member: 'users.region_lock',
+                operator: 'equals',
+                values: ['0'],
+              }
+            ]
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*AND.*THEN.*city.*ELSE.*NULL.*END/s);
+    });
+
+    it('uses mask.sql as the ELSE branch when dimension has a custom mask', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+        mask:
+          sql: "'***MASKED***'"
+      - name: data_region
+        sql: data_region
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{
+          member: 'users.city',
+          filter: {
+            member: 'users.data_region',
+            operator: 'equals',
+            values: ['RESEARCH'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/WHEN.*data_region.*THEN.*city.*ELSE.*MASKED.*END/s);
+    });
+
+    it('applies regular masking (no CASE WHEN) when no memberMaskFilters', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: users
+    sql_table: public.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['users.count'],
+        dimensions: ['users.city'],
+        maskedMembers: [{ member: 'users.city' }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).toContain('NULL');
+    });
+
+    it('renders the mask value (no CASE WHEN) for aggregate measures when the filter member is not in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      // The aggregate measure must not be wrapped in a row-grain CASE WHEN that
+      // references the (ungrouped) filter column. It should fall back to the mask.
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).not.toMatch(/owner_id\s*=/);
+      expect(sql).toContain('NULL');
+    });
+
+    it('uses the static mask value for aggregate measures when the filter member is not in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+        mask: -1
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toMatch(/CASE\s+WHEN/);
+      expect(sql).not.toMatch(/owner_id\s*=/);
+      // The Tesseract planner parenthesizes the masked literal, e.g. `(-1)`.
+      expect(sql).toMatch(/\(?-1\)?\s+"transactions__total_cost"/);
+    });
+
+    it('still applies conditional CASE WHEN masking for aggregate measures when the filter member is in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id', 'transactions.owner_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/owner_id/);
+    });
+
+    it('tesseract: still applies conditional CASE WHEN masking for aggregate measures when the filter member is in the group by', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: transactions
+    sql_table: public.transactions
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: org_id
+        sql: org_id
+        type: string
+      - name: owner_id
+        sql: owner_id
+        type: string
+    measures:
+      - name: total_cost
+        sql: cost
+        type: sum
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['transactions.total_cost'],
+        dimensions: ['transactions.org_id', 'transactions.owner_id'],
+        maskedMembers: [{
+          member: 'transactions.total_cost',
+          filter: {
+            member: 'transactions.owner_id',
+            operator: 'equals',
+            values: ['42'],
+          }
+        }],
+        useNativeSqlPlanner: true,
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/owner_id/);
+    });
+
+    it('does not recurse when filter member is also masked', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: items
+    sql_table: public.items
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: product_id
+        sql: product_id
+        type: number
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['items.count'],
+        dimensions: ['items.product_id', 'items.price'],
+        maskedMembers: [
+          {
+            member: 'items.product_id',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+          {
+            member: 'items.price',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+        ],
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/product_id/);
+      expect(sql).not.toMatch(/Maximum call stack/);
+    });
+
+    it('tesseract: does not recurse when filter member is also masked', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: items
+    sql_table: public.items
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: product_id
+        sql: product_id
+        type: number
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+    measures:
+      - name: count
+        type: count
+      `);
+
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: ['items.count'],
+        dimensions: ['items.product_id', 'items.price'],
+        maskedMembers: [
+          {
+            member: 'items.product_id',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+          {
+            member: 'items.price',
+            filter: { member: 'items.product_id', operator: 'lte', values: ['3'] }
+          },
+        ],
+        useNativeSqlPlanner: true,
+      });
+      // The filter member (product_id) is itself masked; rendering the mask filter
+      // through the "skip"-masking unmasked tree must not recurse back into masking.
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toMatch(/CASE\s+WHEN/);
+      expect(sql).toMatch(/product_id/);
+      expect(sql).not.toMatch(/Maximum call stack/);
+    });
+  });
+
+  describe('Multi-stage filter directive', () => {
+    it('compiles YAML with filter on multi-stage measure', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql_table: public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: city
+        sql: city
+        type: string
+      - name: created_at
+        sql: created_at
+        type: time
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+      - name: revenue_filtered
+        sql: "{revenue}"
+        multi_stage: true
+        type: number
+        filter:
+          mode: relative
+          exclude:
+            - CUBE.status
+          include:
+            - member: orders.created_at
+              operator: afterDate
+              values:
+                - "2024-01-01"
+      `);
+
+      await compilers.compiler.compile();
+
+      const measure = compilers.cubeEvaluator.cubeFromPath('orders').measures.revenue_filtered as any;
+      expect(measure.multiStage).toBe(true);
+      expect(measure.filter).toBeDefined();
+      expect(measure.filter.mode).toBe('relative');
+      expect(typeof measure.filter.exclude).toBe('function');
+      expect(Array.isArray(measure.filter.include)).toBe(true);
+      expect(measure.filter.include[0].member).toBe('orders.created_at');
+      expect(measure.filter.include[0].operator).toBe('afterDate');
+      expect(measure.filter.include[0].values).toEqual(['2024-01-01']);
     });
   });
 });

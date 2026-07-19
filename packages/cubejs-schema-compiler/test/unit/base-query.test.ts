@@ -52,10 +52,8 @@ describe('SQL Generation', () => {
         filters: [],
       });
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      count("cards".id) "cards__count"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards" ';
+      const expected = 'SELECT count("cards".id) "cards__count" \n' +
+          'FROM  card_tbl  AS "cards"';
       expect(queryAndParams[0]).toContain('card_tbl');
       expect(queryAndParams[0]).toEqual(expected);
     });
@@ -71,10 +69,8 @@ describe('SQL Generation', () => {
         filters: [],
       });
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      sum("cards".amount) "cards__sum"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards" ';
+      const expected = 'SELECT sum("cards".amount) "cards__sum" \n' +
+          'FROM  card_tbl  AS "cards"';
       expect(queryAndParams[0]).toContain('card_tbl');
       expect(queryAndParams[0]).toEqual(expected);
     });
@@ -93,10 +89,10 @@ describe('SQL Generation', () => {
         filters: [],
       });
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      const expected = 'SELECT "cards".type "cards__type", count("cards".id) "cards__count" \n' +
+          'FROM  card_tbl  AS "cards"\n' +
+          'GROUP BY 1\n' +
+          'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
     it('Simple query - time dimension', async () => {
@@ -124,7 +120,7 @@ describe('SQL Generation', () => {
 
       expect(queryAndParams[0]).toContain('"cards".type "cards__type", date_trunc(\'day\', ("cards".created_at::timestamptz AT TIME ZONE \'America/Los_Angeles\')) "cards__created_at_day"');
       expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
-      expect(queryAndParams[0]).toContain('ORDER BY 2');
+      expect(queryAndParams[0]).toContain('ORDER BY  2');
     });
     it('Simple query - complex measure', async () => {
       await compilers.compiler.compile();
@@ -137,10 +133,8 @@ describe('SQL Generation', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      max("cards".amount) - min("cards".amount) "cards__diff"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards" ';
+      const expected = 'SELECT max("cards".amount) - min("cards".amount) "cards__diff" \n' +
+          'FROM  card_tbl  AS "cards"';
       expect(queryAndParams[0]).toEqual(expected);
     });
     it('Simple query - complex dimension', async () => {
@@ -157,10 +151,10 @@ describe('SQL Generation', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      CONCAT("cards".type, \' \', "cards".location) "cards__type_complex", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      const expected = 'SELECT CONCAT("cards".type, \' \', "cards".location) "cards__type_complex", max("cards".amount) - min("cards".amount) "cards__diff" \n' +
+          'FROM  card_tbl  AS "cards"\n' +
+          'GROUP BY 1\n' +
+          'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
     it('Simple query - CUBE dimension', async () => {
@@ -177,10 +171,10 @@ describe('SQL Generation', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      "cards".type "cards__type_with_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      const expected = 'SELECT "cards".type "cards__type_with_cube", max("cards".amount) - min("cards".amount) "cards__diff" \n' +
+          'FROM  card_tbl  AS "cards"\n' +
+          'GROUP BY 1\n' +
+          'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
     it('Simple query - CUBE id', async () => {
@@ -197,10 +191,10 @@ describe('SQL Generation', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      "cards".id "cards__id_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      const expected = 'SELECT "cards".id "cards__id_cube", max("cards".amount) - min("cards".amount) "cards__diff" \n' +
+          'FROM  card_tbl  AS "cards"\n' +
+          'GROUP BY 1\n' +
+          'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
     it('Simple query - simple filter', async () => {
@@ -238,10 +232,11 @@ describe('SQL Generation', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) AND ("cards".type = $3) GROUP BY 1 ORDER BY 2 DESC';
+      const expected = 'SELECT "cards".type "cards__type", count("cards".id) "cards__count" \n' +
+          'FROM  card_tbl  AS "cards"\n' +
+          'WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) AND ("cards".type = $3)\n' +
+          'GROUP BY 1\n' +
+          'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
       const expectedParams = ['type_value', 'not_type_value', 'type_value'];
       expect(queryAndParams[1]).toEqual(expectedParams);
@@ -309,10 +304,11 @@ describe('SQL Generation', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  WHERE (("cards".type IS NULL) OR ("cards".type IS NOT NULL)) AND (("cards".type IN ($1, $2)) OR ("cards".type NOT IN ($3, $4) OR "cards".type IS NULL)) AND (("cards".type IN ($5, $6) OR "cards".type IS NULL) OR ("cards".type NOT IN ($7, $8))) GROUP BY 1 ORDER BY 2 DESC';
+      const expected = 'SELECT "cards".type "cards__type", count("cards".id) "cards__count" \n' +
+          'FROM  card_tbl  AS "cards"\n' +
+          'WHERE (("cards".type IS NULL) OR ("cards".type IS NOT NULL)) AND (("cards".type IN ($1, $2)) OR ("cards".type NOT IN ($3, $4) OR "cards".type IS NULL)) AND (("cards".type IN ($5, $6) OR "cards".type IS NULL) OR ("cards".type NOT IN ($7, $8)))\n' +
+          'GROUP BY 1\n' +
+          'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
       // let expectedParams = [ 'type_value', 'not_type_value', 'type_value' ];
       // expect(queryAndParams[1]).toEqual(expectedParams);
@@ -353,10 +349,12 @@ describe('SQL Generation', () => {
       });
 
       const queryAndParams = query.buildSqlAndParams();
-      const expected = 'SELECT\n' +
-          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) GROUP BY 1 HAVING (count("cards".id) = $3) ORDER BY 2 DESC';
+      const expected = 'SELECT "cards".type "cards__type", count("cards".id) "cards__count" \n' +
+          'FROM  card_tbl  AS "cards"\n' +
+          'WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL))\n' +
+          'GROUP BY 1\n' +
+          'HAVING (count("cards".id) = $3)\n' +
+          'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
       const expectedParams = ['type_value', 'not_type_value', '3'];
       expect(queryAndParams[1]).toEqual(expectedParams);
@@ -390,7 +388,7 @@ describe('SQL Generation', () => {
       });
 
       let queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0].includes('ORDER BY 1')).toBeTruthy();
+      expect(queryAndParams[0].includes('ORDER BY  1')).toBeTruthy();
 
       // The order of time dimensions should have no effect on the `ORDER BY` clause
 
@@ -415,7 +413,7 @@ describe('SQL Generation', () => {
       });
 
       queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0].includes('ORDER BY 1')).toBeTruthy();
+      expect(queryAndParams[0].includes('ORDER BY  1')).toBeTruthy();
     });
   });
 
@@ -976,8 +974,8 @@ describe('SQL Generation', () => {
 
       const queryAndParams = query.buildSqlAndParams();
 
-      expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
-      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN  card2_tbl  AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN  card3_tbl  AS "cards_c" ON "cards_b".other_id = "cards_c".id');
     });
 
     it('multiplied join', async () => {
@@ -996,8 +994,8 @@ describe('SQL Generation', () => {
 
       const _queryAndParams = query.buildSqlAndParams();
 
-      /* expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
-      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id'); */
+      /* expect(queryAndParams[0]).toContain('LEFT JOIN  card2_tbl  AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN  card3_tbl  AS "cards_c" ON "cards_b".other_id = "cards_c".id'); */
     });
 
     it('join hint cache', async () => {
@@ -1031,7 +1029,7 @@ describe('SQL Generation', () => {
         ],
       });
       const queryAndParamsWithJoin = queryWithJoin.buildSqlAndParams();
-      expect(queryAndParamsWithJoin[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParamsWithJoin[0]).toContain('LEFT JOIN  card2_tbl  AS "cards_b" ON "cards_a".other_id = "cards_b".id');
 
       // Second query does not require a join and should not be impacted by the first query
       const queryWithoutJoin = new PostgresQuery(filterParamsCompilers, {
@@ -1104,6 +1102,20 @@ describe('SQL Generation', () => {
       expect(timeDimension.formatToDate('2021-01-01T23:59:59.999999')).toEqual(
         '2021-01-01T23:59:59.999999'
       );
+    });
+
+    it('CORE-541: measure filter casts bound param - bigquery tesseract planner', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BigqueryQuery(compilers, {
+        measures: ['cards.count'],
+        filters: [
+          { member: 'cards.count', operator: 'gt', values: ['10'] }
+        ],
+        useNativeSqlPlanner: true,
+      });
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('CAST(? AS FLOAT64)');
     });
 
     it('Test time series with different granularity - postgres', async () => {
@@ -2005,7 +2017,7 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
-      expect(queryString).toContain('select * from order where ((type = ?))');
+      expect(queryString).toContain('select * from order where (type = ?)');
     });
 
     it('propagate filter params within cte from view into cube\'s query', async () => {
@@ -2056,7 +2068,7 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
-      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(type\s=\s\?\)\)/.test(queryString)).toBeTruthy();
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(type\s=\s\?\)/.test(queryString)).toBeTruthy();
     });
 
     it('correctly substitute filter params in cube\'s query dimension used in filter', async () => {
@@ -2074,10 +2086,9 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
-      expect(queryString).toContain(`SELECT
-      (1 = 1) "order__proxied", count(*) "order__count"
-    FROM
-      (select * from order where (1 = 1)) AS "order"  WHERE ((1 = 1) = ?)`);
+      expect(queryString).toContain('1 = 1 "order__proxied"');
+      expect(queryString).toContain('(select * from order where 1 = 1)  AS "order"');
+      expect(queryString).toContain('WHERE (1 = 1 = ?)');
     });
 
     it('correctly substitute filter params in cube\'s query measure used in filter', async () => {
@@ -2100,10 +2111,9 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
-      expect(queryString).toContain(`SELECT
-      "order".type "order__type", avg(CASE WHEN ((category = ?)) THEN "order".product_id END) "order__avg_filtered"
-    FROM
-      (select * from order where (type = ?)) AS "order"  WHERE ("order".type = ?) AND ("order".category = ?)`);
+      expect(queryString).toContain('avg(CASE WHEN ((category = ?)) THEN "order".product_id END) "order__avg_filtered"');
+      expect(queryString).toContain('(select * from order where (type = ?))  AS "order"');
+      expect(queryString).toContain('WHERE ("order".type = ?) AND ("order".category = ?)');
     });
 
     it('view referencing cube with FILTER_PARAMS - multiple filters and complex query', async () => {
@@ -2262,7 +2272,7 @@ describe('SQL Generation', () => {
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
 
-      expect(queryString).toContain('CASE WHEN (((category = $1)))');
+      expect(queryString).toContain('CASE WHEN ((category = $1))');
       expect(queryString).toMatch(/sum.*CASE WHEN/);
       expect(queryString).toContain('WHERE ("sales".category = $2)');
       expect(queryAndParams[1]).toEqual(['electronics', 'electronics']);
@@ -2420,7 +2430,7 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
-      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(dim0\s=\s\$1\)/.test(queryString)).toBeTruthy();
     });
 
     it('propagate 2 filter params from view into cube\'s query', async () => {
@@ -2487,7 +2497,7 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
-      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(dim0\s=\s\$1\)/.test(queryString)).toBeTruthy();
     });
 
     it('propagate 2 filter params within cte from view into cube\'s query', async () => {
@@ -2558,7 +2568,7 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
-      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(dim0\s=\s\$1\)/.test(queryString)).toBeTruthy();
     });
   });
 });

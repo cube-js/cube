@@ -15,6 +15,7 @@ import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
+import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
@@ -50,6 +51,16 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   aggType?: string;
   keyReference?: string;
   currency?: string;
+  links?: Array<{
+    name: string;
+    label: string;
+    url?: (...args: any[]) => string;
+    dashboard?: string;
+    icon?: string;
+    target?: 'blank' | 'self';
+    params?: Array<{ key: string; value: (...args: any[]) => string }>;
+  }>;
+  synthetic?: boolean;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -96,6 +107,16 @@ export type MeasureConfig = {
   public: boolean;
 };
 
+export type LinkConfig = {
+  name: string;
+  label: string;
+  dashboard?: string;
+  icon?: string;
+  target?: 'blank' | 'self';
+  primary?: boolean;
+  params?: string[];
+};
+
 export type DimensionConfig = {
   name: string;
   title: string;
@@ -114,6 +135,8 @@ export type DimensionConfig = {
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
   key?: string;
+  links?: LinkConfig[];
+  synthetic?: boolean;
 };
 
 export type SegmentConfig = {
@@ -139,6 +162,7 @@ export type CubeConfig = {
   isVisible: boolean;
   public: boolean;
   description?: string;
+  viewGroups?: string[];
   connectedComponent: number;
   meta?: any;
   measures: MeasureConfig[];
@@ -162,6 +186,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly contextEvaluator: ContextEvaluator;
 
+  private readonly viewGroupEvaluator: ViewGroupEvaluator;
+
   private readonly joinGraph: JoinGraph;
 
   public cubes: TransformedCube[];
@@ -175,15 +201,21 @@ export class CubeToMetaTransformer implements CompilerInterface {
     cubeValidator: CubeValidator,
     cubeEvaluator: CubeEvaluator,
     contextEvaluator: ContextEvaluator,
+    viewGroupEvaluator: ViewGroupEvaluator,
     joinGraph: JoinGraph
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
     this.cubeEvaluator = cubeEvaluator;
     this.contextEvaluator = contextEvaluator;
+    this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
     this.cubes = [];
     this.queries = [];
+  }
+
+  public get viewGroups(): CompiledViewGroup[] {
+    return this.viewGroupEvaluator.compiledViewGroups;
   }
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
@@ -239,6 +271,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     const nestedFolders: NestedFolder[] = (extendedCube.folders || []).map((f: Folder) => processFolder(f));
 
+    const viewGroupNames = extendedCube.isView
+      ? this.viewGroupEvaluator.viewGroupsForView(cubeName)
+      : [];
+
     return {
       config: {
         name: cubeName,
@@ -247,6 +283,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
         isVisible: isCubeVisible,
         public: isCubeVisible,
         description: extendedCube.description,
+        ...(viewGroupNames.length > 0 ? { viewGroups: viewGroupNames } : {}),
         connectedComponent: this.joinGraph.connectedComponents()[cubeName],
         meta: extendedCube.meta,
         measures: Object.entries(extendedCube.measures || {}).map((nameToMetric: [string, any]) => {
@@ -299,6 +336,18 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 : undefined,
             order: extendedDimDef.order,
             key: extendedDimDef.keyReference,
+            ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
+              name: link.name,
+              label: link.label,
+              ...(link.dashboard ? { dashboard: typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard } : {}),
+              icon: link.icon,
+              ...(link.target ? { target: link.target } : {}),
+              ...(link.primary ? { primary: true } : {}),
+              ...(link.params && Array.isArray(link.params) && link.params.length > 0
+                ? { params: link.params.map((p: any) => (typeof p.key === 'function' ? p.key() : p.key)) }
+                : {}),
+            })) } : {}),
+            ...(extendedDimDef.synthetic ? { synthetic: true } : {}),
           };
         }),
         segments: Object.entries(extendedCube.segments || {}).map((nameToSegment: [string, any]) => {
@@ -424,7 +473,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   private titleize(name: string): string {
-    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    const titleized = inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    // Capitalize common identifier acronyms so e.g. `userId` reads as "User ID"
+    // rather than "User Id" and an `id` member becomes "ID" instead of "Id".
+    return titleized.replace(/\bId(s?)\b/g, (_match, plural) => `ID${plural}`);
   }
 
   private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {

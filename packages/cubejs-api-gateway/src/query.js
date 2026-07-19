@@ -187,15 +187,16 @@ const querySchema = Joi.object().keys({
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
-  // @deprecated
-  renewQuery: Joi.boolean(),
   cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   cache: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   ungrouped: Joi.boolean(),
-  responseFormat: Joi.valid('default', 'compact'),
+  responseFormat: Joi.valid('default', 'compact', 'columnar'),
   subqueryJoins: Joi.array().items(subqueryJoin),
   joinHints: Joi.array().items(joinHint),
-  maskedMembers: Joi.array().items(Joi.string()),
+  maskedMembers: Joi.array().items(Joi.object().keys({
+    member: Joi.string().required(),
+    filter: Joi.object(),
+  })),
 });
 
 const normalizeQueryOrder = order => {
@@ -241,15 +242,107 @@ export const preAggsJobsRequestSchema = Joi.object({
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
-const normalizeQueryFilters = (filter) => (
+const DATE_RANGE_OPERATORS = ['inDateRange', 'notInDateRange'];
+// Mirrors Tesseract's date_single.rs boundary semantics:
+// Before → < start, AfterOrOn → >= start
+const START_DATE_OPERATORS = ['beforeDate', 'afterOrOnDate'];
+// BeforeOrOn → <= end, After → > end
+const END_DATE_OPERATORS = ['beforeOrOnDate', 'afterDate'];
+
+// Absolute values must pass through byte-exact: bare dates keep each planner's
+// own day-boundary handling, timestamps keep their time component. Timestamps
+// may carry a UTC designator or offset (e.g. from the SQL API push-down).
+const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/;
+
+// Resolve a dateRange input — a relative string ("last 2 weeks"), a single
+// absolute date, or a 2-element array — to a normalized [startISO, endISO]
+// pair.
+export const resolveDateRange = (input, timezone) => {
+  let dateRange;
+  if (typeof input === 'string') {
+    dateRange = dateParser(input, timezone);
+  } else if (Array.isArray(input)) {
+    dateRange = input.length === 1 ? [input[0], input[0]] : input;
+  } else {
+    return input;
+  }
+
+  return dateRange && dateRange.map(
+    (d, i) => (
+      i === 0 ?
+        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
+        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
+    )
+  );
+};
+
+// Resolve relative date strings inside a filter leaf's `values` so that
+// date-range filters can appear inside OR/AND groups (and at the top level)
+// with the same relative-date support that `timeDimensions.dateRange` has.
+// Reuses resolveDateRange so both paths produce identical output. Non-date
+// operators and already-absolute values pass through unchanged.
+export const normalizeDateFilterValues = (filter, timezone) => {
+  if (!filter || !filter.operator || !Array.isArray(filter.values)) {
+    return filter;
+  }
+
+  // Fail fast at the gateway if a range operator is given a multi-element
+  // `values` array that contains a relative-date string. This shape falls
+  // through the resolver (which only handles single-element values) and
+  // would otherwise error deep in query execution with an opaque message. This
+  // surfaces the failure at the API boundary instead.
+  if (
+    (DATE_RANGE_OPERATORS.includes(filter.operator) || filter.operator === 'onTheDate') &&
+    filter.values.length > 1 &&
+    filter.values.some(v => typeof v === 'string' && !AbsoluteDateTimeRegex.test(v))
+  ) {
+    throw new UserError(
+      `Relative-date strings are only supported when \`values\` has a single element for operator \`${filter.operator}\`. Pass an absolute two-element [start, end] pair, or a single relative string like ["last 2 weeks"]. Got: ${JSON.stringify(filter.values)}`
+    );
+  }
+
+  if (filter.values.length !== 1) {
+    return filter;
+  }
+
+  const value = filter.values[0];
+  if (typeof value !== 'string') {
+    return filter;
+  }
+
+  if (DATE_RANGE_OPERATORS.includes(filter.operator) || filter.operator === 'onTheDate') {
+    // onTheDate resolves to a two-sided range: legacy onTheDateWhere reads
+    // values[0]/values[1], and Tesseract maps onTheDate to InDateRange which
+    // requires exactly 2 values.
+    return { ...filter, values: resolveDateRange(value, timezone) };
+  }
+
+  if (AbsoluteDateTimeRegex.test(value)) {
+    return filter;
+  }
+
+  if (START_DATE_OPERATORS.includes(filter.operator)) {
+    const [start] = resolveDateRange(value, timezone);
+    return { ...filter, values: [start] };
+  }
+
+  if (END_DATE_OPERATORS.includes(filter.operator)) {
+    const [, end] = resolveDateRange(value, timezone);
+    return { ...filter, values: [end] };
+  }
+
+  return filter;
+};
+
+const normalizeQueryFilters = (filter, timezone) => (
   filter.map(f => {
     const res = { ...f };
     if (f.or) {
-      res.or = normalizeQueryFilters(f.or);
+      res.or = normalizeQueryFilters(f.or, timezone);
       return res;
     }
     if (f.and) {
-      res.and = normalizeQueryFilters(f.and);
+      res.and = normalizeQueryFilters(f.and, timezone);
       return res;
     }
 
@@ -274,7 +367,7 @@ const normalizeQueryFilters = (filter) => (
       delete res.dimension;
     }
 
-    return res;
+    return normalizeDateFilterValues(res, timezone);
   })
 );
 
@@ -301,19 +394,12 @@ function parseInputMemberExpression(expression) {
 function normalizeQueryCacheMode(query, cacheMode) {
   if (cacheMode !== undefined) {
     query.cacheMode = cacheMode;
-  } else if (!query.cache && query?.renewQuery !== undefined) {
-    // TODO: Drop this when renewQuery will be removed
-    query.cacheMode = query.renewQuery === true
-      ? 'must-revalidate'
-      : 'stale-if-slow';
   } else if (!query.cache) {
     query.cacheMode = 'stale-if-slow';
   } else {
     query.cacheMode = query.cache;
   }
 
-  // TODO: Drop this when renewQuery will be removed
-  query.renewQuery = undefined;
   query.cache = undefined;
 
   return query;
@@ -334,6 +420,7 @@ const normalizeQuery = (query, persistent, cacheMode) => {
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
+
   const validQuery = query.measures?.length ||
     query.dimensions?.length ||
     query.timeDimensions?.filter(td => !!td.granularity).length;
@@ -373,27 +460,14 @@ const normalizeQuery = (query, persistent, cacheMode) => {
     ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
-    filters: normalizeQueryFilters(query.filters || []),
+    filters: normalizeQueryFilters(query.filters || [], timezone),
     dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
-      let dateRange;
-
       const compareDateRange = td.compareDateRange ? td.compareDateRange.map((currentDateRange) => (typeof currentDateRange === 'string' ? dateParser(currentDateRange, timezone) : currentDateRange)) : null;
 
-      if (typeof td.dateRange === 'string') {
-        dateRange = dateParser(td.dateRange, timezone);
-      } else {
-        dateRange = td.dateRange && td.dateRange.length === 1 ? [td.dateRange[0], td.dateRange[0]] : td.dateRange;
-      }
       return {
         ...td,
-        dateRange: dateRange && dateRange.map(
-          (d, i) => (
-            i === 0 ?
-              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
-              moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
-          )
-        ),
+        dateRange: resolveDateRange(td.dateRange, timezone),
         ...(compareDateRange ? { compareDateRange } : {})
       };
     }).concat(regularToTimeDimension)

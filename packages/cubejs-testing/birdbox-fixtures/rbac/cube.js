@@ -1,5 +1,4 @@
 module.exports = {
-  contextToRoles: async (context) => context.securityContext.auth?.roles || [],
   contextToGroups: async (context) => context.securityContext.auth?.groups || [],
   canSwitchSqlUser: async () => true,
   checkSqlAuth: async (req, user, password) => {
@@ -19,8 +18,7 @@ module.exports = {
               canHaveAdmin: true,
               minDefaultId: 10000,
             },
-            roles: ['admin', 'ownder', 'hr'],
-            groups: ['leadership', 'hr'],
+            groups: ['leadership', 'hr', 'admin'],
           },
         },
       };
@@ -41,8 +39,7 @@ module.exports = {
               canHaveAdmin: false,
               minDefaultId: 10000,
             },
-            roles: ['manager'],
-            groups: ['management'],
+            groups: ['management', 'manager'],
           },
         },
       };
@@ -63,7 +60,6 @@ module.exports = {
               canHaveAdmin: false,
               minDefaultId: 20000,
             },
-            roles: [],
             groups: ['general'],
           },
         },
@@ -85,7 +81,6 @@ module.exports = {
               canHaveAdmin: true,
               minDefaultId: 20000,
             },
-            roles: ['restricted'],
             groups: ['restricted'],
           },
         },
@@ -107,14 +102,13 @@ module.exports = {
               region: 'CA',
               allowedCities: ['Los Angeles', 'New York'],
             },
-            roles: [],
             groups: ['developer'],
           },
         },
       };
     }
     // User for testing two-dimensional policy overlap (matches diagram in CompilerApi.ts)
-    // Has policy2_role, so both Policy 1 (*) and Policy 2 (policy2_role) apply
+    // Has policy2_group, so both Policy 1 (*) and Policy 2 (policy2_group) apply
     if (user === 'policy_test') {
       if (password && password !== 'policy_test_password') {
         throw new Error(`Password doesn't match for ${user}`);
@@ -126,13 +120,12 @@ module.exports = {
           auth: {
             username: 'policy_test',
             userAttributes: {},
-            roles: ['policy2_role'],
-            groups: [],
+            groups: ['policy2_group'],
           },
         },
       };
     }
-    // User for masking tests - no special roles, sees only masked values
+    // User for masking tests - no special groups, sees only masked values
     if (user === 'masking_viewer') {
       if (password && password !== 'masking_viewer_password') {
         throw new Error(`Password doesn't match for ${user}`);
@@ -144,13 +137,12 @@ module.exports = {
           auth: {
             username: 'masking_viewer',
             userAttributes: {},
-            roles: [],
             groups: [],
           },
         },
       };
     }
-    // User for masking tests - has full access role
+    // User for masking tests - has full access group
     if (user === 'masking_full') {
       if (password && password !== 'masking_full_password') {
         throw new Error(`Password doesn't match for ${user}`);
@@ -162,8 +154,7 @@ module.exports = {
           auth: {
             username: 'masking_full',
             userAttributes: {},
-            roles: ['masking_full_access'],
-            groups: [],
+            groups: ['masking_full_access'],
           },
         },
       };
@@ -180,8 +171,7 @@ module.exports = {
           auth: {
             username: 'masking_partial',
             userAttributes: {},
-            roles: ['masking_partial'],
-            groups: [],
+            groups: ['masking_partial'],
           },
         },
       };
@@ -199,7 +189,6 @@ module.exports = {
             userAttributes: {
               allowedProductIds: [1, 2],
             },
-            roles: [],
             groups: ['user_group', 'region_group'],
           },
         },
@@ -216,7 +205,6 @@ module.exports = {
           auth: {
             username: 'region_user_no_filter',
             userAttributes: {},
-            roles: [],
             groups: ['user_group'],
           },
         },
@@ -239,8 +227,75 @@ module.exports = {
           auth: {
             username: 'sc_test',
             userAttributes: {},
-            roles: [],
             groups: [],
+          },
+        },
+      };
+    }
+    if (user === 'conditional_mask_user') {
+      if (password && password !== 'conditional_mask_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'conditional_mask_user',
+            userAttributes: {},
+            groups: ['conditional_mask_group'],
+          },
+        },
+      };
+    }
+    if (user === 'conditional_mask_multi_user') {
+      if (password && password !== 'conditional_mask_multi_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'conditional_mask_multi_user',
+            userAttributes: {},
+            groups: ['conditional_mask_group', 'conditional_mask_group_extra'],
+          },
+        },
+      };
+    }
+    // User matching only the full-access policy (with a row filter) on a cube
+    // that also has a separate, group-scoped masking policy the user is NOT in.
+    if (user === 'single_policy_measure_user') {
+      if (password && password !== 'single_policy_measure_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'single_policy_measure_user',
+            userAttributes: {},
+            groups: ['spm_full_group'],
+          },
+        },
+      };
+    }
+    // User belonging to two groups whose access policies grant different
+    // members (member-level union across groups, no row_level filters).
+    if (user === 'multi_group_user') {
+      if (password && password !== 'multi_group_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'multi_group_user',
+            userAttributes: {},
+            groups: ['mg_group_a', 'mg_group_c'],
           },
         },
       };

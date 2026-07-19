@@ -1,5 +1,9 @@
-import Meta from './Meta';
-import { TimeDimensionGranularity } from './time';
+import Meta from './Meta.js';
+import { TimeDimensionGranularity } from './time.js';
+
+export type DeeplyReadonly<T> = {
+  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+};
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
@@ -27,13 +31,25 @@ export type CustomNumericFormat = {
   alias?: string;
 };
 export type DimensionLinkFormat = { type: 'link'; label: string };
-export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
-  | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
-export type MeasureFormat = 'percent' | 'currency' | 'number' | CustomNumericFormat;
 
 type FormatDescriptionBaseName = 'number' | 'percent' | 'currency' | 'abbr' | 'accounting';
 type FormatDescriptionPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 type FormatDescriptionName = 'custom' | 'id' | FormatDescriptionBaseName | `${FormatDescriptionBaseName}_${FormatDescriptionPrecision}`;
+
+type NamedNumericPrecision = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type NamedNumericFormatName =
+  | `number_${NamedNumericPrecision}`
+  | `percent_${NamedNumericPrecision}`
+  | `currency_${NamedNumericPrecision}`
+  | `decimal_${NamedNumericPrecision}`
+  | `abbr_${NamedNumericPrecision}`
+  | `accounting_${NamedNumericPrecision}`
+  | 'decimal' | 'abbr' | 'accounting';
+
+export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
+  | NamedNumericFormatName
+  | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
+export type MeasureFormat = 'percent' | 'currency' | 'number' | NamedNumericFormatName | CustomNumericFormat;
 
 export type FormatDescription = {
   /** Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number' */
@@ -146,10 +162,8 @@ export interface Query {
   offset?: number;
   order?: TQueryOrderObject | TQueryOrderArray;
   timezone?: string;
-  // @deprecated
-  renewQuery?: boolean;
   ungrouped?: boolean;
-  responseFormat?: 'compact' | 'default';
+  responseFormat?: 'compact' | 'columnar' | 'default';
   total?: boolean;
 }
 
@@ -511,6 +525,7 @@ export type Cube = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
+  viewGroups?: string[];
 };
 
 export type CubeMap = {
@@ -524,8 +539,25 @@ export type CubesMap = Record<
   CubeMap
 >;
 
+export type ViewGroup = {
+  name: string;
+  title?: string;
+  description?: string;
+  /**
+   * The group's own direct view references at this level.
+   */
+  views: string[];
+  /**
+   * Recursive representation: view names interleaved with nested view groups,
+   * preserving authoring order. Present when the group is defined via
+   * `includes` (including nested view groups).
+   */
+  includes?: (string | ViewGroup)[];
+};
+
 export type MetaResponse = {
   cubes: Cube[];
+  viewGroups?: ViewGroup[];
 };
 
 export type FilterOperator = {
@@ -575,7 +607,7 @@ export type ProgressResponse = {
 /**
  * Cache mode options for query execution.
  *
- * - **stale-if-slow** (default): Equivalent to previously used `renewQuery: false`.
+ * - **stale-if-slow** (default):
  *   If refresh keys are up-to-date, returns the value from cache.
  *   If refresh keys are expired, tries to return the value from the database.
  *   Returns fresh value from the database if the query executed until the first "Continue wait" interval is reached.
@@ -586,7 +618,7 @@ export type ProgressResponse = {
  *   If refresh keys are expired, returns stale data from cache.
  *   Updates the cache in background.
  *
- * - **must-revalidate**: Equivalent to previously used `renewQuery: true`.
+ * - **must-revalidate**:
  *   If refresh keys are up-to-date, returns the value from cache.
  *   If refresh keys are expired, tries to return the value from the database.
  *   Returns fresh value from the database even if it takes minutes and many "Continue wait" intervals.

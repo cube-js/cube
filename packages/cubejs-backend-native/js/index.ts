@@ -4,7 +4,8 @@ import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
 import { CacheMode } from '@cubejs-backend/shared';
-import { ResultWrapper } from './ResultWrapper';
+import { NativeQueryResultRef, ResultWrapper } from './ResultWrapper';
+import { ColumnarChunkBuilder } from './ColumnarChunkBuilder';
 
 export * from './ResultWrapper';
 
@@ -110,7 +111,6 @@ export type SQLInterfaceOptions = {
   contextToApiScopes: (payload: ContextToApiScopesPayload) => ContextToApiScopesResponse | Promise<ContextToApiScopesResponse>,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   checkSqlAuth: (payload: CheckSQLAuthPayload) => CheckSQLAuthResponse | Promise<CheckSQLAuthResponse>,
-  load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
   meta: (payload: MetaPayload) => unknown | Promise<unknown>,
   stream: (payload: LoadPayload) => unknown | Promise<unknown>,
@@ -286,17 +286,17 @@ function wrapNativeFunctionWithStream(
       if (response && response.stream) {
         writerOrChannel.start();
 
-        let chunkBuffer: any[] = [];
+        const chunkBuilder = new ColumnarChunkBuilder(chunkLength);
         const writable = new Writable({
           objectMode: true,
           highWaterMark: chunkLength,
           write(row: any, encoding: BufferEncoding, callback: (error?: (Error | null)) => void) {
-            chunkBuffer.push(row);
-            if (chunkBuffer.length < chunkLength) {
+            chunkBuilder.push(row);
+            if (chunkBuilder.count() < chunkLength) {
               callback(null);
             } else {
-              const toSend = chunkBuffer;
-              chunkBuffer = [];
+              const toSend = chunkBuilder.toBuffer();
+              chunkBuilder.reset();
               writerOrChannel.chunk(toSend, callback);
             }
           },
@@ -308,9 +308,9 @@ function wrapNativeFunctionWithStream(
                 writerOrChannel.end(callback);
               }
             };
-            if (chunkBuffer.length > 0) {
-              const toSend = chunkBuffer;
-              chunkBuffer = [];
+            if (!chunkBuilder.isEmpty()) {
+              const toSend = chunkBuilder.toBuffer();
+              chunkBuilder.reset();
               writerOrChannel.chunk(toSend, end);
             } else {
               end(null);
@@ -396,10 +396,6 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('options.checkSqlAuth must be a function');
   }
 
-  if (typeof options.load !== 'function') {
-    throw new Error('options.load must be a function');
-  }
-
   if (typeof options.meta !== 'function') {
     throw new Error('options.meta must be a function');
   }
@@ -426,7 +422,6 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     contextToApiScopes: wrapNativeFunctionWithChannelCallback(options.contextToApiScopes),
     checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
     checkSqlAuth: wrapNativeFunctionWithChannelCallback(options.checkSqlAuth),
-    load: wrapNativeFunctionWithChannelCallback(options.load),
     sql: wrapNativeFunctionWithChannelCallback(options.sql),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
     stream: wrapNativeFunctionWithStream(options.stream),
@@ -474,11 +469,11 @@ export type ResultRow = Record<string, string>;
 export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
   const native = loadNative();
 
-  const msg = await native.parseCubestoreResultMessage(message);
+  const msg = await native.parseCubestoreResultMessage(message) as NativeQueryResultRef;
   return new ResultWrapper(msg);
 };
 
-export const getCubestoreResult = (ref: ResultWrapper): ResultRow[] => {
+export const getCubestoreResult = (ref: NativeQueryResultRef): ResultRow[] => {
   const native = loadNative();
 
   return native.getCubestoreResult(ref);
@@ -541,7 +536,6 @@ export interface PyConfiguration {
   contextToApiScopes?: () => Promise<string[]>
   scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
   scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
-  contextToRoles?: (ctx: unknown) => Promise<string[]>
   contextToGroups?: (ctx: unknown) => Promise<string[]>
 }
 

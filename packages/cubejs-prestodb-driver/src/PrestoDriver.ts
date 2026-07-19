@@ -39,7 +39,11 @@ export type PrestoDriverExportBucket = {
   exportBucketCsvEscapeSymbol?: string,
 };
 
-export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
+export type PrestoDriverInternalConfiguration = {
+    engine?: 'presto' | 'trino';
+};
+
+export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverInternalConfiguration & {
   host?: string;
   port?: string;
   catalog?: string;
@@ -49,10 +53,13 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   custom_auth?: string;
   // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
-  ssl?: string | TLSConnectionOptions;
+  ssl?: TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
   preAggregations?: boolean;
+  useSelectTestConnection?: boolean;
+  // @see https://trino.io/docs/current/develop/client-protocol.html
+  headers?: Record<string, string>;
 };
 
 const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
@@ -94,7 +101,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
 
-    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
+    this.useSelectTestConnection = config.useSelectTestConnection ??
+      getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
 
     this.config = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
@@ -121,8 +129,64 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     this.catalog = this.config.catalog;
     this.client = new presto.Client({
       timeout: this.config.queryTimeout,
+      engine: 'presto',
       ...this.config,
     });
+
+    this.applyCustomHeadersToAllRequests(this.client);
+  }
+
+  /**
+   * https://github.com/tagomoris/presto-client-node/pull/97
+   *
+   * Reason for monkey patching:
+   *
+   * The underlying `presto-client` only applies custom headers to the initial
+   * `POST /v1/statement` request. The follow-up `nextUri` GET polls (and the
+   * cancel/kill/node requests) are issued with a fresh, empty header set.
+   */
+  protected applyCustomHeadersToAllRequests(client: any) {
+    const customHeaders = this.config.headers;
+    if (!customHeaders || Object.keys(customHeaders).length === 0) {
+      return;
+    }
+
+    // `request` lives on the prototype; capture it before shadowing it on the instance.
+    const originalRequest = client.request;
+
+    client.request = function patchedRequest(opts: any, callback: any) {
+      if (typeof opts === 'string') {
+        // `opts` is a `nextUri` URL string. The upstream client rebuilds GET
+        // options from it with empty headers, dropping our custom headers. We
+        // recreate those options ourselves (seeded with the custom headers) and
+        // invoke the original `request` with a client "view" whose host/port/
+        // protocol point at the `nextUri` target. The original object branch
+        // otherwise forces the client's configured host, so the view preserves
+        // upstream's host-following behaviour.
+        let href;
+        try {
+          href = new URL(opts);
+        } catch (error) {
+          return callback(error);
+        }
+
+        const view = Object.create(this);
+        view.host = href.hostname;
+        view.port = href.port || (href.protocol === 'https:' ? '443' : '80');
+        view.protocol = href.protocol;
+
+        return originalRequest.call(view, {
+          method: 'GET',
+          path: href.pathname + href.search,
+          headers: { ...customHeaders },
+        }, callback);
+      }
+
+      // Object form (POST /v1/statement, DELETE cancel/kill, node list, ...).
+      // Merge in the custom headers, letting any explicitly-provided headers win.
+      opts.headers = { ...customHeaders, ...(opts.headers || {}) };
+      return originalRequest.call(this, opts, callback);
+    };
   }
 
   public async testConnection(): Promise<void> {
@@ -174,6 +238,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
           session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
@@ -202,6 +267,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
             fullData = concat(normalData, fullData);
@@ -312,9 +378,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     }
 
     if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
-      throw new Error(`Unsupported export bucket type: ${
-        this.config.bucketType
-      }`);
+      throw new Error(`Unsupported export bucket type: ${this.config.bucketType}`);
     }
 
     const types = options.query
@@ -336,7 +400,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return { schema, tableName };
   }
 
-  private generateTableColumnsForExport(types: {name: string, type: string}[]) {
+  private generateTableColumnsForExport(types: { name: string, type: string }[]) {
     return types.map((c) => `CAST(${c.name} AS varchar) ${c.name}`).join(', ');
   }
 
@@ -360,7 +424,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  private async unloadGeneric(params: {tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[]}) {
+  private async unloadGeneric(params: { tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[] }) {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }

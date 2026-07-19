@@ -7,17 +7,18 @@ import { parseCubestoreResultMessage } from '@cubejs-backend/native';
 import { ConnectionError, QueryError } from './errors';
 import {
   BinaryValue,
-  BoolValue, Float64Value,
+  BoolValue,
+  Float64Value,
   HttpCommand,
   HttpError,
   HttpMessage,
   HttpParameter,
   HttpParameterValue,
   HttpQuery,
-  HttpResultSet,
   HttpTable,
   Int64Value,
   NullValue,
+  QueryResultFormat,
   StringValue,
 } from '../codegen';
 
@@ -26,6 +27,14 @@ interface SentMessage {
   reject: (reason?: any) => void;
   buffer: Uint8Array;
 }
+
+export type QueryParameter = null | boolean | number | string | Buffer;
+
+export type WebSocketQueryOptions = {
+  inlineTables?: InlineTable[];
+  queryTracingObj?: any;
+  responseFormat: QueryResultFormat;
+};
 
 interface CubeStoreWebSocket extends WebSocket {
   readyPromise: Promise<CubeStoreWebSocket>;
@@ -150,64 +159,24 @@ export class WebSocketConnection {
         webSocket.on('message', async (msg: Buffer) => {
           const buf = new flatbuffers.ByteBuffer(msg);
           const httpMessage = HttpMessage.getRootAsHttpMessage(buf);
-          const resolvers = webSocket.sentMessages[httpMessage.messageId()];
-          delete webSocket.sentMessages[httpMessage.messageId()];
-          if (!resolvers) {
+
+          const resolver = webSocket.sentMessages[httpMessage.messageId()];
+          if (!resolver) {
             throw new QueryError(`Cube Store missed message id: ${httpMessage.messageId()}`);
           }
 
-          if (getEnv('nativeOrchestrator') && msg.length > 1000) {
-            try {
-              const nativeResMsg = await parseCubestoreResultMessage(msg);
-              resolvers.resolve(nativeResMsg);
-            } catch (e) {
-              resolvers.reject(e);
-            }
-          } else {
-            const commandType = httpMessage.commandType();
+          delete webSocket.sentMessages[httpMessage.messageId()];
 
-            if (commandType === HttpCommand.HttpError) {
-              resolvers.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
-            } else if (commandType === HttpCommand.HttpResultSet) {
-              const resultSet = httpMessage.command(new HttpResultSet());
+          if (httpMessage.commandType() === HttpCommand.HttpError) {
+            resolver.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
+            return;
+          }
 
-              if (!resultSet) {
-                resolvers.reject(new QueryError('Empty resultSet'));
-                return;
-              }
-
-              const columnsLen = resultSet.columnsLength();
-              const columns: Array<string> = [];
-              for (let i = 0; i < columnsLen; i++) {
-                const columnName = resultSet.columns(i);
-                if (!columnName) {
-                  resolvers.reject(new QueryError('Column name is not defined'));
-                  return;
-                }
-                columns.push(columnName);
-              }
-
-              const rowLen = resultSet.rowsLength();
-              const result: any[] = [];
-              for (let i = 0; i < rowLen; i++) {
-                const row = resultSet.rows(i);
-                if (!row) {
-                  resolvers.reject(new QueryError('Null row'));
-                  return;
-                }
-                const valueLen = row.valuesLength();
-                const rowObj = {};
-                for (let j = 0; j < valueLen; j++) {
-                  const value = row.values(j);
-                  rowObj[columns[j]] = value?.stringValue();
-                }
-                result.push(rowObj);
-              }
-
-              resolvers.resolve(result);
-            } else {
-              resolvers.reject(new QueryError('Unsupported command'));
-            }
+          try {
+            const nativeResMsg = await parseCubestoreResultMessage(msg);
+            resolver.resolve(nativeResMsg);
+          } catch (e) {
+            resolver.reject(e);
           }
         });
       });
@@ -322,7 +291,9 @@ export class WebSocketConnection {
     }
   }
 
-  public async query(query: string, inlineTables: InlineTable[], queryTracingObj?: any, parameters?: any): Promise<any[]> {
+  public async query(query: string, parameters: QueryParameter[], options: WebSocketQueryOptions): Promise<any[]> {
+    const { inlineTables, queryTracingObj, responseFormat } = options;
+
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
 
@@ -361,7 +332,7 @@ export class WebSocketConnection {
     }
 
     let parametersOffset: flatbuffers.Offset | null = null;
-    if (parameters) {
+    if (parameters.length > 0) {
       const httpParameterValues: flatbuffers.Offset[] = [];
 
       for (const parameter of parameters) {
@@ -388,6 +359,8 @@ export class WebSocketConnection {
     if (parametersOffset) {
       HttpQuery.addParameters(builder, parametersOffset);
     }
+
+    HttpQuery.addResponseFormat(builder, responseFormat);
 
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;

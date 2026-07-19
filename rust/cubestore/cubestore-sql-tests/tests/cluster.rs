@@ -84,6 +84,7 @@ impl MultiProcTest for ClusterSqlTest {
                 }))
                 .await
                 .unwrap();
+                Ok(())
             })
             .await;
     }
@@ -123,6 +124,7 @@ impl WorkerProc<WorkerArgs> for WorkerFn {
             .start_test_worker(|_| async move {
                 init.signal().await;
                 done.wait_completion().await;
+                Ok(())
             })
             .await
     }

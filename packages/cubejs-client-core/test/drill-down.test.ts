@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import ResultSet from '../src/ResultSet';
+import ResultSet from '../src/ResultSet.js';
 
 vi.mock('moment-range', async () => {
   const Moment = await vi.importActual('moment');

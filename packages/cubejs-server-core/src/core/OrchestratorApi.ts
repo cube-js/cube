@@ -30,7 +30,7 @@ export class OrchestratorApi {
     protected readonly logger,
     protected readonly options: OrchestratorApiOptions
   ) {
-    this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
+    this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
 
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
@@ -295,6 +295,10 @@ export class OrchestratorApi {
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource: string) {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
+  }
+
+  public async cancelQueryByRequestId(requestId: string) {
+    return this.orchestrator.cancelQueryByRequestId(requestId);
   }
 
   public async updateRefreshEndReached() {

@@ -124,6 +124,12 @@ If your organization uses an identity provider such as [Okta][ref-okta] or
 deprovisioning through SCIM. See the [SSO & Identity Providers][ref-sso]
 documentation for setup instructions.
 
+Users created via SCIM — and users auto-provisioned on first SAML
+login — receive the **Viewer** role by default. To assign a different
+default role (including [custom roles][ref-custom-roles]), configure
+**Default role for new users** in the **Advanced** section of your SAML
+configuration. The setting is shared between SAML and SCIM.
+
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles

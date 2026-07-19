@@ -200,21 +200,6 @@ export class BigqueryQuery extends BaseQuery {
    * Overridden from BaseQuery to support BigQuery strict data types for
    * joining conditions (note timeStampCast)
    */
-  public override runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom: string, dateTo: string, dateField: string, dimensionDateFrom: string, _dimensionDateTo: string) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
-        ]
-      );
-  }
-
-  /**
-   * Should be protected, but BaseQuery is in js
-   * Overridden from BaseQuery to support BigQuery strict data types for
-   * joining conditions (note timeStampCast)
-   */
   public override rollingWindowToDateJoinCondition(granularity) {
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {
@@ -347,6 +332,7 @@ export class BigqueryQuery extends BaseQuery {
     // DATEADD is being rewritten to DATE_ADD
     templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP()';
     delete templates.functions.TO_CHAR;
     delete templates.functions.PERCENTILECONT;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
@@ -354,7 +340,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';
-    delete templates.expressions.ilike;
+    templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
