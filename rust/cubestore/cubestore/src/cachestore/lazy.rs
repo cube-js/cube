@@ -554,6 +554,12 @@ impl LazyRocksCacheStore {
         {
             let mut guard = self.state.write().await;
 
+            if matches!(&*guard, LazyRocksCacheStoreState::Closed { .. }) {
+                return Err(CubeError::internal(
+                    "WIPE aborted: shutdown requested during teardown".to_string(),
+                ));
+            }
+
             // Respawn the worker loops against the fresh store, then install it and release the
             // state lock BEFORE the (remote, slow, fallible) snapshot upload.
             {
