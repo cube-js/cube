@@ -83,6 +83,36 @@ CSV is generated client-side from the data already loaded into the widget, so no
 additional query is issued. The parameter is opt-in — omit it (the default) to
 keep the download action hidden.
 
+## Show or hide the AI chat
+
+Embedded dashboards show an AI chat (the agent panel and its launcher bubble) by
+default. You can control it in two ways:
+
+- **Globally, in the UI.** Toggle **Show dashboard chat** under
+  **Embed → Settings** in the Cube Cloud console. This switch is
+  account-wide — it turns the AI chat on or off for the entire embedded surface,
+  i.e. every embedded dashboard.
+- **Per session, via the API.** Pass `settings.showDashboardChat` when you
+  [generate the session](/reference/embed-apis/generate-session#session-settings). A per-session
+  value takes precedence over the global toggle — `false` hides the chat for that
+  session even when it is enabled account-wide, and `true` shows it even when it
+  is disabled:
+
+```javascript
+body: JSON.stringify({
+  deploymentId: DEPLOYMENT_ID,
+  externalId: "user@example.com",
+  settings: {
+    // Hide the AI chat for this viewer only
+    showDashboardChat: false,
+  },
+}),
+```
+
+This applies to embedded published dashboards; it does not affect the standalone
+[Analytics Chat](/embedding/iframe/analytics-chat) surface, where embedding the
+chat is itself the opt-in.
+
 ## Set the language
 
 Embedded dashboards render their UI in the account's default language, which you can

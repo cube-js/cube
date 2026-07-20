@@ -741,6 +741,8 @@
                 "pages": [
                   "GET /v1/deployments",
                   "GET /v1/deployments/{deploymentId}",
+                  "PUT /v1/deployments/{deploymentId}",
+                  "DELETE /v1/deployments/{deploymentId}",
                   "POST /v1/deployments/{deploymentId}/token"
                 ]
               },
@@ -774,6 +776,7 @@
                   "GET /v1/deployments/{deploymentId}/reports/{reportId}",
                   "PUT /v1/deployments/{deploymentId}/reports/{reportId}",
                   "DELETE /v1/deployments/{deploymentId}/reports/{reportId}",
+                  "PUT /v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook",
                   "PUT /v1/deployments/{deploymentId}/reports/{reportId}/refresh"
                 ]
               },
@@ -787,6 +790,7 @@
                   "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "DELETE /v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "PUT /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
+                  "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
                   "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
                   "POST /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
                 ]
@@ -815,6 +819,15 @@
                 ]
               },
               {
+                "group": "User Attributes",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/user-attributes",
+                  "POST /v1/user-attributes",
+                  "PUT /v1/user-attributes/{id}"
+                ]
+              },
+              {
                 "group": "App Theme",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
@@ -834,10 +847,88 @@
                 "group": "Embed Tenants",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
+                  "DELETE /v1/embed-tenants/{embedTenantName}",
                   "GET /v1/embed-tenants/{embedTenantName}/groups",
-                  "DELETE /v1/embed-tenants/{embedTenantName}/groups/{id}",
-                  "GET /v1/embed-tenants/{embedTenantName}/user-attributes",
-                  "DELETE /v1/embed-tenants/{embedTenantName}/user-attributes/{id}"
+                  "DELETE /v1/embed-tenants/{embedTenantName}/groups/{id}"
+                ]
+              },
+              {
+                "group": "Dbt Sync",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /v1/deployments/{deploymentId}/dbt-sync"
+                ]
+              },
+              {
+                "group": "Env Variables",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/deployments/{deploymentId}/env-vars",
+                  "PUT /v1/deployments/{deploymentId}/env-vars"
+                ]
+              },
+              {
+                "group": "OAuth Integrations",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/oauth-integrations",
+                  "POST /v1/oauth-integrations",
+                  "GET /v1/oauth-integrations/{id}",
+                  "PUT /v1/oauth-integrations/{id}",
+                  "DELETE /v1/oauth-integrations/{id}"
+                ]
+              },
+              {
+                "group": "OIDC Token Configs",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/oidc-token-configs",
+                  "POST /v1/oidc-token-configs",
+                  "GET /v1/oidc-token-configs/{id}",
+                  "PUT /v1/oidc-token-configs/{id}",
+                  "DELETE /v1/oidc-token-configs/{id}"
+                ]
+              },
+              {
+                "group": "Regions",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/regions"
+                ]
+              },
+              {
+                "group": "Tenant Settings",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/tenant/settings",
+                  "PUT /v1/tenant/settings"
+                ]
+              },
+              {
+                "group": "User Attribute Values",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /v1/user-attribute-values",
+                  "GET /v1/user-attribute-values/{userId}"
+                ]
+              },
+              {
+                "group": "User OAuth Tokens",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /v1/user-oauth-tokens",
+                  "GET /v1/user-oauth-tokens/{integrationId}",
+                  "DELETE /v1/user-oauth-tokens/{integrationId}",
+                  "POST /v1/user-oauth-tokens/{integrationId}/initiate"
+                ]
+              },
+              {
+                "group": "Users Admin",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "POST /v1/users",
+                  "PUT /v1/users/{id}",
+                  "DELETE /v1/users/{id}"
                 ]
               },
               {

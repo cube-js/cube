@@ -7,6 +7,47 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
 
+<Update label="2026-07-20" description="v0.2.1" tags={["Added","Changed"]}>
+  ### Added
+
+  - `POST /api/v1/deployments/{deploymentId}/dbt-sync` operation (`DbtSyncPublicController.startDbtSync`) — starts a dbt sync for a deployment, optionally on a specific branch. New schemas: `StartDbtSyncInput` (`branchName`), `DbtSyncResponse` (`branchName`, `syncJobId`, `workflowId`).
+  - `PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` operation (`ReportsPublicController.connectReportToWorkbook`) — links a report to the caller's own spreadsheet by recording its placement, and returns the updated `Report`. Requires only read access to the report. New schema: `ConnectReportToWorkbookInput` (`externalWorkbookId`, `resultLocation`, `endResultCell`).
+  - New `SecretsManage` and `DownloadData` RBAC actions, available across all policy action enums (`RoleWithAccess.actions`, the inherited/resource user & group policy actions, and the update-policy request bodies).
+  - `AIEngineerSettings` now includes `chatThreadPolicies`. New schemas: `ChatThreadPolicyDTO` (`actions`, `effect`, `resourceType`, `resources`), `ChatThreadPolicyDTOEffect` (`allow` | `deny`), `ChatThreadPolicyDTOResourceType`.
+  - `GET /api/v1/deployments/{deploymentId}/reports` accepts a new `search` query filter.
+  - `Report` now includes `canEdit`, `canManage`, and `externalWorkbookPlacements` — a report can be placed in multiple spreadsheets. New schema: `ReportPlacement` (`workbookId`, `resultLocation`, `endResultCell`).
+  - `ReportSnapshot` now includes `fillMissingRows`. New schema: `FillMissingRows` (`member`, `excludedDimensions`).
+  - `CreatorMode` now includes `showGeneratedSql` and `showSemanticSql` toggles.
+  - `Dashboard` now includes `restrictDataDownload` and `useBoardDashboards`.
+  - `UpdatePublishedAiWidgetThreadInput` accepts an optional `checksum`.
+
+  ### Changed
+
+  - `DashboardConfigInput.widgets` is now optional.
+</Update>
+
+<Update label="2026-07-02" description="v0.2.0" tags={["Added","Changed","Removed"]}>
+  ### Added
+
+  - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` operation (`WorkbooksPublicController.updatePublishedDashboardAiWidgetThread`) — attaches an AI widget thread to a published dashboard and returns the updated `Dashboard`. New schema: `UpdatePublishedAiWidgetThreadInput` (`threadId`, `widgetId`).
+  - `DELETE /api/v1/embed-tenants/{embedTenantName}/` operation (`EmbedTenantAdminPublicController.deleteEmbedTenant`) for deleting an embed tenant.
+  - `CubePlatformClientConfig.credentials` option, forwarded to the underlying `fetch` to control the credentials mode. Defaults to the browser's `same-origin` behaviour; set `'omit'` for token-only clients (e.g. signed embedding) that must never authenticate via a cookie.
+  - Embed session requests (`GenerateSession`) accept `tenantGroups` and `tenantGroupDefinitions` — per-embed-tenant groups for sharing and organizing content within a single embed tenant (Creator Mode), namespaced separately from the global `groups`. New `embedTenantProfile` field with a `displayName`. New schema: `EmbedTenantProfile`.
+  - `AppConfigResponse` now includes an `embedding` field. New schema: `EmbedSettings` (`locale`).
+  - `CreatorMode` now includes `localizedTitles` for per-locale workspace titles. New schema: `LocalizedValue` (`locale`, `value`).
+  - `GET /api/v1/deployments/{deploymentId}/reports` accepts new `folderId` and `externalWorkbookId` query filters.
+  - `UpdateWorkbookInput` accepts `slug` and `slugTakeover`, and the `Workbook` response now includes `slug`.
+
+  ### Changed
+
+  - `UserAttributeDefinitionDTOType` now includes a `"boolean"` value, and `UserAttributeInput.value` accepts `boolean`.
+
+  ### Removed
+
+  - **BREAKING:** removed the `GET /api/v1/embed-tenants/{embedTenantName}/user-attributes` and `DELETE /api/v1/embed-tenants/{embedTenantName}/user-attributes/{id}` operations, along with the `UserAttribute`, `UserAttributesConnectionResponse`, and `UserAttributeDTOType` schemas.
+  - **BREAKING:** removed the `ephemeralTtlSeconds` field from the embed session request (`GenerateSession`).
+</Update>
+
 <Update label="2026-06-17" description="v0.1.2" tags={["Added","Changed"]}>
   ### Added
 

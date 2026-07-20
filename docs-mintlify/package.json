@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "mintlify dev --port 3002",
     "build": "mintlify build",
-    "broken-links": "mintlify broken-links --check-anchors --check-redirects --check-snippets"
+    "broken-links": "mintlify broken-links --check-anchors --check-redirects --check-snippets",
+    "api:extract": "node scripts/extract-api.mjs",
+    "api:changelog": "node scripts/extract-changelog.mjs",
+    "api:sync": "yarn api:extract && yarn api:changelog",
+    "api:check": "node scripts/extract-api.mjs --check"
   },
   "devDependencies": {
     "mintlify": "^4"
