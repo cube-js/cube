@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod oauth;
 mod output;
+mod update;
 mod util;
 
 use anyhow::{bail, Result};
@@ -187,6 +188,8 @@ enum Command {
 
     /// Make an authenticated raw API request (escape hatch)
     Api(commands::api::Args),
+    /// Update the CLI to the latest release
+    Update(commands::update::Args),
     /// Generate shell completions
     Completion(commands::completion::Args),
 }
@@ -207,7 +210,21 @@ async fn main() {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
     }
     let cli = Cli::parse();
-    if let Err(err) = run(cli).await {
+    commands::update::cleanup_stale_binary();
+
+    // Check for a newer release concurrently with the command; the notice
+    // (if any) prints after the command output. Skipped for `update` itself
+    // and `completion` (whose output is eval'd by shells).
+    let check = match &cli.command {
+        Command::Update(_) | Command::Completion(_) => None,
+        _ => Some(update::spawn_check()),
+    };
+
+    let result = run(cli).await;
+    if let Some(check) = check {
+        update::print_notice(check).await;
+    }
+    if let Err(err) = result {
         eprintln!("error: {err:#}");
         std::process::exit(1);
     }
@@ -247,6 +264,7 @@ async fn run(cli: Cli) -> Result<()> {
         Meta(args) => commands::meta::command(args, &ctx).await,
         Scim(args) => commands::scim::command(args, &ctx).await,
         Api(args) => commands::api::command(args, &ctx).await,
+        Update(args) => commands::update::command(args, &ctx).await,
         Completion(args) => commands::completion::command(args),
     }
 }
