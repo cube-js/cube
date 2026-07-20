@@ -166,6 +166,7 @@ export type UnloadOptions = {
 
 export type QueryOptions = {
   inlineTables?: InlineTables,
+  queryMetadata?: Record<string, string>,
   [key: string]: any
 };
 
