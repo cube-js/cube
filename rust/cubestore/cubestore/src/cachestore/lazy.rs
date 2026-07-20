@@ -21,8 +21,6 @@ use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-// Bounds for the `wipe` teardown so it can never hang the whole cachestore (every op funnels
-// through init() -> state.read(), which is blocked while wipe holds state.write()).
 const WIPE_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
 const WIPE_CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
 const WIPE_CLOSE_POLL_INTERVAL: Duration = Duration::from_millis(20);
@@ -41,6 +39,7 @@ pub enum LazyRocksCacheStoreState {
         init_flag: Sender<bool>,
     },
     Closed {},
+    Wiping {},
     Initialized {
         store: Arc<RocksCacheStore>,
     },
@@ -119,6 +118,12 @@ impl LazyRocksCacheStore {
                         "Unable to initialize Cache Store on lazy call, it was closed".to_string(),
                     ));
                 }
+                LazyRocksCacheStoreState::Wiping { .. } => {
+                    return Err(CubeError::internal(
+                        "Unable to initialize Cache Store on lazy call, a wipe is in progress"
+                            .to_string(),
+                    ));
+                }
                 LazyRocksCacheStoreState::Initialized { store } => {
                     return Ok(store.clone());
                 }
@@ -151,6 +156,9 @@ impl LazyRocksCacheStore {
             LazyRocksCacheStoreState::Initialized { store } => Ok(store.clone()),
             LazyRocksCacheStoreState::Closed { .. } => Err(CubeError::internal(
                 "Unable to initialize Cache Store on lazy call, it was closed".to_string(),
+            )),
+            LazyRocksCacheStoreState::Wiping { .. } => Err(CubeError::internal(
+                "Unable to initialize Cache Store on lazy call, a wipe is in progress".to_string(),
             )),
         }
     }
@@ -194,6 +202,12 @@ impl LazyRocksCacheStore {
             match &*guard {
                 LazyRocksCacheStoreState::Closed { .. } => None,
                 LazyRocksCacheStoreState::FromRemote { .. } => {
+                    *guard = LazyRocksCacheStoreState::Closed {};
+                    None
+                }
+                LazyRocksCacheStoreState::Wiping { .. } => {
+                    // A wipe owns the store; marking Closed makes the wipe abort its re-install
+                    // (see wipe) instead of resurrecting the store after shutdown was requested.
                     *guard = LazyRocksCacheStoreState::Closed {};
                     None
                 }
@@ -387,32 +401,72 @@ impl CacheStore for LazyRocksCacheStore {
     async fn wipe(&self) -> Result<(), CubeError> {
         // Make sure the store is initialized. init() fires init_signal so run_processing_loops
         // spawns the initial loops; the returned Arc is dropped immediately so it does not
-        // inflate the strong count we rely on below.
+        // inflate the strong count the teardown relies on below.
         self.init().await?;
 
-        // Hold the state write lock for the destructive part of the teardown: new operations
-        // block on state.read() in init() until we install the fresh store. We deliberately
-        // release it before the remote snapshot upload (see the end of this method).
-        let mut guard = self.state.write().await;
-        let store = match std::mem::replace(&mut *guard, LazyRocksCacheStoreState::Closed {}) {
-            LazyRocksCacheStoreState::Initialized { store } => store,
-            LazyRocksCacheStoreState::Closed {} => {
-                return Err(CubeError::internal(
-                    "Unable to wipe Cache Store, it was closed".to_string(),
-                ));
-            }
-            LazyRocksCacheStoreState::FromRemote { init_flag } => {
-                // init() above guarantees Initialized; restore defensively.
-                *guard = LazyRocksCacheStoreState::FromRemote { init_flag };
-                return Err(CubeError::internal(
-                    "Unable to wipe Cache Store, unexpected state".to_string(),
-                ));
-            }
-        };
+        {
+            let mut guard = self.state.write().await;
+            match std::mem::replace(&mut *guard, LazyRocksCacheStoreState::Wiping {}) {
+                LazyRocksCacheStoreState::Initialized { store } => {
+                    // Drop the guard before the teardown so the lock is not held across it.
+                    drop(guard);
 
+                    // Everything from here is the point of no return: the loops are stopped and
+                    // the store is destroyed, so it cannot be restored.
+                    if let Err(err) = self.wipe_teardown(store).await {
+                        let mut guard = self.state.write().await;
+                        *guard = LazyRocksCacheStoreState::Closed {};
+                        drop(guard);
+
+                        if self.shutdown_token.is_cancelled() {
+                            log::error!(
+                                "SYSTEM CACHESTORE WIPE aborted during shutdown; cachestore left \
+                                 closed: {}",
+                                err
+                            );
+                        } else {
+                            log::error!(
+                                "SYSTEM CACHESTORE WIPE failed after the teardown point of no \
+                                 return; cachestore is now CLOSED and will reject every operation \
+                                 until the node is restarted: {}",
+                                err
+                            );
+                        }
+
+                        return Err(err);
+                    }
+
+                    Ok(())
+                }
+                LazyRocksCacheStoreState::Wiping {} => {
+                    *guard = LazyRocksCacheStoreState::Wiping {};
+                    Err(CubeError::internal(
+                        "Unable to wipe Cache Store: a wipe is already in progress".to_string(),
+                    ))
+                }
+                LazyRocksCacheStoreState::Closed {} => {
+                    *guard = LazyRocksCacheStoreState::Closed {};
+                    Err(CubeError::internal(
+                        "Unable to wipe Cache Store, it was closed".to_string(),
+                    ))
+                }
+                LazyRocksCacheStoreState::FromRemote { init_flag } => {
+                    // init() above guarantees Initialized; restore defensively.
+                    *guard = LazyRocksCacheStoreState::FromRemote { init_flag };
+                    Err(CubeError::internal(
+                        "Unable to wipe Cache Store, unexpected state".to_string(),
+                    ))
+                }
+            }
+        }
+    }
+}
+
+impl LazyRocksCacheStore {
+    async fn wipe_teardown(&self, store: Arc<RocksCacheStore>) -> Result<(), CubeError> {
         // Stop the worker loops and JOIN them so their Arc<RocksCacheStore> clones are released.
-        // This is the point of no return: WorkerLoop/IntervalLoop tokens are permanently
-        // cancelled, so the old `store` can no longer run loops and there is no restore path.
+        // WorkerLoop/IntervalLoop tokens are permanently cancelled, so the old `store` can no
+        // longer run loops and there is no restore path.
         store.stop_processing_loops().await;
         {
             let mut loops = self.running_loops.lock().await;
@@ -422,7 +476,7 @@ impl CacheStore for LazyRocksCacheStore {
         }
 
         // Flush both RW loops so in-flight serialized ops release their transient Arc<DB> clones.
-        // Bounded so a wedged RW loop cannot hang wipe forever while holding state.write().
+        // Bounded so a wedged RW loop cannot hang wipe forever.
         if let Err(err) = tokio::time::timeout(WIPE_DRAIN_TIMEOUT, store.drain_rw_loops()).await {
             log::warn!(
                 "Wiping cachestore: draining RW loops timed out ({:?}), continuing: {}",
@@ -436,11 +490,12 @@ impl CacheStore for LazyRocksCacheStore {
         // the real Arc<DB> via db_strong_count() to catch detached out-of-queue spawn_blocking
         // readers that the RW-loop drain above does not cover. Sleep-backoff, not a busy spin.
         let deadline = Instant::now() + WIPE_CLOSE_TIMEOUT;
+
         while Arc::strong_count(&store) > 1 || store.db_strong_count() > 1 {
             if Instant::now() >= deadline {
                 // We already committed (loops stopped); the store cannot be restored cleanly.
-                // Leave it Closed and require a restart rather than risk removing/reopening the
-                // directory while the old DB is still open (which could corrupt the new DB).
+                // Bail rather than risk removing/reopening the directory while the old DB is still
+                // open (which could corrupt the new DB); the caller marks the state Closed.
                 return Err(CubeError::internal(
                     "Unable to wipe Cache Store: still in use after draining; restart the node"
                         .to_string(),
@@ -496,17 +551,20 @@ impl CacheStore for LazyRocksCacheStore {
             fresh.add_listener(listener.clone()).await;
         }
 
-        // Respawn the worker loops against the fresh store, then install it and release the
-        // state lock BEFORE the (remote, slow, fallible) snapshot upload.
         {
-            let mut loops = self.running_loops.lock().await;
-            *loops = fresh.clone().spawn_processing_loops();
-        }
+            let mut guard = self.state.write().await;
 
-        *guard = LazyRocksCacheStoreState::Initialized {
-            store: fresh.clone(),
-        };
-        drop(guard);
+            // Respawn the worker loops against the fresh store, then install it and release the
+            // state lock BEFORE the (remote, slow, fallible) snapshot upload.
+            {
+                let mut loops = self.running_loops.lock().await;
+                *loops = fresh.clone().spawn_processing_loops();
+            }
+
+            *guard = LazyRocksCacheStoreState::Initialized {
+                store: fresh.clone(),
+            };
+        }
 
         // Persist a fresh full snapshot and move the remote cachestore-current pointer onto it.
         // Best-effort: the store is already installed and usable, and the upload loop retries;
