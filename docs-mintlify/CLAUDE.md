@@ -245,6 +245,24 @@ Benchmarking the agent's answers against a known-correct ground truth.
   inline backticks for identifiers (`accessible_views`, `agents/rules/`).
 - **Paragraphs**: keep them short; use `-` bullet lists for multiple items.
 
+### Be concise; prefer surgical edits over new content
+
+**Be explicit with yourself about length: most doc changes are small.** Do not
+produce walls of text. Be less verbose. Write the shortest version that fully
+answers "how do I use this?" and stop.
+
+- **Default to editing existing pages, not creating new ones.** A new feature
+  usually extends a page that already exists — add a row to a table, a config
+  option to a reference page, a sentence to the relevant section. Search the
+  docs first and integrate there. Only create a new page when the topic
+  genuinely has no home.
+- **Do not pad.** No "Overview" / "Use cases" / "Best practices" scaffolding
+  for a small feature. A single config option is usually a paragraph plus a
+  code block — not a multi-section page.
+- **Say it once.** Don't restate the same point in prose and again in a
+  callout, and don't explain what the code sample already shows.
+- **One good example beats three near-identical ones.**
+
 ## File and frontmatter conventions
 
 - Content is `.mdx`, organized by topic directory (e.g. `admin/ai/`, `docs/explore-analyze/`).

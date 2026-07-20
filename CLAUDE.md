@@ -66,6 +66,8 @@ yarn dev    # Start the Mintlify dev server
   relevant `group` to appear in the sidebar).
 - Use Mintlify components: `<Note>`, `<Warning>`, `<Info>`, `<Tip>`, `<Steps>`/`<Step>`,
   `<CardGroup>`/`<Card>`. Internal links are root-relative (e.g. `/admin/ai/rules`).
+- Keep docs concise — most changes are small, surgical edits to existing pages, not new
+  pages or walls of text. Prefer editing an existing page over creating a new one.
 - See `docs-mintlify/CLAUDE.md` for full conventions.
 
 ## Architecture Overview
