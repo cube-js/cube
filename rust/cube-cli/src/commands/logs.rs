@@ -15,6 +15,10 @@ pub struct Args {
     /// Container within the pod: cubejs-server (default), vector, api-proxy, …
     #[arg(long, short = 'c')]
     container: Option<String>,
+    /// Log source: production (pods, default) or dev (dev-mode worker;
+    /// ignores --pod/--container)
+    #[arg(long, value_parser = ["production", "dev"])]
+    source: Option<String>,
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -22,6 +26,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     let mut query = Vec::new();
     util::push(&mut query, "pod", &args.pod);
     util::push(&mut query, "container", &args.container);
+    util::push(&mut query, "source", &args.source);
     let res = api
         .get(
             &format!("/api/v1/deployments/{}/logs", args.deployment),
