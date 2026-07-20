@@ -175,6 +175,13 @@ impl CacheStoreSqlService {
                 self.cachestore.healthcheck().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CacheStoreCommand::Wipe => {
+                log::warn!(
+                    "Wiping cachestore state (SYSTEM CACHESTORE WIPE): truncating all tables and persisting a fresh snapshot"
+                );
+                self.cachestore.wipe().await?;
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
         }
     }
 

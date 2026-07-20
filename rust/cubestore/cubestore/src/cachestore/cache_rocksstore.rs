@@ -488,6 +488,27 @@ impl RocksCacheStore {
     pub async fn check_all_indexes(&self) -> Result<(), CubeError> {
         RocksStore::check_all_indexes(&self.store).await
     }
+
+    /// Schedules a no-op on both RW loops (default + queue) and awaits them, so that any
+    /// operation previously enqueued on those loops has finished and released its transient
+    /// Arc<DB> clone. NOTE: this only flushes the two RW loops; it does NOT wait for out-of-queue
+    /// readers (read_operation_out_of_queue), which run on detached spawn_blocking tasks with
+    /// their own Arc<DB> clone. LazyRocksCacheStore::wipe additionally waits on db_strong_count()
+    /// to cover those before closing the DB.
+    pub async fn drain_rw_loops(&self) -> Result<(), CubeError> {
+        self.store
+            .read_operation("wipe_barrier", |_| Ok(()))
+            .await?;
+        self.read_operation_queue("wipe_barrier", |_| Ok(()))
+            .await?;
+
+        Ok(())
+    }
+
+    /// Number of strong references to the underlying RocksDB handle.
+    pub fn db_strong_count(&self) -> usize {
+        Arc::strong_count(&self.store.db)
+    }
 }
 
 impl RocksCacheStore {
@@ -928,6 +949,9 @@ pub trait CacheStore: DIService + Send + Sync {
     async fn persist(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
+    // Wipe all cachestore state (cache + queue) and persist a fresh snapshot, updating the
+    // remote cachestore-current pointer so a poisoned snapshot is not re-hydrated on reload
+    async fn wipe(&self) -> Result<(), CubeError>;
 }
 
 #[async_trait]
@@ -1683,6 +1707,15 @@ impl CacheStore for RocksCacheStore {
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         self.store.rocksdb_properties()
     }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        // Wiping requires dropping and reopening the RocksDB from scratch, which a bare inner
+        // store cannot do to itself (it cannot rebuild its own Arc / swap the state). The
+        // registered production impl is always LazyRocksCacheStore, which owns the teardown.
+        Err(CubeError::internal(
+            "cachestore wipe is only supported through LazyRocksCacheStore".to_string(),
+        ))
+    }
 }
 
 crate::di_service!(RocksCacheStore, [CacheStore]);
@@ -1834,6 +1867,10 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! rocksdb_properties was used.")
+    }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! wipe was used.")
     }
 }
 

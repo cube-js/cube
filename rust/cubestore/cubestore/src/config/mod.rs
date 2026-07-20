@@ -135,11 +135,7 @@ impl CubeServices {
 
             let rocks_cache_store = self.rocks_cache_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                let loops = rocks_cache_store.spawn_processing_loops().await;
-
-                Self::wait_loops(loops).await?;
-
-                Ok(())
+                rocks_cache_store.run_processing_loops().await
             }));
 
             let cluster = self.cluster.clone();

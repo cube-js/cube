@@ -923,6 +923,10 @@ impl CacheStore for CacheStoreMock {
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         panic!("CacheStore mock!")
     }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
 }
 
 crate::di_service!(CacheStoreMock, [CacheStore]);
