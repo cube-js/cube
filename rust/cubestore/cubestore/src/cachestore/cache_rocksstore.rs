@@ -886,7 +886,10 @@ pub trait CacheStore: DIService + Send + Sync {
         item: CacheItem,
         update_if_not_exists: bool,
     ) -> Result<bool, CubeError>;
-    async fn cache_truncate(&self) -> Result<(), CubeError>;
+    async fn cache_clear(&self) -> Result<(), CubeError>;
+    // Wipe the whole cachestore keyspace (cache + queue) with a low-level
+    // RocksDB range delete
+    async fn truncate(&self) -> Result<(), CubeError>;
     async fn cache_delete(&self, key: String) -> Result<(), CubeError>;
     async fn cache_get(&self, key: String) -> Result<Option<IdRow<CacheItem>>, CubeError>;
     async fn cache_keys(&self, prefix: String) -> Result<Vec<IdRow<CacheItem>>, CubeError>;
@@ -900,7 +903,7 @@ pub trait CacheStore: DIService + Send + Sync {
     ) -> Result<Vec<IdRow<QueueResult>>, CubeError>;
     async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError>;
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError>;
-    async fn queue_truncate(&self) -> Result<(), CubeError>;
+    async fn queue_clear(&self) -> Result<(), CubeError>;
     async fn queue_to_cancel(
         &self,
         prefix: String,
@@ -1013,18 +1016,34 @@ impl CacheStore for RocksCacheStore {
         Ok(result)
     }
 
-    async fn cache_truncate(&self) -> Result<(), CubeError> {
+    async fn cache_clear(&self) -> Result<(), CubeError> {
         let block = self.cache_eviction_manager.truncation_block().await;
 
         let result = self
             .store
-            .write_operation("cache_truncate", move |db_ref, batch_pipe| {
+            .write_operation("cache_clear", move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
                 cache_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
             .await;
+
+        self.cache_eviction_manager.notify_truncate_end().await?;
+        drop(block);
+
+        result
+    }
+
+    async fn truncate(&self) -> Result<(), CubeError> {
+        let block = self.cache_eviction_manager.truncation_block().await;
+
+        let result = self.store.truncate().await;
+
+        // Re-seed migration metadata so the emptied store is usable again.
+        if result.is_ok() {
+            self.check_all_indexes().await?;
+        }
 
         self.cache_eviction_manager.notify_truncate_end().await?;
         drop(block);
@@ -1247,8 +1266,8 @@ impl CacheStore for RocksCacheStore {
         .await
     }
 
-    async fn queue_truncate(&self) -> Result<(), CubeError> {
-        self.write_operation_queue("queue_truncate", move |db_ref, batch_pipe| {
+    async fn queue_clear(&self) -> Result<(), CubeError> {
+        self.write_operation_queue("queue_clear", move |db_ref, batch_pipe| {
             let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
             queue_item_schema.truncate(batch_pipe)?;
 
@@ -1737,8 +1756,12 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! cache_set was used.")
     }
 
-    async fn cache_truncate(&self) -> Result<(), CubeError> {
-        panic!("CacheStore cannot be used on the worker node! cache_truncate was used.")
+    async fn cache_clear(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! cache_clear was used.")
+    }
+
+    async fn truncate(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! truncate was used.")
     }
 
     async fn cache_delete(&self, _key: String) -> Result<(), CubeError> {
@@ -1776,8 +1799,8 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_add was used.")
     }
 
-    async fn queue_truncate(&self) -> Result<(), CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_truncate was used.")
+    async fn queue_clear(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_clear was used.")
     }
 
     async fn queue_to_cancel(
@@ -1958,6 +1981,67 @@ mod tests {
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_truncate() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "cachestore_truncate",
+            Config::test("cachestore_truncate"),
+        );
+
+        // Populate both the cache and the queue tables.
+        cachestore
+            .cache_set(
+                CacheItem::new("prefix:k1".to_string(), Some(60), "v1".to_string()),
+                false,
+            )
+            .await?;
+        cachestore
+            .cache_set(
+                CacheItem::new("prefix:k2".to_string(), Some(60), "v2".to_string()),
+                false,
+            )
+            .await?;
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "queue:p1".to_string(),
+                value: "qv1".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+
+        assert_eq!(cachestore.cache_all(None).await?.len(), 2);
+        assert_eq!(cachestore.queue_all(None).await?.len(), 1);
+
+        // Low-level whole-store wipe (no per-row reads).
+        cachestore.truncate().await?;
+
+        assert_eq!(cachestore.cache_all(None).await?.len(), 0);
+        assert_eq!(cachestore.queue_all(None).await?.len(), 0);
+
+        // The emptied store must remain usable (migration metadata re-seeded,
+        // sequence counters reset).
+        assert_eq!(
+            cachestore
+                .cache_set(
+                    CacheItem::new("prefix:again".to_string(), Some(60), "v".to_string()),
+                    false
+                )
+                .await?,
+            true
+        );
+        assert_eq!(cachestore.cache_all(None).await?.len(), 1);
+
+        RocksCacheStore::cleanup_test_cachestore("cachestore_truncate");
 
         Ok(())
     }

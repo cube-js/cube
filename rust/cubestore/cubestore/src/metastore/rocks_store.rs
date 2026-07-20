@@ -567,6 +567,7 @@ impl WriteBatchContainer {
             match entry {
                 WriteBatchEntry::Put { key, value } => batch.put(key, value),
                 WriteBatchEntry::Delete { key } => batch.delete(key),
+                WriteBatchEntry::DeleteRange { from, to } => batch.delete_range(from, to),
             }
         }
         batch
@@ -1038,6 +1039,30 @@ impl RocksStore {
             .await
     }
 
+    /// Wipe the entire keyspace of this store with a single low-level RocksDB
+    /// range deletion (no per-row reads)
+    pub async fn truncate(&self) -> Result<(), CubeError> {
+        self.write_operation("truncate", move |_db_ref, batch_pipe| {
+            batch_pipe
+                .batch()
+                .delete_range([0u8].as_slice(), [0xffu8; 32].as_slice());
+            Ok(())
+        })
+        .await?;
+
+        self.seq_store.lock()?.clear();
+
+        self.write_operation("truncate_compaction", move |db_ref, _batch_pipe| {
+            let start: Option<&[u8]> = None;
+            let end: Option<&[u8]> = None;
+            db_ref.db.compact_range(start, end);
+            Ok(())
+        })
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn write_operation_impl<F, R, S>(
         &self,
         rw_loop: &RocksStoreRWLoop,
@@ -1154,14 +1179,10 @@ impl RocksStore {
                 let mut serializer = WriteBatchContainer::new();
 
                 let mut seq_numbers = Vec::new();
-                let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
                 for update in updates.into_iter() {
                     let (n, write_batch) = update?;
                     seq_numbers.push(n);
                     write_batch.iterate(&mut serializer);
-                    if serializer.size() > size_limit {
-                        break;
-                    }
                 }
 
                 (

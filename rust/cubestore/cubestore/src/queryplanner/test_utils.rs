@@ -754,6 +754,9 @@ impl MetaStore for MetaStoreMock {
     async fn compaction(&self) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
+    async fn truncate(&self) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
     async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
@@ -789,7 +792,11 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn cache_truncate(&self) -> Result<(), CubeError> {
+    async fn cache_clear(&self) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn truncate(&self) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 
@@ -831,7 +838,7 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock queue_add, payload: {:?}!", payload)
     }
 
-    async fn queue_truncate(&self) -> Result<(), CubeError> {
+    async fn queue_clear(&self) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 

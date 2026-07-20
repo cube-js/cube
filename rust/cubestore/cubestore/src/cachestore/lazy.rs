@@ -251,8 +251,12 @@ impl CacheStore for LazyRocksCacheStore {
             .await
     }
 
-    async fn cache_truncate(&self) -> Result<(), CubeError> {
-        self.init().await?.cache_truncate().await
+    async fn cache_clear(&self) -> Result<(), CubeError> {
+        self.init().await?.cache_clear().await
+    }
+
+    async fn truncate(&self) -> Result<(), CubeError> {
+        self.init().await?.truncate().await
     }
 
     async fn cache_delete(&self, key: String) -> Result<(), CubeError> {
@@ -290,8 +294,8 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_add(payload).await
     }
 
-    async fn queue_truncate(&self) -> Result<(), CubeError> {
-        self.init().await?.queue_truncate().await
+    async fn queue_clear(&self) -> Result<(), CubeError> {
+        self.init().await?.queue_clear().await
     }
 
     async fn queue_to_cancel(

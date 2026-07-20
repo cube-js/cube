@@ -1200,6 +1200,8 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+    // Wipe the whole metastore keyspace with a low-level RocksDB range delete
+    async fn truncate(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
 
@@ -4828,6 +4830,16 @@ impl MetaStore for RocksMetaStore {
         Ok(())
     }
 
+    async fn truncate(&self) -> Result<(), CubeError> {
+        // Low-level whole-keyspace wipe (no per-row reads) + compaction.
+        self.store.truncate().await?;
+
+        self.check_all_indexes().await?;
+        self.cached_tables.reset();
+
+        Ok(())
+    }
+
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         self.store.rocksdb_properties()
     }
@@ -5487,6 +5499,43 @@ mod tests {
     #[test]
     fn test_structures_size() {
         assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 640);
+    }
+
+    #[tokio::test]
+    async fn truncate_test() -> Result<(), CubeError> {
+        let config = Config::test("metastore_truncate_test");
+        let store_path = env::current_dir()?.join("test-truncate-local");
+        let remote_store_path = env::current_dir()?.join("test-truncate-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+
+            meta_store.create_schema("foo".to_string(), false).await?;
+            meta_store.create_schema("bar".to_string(), false).await?;
+            assert_eq!(meta_store.get_schemas().await?.len(), 2);
+
+            // Low-level whole-keyspace wipe (no per-row reads).
+            meta_store.truncate().await?;
+
+            assert_eq!(meta_store.get_schemas().await?.len(), 0);
+
+            // The emptied store must remain usable and sequence ids restart.
+            let schema = meta_store.create_schema("baz".to_string(), false).await?;
+            assert_eq!(schema.id, 1);
+            assert_eq!(meta_store.get_schemas().await?.len(), 1);
+        }
+
+        let _ = fs::remove_dir_all(store_path);
+        let _ = fs::remove_dir_all(remote_store_path);
+
+        Ok(())
     }
 
     #[tokio::test]

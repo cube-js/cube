@@ -22,7 +22,7 @@ const cubeStoreDriverFactory = async () => {
 };
 
 const beforeAll = async () => {
-  await (await cubeStoreDriverFactory()).query('QUEUE TRUNCATE');
+  await (await cubeStoreDriverFactory()).query('QUEUE CLEAR');
 };
 
 const workers = parseInt(process.env.WORKERS || '2', 10);
