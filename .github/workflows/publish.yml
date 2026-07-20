@@ -770,6 +770,65 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
 
+  cube-cli:
+    name: Cube CLI ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux — fully static single binaries (musl + rustls, no OpenSSL).
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-musl
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+          # macOS — Intel and Apple Silicon.
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-14
+            target: aarch64-apple-darwin
+          # Windows.
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install musl tools
+        if: endsWith(matrix.target, '-musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.target }}
+          cache-workspaces: rust/cube-cli
+      - name: Set crate version to the release version
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          sed -i.bak "s/^version = .*/version = \"$v\"/" rust/cube-cli/Cargo.toml
+          rm -f rust/cube-cli/Cargo.toml.bak
+      - name: Build
+        working-directory: rust/cube-cli
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Create archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          bindir="rust/cube-cli/target/${{ matrix.target }}/release"
+          bin=cube
+          [ "${{ runner.os }}" = "Windows" ] && bin=cube.exe
+          tar -C "$bindir" -czf "cube-${{ matrix.target }}.tar.gz" "$bin"
+      - name: Upload Binary to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: cube-${{ matrix.target }}.tar.gz
+          asset_name: cube-${{ matrix.target }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
+
   trigger-test-suites:
     name: Trigger test suites run
     runs-on: ubuntu-24.04

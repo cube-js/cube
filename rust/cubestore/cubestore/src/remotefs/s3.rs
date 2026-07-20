@@ -33,9 +33,11 @@ pub struct S3RemoteFs {
     /// STS AssumeRoleWithWebIdentity with the JWT inside it.
     web_identity_token_file: Option<String>,
     web_identity_role_arn: Option<String>,
-    /// When set, every request carries `x-amz-server-side-encryption` with this
-    /// value. Some AWS Organizations SCPs deny `s3:PutObject` unless the header
-    /// is present, even when the bucket has default encryption.
+    /// When set, object-storing requests (PutObject / multipart initiation)
+    /// carry `x-amz-server-side-encryption` with this value. Some AWS
+    /// Organizations SCPs deny `s3:PutObject` unless the header is present,
+    /// even when the bucket has default encryption. Never sent on read/list
+    /// operations — S3 rejects it there.
     server_side_encryption: Option<String>,
 }
 
@@ -142,9 +144,9 @@ fn new_bucket(
     server_side_encryption: &Option<String>,
 ) -> Result<Bucket, CubeError> {
     let mut bucket = Bucket::new(bucket_name, region, credentials)?;
-    if let Some(sse) = server_side_encryption {
-        bucket.add_header("x-amz-server-side-encryption", sse);
-    }
+    // Applied per-operation by rust-s3 (PutObject / multipart initiation only)
+    // — S3 rejects the header on read/list operations.
+    bucket.set_server_side_encryption(server_side_encryption.clone());
     Ok(bucket)
 }
 
@@ -588,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn new_bucket_applies_sse_header() {
+    fn new_bucket_configures_per_operation_sse() {
         let credentials = Credentials::new(Some("key"), Some("secret"), None, None, None).unwrap();
         let bucket = new_bucket(
             "test-bucket",
@@ -597,13 +599,14 @@ mod tests {
             &Some("AES256".to_string()),
         )
         .unwrap();
-        assert_eq!(
-            bucket
-                .extra_headers()
-                .get("x-amz-server-side-encryption")
-                .map(|v| v.to_str().unwrap()),
-            Some("AES256")
-        );
+        assert_eq!(bucket.server_side_encryption(), Some("AES256"));
+        // The header must NOT be bucket-wide: S3 rejects it on read/list
+        // operations. rust-s3 applies it per-operation (PutObject /
+        // InitiateMultipartUpload only).
+        assert!(bucket
+            .extra_headers()
+            .get("x-amz-server-side-encryption")
+            .is_none());
     }
 
     #[test]
@@ -616,6 +619,7 @@ mod tests {
             &None,
         )
         .unwrap();
+        assert_eq!(bucket.server_side_encryption(), None);
         assert!(bucket
             .extra_headers()
             .get("x-amz-server-side-encryption")
