@@ -489,9 +489,12 @@ impl RocksCacheStore {
         RocksStore::check_all_indexes(&self.store).await
     }
 
-    /// Schedules a no-op on both RW loops (default + queue) and awaits them, guaranteeing that
-    /// any previously enqueued operation has finished and released its transient Arc<DB> clone.
-    /// Used by LazyRocksCacheStore::wipe before dropping/reopening the RocksDB.
+    /// Schedules a no-op on both RW loops (default + queue) and awaits them, so that any
+    /// operation previously enqueued on those loops has finished and released its transient
+    /// Arc<DB> clone. NOTE: this only flushes the two RW loops; it does NOT wait for out-of-queue
+    /// readers (read_operation_out_of_queue), which run on detached spawn_blocking tasks with
+    /// their own Arc<DB> clone. LazyRocksCacheStore::wipe additionally waits on db_strong_count()
+    /// to cover those before closing the DB.
     pub async fn drain_rw_loops(&self) -> Result<(), CubeError> {
         self.store
             .read_operation("wipe_barrier", |_| Ok(()))
@@ -500,6 +503,13 @@ impl RocksCacheStore {
             .await?;
 
         Ok(())
+    }
+
+    /// Number of strong references to the underlying RocksDB handle. LazyRocksCacheStore::wipe
+    /// uses this to confirm the DB is uniquely held (so dropping the store closes it and
+    /// releases the directory LOCK) before removing and reopening the folder.
+    pub fn db_strong_count(&self) -> usize {
+        Arc::strong_count(&self.store.db)
     }
 }
 

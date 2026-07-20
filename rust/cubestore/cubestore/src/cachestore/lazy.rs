@@ -12,6 +12,7 @@ use crate::config::ConfigObj;
 use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow};
 use crate::CubeError;
 use async_trait::async_trait;
+use datafusion::cube_ext;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -19,6 +20,19 @@ use tokio::sync::watch::{Receiver, Sender};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+
+// Bounds for the `wipe` teardown so it can never hang the whole cachestore (every op funnels
+// through init() -> state.read(), which is blocked while wipe holds state.write()).
+const WIPE_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
+const WIPE_CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
+const WIPE_CLOSE_POLL_INTERVAL: Duration = Duration::from_millis(20);
+const WIPE_REOPEN_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Best-effort detection of a RocksDB "directory lock is held" open error, used to retry the
+/// reopen while a detached out-of-queue operation still holds an `Arc<DB>` clone.
+fn is_rocksdb_lock_error(err: &CubeError) -> bool {
+    err.to_string().to_lowercase().contains("lock")
+}
 
 pub enum LazyRocksCacheStoreState {
     FromRemote {
@@ -375,8 +389,9 @@ impl CacheStore for LazyRocksCacheStore {
         // inflate the strong count we rely on below.
         self.init().await?;
 
-        // Hold the state write lock for the whole teardown: new operations block on
-        // state.read() in init() until we install the fresh store.
+        // Hold the state write lock for the destructive part of the teardown: new operations
+        // block on state.read() in init() until we install the fresh store. We deliberately
+        // release it before the remote snapshot upload (see the end of this method).
         let mut guard = self.state.write().await;
         let store = match std::mem::replace(&mut *guard, LazyRocksCacheStoreState::Closed {}) {
             LazyRocksCacheStoreState::Initialized { store } => store,
@@ -395,6 +410,8 @@ impl CacheStore for LazyRocksCacheStore {
         };
 
         // Stop the worker loops and JOIN them so their Arc<RocksCacheStore> clones are released.
+        // This is the point of no return: WorkerLoop/IntervalLoop tokens are permanently
+        // cancelled, so the old `store` can no longer run loops and there is no restore path.
         store.stop_processing_loops().await;
         {
             let mut loops = self.running_loops.lock().await;
@@ -403,62 +420,93 @@ impl CacheStore for LazyRocksCacheStore {
             }
         }
 
-        // Flush both RW loops so no in-flight operation still holds an Arc<DB> clone.
-        store.drain_rw_loops().await?;
+        // Flush both RW loops so in-flight serialized ops release their transient Arc<DB> clones.
+        // Bounded so a wedged RW loop cannot hang wipe forever while holding state.write().
+        if let Err(err) = tokio::time::timeout(WIPE_DRAIN_TIMEOUT, store.drain_rw_loops()).await {
+            log::warn!(
+                "Wiping cachestore: draining RW loops timed out ({:?}), continuing: {}",
+                WIPE_DRAIN_TIMEOUT,
+                err
+            );
+        }
 
-        // Wait until we are the sole owner of the store before closing it, so RocksDB releases
-        // the directory LOCK and the reopen below succeeds.
-        let deadline = Instant::now() + Duration::from_secs(30);
-        while Arc::strong_count(&store) > 1 {
+        // Wait until nothing else references the store or the underlying RocksDB, so that
+        // drop(store) closes the DB (releasing the directory LOCK) before we reopen. We watch
+        // the real Arc<DB> via db_strong_count() to catch detached out-of-queue spawn_blocking
+        // readers that the RW-loop drain above does not cover. Sleep-backoff, not a busy spin.
+        let deadline = Instant::now() + WIPE_CLOSE_TIMEOUT;
+        while Arc::strong_count(&store) > 1 || store.db_strong_count() > 1 {
             if Instant::now() >= deadline {
-                // Restore the store so the cachestore stays usable instead of corrupting it.
-                let mut loops = self.running_loops.lock().await;
-                *loops = store.clone().spawn_processing_loops();
-                *guard = LazyRocksCacheStoreState::Initialized { store };
+                // We already committed (loops stopped); the store cannot be restored cleanly.
+                // Leave it Closed and require a restart rather than risk removing/reopening the
+                // directory while the old DB is still open (which could corrupt the new DB).
                 return Err(CubeError::internal(
-                    "Unable to wipe Cache Store: store is still in use after draining loops"
+                    "Unable to wipe Cache Store: still in use after draining; restart the node"
                         .to_string(),
                 ));
             }
 
-            tokio::task::yield_now().await;
+            tokio::time::sleep(WIPE_CLOSE_POLL_INTERVAL).await;
         }
 
-        // Close the DB (drops the last Arc<DB>) and drop the folder.
+        // Close the DB (drops the last Arc<DB>) synchronously.
         drop(store);
 
-        if let Err(err) = std::fs::remove_dir_all(&self.path) {
-            if err.kind() != std::io::ErrorKind::NotFound {
-                return Err(CubeError::internal(format!(
-                    "Unable to wipe Cache Store: failed to remove {}: {}",
-                    self.path, err
-                )));
+        // Remove the folder and reopen from scratch off the async executor (blocking syscalls +
+        // RocksDB open). Retry the open on a held directory LOCK to cover any residual detached
+        // Arc<DB> that outlived the wait above.
+        let path = self.path.clone();
+        let metastore_fs = self.metastore_fs.clone();
+        let config = self.config.clone();
+        let fresh = cube_ext::spawn_blocking(move || -> Result<Arc<RocksCacheStore>, CubeError> {
+            if let Err(err) = std::fs::remove_dir_all(&path) {
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    return Err(CubeError::internal(format!(
+                        "Unable to wipe Cache Store: failed to remove {}: {}",
+                        path, err
+                    )));
+                }
             }
-        }
 
-        // Reopen from scratch (create_if_missing, no remote download), run migrations and
-        // re-attach listeners.
-        let fresh = RocksCacheStore::new(
-            Path::new(&self.path),
-            self.metastore_fs.clone(),
-            self.config.clone(),
-        )?;
+            let reopen_deadline = Instant::now() + WIPE_REOPEN_TIMEOUT;
+            loop {
+                match RocksCacheStore::new(Path::new(&path), metastore_fs.clone(), config.clone()) {
+                    Ok(store) => return Ok(store),
+                    Err(err) if is_rocksdb_lock_error(&err) && Instant::now() < reopen_deadline => {
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+        })
+        .await??;
+
+        // Run migrations / re-enable auto-compaction and re-attach listeners.
         fresh.check_all_indexes().await?;
         for listener in &self.listeners {
             fresh.add_listener(listener.clone()).await;
         }
 
-        // Persist a fresh full snapshot and move the remote cachestore-current pointer onto it,
-        // superseding the poisoned lineage.
-        fresh.upload_check_point().await?;
-
-        // Respawn the worker loops against the fresh store.
+        // Respawn the worker loops against the fresh store, then install it and release the
+        // state lock BEFORE the (remote, slow, fallible) snapshot upload.
         {
             let mut loops = self.running_loops.lock().await;
             *loops = fresh.clone().spawn_processing_loops();
         }
+        *guard = LazyRocksCacheStoreState::Initialized {
+            store: fresh.clone(),
+        };
+        drop(guard);
 
-        *guard = LazyRocksCacheStoreState::Initialized { store: fresh };
+        // Persist a fresh full snapshot and move the remote cachestore-current pointer onto it.
+        // Best-effort: the store is already installed and usable, and the upload loop retries;
+        // a transient remote error must not brick the cachestore.
+        if let Err(err) = fresh.upload_check_point().await {
+            log::warn!(
+                "Wiped cachestore reopened, but persisting the fresh snapshot failed (upload loop will retry): {}",
+                err
+            );
+        }
 
         Ok(())
     }
@@ -511,7 +559,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&local);
         let _ = std::fs::remove_dir_all(&remote);
 
-        let cachestore = build_lazy(Config::test("lazy_wipe_clears"), local.clone(), remote).await;
+        let cachestore = build_lazy(
+            Config::test("lazy_wipe_clears"),
+            local.clone(),
+            remote.clone(),
+        )
+        .await;
 
         cachestore
             .cache_set(
@@ -561,7 +614,11 @@ mod tests {
         // The local cachestore folder must exist again after the reopen.
         assert!(local.join("cachestore").exists());
 
+        // Stop the loops respawned by wipe so the test does not leak background tasks.
+        cachestore.stop_processing_loops().await;
+
         let _ = std::fs::remove_dir_all(&local);
+        let _ = std::fs::remove_dir_all(&remote);
 
         Ok(())
     }
@@ -571,8 +628,11 @@ mod tests {
         init_test_logger().await;
 
         let (local, remote) = test_dirs("lazy_wipe_remote");
-        let _ = std::fs::remove_dir_all(&local);
-        let _ = std::fs::remove_dir_all(&remote);
+        let local_pre = local.parent().unwrap().join("lazy_wipe_remote-local-pre");
+        let local2 = local.parent().unwrap().join("lazy_wipe_remote-local2");
+        for dir in [&local, &remote, &local_pre, &local2] {
+            let _ = std::fs::remove_dir_all(dir);
+        }
 
         let cachestore = build_lazy(
             Config::test("lazy_wipe_remote"),
@@ -588,18 +648,45 @@ mod tests {
             )
             .await?;
 
+        // Upload the seed to the remote so the test actually proves that wipe RESETS the remote
+        // (rather than that an empty remote yields an empty store). init() returns the inner
+        // store; the returned Arc is scoped so it is dropped before wipe (else it would inflate
+        // the strong count wipe waits on).
+        {
+            let store = cachestore.init().await?;
+            store.upload_check_point().await?;
+        }
+
+        // A fresh instance over the same remote must now see the seeded row (pre-wipe state).
+        {
+            let reloaded = build_lazy(
+                Config::test("lazy_wipe_remote"),
+                local_pre.clone(),
+                remote.clone(),
+            )
+            .await;
+            assert_eq!(reloaded.cache_all(None).await?.len(), 1);
+            reloaded.stop_processing_loops().await;
+        }
+
         cachestore.wipe().await?;
 
-        // A fresh instance pointing at the same remote (with an empty local dir) must download
-        // the post-wipe snapshot via cachestore-current and come back empty.
-        let local2 = local.parent().unwrap().join("lazy_wipe_remote-local2");
-        let _ = std::fs::remove_dir_all(&local2);
-
-        let reloaded = build_lazy(Config::test("lazy_wipe_remote"), local2.clone(), remote).await;
+        // After wipe, a fresh instance over the same remote must download the post-wipe snapshot
+        // via cachestore-current and come back empty.
+        let reloaded = build_lazy(
+            Config::test("lazy_wipe_remote"),
+            local2.clone(),
+            remote.clone(),
+        )
+        .await;
         assert_eq!(reloaded.cache_all(None).await?.len(), 0);
+        reloaded.stop_processing_loops().await;
 
-        let _ = std::fs::remove_dir_all(&local);
-        let _ = std::fs::remove_dir_all(&local2);
+        cachestore.stop_processing_loops().await;
+
+        for dir in [&local, &remote, &local_pre, &local2] {
+            let _ = std::fs::remove_dir_all(dir);
+        }
 
         Ok(())
     }
