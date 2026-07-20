@@ -36,6 +36,15 @@ cube update          # download the latest release and replace this binary
 cube update --check  # just report what's available
 ```
 
+### Telemetry
+
+The CLI sends anonymous usage events (command group, success/failure,
+version, platform) to `track.cube.dev` — the same pipeline and wire format
+as the legacy `cubejs` CLI. No personal data is collected; the anonymous id
+is a SHA-256 hash of the OS machine id. Telemetry is disabled automatically
+in CI (the `CI` env var), or explicitly with `CUBE_NO_TELEMETRY=1` (or the
+legacy `CUBEJS_TELEMETRY=false`).
+
 ### Build from source
 
 ```bash

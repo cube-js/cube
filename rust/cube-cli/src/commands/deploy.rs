@@ -102,6 +102,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         manifest.insert(rel.clone(), serde_json::json!({ "hash": hash }));
     }
 
+    // Same event name the legacy `cubejs deploy` emitted.
+    crate::telemetry::event("Cube Cloud CLI Deploy", serde_json::Map::new());
+
     // Open the upload transaction.
     let mut body = serde_json::Map::new();
     util::set(&mut body, "branchName", &args.branch);
@@ -150,6 +153,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     let res = api
         .post(&format!("{base}/upload/finish"), Some(&util::body(body)))
         .await?;
+
+    crate::telemetry::event("Cube Cloud CLI Deploy Success", serde_json::Map::new());
 
     if ctx.json {
         output::print_json(&res);

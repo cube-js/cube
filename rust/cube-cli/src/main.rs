@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod oauth;
 mod output;
+mod telemetry;
 mod update;
 mod util;
 
@@ -200,6 +201,47 @@ pub fn cli_command() -> clap::Command {
     Cli::command()
 }
 
+impl Command {
+    /// Canonical command-group name, used for telemetry.
+    fn name(&self) -> &'static str {
+        use Command::*;
+        match self {
+            Login(_) => "login",
+            Logout(_) => "logout",
+            Whoami(_) => "whoami",
+            Context(_) => "context",
+            Deployments(_) => "deployments",
+            Regions(_) => "regions",
+            Deploy(_) => "deploy",
+            Github(_) => "github",
+            DataModel(_) => "data-model",
+            Environments(_) => "environments",
+            Variables(_) => "variables",
+            Folders(_) => "folders",
+            Workbooks(_) => "workbooks",
+            Reports(_) => "reports",
+            Workspace(_) => "workspace",
+            Notifications(_) => "notifications",
+            Users(_) => "users",
+            Groups(_) => "groups",
+            Attributes(_) => "attributes",
+            Policies(_) => "policies",
+            Tenant(_) => "tenant",
+            Embed(_) => "embed",
+            Integrations(_) => "integrations",
+            Oidc(_) => "oidc",
+            ApiKeys(_) => "api-keys",
+            Agents(_) => "agents",
+            App(_) => "app",
+            Meta(_) => "meta",
+            Scim(_) => "scim",
+            Api(_) => "api",
+            Update(_) => "update",
+            Completion(_) => "completion",
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // Rust ignores SIGPIPE by default, turning `cube ... | head` into a
@@ -214,13 +256,30 @@ async fn main() {
 
     // Check for a newer release concurrently with the command; the notice
     // (if any) prints after the command output. Skipped for `update` itself
-    // and `completion` (whose output is eval'd by shells).
+    // and `completion` (whose output is eval'd by shells). Completion also
+    // skips telemetry — it runs on shell startup.
+    let is_completion = matches!(cli.command, Command::Completion(_));
     let check = match &cli.command {
         Command::Update(_) | Command::Completion(_) => None,
         _ => Some(update::spawn_check()),
     };
+    let command_name = cli.command.name();
 
     let result = run(cli).await;
+
+    if !is_completion {
+        let mut props = serde_json::Map::new();
+        props.insert("command".into(), serde_json::json!(command_name));
+        props.insert("success".into(), serde_json::json!(result.is_ok()));
+        telemetry::event("Cube CLI Command", props);
+        if let Err(err) = &result {
+            let mut props = serde_json::Map::new();
+            props.insert("command".into(), serde_json::json!(command_name));
+            props.insert("error".into(), serde_json::json!(format!("{err:#}")));
+            telemetry::event("Error", props);
+        }
+        telemetry::flush().await;
+    }
     if let Some(check) = check {
         update::print_notice(check).await;
     }
