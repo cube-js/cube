@@ -74,6 +74,20 @@ impl Client {
         self.token.lock().unwrap().clone()
     }
 
+    /// Authorization header value for a credential. JWTs (three dot-separated
+    /// segments — OAuth access tokens, legacy deploy JWTs) use the `Bearer`
+    /// scheme; opaque credentials are Cube Cloud API keys and use `Api-Key`.
+    /// `CUBE_AUTH_SCHEME=bearer|api-key` overrides the heuristic.
+    fn authorization(token: &str) -> String {
+        let scheme = match std::env::var("CUBE_AUTH_SCHEME").as_deref() {
+            Ok("bearer") | Ok("Bearer") => "Bearer",
+            Ok("api-key") | Ok("Api-Key") => "Api-Key",
+            _ if token.split('.').count() == 3 => "Bearer",
+            _ => "Api-Key",
+        };
+        format!("{scheme} {token}")
+    }
+
     /// Send a single attempt, returning the status and body text.
     async fn send_once(
         &self,
@@ -83,10 +97,10 @@ impl Client {
         body: Option<&Value>,
     ) -> Result<(StatusCode, String)> {
         let url = format!("{}{}", self.base_url, path);
-        let mut req = self
-            .http
-            .request(method.clone(), &url)
-            .bearer_auth(self.token());
+        let mut req = self.http.request(method.clone(), &url).header(
+            reqwest::header::AUTHORIZATION,
+            Self::authorization(&self.token()),
+        );
         if !query.is_empty() {
             req = req.query(query);
         }
@@ -144,7 +158,7 @@ impl Client {
             async move {
                 let res = http
                     .post(url)
-                    .bearer_auth(token)
+                    .header(reqwest::header::AUTHORIZATION, Self::authorization(&token))
                     .multipart(form)
                     .send()
                     .await

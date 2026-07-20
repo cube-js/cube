@@ -26,6 +26,9 @@ pub struct Args {
     /// Keep remote files that don't exist locally (default prunes them)
     #[arg(long)]
     keep_missing: bool,
+    /// Commit message for the deploy commit
+    #[arg(long, short = 'm')]
+    message: Option<String>,
 }
 
 /// Collect deployable files as (posix relative path, absolute path).
@@ -149,6 +152,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         "autoRemoveFiles".into(),
         serde_json::json!(!args.keep_missing),
     );
+    util::set(&mut body, "commitMessage", &args.message);
     util::set(&mut body, "branchName", &args.branch);
     let res = api
         .post(&format!("{base}/upload/finish"), Some(&util::body(body)))
