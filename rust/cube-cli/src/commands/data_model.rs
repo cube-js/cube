@@ -116,6 +116,14 @@ enum Cmd {
         #[arg(long)]
         branch: Option<String>,
     },
+    /// List server-side content hashes of data model files
+    FileHashes {
+        /// Deployment id
+        deployment: i64,
+        /// Branch name (defaults to the deployment default branch)
+        #[arg(long)]
+        branch: Option<String>,
+    },
     /// Sync a branch from its remote and rebuild if it moved
     Pull {
         /// Deployment id
@@ -386,6 +394,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             } else {
                 output::success("Committed and pushed");
             }
+        }
+        Cmd::FileHashes { deployment, branch } => {
+            let mut query = Vec::new();
+            util::push(&mut query, "branchName", &branch);
+            let res = api
+                .get(
+                    &format!("/build/api/v1/deployments/{deployment}/data-model/file-hashes"),
+                    &query,
+                )
+                .await?;
+            output::print_json(&res);
         }
         Cmd::Pull { deployment, branch } => {
             let body = branch.as_ref().map(|b| json!({ "branchName": b }));

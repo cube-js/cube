@@ -128,6 +128,50 @@ impl Client {
             text = t;
         }
 
+        self.finish_response(&method, path, status, text)
+    }
+
+    /// POST a multipart form. `build_form` is called per attempt because a
+    /// form can only be sent once (the 401-refresh retry needs a fresh one).
+    pub async fn post_multipart<F>(&self, path: &str, build_form: F) -> Result<Value>
+    where
+        F: Fn() -> reqwest::multipart::Form,
+    {
+        let url = format!("{}{}", self.base_url, path);
+        let send = |form: reqwest::multipart::Form, token: String| {
+            let http = &self.http;
+            let url = &url;
+            async move {
+                let res = http
+                    .post(url)
+                    .bearer_auth(token)
+                    .multipart(form)
+                    .send()
+                    .await
+                    .map_err(|e| anyhow!("request to {url} failed: {e}"))?;
+                let status = res.status();
+                let text = res.text().await.unwrap_or_default();
+                Ok::<_, anyhow::Error>((status, text))
+            }
+        };
+
+        let (mut status, mut text) = send(build_form(), self.token()).await?;
+        if status == StatusCode::UNAUTHORIZED && self.try_refresh().await? {
+            let (s, t) = send(build_form(), self.token()).await?;
+            status = s;
+            text = t;
+        }
+        self.finish_response(&Method::POST, path, status, text)
+    }
+
+    /// Shared tail of every request: error mapping + JSON/HTML handling.
+    fn finish_response(
+        &self,
+        method: &Method,
+        path: &str,
+        status: StatusCode,
+        text: String,
+    ) -> Result<Value> {
         if !status.is_success() {
             let detail = serde_json::from_str::<Value>(&text)
                 .ok()

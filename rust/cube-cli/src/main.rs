@@ -119,6 +119,8 @@ enum Command {
     /// List available deployment regions
     #[command(alias = "region")]
     Regions(commands::regions::Args),
+    /// Upload a local project directory to a deployment and build it
+    Deploy(commands::deploy::Args),
     /// GitHub integration: link status, installations, repos, and connect
     #[command(alias = "gh")]
     Github(commands::github::Args),
@@ -218,6 +220,7 @@ async fn run(cli: Cli) -> Result<()> {
         Context(args) => commands::context::command(args, &mut ctx).await,
         Deployments(args) => commands::deployments::command(args, &ctx).await,
         Regions(args) => commands::regions::command(args, &ctx).await,
+        Deploy(args) => commands::deploy::command(args, &ctx).await,
         Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,

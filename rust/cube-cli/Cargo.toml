@@ -23,7 +23,8 @@ clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 inquire = "0.7"
 owo-colors = "4"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart"] }
+sha1 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

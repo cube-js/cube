@@ -86,6 +86,14 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
     },
+    /// Show the latest build status for a branch
+    BuildStatus {
+        /// Deployment id
+        deployment: i64,
+        /// Branch (defaults to the active dev-mode branch, else the deploy branch)
+        #[arg(long)]
+        branch: Option<String>,
+    },
     /// Advance onboarding to a target creation step
     AdvanceStep {
         /// Deployment id
@@ -196,6 +204,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             } else {
                 output::success(&format!("Deleted deployment {deployment}"));
             }
+        }
+        Cmd::BuildStatus { deployment, branch } => {
+            let mut query = Vec::new();
+            util::push(&mut query, "branchName", &branch);
+            let res = api
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/build-status"),
+                    &query,
+                )
+                .await?;
+            output::print_json(&res);
         }
         Cmd::AdvanceStep { deployment, step } => {
             let res = api
