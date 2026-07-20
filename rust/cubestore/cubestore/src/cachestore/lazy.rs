@@ -34,7 +34,7 @@ fn is_rocksdb_lock_error(err: &CubeError) -> bool {
 }
 
 pub enum LazyRocksCacheStoreState {
-    FromRemote {
+    Initializing {
         #[allow(dead_code)] // Receiver notified when this sender is dropped on transition
         init_flag: Sender<bool>,
     },
@@ -98,7 +98,7 @@ impl LazyRocksCacheStore {
 
         Ok(Arc::new(Self {
             init_signal: Some(init_signal),
-            state: tokio::sync::RwLock::new(LazyRocksCacheStoreState::FromRemote { init_flag }),
+            state: tokio::sync::RwLock::new(LazyRocksCacheStoreState::Initializing { init_flag }),
             path: path.to_string(),
             metastore_fs,
             config,
@@ -112,7 +112,7 @@ impl LazyRocksCacheStore {
         {
             let guard = self.state.read().await;
             match &*guard {
-                LazyRocksCacheStoreState::FromRemote { .. } => {}
+                LazyRocksCacheStoreState::Initializing { .. } => {}
                 LazyRocksCacheStoreState::Closed { .. } => {
                     return Err(CubeError::internal(
                         "Unable to initialize Cache Store on lazy call, it was closed".to_string(),
@@ -132,7 +132,7 @@ impl LazyRocksCacheStore {
 
         let mut guard = self.state.write().await;
         match &*guard {
-            LazyRocksCacheStoreState::FromRemote { .. } => {
+            LazyRocksCacheStoreState::Initializing { .. } => {
                 let store = RocksCacheStore::load_from_remote(
                     &self.path,
                     self.metastore_fs.clone(),
@@ -144,7 +144,7 @@ impl LazyRocksCacheStore {
                     store.add_listener(listener.clone()).await;
                 }
 
-                // Dropping the previous FromRemote (via replace) drops init_flag, which
+                // Dropping the previous Initializing (via replace) drops init_flag, which
                 // notifies run_processing_loops to spawn the processing loops.
                 *guard = LazyRocksCacheStoreState::Initialized {
                     store: store.clone(),
@@ -201,7 +201,7 @@ impl LazyRocksCacheStore {
             let mut guard = self.state.write().await;
             match &*guard {
                 LazyRocksCacheStoreState::Closed { .. } => None,
-                LazyRocksCacheStoreState::FromRemote { .. } => {
+                LazyRocksCacheStoreState::Initializing { .. } => {
                     *guard = LazyRocksCacheStoreState::Closed {};
                     None
                 }
@@ -450,9 +450,9 @@ impl CacheStore for LazyRocksCacheStore {
                         "Unable to wipe Cache Store, it was closed".to_string(),
                     ))
                 }
-                LazyRocksCacheStoreState::FromRemote { init_flag } => {
+                LazyRocksCacheStoreState::Initializing { init_flag } => {
                     // init() above guarantees Initialized; restore defensively.
-                    *guard = LazyRocksCacheStoreState::FromRemote { init_flag };
+                    *guard = LazyRocksCacheStoreState::Initializing { init_flag };
                     Err(CubeError::internal(
                         "Unable to wipe Cache Store, unexpected state".to_string(),
                     ))
