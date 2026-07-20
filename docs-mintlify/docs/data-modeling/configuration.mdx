@@ -85,6 +85,18 @@ run against the data source.
 Backed by
 [`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout).
 
+## Auto-run
+
+The deployment-wide default for whether [Explore][ref-explore] and
+[Workbooks][ref-workbooks] tabs run their query automatically as you build it,
+or wait for you to click **Run query**. Defaults to on.
+
+A semantic view's [`meta.auto_run`][ref-view-auto-run] setting and a user's
+own per-tab toggle both take precedence over this deployment default.
+
+Backed by
+[`CUBEJS_AUTO_RUN_MODE`](/reference/configuration/environment-variables#cubejs_auto_run_mode).
+
 ## Applying changes
 
 Saving Model Configuration restarts the deployment's development-mode
@@ -98,3 +110,6 @@ pick up the changes on the next build or deploy.
 [ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-environments-dev]: /admin/deployment/environments#development-environments
+[ref-explore]: /docs/explore-analyze/explore
+[ref-workbooks]: /docs/explore-analyze/workbooks/querying-data
+[ref-view-auto-run]: /reference/data-modeling/view#auto_run

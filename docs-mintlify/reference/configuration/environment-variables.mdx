@@ -31,6 +31,20 @@ different for multitenant setups.
 | --------------- | ---------------------- | --------------------- |
 | A valid string  | `cubejs`               | `cubejs`              |
 
+## `CUBEJS_AUTO_RUN_MODE`
+
+The deployment-wide default for whether [Explore](/docs/explore-analyze/explore)
+and [Workbooks](/docs/explore-analyze/workbooks/querying-data) tabs run their
+query automatically as it's built, or wait for an explicit **Run query**. Set
+via the **Auto-run** switch in [Model Configuration](/docs/data-modeling/configuration#auto-run).
+A view's `meta.auto_run` setting and a user's per-tab toggle both take
+precedence over this default. Only the literal string `false` turns it off —
+any other value (including unset) is treated as on.
+
+| Possible Values | Default in Development | Default in Production |
+| ---------------- | ----------------------- | ----------------------- |
+| `true`, `false`  | `true`                   | `true`                   |
+
 ## `CUBEJS_AWS_KEY`
 
 The AWS Access Key ID to use for database connections.
