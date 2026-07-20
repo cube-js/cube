@@ -171,6 +171,9 @@ enum Command {
     Integrations(commands::integrations::Args),
     /// Manage OIDC token configs
     Oidc(commands::oidc::Args),
+    /// Manage API keys for programmatic access
+    #[command(name = "api-keys", alias = "api-key")]
+    ApiKeys(commands::api_keys::Args),
 
     /// List agents and agent skills
     #[command(alias = "agent")]
@@ -238,6 +241,7 @@ async fn run(cli: Cli) -> Result<()> {
         Embed(args) => commands::embed::command(args, &ctx).await,
         Integrations(args) => commands::integrations::command(args, &ctx).await,
         Oidc(args) => commands::oidc::command(args, &ctx).await,
+        ApiKeys(args) => commands::api_keys::command(args, &ctx).await,
         Agents(args) => commands::agents::command(args, &ctx).await,
         App(args) => commands::app::command(args, &ctx).await,
         Meta(args) => commands::meta::command(args, &ctx).await,
