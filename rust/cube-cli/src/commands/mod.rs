@@ -16,6 +16,7 @@ pub mod groups;
 pub mod integrations;
 pub mod login;
 pub mod logout;
+pub mod logs;
 pub mod meta;
 pub mod notifications;
 pub mod oidc;
