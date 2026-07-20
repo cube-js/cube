@@ -128,6 +128,7 @@ Every endpoint of the Console Server public API is covered:
 |---|---|
 | `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token, advance-step, reset-step |
 | `regions` | list available deployment regions |
+| `logs` | tail deployment pod logs (`--pod`, `-c/--container`; defaults to the Cube API container) |
 | `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
 | `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, dev-mode, exit-dev-mode, commit, pull |
 | `environments` | list, tokens, create-token (incl. `--meta-sync`) |

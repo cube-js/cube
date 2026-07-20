@@ -12,8 +12,8 @@ pub struct Args {
     /// Only this pod (defaults to all tailable pods)
     #[arg(long)]
     pod: Option<String>,
-    /// Container within the pod, e.g. cubejs-server
-    #[arg(long)]
+    /// Container within the pod: cubejs-server (default), vector, api-proxy, …
+    #[arg(long, short = 'c')]
     container: Option<String>,
 }
 
