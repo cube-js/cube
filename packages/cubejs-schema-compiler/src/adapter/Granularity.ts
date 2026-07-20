@@ -10,6 +10,7 @@ import {
   timeSeriesFromCustomInterval,
   TimeSeriesOptions
 } from '@cubejs-backend/shared';
+import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 
 export class Granularity {
@@ -44,7 +45,7 @@ export class Granularity {
       );
 
       if (!customGranularity) {
-        throw new Error(`Granularity "${timeDimension.granularity}" does not exist in dimension ${timeDimension.dimension}`);
+        throw new UserError(`Granularity "${timeDimension.granularity}" does not exist in dimension ${timeDimension.dimension}`);
       }
 
       this.granularityInterval = customGranularity.interval;

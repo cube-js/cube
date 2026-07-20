@@ -863,6 +863,27 @@ describe('SQL Generation', () => {
       }
     });
 
+    it('throws UserError for unknown granularity', async () => {
+      await compilers.compiler.compile();
+
+      const buildQuery = () => new PostgresQuery(compilers, {
+        measures: ['orders.count'],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'all',
+            dateRange: ['2020-01-01', '2021-12-31']
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      });
+
+      expect(buildQuery).toThrow(UserError);
+      expect(buildQuery).toThrow('Granularity "all" does not exist in dimension orders.createdAt');
+    });
+
     describe('via PostgresQuery', () => {
       beforeAll(async () => {
         await compilers.compiler.compile();
