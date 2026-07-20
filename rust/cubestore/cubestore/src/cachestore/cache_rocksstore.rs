@@ -928,6 +928,9 @@ pub trait CacheStore: DIService + Send + Sync {
     async fn persist(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
+    // Wipe all cachestore state (cache + queue) and persist a fresh snapshot, updating the
+    // remote cachestore-current pointer so a poisoned snapshot is not re-hydrated on reload
+    async fn wipe(&self) -> Result<(), CubeError>;
 }
 
 #[async_trait]
@@ -1683,6 +1686,20 @@ impl CacheStore for RocksCacheStore {
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         self.store.rocksdb_properties()
     }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        // Truncate all cachestore tables (cache_item, queue_item, queue_item_payload,
+        // queue_result) via the serialized RW loops.
+        self.cache_truncate().await?;
+        self.queue_truncate().await?;
+
+        // Persist a fresh full snapshot and move the remote cachestore-current pointer to it
+        // (also prunes old snapshots), so the poisoned lineage is superseded and future boots
+        // load the clean state instead of re-hydrating the bad one.
+        self.store.upload_check_point().await?;
+
+        Ok(())
+    }
 }
 
 crate::di_service!(RocksCacheStore, [CacheStore]);
@@ -1835,6 +1852,10 @@ impl CacheStore for ClusterCacheStoreClient {
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! rocksdb_properties was used.")
     }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! wipe was used.")
+    }
 }
 
 crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
@@ -1921,6 +1942,102 @@ mod tests {
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wipe_clears_state() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("wipe_clears_state", Config::test("wipe"));
+
+        cachestore
+            .cache_set(
+                CacheItem::new("prefix:key1".to_string(), Some(60), "v1".to_string()),
+                false,
+            )
+            .await?;
+        cachestore
+            .cache_set(
+                CacheItem::new("prefix:key2".to_string(), Some(60), "v2".to_string()),
+                false,
+            )
+            .await?;
+        cachestore
+            .queue_add(QueueAddPayload {
+                path: "queue:job1".to_string(),
+                value: "payload".to_string(),
+                priority: 0,
+                orphaned: None,
+                process_id: None,
+                exclusive: false,
+                external_id: None,
+            })
+            .await?;
+
+        assert_eq!(cachestore.cache_all(None).await?.len(), 2);
+        assert_eq!(cachestore.queue_all(None).await?.len(), 1);
+
+        cachestore.wipe().await?;
+
+        assert_eq!(cachestore.cache_all(None).await?.len(), 0);
+        assert_eq!(cachestore.queue_all(None).await?.len(), 0);
+
+        RocksCacheStore::cleanup_test_cachestore("wipe_clears_state");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wipe_persists_fresh_snapshot() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "wipe_persists_fresh_snapshot",
+            Config::test("wipe_snapshot"),
+        );
+
+        cachestore
+            .cache_set(
+                CacheItem::new("prefix:key1".to_string(), Some(60), "v1".to_string()),
+                false,
+            )
+            .await?;
+
+        cachestore.wipe().await?;
+
+        // wipe() must persist a fresh checkpoint and move cachestore-current onto it.
+        let snapshots = cachestore.store.get_snapshots_list().await?;
+        assert_eq!(
+            snapshots.iter().filter(|s| s.current).count(),
+            1,
+            "exactly one snapshot must be marked as current after wipe"
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("wipe_persists_fresh_snapshot");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wipe_on_empty_store() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "wipe_on_empty_store",
+            Config::test("wipe_empty"),
+        );
+
+        // Wiping a fresh empty store must succeed and still produce a current snapshot.
+        cachestore.wipe().await?;
+
+        assert_eq!(cachestore.cache_all(None).await?.len(), 0);
+        let snapshots = cachestore.store.get_snapshots_list().await?;
+        assert_eq!(snapshots.iter().filter(|s| s.current).count(), 1);
+
+        RocksCacheStore::cleanup_test_cachestore("wipe_on_empty_store");
 
         Ok(())
     }

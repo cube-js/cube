@@ -218,6 +218,7 @@ pub enum CacheStoreCommand {
     Eviction,
     Info,
     Persist,
+    Wipe,
 }
 
 type QueryParameterHolder = Option<QueryParameter>;
@@ -605,6 +606,8 @@ impl<'a> CubeStoreParser<'a> {
             CacheStoreCommand::Info
         } else if self.parse_custom_token("healthcheck") {
             CacheStoreCommand::Healthcheck
+        } else if self.parse_custom_token("wipe") {
+            CacheStoreCommand::Wipe
         } else {
             return Err(ParserError::ParserError(
                 "Unknown cachestore command".to_string(),

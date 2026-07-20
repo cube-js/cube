@@ -334,6 +334,10 @@ impl CacheStore for LazyRocksCacheStore {
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         self.init().await?.rocksdb_properties().await
     }
+
+    async fn wipe(&self) -> Result<(), CubeError> {
+        self.init().await?.wipe().await
+    }
 }
 
 crate::di_service!(LazyRocksCacheStore, [CacheStore]);
