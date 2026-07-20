@@ -28,10 +28,11 @@ const WIPE_CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
 const WIPE_CLOSE_POLL_INTERVAL: Duration = Duration::from_millis(20);
 const WIPE_REOPEN_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Best-effort detection of a RocksDB "directory lock is held" open error, used to retry the
-/// reopen while a detached out-of-queue operation still holds an `Arc<DB>` clone.
 fn is_rocksdb_lock_error(err: &CubeError) -> bool {
-    err.to_string().to_lowercase().contains("lock")
+    let msg = err.to_string();
+    msg.contains("lock hold by current process")
+        || msg.contains("While lock file")
+        || msg.contains("Resource temporarily unavailable")
 }
 
 pub enum LazyRocksCacheStoreState {
@@ -446,6 +447,12 @@ impl CacheStore for LazyRocksCacheStore {
                 ));
             }
 
+            log::warn!(
+                "Wiping cachestore: waiting for outstanding Cache Store references to be released before closing the DB (store strong count: {}, DB strong count: {})",
+                Arc::strong_count(&store),
+                store.db_strong_count()
+            );
+
             tokio::time::sleep(WIPE_CLOSE_POLL_INTERVAL).await;
         }
 
@@ -458,6 +465,7 @@ impl CacheStore for LazyRocksCacheStore {
         let path = self.path.clone();
         let metastore_fs = self.metastore_fs.clone();
         let config = self.config.clone();
+
         let fresh = cube_ext::spawn_blocking(move || -> Result<Arc<RocksCacheStore>, CubeError> {
             if let Err(err) = std::fs::remove_dir_all(&path) {
                 if err.kind() != std::io::ErrorKind::NotFound {
@@ -469,11 +477,12 @@ impl CacheStore for LazyRocksCacheStore {
             }
 
             let reopen_deadline = Instant::now() + WIPE_REOPEN_TIMEOUT;
+
             loop {
                 match RocksCacheStore::new(Path::new(&path), metastore_fs.clone(), config.clone()) {
                     Ok(store) => return Ok(store),
                     Err(err) if is_rocksdb_lock_error(&err) && Instant::now() < reopen_deadline => {
-                        std::thread::sleep(std::time::Duration::from_millis(50));
+                        std::thread::sleep(Duration::from_millis(50));
                     }
                     Err(err) => return Err(err),
                 }
@@ -481,8 +490,8 @@ impl CacheStore for LazyRocksCacheStore {
         })
         .await??;
 
-        // Run migrations / re-enable auto-compaction and re-attach listeners.
         fresh.check_all_indexes().await?;
+
         for listener in &self.listeners {
             fresh.add_listener(listener.clone()).await;
         }
@@ -493,6 +502,7 @@ impl CacheStore for LazyRocksCacheStore {
             let mut loops = self.running_loops.lock().await;
             *loops = fresh.clone().spawn_processing_loops();
         }
+
         *guard = LazyRocksCacheStoreState::Initialized {
             store: fresh.clone(),
         };

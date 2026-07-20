@@ -505,9 +505,7 @@ impl RocksCacheStore {
         Ok(())
     }
 
-    /// Number of strong references to the underlying RocksDB handle. LazyRocksCacheStore::wipe
-    /// uses this to confirm the DB is uniquely held (so dropping the store closes it and
-    /// releases the directory LOCK) before removing and reopening the folder.
+    /// Number of strong references to the underlying RocksDB handle.
     pub fn db_strong_count(&self) -> usize {
         Arc::strong_count(&self.store.db)
     }
