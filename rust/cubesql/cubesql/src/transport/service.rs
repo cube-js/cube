@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::{DateTime, SecondsFormat, Utc};
 use cubeclient::apis::{
     configuration::Configuration as ClientConfiguration, default_api as cube_api,
 };
@@ -84,6 +85,7 @@ pub struct SpanId {
     pub query_key: serde_json::Value,
     span_start: SystemTime,
     is_data_query: RWLockAsync<bool>,
+    last_refresh_time: RWLockAsync<Option<DateTime<Utc>>>,
 }
 
 impl SpanId {
@@ -93,6 +95,7 @@ impl SpanId {
             query_key,
             span_start: SystemTime::now(),
             is_data_query: tokio::sync::RwLock::new(false),
+            last_refresh_time: tokio::sync::RwLock::new(None),
         }
     }
 
@@ -104,6 +107,22 @@ impl SpanId {
     pub async fn is_data_query(&self) -> bool {
         let read = self.is_data_query.read().await;
         *read
+    }
+
+    /// Records the refresh time of a load result contributing to this span.
+    /// A span may cover several load requests (e.g. a join of cube scans);
+    /// the oldest value wins, matching `lastRefreshTime` semantics elsewhere.
+    pub async fn set_last_refresh_time(&self, last_refresh_time: DateTime<Utc>) {
+        let mut write = self.last_refresh_time.write().await;
+        *write = Some(match *write {
+            Some(current) => current.min(last_refresh_time),
+            None => last_refresh_time,
+        });
+    }
+
+    pub async fn last_refresh_time(&self) -> Option<String> {
+        let read = self.last_refresh_time.read().await;
+        read.map(|t| t.to_rfc3339_opts(SecondsFormat::Millis, true))
     }
 
     pub fn duration(&self) -> u64 {
@@ -1039,5 +1058,39 @@ impl SqlTemplates {
             "statements/join",
             context! { join_type => join_type, source => source, condition => condition },
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[tokio::test]
+    async fn span_id_last_refresh_time_keeps_oldest() {
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+        assert_eq!(span_id.last_refresh_time().await, None);
+
+        let newer = Utc.with_ymd_and_hms(2024, 6, 1, 12, 0, 0).unwrap();
+        let older = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+
+        span_id.set_last_refresh_time(newer).await;
+        assert_eq!(
+            span_id.last_refresh_time().await,
+            Some("2024-06-01T12:00:00.000Z".to_string())
+        );
+
+        span_id.set_last_refresh_time(older).await;
+        assert_eq!(
+            span_id.last_refresh_time().await,
+            Some("2024-01-01T00:00:00.000Z".to_string())
+        );
+
+        // A newer value must not override the recorded oldest one
+        span_id.set_last_refresh_time(newer).await;
+        assert_eq!(
+            span_id.last_refresh_time().await,
+            Some("2024-01-01T00:00:00.000Z".to_string())
+        );
     }
 }

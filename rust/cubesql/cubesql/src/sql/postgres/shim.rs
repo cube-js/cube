@@ -382,7 +382,8 @@ impl AsyncPostgresShim {
                                             "query": span_id.query_key.clone(),
                                             "apiType": "sql",
                                             "duration": span_id.duration(),
-                                            "isDataQuery": span_id.is_data_query().await
+                                            "isDataQuery": span_id.is_data_query().await,
+                                            "lastRefreshTime": span_id.last_refresh_time().await
                                         }),
                                     )
                                     .await?;
@@ -1869,6 +1870,7 @@ impl AsyncPostgresShim {
                                 "apiType": "sql",
                                 "duration": start_time.elapsed().unwrap().as_millis() as u64,
                                 "isDataQuery": span_id.is_data_query().await,
+                                "lastRefreshTime": span_id.last_refresh_time().await,
                             }),
                         )
                         .await?;

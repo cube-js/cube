@@ -463,6 +463,7 @@ async fn handle_sql_query(
                             "apiType": "sql",
                             "duration": span_id.as_ref().unwrap().duration(),
                             "isDataQuery": span_id.as_ref().unwrap().is_data_query().await,
+                            "lastRefreshTime": span_id.as_ref().unwrap().last_refresh_time().await,
                         }),
                     )
                     .await?;
