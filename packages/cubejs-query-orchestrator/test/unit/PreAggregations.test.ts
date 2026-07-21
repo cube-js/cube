@@ -1090,4 +1090,81 @@ describe('PreAggregations', () => {
       }
     });
   });
+
+  // https://github.com/cube-js/cube/issues/11317
+  describe('rollupLambda out-of-range placeholder bypass (issue #11317)', () => {
+    const rollupLambdaId = 'SensorReadings.lambda';
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    // Mirrors the documented `rollups: [batch, hot]` shape: `hot` is the
+    // last-listed (and therefore `lastRollupLambda: true`) member.
+    const createHotLoader = (matchedTimeDimensionDateRange: [string, string], hotBuildRange: [string, string]) => {
+      const loader = new PreAggregationPartitionRangeLoader(
+        {} as any, // driverFactory
+        {} as any, // logger
+        { options: {} } as any, // queryCache
+        {} as any, // preAggregations
+        mockPreAggregation({
+          rollupLambdaId,
+          lastRollupLambda: true,
+          matchedTimeDimensionDateRange,
+        }) as any,
+        [
+          // The already-processed 'batch' member of the same rollupLambda,
+          // covering a much older, disjoint date range.
+          ['SensorReadings.batch', {
+            targetTableName: 'batch_table',
+            refreshKeyValues: [],
+            lastUpdatedAt: Date.now(),
+            buildRangeEnd: '2023-06-05T23:59:59.999',
+            rollupLambdaId,
+          }],
+        ],
+        {} as any, // loadCache
+        {} as any,
+      );
+
+      jest.spyOn(loader as any, 'loadRangeQuery').mockImplementation(async (query: any) => {
+        if (query[0].includes('MIN')) {
+          return [{ value: hotBuildRange[0] }];
+        }
+        return [{ value: hotBuildRange[1] }];
+      });
+
+      jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockImplementation(async () => ({
+        targetTableName: 'hot_placeholder_table',
+        refreshKeyValues: [],
+        lastUpdatedAt: Date.now(),
+        buildRangeEnd: hotBuildRange[1],
+      } as any));
+
+      return loader;
+    };
+
+    test('excludes hot rollup from the union when its build range has zero overlap with the query', async () => {
+      // Hot's own build range (its last 5 days as of some point in time).
+      const hotBuildRange: [string, string] = ['2024-01-10T00:00:00.000', '2024-01-14T23:59:59.999'];
+      // The query's requested date range falls entirely within batch's
+      // territory, months before hot's build range even starts.
+      const matchedTimeDimensionDateRange: [string, string] = ['2023-06-01T00:00:00.000', '2023-06-05T23:59:59.999'];
+
+      const loader = createHotLoader(matchedTimeDimensionDateRange, hotBuildRange);
+      const result = await loader.loadPreAggregations();
+
+      // Hot has zero overlap with the requested range, so `partitionRanges()`
+      // substitutes a placeholder pointing at hot's own last (genuinely,
+      // fully-built) partition (PreAggregationPartitionRangeLoader.ts
+      // ~L424-439), purely so the outer UNION ALL has a table to reference.
+      // The completeness filter at ~L276-279 only checks that a candidate
+      // partition was built out to its own natural boundary - it never
+      // checks whether the partition actually intersects the query's
+      // requested date range - so this out-of-range placeholder survives
+      // and gets used as if it were valid data for this query, instead of
+      // being excluded/marked empty.
+      expect(result.targetTableName).toContain('WHERE 1 = 0');
+    });
+  });
 });
