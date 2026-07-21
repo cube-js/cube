@@ -42,7 +42,12 @@ and select **From Database → From Analysis Services**. Then, enter the
 credentials.
 
 To find your MDX API credentials, go to the [Integrations][ref-integrations-apis] page, click
-**API credentials**, and choose the **MDX API** tab.
+**API credentials**, and choose the **MDX API** tab. Use the full MDX API URL, including
+the `/cubejs-api/v2/mdx` path, as the server name.
+
+The MDX API supports the same [Kerberos][ref-kerberos] and [NTLM][ref-ntlm]
+authentication methods as the DAX API, configured on the **Settings → Power BI** page
+of your deployment.
 
 ### Cube Cloud for Excel
 
@@ -57,3 +62,5 @@ add-in and [authenticate][ref-cube-cloud-for-excel-authentication] to Cube Cloud
 [ref-cube-cloud-for-excel-authentication]: /docs/integrations/microsoft-excel#authentication
 [ref-integrations-tools]: /admin/connect-to-data/visualization-tools
 [ref-integrations-apis]: /admin/connect-to-data/visualization-tools
+[ref-kerberos]: /docs/integrations/power-bi/kerberos
+[ref-ntlm]: /docs/integrations/power-bi/ntlm
