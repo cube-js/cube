@@ -65,6 +65,12 @@ export class KsqlQuery extends BaseQuery {
     // ksqlDB has no `||` string operator — concatenation and LIKE-pattern
     // wildcards must use CONCAT (mirrors concatStringsSql / KsqlFilter).
     templates.expressions.concat_strings = 'CONCAT({{ strings | join(\', \') }})';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
+    // ksqlDB silently returns NULL when casting strings with a trailing 'Z'
+    // (confluentinc/ksql#9094), so the markers are stripped and the UTC zone is passed
+    // to PARSE_TIMESTAMP explicitly. The base template renders the value bare, which
+    // is invalid syntax
+    templates.expressions.timestamp_literal = 'PARSE_TIMESTAMP(\'{{ value | replace("T", " ") | replace("Z", "") }}\', \'yyyy-MM-dd HH:mm:ss.SSS\', \'UTC\')';
     templates.filters.like_pattern =
       '{% if start_wild or end_wild %}CONCAT(' +
       '{% if start_wild %}\'%\', {% endif %}{{ value }}{% if end_wild %}, \'%\'{% endif %})' +

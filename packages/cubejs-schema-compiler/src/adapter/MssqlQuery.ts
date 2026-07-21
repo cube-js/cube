@@ -281,6 +281,11 @@ export class MssqlQuery extends BaseQuery {
     templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
+    // CONVERT style 127 is defined as exactly this format (yyyy-mm-ddThh:mi:ss.mmmZ,
+    // "ISO8601 with time zone Z"). The base template renders the value bare, which is
+    // invalid T-SQL syntax
+    templates.expressions.timestamp_literal = 'CONVERT(DATETIME2, \'{{ value }}\', 127)';
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'BIT';
     templates.types.integer = 'INT';
