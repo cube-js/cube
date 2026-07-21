@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+### Bug Fixes
+
+- **cube-cli:** create endpoint 404 without --bootstrap, about text ([#11312](https://github.com/cube-js/cube/issues/11312)) ([746413d](https://github.com/cube-js/cube/commit/746413db20902a9b1afb29cf63bb670383234ff4))
+
 ## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
 
 ### Bug Fixes
