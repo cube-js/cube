@@ -10,9 +10,10 @@ RUN yarn config set network-timeout 120000 -g
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
-    # python3 package is necessary to install `python3` executable for node-gyp
     # libpython3-dev is needed to trigger post-installer to download native with python
-    && apt-get install -y python3 python3.13 libpython3.13-dev gcc g++ make cmake openjdk-21-jdk-headless \
+    && apt-get install -y python3.13 libpython3.13-dev gcc g++ make cmake openjdk-21-jdk-headless \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
@@ -33,6 +34,8 @@ RUN groupadd cube && useradd -ms /bin/bash -g cube cube \
     && DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends libssl3t64 openjdk-21-jre-headless python3.13 libpython3.13-dev \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir cube \
     && chown -R cube:cube /tmp /cube /usr
