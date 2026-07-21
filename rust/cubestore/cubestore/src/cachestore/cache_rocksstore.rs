@@ -887,8 +887,7 @@ pub trait CacheStore: DIService + Send + Sync {
         update_if_not_exists: bool,
     ) -> Result<bool, CubeError>;
     async fn cache_clear(&self) -> Result<(), CubeError>;
-    // Wipe the whole cachestore keyspace (cache + queue) with a low-level
-    // RocksDB range delete
+    // Wipe the whole cachestore keyspace with a low-level RocksDB range delete.
     async fn truncate(&self) -> Result<(), CubeError>;
     async fn cache_delete(&self, key: String) -> Result<(), CubeError>;
     async fn cache_get(&self, key: String) -> Result<Option<IdRow<CacheItem>>, CubeError>;
@@ -1038,11 +1037,14 @@ impl CacheStore for RocksCacheStore {
     async fn truncate(&self) -> Result<(), CubeError> {
         let block = self.cache_eviction_manager.truncation_block().await;
 
-        let result = self.store.truncate().await;
+        let mut result = self.store.truncate().await;
 
-        // Re-seed migration metadata so the emptied store is usable again.
+        // Re-seed migration metadata so the emptied store is usable again. Fold
+        // any re-seed error into `result` rather than early-returning with `?`,
+        // so the eviction manager is always notified and the block released even
+        // on failure (mirrors `cache_clear`); otherwise waiters could get stuck.
         if result.is_ok() {
-            self.check_all_indexes().await?;
+            result = self.check_all_indexes().await;
         }
 
         self.cache_eviction_manager.notify_truncate_end().await?;

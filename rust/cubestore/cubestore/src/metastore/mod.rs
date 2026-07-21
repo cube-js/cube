@@ -1200,7 +1200,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
-    // Wipe the whole metastore keyspace with a low-level RocksDB range delete
+    // Wipe the whole metastore keyspace with a low-level RocksDB range delete.
     async fn truncate(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;

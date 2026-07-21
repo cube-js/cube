@@ -567,7 +567,6 @@ impl WriteBatchContainer {
             match entry {
                 WriteBatchEntry::Put { key, value } => batch.put(key, value),
                 WriteBatchEntry::Delete { key } => batch.delete(key),
-                WriteBatchEntry::DeleteRange { from, to } => batch.delete_range(from, to),
             }
         }
         batch
@@ -1040,19 +1039,27 @@ impl RocksStore {
     }
 
     /// Wipe the entire keyspace of this store with a single low-level RocksDB
-    /// range deletion (no per-row reads)
+    /// range deletion (no per-row reads).
     pub async fn truncate(&self) -> Result<(), CubeError> {
+        // Whole-keyspace `[low, high)` bounds for the range delete. Every key
+        // this store writes begins with a `RowKey` tag byte in `1..=5` (see
+        // `RowKey::to_bytes`), so `[0x00]` sorts at or below any real key and 32
+        // `0xff` bytes sort strictly above any of them, covering the keyspace.
+        const KEYSPACE_LOWER_BOUND: [u8; 1] = [0x00];
+        const KEYSPACE_UPPER_BOUND: [u8; 32] = [0xffu8; 32];
+
         self.write_operation("truncate", move |_db_ref, batch_pipe| {
-            batch_pipe
-                .batch()
-                .delete_range([0u8].as_slice(), [0xffu8; 32].as_slice());
+            batch_pipe.batch().delete_range(
+                KEYSPACE_LOWER_BOUND.as_slice(),
+                KEYSPACE_UPPER_BOUND.as_slice(),
+            );
             Ok(())
         })
         .await?;
 
         self.seq_store.lock()?.clear();
 
-        self.write_operation("truncate_compaction", move |db_ref, _batch_pipe| {
+        self.read_operation_out_of_queue("truncate_compaction", move |db_ref| {
             let start: Option<&[u8]> = None;
             let end: Option<&[u8]> = None;
             db_ref.db.compact_range(start, end);
@@ -1179,10 +1186,14 @@ impl RocksStore {
                 let mut serializer = WriteBatchContainer::new();
 
                 let mut seq_numbers = Vec::new();
+                let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
                 for update in updates.into_iter() {
                     let (n, write_batch) = update?;
                     seq_numbers.push(n);
                     write_batch.iterate(&mut serializer);
+                    if serializer.size() > size_limit {
+                        break;
+                    }
                 }
 
                 (
