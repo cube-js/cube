@@ -48,6 +48,9 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
     ctx.config.default_context = Some(args.name.clone());
     ctx.config.save()?;
 
+    // Same event name the legacy `cubejs auth` emitted.
+    crate::telemetry::event("Cube Cloud CLI Authenticate", serde_json::Map::new());
+
     output::success(&format!(
         "Logged in as {email} (context `{}`, saved to {})",
         args.name,

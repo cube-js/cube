@@ -5,10 +5,14 @@ on:
     branches: [master]
     paths:
       - 'rust/cube-cli/**'
+      - 'install-cli.sh'
+      - 'install-cli.ps1'
       - '.github/workflows/cube-cli.yml'
   pull_request:
     paths:
       - 'rust/cube-cli/**'
+      - 'install-cli.sh'
+      - 'install-cli.ps1'
       - '.github/workflows/cube-cli.yml'
 
 concurrency:

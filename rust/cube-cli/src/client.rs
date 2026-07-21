@@ -74,6 +74,20 @@ impl Client {
         self.token.lock().unwrap().clone()
     }
 
+    /// Authorization header value for a credential. JWTs (three dot-separated
+    /// segments — OAuth access tokens, legacy deploy JWTs) use the `Bearer`
+    /// scheme; opaque credentials are Cube Cloud API keys and use `Api-Key`.
+    /// `CUBE_AUTH_SCHEME=bearer|api-key` overrides the heuristic.
+    fn authorization(token: &str) -> String {
+        let scheme = match std::env::var("CUBE_AUTH_SCHEME").as_deref() {
+            Ok("bearer") | Ok("Bearer") => "Bearer",
+            Ok("api-key") | Ok("Api-Key") => "Api-Key",
+            _ if token.split('.').count() == 3 => "Bearer",
+            _ => "Api-Key",
+        };
+        format!("{scheme} {token}")
+    }
+
     /// Send a single attempt, returning the status and body text.
     async fn send_once(
         &self,
@@ -83,10 +97,10 @@ impl Client {
         body: Option<&Value>,
     ) -> Result<(StatusCode, String)> {
         let url = format!("{}{}", self.base_url, path);
-        let mut req = self
-            .http
-            .request(method.clone(), &url)
-            .bearer_auth(self.token());
+        let mut req = self.http.request(method.clone(), &url).header(
+            reqwest::header::AUTHORIZATION,
+            Self::authorization(&self.token()),
+        );
         if !query.is_empty() {
             req = req.query(query);
         }
@@ -128,6 +142,50 @@ impl Client {
             text = t;
         }
 
+        self.finish_response(&method, path, status, text)
+    }
+
+    /// POST a multipart form. `build_form` is called per attempt because a
+    /// form can only be sent once (the 401-refresh retry needs a fresh one).
+    pub async fn post_multipart<F>(&self, path: &str, build_form: F) -> Result<Value>
+    where
+        F: Fn() -> reqwest::multipart::Form,
+    {
+        let url = format!("{}{}", self.base_url, path);
+        let send = |form: reqwest::multipart::Form, token: String| {
+            let http = &self.http;
+            let url = &url;
+            async move {
+                let res = http
+                    .post(url)
+                    .header(reqwest::header::AUTHORIZATION, Self::authorization(&token))
+                    .multipart(form)
+                    .send()
+                    .await
+                    .map_err(|e| anyhow!("request to {url} failed: {e}"))?;
+                let status = res.status();
+                let text = res.text().await.unwrap_or_default();
+                Ok::<_, anyhow::Error>((status, text))
+            }
+        };
+
+        let (mut status, mut text) = send(build_form(), self.token()).await?;
+        if status == StatusCode::UNAUTHORIZED && self.try_refresh().await? {
+            let (s, t) = send(build_form(), self.token()).await?;
+            status = s;
+            text = t;
+        }
+        self.finish_response(&Method::POST, path, status, text)
+    }
+
+    /// Shared tail of every request: error mapping + JSON/HTML handling.
+    fn finish_response(
+        &self,
+        method: &Method,
+        path: &str,
+        status: StatusCode,
+        text: String,
+    ) -> Result<Value> {
         if !status.is_success() {
             let detail = serde_json::from_str::<Value>(&text)
                 .ok()
@@ -149,6 +207,19 @@ impl Client {
 
         if text.trim().is_empty() {
             return Ok(Value::Null);
+        }
+        // Cube Cloud serves the web app (200 + HTML) for unknown routes.
+        // Surface that as "endpoint not available" instead of returning the
+        // HTML as a JSON string, which downstream renders as an empty table.
+        let trimmed = text.trim_start();
+        let looks_like_html =
+            trimmed.len() >= 2 && trimmed.starts_with('<') && !trimmed.starts_with("<?xml");
+        if looks_like_html {
+            bail!(
+                "{method} {path} returned the Cube Cloud web app instead of JSON — \
+                 this endpoint is not available on this tenant (the server may be \
+                 running an older version)"
+            );
         }
         Ok(serde_json::from_str(&text).unwrap_or(Value::String(text)))
     }

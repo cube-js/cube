@@ -3,6 +3,8 @@ mod commands;
 mod config;
 mod oauth;
 mod output;
+mod telemetry;
+mod update;
 mod util;
 
 use anyhow::{bail, Result};
@@ -119,6 +121,13 @@ enum Command {
     /// List available deployment regions
     #[command(alias = "region")]
     Regions(commands::regions::Args),
+    /// Upload a local project directory to a deployment and build it
+    Deploy(commands::deploy::Args),
+    /// Tail a deployment's pod logs
+    Logs(commands::logs::Args),
+    /// GitHub integration: link status, installations, repos, and connect
+    #[command(alias = "gh")]
+    Github(commands::github::Args),
     /// Manage a deployment's data model files
     #[command(name = "data-model", alias = "dm")]
     DataModel(commands::data_model::Args),
@@ -166,12 +175,13 @@ enum Command {
     Integrations(commands::integrations::Args),
     /// Manage OIDC token configs
     Oidc(commands::oidc::Args),
+    /// Manage API keys for programmatic access
+    #[command(name = "api-keys", alias = "api-key")]
+    ApiKeys(commands::api_keys::Args),
 
     /// List agents and agent skills
     #[command(alias = "agent")]
     Agents(commands::agents::Args),
-    /// AI Engineer settings and active region
-    AiEngineer(commands::ai_engineer::Args),
     /// App-level config and theme
     App(commands::app::Args),
     /// Fetch data-model metadata
@@ -181,6 +191,8 @@ enum Command {
 
     /// Make an authenticated raw API request (escape hatch)
     Api(commands::api::Args),
+    /// Update the CLI to the latest release
+    Update(commands::update::Args),
     /// Generate shell completions
     Completion(commands::completion::Args),
 }
@@ -191,10 +203,90 @@ pub fn cli_command() -> clap::Command {
     Cli::command()
 }
 
+impl Command {
+    /// Canonical command-group name, used for telemetry.
+    fn name(&self) -> &'static str {
+        use Command::*;
+        match self {
+            Login(_) => "login",
+            Logout(_) => "logout",
+            Whoami(_) => "whoami",
+            Context(_) => "context",
+            Deployments(_) => "deployments",
+            Regions(_) => "regions",
+            Deploy(_) => "deploy",
+            Logs(_) => "logs",
+            Github(_) => "github",
+            DataModel(_) => "data-model",
+            Environments(_) => "environments",
+            Variables(_) => "variables",
+            Folders(_) => "folders",
+            Workbooks(_) => "workbooks",
+            Reports(_) => "reports",
+            Workspace(_) => "workspace",
+            Notifications(_) => "notifications",
+            Users(_) => "users",
+            Groups(_) => "groups",
+            Attributes(_) => "attributes",
+            Policies(_) => "policies",
+            Tenant(_) => "tenant",
+            Embed(_) => "embed",
+            Integrations(_) => "integrations",
+            Oidc(_) => "oidc",
+            ApiKeys(_) => "api-keys",
+            Agents(_) => "agents",
+            App(_) => "app",
+            Meta(_) => "meta",
+            Scim(_) => "scim",
+            Api(_) => "api",
+            Update(_) => "update",
+            Completion(_) => "completion",
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    // Rust ignores SIGPIPE by default, turning `cube ... | head` into a
+    // broken-pipe panic. Restore the default disposition so the process
+    // exits quietly when the reader goes away, like other CLI tools.
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
     let cli = Cli::parse();
-    if let Err(err) = run(cli).await {
+    commands::update::cleanup_stale_binary();
+
+    // Check for a newer release concurrently with the command; the notice
+    // (if any) prints after the command output. Skipped for `update` itself
+    // and `completion` (whose output is eval'd by shells). Completion also
+    // skips telemetry — it runs on shell startup.
+    let is_completion = matches!(cli.command, Command::Completion(_));
+    let check = match &cli.command {
+        Command::Update(_) | Command::Completion(_) => None,
+        _ => Some(update::spawn_check()),
+    };
+    let command_name = cli.command.name();
+
+    let result = run(cli).await;
+
+    if !is_completion {
+        let mut props = serde_json::Map::new();
+        props.insert("command".into(), serde_json::json!(command_name));
+        props.insert("success".into(), serde_json::json!(result.is_ok()));
+        telemetry::event("Cube CLI Command", props);
+        if let Err(err) = &result {
+            let mut props = serde_json::Map::new();
+            props.insert("command".into(), serde_json::json!(command_name));
+            props.insert("error".into(), serde_json::json!(format!("{err:#}")));
+            telemetry::event("Error", props);
+        }
+        telemetry::flush().await;
+    }
+    if let Some(check) = check {
+        update::print_notice(check).await;
+    }
+    if let Err(err) = result {
         eprintln!("error: {err:#}");
         std::process::exit(1);
     }
@@ -210,6 +302,9 @@ async fn run(cli: Cli) -> Result<()> {
         Context(args) => commands::context::command(args, &mut ctx).await,
         Deployments(args) => commands::deployments::command(args, &ctx).await,
         Regions(args) => commands::regions::command(args, &ctx).await,
+        Deploy(args) => commands::deploy::command(args, &ctx).await,
+        Logs(args) => commands::logs::command(args, &ctx).await,
+        Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,
@@ -226,12 +321,13 @@ async fn run(cli: Cli) -> Result<()> {
         Embed(args) => commands::embed::command(args, &ctx).await,
         Integrations(args) => commands::integrations::command(args, &ctx).await,
         Oidc(args) => commands::oidc::command(args, &ctx).await,
+        ApiKeys(args) => commands::api_keys::command(args, &ctx).await,
         Agents(args) => commands::agents::command(args, &ctx).await,
-        AiEngineer(args) => commands::ai_engineer::command(args, &ctx).await,
         App(args) => commands::app::command(args, &ctx).await,
         Meta(args) => commands::meta::command(args, &ctx).await,
         Scim(args) => commands::scim::command(args, &ctx).await,
         Api(args) => commands::api::command(args, &ctx).await,
+        Update(args) => commands::update::command(args, &ctx).await,
         Completion(args) => commands::completion::command(args),
     }
 }

@@ -6,7 +6,46 @@ public REST API, written in Rust. Structured after the
 group under `src/commands/`, a shared HTTP client, a config module, and
 plain clap-derive dispatch in `main.rs`.
 
-## Install / build
+## Install
+
+Linux / macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
+```
+
+Both scripts download the latest release binary for your platform and put it
+on your `PATH` (`CUBE_INSTALL_DIR` overrides the location; `CUBE_VERSION`
+pins a specific release tag).
+
+### Updates
+
+Every run checks GitHub for a newer release in the background and prints a
+notice when one is available (set `CUBE_NO_UPDATE_CHECK=1` to disable, e.g.
+in CI; the notice only goes to interactive terminals, on stderr). Update
+in place any time with:
+
+```bash
+cube update          # download the latest release and replace this binary
+cube update --check  # just report what's available
+```
+
+### Telemetry
+
+The CLI sends anonymous usage events (command group, success/failure,
+version, platform) to `track.cube.dev` — the same pipeline and wire format
+as the legacy `cubejs` CLI. No personal data is collected; the anonymous id
+is a SHA-256 hash of the OS machine id. Telemetry is disabled automatically
+in CI (the `CI` env var), or explicitly with `CUBE_NO_TELEMETRY=1` (or the
+legacy `CUBEJS_TELEMETRY=false`).
+
+### Build from source
 
 ```bash
 cd rust/cube-cli
@@ -87,8 +126,10 @@ Every endpoint of the Console Server public API is covered:
 
 | Group | Endpoints |
 |---|---|
-| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token |
+| `deployments` | list, get, create (`--bootstrap` scaffolds + builds a serving deployment), update, delete, token, advance-step, reset-step |
 | `regions` | list available deployment regions |
+| `logs` | tail deployment pod logs (`--pod`, `-c/--container`; defaults to the Cube API container) |
+| `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
 | `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, dev-mode, exit-dev-mode, commit, pull |
 | `environments` | list, tokens, create-token (incl. `--meta-sync`) |
 | `variables` | list, set (`KEY=VALUE` upserts) |
@@ -106,7 +147,6 @@ Every endpoint of the Console Server public API is covered:
 | `integrations` | list, get, create, update, delete, tokens list/get/revoke/initiate |
 | `oidc` | list, get, create, update, delete |
 | `agents` | list, skills |
-| `ai-engineer` | settings |
 | `app` | config, theme |
 | `meta` | POST /api/v1/meta/ |
 | `scim` | Users/Groups CRUD + patch, resource-types, schemas, service-provider-config |

@@ -86,6 +86,26 @@ enum Cmd {
         /// Deployment id
         deployment: i64,
     },
+    /// Show the latest build status for a branch
+    BuildStatus {
+        /// Deployment id
+        deployment: i64,
+        /// Branch (defaults to the active dev-mode branch, else the deploy branch)
+        #[arg(long)]
+        branch: Option<String>,
+    },
+    /// Advance onboarding to a target creation step
+    AdvanceStep {
+        /// Deployment id
+        deployment: i64,
+        /// Target step: project, upload, schema, github, ssh, databases, ready, demo
+        step: String,
+    },
+    /// Reset onboarding back to the first creation step (project)
+    ResetStep {
+        /// Deployment id
+        deployment: i64,
+    },
 }
 
 pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
@@ -184,6 +204,35 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             } else {
                 output::success(&format!("Deleted deployment {deployment}"));
             }
+        }
+        Cmd::BuildStatus { deployment, branch } => {
+            let mut query = Vec::new();
+            util::push(&mut query, "branchName", &branch);
+            let res = api
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/build-status"),
+                    &query,
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::AdvanceStep { deployment, step } => {
+            let res = api
+                .post(
+                    &format!("/api/v1/deployments/{deployment}/creation-step/advance"),
+                    Some(&serde_json::json!({ "creationStep": step })),
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::ResetStep { deployment } => {
+            let res = api
+                .post(
+                    &format!("/api/v1/deployments/{deployment}/creation-step/reset"),
+                    None,
+                )
+                .await?;
+            output::print_json(&res);
         }
         Cmd::Token { deployment } => {
             let res = api

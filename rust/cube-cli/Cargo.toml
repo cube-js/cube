@@ -23,12 +23,22 @@ clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 inquire = "0.7"
 owo-colors = "4"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+# Native root store (honors SSL_CERT_FILE and OS-installed CAs, e.g. behind
+# corporate TLS-inspecting proxies) with rustls — still no OpenSSL, still
+# fully static on musl.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "json", "multipart"] }
+sha1 = "0.10"
+sha2 = "0.10"
+flate2 = "1"
+tar = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 toml = "0.8"
 etcetera = "0.8"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [profile.release]
 lto = "thin"
