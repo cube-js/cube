@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+### Bug Fixes
+
+- **cube-cli:** version from lerna.json, "Cube CLI" branding, sk- API-key detection ([#11311](https://github.com/cube-js/cube/issues/11311)) ([47a9adc](https://github.com/cube-js/cube/commit/47a9adc47b54285185ab72963d17f2f03e30b342))
+
 ## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
 
 ### Bug Fixes
