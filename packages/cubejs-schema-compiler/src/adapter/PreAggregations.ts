@@ -119,6 +119,10 @@ export class PreAggregations {
 
   private hasCumulativeMeasuresValue: boolean = false;
 
+  private cumulativeMeasuresTrailingIntervalValue: ParsedInterval | null | undefined;
+
+  private cumulativeMeasuresTrailingIntervalComputed: boolean = false;
+
   public preAggregationForQuery: PreAggregationForQuery | undefined = undefined;
 
   public preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
@@ -308,6 +312,17 @@ export class PreAggregations {
    * the whole build range. Returns `undefined` when there are no cumulative measures.
    */
   private cumulativeMeasuresTrailingInterval(): ParsedInterval | null | undefined {
+    // Memoized like hasCumulativeMeasures(): computeCumulativeMeasuresTrailingInterval()
+    // walks the leaf-measure graph, and preAggregationDescriptionFor() calls this once
+    // per pre-aggregation.
+    if (!this.cumulativeMeasuresTrailingIntervalComputed) {
+      this.cumulativeMeasuresTrailingIntervalValue = this.computeCumulativeMeasuresTrailingInterval();
+      this.cumulativeMeasuresTrailingIntervalComputed = true;
+    }
+    return this.cumulativeMeasuresTrailingIntervalValue;
+  }
+
+  private computeCumulativeMeasuresTrailingInterval(): ParsedInterval | null | undefined {
     // Mirror hasCumulativeMeasures(): inspect the leaf measures so composed
     // measures whose cumulative-ness lives in a leaf are handled too.
     const measures = [...this.query.measures, ...this.query.measureFilters];
@@ -333,11 +348,9 @@ export class PreAggregations {
       if (!rollingWindow || (rollingWindow.type && rollingWindow.type !== 'fixed')) {
         return null;
       }
-      // A leading window needs data after the requested range; not handled here.
-      if (rollingWindow.leading && rollingWindow.leading !== 'unbounded') {
-        return null;
-      }
-      if (rollingWindow.leading === 'unbounded' || rollingWindow.trailing === 'unbounded') {
+      // A leading window needs data after the requested range, and an unbounded
+      // trailing window has no fixed lookback — neither can be narrowed here.
+      if (rollingWindow.leading || rollingWindow.trailing === 'unbounded') {
         return null;
       }
       if (rollingWindow.trailing) {
