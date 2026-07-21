@@ -4609,6 +4609,10 @@ export class BaseQuery {
         case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '({{ expr }} IS {% if negate %}NOT {% endif %}NULL)',
         binary: '({{ left }} {{ op }} {{ right }})',
+        // Integer division with PostgreSQL semantics: truncation toward zero.
+        // Plain `/` is correct for dialects where int / int is integer division;
+        // dialects with decimal or float `/` must override this template
+        int_division: '({{ left }} / {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}',
         order_by: '{% if index %} {{ index }} {% else %} {{ expr }} {% endif %} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',

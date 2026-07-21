@@ -26,11 +26,17 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
 use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
 use datafusion::{
     error::{DataFusionError, Result},
+    logical_expr::{ReturnTypeFunction, ScalarFunctionImplementation},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet, JoinType,
-        LogicalPlan, Operator, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, ExprRewritable,
+        ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan, Operator,
+        UserDefinedLogicalNode,
     },
-    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
+    physical_plan::{
+        aggregates::AggregateFunction,
+        functions::{BuiltinScalarFunction, Signature, Volatility},
+        udf::ScalarUDF,
+    },
     scalar::ScalarValue,
 };
 use futures::FutureExt;
@@ -672,6 +678,82 @@ pub struct SqlGenerationResult {
 }
 
 static DATE_PART_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[A-Za-z_ ]+$").unwrap());
+
+/// Marker function for integer division. DataFusion types `int / int` as integer
+/// division (PostgreSQL semantics: truncation toward zero), but `/` in some dialects
+/// (Snowflake, BigQuery, MySQL, ...) performs decimal or float division. Integer
+/// divisions are rewritten to this marker during SQL generation, and the marker is
+/// rendered with the `expressions/int_division` template, so each dialect can map it
+/// to a construct that keeps PostgreSQL semantics. The marker never reaches execution.
+const INT_DIVISION_MARKER: &str = "__int_division";
+
+static INT_DIVISION_UDF: LazyLock<Arc<ScalarUDF>> = LazyLock::new(|| {
+    let fun: ScalarFunctionImplementation = Arc::new(|_| {
+        Err(DataFusionError::Internal(format!(
+            "{INT_DIVISION_MARKER} marker is only used for SQL generation and can't be evaluated"
+        )))
+    });
+    let return_type: ReturnTypeFunction = Arc::new(|types| Ok(Arc::new(types[0].clone())));
+    Arc::new(ScalarUDF::new(
+        INT_DIVISION_MARKER,
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    ))
+});
+
+fn is_integer_type(data_type: &DataType) -> bool {
+    matches!(
+        data_type,
+        DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+    )
+}
+
+/// Replaces `left / right` with the `__int_division` marker when both operands are
+/// integers per `schema`. Subtrees whose types can't be resolved are left unchanged.
+struct IntDivisionRewriter<'a> {
+    schema: &'a DFSchema,
+}
+
+impl ExprRewriter for IntDivisionRewriter<'_> {
+    fn mutate(&mut self, expr: Expr) -> Result<Expr> {
+        match expr {
+            Expr::BinaryExpr {
+                left,
+                op: Operator::Divide,
+                right,
+            } => {
+                let operand_is_integer = |operand: &Expr| {
+                    operand
+                        .get_type(self.schema)
+                        .map(|t| is_integer_type(&t))
+                        .unwrap_or(false)
+                };
+                let is_int_division = operand_is_integer(&left) && operand_is_integer(&right);
+                if is_int_division {
+                    Ok(Expr::ScalarUDF {
+                        fun: INT_DIVISION_UDF.clone(),
+                        args: vec![*left, *right],
+                    })
+                } else {
+                    Ok(Expr::BinaryExpr {
+                        left,
+                        op: Operator::Divide,
+                        right,
+                    })
+                }
+            }
+            _ => Ok(expr),
+        }
+    }
+}
 
 macro_rules! generate_sql_for_timestamp {
     (@generic $literal:ident, $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
@@ -1515,6 +1597,34 @@ impl WrappedSelectNode {
         Ok((patches, other, sql_query))
     }
 
+    /// Rewrites integer divisions in `exprs` to the `__int_division` marker (see
+    /// [`INT_DIVISION_UDF`]). When a rewrite changes an expression, it is wrapped in an
+    /// alias with the original expression name, so generated column aliases stay stable.
+    fn rewrite_int_divisions(exprs: Vec<Expr>, input_schema: &DFSchema) -> Vec<Expr> {
+        exprs
+            .into_iter()
+            .map(|expr| {
+                let Ok(rewritten) = expr.clone().rewrite(&mut IntDivisionRewriter {
+                    schema: input_schema,
+                }) else {
+                    return expr;
+                };
+                if rewritten == expr {
+                    return expr;
+                }
+                match &rewritten {
+                    // Sort and alias expressions can't be wrapped in an alias, and
+                    // their names are not used for generated column aliases
+                    Expr::Sort { .. } | Expr::Alias(_, _) => rewritten,
+                    _ => match expr.name(input_schema) {
+                        Ok(name) => Expr::Alias(Box::new(rewritten), name),
+                        Err(_) => rewritten,
+                    },
+                }
+            })
+            .collect()
+    }
+
     async fn generate_columns(
         &self,
         meta: &MetaContext,
@@ -1556,9 +1666,22 @@ impl WrappedSelectNode {
                 ))
             })?
             .clone();
+
+        // Integer division type detection needs a schema that resolves input columns
+        // of this select: `from` combined with any join inputs
+        let mut input_schema = self.from.schema().as_ref().clone();
+        for (join_plan, _, _) in &self.joins {
+            input_schema = input_schema.join(join_plan.schema()).map_err(|e| {
+                CubeError::internal(format!(
+                    "Can't join schemas for wrapped select input: {}",
+                    e
+                ))
+            })?;
+        }
+
         let (projection, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.projection_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.projection_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1571,7 +1694,7 @@ impl WrappedSelectNode {
         let flat_group_expr = extract_exprlist_from_groupping_set(&self.group_expr);
         let (group_by, sql) = Self::generate_column_expr(
             schema.clone(),
-            flat_group_expr.clone(),
+            Self::rewrite_int_divisions(flat_group_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1598,7 +1721,7 @@ impl WrappedSelectNode {
 
         let (aggregate, sql) = Self::generate_column_expr(
             schema.clone(),
-            aggr_expr.clone(),
+            Self::rewrite_int_divisions(aggr_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1611,7 +1734,7 @@ impl WrappedSelectNode {
 
         let (filter, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.filter_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.filter_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1624,7 +1747,7 @@ impl WrappedSelectNode {
 
         let (window, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.window_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.window_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1661,7 +1784,7 @@ impl WrappedSelectNode {
 
         let (order, sql) = Self::generate_column_expr(
             schema.clone(),
-            order_expr,
+            Self::rewrite_int_divisions(order_expr, &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -2969,6 +3092,37 @@ impl WrappedSelectNode {
                 "generate_sql_for_scalar_udf called with non-ScalarUDF expr".to_string(),
             ));
         };
+        if fun.name == INT_DIVISION_MARKER {
+            let [left, right]: [Expr; 2] = args.try_into().map_err(|args| {
+                DataFusionError::Internal(format!(
+                    "{INT_DIVISION_MARKER} marker expects exactly 2 arguments, got {args:?}"
+                ))
+            })?;
+            let (left, sql_query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                left,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            let (right, sql_query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                right,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            let resulting_sql = sql_generator
+                .get_sql_templates()
+                .int_division_expr(left, right)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for integer division: {}",
+                        e
+                    ))
+                })?;
+            return Ok((resulting_sql, sql_query));
+        }
         let date_part_err = |dp| {
             DataFusionError::Internal(format!(
                 "Can't generate SQL for scalar function: date part '{}' is not supported",

@@ -15431,6 +15431,66 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_int_division_template() {
+        init_testing_logger();
+
+        let int_division_templates = vec![(
+            "expressions/int_division".to_string(),
+            "CAST(TRUNC({{ left }} / {{ right }}) AS BIGINT)".to_string(),
+        )];
+
+        // Integer / integer division must be rendered through the
+        // expressions/int_division template to keep PostgreSQL integer division
+        // semantics on dialects where `/` is decimal or float division
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT customer_gender, COUNT(*) / NULLIF(COUNT(DISTINCT notes), 0) AS ratio
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 100
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            int_division_templates.clone(),
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            sql.contains("CAST(TRUNC("),
+            "{}",
+            "int/int division must use expressions/int_division template, got: {sql}"
+        );
+
+        // Float division must stay on the plain binary expression template
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT customer_gender, SUM(taxful_total_price) / NULLIF(COUNT(DISTINCT notes), 0) AS ratio
+            FROM KibanaSampleDataEcommerce
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 100
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            int_division_templates,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(
+            !sql.contains("CAST(TRUNC("),
+            "{}",
+            "float division must not use expressions/int_division template, got: {sql}"
+        );
+    }
+
+    #[tokio::test]
     async fn test_string_multiply_interval() -> Result<(), CubeError> {
         init_testing_logger();
 

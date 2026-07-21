@@ -69,6 +69,10 @@ export class DuckDBQuery extends BaseQuery {
     templates.functions.STRING_AGG = 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}, COALESCE({{ args[1] }}, \'\'))';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
+    // DuckDB `/` performs float division even for integer operands (since v0.8);
+    // `//` is integer division truncating toward zero (-7 // 2 = -3), matching
+    // PostgreSQL
+    templates.expressions.int_division = '({{ left }} // {{ right }})';
     return templates;
   }
 

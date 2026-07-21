@@ -218,6 +218,9 @@ export class OracleQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'SYS_EXTRACT_UTC(SYSTIMESTAMP)';
     // Oracle forbids `AS` before a table/subquery alias.
     templates.expressions.query_aliased = '{{ query }} {{ quoted_alias }}';
+    // Oracle `/` on NUMBER keeps the fractional part; TRUNC drops decimal digits
+    // (truncation toward zero), matching PostgreSQL integer division
+    templates.expressions.int_division = 'TRUNC({{ left }} / {{ right }})';
     // Oracle does not support positional GROUP BY — group by expressions.
     templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
     // No `AS` before the FROM subquery alias, and Oracle row-limiting syntax.
