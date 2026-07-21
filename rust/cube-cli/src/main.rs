@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand};
     name = "cube",
     display_name = "Cube CLI",
     version = env!("CUBE_CLI_VERSION"),
-    about = "Cube Cloud command line interface"
+    about = "Cube Command Line Interface"
 )]
 struct Cli {
     #[command(flatten)]
