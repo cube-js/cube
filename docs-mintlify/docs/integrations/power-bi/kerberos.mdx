@@ -150,8 +150,9 @@ A connection authenticated as this account is allowed to impersonate other users
 Power BI Service passes an end user’s UPN via `EffectiveUserName`, Cube switches the
 session to that user. For this to work, the value must exactly match the user name the
 connection authenticates as — with Kerberos, that is the full principal in `user@REALM`
-format, e.g., `cube-pbi-svc-account@CUBE.DEV`. A NetBIOS format like
-`CUBE\cube-pbi-svc-account` will not match.
+format, e.g., `cube-pbi-svc-account@CUBE.DEV`. The match is case-sensitive, so keep the
+same letter case as the principal — the realm is typically uppercase. A NetBIOS format
+like `CUBE\cube-pbi-svc-account` will not match.
 
 Once the deployment is ready, you can test the Kerberos authentication by [connecting
 from Power BI][ref-power-bi] to the DAX API.
@@ -229,7 +230,7 @@ The Kerberos principal doesn’t resolve to a Cube user. Check that the user has
 the SCIM mapping was added, force a re-sync.
 * **`... is not allowed to switch to '<user>'`.** The connection didn’t authenticate as
 the [XMLA service account](#setting-the-xmla-service-account) — often because the account
-is set in NetBIOS format instead of `user@REALM`.
+is set in NetBIOS format instead of `user@REALM`, or with a different letter case.
 * **Errors when connecting as the keytab account.** `ktpass` rewrites the keytab
 account’s UPN, so it can no longer sign in. Connect with a
 [separate XMLA service account](#creating-the-service-accounts).
