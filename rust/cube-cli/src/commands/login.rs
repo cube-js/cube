@@ -43,10 +43,11 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
         url = generic_url();
     }
 
+    let generic = url == generic_url();
     let (token, refresh_token) = match args.api_key {
         Some(key) => (key, None),
         None => {
-            let (token, refresh, tenant_url) = device_login(&url).await?;
+            let (token, refresh, tenant_url) = device_login(&url, generic).await?;
             // The generic sign-in reports which tenant the account belongs
             // to — save and validate against that, not cubecloud.dev.
             if let Some(tenant) = tenant_url {
@@ -85,7 +86,14 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
 
 /// Drive the OAuth 2.0 device authorization grant and return
 /// (access_token, refresh_token, tenant_url).
-async fn device_login(url: &str) -> Result<(String, Option<String>, Option<String>)> {
+///
+/// In the generic (tenant-discovery) flow the browser link is routed
+/// through the sign-in page — `{host}/auth?redirect_to=<device page>` —
+/// so the user authenticates first and lands on the approval page.
+async fn device_login(
+    url: &str,
+    generic: bool,
+) -> Result<(String, Option<String>, Option<String>)> {
     let cfg = oauth::OAuthConfig::from_env();
     let http = reqwest::Client::builder()
         .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
@@ -93,10 +101,15 @@ async fn device_login(url: &str) -> Result<(String, Option<String>, Option<Strin
 
     let device = oauth::request_device_code(&http, url, &cfg).await?;
 
-    let verification = device
+    let mut verification = device
         .verification_uri_complete
         .clone()
         .unwrap_or_else(|| device.verification_uri.clone());
+    if generic {
+        if let Some(path) = path_and_query(&verification) {
+            verification = format!("{url}/auth?redirect_to={}", percent_encode(path));
+        }
+    }
 
     println!();
     println!("To authorize this CLI, open the following URL in your browser:");
@@ -115,4 +128,22 @@ async fn device_login(url: &str) -> Result<(String, Option<String>, Option<Strin
 
     let token = oauth::poll_for_token(&http, url, &cfg, &device).await?;
     Ok((token.access_token, token.refresh_token, token.tenant_url))
+}
+
+/// Path + query of an absolute URL (`https://host/a/b?c=d` → `/a/b?c=d`).
+fn path_and_query(url: &str) -> Option<&str> {
+    let after_scheme = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
+    after_scheme.find('/').map(|i| &after_scheme[i..])
+}
+
+/// Minimal percent-encoding for a query-parameter value.
+fn percent_encode(raw: &str) -> String {
+    raw.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
