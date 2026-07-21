@@ -86,6 +86,21 @@ want to delete, then open the switcher and click **Remove Branch**:
   <img src="https://ucarecdn.com/f1d37fe6-a6ae-4d78-a801-133639daf1ec/" alt="Delete a branch" />
 </Frame>
 
+### Sharing a link to a specific branch
+
+Add a `?branch=<name>` query parameter to a Data Model IDE URL to share a link
+that opens directly on that branch, for example:
+
+```
+https://<deployment-url>/d/<deployment-id>/model/files?branch=my-branch
+```
+
+Opening the link switches the viewer to `my-branch` once the branch list
+loads, then removes the parameter from the URL. It keeps the viewer's current
+mode — a read-only viewer stays read-only, and dev mode stays on if it was
+already on — but never turns on dev mode or creates a branch on its own. If
+the branch doesn't exist, you'll see an error toast instead.
+
 ## Generating data model files
 
 You can generate data model files when [creating a new
