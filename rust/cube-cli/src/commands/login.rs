@@ -7,8 +7,11 @@ use crate::{oauth, output, Ctx};
 
 /// Base used when the user doesn't know their tenant URL: the generic
 /// sign-in resolves the tenant from the signed-in account and returns it
-/// as `tenantUrl` in the token response.
-const GENERIC_URL: &str = "https://cubecloud.dev";
+/// as `tenantUrl` in the token response. `CUBE_GENERIC_LOGIN_URL`
+/// overrides the host (e.g. to point at a staging console).
+fn generic_url() -> String {
+    std::env::var("CUBE_GENERIC_LOGIN_URL").unwrap_or_else(|_| "https://cubecloud.dev".to_string())
+}
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -37,7 +40,7 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
     };
     let mut url = url.trim().trim_end_matches('/').to_string();
     if url.is_empty() {
-        url = GENERIC_URL.to_string();
+        url = generic_url();
     }
 
     let (token, refresh_token) = match args.api_key {
