@@ -35,8 +35,10 @@ name](#registering-the-spn) is registered in the domain.
 
 The **Settings → Power BI** page of your Cube deployment is the main entrypoint for
 configuring XMLA authentication. It shows the XMLA endpoint and your deployment's domain,
-generates ready-to-run `setspn` and `ktpass` commands, stores the XMLA service account
-credentials, and accepts the keytab upload.
+generates `setspn` and `ktpass` command templates, stores the XMLA service account
+credentials, and accepts the keytab upload. The generated commands use the XMLA service
+account name — replace it with the [keytab account](#creating-the-service-accounts)
+before running them.
 
 Configuring Kerberos authentication includes the following steps:
 
