@@ -92,7 +92,7 @@ pub enum CacheCommand {
     Remove {
         key: Ident,
     },
-    Truncate {},
+    Clear {},
     Incr {
         path: Ident,
     },
@@ -105,7 +105,7 @@ impl CacheCommand {
             CacheCommand::Get { .. } => "get",
             CacheCommand::Keys { .. } => "keys",
             CacheCommand::Remove { .. } => "remove",
-            CacheCommand::Truncate { .. } => "truncate",
+            CacheCommand::Clear { .. } => "clear",
             CacheCommand::Incr { .. } => "incr",
         }
     }
@@ -162,7 +162,7 @@ pub enum QueueCommand {
         key: QueueKey,
         timeout: u64,
     },
-    Truncate {},
+    Clear {},
 }
 
 impl QueueCommand {
@@ -183,7 +183,7 @@ impl QueueCommand {
             QueueCommand::Retrieve { .. } => "retrieve",
             QueueCommand::Result { .. } => "result",
             QueueCommand::ResultBlocking { .. } => "result_blocking",
-            QueueCommand::Truncate { .. } => "truncate",
+            QueueCommand::Clear { .. } => "clear",
         }
     }
 }
@@ -209,6 +209,7 @@ pub enum MetaStoreCommand {
     SetCurrent { id: u128 },
     Compaction,
     Healthcheck,
+    Truncate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -219,6 +220,7 @@ pub enum CacheStoreCommand {
     Info,
     Persist,
     Wipe,
+    Truncate,
 }
 
 type QueryParameterHolder = Option<QueryParameter>;
@@ -503,10 +505,10 @@ impl<'a> CubeStoreParser<'a> {
             "remove" => CacheCommand::Remove {
                 key: self.parse_identifier()?,
             },
-            "truncate" => CacheCommand::Truncate {},
+            "clear" => CacheCommand::Clear {},
             other => {
                 return Err(ParserError::ParserError(format!(
-                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE",
+                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|CLEAR",
                     other
                 )))
             }
@@ -608,6 +610,8 @@ impl<'a> CubeStoreParser<'a> {
             CacheStoreCommand::Healthcheck
         } else if self.parse_custom_token("wipe") {
             CacheStoreCommand::Wipe
+        } else if self.parse_custom_token("truncate") {
+            CacheStoreCommand::Truncate
         } else {
             return Err(ParserError::ParserError(
                 "Unknown cachestore command".to_string(),
@@ -626,6 +630,8 @@ impl<'a> CubeStoreParser<'a> {
             MetaStoreCommand::Compaction
         } else if self.parse_custom_token("healthcheck") {
             MetaStoreCommand::Healthcheck
+        } else if self.parse_custom_token("truncate") {
+            MetaStoreCommand::Truncate
         } else {
             return Err(ParserError::ParserError(
                 "Unknown metastore command".to_string(),
@@ -785,7 +791,7 @@ impl<'a> CubeStoreParser<'a> {
                     key: self.parse_queue_key()?,
                 }
             }
-            "truncate" => QueueCommand::Truncate {},
+            "clear" => QueueCommand::Clear {},
             other => {
                 return Err(ParserError::ParserError(format!(
                     "Unknown queue command: {}",
@@ -1052,6 +1058,35 @@ mod tests {
     fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
         let mut parser = CubeStoreParser::new(query, None)?;
         Ok(parser.parse_statement()?)
+    }
+
+    #[test]
+    fn parse_truncate_and_clear_commands() -> Result<(), CubeError> {
+        // New low-level whole-store wipes.
+        match parse_stmt("SYS CACHESTORE TRUNCATE")? {
+            Statement::System(SystemCommand::CacheStore(CacheStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS CACHESTORE TRUNCATE, got {:?}", s),
+        }
+        match parse_stmt("SYS METASTORE TRUNCATE")? {
+            Statement::System(SystemCommand::MetaStore(MetaStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS METASTORE TRUNCATE, got {:?}", s),
+        }
+
+        // Renamed logical per-table empties (were CACHE/QUEUE TRUNCATE).
+        match parse_stmt("CACHE CLEAR")? {
+            Statement::Cache(CacheCommand::Clear {}) => {}
+            s => panic!("Expected CACHE CLEAR, got {:?}", s),
+        }
+        match parse_stmt("QUEUE CLEAR")? {
+            Statement::Queue(QueueCommand::Clear {}) => {}
+            s => panic!("Expected QUEUE CLEAR, got {:?}", s),
+        }
+
+        // The old keywords must no longer parse.
+        assert!(parse_stmt("CACHE TRUNCATE").is_err());
+        assert!(parse_stmt("QUEUE TRUNCATE").is_err());
+
+        Ok(())
     }
 
     #[test]

@@ -892,6 +892,10 @@ impl SqlService for SqlServiceImpl {
                         self.db.healthcheck().await?;
                         Ok(DataFrame::empty().into())
                     }
+                    MetaStoreCommand::Truncate => {
+                        self.db.truncate().await?;
+                        Ok(DataFrame::empty().into())
+                    }
                 },
                 SystemCommand::CacheStore(command) => Ok(self
                     .cachestore

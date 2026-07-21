@@ -1038,6 +1038,38 @@ impl RocksStore {
             .await
     }
 
+    /// Wipe the entire keyspace of this store with a single low-level RocksDB
+    /// range deletion (no per-row reads).
+    pub async fn truncate(&self) -> Result<(), CubeError> {
+        // Whole-keyspace `[low, high)` bounds for the range delete. Every key
+        // this store writes begins with a `RowKey` tag byte in `1..=5` (see
+        // `RowKey::to_bytes`), so `[0x00]` sorts at or below any real key and 32
+        // `0xff` bytes sort strictly above any of them, covering the keyspace.
+        const KEYSPACE_LOWER_BOUND: [u8; 1] = [0x00];
+        const KEYSPACE_UPPER_BOUND: [u8; 32] = [0xffu8; 32];
+
+        self.write_operation("truncate", move |_db_ref, batch_pipe| {
+            batch_pipe.batch().delete_range(
+                KEYSPACE_LOWER_BOUND.as_slice(),
+                KEYSPACE_UPPER_BOUND.as_slice(),
+            );
+            Ok(())
+        })
+        .await?;
+
+        self.seq_store.lock()?.clear();
+
+        self.read_operation_out_of_queue("truncate_compaction", move |db_ref| {
+            let start: Option<&[u8]> = None;
+            let end: Option<&[u8]> = None;
+            db_ref.db.compact_range(start, end);
+            Ok(())
+        })
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn write_operation_impl<F, R, S>(
         &self,
         rw_loop: &RocksStoreRWLoop,

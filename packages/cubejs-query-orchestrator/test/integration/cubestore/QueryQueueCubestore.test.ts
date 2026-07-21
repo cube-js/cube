@@ -16,7 +16,7 @@ const cubeStoreDriverFactory = async () => {
   return cubeStoreDriver = new CubeStoreDriver({});
 };
 const beforeAll = async () => {
-  await (await cubeStoreDriverFactory()).query('QUEUE TRUNCATE');
+  await (await cubeStoreDriverFactory()).query('QUEUE CLEAR');
 };
 
 QueryQueueTest(
