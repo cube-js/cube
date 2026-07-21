@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+### Bug Fixes
+
+- **schema-compiler:** do not stamp default target on links meta ([#11294](https://github.com/cube-js/cube/issues/11294)) ([c7db3fc](https://github.com/cube-js/cube/commit/c7db3fc8874075c87e4cae33d75a18411cbe420e))
+- **schema-compiler:** resolve view extends order dependency ([#11297](https://github.com/cube-js/cube/issues/11297)) ([d6363c4](https://github.com/cube-js/cube/commit/d6363c4a3657f92c79c2c7fc7b32cf93257cb808)), closes [#11260](https://github.com/cube-js/cube/issues/11260) [#11260](https://github.com/cube-js/cube/issues/11260)
+- **schema-compiler:** Throw UserError for unknown granularity so API returns 400, thanks @BrianSigafoos-SQ ([#11288](https://github.com/cube-js/cube/issues/11288)) ([e8843dc](https://github.com/cube-js/cube/commit/e8843dc318391fcc05dcac7a3c494e2dbf080c25))
+
 ## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

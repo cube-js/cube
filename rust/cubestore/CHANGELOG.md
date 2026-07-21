@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+### Bug Fixes
+
+- **cubestore:** do not log rate limit errors as errors in HTTP module ([#11293](https://github.com/cube-js/cube/issues/11293)) ([a23d5d6](https://github.com/cube-js/cube/commit/a23d5d663c47bd5918f1dfa62f4aa20cba8eef58))
+- **cubestore:** raise Kafka watermark fetch timeout to stop constant broker disconnects ([#11290](https://github.com/cube-js/cube/issues/11290)) ([d1d0846](https://github.com/cube-js/cube/commit/d1d0846500141c2bfc7a755a476935572cdad45c))
+- **cubestore:** send x-amz-server-side-encryption only on object-storing S3 requests ([#11278](https://github.com/cube-js/cube/issues/11278)) ([3013a46](https://github.com/cube-js/cube/commit/3013a46f3cb96b50d2f8b95f6e236b889692aa63)), closes [cube-js/rust-s3#2](https://github.com/cube-js/rust-s3/issues/2) [cube-js/rust-s3#2](https://github.com/cube-js/rust-s3/issues/2)
+
+### Features
+
+- **cubestore:** Introduce SYS CACHESTORE WIPE ([#11298](https://github.com/cube-js/cube/issues/11298)) ([9c91f60](https://github.com/cube-js/cube/commit/9c91f60a52c54a4324a4f618721459a6234597cc))
+
 ## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
 
 ### Features

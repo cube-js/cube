@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+### Features
+
+- add lastRefreshTime to Load Request Success telemetry events ([#11283](https://github.com/cube-js/cube/issues/11283)) ([802758c](https://github.com/cube-js/cube/commit/802758cb974d787fe5ff0e3f2297bf51b0710694))
+
 ## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
 
 ### Bug Fixes

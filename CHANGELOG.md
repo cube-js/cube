@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+### Bug Fixes
+
+- **cubestore:** do not log rate limit errors as errors in HTTP module ([#11293](https://github.com/cube-js/cube/issues/11293)) ([a23d5d6](https://github.com/cube-js/cube/commit/a23d5d663c47bd5918f1dfa62f4aa20cba8eef58))
+- **cubestore:** raise Kafka watermark fetch timeout to stop constant broker disconnects ([#11290](https://github.com/cube-js/cube/issues/11290)) ([d1d0846](https://github.com/cube-js/cube/commit/d1d0846500141c2bfc7a755a476935572cdad45c))
+- **cubestore:** send x-amz-server-side-encryption only on object-storing S3 requests ([#11278](https://github.com/cube-js/cube/issues/11278)) ([3013a46](https://github.com/cube-js/cube/commit/3013a46f3cb96b50d2f8b95f6e236b889692aa63)), closes [cube-js/rust-s3#2](https://github.com/cube-js/rust-s3/issues/2) [cube-js/rust-s3#2](https://github.com/cube-js/rust-s3/issues/2)
+- **schema-compiler:** do not stamp default target on links meta ([#11294](https://github.com/cube-js/cube/issues/11294)) ([c7db3fc](https://github.com/cube-js/cube/commit/c7db3fc8874075c87e4cae33d75a18411cbe420e))
+- **schema-compiler:** resolve view extends order dependency ([#11297](https://github.com/cube-js/cube/issues/11297)) ([d6363c4](https://github.com/cube-js/cube/commit/d6363c4a3657f92c79c2c7fc7b32cf93257cb808)), closes [#11260](https://github.com/cube-js/cube/issues/11260) [#11260](https://github.com/cube-js/cube/issues/11260)
+- **schema-compiler:** Throw UserError for unknown granularity so API returns 400, thanks @BrianSigafoos-SQ ([#11288](https://github.com/cube-js/cube/issues/11288)) ([e8843dc](https://github.com/cube-js/cube/commit/e8843dc318391fcc05dcac7a3c494e2dbf080c25))
+
+### Features
+
+- add lastRefreshTime to Load Request Success telemetry events ([#11283](https://github.com/cube-js/cube/issues/11283)) ([802758c](https://github.com/cube-js/cube/commit/802758cb974d787fe5ff0e3f2297bf51b0710694))
+- **cube-cli:** GitHub import, upload deploy, install/self-update, telemetry ([#11291](https://github.com/cube-js/cube/issues/11291)) ([11c67c4](https://github.com/cube-js/cube/commit/11c67c451f09840ece18b6d5e800bff182723ddf))
+- **cubestore:** Introduce SYS CACHESTORE WIPE ([#11298](https://github.com/cube-js/cube/issues/11298)) ([9c91f60](https://github.com/cube-js/cube/commit/9c91f60a52c54a4324a4f618721459a6234597cc))
+
 ## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
 
 ### Bug Fixes
