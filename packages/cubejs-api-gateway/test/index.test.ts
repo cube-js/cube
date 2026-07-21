@@ -18,6 +18,7 @@ import {
   AdapterApiMock
 } from './mocks';
 import { ApiScopesTuple } from '../src/types/auth';
+import { PreAggJob } from '../src/types/request';
 
 const logger = (type, message) => console.log({ type, ...message });
 
@@ -1183,6 +1184,57 @@ describe('API Gateway', () => {
       res = await req;
       expect(res.status).toEqual(400);
       expect(res.body.error.includes('Cannot parse selector date range')).toBeTruthy();
+    });
+
+    // https://github.com/cube-js/cube/issues/11313
+    test('job queue status is reported per job data source, not only for the default one', async () => {
+      // Constructed off the prototype (bypassing the constructor, which requires a full
+      // native SQL server) since getPreAggJobQueueStatus doesn't use instance state.
+      const apiGateway = Object.create(ApiGateway.prototype);
+
+      const job: PreAggJob = {
+        request: 'request-id',
+        context: { securityContext: {} },
+        preagg: 'orders_test.main',
+        table: 'orders_test_main',
+        target: 'orders_test_main_20200101',
+        structure: 'structure-version',
+        content: 'content-version',
+        updated: 1,
+        key: [],
+        status: 'scheduled',
+        timezone: 'UTC',
+        dataSource: 'test_ds',
+      };
+
+      // Mimics QueryOrchestrator#getPreAggregationQueueStates, which defaults
+      // its dataSource argument to 'default' and only returns queue entries
+      // that were scheduled on the requested data source's queue.
+      const orchestrator = {
+        getPreAggregationQueueStates: jest.fn((dataSource = 'default') => {
+          if (dataSource !== job.dataSource) {
+            return [];
+          }
+          return [{
+            queryHandler: 'query',
+            query: {
+              requestId: job.request,
+              newVersionEntry: {
+                table_name: job.table,
+                structure_version: job.structure,
+                content_version: job.content,
+                last_updated_at: job.updated,
+              },
+            },
+            status: ['active'],
+          }];
+        }),
+      };
+
+      const status = await (apiGateway as any).getPreAggJobQueueStatus(orchestrator, job);
+
+      expect(orchestrator.getPreAggregationQueueStates).toHaveBeenCalledWith(job.dataSource);
+      expect(status).toEqual('processing');
     });
   });
 
