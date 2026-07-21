@@ -5,9 +5,15 @@ use crate::client::Client;
 use crate::config::ContextConfig;
 use crate::{oauth, output, Ctx};
 
+/// Base used when the user doesn't know their tenant URL: the generic
+/// sign-in resolves the tenant from the signed-in account and returns it
+/// as `tenantUrl` in the token response.
+const GENERIC_URL: &str = "https://cubecloud.dev";
+
 #[derive(clap::Args)]
 pub struct Args {
-    /// Cube Cloud URL, e.g. https://<tenant>.cubecloud.dev
+    /// Cube Cloud URL, e.g. https://<tenant>.cubecloud.dev (omit to sign in
+    /// via cubecloud.dev, which finds your tenant from your account)
     #[arg(long)]
     url: Option<String>,
     /// Authenticate with an API key instead of the browser device flow
@@ -23,13 +29,28 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
         Some(url) => url,
         None => inquire::Text::new("Cube Cloud URL:")
             .with_placeholder("https://<tenant>.cubecloud.dev")
+            .with_help_message(
+                "don't know your tenant? press Enter to sign in via cubecloud.dev \
+                 — it finds your tenant from your account",
+            )
             .prompt()?,
     };
-    let url = url.trim_end_matches('/').to_string();
+    let mut url = url.trim().trim_end_matches('/').to_string();
+    if url.is_empty() {
+        url = GENERIC_URL.to_string();
+    }
 
     let (token, refresh_token) = match args.api_key {
         Some(key) => (key, None),
-        None => device_login(&url).await?,
+        None => {
+            let (token, refresh, tenant_url) = device_login(&url).await?;
+            // The generic sign-in reports which tenant the account belongs
+            // to — save and validate against that, not cubecloud.dev.
+            if let Some(tenant) = tenant_url {
+                url = tenant.trim_end_matches('/').to_string();
+            }
+            (token, refresh)
+        }
     };
 
     // Validate the credentials before saving them.
@@ -60,8 +81,8 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
 }
 
 /// Drive the OAuth 2.0 device authorization grant and return
-/// (access_token, refresh_token).
-async fn device_login(url: &str) -> Result<(String, Option<String>)> {
+/// (access_token, refresh_token, tenant_url).
+async fn device_login(url: &str) -> Result<(String, Option<String>, Option<String>)> {
     let cfg = oauth::OAuthConfig::from_env();
     let http = reqwest::Client::builder()
         .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
@@ -90,5 +111,5 @@ async fn device_login(url: &str) -> Result<(String, Option<String>)> {
     println!("{}", "Waiting for authorization…".dimmed());
 
     let token = oauth::poll_for_token(&http, url, &cfg, &device).await?;
-    Ok((token.access_token, token.refresh_token))
+    Ok((token.access_token, token.refresh_token, token.tenant_url))
 }
