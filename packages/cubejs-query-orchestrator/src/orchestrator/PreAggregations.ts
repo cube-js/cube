@@ -363,6 +363,12 @@ export class PreAggregations {
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
   }
 
+  public async removeTableUsed(tableName: string): Promise<void> {
+    this.usedCache.delete(tableName);
+
+    await this.queryCache.getCacheDriver().remove(this.tablesUsedRedisKey(tableName));
+  }
+
   public async updateLastTouch(tableName: string): Promise<void> {
     if (this.touchCache.has(tableName)) {
       return;
@@ -386,6 +392,12 @@ export class PreAggregations {
   public async tablesTouched() {
     return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesTouchRedisKey('')))
       .map(k => k.replace(this.tablesTouchRedisKey(''), ''));
+  }
+
+  public async removeTableTouched(tableName: string): Promise<void> {
+    this.touchCache.delete(tableName);
+
+    await this.queryCache.getCacheDriver().remove(this.tablesTouchRedisKey(tableName));
   }
 
   public async updatePreAggBackoff(tableName: string, backoffData: { backoffMultiplier: number, nextTimestamp: Date }): Promise<void> {
