@@ -132,6 +132,9 @@ export class BaseQuery {
   /** @type {import('../compiler/JoinGraph').FinishedJoinTree} */
   join;
 
+  /** @type {Readonly<Record<string, string>> | undefined} */
+  allBackAliasMembersExceptSegmentsCache;
+
   /**
    * BaseQuery class constructor.
    * @param {Compilers|*} compilers
@@ -5374,7 +5377,24 @@ export class BaseQuery {
    * @returns {Record<string, string>}
    */
   allBackAliasMembersExceptSegments() {
-    return this.backAliasMembers(this.flattenAllMembers(true));
+    // Alias collection can run while the join is still being built or from a
+    // nested alias-gathering traversal. Those intermediate results depend on
+    // the current evaluation phase and must not be cached.
+    if (
+      this.joinGraphPaths === undefined ||
+      this.joinGraphPaths === null ||
+      this.safeEvaluateSymbolContext().aliasGathering
+    ) {
+      return this.backAliasMembers(this.flattenAllMembers(true));
+    }
+
+    if (!this.allBackAliasMembersExceptSegmentsCache) {
+      this.allBackAliasMembersExceptSegmentsCache = Object.freeze(
+        this.backAliasMembers(this.flattenAllMembers(true))
+      );
+    }
+
+    return this.allBackAliasMembersExceptSegmentsCache;
   }
 
   /**
