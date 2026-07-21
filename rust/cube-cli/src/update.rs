@@ -110,7 +110,7 @@ pub fn spawn_check() -> tokio::task::JoinHandle<Option<String>> {
         if newer_than(&latest, CURRENT_VERSION) {
             Some(format!(
                 "\n{} {} → {}\nRun {} to install it.",
-                "A new release of cube is available:".yellow(),
+                "A new release of Cube CLI is available:".yellow(),
                 CURRENT_VERSION.dimmed(),
                 latest.bold().green(),
                 "cube update".bold().cyan(),
