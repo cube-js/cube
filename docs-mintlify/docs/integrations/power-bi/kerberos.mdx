@@ -1,10 +1,10 @@
 ---
 title: Kerberos authentication
-description: "Kerberos is the most common authentication method for Windows environments. It can be used to authenticate requests to DAX API."
+description: "Kerberos is the most common authentication method for Windows environments. It can be used to authenticate requests to the DAX API and MDX API."
 ---
 
 [Kerberos][link-kerberos] is the most common authentication method for Windows environments.
-It can be used to authenticate requests to [DAX API][ref-dax-api].
+It can be used to authenticate requests to the [DAX API][ref-dax-api] and [MDX API][ref-mdx-api].
 
 <Note>
 
@@ -28,18 +28,25 @@ It works as follows:
 name](#registering-the-spn) is registered in the domain.
 * Once verified, the Key Distribution Center issues a Kerberos ticket for the user.
 * This ticket is transmitted to the DAX API in the request authorization header.
-* The DAX API [decrypts and verifies](#configuring-the-deployment) the Kerberos ticket.
-* Finally, the user principal name is passed for [further verification](#verifying-the-credentials).
+* The DAX API [decrypts and verifies](#generating-and-uploading-the-keytab) the Kerberos ticket.
+* Finally, the user principal name is [resolved to a Cube user](#provisioning-users-with-scim).
 
 ## Configuration
+
+The **Settings → Power BI** page of your Cube deployment is the main entrypoint for
+configuring XMLA authentication. It shows the XMLA endpoint and your deployment's domain,
+generates `setspn` and `ktpass` command templates, stores the XMLA service account
+credentials, and accepts the keytab upload. The generated commands use the XMLA service
+account name — replace it with the [keytab account](#creating-the-service-accounts)
+before running them.
 
 Configuring Kerberos authentication includes the following steps:
 
 * [Obtain a Windows Server machine](#obtaining-a-windows-machine) to use during the next steps.
-* [Register the service principal name](#registering-the-spn).
-* [Generate a keytab](#generating-the-keytab).
-* [Configure the deployment](#configuring-the-deployment) to verify Kerberos tickets.
-* Optionally, [customize the authentication](#verifying-the-credentials).
+* [Create the service accounts](#creating-the-service-accounts).
+* [Register the SPNs](#registering-the-spn).
+* [Generate and upload the keytab](#generating-and-uploading-the-keytab).
+* [Set the XMLA service account](#setting-the-xmla-service-account).
 
 ### Obtaining a Windows machine
 
@@ -53,8 +60,8 @@ on Azure, this virtual machine can be created in the `aadds-vnet` subnet.
 You should log in to this Windows Server machine using the account that has
 [AAD DC Administrators][link-aad-dc-admins] group membership.
 
-It is also recommended to create a custom organizational unit (OU) and a new user
-in this OU that will act as the service account.
+It is also recommended to create a custom organizational unit (OU) for the
+[service accounts](#creating-the-service-accounts).
 
 On the screenshot below, the `mdax-api-svc-account` user is created in the
 `MyCustomOU` OU in the `CUBE` domain:
@@ -63,16 +70,26 @@ On the screenshot below, the `mdax-api-svc-account` user is created in the
   <img src="https://ucarecdn.com/4245aea8-3e75-4336-ad63-b8f899d0bbc2/" />
 </Frame>
 
+### Creating the service accounts
+
+Create two separate accounts in your directory:
+
+* A **keytab account** (e.g., `mdax-api-svc-account`) that the SPNs are registered on
+and the keytab is generated for. Running `ktpass` rewrites this account's user principal
+name to the SPN format — this is expected, but it means the account can no longer sign
+in as a regular user, so don't use it for anything else.
+* An **XMLA service account** (e.g., `cube-pbi-svc-account`) that clients — for example,
+the Power BI [on-premises data gateway][link-power-bi-opdg] — use to connect to Cube.
+
 ### Registering the SPN
 
 A [service principal name][link-spn] (SPN) is a unique identifier of a service instance.
 Kerberos authentication uses SPNs to associate a service instance with a service sign-in account.
 
-First, obtain your Cube Cloud deployment’s domain by going to **Settings → General**
-and copying the value in the **Custom domain** section.
+First, obtain your deployment’s domain from the **Settings → Power BI** page.
 
 Then, use the [`setspn` command][link-setspn] to register the Service Principal Name
-for the DAX API.
+for the DAX API against the keytab account.
 
 In the following example, the web service (`HTTP`) SPN on the
 `redundant-brohman.gcp-us-central1.cubecloudapp.dev` domain is registered for the
@@ -82,7 +99,31 @@ In the following example, the web service (`HTTP`) SPN on the
 setspn -S HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev CUBE\mdax-api-svc-account
 ```
 
-### Generating the keytab
+If clients connect to the deployment through a different hostname (e.g., a custom
+domain), register the SPN for the hostname that clients actually connect to.
+
+#### Load balancer SPN on AWS
+
+On AWS, the deployment’s domain is a CNAME record pointing to the DNS name of an AWS
+load balancer. When connecting directly (without an HTTP proxy), Windows resolves the
+CNAME and requests a Kerberos ticket for the load balancer hostname, so a second SPN
+must be registered on the same account. Without it, clients silently fall back to
+[NTLM][ref-ntlm]. GCP deployments resolve to an A record and don’t need this.
+
+Find the load balancer hostname and register the second SPN:
+
+```bash
+nslookup redundant-brohman.aws-us-east-1.cubecloudapp.dev
+# Name: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-1234567890abcdef.elb.us-east-1.amazonaws.com
+
+setspn -S HTTP/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-1234567890abcdef.elb.us-east-1.amazonaws.com CUBE\mdax-api-svc-account
+```
+
+The keytab doesn’t need to be regenerated — both SPNs share the keytab account’s key.
+If the deployment’s load balancer is ever re-provisioned, its hostname changes and the
+second SPN must be registered again.
+
+### Generating and uploading the keytab
 
 The [keytab][link-keytab-file] file contains information needed to decrypt the Kerberos
 token.
@@ -94,30 +135,24 @@ prompted to enter the password for the specified user:
 ktpass /out kerberos.keytab /princ HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev@CUBE.DEV /mapuser mdax-api-svc-account /crypto All /ptype KRB5_NT_PRINCIPAL /pass *
 ```
 
-Then, convert the keytab to a Base64-encoded string. For example, the following PowerShell
-script will do the conversion and put the result in the clipboard:
+Then, upload the `.keytab` file on the **Settings → Power BI** page. It is stored
+Base64-encoded in the `CUBE_XMLA_KRB5_KEYTAB_B64` environment variable. The
+`CUBE_XMLA_SPN` and `KRB5_KTNAME` environment variables are managed by Cube
+automatically and don’t need to be set.
 
-```ps
-$Path = "C:\kerberos.keytab"
-[Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) | Set-Clipboard
-```
+### Setting the XMLA service account
 
-### Configuring the deployment
+On the **Settings → Power BI** page, set the **XMLA service account** name and password.
+They are stored in the `CUBE_XMLA_API_USER` and `CUBE_XMLA_API_PASSWORD` environment
+variables and default to the deployment’s SQL API credentials.
 
-Go to **Settings → Environment Variables** of your Cube Cloud deployment and set
-the following environment variables to facilitate the verification of Kerberos tickets:
-
-| Environment variable | Value |
-| --- | --- |
-| `CUBE_XMLA_KRB5_KEYTAB_B64` | Base64-encoded keytab |
-| `CUBE_XMLA_SPN` | `HTTP` |
-| `KRB5_KTNAME` | `/cube/conf/kerberos.keytab` |
-
-### Verifying the credentials
-
-By default, [`CUBEJS_SQL_USER`](/reference/configuration/environment-variables#cubejs_sql_user) and [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password) environment variables are used
-to verify the passed credentials. You can also customize the authentication by using the
-[`check_sql_auth` configuration option][ref-config-check-sql-auth].
+A connection authenticated as this account is allowed to impersonate other users: when
+Power BI Service passes an end user’s UPN via `EffectiveUserName`, Cube switches the
+session to that user. For this to work, the value must exactly match the user name the
+connection authenticates as — with Kerberos, that is the full principal in `user@REALM`
+format, e.g., `cube-pbi-svc-account@CUBE.DEV`. The match is case-sensitive, so keep the
+same letter case as the principal — the realm is typically uppercase. A NetBIOS format
+like `CUBE\cube-pbi-svc-account` will not match.
 
 Once the deployment is ready, you can test the Kerberos authentication by [connecting
 from Power BI][ref-power-bi] to the DAX API.
@@ -184,6 +219,26 @@ only the IdP-side mapping UI differs. In Okta, add a custom attribute on the SCI
 Profile Editor, then bind your source attribute to it on the Mappings tab. The value Cube
 receives is just a string — what you map to it is your decision.
 
+## Troubleshooting
+
+* **Kerberos works through an HTTP proxy (e.g., Fiddler) but falls back to NTLM on a
+direct connection.** On AWS, this means the [load balancer SPN](#load-balancer-spn-on-aws)
+is missing.
+* **`Unable to fetch Cloud context for XMLA user` in logs, `Access Denied` in the client.**
+The Kerberos principal doesn’t resolve to a Cube user. Check that the user has a matching
+[alternate username](#provisioning-users-with-scim); if the user was provisioned before
+the SCIM mapping was added, force a re-sync.
+* **`... is not allowed to switch to '<user>'`.** The connection didn’t authenticate as
+the [XMLA service account](#setting-the-xmla-service-account) — often because the account
+is set in NetBIOS format instead of `user@REALM`, or with a different letter case.
+* **Errors when connecting as the keytab account.** `ktpass` rewrites the keytab
+account’s UPN, so it can no longer sign in. Connect with a
+[separate XMLA service account](#creating-the-service-accounts).
+
+Cube always offers `Negotiate`, `NTLM`, and `Basic` authentication on the XMLA endpoints;
+the NTLM fallback can’t be disabled. Check the deployment logs to see which method a
+connection actually used: `method=kerberos` vs. `method=ntlm`.
+
 
 [link-rsat]: https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/remote-server-administration-tools
 [link-kdc]: https://learn.microsoft.com/en-us/windows/win32/secauthn/key-distribution-center
@@ -192,8 +247,10 @@ receives is just a string — what you map to it is your decision.
 [link-setspn]: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc731241(v=ws.11)
 [link-keytab-file]: https://web.mit.edu/Kerberos/krb5-1.16/doc/basic/keytab_def.html
 [link-ktpass]: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ktpass
-[ref-power-bi]: /admin/connect-to-data/visualization-tools/powerbi#connecting-from-power-bi
+[ref-power-bi]: /admin/connect-to-data/visualization-tools/powerbi#connect-to-the-dax-api
 [link-kerberos]: https://en.wikipedia.org/wiki/Kerberos_(protocol)#Microsoft_Windows
 [ref-dax-api]: /reference/core-data-apis/dax-api
-[ref-config-check-sql-auth]: /reference/configuration/config#check_sql_auth
+[ref-mdx-api]: /reference/core-data-apis/mdx-api
+[ref-ntlm]: /docs/integrations/power-bi/ntlm
+[link-power-bi-opdg]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
 [ref-scim]: /admin/sso/microsoft-entra-id/scim

@@ -1,10 +1,10 @@
 ---
 title: NTLM authentication
-description: "NTLM is an authentication method developed by Microsoft that can be used to authenticate requests to DAX API."
+description: "NTLM is an authentication method developed by Microsoft that can be used to authenticate requests to the DAX API and MDX API."
 ---
 
 [NTLM][link-ntlm] is an authentication method developed by Microsoft that can be used to
-authenticate requests to [DAX API][ref-dax-api].
+authenticate requests to the [DAX API][ref-dax-api] and [MDX API][ref-mdx-api].
 
 <Note>
 
@@ -77,7 +77,9 @@ You need to have the [on-premises data gateway][link-power-bi-opdg] installed
 on a Windows Server machine.
 
 It should be configured to authenticate with a _master user_ account. It can be a
-local user on the machine or a domain user.
+local user on the machine or a domain user. Its credentials must match the [XMLA
+service account](#verifying-the-credentials) configured in Cube — the user name must
+match exactly, including the format and letter case (e.g., `svc-account@example.com`).
 
 The Windows machine running the gateway should be joined to the corporate Active
 Directory or Entra ID where your business users have their accounts. The service account running
@@ -85,19 +87,27 @@ the gateway needs minimal permissions but must exist in that same directory.
 
 ### Verifying the credentials
 
-By default, [`CUBEJS_SQL_USER`](/reference/configuration/environment-variables#cubejs_sql_user) and [`CUBEJS_SQL_PASSWORD`](/reference/configuration/environment-variables#cubejs_sql_password) environment variables are used
-to verify the passed credentials. You can also customize the authentication by using the
-[`check_sql_auth` configuration option][ref-config-check-sql-auth].
+NTLM connections are verified against the **XMLA service account** credentials set on
+the **Settings → Power BI** page of your deployment. They are stored in the
+`CUBE_XMLA_API_USER` and `CUBE_XMLA_API_PASSWORD` environment variables and default to
+the deployment’s SQL API credentials.
 
-Also, the [`CUBEJS_SQL_SUPER_USER`](/reference/configuration/environment-variables#cubejs_sql_super_user) environment variable or the [`can_switch_sql_user`
-configuration option][ref-config-can-switch-sql-user] can be used to ensure that the
-user name can be changed to the UPN of the interacting user only if proper credentials
-of the master user account were passed.
+All NTLM connections are validated against this single shared password — per-user
+passwords are not supported with NTLM. Users other than the service account must exist
+as Cube users. A mismatch fails with
+`Authentication failed due to invalid username or password`.
+
+Cube changes the session user to the UPN of the interacting user only if the connection
+authenticated as the XMLA service account. The UPN must resolve to a Cube user — see
+[provisioning users with SCIM][ref-kerberos-scim]. The [`can_switch_sql_user`
+configuration option][ref-config-can-switch-sql-user] can be used to customize this
+check.
 
 
 [link-ntlm]: https://en.wikipedia.org/wiki/NTLM
 [ref-dax-api]: /reference/core-data-apis/dax-api
+[ref-mdx-api]: /reference/core-data-apis/mdx-api
 [link-power-bi-opdg]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
 [ref-kerberos]: /docs/integrations/power-bi/kerberos
-[ref-config-check-sql-auth]: /reference/configuration/config#check_sql_auth
+[ref-kerberos-scim]: /docs/integrations/power-bi/kerberos#provisioning-users-with-scim
 [ref-config-can-switch-sql-user]: /reference/configuration/config#can_switch_sql_user

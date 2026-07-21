@@ -32,11 +32,17 @@ method.
 
 In Power BI Desktop, choose the **SQL Server Analysis Services database** option
 when connecting to a data source. Then, enter the DAX API credentials and choose
-**Windows** authentication. It accomodates both [Kerberos][ref-kerberos] and
+**Windows** authentication. It accommodates both [Kerberos][ref-kerberos] and
 [NTLM][ref-ntlm] methods.
 
 To find your DAX API credentials, go to the [Integrations][ref-integrations-apis] page,
-click **API credentials**, and choose the **DAX API** tab.
+click **API credentials**, and choose the **DAX API** tab. Use the full DAX API URL,
+including the `/cubejs-api/v2/dax` path, as the server name — with a bare hostname, the
+client tries to reach an Analysis Services instance on TCP port 2383 and fails to
+connect.
+
+Authentication for the DAX API — the XMLA service account, NTLM credentials, and
+Kerberos assets — is configured on the **Settings → Power BI** page of your deployment.
 
 ### Authentication methods
 

@@ -60,10 +60,16 @@ in the same cube or view), that would cause a conflict.
 ## Authentication
 
 The DAX API supports [Kerberos][ref-kerberos] and [NTLM][ref-ntlm] authentication
-methods.
+methods, as well as user name and password authentication.
 
 While NTLM can be used for testing purposes, we strongly recommend configuring
 Kerberos for production environments.
+
+Authentication is configured on the **Settings → Power BI** page of your deployment.
+It shows the XMLA endpoint URL and manages the XMLA service account credentials and
+the Kerberos setup, including the keytab upload. For quick connectivity tests, you can
+also enable short-lived token authentication in **Settings → Configuration**; it is
+not recommended for production.
 
 ## Data modeling
 
