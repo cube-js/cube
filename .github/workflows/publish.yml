@@ -803,12 +803,17 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache-workspaces: rust/cube-cli
-      - name: Set crate version to the release version
+      # The CLI version comes from lerna.json at build time (see
+      # rust/cube-cli/build.rs); just guard against tag/lerna drift.
+      - name: Check release version matches lerna.json
         shell: bash
         run: |
           v="${GITHUB_REF_NAME#v}"
-          sed -i.bak "s/^version = .*/version = \"$v\"/" rust/cube-cli/Cargo.toml
-          rm -f rust/cube-cli/Cargo.toml.bak
+          l=$(jq -r .version lerna.json)
+          if [ "$v" != "$l" ]; then
+            echo "tag version $v does not match lerna.json version $l" >&2
+            exit 1
+          fi
       - name: Build
         working-directory: rust/cube-cli
         run: cargo build --release --target ${{ matrix.target }}

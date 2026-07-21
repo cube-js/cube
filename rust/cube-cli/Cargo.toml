@@ -1,9 +1,11 @@
 [package]
 name = "cube-cli"
-# Kept in lockstep with the Cube monorepo version (lerna.json). The release
-# workflow overrides this from the pushed `v*` tag at build time.
-version = "1.7.2"
+# Placeholder — the real version is the Cube monorepo version, read from the
+# repo-root lerna.json by build.rs at build time (CUBE_CLI_VERSION). This
+# field is only the fallback for builds outside the monorepo.
+version = "0.0.0"
 edition = "2021"
+build = "build.rs"
 description = "Cube Cloud command line interface"
 license = "Apache-2.0"
 repository = "https://github.com/cube-js/cube"
@@ -39,6 +41,9 @@ etcetera = "0.8"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[build-dependencies]
+serde_json = "1"
 
 [profile.release]
 lto = "thin"

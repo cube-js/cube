@@ -16,7 +16,7 @@ pub struct Args {
 
 pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
     let http = reqwest::Client::builder()
-        .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
         .build()?;
 
     let release = update::latest_release(&http).await?;
@@ -24,7 +24,7 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
 
     if !is_newer(latest, CURRENT_VERSION) {
         output::success(&format!(
-            "cube {CURRENT_VERSION} is up to date (latest release: {latest})"
+            "Cube CLI {CURRENT_VERSION} is up to date (latest release: {latest})"
         ));
         return Ok(());
     }
@@ -57,7 +57,7 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
     let new_binary = extract_binary(&bytes)?;
     replace_current_exe(&new_binary)?;
 
-    output::success(&format!("Updated cube {CURRENT_VERSION} → {latest}"));
+    output::success(&format!("Updated Cube CLI {CURRENT_VERSION} → {latest}"));
     Ok(())
 }
 

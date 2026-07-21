@@ -25,7 +25,7 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
             .with_placeholder("https://<tenant>.cubecloud.dev")
             .prompt()?,
     };
-    let url = url.trim_end_matches('/').to_string();
+    let url = url.trim().trim_end_matches('/').to_string();
 
     let (token, refresh_token) = match args.api_key {
         Some(key) => (key, None),
@@ -64,7 +64,7 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
 async fn device_login(url: &str) -> Result<(String, Option<String>)> {
     let cfg = oauth::OAuthConfig::from_env();
     let http = reqwest::Client::builder()
-        .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
         .build()?;
 
     let device = oauth::request_device_code(&http, url, &cfg).await?;

@@ -283,7 +283,7 @@ dependencies = [
 
 [[package]]
 name = "cube-cli"
-version = "1.7.2"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",

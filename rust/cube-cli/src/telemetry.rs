@@ -37,7 +37,7 @@ pub fn event(name: &str, props: Map<String, Value>) {
     }
     let mut payload = json!({
         "event": name,
-        "cliVersion": env!("CARGO_PKG_VERSION"),
+        "cliVersion": env!("CUBE_CLI_VERSION"),
         "clientTimestamp": timestamp(),
         "id": random_id(),
         "platform": platform(),
@@ -58,7 +58,7 @@ pub async fn flush() {
         return;
     }
     let Ok(http) = reqwest::Client::builder()
-        .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
         .timeout(Duration::from_secs(2))
         .build()
     else {

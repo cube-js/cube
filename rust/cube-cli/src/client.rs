@@ -39,7 +39,7 @@ impl Client {
         }
         Ok(Self {
             http: reqwest::Client::builder()
-                .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+                .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
                 .build()?,
             base_url,
             token: Mutex::new(token.to_string()),
@@ -74,16 +74,16 @@ impl Client {
         self.token.lock().unwrap().clone()
     }
 
-    /// Authorization header value for a credential. JWTs (three dot-separated
-    /// segments — OAuth access tokens, legacy deploy JWTs) use the `Bearer`
-    /// scheme; opaque credentials are Cube Cloud API keys and use `Api-Key`.
-    /// `CUBE_AUTH_SCHEME=bearer|api-key` overrides the heuristic.
+    /// Authorization header value for a credential. Cube Cloud API keys are
+    /// prefixed `sk-` and use the `Api-Key` scheme; everything else (OAuth
+    /// access tokens — not necessarily JWTs — and legacy deploy JWTs) uses
+    /// `Bearer`. `CUBE_AUTH_SCHEME=bearer|api-key` overrides the detection.
     fn authorization(token: &str) -> String {
         let scheme = match std::env::var("CUBE_AUTH_SCHEME").as_deref() {
             Ok("bearer") | Ok("Bearer") => "Bearer",
             Ok("api-key") | Ok("Api-Key") => "Api-Key",
-            _ if token.split('.').count() == 3 => "Bearer",
-            _ => "Api-Key",
+            _ if token.starts_with("sk-") => "Api-Key",
+            _ => "Bearer",
         };
         format!("{scheme} {token}")
     }
