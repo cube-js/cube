@@ -13,9 +13,9 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "cube",
-    version,
-    about = "Cube Cloud command line interface",
-    propagate_version = true
+    display_name = "Cube CLI",
+    version = env!("CUBE_CLI_VERSION"),
+    about = "Cube Cloud command line interface"
 )]
 struct Cli {
     #[command(flatten)]

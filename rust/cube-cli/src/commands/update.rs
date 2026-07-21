@@ -16,7 +16,7 @@ pub struct Args {
 
 pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
     let http = reqwest::Client::builder()
-        .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
         .build()?;
 
     let release = update::latest_release(&http).await?;

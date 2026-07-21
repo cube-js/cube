@@ -39,7 +39,7 @@ impl Client {
         }
         Ok(Self {
             http: reqwest::Client::builder()
-                .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+                .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
                 .build()?,
             base_url,
             token: Mutex::new(token.to_string()),

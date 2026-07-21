@@ -15,7 +15,7 @@ fn release_api_base() -> String {
     std::env::var("CUBE_UPDATE_API").unwrap_or_else(|_| "https://api.github.com".to_string())
 }
 
-pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const CURRENT_VERSION: &str = env!("CUBE_CLI_VERSION");
 
 /// The release target triple this binary maps to. Linux always maps to the
 /// musl asset — that's the only Linux artifact we ship, and it runs anywhere.
@@ -102,7 +102,7 @@ pub fn spawn_check() -> tokio::task::JoinHandle<Option<String>> {
             return None;
         }
         let http = reqwest::Client::builder()
-            .user_agent(concat!("cube-cli/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
             .build()
             .ok()?;
         let release = latest_release(&http).await.ok()?;

@@ -58,9 +58,11 @@ no OpenSSL dependency and musl builds work out of the box.
 
 ## Versioning & releases
 
-The CLI version tracks the Cube monorepo version (`lerna.json`); `Cargo.toml`
-is kept in sync and the release build overrides it from the pushed tag, so
-`cube --version` always matches the Cube release.
+The CLI version tracks the Cube monorepo version: `build.rs` reads the
+repo-root `lerna.json` at build time (the `Cargo.toml` version is only a
+fallback for out-of-tree builds), so `cube --version` always reports the
+real Cube version — for release builds and source builds alike. The release
+workflow just verifies the pushed tag matches `lerna.json`.
 
 The CLI is built and published by the **same release workflow as the rest of
 Cube** (`.github/workflows/publish.yml`, on `v*.*.*` tags). Its `cube-cli`
