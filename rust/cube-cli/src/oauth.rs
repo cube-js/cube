@@ -68,10 +68,6 @@ pub struct TokenResponse {
     pub access_token: String,
     #[serde(default, alias = "refreshToken")]
     pub refresh_token: Option<String>,
-    /// The user's tenant URL, filled in by the generic cubecloud.dev sign-in
-    /// (which resolves the tenant from the signed-in account).
-    #[serde(default, alias = "tenantUrl")]
-    pub tenant_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

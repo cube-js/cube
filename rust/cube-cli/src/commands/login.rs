@@ -5,18 +5,9 @@ use crate::client::Client;
 use crate::config::ContextConfig;
 use crate::{oauth, output, Ctx};
 
-/// Base used when the user doesn't know their tenant URL: the generic
-/// sign-in resolves the tenant from the signed-in account and returns it
-/// as `tenantUrl` in the token response. `CUBE_GENERIC_LOGIN_URL`
-/// overrides the host (e.g. to point at a staging console).
-fn generic_url() -> String {
-    std::env::var("CUBE_GENERIC_LOGIN_URL").unwrap_or_else(|_| "https://cubecloud.dev".to_string())
-}
-
 #[derive(clap::Args)]
 pub struct Args {
-    /// Cube Cloud URL, e.g. https://<tenant>.cubecloud.dev (omit to sign in
-    /// via cubecloud.dev, which finds your tenant from your account)
+    /// Cube Cloud URL, e.g. https://<tenant>.cubecloud.dev
     #[arg(long)]
     url: Option<String>,
     /// Authenticate with an API key instead of the browser device flow
@@ -32,29 +23,13 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
         Some(url) => url,
         None => inquire::Text::new("Cube Cloud URL:")
             .with_placeholder("https://<tenant>.cubecloud.dev")
-            .with_help_message(
-                "don't know your tenant? press Enter to sign in via cubecloud.dev \
-                 — it finds your tenant from your account",
-            )
             .prompt()?,
     };
-    let mut url = url.trim().trim_end_matches('/').to_string();
-    if url.is_empty() {
-        url = generic_url();
-    }
+    let url = url.trim().trim_end_matches('/').to_string();
 
-    let generic = url == generic_url();
     let (token, refresh_token) = match args.api_key {
         Some(key) => (key, None),
-        None => {
-            let (token, refresh, tenant_url) = device_login(&url, generic).await?;
-            // The generic sign-in reports which tenant the account belongs
-            // to — save and validate against that, not cubecloud.dev.
-            if let Some(tenant) = tenant_url {
-                url = tenant.trim_end_matches('/').to_string();
-            }
-            (token, refresh)
-        }
+        None => device_login(&url).await?,
     };
 
     // Validate the credentials before saving them.
@@ -85,15 +60,8 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
 }
 
 /// Drive the OAuth 2.0 device authorization grant and return
-/// (access_token, refresh_token, tenant_url).
-///
-/// In the generic (tenant-discovery) flow the browser link is routed
-/// through the sign-in page — `{host}/auth?redirect_to=<device page>` —
-/// so the user authenticates first and lands on the approval page.
-async fn device_login(
-    url: &str,
-    generic: bool,
-) -> Result<(String, Option<String>, Option<String>)> {
+/// (access_token, refresh_token).
+async fn device_login(url: &str) -> Result<(String, Option<String>)> {
     let cfg = oauth::OAuthConfig::from_env();
     let http = reqwest::Client::builder()
         .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
@@ -101,15 +69,10 @@ async fn device_login(
 
     let device = oauth::request_device_code(&http, url, &cfg).await?;
 
-    let mut verification = device
+    let verification = device
         .verification_uri_complete
         .clone()
         .unwrap_or_else(|| device.verification_uri.clone());
-    if generic {
-        if let Some(path) = path_and_query(&verification) {
-            verification = format!("{url}/auth?redirect_to={}", percent_encode(path));
-        }
-    }
 
     println!();
     println!("To authorize this CLI, open the following URL in your browser:");
@@ -127,23 +90,5 @@ async fn device_login(
     println!("{}", "Waiting for authorization…".dimmed());
 
     let token = oauth::poll_for_token(&http, url, &cfg, &device).await?;
-    Ok((token.access_token, token.refresh_token, token.tenant_url))
-}
-
-/// Path + query of an absolute URL (`https://host/a/b?c=d` → `/a/b?c=d`).
-fn path_and_query(url: &str) -> Option<&str> {
-    let after_scheme = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
-    after_scheme.find('/').map(|i| &after_scheme[i..])
-}
-
-/// Minimal percent-encoding for a query-parameter value.
-fn percent_encode(raw: &str) -> String {
-    raw.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                (b as char).to_string()
-            }
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
+    Ok((token.access_token, token.refresh_token))
 }
