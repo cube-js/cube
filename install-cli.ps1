@@ -1,6 +1,6 @@
 # Cube CLI installer for Windows (x86_64).
 #
-#   irm https://raw.githubusercontent.com/cube-js/cube/master/rust/cube-cli/install/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
 #
 # Environment overrides:
 #   CUBE_INSTALL_DIR   install directory (default: %LOCALAPPDATA%\cube\bin)

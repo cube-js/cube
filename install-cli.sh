@@ -1,7 +1,7 @@
 #!/bin/sh
 # Cube CLI installer for Linux and macOS.
 #
-#   curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/rust/cube-cli/install/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
 #
 # Environment overrides:
 #   CUBE_INSTALL_DIR      install directory (default: /usr/local/bin if

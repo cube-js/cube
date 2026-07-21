@@ -11,13 +11,13 @@ plain clap-derive dispatch in `main.rs`.
 Linux / macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/rust/cube-cli/install/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/cube-js/cube/master/rust/cube-cli/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
 ```
 
 Both scripts download the latest release binary for your platform and put it
