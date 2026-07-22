@@ -146,6 +146,64 @@ automated — uses the same configuration:
 | **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
 | **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
 
+## Pass environment variables to dbt
+
+Some dbt projects read environment variables while the sandbox runs — most
+commonly a token used to install a **private dbt package**. For example, a
+`packages.yml` that pulls a package from a private Git repository:
+
+```yaml
+packages:
+  - git: "https://x-access-token:{{ env_var('DBT_PACKAGES_TOKEN') }}@github.com/your-org/private-package.git"
+    revision: v1.0.1
+```
+
+Here `dbt deps` fails inside the sandbox unless `DBT_PACKAGES_TOKEN` is available
+to it. Data
+source connection variables (`CUBEJS_DB_*`) reach the sandbox automatically; any
+other variable does **not**, unless you select it.
+
+In the **dbt project** settings card, the **Environment variables** picker lets
+you choose which of the deployment's environment variables to pass into the
+sandbox. You select variables **by name** — their values stay in the deployment
+env, are resolved server-side at sync time, and never reach the browser.
+
+<Steps>
+
+<Step title="Define the variable on the deployment">
+
+In **Settings → Configuration**, add the environment variable (e.g.
+`DBT_PACKAGES_TOKEN`) with its value, if it isn't set already.
+
+</Step>
+
+<Step title="Select it in the dbt settings">
+
+Edit the default data source, expand the **dbt project** section, and under
+**Environment variables** select the variable(s) to pass — then **Save dbt
+settings**.
+
+</Step>
+
+<Step title="Reference it in dbt">
+
+Use the variable in your dbt project via `env_var('DBT_PACKAGES_TOKEN')`, as in the
+`packages.yml` example above. It's now available to `dbt deps`, `dbt parse`, and
+the rest of the pull.
+
+</Step>
+
+</Steps>
+
+<Note>
+
+`CUBEJS_DB_*` connection variables, and a few names reserved by the sync itself
+(schema, dbt profile, and Git internals), can't be selected. If a selected
+variable is later removed from the deployment env, it's skipped on the next sync
+and the settings card flags it.
+
+</Note>
+
 ## Run a pull manually
 
 <Steps>
