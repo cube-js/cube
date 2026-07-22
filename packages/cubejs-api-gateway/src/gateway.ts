@@ -34,10 +34,6 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 
 import { QueryBody } from '@cubejs-backend/query-orchestrator';
 import {
-  buildBuiltInsCatalog,
-  isBuiltInGranularity,
-} from '@cubejs-backend/schema-compiler';
-import {
   QueryType,
   ApiScopes,
 } from './types/strings';
@@ -730,8 +726,6 @@ class ApiGateway {
       const cubesConfig = onlyViews
         ? metaConfig.cubes.filter((c: any) => c.config?.type === 'view')
         : metaConfig.cubes;
-      // Time dimensions arrive from CompilerApi with `effectiveGranularities` already attached —
-      // baked into the compiled model at compile time (resolved once per appId, all config forms).
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
       const visibleCubeNames = new Set(cubes.map(c => c.name));
       const viewGroups = (metaConfig.viewGroups || [])
@@ -764,31 +758,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('meta', context.securityContext);
       const compilerApi = await this.getCompilerApi(context);
-      // Serve the per-appId catalog baked into the compiled model — no per-request resolution.
-      const globalConfig = await compilerApi.getGlobalGranularitiesConfig({ requestId: context.requestId });
-      const builtInsCatalog = buildBuiltInsCatalog(globalConfig);
-
-      const granularities: any[] = [];
-      for (const [name, entry] of Object.entries(builtInsCatalog)) {
-        granularities.push({ type: 'built-in', name, ...entry });
-      }
-      for (const [name, def] of Object.entries<any>(globalConfig.customGranularities)) {
-        // Skip names already emitted by `buildBuiltInsCatalog` (their inline overrides are folded in
-        // there). Use isBuiltInGranularity (hasOwnProperty), not `in`, so a custom named e.g.
-        // `constructor`/`toString` isn't misclassified as a built-in via the prototype chain and dropped.
-        if (!isBuiltInGranularity(name)) {
-          const entry: any = {
-            type: 'custom',
-            name,
-            title: def.title || name,
-          };
-          if (def.interval !== undefined) entry.interval = def.interval;
-          if (def.origin !== undefined) entry.origin = def.origin;
-          if (def.offset !== undefined) entry.offset = def.offset;
-          if (def.format !== undefined) entry.format = def.format;
-          granularities.push(entry);
-        }
-      }
+      const granularities = await compilerApi.getGranularities({ requestId: context.requestId });
       res({ data: { granularities } });
     } catch (e: any) {
       this.handleError({

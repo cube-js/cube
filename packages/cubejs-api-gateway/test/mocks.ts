@@ -80,13 +80,12 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return { query, denied: false };
   },
 
-  async getGlobalGranularitiesConfig(_options: any = {}) {
-    return {
-      enabledBuiltIns: ['year', 'month'],
-      customGranularities: {
-        fiscal_year: { title: 'Fiscal Year', interval: '1 year', origin: '2024-02-01' },
-      },
-    };
+  async getGranularities(_options: any = {}) {
+    return [
+      { type: 'built-in', name: 'year', title: 'Year', format: '%Y', interval: '1 year' },
+      { type: 'built-in', name: 'month', title: 'Month', format: '%b %Y', interval: '1 month' },
+      { type: 'custom', name: 'fiscal_year', title: 'Fiscal Year', interval: '1 year', origin: '2024-02-01' },
+    ];
   },
 
   async metaConfig(_ctx, options: any = {}) {

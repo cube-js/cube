@@ -41,9 +41,8 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
-  // Resolved-once global granularities config for this appId, baked into the compiled model by
-  // CubeToMetaTransformer. CompilerApi resolves all config forms (env / static / function) before
-  // compile and passes the result here.
+  // Resolved global granularities config (all forms resolved by CompilerApi before compile), baked
+  // into the compiled model by CubeToMetaTransformer.
   granularitiesConfig?: GlobalGranularitiesConfig;
 };
 

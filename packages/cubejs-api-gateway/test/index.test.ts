@@ -721,7 +721,7 @@ describe('API Gateway', () => {
     expect(dim.granularitiesBlock).toBeUndefined();
   });
 
-  test('granularities endpoint returns the context-resolved global config', async () => {
+  test('granularities endpoint returns the per-appId catalog baked into the compiled model', async () => {
     const { app } = await createApiGateway();
 
     const res = await request(app)
