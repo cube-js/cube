@@ -2928,6 +2928,19 @@ limit
                     ])),
                 }])
             ),
+            // DATE_ADD with a date-only string argument
+            (
+                "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
+                "order_date >= DATE_ADD('2021-09-30', INTERVAL '-30' DAY) AND order_date < '2021-09-07'".to_string(),
+                Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-08-31T00:00:00.000Z".to_string(),
+                        "2021-09-06T23:59:59.999Z".to_string()
+                    ])),
+                }])
+            ),
             // Column precedence vs projection alias
             (
                 "COUNT(*), DATE(order_date) AS order_date".to_string(),
@@ -15487,6 +15500,46 @@ ORDER BY "source"."str0" ASC
             !sql.contains("CAST(TRUNC("),
             "{}",
             "float division must not use expressions/int_division template, got: {sql}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_timestamp_literal_from_date_only_string() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        // MySQL-style timestamp_literal template: ISO-8601 'T'/'Z' markers are
+        // stripped with the replace filter. A date-only string cast to timestamp
+        // constant-folds, so the resulting constant must be rendered through the
+        // timestamp_literal template instead of being emitted bare
+        let templates = vec![(
+            "expressions/timestamp_literal".to_string(),
+            "TIMESTAMP('{{ value | replace(\"T\", \" \") | replace(\"Z\", \"\") }}')".to_string(),
+        )];
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE DATE_ADD(order_date, INTERVAL '2 DAY') < CAST('2021-01-01' AS TIMESTAMP)
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            templates,
+        )
+        .await;
+
+        let request = query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .request;
+        let request_json = serde_json::to_string(&request).unwrap();
+        assert!(
+            request_json.contains("TIMESTAMP('2021-01-01 00:00:00.000')"),
+            "{}", "timestamp literal must render through the timestamp_literal template, got: {request_json}"
         );
     }
 

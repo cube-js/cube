@@ -221,6 +221,10 @@ export class OracleQuery extends BaseQuery {
     // Oracle `/` on NUMBER keeps the fractional part; TRUNC drops decimal digits
     // (truncation toward zero), matching PostgreSQL integer division
     templates.expressions.int_division = 'TRUNC({{ left }} / {{ right }})';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
+    // the 'T'/'Z' markers are consumed as literal chunks in the format mask. The base
+    // template renders the value bare, which is invalid Oracle syntax
+    templates.expressions.timestamp_literal = 'TO_TIMESTAMP(\'{{ value }}\', \'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"\')';
     // Oracle does not support positional GROUP BY — group by expressions.
     templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
     // No `AS` before the FROM subquery alias, and Oracle row-limiting syntax.

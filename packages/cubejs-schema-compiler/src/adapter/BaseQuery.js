@@ -4637,7 +4637,10 @@ export class BaseQuery {
         wrap_segment_select: '{{ expr }}',
         wrap_segment_filter: '{{ expr }}',
         rolling_window_expr_timestamp_cast: '{{ value }}',
-        timestamp_literal: '{{ value }}',
+        // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
+        // ANSI CAST of the quoted value is the most portable default; dialects override
+        // with their exact parsing construct. A bare unquoted value is never valid SQL
+        timestamp_literal: 'CAST(\'{{ value }}\' AS TIMESTAMP)',
         between: '{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}',
       },
       tesseract: {

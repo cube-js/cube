@@ -57,6 +57,11 @@ export class DruidQuery extends BaseQuery {
 
     // Druid doesn't support ILIKE, so case-insensitive matching is emulated with LOWER(...) LIKE CONCAT(...)
     templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
+    // TIME_PARSE without a pattern parses ISO-8601, which is also Druid's native
+    // timestamp format. The base template renders the value bare, which is invalid
+    // syntax
+    templates.expressions.timestamp_literal = 'TIME_PARSE(\'{{ value }}\')';
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
