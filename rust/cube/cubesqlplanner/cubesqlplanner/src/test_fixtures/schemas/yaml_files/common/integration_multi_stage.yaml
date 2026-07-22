@@ -249,6 +249,16 @@ cubes:
                 - orders.status
                 - orders.created_at.month
 
+          # group_by-locked sum over a non-sum-rollable input
+          # (count_distinct): not window-path eligible, so the Aggregate
+          # stage renders a plain sum() over the FullKeyAggregate join.
+          - name: unique_customers_group_by_status
+            type: sum
+            sql: "{CUBE.unique_customers}"
+            multi_stage: true
+            group_by:
+                - orders.status
+
           - name: amount_grain_keep_only_status
             type: sum
             sql: "{CUBE.total_amount}"
