@@ -142,7 +142,7 @@ export class BaseQuery {
     this.compilers = compilers;
     this.options = options || {};
     /** @type {import('../compiler/CubeEvaluator').CubeEvaluator} */
-    this.cubeEvaluator = compilers.cubeEvaluator.withGranularityDefinitions(this.options.granularityDefinitions);
+    this.cubeEvaluator = compilers.cubeEvaluator;
     /** @type {import('../compiler/JoinGraph').JoinGraph} */
     this.joinGraph = compilers.joinGraph;
 
@@ -271,10 +271,6 @@ export class BaseQuery {
       segments: this.options.segments,
       order: this.options.order,
       contextSymbols: this.options.contextSymbols,
-      // Key on the O(1) config hash, NOT the granularityDefinitions map: the map shares one object
-      // across all plain dimensions by reference, and JSON.stringify would expand it once per time
-      // dimension, bloating the (serialized, LRU-retained) cache key by O(dimensions × customs).
-      granularityHash: this.options.granularityHash,
       timezone: this.options.timezone,
       limit: this.options.limit,
       offset: this.options.offset,
@@ -4225,8 +4221,6 @@ export class BaseQuery {
       preAggregationQuery: this.options.preAggregationQuery,
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       contextSymbols: this.contextSymbols,
-      granularityDefinitions: this.options.granularityDefinitions,
-      granularityHash: this.options.granularityHash,
       preAggregationsSchema: this.preAggregationsSchemaOption,
       cubeLatticeCache: this.options.cubeLatticeCache,
       historyQueries: this.options.historyQueries,
@@ -4384,9 +4378,7 @@ export class BaseQuery {
           const dimensionDef = this.cubeEvaluator.dimensionByPath(path.slice(0, 2));
           if (dimensionDef.type === 'time' &&
             this.cubeEvaluator.resolveGranularity(
-              [path[0], path[1], 'granularities', path[2]],
-              undefined,
-              this.options.granularityDefinitions
+              [path[0], path[1], 'granularities', path[2]]
             )) {
             const td = this.newTimeDimension({
               dimension: `${path[0]}.${path[1]}`,
