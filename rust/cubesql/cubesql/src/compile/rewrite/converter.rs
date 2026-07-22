@@ -1481,6 +1481,13 @@ impl LanguageToLogicalPlanConverter {
                             • one of the cubes contains a measure\n\
                             • the cube on the right contains a filter, sorting or limits\n".to_string(),
                         ));
+                    } else if Rewriter::sql_push_down_enabled() {
+                        return Err(CubeError::rewrite(
+                            "Use __cubeJoinField to join Cubes. A join on regular columns is not supported when:\n\
+                            • the joined queries use different data sources\n\
+                            • an ungrouped side selects a measure or an expression, filters on something other than its members, or is a whole cube table\n\
+                            • the data source does not support this join type\n".to_string(),
+                        ));
                     } else {
                         return Err(CubeError::rewrite(
                             "Use __cubeJoinField to join Cubes".to_string(),

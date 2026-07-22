@@ -230,8 +230,32 @@ The `JOIN` type (`INNER`, `LEFT`, `RIGHT`, `FULL`) controls which keys are
 kept. This only applies to grouped queries whose `GROUP BY` is the join key. See
 [multi-fact views][ref-multi-fact-views] for the full explanation.
 
+## Joining ungrouped queries on regular columns
+
+With [query pushdown][ref-query-pushdown] (enabled by default), you can join queries
+on regular columns, not just `__cubeJoinField`, as long as at least one side is
+ungrouped (no `GROUP BY`). Cube runs each side as a standalone query and joins them
+in SQL on the data source:
+
+```sql
+SELECT o.status, u.city
+FROM (SELECT status, user_id FROM orders LIMIT 1000) o
+JOIN (SELECT id, city FROM users) u ON o.user_id = u.id
+```
+
+This requires:
+
+- both sides to come from the same data source;
+- each ungrouped side to be a subquery that selects dimensions as plain columns, with
+  no expressions and only filters that Cube can apply to the query itself (e.g.,
+  comparisons on dimensions). Measures, expressions, and bare cube tables on an
+  ungrouped side aren't supported.
+
+Each ungrouped side fetches raw rows, so keep it narrow with filters or a `LIMIT`.
+
 
 [ref-views]: /docs/data-modeling/views
 [ref-join-paths]: /docs/data-modeling/joins#join-paths
 [ref-join-hints]: /docs/data-modeling/joins#join-hints
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-query-pushdown]: /reference/core-data-apis/sql-api/query-format#query-pushdown

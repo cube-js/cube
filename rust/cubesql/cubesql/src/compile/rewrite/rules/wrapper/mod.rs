@@ -267,7 +267,8 @@ impl WrapperRules {
                     None => ControlFlow::Break(false),
                 }
             }
-            // TODO is it correct?
+            // Optimistic: a generator miss surfaces as a generation-time error, not broken
+            // SQL. Use `is_template_available_on_every_data_source` to refuse instead.
             DataSource::Unrestricted => ControlFlow::Break(true),
         }
     }
@@ -282,5 +283,69 @@ impl WrapperRules {
             .get_sql_templates()
             .templates
             .contains_key(template)
+    }
+
+    /// Strict counterpart of `can_rewrite_template` for [`DataSource::Unrestricted`].
+    /// An empty generator registry refuses: nothing could render the template.
+    fn is_template_available_on_every_data_source(meta: &MetaContext, template: &str) -> bool {
+        !meta.data_source_to_sql_generator.is_empty()
+            && meta
+                .data_source_to_sql_generator
+                .values()
+                .all(|sql_generator| {
+                    sql_generator
+                        .get_sql_templates()
+                        .templates
+                        .contains_key(template)
+                })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WrapperRules;
+    use crate::{compile::test::sql_generator, transport::MetaContext};
+    use std::{collections::HashMap, sync::Arc};
+    use uuid::Uuid;
+
+    fn meta_with_generators(generators: Vec<(&str, Vec<(String, String)>)>) -> Arc<MetaContext> {
+        Arc::new(MetaContext::new(
+            vec![],
+            HashMap::new(),
+            generators
+                .into_iter()
+                .map(|(data_source, custom_templates)| {
+                    (data_source.to_string(), sql_generator(custom_templates))
+                })
+                .collect(),
+            Uuid::new_v4(),
+        ))
+    }
+
+    #[test]
+    fn test_template_available_on_every_data_source() {
+        // Custom template with an empty value removes the base template
+        let meta = meta_with_generators(vec![
+            ("default", vec![]),
+            (
+                "no_full_join",
+                vec![("join_types/full".to_string(), "".to_string())],
+            ),
+        ]);
+        assert!(WrapperRules::is_template_available_on_every_data_source(
+            &meta,
+            "join_types/inner"
+        ));
+        assert!(!WrapperRules::is_template_available_on_every_data_source(
+            &meta,
+            "join_types/full"
+        ));
+
+        // An empty generator registry refuses: nothing could render the template
+        let empty_meta = meta_with_generators(vec![]);
+        assert!(!WrapperRules::is_template_available_on_every_data_source(
+            &empty_meta,
+            "join_types/inner"
+        ));
     }
 }
