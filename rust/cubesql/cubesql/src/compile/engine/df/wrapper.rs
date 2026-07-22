@@ -1483,6 +1483,7 @@ impl WrappedSelectNode {
                             Some(push_to_cube_context),
                             subqueries,
                         )?;
+                        let filter = Self::escape_interpolation_quotes(filter, true);
 
                         let used_cubes = Self::prepare_used_cubes(&used_members);
 
