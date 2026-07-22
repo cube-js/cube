@@ -1,5 +1,6 @@
 use self::engine::CubeContext;
 
+pub mod ast_conv;
 pub mod builder;
 pub mod engine;
 pub mod error;
