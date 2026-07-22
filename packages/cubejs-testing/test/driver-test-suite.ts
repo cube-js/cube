@@ -15,7 +15,8 @@ type SupportedDriverType =
   'bigquery' |
   'athena' |
   'databricks-jdbc' |
-  'vertica';
+  'vertica' |
+  'doris';
 
 type TestSuite = {
   config?: Partial<Env>
