@@ -23,14 +23,16 @@ import { resolveNamedNumericFormat, STANDARD_FORMAT_SPECIFIERS, DEFAULT_FORMAT_S
 import {
   EffectiveGranularity,
   NormalizedGranularitiesBlock,
+  ResolvedGranularitySet,
+  GRANULARITY_STRING_FIELDS,
   normalizeGranularitiesBlock,
-  effectiveGranularitiesFor,
+  resolveDimensionGranularities,
+  serializeEffectiveGranularities,
 } from './GranularityResolver';
 import {
   GlobalGranularitiesConfig,
-  GranularitiesOption,
+  DEFAULT_GRANULARITIES_CONFIG,
   buildBuiltInsCatalog,
-  resolveGlobalGranularitiesSync,
 } from './GlobalGranularitiesConfig';
 
 export type CustomNumericFormat = { type: 'custom-numeric'; value: string; alias?: string };
@@ -215,19 +217,23 @@ export class CubeToMetaTransformer implements CompilerInterface {
    */
   public queries: TransformedCube[];
 
-  private readonly granularitiesOption?: GranularitiesOption;
+  // Resolved-once global granularities config for this appId, baked into the compiled model.
+  // CompilerApi resolves all config forms (env / static / function) before compile and passes the
+  // result here — the transformer never sees a function.
+  private readonly granularitiesConfig?: GlobalGranularitiesConfig;
 
-  // Inputs for time dimensions that customize their granularity set, keyed by `cube.dimension`;
-  // absent dims use the config-wide default. Read by CompilerApi variant builds; never serialized.
-  public readonly granularityInputs: Map<string, NormalizedGranularitiesBlock> = new Map();
-
-  // Set during compile() for the context-independent config forms (env / static list);
-  // null when `granularities` is a function and resolution has to happen per request.
-  private staticGranularityState: {
+  // Set during compile() from the resolved config. Everything a time dimension needs is precomputed
+  // once here so the per-dimension loop does no repeated resolution for the common (plain) case:
+  //  - `defaultSet`: the serialized effective set shared by every dimension without a local block;
+  //  - `defaultGlobalCustoms`: the global-custom map (name -> def, `type` stripped) baked into those
+  //    same plain dimensions — invariant across them, so computed once and shared by reference.
+  // Both derive from a single `resolveDimensionGranularities(EMPTY_BLOCK, config)` pass.
+  private granularityState!: {
     config: GlobalGranularitiesConfig;
     catalog: Record<string, GranularityDefinition>;
     defaultSet: EffectiveGranularity[];
-  } | null = null;
+    defaultGlobalCustoms: Record<string, GranularityDefinition>;
+  };
 
   public constructor(
     cubeValidator: CubeValidator,
@@ -235,7 +241,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     contextEvaluator: ContextEvaluator,
     viewGroupEvaluator: ViewGroupEvaluator,
     joinGraph: JoinGraph,
-    granularitiesOption?: GranularitiesOption
+    granularitiesConfig?: GlobalGranularitiesConfig
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
@@ -243,9 +249,15 @@ export class CubeToMetaTransformer implements CompilerInterface {
     this.contextEvaluator = contextEvaluator;
     this.viewGroupEvaluator = viewGroupEvaluator;
     this.joinGraph = joinGraph;
-    this.granularitiesOption = granularitiesOption;
+    this.granularitiesConfig = granularitiesConfig;
     this.cubes = [];
     this.queries = [];
+  }
+
+  // The resolved global config baked into this compiled model. Exposed for the /v1/granularities
+  // endpoint, which serves the per-appId catalog from the compiled model rather than re-resolving.
+  public get globalGranularitiesConfig(): GlobalGranularitiesConfig | undefined {
+    return this.granularityState?.config;
   }
 
   public get viewGroups(): CompiledViewGroup[] {
@@ -253,23 +265,21 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   public compile(_cubes: any[], errorReporter: ErrorReporter): void {
-    this.granularityInputs.clear();
-    // Env/static configs are resolved once here and baked in. The function form must never run
-    // at compile time (the compiled model is shared across security contexts) — CompilerApi
-    // resolves it per request from `granularityInputs`.
-    if (typeof this.granularitiesOption === 'function') {
-      this.staticGranularityState = null;
-    } else {
-      const config = resolveGlobalGranularitiesSync(this.granularitiesOption);
-      const catalog = buildBuiltInsCatalog(config);
-      this.staticGranularityState = {
-        config,
-        catalog,
-        // One shared array for every time dimension without local customization — with large
-        // models this avoids re-allocating an identical granularity set per dimension.
-        defaultSet: effectiveGranularitiesFor(undefined, config.enabledBuiltIns, config.customGranularities, catalog),
-      };
-    }
+    // The config is already resolved (env / static / function) by CompilerApi at compile time and
+    // baked in here — a missing config means the default catalog.
+    const config = this.granularitiesConfig ?? DEFAULT_GRANULARITIES_CONFIG;
+    const catalog = buildBuiltInsCatalog(config);
+    // Resolve the no-local-block ("default") set once; every plain time dimension shares both its
+    // serialized wire form and its global-custom map by reference (no per-dimension resolution).
+    const defaultResolved = resolveDimensionGranularities(
+      normalizeGranularitiesBlock(undefined), config.enabledBuiltIns, config.customGranularities, catalog,
+    );
+    this.granularityState = {
+      config,
+      catalog,
+      defaultSet: serializeEffectiveGranularities(defaultResolved),
+      defaultGlobalCustoms: this.globalCustomsOf(defaultResolved, config, {}),
+    };
 
     this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
@@ -353,10 +363,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
           const dimensionVisibility = isCubeVisible
             ? this.isVisible(extendedDimDef, !extendedDimDef.primaryKey)
             : false;
-          const granularitiesObj = extendedDimDef.granularities;
-          // `granularities` keeps its legacy custom-only shape (deprecated). The reconciled set
-          // is emitted as `effectiveGranularities`: baked in here for env/static global configs,
-          // or attached per request by CompilerApi variants when the config is a function.
+          // Snapshot the dimension's LOCAL customs before any merge below: the deprecated
+          // `granularities` meta field must keep listing only the model's own custom granularities.
+          const localCustoms = extendedDimDef.granularities;
+          const localCustomEntries = localCustoms ? Object.entries(localCustoms) : [];
           const { granularitiesBlock } = extendedDimDef as any;
           const dimType = this.dimensionDataType(extendedDimDef.type || 'string');
           const dimFormat = this.transformDimensionFormat(extendedDimDef);
@@ -364,16 +374,25 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
           let effectiveGranularities: EffectiveGranularity[] | undefined;
           if (dimType === 'time') {
-            const inputs = this.granularityInputsForDimension(cubeTitle, granularitiesObj, granularitiesBlock);
+            const s = this.granularityState;
+            const inputs = this.granularityInputsForDimension(cubeTitle, localCustoms, granularitiesBlock);
+            // Dimensions with a local block resolve individually; plain ones reuse the shared default
+            // (both the serialized set and the global-custom map) computed once in compile().
+            let globalCustoms: Record<string, GranularityDefinition>;
             if (inputs) {
-              this.granularityInputs.set(`${cubeName}.${dimensionName}`, inputs);
+              const resolved = resolveDimensionGranularities(
+                inputs, s.config.enabledBuiltIns, s.config.customGranularities, s.catalog,
+              );
+              effectiveGranularities = serializeEffectiveGranularities(resolved);
+              globalCustoms = this.globalCustomsOf(resolved, s.config, localCustoms ?? {});
+            } else {
+              effectiveGranularities = s.defaultSet;
+              globalCustoms = s.defaultGlobalCustoms;
             }
-            if (this.staticGranularityState) {
-              const s = this.staticGranularityState;
-              effectiveGranularities = inputs
-                ? effectiveGranularitiesFor(inputs, s.config.enabledBuiltIns, s.config.customGranularities, s.catalog)
-                : s.defaultSet;
-            }
+
+            // Bake the effective GLOBAL customs into the dimension's `granularities` map (SQL resolves
+            // customs by name from this map, and pre-agg matching reads it). Locals win over globals.
+            this.mergeGlobalCustomsIntoDimension(cubeName, dimensionName, extendedDimDef, localCustoms, globalCustoms);
           }
 
           return {
@@ -395,8 +414,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
             primaryKey: !!extendedDimDef.primaryKey,
             aliasMember: extendedDimDef.aliasMember,
             granularities:
-              granularitiesObj
-                ? Object.entries(granularitiesObj).map(([gName, gDef]: [string, any]) => ({
+              localCustomEntries.length > 0
+                ? localCustomEntries.map(([gName, gDef]: [string, any]) => ({
                   name: gName,
                   title: this.title(cubeTitle, [gName, gDef], true),
                   interval: gDef.interval,
@@ -469,6 +488,72 @@ export class CubeToMetaTransformer implements CompilerInterface {
       };
     }
     return { includes: block.includes, excludes: block.excludes, custom };
+  }
+
+  // From an already-resolved set, extract the GLOBAL customs a dimension exposes: entries that are
+  // custom, defined in the global config, and not shadowed by a local of the same name. Projected
+  // through GRANULARITY_STRING_FIELDS (the shared field list, so it can't drift from serialize/hash).
+  private globalCustomsOf(
+    resolved: ResolvedGranularitySet,
+    config: GlobalGranularitiesConfig,
+    localCustoms: Record<string, GranularityDefinition>,
+  ): Record<string, GranularityDefinition> {
+    const out: Record<string, GranularityDefinition> = {};
+    for (const [name, def] of Object.entries(resolved)) {
+      if (def.type === 'custom' &&
+        Object.prototype.hasOwnProperty.call(config.customGranularities, name) &&
+        !Object.prototype.hasOwnProperty.call(localCustoms, name)
+      ) {
+        const projected: GranularityDefinition = {} as GranularityDefinition;
+        for (const field of GRANULARITY_STRING_FIELDS) {
+          if (def[field] !== undefined) {
+            (projected as any)[field] = def[field];
+          }
+        }
+        out[name] = projected;
+      }
+    }
+    return out;
+  }
+
+  // Bake the precomputed effective GLOBAL customs (`globalCustoms`) into a time dimension's
+  // `granularities` map — decision 3 of the per-appId compile-time bake — so the SQL symbol path
+  // resolves them by name and they participate in pre-agg matching. Locals always win.
+  //
+  // The bake must reach BOTH object graphs the downstream paths read: the `cubeList`/`evaluatedCubes`
+  // object (`dimDef`, read by timeDimensionsForCube → pre-agg matching) AND the separate
+  // `symbols[cube][dim]` object that CubeSymbols.resolveGranularity reads for SQL. These are distinct
+  // objects (built by different transforms) even for a plain cube, so the second write is
+  // load-bearing, not a no-op. If only `dimDef` were written, SQL couldn't resolve a baked global and
+  // pre-agg matching would throw when it builds a Granularity for it. We REASSIGN `granularities`
+  // (never mutate in place) so a view dim sharing its source's map by reference isn't contaminated
+  // before it is itself processed.
+  private mergeGlobalCustomsIntoDimension(
+    cubeName: string,
+    dimensionName: string,
+    dimDef: ExtendedCubeSymbolDefinition,
+    localCustoms: Record<string, GranularityDefinition> | undefined,
+    globalCustoms: Record<string, GranularityDefinition>,
+  ): void {
+    if (Object.keys(globalCustoms).length === 0) {
+      return;
+    }
+    const hasLocals = !!localCustoms && Object.keys(localCustoms).length > 0;
+
+    // With no locals the baked map IS the shared globalCustoms — assign it by reference (every plain
+    // dimension then shares one object). Copy-on-write only when locals must be layered on top.
+    const write = (existing: Record<string, GranularityDefinition> | undefined) => (
+      existing && Object.keys(existing).length > 0
+        ? { ...globalCustoms, ...existing } // globals first, locals last so locals win on collisions
+        : globalCustoms
+    );
+
+    dimDef.granularities = write(hasLocals ? localCustoms : undefined);
+
+    const symbolDim = (this.cubeEvaluator as any).symbols?.[cubeName]?.[dimensionName];
+    if (symbolDim && symbolDim !== dimDef) {
+      symbolDim.granularities = write(symbolDim.granularities as Record<string, GranularityDefinition> | undefined);
+    }
   }
 
   public queriesForContext(contextId: string | null | undefined): TransformedCube[] {

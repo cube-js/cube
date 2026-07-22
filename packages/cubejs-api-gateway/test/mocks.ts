@@ -80,7 +80,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return { query, denied: false };
   },
 
-  async resolveGlobalGranularitiesConfig(_ctx: any) {
+  async getGlobalGranularitiesConfig(_options: any = {}) {
     return {
       enabledBuiltIns: ['year', 'month'],
       customGranularities: {

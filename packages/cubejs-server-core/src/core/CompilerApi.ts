@@ -4,19 +4,14 @@ import {
   AccessPolicyDefinition,
   BaseQuery,
   CanUsePreAggregationFn,
-  buildBuiltInsCatalog,
   compile,
   Compiler,
   createQuery,
   CubeDefinition,
-  EffectiveGranularity,
   EvaluatedCube,
   GlobalGranularitiesConfig,
   GranularitiesOption,
-  GranularitySets,
   granularityConfigHash,
-  NormalizedGranularitiesBlock,
-  normalizeGranularitiesBlock,
   PreAggregationFilters,
   PreAggregationInfo,
   PreAggregationReferences,
@@ -24,10 +19,7 @@ import {
   prepareCompiler,
   queryClass,
   QueryFactory,
-  effectiveGranularitiesFor,
-  resolveDimensionGranularities,
   resolveGlobalGranularities,
-  resolveGlobalGranularitiesSync,
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
@@ -100,12 +92,6 @@ export interface DataSourceInfo {
 }
 
 export class CompilerApi {
-  // Bound on cached granularity-enriched meta variants per compiled model (~2 MB each on a
-  // 3k-cube model). Contains a `granularities` function keyed on a high-cardinality context
-  // fact; legitimate configs (calendars × locales) stay well under it. Exceeding evicts LRU
-  // and logs. Kept below CubeSQL's LRU-100 compilerId-keyed cache.
-  protected static readonly MAX_GRANULARITY_VARIANTS = 64;
-
   protected readonly repository: SchemaFileRepository;
 
   protected readonly dbType: DbTypeInternalFn;
@@ -154,9 +140,12 @@ export class CompilerApi {
 
   protected readonly granularities?: GranularitiesOption;
 
-  // Memoized hash of a STATIC-list granularities config (immutable for the instance lifetime).
-  // Undefined until first computed; the env form is never memoized here (env can change at runtime).
-  private staticGranularityHashMemo?: string;
+  // Resolved-once-per-appId global granularities config, baked into the compiled model. Resolved in
+  // getCompilers with the appId-level compile context (all three forms — env / static / function).
+  // The in-flight PROMISE is memoized (not just the value) so concurrent initial getCompilers calls
+  // share a single resolve/await — the function form is invoked exactly once per appId. Cleared on
+  // rejection so a failed resolve can be retried.
+  private resolvedGranularitiesPromise?: Promise<{ config: GlobalGranularitiesConfig; hash: string }>;
 
   protected queryFactory?: QueryFactory;
 
@@ -250,16 +239,15 @@ export class CompilerApi {
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
 
-    // Env/static granularity configs are baked into the compiled meta, so a config change must
-    // force a recompile. The function form is resolved per request instead (variant cache) and
-    // must never churn the compiler version. A static LIST is immutable for the instance lifetime,
-    // so its hash is memoized; the env form stays per-call since env vars can change at runtime.
-    if (typeof this.granularities !== 'function') {
-      compilerVersion += `_gran_${this.staticGranularityHash()}`;
-    }
+    // Resolve the global granularities config ONCE per appId with the compile context (handles all
+    // forms — env / static / function — awaiting the function). The resolved config is baked into
+    // the compiled model, so its hash goes into compilerVersion for every form: a config change
+    // then forces a recompile. Memoized on the instance so repeated calls don't re-resolve/re-await.
+    const { config: resolvedGranularities, hash: granularitiesHash } = await this.getResolvedGranularities();
+    compilerVersion += `_gran_${granularitiesHash}`;
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      this.compilers = this.compileSchema(compilerVersion, options.requestId).catch(e => {
+      this.compilers = this.compileSchema(compilerVersion, resolvedGranularities, options.requestId).catch(e => {
         this.compilers = undefined;
         throw e;
       });
@@ -267,6 +255,33 @@ export class CompilerApi {
     }
 
     return this.compilers;
+  }
+
+  // Resolve `config.granularities` with the appId-level compile context. The static-list and function
+  // forms are IMMUTABLE for the instance (a static list can't change; the function is frozen per
+  // appId by design), so they are memoized — including the in-flight promise, so concurrent initial
+  // compiles share one resolve/await and the function is invoked exactly once. The ENV form
+  // (`granularities === undefined`, reading CUBEJS_GRANULARITIES*) is NOT memoized: env can change at
+  // runtime, and re-resolving each call lets the folded hash trigger a recompile — matching rev-1.
+  private getResolvedGranularities(): Promise<{ config: GlobalGranularitiesConfig; hash: string }> {
+    const resolve = () => resolveGlobalGranularities(
+      this.granularities,
+      { securityContext: this.compileContext?.securityContext },
+    ).then(config => ({ config, hash: granularityConfigHash(config) }));
+
+    // Env form: always re-resolve (cheap env parse) so a runtime change is picked up.
+    if (this.granularities === undefined) {
+      return resolve();
+    }
+
+    if (!this.resolvedGranularitiesPromise) {
+      this.resolvedGranularitiesPromise = resolve();
+      // Allow a retry if the resolve (e.g. a throwing function form) fails.
+      this.resolvedGranularitiesPromise.catch(() => {
+        this.resolvedGranularitiesPromise = undefined;
+      });
+    }
+    return this.resolvedGranularitiesPromise;
   }
 
   /**
@@ -284,7 +299,7 @@ export class CompilerApi {
     });
   }
 
-  public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
+  public async compileSchema(compilerVersion: string, granularitiesConfig: GlobalGranularitiesConfig, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
@@ -301,7 +316,7 @@ export class CompilerApi {
         compiledScriptCache: this.compiledScriptCache,
         compiledJinjaCache: this.compiledJinjaCache,
         compiledYamlCache: this.compiledYamlCache,
-        granularities: this.granularities,
+        granularitiesConfig,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
@@ -350,12 +365,9 @@ export class CompilerApi {
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
     const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    // `granularityDefinitions` (a reference-shared map) flows to resolveGranularity for SQL, but the
-    // query cache must key on the O(1) `granularityHash` instead — JSON.stringify'ing the map would
-    // expand the shared references once per time dimension and bloat the cache key.
-    const { definitions: granularityDefinitions, hash: granularityHash } = await this.granularityDefinitionsForQuery(compilers, query);
-    const queryWithGranularities = { ...query, granularityDefinitions, granularityHash };
-    let sqlGenerator = await this.createQueryByDataSource(compilers, queryWithGranularities, dataSource, dbType);
+    // Custom granularities (local + baked-in globals) resolve from the compiled symbols, so no
+    // per-request granularity threading is needed here.
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
 
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
@@ -371,7 +383,7 @@ export class CompilerApi {
         // TODO consider more efficient way than instantiating query
         sqlGenerator = await this.createQueryByDataSource(
           compilers,
-          queryWithGranularities,
+          query,
           dataSource,
           _dbType
         );
@@ -385,112 +397,6 @@ export class CompilerApi {
     }
 
     return { sqlGenerator, compilers };
-  }
-
-  /**
-   * Request-scoped custom granularities keyed by time dimension. The shared cube evaluator cannot
-   * contain function-config results because it is reused across security contexts, so query-time
-   * resolution receives this immutable lookup instead. Building it through the same resolver and
-   * per-dimension inputs as meta keeps includes/excludes behavior identical on both paths.
-   *
-   * The result is a pure function of (compiled model, resolved config), so it is cached on the
-   * compiled model keyed by the canonical config hash — the same discriminator the meta variant
-   * cache uses. Steady state is O(config) (resolve + hash + map lookup); the O(model) scan runs
-   * once per distinct config, not once per query. Recompile discards the cache with `compilers`.
-   */
-  protected async granularityDefinitionsForQuery(
-    compilers: Compiler,
-    query: NormalizedQuery,
-  ): Promise<{ definitions: Record<string, Record<string, any>>; hash: string | null }> {
-    // Resolve through the same securityContext-only seam as the meta path so both paths agree on
-    // the effective set — a `granularities` function must key only on securityContext.
-    const { contextSymbols } = query as any;
-    const config = await this.resolveGranularities({ securityContext: contextSymbols?.securityContext });
-
-    // Only GLOBAL customs need threading (locals already resolve via the compiled symbols map, and
-    // built-ins via the predefined path). With none configured there's nothing to add, so skip both
-    // the cache and the scan — the common case falls straight through to the symbols map. A null
-    // hash then keeps the query-cache key free of any granularity discriminator.
-    if (Object.keys(config.customGranularities).length === 0) {
-      return { definitions: {}, hash: null };
-    }
-
-    if (!compilers.granularityDefinitions) {
-      compilers.granularityDefinitions = new Map();
-    }
-    const cache = compilers.granularityDefinitions;
-    const hash = granularityConfigHash(config);
-
-    // Promise-valued (like granularityVariants) so concurrent misses of one hash coalesce into a
-    // single build rather than each re-running the O(model) scan.
-    let built = cache.get(hash);
-    if (built) {
-      // Refresh LRU recency.
-      cache.delete(hash);
-      cache.set(hash, built);
-    } else {
-      if (cache.size >= CompilerApi.MAX_GRANULARITY_VARIANTS) {
-        cache.delete(cache.keys().next().value);
-      }
-      built = Promise.resolve().then(() => this.buildGranularityDefinitions(compilers, config));
-      cache.set(hash, built);
-      built.catch(() => {
-        if (cache.get(hash) === built) {
-          cache.delete(hash);
-        }
-      });
-    }
-    return { definitions: await built, hash };
-  }
-
-  /**
-   * One O(model) pass building the SQL-path global-custom lookup: `dim -> { customName -> def }`,
-   * respecting each dimension's includes/excludes exactly as the meta path does. Emits only global
-   * customs (locals/built-ins resolve elsewhere) with the meta-only `type` tag stripped.
-   */
-  protected buildGranularityDefinitions(
-    compilers: Compiler,
-    config: GlobalGranularitiesConfig,
-  ): Record<string, Record<string, any>> {
-    const { enabledBuiltIns, customGranularities } = config;
-    const catalog = buildBuiltInsCatalog(config);
-    const inputs = compilers.metaTransformer.granularityInputs;
-    const definitions: Record<string, Record<string, any>> = {};
-
-    // Keep only the global customs a dimension's resolved set actually exposes, `type` tag stripped.
-    const globalCustomsOf = (block: NormalizedGranularitiesBlock) => Object.fromEntries(
-      Object.entries(resolveDimensionGranularities(block, enabledBuiltIns, customGranularities, catalog))
-        .filter(([name, def]) => def.type === 'custom' &&
-          Object.prototype.hasOwnProperty.call(customGranularities, name))
-        .map(([name, { type: _type, ...def }]) => [name, def])
-    );
-
-    // A time dimension WITHOUT a local block resolves against the empty block, so it exposes every
-    // global custom with no filtering — the same map for all of them. Local blocks (rare) are the
-    // only dimensions needing individual reconciliation, so only those are walked. No full model
-    // scan: cost is O(global customs) + O(local-block dims), not O(all time dimensions).
-    const shared = globalCustomsOf(normalizeGranularitiesBlock(undefined));
-
-    if (Object.keys(shared).length > 0) {
-      // A time dimension is "plain" iff it isn't in `granularityInputs` (which holds only dims that
-      // declared a local granularities block). Assign the shared map by reference to each plain dim.
-      for (const cube of compilers.metaTransformer.cubes) {
-        for (const dim of cube.config.dimensions || []) {
-          if (dim.type === 'time' && !inputs.has(dim.name)) {
-            definitions[dim.name] = shared;
-          }
-        }
-      }
-    }
-
-    for (const [dimName, block] of inputs) {
-      const customs = globalCustomsOf(block);
-      if (Object.keys(customs).length > 0) {
-        definitions[dimName] = customs;
-      }
-    }
-
-    return definitions;
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
@@ -520,8 +426,6 @@ export class CompilerApi {
       const key = {
         query: keyOptions,
         options,
-        // Key on the O(1) hash, not the reference-shared definitions map (see getQueryCache).
-        granularityHash: sqlGenerator.options.granularityHash,
       };
       return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
     } else {
@@ -1227,130 +1131,14 @@ export class CompilerApi {
   }
 
   /**
-   * Resolve the global granularity config for a request. A `granularities` function may depend
-   * only on `securityContext` (like queryRewrite and access policies): the meta path and the SQL
-   * path receive different-shaped request objects, but both carry the security context, so keying
-   * on it — and nothing else — is what guarantees the two paths resolve the SAME config and never
-   * advertise a granularity that then fails at query time.
+   * The resolved-once global granularities config baked into the compiled model. Serves the
+   * /v1/granularities endpoint (per-appId catalog) — no per-request resolution.
    */
-  // Hash of the static/env granularities config for the compilerVersion suffix. Memoized for the
-  // array (static-list) form since it can't change; recomputed for the env form (undefined) since
-  // CUBEJS_GRANULARITIES* can change between calls. Never called for the function form.
-  private staticGranularityHash(): string {
-    if (Array.isArray(this.granularities)) {
-      if (this.staticGranularityHashMemo === undefined) {
-        this.staticGranularityHashMemo = granularityConfigHash(resolveGlobalGranularitiesSync(this.granularities));
-      }
-      return this.staticGranularityHashMemo;
-    }
-    // Only reached for the env form (undefined); the function form never calls this.
-    return granularityConfigHash(resolveGlobalGranularitiesSync(undefined));
-  }
-
-  private async resolveGranularities(context: Context): Promise<GlobalGranularitiesConfig> {
-    const securityContext = context?.securityContext ?? {};
-    return resolveGlobalGranularities(this.granularities, { securityContext });
-  }
-
-  /**
-   * Global granularity config for a request context. O(config): env/static forms ignore the
-   * context; the function form is invoked with it. Used by the /v1/granularities endpoint.
-   */
-  public async resolveGlobalGranularitiesConfig(context: Context): Promise<GlobalGranularitiesConfig> {
-    return this.resolveGranularities(context);
-  }
-
-  /**
-   * Meta cubes with `effectiveGranularities` attached, plus the hash to mix into compilerId.
-   * Env/static configs are baked into the base meta at compile time (null hash); a function
-   * config resolves per request. The cache holds the sparse per-config granularity SETS (a few KB)
-   * — not enriched cube copies — keyed by config hash and owned by the compiled model, so a
-   * recompile discards it; the (cheap) attach onto base cubes happens here at read time.
-   */
-  protected async selectGranularityVariant(
-    compilers: Compiler,
-    requestContext: Context,
-  ): Promise<{ cubes: any[]; granularityHash: string | null }> {
-    if (typeof this.granularities !== 'function') {
-      return { cubes: compilers.metaTransformer.cubes, granularityHash: null };
-    }
-
-    const config = await this.resolveGranularities(requestContext);
-    const granularityHash = granularityConfigHash(config);
-
-    if (!compilers.granularityVariants) {
-      compilers.granularityVariants = new Map();
-    }
-    const cache = compilers.granularityVariants;
-
-    let sets = cache.get(granularityHash);
-    if (sets) {
-      // Refresh LRU recency.
-      cache.delete(granularityHash);
-      cache.set(granularityHash, sets);
-    } else {
-      if (cache.size >= CompilerApi.MAX_GRANULARITY_VARIANTS) {
-        const oldest = cache.keys().next().value;
-        cache.delete(oldest);
-        this.logger('Granularity variant cache is full', {
-          warning: `More than ${CompilerApi.MAX_GRANULARITY_VARIANTS} distinct granularity configs seen for one compiled model; ` +
-            'evicting the least recently used variant. A `granularities` function returning unstable values ' +
-            'causes per-request meta rebuilds and churns compilerId-based caches (e.g. in CubeSQL).',
-        });
-      }
-      sets = Promise.resolve().then(() => this.buildGranularitySets(compilers, config));
-      cache.set(granularityHash, sets);
-      sets.catch(() => {
-        if (cache.get(granularityHash) === sets) {
-          cache.delete(granularityHash);
-        }
-      });
-    }
-
-    return { cubes: this.attachEffectiveGranularities(compilers.metaTransformer.cubes, await sets), granularityHash };
-  }
-
-  /**
-   * The sparse effective granularity data for one config. The expensive reconciliation runs ONLY
-   * for the rare dimensions with a local block; every plain dimension uses one shared `defaultSet`.
-   * No cube copying here — that happens cheaply in `attachEffectiveGranularities` at read time.
-   */
-  protected buildGranularitySets(compilers: Compiler, config: GlobalGranularitiesConfig): GranularitySets {
-    const catalog = buildBuiltInsCatalog(config);
-    const { enabledBuiltIns, customGranularities } = config;
-    const overrides = new Map<string, EffectiveGranularity[]>();
-    for (const [dimName, block] of compilers.metaTransformer.granularityInputs) {
-      overrides.set(dimName, effectiveGranularitiesFor(block, enabledBuiltIns, customGranularities, catalog));
-    }
-    return {
-      defaultSet: effectiveGranularitiesFor(undefined, enabledBuiltIns, customGranularities, catalog),
-      overrides,
-    };
-  }
-
-  /**
-   * Attach the per-config effective sets onto the base meta cubes without mutating them: copy only
-   * the cubes/dimensions touched, and reference the shared `defaultSet` for plain time dimensions
-   * (per-dim `overrides` for the rare local-block ones). O(time dimensions) shallow work — no
-   * reconciliation, no deep clone of measures/segments/etc.
-   */
-  protected attachEffectiveGranularities(baseCubes: any[], sets: GranularitySets): any[] {
-    return baseCubes.map((cube: any) => {
-      if (!cube.config.dimensions?.some((d: any) => d.type === 'time')) {
-        return cube;
-      }
-      return {
-        ...cube,
-        config: {
-          ...cube.config,
-          dimensions: cube.config.dimensions.map((dim: any) => (
-            dim.type === 'time'
-              ? { ...dim, effectiveGranularities: sets.overrides.get(dim.name) ?? sets.defaultSet }
-              : dim
-          )),
-        },
-      };
-    });
+  public async getGlobalGranularitiesConfig(options: { requestId?: string } = {}): Promise<GlobalGranularitiesConfig> {
+    const compilers = await this.getCompilers(options);
+    // `getCompilers` has compiled the model, so the baked config is always present; fall back to the
+    // memoized resolve only defensively (should not happen on a successfully compiled model).
+    return compilers.metaTransformer.globalGranularitiesConfig ?? (await this.getResolvedGranularities()).config;
   }
 
   public async metaConfig(
@@ -1359,18 +1147,16 @@ export class CompilerApi {
   ): Promise<any> {
     const { includeCompilerId, includeViewGroups, skipVisibilityPatch, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
-    const { cubes, granularityHash } = await this.selectGranularityVariant(compilers, requestContext);
+    // Granularities are baked into the compiled model, so the base meta cubes are served directly.
+    const cubes = compilers.metaTransformer.cubes;
 
-    // Fixed composition order: base compilerId, then visibility mask, then granularity hash. Only
-    // computed when the caller actually wants the id — the hashing is skipped when a caller asks
-    // for view groups alone (the gateway always requests view groups).
+    // Fixed composition order: base compilerId, then visibility mask. Only computed when the caller
+    // actually wants the id — the hashing is skipped when a caller asks for view groups alone (the
+    // gateway always requests view groups).
     const composeCompilerId = (visibilityMaskHash: string | null) => {
       let id = compilers.compilerId;
       if (visibilityMaskHash) {
         id = this.mixInMaskHash(id, visibilityMaskHash);
-      }
-      if (granularityHash) {
-        id = this.mixInMaskHash(id, granularityHash);
       }
       return id;
     };
@@ -1412,11 +1198,11 @@ export class CompilerApi {
     options?: { requestId?: string }
   ): Promise<{ metaConfig: any; cubeDefinitions: Record<string, CubeDefinition> }> {
     const compilers = await this.getCompilers(options);
-    const { cubes } = await this.selectGranularityVariant(compilers, requestContext);
+    // Granularities are baked into the compiled model, so the base meta cubes are used directly.
     const { cubes: patchedCubes } = await this.patchVisibilityByAccessPolicy(
       compilers,
       requestContext,
-      cubes
+      compilers.metaTransformer.cubes
     );
     return {
       metaConfig: patchedCubes,

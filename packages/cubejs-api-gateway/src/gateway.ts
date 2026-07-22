@@ -730,8 +730,8 @@ class ApiGateway {
       const cubesConfig = onlyViews
         ? metaConfig.cubes.filter((c: any) => c.config?.type === 'view')
         : metaConfig.cubes;
-      // Time dimensions arrive from CompilerApi with `effectiveGranularities` already attached
-      // (baked at compile for env/static configs, variant-cached for the function form).
+      // Time dimensions arrive from CompilerApi with `effectiveGranularities` already attached —
+      // baked into the compiled model at compile time (resolved once per appId, all config forms).
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
       const visibleCubeNames = new Set(cubes.map(c => c.name));
       const viewGroups = (metaConfig.viewGroups || [])
@@ -764,7 +764,8 @@ class ApiGateway {
     try {
       await this.assertApiScope('meta', context.securityContext);
       const compilerApi = await this.getCompilerApi(context);
-      const globalConfig = await compilerApi.resolveGlobalGranularitiesConfig(context);
+      // Serve the per-appId catalog baked into the compiled model — no per-request resolution.
+      const globalConfig = await compilerApi.getGlobalGranularitiesConfig({ requestId: context.requestId });
       const builtInsCatalog = buildBuiltInsCatalog(globalConfig);
 
       const granularities: any[] = [];
