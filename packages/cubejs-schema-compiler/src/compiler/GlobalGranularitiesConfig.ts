@@ -40,7 +40,7 @@ export type GlobalGranularitiesConfig = {
   customGranularities: Readonly<Record<string, GranularityDefinition>>;
 };
 
-const DEFAULT_CONFIG: GlobalGranularitiesConfig = Object.freeze({
+export const DEFAULT_GRANULARITIES_CONFIG: GlobalGranularitiesConfig = Object.freeze({
   enabledBuiltIns: BUILT_IN_GRANULARITY_NAMES,
   customGranularities: Object.freeze({}),
 });
@@ -69,7 +69,7 @@ function applyEnvOverrides(name: string, base?: Partial<GranularityDefinition>):
 function resolveFromEnv(): GlobalGranularitiesConfig {
   const list = getEnv('granularities');
   if (!list || list.length === 0) {
-    return DEFAULT_CONFIG;
+    return DEFAULT_GRANULARITIES_CONFIG;
   }
 
   const enabledBuiltIns: string[] = [];
@@ -168,7 +168,7 @@ export async function resolveGlobalGranularities(
     // A function opts out of env vars entirely, so a non-array return (null / undefined / a stray
     // object) means "no explicit config" → the default built-in catalog, NOT an env fallback that
     // would leak CUBEJS_GRANULARITIES into a context the function meant to leave unconfigured.
-    return Array.isArray(resolved) ? resolveFromList(resolved) : DEFAULT_CONFIG;
+    return Array.isArray(resolved) ? resolveFromList(resolved) : DEFAULT_GRANULARITIES_CONFIG;
   }
   return resolveGlobalGranularitiesSync(userValue);
 }

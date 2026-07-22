@@ -97,15 +97,6 @@ export type EffectiveGranularity = {
   format?: string;
 };
 
-// The per-config effective granularity data, sparse: one `defaultSet` shared by every time
-// dimension without a local block, plus per-dimension `overrides` for the rare dims that declared
-// one. Attached onto the base meta cubes at read time (see CompilerApi.attachEffectiveGranularities)
-// instead of storing a full enriched cube copy.
-export type GranularitySets = {
-  defaultSet: EffectiveGranularity[];
-  overrides: Map<string, EffectiveGranularity[]>;
-};
-
 // Serialize a resolved set for /v1/meta. `title` always present (falls back to the name); the
 // other string fields are included only when defined. Order follows GRANULARITY_STRING_FIELDS,
 // which also drives the config hash — the two share the field list so they can't drift.

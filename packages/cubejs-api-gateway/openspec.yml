@@ -7,7 +7,7 @@ paths:
   "/v1/granularities":
     get:
       summary: "List the granularities available for this deployment"
-      description: "Returns the granularities enabled in this deployment — built-ins plus any custom granularities defined via `CUBEJS_GRANULARITIES` or `config.granularities`. Evaluated per request context."
+      description: "Returns the granularities enabled in this deployment — built-ins plus any custom granularities defined via `CUBEJS_GRANULARITIES` or `config.granularities`. Resolved once per application ID at data-model compile time and served from the compiled model."
       operationId: "granularitiesV1"
       responses:
         "200":

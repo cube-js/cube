@@ -1529,8 +1529,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           cube[refProperty].type === 'time' &&
           self.resolveGranularity(
             [cubeName, refProperty, 'granularities', propertyName],
-            cube,
-            query?.options?.granularityDefinitions
+            cube
           )
         ) {
           return {
@@ -1565,7 +1564,6 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   public resolveGranularity(
     path: string | string[],
     refCube?: any,
-    granularityDefinitions?: Record<string, Record<string, GranularityDefinition>>,
   ) {
     const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
     const cube = refCube || this.symbols[cubeName];
@@ -1584,53 +1582,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       return { interval: `1 ${granName}` };
     }
 
-    return cube?.[dimName]?.[gr]?.[granName] ||
-      granularityDefinitions?.[`${cubeName}.${dimName}`]?.[granName];
-  }
-
-  /**
-   * Returns a request-owned evaluator facade that keeps all state and method execution on the
-   * shared evaluator, while binding custom-granularity fallback to one request's effective set.
-   * The native SQL planner calls resolveGranularity on the evaluator bridge directly, so the
-   * request context has to live at this seam rather than only at JS adapter call sites.
-   *
-   * Must be a Proxy (not Object.create): the native bridge serializes this object's OWN enumerable
-   * fields (e.g. `primaryKeys`), which a prototype-delegating object would hide. The Proxy forwards
-   * every property to the real evaluator; to avoid allocating a bound function on every method
-   * access on the hot query path, bound methods are memoized in `boundCache` (bind once, reuse).
-   */
-  public withGranularityDefinitions(
-    granularityDefinitions?: Record<string, Record<string, GranularityDefinition>>,
-  ): this {
-    if (!granularityDefinitions || Object.keys(granularityDefinitions).length === 0) {
-      return this;
-    }
-
-    const evaluator = this;
-    const boundResolveGranularity = (path: string | string[], refCube?: any) => evaluator.resolveGranularity(
-      path,
-      refCube,
-      granularityDefinitions,
-    );
-    const boundCache = new Map<PropertyKey, Function>();
-    return new Proxy(this, {
-      get(target, property) {
-        if (property === 'resolveGranularity') {
-          return boundResolveGranularity;
-        }
-        const value = Reflect.get(target, property, target);
-        if (typeof value !== 'function') {
-          return value;
-        }
-        const cached = boundCache.get(property);
-        if (cached) {
-          return cached;
-        }
-        const bound = value.bind(target);
-        boundCache.set(property, bound);
-        return bound;
-      },
-    });
+    // Custom granularities (local + baked-in globals) resolve from the compiled cube symbols.
+    return cube?.[dimName]?.[gr]?.[granName];
   }
 
   protected cubeDependenciesProxy(parentIndex, cubeName) {

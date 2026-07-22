@@ -26,8 +26,7 @@ import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import type { ErrorReporter } from './ErrorReporter';
-import type { GranularitiesOption } from './GlobalGranularitiesConfig';
-import type { GranularitySets } from './GranularityResolver';
+import type { GlobalGranularitiesConfig } from './GlobalGranularitiesConfig';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -42,9 +41,10 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
-  // Global `granularities` config: env/static forms are resolved at compile time by
-  // CubeToMetaTransformer; the function form per request by CompilerApi.
-  granularities?: GranularitiesOption;
+  // Resolved-once global granularities config for this appId, baked into the compiled model by
+  // CubeToMetaTransformer. CompilerApi resolves all config forms (env / static / function) before
+  // compile and passes the result here.
+  granularitiesConfig?: GlobalGranularitiesConfig;
 };
 
 export interface CompilerInterface {
@@ -61,17 +61,6 @@ export type Compiler = {
     compilerCache: CompilerCache;
     headCommitId?: string;
     compilerId: string;
-    // Per-config effective granularity SETS keyed by config hash — NOT enriched cube copies. The
-    // sparse `{ defaultSet, overrides }` shape is a few KB (one shared array + the rare local-block
-    // dims) rather than a ~MB clone of the whole meta; CompilerApi attaches these onto the base
-    // cubes cheaply at read time. Owned by the compiled model so a recompile discards it. Bounded
-    // LRU, function form only.
-    granularityVariants?: Map<string, Promise<GranularitySets>>;
-    // Per-request SQL-path global-custom lookups (dim -> name -> def) keyed by config hash. Same
-    // ownership/lifecycle as granularityVariants: a pure function of (model, config), cached here
-    // and discarded on recompile, bounded to match the variant cache. Promise-valued so concurrent
-    // misses of one hash coalesce into a single build.
-    granularityDefinitions?: Map<string, Promise<Record<string, Record<string, any>>>>;
 };
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
@@ -85,7 +74,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator, cubeValidator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph, options.granularities);
+  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph, options.granularitiesConfig);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
