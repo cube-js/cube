@@ -131,6 +131,11 @@ export interface DriverCapabilities extends ExternalDriverCompatibilities {
 
 export type StreamOptions = {
   highWaterMark: number;
+  /**
+   * Cube request identifier, forwarded so drivers can tag the underlying
+   * database job/query for tracing (e.g. BigQuery job labels).
+   */
+  requestId?: string;
 };
 
 export type StreamingSourceOptions = {

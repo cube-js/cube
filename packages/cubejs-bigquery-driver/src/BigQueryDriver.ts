@@ -28,6 +28,7 @@ import {
   QueryOptions,
   QuerySchemasResult,
   QueryTablesResult,
+  StreamOptions,
   StreamTableData,
   TableCSVData,
 } from '@cubejs-backend/base-driver';
@@ -332,14 +333,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async stream(
     query: string,
-    values: unknown[]
+    values: unknown[],
+    options?: StreamOptions
   ): Promise<StreamTableData> {
+    const labels = this.buildQueryLabels(options);
     const stream = await this.bigquery.createQueryStream({
       query,
       params: values,
       parameterMode: 'positional',
       useLegacySql: false,
       wrapIntegers: true,
+      ...(labels ? { labels } : {}),
     });
 
     const rowStream = new HydrationStream();
@@ -402,6 +406,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected async awaitForJobStatus(job: Job, options: any, withResults: boolean) {
     const [result] = await job.getMetadata();
+
     if (result.status && result.status.state === 'DONE') {
       if (result.status.errorResult) {
         throw new Error(
@@ -418,12 +423,38 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return withResults ? job.getQueryResults({ wrapIntegers: true }) : true;
   }
 
+  /**
+   * @see https://cloud.google.com/bigquery/docs/labels-intro#requirements
+   */
+  protected buildQueryLabels(options?: QueryOptions): { [k: string]: string } | undefined {
+    const requestId = options?.requestId;
+    if (!requestId) {
+      return undefined;
+    }
+
+    const rawId = String(requestId);
+    const spanIdx = rawId.lastIndexOf('-span-');
+    const queryUuid = spanIdx !== -1 ? rawId.substring(0, spanIdx) : rawId;
+
+    const value = queryUuid.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
+    if (!value) {
+      return undefined;
+    }
+
+    return { cube_request_id: value };
+  }
+
   protected async runQueryJob<T = QueryRowsResponse>(
     bigQueryQuery: Query,
     options: any,
     withResults: boolean = true
   ): Promise<T> {
-    const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
+    const labels = this.buildQueryLabels(options);
+    const jobRequest: Query = labels
+      ? { ...bigQueryQuery, labels: { ...bigQueryQuery.labels, ...labels } }
+      : bigQueryQuery;
+    const [job] = await this.bigquery.createQueryJob(jobRequest);
+
     return <any> this.waitForJobResult(job, options, withResults);
   }
 
