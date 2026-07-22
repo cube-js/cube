@@ -15,9 +15,11 @@ use crate::{
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
-            convert_select_to_query_plan_with_config, init_testing_logger, LogicalPlanTestUtils,
+            convert_select_to_query_plan_with_config, convert_sql_to_cube_query, get_test_session,
+            get_test_tenant_ctx_customized, get_test_tenant_ctx_with_split_data_sources,
+            init_testing_logger, LogicalPlanTestUtils,
         },
-        DatabaseProtocol,
+        CompilationError, DatabaseProtocol,
     },
     config::ConfigObjImpl,
     transport::TransportLoadRequestQuery,
@@ -1762,6 +1764,340 @@ GROUP BY 1
     );
 }
 
+/// Regression test for self-join of an ungrouped (raw) CTE under SQL push down.
+/// Both join sides are ungrouped queries, so they must be rendered as standalone
+/// subqueries joined with plain SQL. Before wrapper-push-down-ungrouped-join-ungrouped
+/// this failed with `Use __cubeJoinField to join Cubes`.
+#[tokio::test]
+async fn test_wrapper_ungrouped_join_ungrouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH txns AS (
+            SELECT
+                customer_gender,
+                taxful_total_price AS amount,
+                order_date
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender ILIKE '%male%'
+            LIMIT 5000
+        )
+        SELECT
+            a.customer_gender,
+            a.amount,
+            a.order_date AS txn1_date,
+            b.order_date AS txn2_date
+        FROM txns a
+        JOIN txns b ON a.customer_gender = b.customer_gender
+            AND a.amount = b.amount
+            AND a.order_date < b.order_date
+        ORDER BY a.customer_gender, a.order_date
+        LIMIT 100
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("INNER JOIN ("),
+        "wrapped SQL is missing INNER JOIN of standalone subqueries:\n{}",
+        sql
+    );
+    // Both sides are ungrouped load queries
+    assert_eq!(
+        sql.matches(r#""ungrouped": true"#).count(),
+        2,
+        "expected both join sides to be standalone ungrouped load queries:\n{}",
+        sql
+    );
+}
+
+/// Same as [`test_wrapper_ungrouped_join_ungrouped`], but the CTE has only an
+/// OFFSET (no LIMIT): the offset must stay inside each standalone subquery.
+#[tokio::test]
+async fn test_wrapper_ungrouped_join_ungrouped_offset() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH txns AS (
+            SELECT
+                customer_gender,
+                taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            OFFSET 10
+        )
+        SELECT a.customer_gender, a.amount
+        FROM txns a
+        JOIN txns b ON a.customer_gender = b.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("INNER JOIN ("),
+        "wrapped SQL is missing INNER JOIN of standalone subqueries:\n{}",
+        sql
+    );
+    assert_eq!(
+        sql.matches(r#""offset": 10"#).count(),
+        2,
+        "expected both join sides to keep their offset:\n{}",
+        sql
+    );
+}
+
+/// LEFT JOIN with the ungrouped side on the outer (left) side.
+#[tokio::test]
+async fn test_wrapper_ungrouped_left_join_ungrouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH txns AS (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            LIMIT 5000
+        )
+        SELECT a.customer_gender, b.amount
+        FROM txns a
+        LEFT JOIN txns b ON a.customer_gender = b.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("LEFT JOIN ("),
+        "wrapped SQL is missing LEFT JOIN of standalone subqueries:\n{}",
+        sql
+    );
+}
+
+/// RIGHT JOIN with the ungrouped side on the left and a grouped subquery on the
+/// right. Right/Full join subqueries are only supported on the non-push-to-Cube
+/// path, which is exactly what a join with an ungrouped side produces.
+#[tokio::test]
+async fn test_wrapper_ungrouped_right_join_grouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH txns AS (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            LIMIT 5000
+        ),
+        averages AS (
+            SELECT customer_gender, AVG(avgPrice) AS avg_amount
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT t.amount, ca.avg_amount
+        FROM txns t
+        RIGHT JOIN averages ca ON t.customer_gender = ca.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("RIGHT JOIN ("),
+        "wrapped SQL is missing RIGHT JOIN of standalone subqueries:\n{}",
+        sql
+    );
+}
+
+/// FULL JOIN of two ungrouped sides.
+#[tokio::test]
+async fn test_wrapper_ungrouped_full_join_ungrouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH txns AS (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            LIMIT 5000
+        )
+        SELECT a.customer_gender, b.amount
+        FROM txns a
+        FULL JOIN txns b ON a.customer_gender = b.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("FULL JOIN ("),
+        "wrapped SQL is missing FULL JOIN of standalone subqueries:\n{}",
+        sql
+    );
+}
+
+/// When the data source has no `join_types/full` template, a FULL JOIN of two
+/// ungrouped sides must not be pushed down as broken SQL: the rule must not fire.
+#[tokio::test]
+async fn test_wrapper_ungrouped_full_join_without_template() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_customized(vec![
+        // Emulate a data source without FULL JOIN support: empty value removes the template
+        ("join_types/full".to_string(), "".to_string()),
+    ]);
+    let query = convert_sql_to_cube_query(
+        &r#"
+        WITH txns AS (
+            SELECT customer_gender, taxful_total_price AS amount
+            FROM KibanaSampleDataEcommerce
+            LIMIT 5000
+        )
+        SELECT a.customer_gender, b.amount
+        FROM txns a
+        FULL JOIN txns b ON a.customer_gender = b.customer_gender
+        "#
+        .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await;
+
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
+}
+
+/// The output of an ungrouped join is raw rows with possibly duplicated join keys
+/// (UngroupedScan:true). It must never be consumed as the grouped RHS of the
+/// push-to-Cube subquery join path: Cube renders subqueryJoins as a plain join for
+/// simple measures but as a SELECT DISTINCT keys semi-join for multiplied measures,
+/// and with duplicated join keys those disagree — same query, different numbers.
+/// MEASURE() over such a join must stay outside the pushed-down SQL (and fail at
+/// execution) instead of producing contract-dependent results.
+#[tokio::test]
+async fn test_wrapper_no_measure_over_raw_join_subquery() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH t AS (
+            SELECT customer_gender, order_date
+            FROM KibanaSampleDataEcommerce
+            LIMIT 100
+        ),
+        pairs AS (
+            SELECT a.customer_gender AS g
+            FROM t a
+            JOIN t b ON a.customer_gender = b.customer_gender
+                AND a.order_date < b.order_date
+        )
+        SELECT k.customer_gender, MEASURE(k.count)
+        FROM KibanaSampleDataEcommerce k
+        JOIN pairs p ON k.customer_gender = p.g
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // Query is plannable, but MEASURE() must not be pushed into a load query
+    // joined to the raw pairs subquery
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let physical_plan_string = displayable(physical_plan.as_ref()).indent().to_string();
+    assert!(
+        !physical_plan_string.contains("subqueryJoins"),
+        "raw join output leaked into a push-to-Cube subquery join:\n{}",
+        physical_plan_string
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(
+        !matches!(logical_plan, LogicalPlan::Extension(_)),
+        "MEASURE() over a raw join must stay outside the pushed-down SQL, got:\n{}",
+        logical_plan.display_indent()
+    );
+}
+
+/// Both join sides must live on the same data source: an ungrouped join across
+/// two data sources can't be pushed down as one SQL query and must stay an error.
+#[tokio::test]
+async fn test_wrapper_ungrouped_join_ungrouped_different_data_sources() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_split_data_sources();
+    let query = convert_sql_to_cube_query(
+        &r#"
+        SELECT k.customer_gender, l.content
+        FROM (SELECT customer_gender, has_subscription FROM KibanaSampleDataEcommerce LIMIT 100) k
+        JOIN (SELECT read, content FROM Logs LIMIT 100) l ON (k.has_subscription = l.read)
+        "#
+        .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await;
+
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
+}
+
 /// Regression test for window expression on top of a grouped join subquery
 /// (Sigma-style query). Window expr rebase in converter must keep field names
 /// consistent with column references in plans above.
@@ -2809,3 +3145,4 @@ async fn test_case_wrapper_sum_case_date_only_string() {
         displayable(physical_plan.as_ref()).indent()
     );
 }
+
