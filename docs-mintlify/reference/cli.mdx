@@ -1,0 +1,205 @@
+---
+title: Cube CLI
+description: Command-line interface for managing Cube deployments, data models, and workspace resources.
+---
+
+<Warning>
+
+The Cube CLI is currently in preview, and commands and flags may still
+change. Reach out to the [Cube support team](/admin/account-billing/support)
+to activate this feature for your account.
+
+</Warning>
+
+The Cube CLI (`cube`) is a single-binary command-line interface for the Cube
+platform. Use it to create and manage deployments, deploy data model code,
+work with the data model Git workflow, connect GitHub repositories, tail
+deployment logs, and automate workspace administration from scripts and CI.
+
+<Info>
+
+The Cube CLI works with the Cube cloud platform. It is not required for
+running Cube Core locally.
+
+</Info>
+
+## Installation
+
+Linux / macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
+```
+
+The installer downloads the release binary for your platform and adds it to
+your `PATH`. Set `CUBE_VERSION` to pin a release tag, or `CUBE_INSTALL_DIR`
+to change the install location.
+
+The CLI checks for new releases in the background and prints a notice when
+one is available. Update in place at any time:
+
+```bash
+cube update          # install the latest release
+cube update --check  # only report what's available
+```
+
+## Authentication
+
+Sign in with the browser device flow — the CLI prints a URL and a short
+code, opens your browser, and waits for approval:
+
+```bash
+cube login --url https://TENANT.cubecloud.dev
+```
+
+Credentials are saved to `~/.config/cube/config.toml` (Linux/macOS) or
+`%APPDATA%\cube\config.toml` (Windows). Multiple accounts are supported as
+named contexts (`--name` on login, `--context` on any command), and expired
+access tokens refresh automatically.
+
+For CI and scripts, use an [API key][ref-api-keys] instead:
+
+```bash
+cube login --api-key sk-YOUR_API_KEY --url https://TENANT.cubecloud.dev
+# or, without a config file:
+CUBE_API_URL=https://TENANT.cubecloud.dev CUBE_API_KEY=sk-YOUR_API_KEY cube deployments list
+```
+
+## Deploy a project
+
+The core workflow — create a deployment, connect a database, upload your
+data model, and query it:
+
+<Steps>
+
+<Step title="Create a deployment">
+
+```bash
+cube deployments create --name my-deployment --region aws-us-east-1-2
+cube regions  # list available regions
+```
+
+</Step>
+
+<Step title="Connect a database">
+
+```bash
+cube variables set DEPLOYMENT_ID \
+  CUBEJS_DB_TYPE=postgres \
+  CUBEJS_DB_HOST=db.example.com \
+  CUBEJS_DB_NAME=mydb \
+  CUBEJS_DB_USER=user \
+  CUBEJS_DB_PASS=secret
+```
+
+</Step>
+
+<Step title="Deploy your project">
+
+```bash
+cube deployments update DEPLOYMENT_ID -d '{"deployMode":"cli"}'
+cube deploy DEPLOYMENT_ID --directory ./my-cube-project -m "initial deploy"
+```
+
+`cube deploy` hashes local files, uploads only what changed, removes remote
+files deleted locally (`--keep-missing` opts out), and triggers a single
+build.
+
+</Step>
+
+<Step title="Watch the build and query">
+
+```bash
+cube deployments build-status DEPLOYMENT_ID
+cube deployments token DEPLOYMENT_ID  # mints a Core Data APIs token
+```
+
+Use the token against the deployment's [REST (JSON) API][ref-rest-api] endpoint.
+
+</Step>
+
+</Steps>
+
+## Import from GitHub
+
+Connect a deployment to a GitHub repository instead of uploading files:
+
+```bash
+cube github status                       # link state of your GitHub account
+cube github installations                # your GitHub App installations
+cube github repos INSTALLATION_ID        # repositories in an installation
+cube github branches OWNER/REPO --installation INSTALLATION_ID
+cube deployments create --name from-repo --region aws-us-east-1-2 \
+  -d '{"creationMethod":"github"}'
+cube github connect DEPLOYMENT_ID REPO --installation INSTALLATION_ID --branch main
+```
+
+Connecting clones the repository into the deployment and triggers the first
+build.
+
+## Command reference
+
+Run `cube <command> --help` for the full options of any command.
+
+| Command | Description |
+| --- | --- |
+| `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
+| `deployments` | List, get, create, update, delete deployments; `token`, `build-status`, `advance-step`, `reset-step` |
+| `deploy` | Upload a local project directory and build it |
+| `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
+| `regions` | List available deployment regions |
+| `github` | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
+| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
+| `environments` | Deployment environments and environment tokens |
+| `variables` | Deployment environment variables |
+| `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
+| `users`, `groups`, `attributes`, `policies` | Users, groups, and access control |
+| `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
+| `embed` | Embed sessions, tokens, and embed tenants |
+| `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 |
+| `api` | Raw authenticated API request (escape hatch): `cube api GET /api/v1/... -q key=value -d '{...}'` |
+| `update` | Update the CLI to the latest release |
+| `completion` | Generate shell completions |
+
+List commands print tables by default; pass `--json` anywhere for raw JSON
+output, suitable for piping to `jq`.
+
+## Data model Git workflow
+
+Edit the data model through branches without touching production:
+
+```bash
+cube data-model create-branch DEPLOYMENT_ID my-branch --dev-mode
+cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch my-branch
+cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders cube"
+```
+
+`merge-to-default` merges into the deploy branch and rebuilds production.
+
+## Environment variables
+
+| Variable | Description |
+| --- | --- |
+| `CUBE_API_URL` | Tenant URL, e.g. `https://TENANT.cubecloud.dev` (alternative to a saved context) |
+| `CUBE_API_KEY` | Credential: an API key or token (alternative to `cube login`) |
+| `CUBE_AUTH_SCHEME` | Force the `Authorization` scheme: `bearer` or `api-key` (auto-detected by default) |
+| `CUBE_NO_UPDATE_CHECK` | Disable the background update check |
+| `CUBE_NO_TELEMETRY` | Disable anonymous usage telemetry (also disabled when `CI` is set) |
+| `CUBE_VERSION` | Installer only: release tag to install |
+| `CUBE_INSTALL_DIR` | Installer only: install directory |
+
+## Telemetry
+
+The CLI sends anonymous usage events (command group, success/failure,
+version, platform). No personal data is collected; the anonymous identifier
+is a hash of the OS machine id. Telemetry is disabled automatically in CI,
+or explicitly with `CUBE_NO_TELEMETRY=1`.
+
+[ref-api-keys]: /admin/account-billing/api-keys
+[ref-rest-api]: /reference/core-data-apis/rest-api/index

@@ -563,6 +563,12 @@
             ]
           },
           {
+            "group": "CLI",
+            "pages": [
+              "reference/cli"
+            ]
+          },
+          {
             "group": "JavaScript SDK",
             "pages": [
               "reference/javascript-sdk",
