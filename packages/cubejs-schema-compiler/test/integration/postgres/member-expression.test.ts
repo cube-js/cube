@@ -59,6 +59,14 @@ cubes:
         sql: "{CUBE}.CUSTOMER_ID = {customers}.ID"
         relationship: many_to_one
 
+      - name: order_details
+        sql: "{CUBE}.ID = {order_details}.ORDER_ID"
+        relationship: one_to_one
+
+      - name: order_items
+        sql: "{CUBE}.ID = {order_items}.ORDER_ID"
+        relationship: one_to_many
+
     dimensions:
       - name: id
         sql: ID
@@ -129,6 +137,56 @@ cubes:
         type: number
         format: percent
         description: "Annual CAGR, year over year growth in revenue"
+
+  - name: order_items
+    sql: >
+      SELECT 1 AS ID, 10 AS ORDER_ID, 'A' AS ITEM_TYPE
+      UNION ALL
+      SELECT 2 AS ID, 10 AS ORDER_ID, 'B' AS ITEM_TYPE
+      UNION ALL
+      SELECT 3 AS ID, 11 AS ORDER_ID, 'A' AS ITEM_TYPE
+    public: false
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: item_type
+        sql: ITEM_TYPE
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+  - name: order_details
+    sql: >
+      SELECT 10 AS ORDER_ID, 'web' AS CHANNEL
+      UNION ALL
+      SELECT 11 AS ORDER_ID, 'web' AS CHANNEL
+      UNION ALL
+      SELECT 12 AS ORDER_ID, 'retail' AS CHANNEL
+      UNION ALL
+      SELECT 13 AS ORDER_ID, 'retail' AS CHANNEL
+      UNION ALL
+      SELECT 14 AS ORDER_ID, 'retail' AS CHANNEL
+    public: false
+
+    dimensions:
+      - name: order_id
+        sql: ORDER_ID
+        type: number
+        primary_key: true
+
+      - name: channel
+        sql: CHANNEL
+        type: string
+
+    measures:
+      - name: count
+        type: count
 
   - name: line_items
     sql: >
@@ -329,6 +387,64 @@ views:
   },
 
   [{ same_state_city_count: '0' }]));
+
+  it('dimension-only measure expression over dimensions of multiple joined cubes without row multiplication', async () => runQueryTest({
+    measures: [
+      {
+        // eslint-disable-next-line no-new-func
+        expression: new Function(
+          'orders',
+          'order_details',
+          // eslint-disable-next-line no-template-curly-in-string
+          'return `SUM(CASE WHEN ${order_details.channel} = \'web\' THEN ${orders.id} ELSE 0 END)`'
+        ),
+        // eslint-disable-next-line no-template-curly-in-string
+        definition: 'SUM(CASE WHEN ${order_details.channel} = \'web\' THEN ${orders.id} ELSE 0 END)',
+        expressionName: 'web_orders_id_sum',
+        cubeName: 'orders',
+      },
+    ],
+  },
+
+  [{ web_orders_id_sum: '21' }]));
+
+  const multiCubeDimOnlyMeasure = {
+    // eslint-disable-next-line no-new-func
+    expression: new Function(
+      'orders',
+      'order_details',
+      // eslint-disable-next-line no-template-curly-in-string
+      'return `SUM(CASE WHEN ${order_details.channel} = \'web\' THEN ${orders.id} ELSE 0 END)`'
+    ),
+    // eslint-disable-next-line no-template-curly-in-string
+    definition: 'SUM(CASE WHEN ${order_details.channel} = \'web\' THEN ${orders.id} ELSE 0 END)',
+    expressionName: 'web_orders_id_sum',
+    cubeName: 'orders',
+  };
+
+  it('dimension-only measure expression over multiple cubes errors when a query dimension multiplies a referenced cube', async () => {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [multiCubeDimOnlyMeasure],
+      dimensions: ['order_items.item_type'],
+    });
+    expect(() => query.buildSqlAndParams()).toThrow(/row multiplication/);
+  });
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('dimension-only measure expression over multiple cubes next to a measure from a one_to_many cube', async () => runQueryTest({
+      measures: [multiCubeDimOnlyMeasure, 'order_items.count'],
+    },
+    [{ web_orders_id_sum: '21', order_items__count: '3' }]));
+  } else {
+    it('dimension-only measure expression over multiple cubes next to a measure from a one_to_many cube errors in legacy planner', async () => {
+      await compiler.compile();
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [multiCubeDimOnlyMeasure, 'order_items.count'],
+      });
+      expect(() => query.buildSqlAndParams()).toThrow(/row multiplication/);
+    });
+  }
 
   if (getEnv('nativeSqlPlanner')) {
     it('member expression multi stage', async () => runQueryTest({
