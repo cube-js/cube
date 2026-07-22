@@ -7,11 +7,13 @@ import {
   compile,
   Compiler,
   createQuery,
+  buildBuiltInsCatalog,
   CubeDefinition,
   EvaluatedCube,
   GlobalGranularitiesConfig,
   GranularitiesOption,
   granularityConfigHash,
+  isBuiltInGranularity,
   PreAggregationFilters,
   PreAggregationInfo,
   PreAggregationReferences,
@@ -141,10 +143,8 @@ export class CompilerApi {
   protected readonly granularities?: GranularitiesOption;
 
   // Resolved-once-per-appId global granularities config, baked into the compiled model. Resolved in
-  // getCompilers with the appId-level compile context (all three forms — env / static / function).
-  // The in-flight PROMISE is memoized (not just the value) so concurrent initial getCompilers calls
-  // share a single resolve/await — the function form is invoked exactly once per appId. Cleared on
-  // rejection so a failed resolve can be retried.
+  // Memoized resolved global granularities config (+ hash) for the static/function forms; see
+  // getResolvedGranularities.
   private resolvedGranularitiesPromise?: Promise<{ config: GlobalGranularitiesConfig; hash: string }>;
 
   protected queryFactory?: QueryFactory;
@@ -239,10 +239,7 @@ export class CompilerApi {
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
 
-    // Resolve the global granularities config ONCE per appId with the compile context (handles all
-    // forms — env / static / function — awaiting the function). The resolved config is baked into
-    // the compiled model, so its hash goes into compilerVersion for every form: a config change
-    // then forces a recompile. Memoized on the instance so repeated calls don't re-resolve/re-await.
+    // Fold the resolved granularities hash into compilerVersion so a config change forces a recompile.
     const { config: resolvedGranularities, hash: granularitiesHash } = await this.getResolvedGranularities();
     compilerVersion += `_gran_${granularitiesHash}`;
 
@@ -257,12 +254,10 @@ export class CompilerApi {
     return this.compilers;
   }
 
-  // Resolve `config.granularities` with the appId-level compile context. The static-list and function
-  // forms are IMMUTABLE for the instance (a static list can't change; the function is frozen per
-  // appId by design), so they are memoized — including the in-flight promise, so concurrent initial
-  // compiles share one resolve/await and the function is invoked exactly once. The ENV form
-  // (`granularities === undefined`, reading CUBEJS_GRANULARITIES*) is NOT memoized: env can change at
-  // runtime, and re-resolving each call lets the folded hash trigger a recompile — matching rev-1.
+  // Resolve `config.granularities` with the appId-level compile context. Static-list/function forms
+  // are immutable for the instance, so they memoize the in-flight promise (concurrent compiles share
+  // one await; the function runs once per appId). The env form re-resolves each call so a runtime
+  // CUBEJS_GRANULARITIES* change still flows through the folded hash to trigger a recompile.
   private getResolvedGranularities(): Promise<{ config: GlobalGranularitiesConfig; hash: string }> {
     const resolve = () => resolveGlobalGranularities(
       this.granularities,
@@ -1131,14 +1126,32 @@ export class CompilerApi {
   }
 
   /**
-   * The resolved-once global granularities config baked into the compiled model. Serves the
-   * /v1/granularities endpoint (per-appId catalog) — no per-request resolution.
+   * The `/v1/granularities` catalog for this appId — built-ins plus global customs — assembled from
+   * the config baked into the compiled model. No per-request resolution.
    */
-  public async getGlobalGranularitiesConfig(options: { requestId?: string } = {}): Promise<GlobalGranularitiesConfig> {
+  public async getGranularities(options: { requestId?: string } = {}): Promise<any[]> {
     const compilers = await this.getCompilers(options);
-    // `getCompilers` has compiled the model, so the baked config is always present; fall back to the
-    // memoized resolve only defensively (should not happen on a successfully compiled model).
-    return compilers.metaTransformer.globalGranularitiesConfig ?? (await this.getResolvedGranularities()).config;
+    const config = compilers.metaTransformer.globalGranularitiesConfig ?? (await this.getResolvedGranularities()).config;
+
+    const granularities: any[] = Object.entries(buildBuiltInsCatalog(config))
+      .map(([name, entry]) => ({ type: 'built-in', name, ...entry }));
+
+    for (const [name, def] of Object.entries<any>(config.customGranularities)) {
+      // Skip customs that override a built-in — those are already folded into the catalog above.
+      // hasOwnProperty (not `in`) so a custom named e.g. `toString` isn't dropped via the prototype.
+      if (!isBuiltInGranularity(name)) {
+        granularities.push({
+          type: 'custom',
+          name,
+          title: def.title || name,
+          ...(def.interval !== undefined ? { interval: def.interval } : {}),
+          ...(def.origin !== undefined ? { origin: def.origin } : {}),
+          ...(def.offset !== undefined ? { offset: def.offset } : {}),
+          ...(def.format !== undefined ? { format: def.format } : {}),
+        });
+      }
+    }
+    return granularities;
   }
 
   public async metaConfig(

@@ -222,12 +222,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
   // result here — the transformer never sees a function.
   private readonly granularitiesConfig?: GlobalGranularitiesConfig;
 
-  // Set during compile() from the resolved config. Everything a time dimension needs is precomputed
-  // once here so the per-dimension loop does no repeated resolution for the common (plain) case:
-  //  - `defaultSet`: the serialized effective set shared by every dimension without a local block;
-  //  - `defaultGlobalCustoms`: the global-custom map (name -> def, `type` stripped) baked into those
-  //    same plain dimensions — invariant across them, so computed once and shared by reference.
-  // Both derive from a single `resolveDimensionGranularities(EMPTY_BLOCK, config)` pass.
+  // Precomputed once in compile() so plain dimensions need no per-dimension resolution: `defaultSet`
+  // and `defaultGlobalCustoms` are shared by reference across every dimension without a local block.
   private granularityState!: {
     config: GlobalGranularitiesConfig;
     catalog: Record<string, GranularityDefinition>;
@@ -516,18 +512,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
     return out;
   }
 
-  // Bake the precomputed effective GLOBAL customs (`globalCustoms`) into a time dimension's
-  // `granularities` map — decision 3 of the per-appId compile-time bake — so the SQL symbol path
-  // resolves them by name and they participate in pre-agg matching. Locals always win.
-  //
-  // The bake must reach BOTH object graphs the downstream paths read: the `cubeList`/`evaluatedCubes`
-  // object (`dimDef`, read by timeDimensionsForCube → pre-agg matching) AND the separate
-  // `symbols[cube][dim]` object that CubeSymbols.resolveGranularity reads for SQL. These are distinct
-  // objects (built by different transforms) even for a plain cube, so the second write is
-  // load-bearing, not a no-op. If only `dimDef` were written, SQL couldn't resolve a baked global and
-  // pre-agg matching would throw when it builds a Granularity for it. We REASSIGN `granularities`
-  // (never mutate in place) so a view dim sharing its source's map by reference isn't contaminated
-  // before it is itself processed.
+  // Bake global customs into a dimension's `granularities` map (locals win). Must write BOTH the
+  // `dimDef` object (pre-agg matching) and the distinct `symbols[cube][dim]` object (SQL
+  // resolveGranularity) — writing one leaves the other unable to resolve the custom. Reassign, never
+  // mutate in place, so a view dim sharing its source's map by reference isn't contaminated.
   private mergeGlobalCustomsIntoDimension(
     cubeName: string,
     dimensionName: string,
