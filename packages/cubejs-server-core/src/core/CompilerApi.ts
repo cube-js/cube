@@ -1148,7 +1148,7 @@ export class CompilerApi {
     const { includeCompilerId, includeViewGroups, skipVisibilityPatch, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
     // Granularities are baked into the compiled model, so the base meta cubes are served directly.
-    const cubes = compilers.metaTransformer.cubes;
+    const { cubes } = compilers.metaTransformer;
 
     // Fixed composition order: base compilerId, then visibility mask. Only computed when the caller
     // actually wants the id — the hashing is skipped when a caller asks for view groups alone (the
