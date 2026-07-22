@@ -5,8 +5,8 @@ use crate::{
         rules::{members::MemberRules, wrapper::WrapperRules},
         transforming_rewrite, wrapped_select, wrapped_select_having_expr_empty_tail,
         wrapped_select_joins_empty_tail, wrapper_pullup_replacer, wrapper_replacer_context,
-        LogicalPlanLanguage, WrappedSelectAlias, WrappedSelectSelectType, WrappedSelectType,
-        WrapperReplacerContextAliasToCube,
+        LogicalPlanLanguage, WrappedSelectAlias, WrappedSelectLimit, WrappedSelectOffset,
+        WrappedSelectSelectType, WrappedSelectType, WrapperReplacerContextAliasToCube,
     },
     var, var_iter, var_list_iter,
 };
@@ -381,10 +381,19 @@ impl WrapperRules {
                     "?projection_expr",
                     "?group_expr",
                     "?aggr_expr",
+                    "?window_expr",
+                    "?filter_expr",
+                    "?order_expr",
                     "?inner_select_type",
                     "?inner_projection_expr",
                     "?inner_group_expr",
                     "?inner_aggr_expr",
+                    "?inner_window_expr",
+                    "?inner_filter_expr",
+                    "?inner_order_expr",
+                    "?inner_joins",
+                    "?inner_limit",
+                    "?inner_offset",
                     "?alias_to_cube",
                     "?select_alias",
                     "?alias_to_cube_out",
@@ -455,18 +464,36 @@ impl WrapperRules {
         projection_expr_var: &'static str,
         _group_expr_var: &'static str,
         _aggr_expr_var: &'static str,
+        window_expr_var: &'static str,
+        filter_expr_var: &'static str,
+        order_expr_var: &'static str,
         inner_select_type_var: &'static str,
         inner_projection_expr_var: &'static str,
         _inner_group_expr_var: &'static str,
         _inner_aggr_expr_var: &'static str,
+        inner_window_expr_var: &'static str,
+        inner_filter_expr_var: &'static str,
+        inner_order_expr_var: &'static str,
+        inner_joins_var: &'static str,
+        inner_limit_var: &'static str,
+        inner_offset_var: &'static str,
         alias_to_cube_var: &'static str,
         select_alias_var: &'static str,
         alias_to_cube_out_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let select_type_var = var!(select_type_var);
         let projection_expr_var = var!(projection_expr_var);
+        let window_expr_var = var!(window_expr_var);
+        let filter_expr_var = var!(filter_expr_var);
+        let order_expr_var = var!(order_expr_var);
         let inner_select_type_var = var!(inner_select_type_var);
         let inner_projection_expr_var = var!(inner_projection_expr_var);
+        let inner_window_expr_var = var!(inner_window_expr_var);
+        let inner_filter_expr_var = var!(inner_filter_expr_var);
+        let inner_order_expr_var = var!(inner_order_expr_var);
+        let inner_joins_var = var!(inner_joins_var);
+        let inner_limit_var = var!(inner_limit_var);
+        let inner_offset_var = var!(inner_offset_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let select_alias_var = var!(select_alias_var);
         let alias_to_cube_out_var = var!(alias_to_cube_out_var);
@@ -497,7 +524,39 @@ impl WrapperRules {
                     return match select_type {
                         WrappedSelectType::Projection => {
                             // TODO changes of alias can be non-trivial
-                            subst[projection_expr_var] != subst[inner_projection_expr_var]
+                            if subst[projection_expr_var] != subst[inner_projection_expr_var] {
+                                return true;
+                            }
+
+                            // Identical projections can still be a non-trivial nesting:
+                            // outer select can filter, order or window over an inner select
+                            // that can't be merged into (it has joins, limit or offset).
+                            // Comparing same-purpose eclasses converges: repeated rule
+                            // applications produce equal components, and get rejected here.
+                            if subst[filter_expr_var] != subst[inner_filter_expr_var] {
+                                return true;
+                            }
+                            if subst[order_expr_var] != subst[inner_order_expr_var] {
+                                return true;
+                            }
+                            if subst[window_expr_var] != subst[inner_window_expr_var] {
+                                return true;
+                            }
+
+                            let inner_has_joins =
+                                var_list_iter!(egraph[subst[inner_joins_var]], WrappedSelectJoins)
+                                    .any(|joins| !joins.is_empty());
+                            if inner_has_joins {
+                                return true;
+                            }
+
+                            let inner_has_limit =
+                                var_iter!(egraph[subst[inner_limit_var]], WrappedSelectLimit)
+                                    .any(|limit| limit.is_some());
+                            let inner_has_offset =
+                                var_iter!(egraph[subst[inner_offset_var]], WrappedSelectOffset)
+                                    .any(|offset| offset.is_some());
+                            inner_has_limit || inner_has_offset
                         }
                         WrappedSelectType::Aggregate => {
                             // TODO write rules for non trivial wrapped aggregate

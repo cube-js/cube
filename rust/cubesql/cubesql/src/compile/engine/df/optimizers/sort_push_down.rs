@@ -112,15 +112,29 @@ fn sort_push_down(
             // Sort can be pushed down Filter, and while it may seem weird to do that
             // after doing the exact opposite in `FilterPushDown`, this may allow the sort
             // to push through some complex filters, ultimately reaching CubeScan.
-            Ok(LogicalPlan::Filter(Filter {
-                predicate: predicate.clone(),
-                input: Arc::new(sort_push_down(
-                    optimizer,
-                    input,
+            // Only do that when the sort can actually reach a scan: when it would get
+            // stuck above a barrier like Join or Aggregate instead, a sort in a subquery
+            // under a filter does not guarantee result order once the query is pushed
+            // down to SQL, so the sort must stay above the filter.
+            if sort_expr.is_none() || sort_can_reach_scan(input) {
+                Ok(LogicalPlan::Filter(Filter {
+                    predicate: predicate.clone(),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        sort_expr,
+                        optimizer_config,
+                    )?),
+                }))
+            } else {
+                issue_sort(
                     sort_expr,
-                    optimizer_config,
-                )?),
-            }))
+                    LogicalPlan::Filter(Filter {
+                        predicate: predicate.clone(),
+                        input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    }),
+                )
+            }
         }
         LogicalPlan::Window(Window {
             input,
@@ -269,6 +283,19 @@ fn rewrite_map_for_projection(
             ]
         })
         .collect()
+}
+
+/// Whether pushing a sort expression down this plan is useful: the sort must not
+/// get stuck directly above a Join. A sort in a subquery under a filter does not
+/// guarantee result order once the query is pushed down to SQL, and a sort right
+/// above a Join can't be absorbed into a CubeScan.
+fn sort_can_reach_scan(plan: &LogicalPlan) -> bool {
+    match plan {
+        LogicalPlan::Projection(Projection { input, .. }) => sort_can_reach_scan(input),
+        LogicalPlan::Filter(Filter { input, .. }) => sort_can_reach_scan(input),
+        LogicalPlan::Join(_) | LogicalPlan::CrossJoin(_) => false,
+        _ => true,
+    }
 }
 
 /// Issues a Sort containing the provided input if the provided `sort_expr` is `Some`;

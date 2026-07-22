@@ -827,6 +827,43 @@ pub fn get_test_tenant_ctx_with_meta(meta: Vec<CubeMeta>) -> Arc<MetaContext> {
     get_test_tenant_ctx_with_meta_and_templates(meta, vec![])
 }
 
+/// Standard test tenant context, except `Logs` members live on a separate data
+/// source from the rest of the cubes. Both data sources use the default mock
+/// templates. Used to check that rewrites requiring a single data source do not
+/// fire across data sources.
+pub fn get_test_tenant_ctx_with_split_data_sources() -> Arc<MetaContext> {
+    let meta = get_test_meta();
+    let member_to_data_source = meta
+        .iter()
+        .flat_map(|cube| {
+            cube.dimensions
+                .iter()
+                .map(|d| &d.name)
+                .chain(cube.measures.iter().map(|m| &m.name))
+                .chain(cube.segments.iter().map(|s| &s.name))
+        })
+        .map(|member| {
+            let data_source = if member.starts_with("Logs.") {
+                "logs"
+            } else {
+                "default"
+            };
+            (member.clone(), data_source.to_string())
+        })
+        .collect();
+    Arc::new(MetaContext::new(
+        meta,
+        member_to_data_source,
+        vec![
+            ("default".to_string(), sql_generator(vec![])),
+            ("logs".to_string(), sql_generator(vec![])),
+        ]
+        .into_iter()
+        .collect(),
+        Uuid::new_v4(),
+    ))
+}
+
 pub async fn get_test_session(
     protocol: DatabaseProtocol,
     meta_context: Arc<MetaContext>,

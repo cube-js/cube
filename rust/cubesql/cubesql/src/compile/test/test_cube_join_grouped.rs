@@ -959,3 +959,79 @@ LIMIT 1
     assert_eq!(request.segments.as_ref().unwrap().len(), 1);
     assert!(request.segments.as_ref().unwrap()[0].contains(r#"\"t0\".\"measure\" IS NULL"#));
 }
+
+/// Ungrouped query with LIMIT joined with grouped query can not be pushed to Cube:
+/// limit must apply before join, and it does not commute with it.
+/// Instead it should plan as a plain SQL join of two standalone subqueries,
+/// keeping the limit inside the ungrouped subquery
+#[tokio::test]
+async fn test_join_limited_ungrouped_with_grouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+WITH category_averages AS (
+  SELECT
+    KibanaSampleDataEcommerce.customer_gender,
+    MEASURE(KibanaSampleDataEcommerce.avgPrice) AS avg_amount
+  FROM KibanaSampleDataEcommerce
+  WHERE KibanaSampleDataEcommerce.customer_gender IN ('male', 'female')
+    AND KibanaSampleDataEcommerce.order_date >= '2026-01-01'
+  GROUP BY 1
+  LIMIT 5000
+), transactions AS (
+  SELECT
+    KibanaSampleDataEcommerce.customer_gender,
+    KibanaSampleDataEcommerce.notes,
+    KibanaSampleDataEcommerce.taxful_total_price,
+    KibanaSampleDataEcommerce.order_date
+  FROM KibanaSampleDataEcommerce
+  WHERE KibanaSampleDataEcommerce.customer_gender IN ('male', 'female')
+    AND KibanaSampleDataEcommerce.order_date >= '2026-01-01'
+  LIMIT 5000
+)
+SELECT
+  t.customer_gender,
+  t.notes,
+  t.taxful_total_price AS transaction_amount,
+  ca.avg_amount AS category_average,
+  t.taxful_total_price - ca.avg_amount AS amount_above_average,
+  t.order_date
+FROM transactions t
+JOIN category_averages ca ON t.customer_gender = ca.customer_gender
+WHERE t.taxful_total_price > ca.avg_amount
+ORDER BY 5 DESC
+LIMIT 100
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let physical_plan_string = displayable(physical_plan.as_ref()).indent().to_string();
+    println!("Physical plan: {}", physical_plan_string);
+
+    let cube_scans = query_plan.as_logical_plan().find_cube_scans();
+    assert_eq!(cube_scans.len(), 2);
+
+    // Ungrouped side keeps its limit inside its own subquery
+    assert!(cube_scans
+        .iter()
+        .any(|scan| scan.request.ungrouped == Some(true) && scan.request.limit == Some(5000)));
+    // Grouped side is a regular grouped subquery
+    assert!(cube_scans.iter().any(|scan| {
+        scan.request.ungrouped.is_none()
+            && scan.request.limit == Some(5000)
+            && scan.request.measures == Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string()])
+    }));
+
+    // Join is pushed down to the data source as a plain SQL join
+    assert!(physical_plan_string.contains(r#"INNER JOIN (SELECT * FROM {"#));
+    assert!(physical_plan_string.contains(r#"ON ("t"."customer_gender" = "ca"."customer_gender")"#));
+}
