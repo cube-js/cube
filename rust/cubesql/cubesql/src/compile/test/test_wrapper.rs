@@ -2555,6 +2555,61 @@ GROUP BY
     );
 }
 
+/// Backslashes in patch measure filter SQL must be escaped for JS template literal
+/// evaluation on the Cube side, same as SqlFunction member expressions
+#[tokio::test]
+async fn test_ad_hoc_measure_filter_like_escape() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"SELECT
+    SUM(
+        CASE (dim_str0 ILIKE '%foo%')
+        WHEN TRUE
+        THEN maxPrice
+        ELSE NULL
+        END
+    )
+FROM MultiTypeCube
+;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![(
+            "expressions/ilike".to_string(),
+            "{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}\
+             {% if default_escape %} ESCAPE '\\\\'{% endif %}"
+                .to_string(),
+        )],
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let measures = request.measures.unwrap();
+    assert_eq!(measures.len(), 1);
+    let measure: serde_json::Value = serde_json::from_str(&measures[0]).unwrap();
+    let filter_sql = measure["expr"]["addFilters"][0]["sql"].as_str().unwrap();
+    // Member expression SQL is evaluated as a JS template literal on the Cube side,
+    // which collapses `\\` back to `\`, so the ESCAPE clause must carry doubled backslashes
+    assert!(
+        filter_sql.contains(r#"ILIKE $0$ ESCAPE '\\\\'"#),
+        "expected escaped ESCAPE clause in patch measure filter, got: {}",
+        filter_sql
+    );
+}
+
 #[tokio::test]
 async fn test_wrapper_between() {
     if !Rewriter::sql_push_down_enabled() {
