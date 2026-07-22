@@ -2188,8 +2188,17 @@ export class BaseQuery {
       case 1:
         [cubeNameToAttach] = cubeNamesForMeasure;
         break;
-      default:
-        throw new Error(`Expected single cube for dimension-only measure ${measureName}, got ${cubeNamesForMeasure}`);
+      default: {
+        if (cubeNamesForMeasure.some(cubeName => this.multipliedJoinRowResult(cubeName))) {
+          throw new Error(`Dimension-only measure ${measureName} references cubes (${cubeNamesForMeasure}) that lead to row multiplication. Please rewrite it using sub query.`);
+        }
+        // Dimensions from several cubes, but none of them is on the multiplied
+        // side of a join - safe to evaluate the expression on top of join tree
+        return [measureName, [{
+          multiplied: false,
+          measure: m.measure,
+        }]];
+      }
     }
 
     const multiplied = this.multipliedJoinRowResult(cubeNameToAttach) || false;

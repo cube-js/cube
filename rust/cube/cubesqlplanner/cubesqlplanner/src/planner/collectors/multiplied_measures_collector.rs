@@ -139,11 +139,24 @@ pub fn collect_multiplied_measures(
                     multiplied,
                 }]
             } else {
-                return Err(CubeError::user(format!(
-                    "Expected single cube for dimension-only measure {}, got {:?}",
-                    node.full_name(),
-                    cube_names
-                )));
+                if cube_names
+                    .iter()
+                    .any(|cube_name| join.is_multiplied(cube_name))
+                {
+                    return Err(CubeError::user(format!(
+                        "Dimension-only measure {} references cubes {:?} that lead to row multiplication. Please rewrite it using sub query.",
+                        node.full_name(),
+                        cube_names
+                    )));
+                }
+                // Dimensions from several cubes, but none of them is on the
+                // multiplied side of a join - safe to evaluate the expression
+                // on top of the join tree as a regular measure.
+                vec![MeasureResult {
+                    cube_name: node.cube_name().clone(),
+                    measure: node.clone(),
+                    multiplied: false,
+                }]
             };
             return Ok(result);
         }
