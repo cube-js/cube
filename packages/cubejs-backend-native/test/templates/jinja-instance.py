@@ -99,6 +99,17 @@ async def load_data():
   }
   return api_response
 
+class ExampleCallable:
+  # Invoked as `obj(...)` in a template — exercises python_obj_call_sync.
+  def __call__(self, arg1, arg2, **kwargs):
+    kwargs_str = ",".join(f"{key}={value}" for key, value in sorted(kwargs.items()))
+
+    return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
+
+@template.function
+def load_callable():
+  return ExampleCallable()
+
 class ExampleClassModelA:
   def get_name_method(self):
     return "example"

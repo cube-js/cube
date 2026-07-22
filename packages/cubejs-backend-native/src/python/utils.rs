@@ -5,11 +5,9 @@ use pyo3::types::{PyDict, PyFunction, PyString, PyTuple};
 use pyo3::{ffi, AsPyPointer};
 use std::ffi::c_int;
 
-/// Splits synchronously-collected minijinja arguments into a positional tuple
-/// and an optional kwargs dict. Keyword arguments (`fn(key=value)`) arrive as a
-/// dedicated kwargs CLRepr and must be forwarded as Python kwargs, not appended
-/// to the positional tuple — otherwise the callee receives the kwargs dict as a
-/// positional value. Mirrors the function-call path in runtime.rs.
+/// Splits minijinja call arguments into a positional tuple and an optional
+/// kwargs dict, so `fn(key=value)` reaches Python as a keyword argument rather
+/// than a positional kwargs dict. Mirrors the async path in runtime.rs.
 fn split_positional_and_kwargs(
     py: Python<'_>,
     arguments: Vec<CLRepr>,
