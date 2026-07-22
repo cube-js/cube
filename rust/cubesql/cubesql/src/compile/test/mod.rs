@@ -672,6 +672,7 @@ pub fn sql_generator(
             SqlTemplates::new(
                 vec![
                     ("functions/COALESCE".to_string(), "COALESCE({{ args_concat }})".to_string()),
+                    ("functions/NULLIF".to_string(), "NULLIF({{ args_concat }})".to_string()),
                     ("functions/SUM".to_string(), "SUM({{ args_concat }})".to_string()),
                     ("functions/MIN".to_string(), "MIN({{ args_concat }})".to_string()),
                     ("functions/MAX".to_string(), "MAX({{ args_concat }})".to_string()),
@@ -733,6 +734,7 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                         "{{expr}} {{quoted_alias}}".to_string(),
                     ),
                     ("expressions/binary".to_string(), "({{ left }} {{ op }} {{ right }})".to_string()),
+                    ("expressions/int_division".to_string(), "({{ left }} / {{ right }})".to_string()),
                     ("expressions/is_null".to_string(), "({{ expr }} IS {% if negate %}NOT {% endif %}NULL)".to_string()),
                     ("expressions/case".to_string(), "CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
                     ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),

@@ -235,6 +235,12 @@ export class PinotQuery extends BaseQuery {
       '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}' +
       '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    // Pinot `/` returns DOUBLE for integer operands, and intDiv() is floor
+    // division (intDiv(-7, 2) = -4). CAST to LONG truncates toward zero
+    // (CAST(-7 / 2 AS LONG) = -3), matching PostgreSQL integer division.
+    // Note: the division itself happens in DOUBLE, so results are exact only
+    // up to 2^53
+    templates.expressions.int_division = 'CAST({{ left }} / {{ right }} AS LONG)';
     templates.expressions.timestamp_literal = 'fromDateTime(\'{{ value }}\', \'yyyy-MM-dd\'\'T\'\'HH:mm:ss.SSS\'\'Z\'\'\')';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';

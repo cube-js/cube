@@ -765,6 +765,13 @@ impl SqlTemplates {
         )
     }
 
+    pub fn int_division_expr(&self, left: String, right: String) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/int_division",
+            context! { left => left, right => right },
+        )
+    }
+
     pub fn is_null_expr(&self, expr: String, negate: bool) -> Result<String, CubeError> {
         self.render_template(
             "expressions/is_null",

@@ -337,6 +337,9 @@ export class BigqueryQuery extends BaseQuery {
     delete templates.functions.PERCENTILECONT;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
+    // BigQuery `/` on INT64 operands returns FLOAT64; DIV() is integer division
+    // truncating toward zero, matching PostgreSQL (DIV(12, -7) = -1)
+    templates.expressions.int_division = 'DIV({{ left }}, {{ right }})';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';

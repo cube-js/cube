@@ -193,6 +193,9 @@ export class MysqlQuery extends BaseQuery {
     templates.quotes.escape = '\\`';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // MySQL `/` returns DECIMAL even for integer operands; DIV discards the
+    // fractional part (truncation toward zero), matching PostgreSQL (-5 DIV 2 = -2)
+    templates.expressions.int_division = '({{ left }} DIV {{ right }})';
     delete templates.expressions.ilike;
     templates.types.string = 'CHAR';
     templates.types.boolean = 'TINYINT';
