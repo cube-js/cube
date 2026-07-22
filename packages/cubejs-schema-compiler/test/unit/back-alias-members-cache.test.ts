@@ -109,7 +109,17 @@ describe('allBackAliasMembersExceptSegments cache', () => {
 
     const completed = query.allBackAliasMembersExceptSegments();
     expect(query.allBackAliasMembersExceptSegments()).toBe(completed);
-    expect(backAliasMembers).toHaveBeenCalledTimes(3);
+
+    const nestedAfterCache = query.evaluateSymbolSqlWithContext(
+      () => query.allBackAliasMembersExceptSegments(),
+      { aliasGathering: true }
+    );
+
+    expect(nestedAfterCache).toEqual(completed);
+    expect(nestedAfterCache).not.toBe(completed);
+    expect(query.allBackAliasMembersExceptSegmentsCache).toBe(completed);
+    expect(query.allBackAliasMembersExceptSegments()).toBe(completed);
+    expect(backAliasMembers).toHaveBeenCalledTimes(4);
   });
 
   it('only stores successful alias collection results', () => {
