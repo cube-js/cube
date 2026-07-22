@@ -22,7 +22,12 @@ use async_trait::async_trait;
 use cubeclient::models::V1CubeMetaType;
 use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
 use std::future::Future;
-use std::{collections::HashMap, env, ops::Deref, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    env,
+    ops::Deref,
+    sync::Arc,
+};
 use uuid::Uuid;
 
 pub mod rewrite_engine;
@@ -996,6 +1001,41 @@ pub fn get_test_tenant_ctx_with_multi_data_source_view_and_templates(
     ))
 }
 
+/// Standard test tenant context, except `Logs` members live on a separate data source.
+/// Used to check that rewrites requiring a single data source do not fire across them.
+pub fn get_test_tenant_ctx_with_split_data_sources() -> Arc<MetaContext> {
+    let meta = get_test_meta();
+    let member_to_data_source = meta
+        .iter()
+        .flat_map(|cube| {
+            cube.dimensions
+                .iter()
+                .map(|d| &d.name)
+                .chain(cube.measures.iter().map(|m| &m.name))
+                .chain(cube.segments.iter().map(|s| &s.name))
+        })
+        .map(|member| {
+            let data_source = if member.starts_with("Logs.") {
+                "logs"
+            } else {
+                "default"
+            };
+            (member.clone(), data_source.to_string())
+        })
+        .collect();
+    Arc::new(MetaContext::new(
+        meta,
+        member_to_data_source,
+        vec![
+            ("default".to_string(), sql_generator(vec![])),
+            ("logs".to_string(), sql_generator(vec![])),
+        ]
+        .into_iter()
+        .collect(),
+        Uuid::new_v4(),
+    ))
+}
+
 pub async fn get_test_session(
     protocol: DatabaseProtocol,
     meta_context: Arc<MetaContext>,
@@ -1130,6 +1170,8 @@ impl TransportService for TestConnectionTransport {
         member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
+        // Sorted so that snapshots of the generated SQL are stable
+        let member_to_alias = member_to_alias.map(|m| m.into_iter().collect::<BTreeMap<_, _>>());
         let inputs = serde_json::json!({
             "query": query,
             "meta": meta,

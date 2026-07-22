@@ -56,8 +56,9 @@ fn sort_push_down(
         }) => {
             // Sort can be pushed down to projection, however we only map specific expressions.
             // Complex expressions can't be pushed down, so if there are any, Sort is issued
-            // before the projection.
-            if plan_has_projections(input) {
+            // before the projection. A sort that can't reach a scan stays above the
+            // projection as well.
+            if plan_has_projections(input) && sort_can_reach_scan(input) {
                 if let Some(sort_expr) = &sort_expr {
                     let rewrite_map = rewrite_map_for_projection(expr, schema);
                     if let Some(new_sort_expr) = sort_expr
@@ -109,18 +110,27 @@ fn sort_push_down(
             )
         }
         LogicalPlan::Filter(Filter { predicate, input }) => {
-            // Sort can be pushed down Filter, and while it may seem weird to do that
-            // after doing the exact opposite in `FilterPushDown`, this may allow the sort
-            // to push through some complex filters, ultimately reaching CubeScan.
-            Ok(LogicalPlan::Filter(Filter {
-                predicate: predicate.clone(),
-                input: Arc::new(sort_push_down(
-                    optimizer,
-                    input,
+            // Pushing Sort down through a Filter can let it reach a CubeScan through complex
+            // filters, but a sort stuck above a Join lands in a subquery and loses its order.
+            if sort_expr.is_none() || sort_can_reach_scan(input) {
+                Ok(LogicalPlan::Filter(Filter {
+                    predicate: predicate.clone(),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        sort_expr,
+                        optimizer_config,
+                    )?),
+                }))
+            } else {
+                issue_sort(
                     sort_expr,
-                    optimizer_config,
-                )?),
-            }))
+                    LogicalPlan::Filter(Filter {
+                        predicate: predicate.clone(),
+                        input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    }),
+                )
+            }
         }
         LogicalPlan::Window(Window {
             input,
@@ -271,6 +281,32 @@ fn rewrite_map_for_projection(
         .collect()
 }
 
+/// Whether a sort pushed down this plan can avoid getting stuck above a Join, where
+/// it would land in a subquery and stop guaranteeing result order once pushed to SQL.
+fn sort_can_reach_scan(plan: &LogicalPlan) -> bool {
+    match plan {
+        LogicalPlan::Projection(Projection { input, .. })
+        | LogicalPlan::Filter(Filter { input, .. })
+        | LogicalPlan::Sort(Sort { input, .. })
+        // The sort is issued right above these, but the wrapper then renders it inside
+        // their subquery when a Join is below: keep it higher so it stays outermost
+        | LogicalPlan::Aggregate(Aggregate { input, .. })
+        | LogicalPlan::Window(Window { input, .. })
+        | LogicalPlan::Limit(Limit { input, .. })
+        | LogicalPlan::Distinct(Distinct { input })
+        | LogicalPlan::Subquery(Subquery { input, .. }) => sort_can_reach_scan(input),
+        LogicalPlan::Union(Union { inputs, .. }) => {
+            // Vacuously true for a unionless Union; such plans don't survive planning
+            inputs.iter().all(|input| sort_can_reach_scan(input))
+        }
+        LogicalPlan::Join(_) | LogicalPlan::CrossJoin(_) => false,
+        // Optimistic by design: a stricter allow-list demonstrably loses push down
+        // (grouped scans regress to post-processing plans), while over-permitting
+        // costs at most a pushed sort that is not absorbed
+        _ => true,
+    }
+}
+
 /// Issues a Sort containing the provided input if the provided `sort_expr` is `Some`;
 /// otherwise, issues the provided input instead.
 fn issue_sort(sort_expr: Option<Vec<Expr>>, input: LogicalPlan) -> Result<LogicalPlan> {
@@ -378,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_down_join_sort_left() -> Result<()> {
+    fn test_sort_stays_above_join_sort_left() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
@@ -403,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_down_join_sort_right() -> Result<()> {
+    fn test_sort_stays_above_join_sort_right() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
@@ -428,7 +464,35 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_down_cross_join_sort_left() -> Result<()> {
+    fn test_sort_stays_above_filter_over_join() -> Result<()> {
+        // Sort must not be pushed below a Filter when it would get stuck above a Join:
+        // a sort in a subquery under a filter does not guarantee result order once the
+        // query is pushed down to SQL.
+        let plan = LogicalPlanBuilder::from(
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
+                .project(vec![col("key"), col("c1")])?
+                .build()?,
+        )
+        .join(
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"], vec![])?)
+                .project(vec![col("key"), col("c2")])?
+                .build()?,
+            JoinType::Inner,
+            (
+                vec![Column::from_name("key")],
+                vec![Column::from_name("key")],
+            ),
+        )?
+        .filter(col("j1.c1").gt_eq(col("j2.c2")))?
+        .sort(vec![sort(col("j1.c1"), true, false)])?
+        .build()?;
+
+        insta::assert_debug_snapshot!(optimize(&plan));
+        Ok(())
+    }
+
+    #[test]
+    fn test_sort_stays_above_cross_join_sort_left() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
@@ -448,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_down_cross_join_sort_right() -> Result<()> {
+    fn test_sort_stays_above_cross_join_sort_right() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
