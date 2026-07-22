@@ -86,7 +86,7 @@ This option for [`@cubejs-client/ws-transport`][link-hearbeatinterval] has been
 replaced by `heartBeatInterval`.
 
 [link-hearbeatinterval]:
-  https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
+  https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-ws-transport#hearbeatinterval
 
 ### `CUBEJS_ENABLE_TLS`
 
@@ -97,7 +97,7 @@ TLS on a load balancer or reverse proxy instead. [Read more
 here][link-enable-https].
 
 [link-enable-https]:
-  https://cube.dev/docs/deployment/production-checklist#enable-https
+  https://docs.cube.dev/admin/deployment/core#set-up-reverse-proxy
 
 ### Embedding Cube.js within Express
 
@@ -113,7 +113,7 @@ microservices, if necessary).
 
 [link-cube-docker]: https://cube.dev/blog/cubejs-loves-docker
 [link-migration]:
-  https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
+  https://docs.cube.dev/admin/deployment/core
 
 ### Absolute import for `@cubejs-backend/query-orchestrator`
 
@@ -146,7 +146,7 @@ across different tenants, if need be. Single-tenant setups should consider
 removing the `contextToDataSourceId` property completely.
 
 [link-contexttoorchestratorid]:
-  https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
+  https://docs.cube.dev/reference/configuration/config#context_to_orchestrator_id
 
 ### Absolute import for `@cubejs-backend/server-core`
 
@@ -201,8 +201,8 @@ WebSockets transports.
 If you are using custom authorization, please take a [look at the
 documentation][link-custom-auth]
 
-[link-custom-auth]: https://cube.dev/docs/security#custom-authentication
-[ref-checkauth]: https://cube.dev/docs/config#options-reference-check-auth
+[link-custom-auth]: https://docs.cube.dev/docs/data-modeling/access-control#authentication
+[ref-checkauth]: https://docs.cube.dev/reference/configuration/config#check_auth
 
 ### Node.js 10
 
@@ -254,7 +254,7 @@ New shape of `authInfo`:
 }
 ```
 
-[ref-security-context]: https://cube.dev/docs/security/context
+[ref-security-context]: https://docs.cube.dev/docs/data-modeling/access-control/context
 
 Deprecated:
 
@@ -290,7 +290,7 @@ Cube no longer supports using databases such as MySQL and Postgres as external
 databases. [Please switch to using Cube Store][link-running-in-prod] as it is a
 more robust and reliable solution.
 
-[link-running-in-prod]: https://cube.dev/docs/caching/running-in-production
+[link-running-in-prod]: https://docs.cube.dev/cube-core/running-in-production
 
 ### `CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`
 
@@ -307,7 +307,7 @@ migration to Cube Store and are no longer necessary.
 Using external databases for pre-aggregations is now deprecated, and we strongly
 recommend [using Cube Store as a solution][ref-caching-in-prod].
 
-[ref-caching-in-prod]: https://cube.dev/docs/caching/running-in-production
+[ref-caching-in-prod]: https://docs.cube.dev/cube-core/running-in-production
 
 ### `dbType`
 
@@ -344,7 +344,7 @@ Redis](https://cube.dev/blog/replacing-redis-with-cube-store). Please migrate to
 **Deprecated in Release: v0.33.0**
 
 The `SECURITY_CONTEXT` context variable is deprecated. Use
-[`query_rewrite`](https://cube.dev/docs/reference/configuration/config#query_rewrite)
+[`query_rewrite`](https://docs.cube.dev/reference/configuration/config#query_rewrite)
 instead.
 
 ### `running_total` measure type
@@ -354,7 +354,7 @@ instead.
 **Removed in Release: v1.7.0**
 
 The `running_total` measure type has been removed. Use a
-[`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
+[`rolling_window`](https://docs.cube.dev/reference/data-modeling/measures#rolling_window)
 with an `unbounded` trailing window to calculate running totals instead.
 
 ### Top-level `includes` parameter in views
@@ -363,7 +363,7 @@ with an `unbounded` trailing window to calculate running totals instead.
 
 The top-level `includes` parameter is now removed. Please always use the
 `includes` parameter within [`cubes` and `join_path`
-parameters](https://cube.dev/docs/reference/data-model/view#cubes) so you can
+parameters](https://docs.cube.dev/reference/data-modeling/view#cubes) so you can
 explicitly control the join path.
 
 ### Node.js 16
@@ -377,7 +377,7 @@ explicitly control the join path.
 **Removed in release: v0.35.0**
 
 Early prototype of the MySQL-based SQL API is removed in favor of the Postgres-compatible
-[SQL API](https://cube.dev/docs/product/apis-integrations/sql-api), together with the
+[SQL API](https://docs.cube.dev/reference/core-data-apis/sql-api), together with the
 `CUBEJS_SQL_PORT` environment variable.
 
 ### `initApp` hook
@@ -392,7 +392,7 @@ The `initApp` hook is removed as it's not relevant anymore for Docker-based arch
 
 The `/v1/run-scheduled-refresh` REST API endpoint is deprecated as it's not
 relevant anymore for Docker-based architecture. Use the [Orchestration
-API](https://cube.dev/docs/product/apis-integrations/orchestration-api) and
+API](https://docs.cube.dev/reference/orchestration-api) and
 `/v1/pre-aggregations/jobs` endpoint instead.
 
 ### Node.js 18
@@ -408,7 +408,7 @@ no more updates. Please upgrade to Node.js 20 or higher.
 
 **Removed in Release: v1.7.0**
 
-This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
+This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
 
 ### Node.js 18
 
@@ -429,7 +429,7 @@ no more updates. Please upgrade to Node.js 22 or higher.
 
 **Removed in Release: v1.7.0**
 
-This parameter has been removed. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
+This parameter has been removed. See [cache control](https://docs.cube.dev/reference/core-data-apis/rest-api#cache-control)
 options and use the `cache` parameter of the `/v1/load` endpoint instead.
 
 ### Elasticsearch driver
