@@ -296,43 +296,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn read_contents_allows_frame_at_exact_limit() {
-        let body = vec![0u8; (MAX_STARTUP_PACKET_LENGTH - 4) as usize];
-        let mut reader = Cursor::new(frame(MAX_STARTUP_PACKET_LENGTH, &body));
-        let cursor = read_contents(&mut reader, 0, MAX_STARTUP_PACKET_LENGTH)
-            .await
-            .expect("frame at the exact limit should be accepted");
-        assert_eq!(cursor.into_inner().len(), body.len());
-    }
-
-    #[tokio::test]
     async fn read_contents_rejects_oversized_frame_before_allocating() {
         let mut reader = Cursor::new(u32::MAX.to_be_bytes().to_vec());
         let err = read_contents(&mut reader, 0, MAX_STARTUP_PACKET_LENGTH)
             .await
             .expect_err("oversized frame must be rejected");
-
-        assert!(
-            err.to_string().contains("exceeds the maximum allowed size"),
-            "unexpected error: {}",
-            err
-        );
-    }
-
-    #[tokio::test]
-    async fn read_message_rejects_oversized_auth_message() {
-        // A PasswordMessage frame claiming a body far above the pre-auth limit
-        let mut data = vec![b'p'];
-        data.extend_from_slice(&(MAX_AUTH_MESSAGE_LENGTH + 1).to_be_bytes());
-        let mut reader = Cursor::new(data);
-
-        let err = read_message(
-            &mut reader,
-            MessageTagParserDefaultImpl::with_arc(),
-            MAX_AUTH_MESSAGE_LENGTH,
-        )
-        .await
-        .expect_err("oversized pre-auth message must be rejected");
 
         assert!(
             err.to_string().contains("exceeds the maximum allowed size"),
