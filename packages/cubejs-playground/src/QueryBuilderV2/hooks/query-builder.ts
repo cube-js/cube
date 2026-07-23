@@ -129,6 +129,10 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
     onQueryChange,
   } = props;
 
+  const onQueryChangeStable = useEvent((...args: Parameters<NonNullable<typeof onQueryChange>>) => {
+    onQueryChange?.(...args);
+  });
+
   function queryValidation(query: Query) {
     let validatedQuery = validateQuery(query);
 
@@ -1024,7 +1028,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
   }, [queryHash, chartType, meta]);
 
   useEffect(() => {
-    onQueryChange?.({ query, chartType, pivotConfig });
+    onQueryChangeStable({ query, chartType, pivotConfig });
   }, [queryHash, chartType, pivotConfig]);
 
   // Update invalidation markers
