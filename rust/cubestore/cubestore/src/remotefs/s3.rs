@@ -625,4 +625,146 @@ mod tests {
             .get("x-amz-server-side-encryption")
             .is_none());
     }
+
+    // Regression test for https://github.com/cube-js/cube/issues/11340:
+    // "CubeStore S3 transport failures leave abandoned multipart uploads
+    // without retry or cleanup".
+    //
+    // `upload_file` above calls `bucket.put_object_stream(...)` and
+    // propagates any error straight through with `?` (no retry, no
+    // explicit `abort_upload()` on this call site). Inside the pinned
+    // rust-s3 fork itself (rev 9deb3475c7963deaa6c30de59771e61af5b15b8f,
+    // rust-s3/src/bucket.rs `_put_object_stream_with_content_type`),
+    // transport-level errors on `UploadPart` are propagated via `?`
+    // *before* the code that calls `abort_upload()` runs — that call is
+    // reachable only from the branch that inspects a *completed* HTTP
+    // response's status code:
+    //
+    //   let response_data = request.response_data(true).await?;   // <-- transport
+    //                                                               //     errors bail
+    //                                                               //     out here
+    //   if !(200..300).contains(&response_data.status_code()) {
+    //       match self.abort_upload(&path, upload_id).await { ... }
+    //   }
+    //
+    // So a connection-level failure (channel closed, EOF, timeout) never
+    // triggers `abort_upload()`, and the multipart upload is abandoned in
+    // S3. This test drives a real `s3::Bucket` (the exact type/call used
+    // by `S3RemoteFs::upload_file`) against a local mock endpoint that
+    // answers `InitiateMultipartUpload` normally and then abruptly closes
+    // the TCP connection on `UploadPart` — reproducing "channel closed" /
+    // "unexpected EOF" — and asserts the mock never receives an
+    // `AbortMultipartUpload` (DELETE ...uploadId=...) request.
+    #[tokio::test]
+    async fn put_object_stream_abandons_mpu_on_transport_failure() {
+        use std::io::Write as _;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let abort_received = Arc::new(AtomicBool::new(false));
+
+        {
+            let abort_received = abort_received.clone();
+            tokio::spawn(async move {
+                loop {
+                    let (mut socket, _) = match listener.accept().await {
+                        Ok(x) => x,
+                        Err(_) => return,
+                    };
+                    let abort_received = abort_received.clone();
+                    tokio::spawn(async move {
+                        // Read just enough to see the request line (method +
+                        // path); we never need to look at headers/body to
+                        // decide how to respond.
+                        let mut buf = Vec::new();
+                        let mut chunk = [0u8; 4096];
+                        let (method, path) = loop {
+                            let n = match socket.read(&mut chunk).await {
+                                Ok(0) | Err(_) => return,
+                                Ok(n) => n,
+                            };
+                            buf.extend_from_slice(&chunk[..n]);
+                            if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                                let head = String::from_utf8_lossy(&buf[..pos]).to_string();
+                                let first_line = head.lines().next().unwrap_or("").to_string();
+                                let mut parts = first_line.split_whitespace();
+                                break (
+                                    parts.next().unwrap_or("").to_string(),
+                                    parts.next().unwrap_or("").to_string(),
+                                );
+                            }
+                            if buf.len() > 16 * 1024 * 1024 {
+                                return;
+                            }
+                        };
+
+                        if method == "PUT" && path.contains("partNumber=") {
+                            // Simulate the production failure mode: the
+                            // connection dies mid-flight with no HTTP
+                            // response at all (not a clean non-2xx status).
+                            drop(socket);
+                            return;
+                        }
+
+                        if method == "DELETE" && path.contains("uploadId=") {
+                            abort_received.store(true, Ordering::SeqCst);
+                            let resp = "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                            let _ = socket.write_all(resp.as_bytes()).await;
+                            return;
+                        }
+
+                        if method == "POST" && path.contains("uploads") {
+                            let body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+<InitiateMultipartUploadResult><Bucket>test-bucket</Bucket><Key>test-key</Key>\
+<UploadId>mock-upload-id</UploadId></InitiateMultipartUploadResult>";
+                            let resp = format!(
+                                "HTTP/1.1 200 OK\r\nContent-Type: application/xml\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                                body.len(),
+                                body
+                            );
+                            let _ = socket.write_all(resp.as_bytes()).await;
+                            return;
+                        }
+
+                        let resp =
+                            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    });
+                }
+            });
+        }
+
+        let credentials = Credentials::new(Some("key"), Some("secret"), None, None, None).unwrap();
+        let region = Region::Custom {
+            region: "".to_string(),
+            endpoint: format!("http://{}", addr),
+        };
+        let mut bucket = Bucket::new("test-bucket", region, credentials).unwrap();
+        bucket.set_path_style();
+
+        // put_object_stream only takes the multipart path once the first
+        // chunk read reaches CHUNK_SIZE (8 MiB in the pinned rust-s3 fork),
+        // so the payload must exceed that.
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(&vec![0u8; 9 * 1024 * 1024]).unwrap();
+        tmp.flush().unwrap();
+        let mut reader = File::open(tmp.path()).await.unwrap();
+
+        let result = bucket.put_object_stream(&mut reader, "test-key").await;
+
+        assert!(
+            result.is_err(),
+            "expected the transport failure on UploadPart to surface as an error, got {:?}",
+            result
+        );
+        assert!(
+            !abort_received.load(Ordering::SeqCst),
+            "BUG (cube-js/cube#11340): abort_upload() was never invoked after a transport-level \
+             failure on UploadPart — the multipart upload is abandoned in S3"
+        );
+    }
 }
