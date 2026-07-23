@@ -123,6 +123,30 @@ describe('BaseDriver', () => {
     ]);
   });
 
+  test('tablesSchema() never marks primary key columns, even when the table has a real primary key (#11270)', async () => {
+    // Mirrors what a real driver's informationSchemaQuery() returns for a table
+    // whose primary key column is not literally named "id" - e.g. the Chinook
+    // sample database's `album.album_id`, `track.track_id`, etc. These rows
+    // carry no key information because informationSchemaQuery() never selects
+    // it (see BaseDriver#informationSchemaQuery / #informationColumnsSchemaReducer).
+    const rows = [
+      { column_name: 'album_id', table_name: 'album', table_schema: 'public', data_type: 'integer' },
+      { column_name: 'title', table_name: 'album', table_schema: 'public', data_type: 'character varying' },
+      { column_name: 'artist_id', table_name: 'album', table_schema: 'public', data_type: 'integer' },
+    ];
+
+    const driver = new BaseDriverImplementedMock(rows);
+    const schema = await driver.tablesSchema();
+    const albumIdColumn: any = schema.public.album.find((c: any) => c.name === 'album_id');
+
+    // album_id is the table's actual primary key, so it should be reported
+    // the same way BaseDriver#tablesSchemaV2 reports it - otherwise
+    // ScaffoldingSchema (which only falls back to a literal column name of
+    // "id") has no way to know it's a primary key, and generated cubes for
+    // tables like this end up with no `primary_key: true` dimension at all.
+    expect(albumIdColumn?.attributes).toEqual(['primaryKey']);
+  });
+
   test('wrapQueryWithLimit wraps the query with a limit', () => {
     const driver = new BaseDriverImplementedMock({});
     const query = { query: 'SELECT * FROM users', limit: 10 };
