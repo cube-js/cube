@@ -1,6 +1,6 @@
 use crate::cross::CLRepr;
 use crate::python::neon_py::*;
-use crate::python::utils::PyAnyHelpers;
+use crate::python::utils::{split_positional_and_kwargs, PyAnyHelpers};
 use crate::tokio_runtime_node;
 use cubesql::CubeError;
 use futures::FutureExt;
@@ -133,16 +133,7 @@ impl PyRuntime {
 
         let task_block = panic::AssertUnwindSafe(|| {
             Python::with_gil(move |py| -> PyResult<PyScheduledFunResult> {
-                let mut prep_tuple = Vec::with_capacity(args.len());
-                let mut kwargs_dict_opt = None;
-
-                for arg in args {
-                    if arg.is_kwarg() {
-                        kwargs_dict_opt = Some(arg.into_py_dict(py)?);
-                    } else {
-                        prep_tuple.push(arg.into_py(py)?);
-                    }
-                }
+                let (prep_tuple, kwargs_dict_opt) = split_positional_and_kwargs(py, args)?;
 
                 let py_args = PyTuple::new_bound(py, prep_tuple);
                 let py_kwargs = kwargs_dict_opt.as_ref();
