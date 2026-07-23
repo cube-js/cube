@@ -59,6 +59,9 @@ const SecondsDurations = {
   second: 1
 };
 
+/** @type {WeakMap<object, Readonly<Record<string, string>>>} */
+const allBackAliasMembersExceptSegmentsCache = new WeakMap();
+
 /**
  * Set of the schema compilers.
  * @typedef {Object} Compilers
@@ -5286,7 +5289,7 @@ export class BaseQuery {
 
       const aliases = allFilters ?
         allFilters
-          .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
+          .map(v => (v.query ? v.query.cachedAllBackAliasMembersExceptSegments() : {}))
           .reduce((a, b) => ({ ...a, ...b }), {})
         : {};
       // Filtering aliases that somehow relate to this group members
@@ -5337,7 +5340,7 @@ export class BaseQuery {
                 // is checked below to prevent looping.
                 const aliases = allFilters ?
                   allFilters
-                    .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
+                    .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.cachedAllBackAliasMembersExceptSegments() : {}))
                     .reduce((a, b) => ({ ...a, ...b }), {})
                   : {};
                 // Filtering aliases that somehow relate to this group member
@@ -5391,6 +5394,35 @@ export class BaseQuery {
    */
   allBackAliasMembersExceptSegments() {
     return this.backAliasMembers(this.flattenAllMembers(true));
+  }
+
+  /**
+   * Internal memoized variant for FILTER_PARAMS and FILTER_GROUP expansion.
+   * The public method above retains its fresh, mutable return-value contract.
+   *
+   * @private
+   * @returns {Readonly<Record<string, string>>}
+   */
+  cachedAllBackAliasMembersExceptSegments() {
+    // Alias collection can run while the join is still being built or from a
+    // nested alias-gathering traversal. Those intermediate results depend on
+    // the current evaluation phase and must not be cached.
+    if (
+      this.allBackAliasMembersExceptSegments !== BaseQuery.prototype.allBackAliasMembersExceptSegments ||
+      this.joinGraphPaths === undefined ||
+      this.joinGraphPaths === null ||
+      this.safeEvaluateSymbolContext().aliasGathering
+    ) {
+      return this.allBackAliasMembersExceptSegments();
+    }
+
+    let aliases = allBackAliasMembersExceptSegmentsCache.get(this);
+    if (!aliases) {
+      aliases = Object.freeze(this.allBackAliasMembersExceptSegments());
+      allBackAliasMembersExceptSegmentsCache.set(this, aliases);
+    }
+
+    return aliases;
   }
 
   /**
