@@ -98,6 +98,10 @@ pub const MAX_AUTH_MESSAGE_LENGTH: u32 = 64 * 1024;
 /// and Bind parameters; 10 MiB covers machine-generated SQL from BI tools.
 pub const MAX_FRONTEND_MESSAGE_LENGTH: u32 = 10 * 1024 * 1024;
 
+/// Upper bound for a single Bind parameter value. A parameter can never
+/// exceed its containing frame, so cap it at the frontend message limit.
+pub const MAX_BIND_PARAMETER_LENGTH: u32 = MAX_FRONTEND_MESSAGE_LENGTH;
+
 pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
     reader: &mut Reader,
     message_tag: u8,
