@@ -57,6 +57,32 @@ async fn test_ungrouped_with_dimension() {
     }
 }
 
+// Issue #11327: an ungrouped query (bare SELECT, no GROUP BY — the shape
+// BI tools emit when browsing a table) selecting a group_by-locked
+// multi-stage measure over a non-sum-rollable inner (count_distinct)
+// plus a dimension must still emit GROUP BY on the Aggregate stage that
+// projects the plain sum(...) — otherwise the generated SQL has a bare
+// aggregate next to a bare dimension column with no GROUP BY anywhere,
+// which standard-SQL databases (e.g. Postgres) reject.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_group_by_locked_measure_with_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.unique_customers_group_by_status
+        dimensions:
+          - orders.category
+        ungrouped: true
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains("GROUP BY"),
+        "expected the Aggregate stage to be grouped by its projected dimensions, got:\n{sql}"
+    );
+}
+
 // Cross-product issue: ungrouped mode prevents aggregation in both
 // current and shifted CTEs. The JOIN between them produces a cartesian
 // product — Feb has 5 current rows × 5 shifted Jan rows = 25 rows,

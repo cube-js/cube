@@ -226,6 +226,17 @@ cubes:
             group_by:
                 - orders.status
 
+          # issue #11327 repro: group_by-locked measure over a
+          # non-sum-rollable inner (count_distinct) — this skips the
+          # window-function path (which is valid without GROUP BY) and
+          # hits the plain-aggregate Aggregate-stage JOIN model instead.
+          - name: unique_customers_group_by_status
+            type: sum
+            sql: "{CUBE.unique_customers}"
+            multi_stage: true
+            group_by:
+                - orders.status
+
           - name: amount_group_by_category
             type: sum
             sql: "{CUBE.total_amount}"
