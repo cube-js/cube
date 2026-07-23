@@ -66,7 +66,7 @@ jobs:
       - name: NPM publish
         uses: nick-fields/retry@v3
         env:
-          NPM_CONFIG_PROVENANCE: true
+          NPM_CONFIG_PROVENANCE: false
         with:
           max_attempts: 5
           retry_on: error
