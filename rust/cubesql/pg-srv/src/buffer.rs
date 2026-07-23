@@ -95,8 +95,8 @@ pub const MAX_AUTH_MESSAGE_LENGTH: u32 = 64 * 1024;
 /// Upper bound for any frontend message on an authenticated connection.
 /// PostgreSQL allows ~1 GiB (`PQ_LARGE_MESSAGE_LIMIT`), but without COPY
 /// support the largest legitimate messages are query texts (Query/Parse)
-/// and Bind parameters; 16 MiB covers machine-generated SQL from BI tools.
-pub const MAX_FRONTEND_MESSAGE_LENGTH: u32 = 16 * 1024 * 1024;
+/// and Bind parameters; 10 MiB covers machine-generated SQL from BI tools.
+pub const MAX_FRONTEND_MESSAGE_LENGTH: u32 = 10 * 1024 * 1024;
 
 pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
     reader: &mut Reader,
