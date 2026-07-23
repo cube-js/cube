@@ -533,9 +533,9 @@ impl Serialize for ParameterDescription {
     const CODE: u8 = b't';
 
     fn serialize(&self) -> Option<Vec<u8>> {
+        let size = i16::try_from(self.parameters.len()).ok()?;
+
         let mut buffer: Vec<u8> = Vec::with_capacity(6 * self.parameters.len());
-        // FIXME!
-        let size = i16::try_from(self.parameters.len()).unwrap();
         buffer.put_i16(size);
 
         for parameter in &self.parameters {
@@ -572,8 +572,7 @@ impl Serialize for RowDescription {
     const CODE: u8 = b'T';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        // FIXME!
-        let size = u16::try_from(self.fields.len()).unwrap();
+        let size = u16::try_from(self.fields.len()).ok()?;
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
         buffer.extend_from_slice(&size.to_be_bytes());
 

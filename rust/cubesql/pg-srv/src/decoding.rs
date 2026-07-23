@@ -68,19 +68,32 @@ impl FromProtocolValue for i64 {
     }
 
     fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
+        if raw.len() != 8 {
+            return Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!(
+                        "Invalid binary int8 format, expected 8 bytes, got {}",
+                        raw.len()
+                    ),
+                ),
+                backtrace: Backtrace::capture(),
+            });
+        }
+
         Ok(BigEndian::read_i64(raw))
     }
 }
 
 impl FromProtocolValue for bool {
     fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
-        match raw[0] {
-            b't' => Ok(true),
-            b'f' => Ok(false),
+        match raw.first() {
+            Some(b't') => Ok(true),
+            Some(b'f') => Ok(false),
             other => Err(ProtocolError::ErrorResponse {
                 source: ErrorResponse::error(
                     ErrorCode::ProtocolViolation,
-                    format!("Unable to decode bool from text, actual: {}", other),
+                    format!("Unable to decode bool from text, actual: {:?}", other),
                 ),
                 backtrace: Backtrace::capture(),
             }),
@@ -88,13 +101,13 @@ impl FromProtocolValue for bool {
     }
 
     fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
-        match raw[0] {
-            1 => Ok(true),
-            0 => Ok(false),
+        match raw.first() {
+            Some(1) => Ok(true),
+            Some(0) => Ok(false),
             other => Err(ProtocolError::ErrorResponse {
                 source: ErrorResponse::error(
                     ErrorCode::ProtocolViolation,
-                    format!("Unable to decode bool from binary, actual: {}", other),
+                    format!("Unable to decode bool from binary, actual: {:?}", other),
                 ),
                 backtrace: Backtrace::capture(),
             }),
@@ -118,6 +131,19 @@ impl FromProtocolValue for f64 {
     }
 
     fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
+        if raw.len() != 8 {
+            return Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!(
+                        "Invalid binary float8 format, expected 8 bytes, got {}",
+                        raw.len()
+                    ),
+                ),
+                backtrace: Backtrace::capture(),
+            });
+        }
+
         Ok(BigEndian::read_f64(raw))
     }
 }
@@ -203,5 +229,21 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_binary_decoders_reject_short_values() {
+        // A client-supplied Bind value shorter than the fixed width must
+        // produce a protocol error, not panic the connection task.
+        assert!(<i64 as FromProtocolValue>::from_binary(&[]).is_err());
+        assert!(<i64 as FromProtocolValue>::from_binary(&[0, 1, 2, 3, 4, 5, 6]).is_err());
+        assert!(<f64 as FromProtocolValue>::from_binary(&[]).is_err());
+        assert!(<f64 as FromProtocolValue>::from_binary(&[0, 1, 2, 3, 4, 5, 6]).is_err());
+    }
+
+    #[test]
+    fn test_bool_decoders_reject_empty_values() {
+        assert!(<bool as FromProtocolValue>::from_binary(&[]).is_err());
+        assert!(<bool as FromProtocolValue>::from_text(&[]).is_err());
     }
 }
