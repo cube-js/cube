@@ -106,12 +106,14 @@ pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
     // protocol defines length for all types of messages
     let length = reader.read_u32().await?;
     if length < 4 {
-        return Err(Error::other("Unexpectedly small (<4) message size"));
+        return Err(Error::other(format!(
+            "Unexpectedly small (<4) message size {length} for tag {message_tag:X?}"
+        )));
     }
 
     if length > max_length {
         return Err(Error::other(format!(
-            "Message size {length} exceeds the maximum allowed size of {max_length} bytes"
+            "Message size {length} for tag {message_tag:X?} exceeds the maximum allowed size of {max_length} bytes"
         )));
     }
 
