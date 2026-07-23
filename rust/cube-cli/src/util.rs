@@ -43,6 +43,18 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
+/// Normalize a user-supplied Cube Cloud URL: trim whitespace and trailing
+/// slashes, and default to `https://` when no scheme is given (reqwest
+/// otherwise fails with "relative URL without a base").
+pub fn normalize_url(url: &str) -> String {
+    let url = url.trim().trim_end_matches('/');
+    if url.is_empty() || url.contains("://") {
+        url.to_string()
+    } else {
+        format!("https://{url}")
+    }
+}
+
 /// Parse a `KEY=VALUE` pair (for `cube variables set`).
 pub fn parse_kv(s: &str) -> Result<(String, String), String> {
     match s.split_once('=') {
@@ -79,6 +91,27 @@ mod tests {
         assert!(parse_data(Some("[1, 2]")).is_err());
         assert!(parse_data(Some("not json")).is_err());
         assert!(parse_data(None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn normalize_url_defaults_to_https() {
+        assert_eq!(
+            normalize_url("cloud.cubecloud.dev"),
+            "https://cloud.cubecloud.dev"
+        );
+        assert_eq!(
+            normalize_url(" cloud.cubecloud.dev/ "),
+            "https://cloud.cubecloud.dev"
+        );
+        assert_eq!(
+            normalize_url("https://cloud.cubecloud.dev/"),
+            "https://cloud.cubecloud.dev"
+        );
+        assert_eq!(
+            normalize_url("http://localhost:4000"),
+            "http://localhost:4000"
+        );
+        assert_eq!(normalize_url(""), "");
     }
 
     #[test]

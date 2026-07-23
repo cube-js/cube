@@ -25,7 +25,7 @@ pub async fn command(args: Args, ctx: &mut Ctx) -> Result<()> {
             .with_placeholder("https://<tenant>.cubecloud.dev")
             .prompt()?,
     };
-    let url = url.trim().trim_end_matches('/').to_string();
+    let url = crate::util::normalize_url(&url);
 
     let (token, refresh_token) = match args.api_key {
         Some(key) => (key, None),

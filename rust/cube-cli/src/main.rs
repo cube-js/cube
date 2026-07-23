@@ -71,7 +71,8 @@ impl Ctx {
         let url = self
             .api_url
             .clone()
-            .or_else(|| ctx.map(|(_, c)| c.url.clone()));
+            .or_else(|| ctx.map(|(_, c)| c.url.clone()))
+            .map(|u| util::normalize_url(&u));
         // An explicit --token / CUBE_API_KEY wins and disables auto-refresh
         // (it isn't tied to a stored refresh token).
         let token = self
