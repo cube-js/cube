@@ -13,7 +13,7 @@ env:
 jobs:
   npm:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: write
       id-token: write  # Required for OIDC trusted publishing
@@ -64,9 +64,15 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
       - name: NPM publish
-        run: ./node_modules/.bin/lerna publish from-package --yes
+        uses: nick-fields/retry@v3
         env:
           NPM_CONFIG_PROVENANCE: true
+        with:
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 15
+          command: ./node_modules/.bin/lerna publish from-package --yes
 
   native_linux:
     # Please use minimal possible version of ubuntu, because it produces constraint on glibc
