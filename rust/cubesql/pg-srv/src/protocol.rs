@@ -1124,7 +1124,9 @@ pub trait Deserialize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{read_message, MessageTagParserDefaultImpl, ProtocolError};
+    use crate::{
+        read_message, MessageTagParserDefaultImpl, ProtocolError, MAX_FRONTEND_MESSAGE_LENGTH,
+    };
 
     use std::io::Cursor;
 
@@ -1202,7 +1204,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Parse(parse) => {
                 assert_eq!(
@@ -1232,7 +1239,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(bind) => {
                 assert_eq!(
@@ -1267,7 +1279,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1305,7 +1322,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1337,7 +1359,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(body.parameter_formats, vec![Format::Binary]);
@@ -1367,7 +1394,12 @@ mod tests {
             .to_string(),
         );
         let mut cursor = Cursor::new(buffer);
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1389,7 +1421,12 @@ mod tests {
             .to_string(),
         );
         let mut cursor = Cursor::new(buffer);
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(body.parameter_formats, vec![Format::Binary]);
@@ -1416,7 +1453,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Describe(desc) => {
                 assert_eq!(
@@ -1443,7 +1485,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::PasswordMessage(body) => {
                 assert_eq!(
@@ -1469,7 +1516,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Execute(body) => {
                 assert_eq!(
@@ -1499,8 +1551,18 @@ mod tests {
 
         // This test demonstrates that protocol can decode two
         // simple messages without body in sequence
-        read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
-        read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
+        read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
 
         Ok(())
     }
