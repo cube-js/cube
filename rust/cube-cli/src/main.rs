@@ -21,7 +21,7 @@ struct Cli {
     #[command(flatten)]
     global: GlobalArgs,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(clap::Args, Clone)]
@@ -255,21 +255,29 @@ async fn main() {
     unsafe {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
     }
-    let cli = Cli::parse();
+    let Cli { global, command } = Cli::parse();
     commands::update::cleanup_stale_binary();
+
+    // Bare `cube` with no subcommand: show the version, then the help text.
+    let Some(command) = command else {
+        println!("Cube CLI {}", env!("CUBE_CLI_VERSION"));
+        println!();
+        let _ = cli_command().print_help();
+        return;
+    };
 
     // Check for a newer release concurrently with the command; the notice
     // (if any) prints after the command output. Skipped for `update` itself
     // and `completion` (whose output is eval'd by shells). Completion also
     // skips telemetry — it runs on shell startup.
-    let is_completion = matches!(cli.command, Command::Completion(_));
-    let check = match &cli.command {
+    let is_completion = matches!(command, Command::Completion(_));
+    let check = match &command {
         Command::Update(_) | Command::Completion(_) => None,
         _ => Some(update::spawn_check()),
     };
-    let command_name = cli.command.name();
+    let command_name = command.name();
 
-    let result = run(cli).await;
+    let result = run(global, command).await;
 
     if !is_completion {
         let mut props = serde_json::Map::new();
@@ -293,10 +301,10 @@ async fn main() {
     }
 }
 
-async fn run(cli: Cli) -> Result<()> {
-    let mut ctx = Ctx::new(&cli.global)?;
+async fn run(global: GlobalArgs, command: Command) -> Result<()> {
+    let mut ctx = Ctx::new(&global)?;
     use Command::*;
-    match cli.command {
+    match command {
         Login(args) => commands::login::command(args, &mut ctx).await,
         Logout(args) => commands::logout::command(args, &mut ctx).await,
         Whoami(args) => commands::whoami::command(args, &ctx).await,
