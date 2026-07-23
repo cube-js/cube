@@ -109,7 +109,8 @@ cube deploy DEPLOYMENT_ID --directory ./my-cube-project -m "initial deploy"
 
 `cube deploy` hashes local files, uploads only what changed, removes remote
 files deleted locally (`--keep-missing` opts out), and triggers a single
-build.
+build. Pass `--branch` to deploy to a specific data model branch instead of
+the active dev-mode branch (or the deploy branch, if none is active).
 
 </Step>
 
@@ -154,7 +155,7 @@ Run `cube <command> --help` for the full options of any command.
 | `deploy` | Upload a local project directory and build it |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
-| `github` | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
+| `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
@@ -191,6 +192,7 @@ cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders
 | `CUBE_AUTH_SCHEME` | Force the `Authorization` scheme: `bearer` or `api-key` (auto-detected by default) |
 | `CUBE_NO_UPDATE_CHECK` | Disable the background update check |
 | `CUBE_NO_TELEMETRY` | Disable anonymous usage telemetry (also disabled when `CI` is set) |
+| `CUBEJS_TELEMETRY=false` | Legacy alias for `CUBE_NO_TELEMETRY`, kept for compatibility with the previous `cubejs` CLI |
 | `CUBE_VERSION` | Installer only: release tag to install |
 | `CUBE_INSTALL_DIR` | Installer only: install directory |
 
@@ -199,7 +201,7 @@ cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders
 The CLI sends anonymous usage events (command group, success/failure,
 version, platform). No personal data is collected; the anonymous identifier
 is a hash of the OS machine id. Telemetry is disabled automatically in CI,
-or explicitly with `CUBE_NO_TELEMETRY=1`.
+or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`).
 
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-rest-api]: /reference/core-data-apis/rest-api/index
