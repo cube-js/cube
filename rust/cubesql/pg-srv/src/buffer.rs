@@ -76,10 +76,11 @@ impl MessageTagParser for MessageTagParserDefaultImpl {
 pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
     reader: &mut Reader,
     parser: Arc<dyn MessageTagParser>,
+    max_length: u32,
 ) -> Result<FrontendMessage, ProtocolError> {
     // https://www.postgresql.org/docs/14/protocol-message-formats.html
     let message_tag = reader.read_u8().await?;
-    let cursor = read_contents(reader, message_tag).await?;
+    let cursor = read_contents(reader, message_tag, max_length).await?;
     let message = parser.parse(message_tag, cursor).await?;
 
     trace!("[pg] Decoded {:X?}", message,);
@@ -87,14 +88,33 @@ pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
     Ok(message)
 }
 
+/// PostgreSQL rejects startup packets larger than 10k
+pub const MAX_STARTUP_PACKET_LENGTH: u32 = 10 * 1024;
+pub const MAX_AUTH_MESSAGE_LENGTH: u32 = 64 * 1024;
+
+/// Upper bound for any frontend message on an authenticated connection.
+/// PostgreSQL allows ~1 GiB (`PQ_LARGE_MESSAGE_LIMIT`), but without COPY
+/// support the largest legitimate messages are query texts (Query/Parse)
+/// and Bind parameters; 10 MiB covers machine-generated SQL from BI tools.
+pub const MAX_FRONTEND_MESSAGE_LENGTH: u32 = 10 * 1024 * 1024;
+
 pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
     reader: &mut Reader,
     message_tag: u8,
+    max_length: u32,
 ) -> Result<Cursor<Vec<u8>>, Error> {
     // protocol defines length for all types of messages
     let length = reader.read_u32().await?;
     if length < 4 {
-        return Err(Error::other("Unexpectedly small (<0) message size"));
+        return Err(Error::other(format!(
+            "Unexpectedly small (<4) message size {length} for tag {message_tag:X?}"
+        )));
+    }
+
+    if length > max_length {
+        return Err(Error::other(format!(
+            "Message size {length} for tag {message_tag:X?} exceeds the maximum allowed size of {max_length} bytes"
+        )));
     }
 
     trace!(
@@ -253,4 +273,39 @@ pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
 pub fn write_string(buffer: &mut Vec<u8>, string: &str) {
     buffer.extend_from_slice(string.as_bytes());
     buffer.push(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    fn frame(length: u32, body: &[u8]) -> Vec<u8> {
+        let mut buf = length.to_be_bytes().to_vec();
+        buf.extend_from_slice(body);
+        buf
+    }
+
+    #[tokio::test]
+    async fn read_contents_within_limit_ok() {
+        let mut reader = Cursor::new(frame(7, b"abc"));
+        let cursor = read_contents(&mut reader, 0, MAX_STARTUP_PACKET_LENGTH)
+            .await
+            .expect("frame within the limit should be accepted");
+        assert_eq!(cursor.into_inner(), b"abc");
+    }
+
+    #[tokio::test]
+    async fn read_contents_rejects_oversized_frame_before_allocating() {
+        let mut reader = Cursor::new(u32::MAX.to_be_bytes().to_vec());
+        let err = read_contents(&mut reader, 0, MAX_STARTUP_PACKET_LENGTH)
+            .await
+            .expect_err("oversized frame must be rejected");
+
+        assert!(
+            err.to_string().contains("exceeds the maximum allowed size"),
+            "unexpected error: {}",
+            err
+        );
+    }
 }
