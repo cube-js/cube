@@ -671,6 +671,14 @@ impl Deserialize for Parse {
         let query = buffer::read_string(&mut buffer).await?;
 
         let total = buffer.read_i16().await?;
+        if total < 0 {
+            return Err(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                format!("Invalid parameter count: {total}"),
+            )
+            .into());
+        }
+
         let mut param_types = Vec::with_capacity(total as usize);
 
         for _ in 0..total {
@@ -847,12 +855,24 @@ impl Deserialize for Bind {
                 let len = buffer.read_i32().await?;
                 if len == -1 {
                     parameter_values.push(None);
+                } else if len < 0 {
+                    return Err(ErrorResponse::error(
+                        ErrorCode::ProtocolViolation,
+                        format!("Invalid bind parameter length: {len}"),
+                    )
+                    .into());
+                } else if len as u32 > buffer::MAX_BIND_PARAMETER_LENGTH {
+                    return Err(ErrorResponse::error(
+                        ErrorCode::ProtocolViolation,
+                        format!(
+                            "Bind parameter length {len} exceeds the maximum allowed size of {} bytes",
+                            buffer::MAX_BIND_PARAMETER_LENGTH
+                        ),
+                    )
+                    .into());
                 } else {
-                    let mut value = Vec::with_capacity(len as usize);
-                    for _ in 0..len {
-                        value.push(buffer.read_u8().await?);
-                    }
-
+                    let mut value = vec![0u8; len as usize];
+                    buffer.read_exact(&mut value).await?;
                     parameter_values.push(Some(value));
                 }
             }
@@ -1627,5 +1647,116 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_bind_rejects_oversized_parameter_length() {
+        // Bind ('B') frame declaring a single parameter whose length is
+        // i32::MAX (~2 GiB) inside a 17-byte frame. Must be rejected before
+        // allocating instead of attempting a giant Vec::with_capacity.
+        let buffer = vec![
+            0x42, // tag 'B'
+            0x00, 0x00, 0x00, 0x10, // length = 16
+            0x00, // portal: ""
+            0x00, // statement: ""
+            0x00, 0x00, // 0 parameter format codes
+            0x00, 0x01, // 1 parameter value
+            0x7F, 0xFF, 0xFF, 0xFF, // value length = i32::MAX
+            0x00, 0x00, // 0 result format codes
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("oversized bind parameter length must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("exceeds the maximum allowed size"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_bind_rejects_negative_parameter_length() {
+        // Bind ('B') frame with a negative, non-NULL (-1) parameter length.
+        // Without a guard, `len as usize` wraps to a huge value and aborts
+        // the task with a capacity overflow.
+        let buffer = vec![
+            0x42, // tag 'B'
+            0x00, 0x00, 0x00, 0x10, // length = 16
+            0x00, // portal: ""
+            0x00, // statement: ""
+            0x00, 0x00, // 0 parameter format codes
+            0x00, 0x01, // 1 parameter value
+            0xFF, 0xFF, 0xFF, 0xFE, // value length = -2
+            0x00, 0x00, // 0 result format codes
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("negative bind parameter length must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("Invalid bind parameter length"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_rejects_negative_parameter_count() {
+        // Parse ('P') frame with a negative parameter-type count. Without a
+        // guard, `total as usize` wraps to usize::MAX and aborts the task
+        // with a capacity overflow.
+        let buffer = vec![
+            0x50, // tag 'P'
+            0x00, 0x00, 0x00, 0x08, // length = 8
+            0x00, // name: ""
+            0x00, // query: ""
+            0xFF, 0xFF, // parameter count = -1
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("negative parse parameter count must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("Invalid parameter count"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
     }
 }
