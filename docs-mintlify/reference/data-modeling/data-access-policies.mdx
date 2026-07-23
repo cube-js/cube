@@ -214,7 +214,8 @@ The `if` expression must evaluate to a boolean. The syntax you can use inside it
 depends on the data model format:
 
 - In **YAML** data models, the expression inside `{ }` is evaluated as a Python
-expression. Only logical operators, member access, and method calls are supported.
+expression. Logical operators, equality and inequality, member access, and method
+calls are supported.
 - In **JavaScript** data models, the expression is evaluated as a JavaScript
 expression, so a broader set of operators is available.
 
@@ -227,11 +228,14 @@ The following operators and constructs are supported:
 | Logical NOT | `not` | `!` |
 | Member access | `.` | `.` |
 | Method call (e.g., `includes`) | `.includes(…)` | `.includes(…)` |
-| Equality and inequality | — | `===`, `!==`, `==`, `!=` |
+| Equality and inequality | `==`, `!=` | `===`, `!==`, `==`, `!=` |
 | Comparison | — | `<`, `>`, `<=`, `>=` |
 | Arithmetic | — | `+`, `-`, `*`, `/`, `%`, `**` |
 | Ternary | — | `? :` |
 | Optional chaining | — | `?.` |
+
+Chained comparisons aren't supported in YAML. Write `a == b and b == c` instead
+of `a == b == c`.
 
 For example, the following policy applies to users who are not blocked, are either
 administrators or based in the EMEA region, and belong to the `admins` group. Each
