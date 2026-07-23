@@ -34,6 +34,7 @@ program
   await configureValidateCommand(program);
 
   if (!process.argv.slice(2).length) {
+    console.log(`Cube.js CLI v${packageJson.version}`);
     program.help();
   }
 
