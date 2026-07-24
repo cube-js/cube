@@ -16,21 +16,21 @@ export interface SqlDialectEscapeRules {
   readonly identifierQuoteChar: string;
 }
 
-export const AnsiSqlDialect: SqlDialectEscapeRules = {
+const AnsiSqlDialect: SqlDialectEscapeRules = {
   stringQuoteChar: '\'',
   doubleQuoteToEscape: true,
   escapeBackslash: false,
   identifierQuoteChar: '"',
 };
 
-export const MySqlDialect: SqlDialectEscapeRules = {
+const MySqlDialect: SqlDialectEscapeRules = {
   stringQuoteChar: '\'',
   doubleQuoteToEscape: true,
   escapeBackslash: true,
   identifierQuoteChar: '`',
 };
 
-export class SqlEscaper {
+class SqlEscaper {
   public constructor(public readonly rules: SqlDialectEscapeRules) {}
 
   public static forDialect(dialect: SqlDialectEscapeRules): SqlEscaper {

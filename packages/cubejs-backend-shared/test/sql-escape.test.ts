@@ -1,10 +1,7 @@
 /* eslint-disable quotes */
 import {
-  SqlEscaper,
   formatAnsi,
   formatMySql,
-  AnsiSqlDialect,
-  MySqlDialect,
 } from '../src/sql-escape';
 
 const injectionPayloads: Array<[string, string]> = [
@@ -81,35 +78,18 @@ function stringsUpToLength(alphabet: string[], maxLength: number): string[] {
 }
 
 describe('sql-escape', () => {
-  const presto = new SqlEscaper(AnsiSqlDialect); // ANSI rules (Presto/Trino/Postgres)
-  const mysql = new SqlEscaper(MySqlDialect);
-
-  describe('SqlEscaper construction', () => {
-    it('exposes the built-in dialect presets', () => {
-      expect(AnsiSqlDialect.escapeBackslash).toBe(false);
-      expect(MySqlDialect.escapeBackslash).toBe(true);
-    });
-
-    it('accepts explicit rules', () => {
-      const e = SqlEscaper.forDialect({
-        stringQuoteChar: "'",
-        doubleQuoteToEscape: true,
-        escapeBackslash: false,
-        identifierQuoteChar: '"',
-      });
-      expect(e.escapeString("a'b")).toBe("'a''b'");
-    });
-
-    it('supports dialects that escape quotes with backslashes', () => {
-      const e = SqlEscaper.forDialect({
-        stringQuoteChar: "'",
-        doubleQuoteToEscape: false,
-        escapeBackslash: true,
-        identifierQuoteChar: '`',
-      });
-      expect(e.escapeString("a\\'b")).toBe("'a\\\\\\'b'");
-    });
-  });
+  const presto = {
+    escapeString: (value: string) => formatAnsi('?', [value]),
+    escapeIdentifier: (value: string) => formatAnsi('??', [value]),
+    escapeValue: (value: unknown) => formatAnsi('?', [value]),
+    format: formatAnsi,
+  };
+  const mysql = {
+    escapeString: (value: string) => formatMySql('?', [value]),
+    escapeIdentifier: (value: string) => formatMySql('??', [value]),
+    escapeValue: (value: unknown) => formatMySql('?', [value]),
+    format: formatMySql,
+  };
 
   describe('escapeString — ANSI/Presto (double quotes, backslash literal)', () => {
     it('doubles single quotes', () => {
