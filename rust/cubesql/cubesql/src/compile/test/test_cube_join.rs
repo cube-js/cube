@@ -520,8 +520,72 @@ async fn test_join_two_subqueries_filter_push_down() {
     )
 }
 
+/// A `__cubeJoinField` join where one side has a LIMIT can be neither merged into
+/// a single CubeScan nor planned as a join of standalone subqueries:
+/// `__cubeJoinField` is virtual and does not exist as a column in generated
+/// subquery SQL. This must stay a compilation error — not broken SQL.
 #[tokio::test]
-async fn test_join_cubes_on_wrong_field_error() {
+async fn test_join_cubes_on_cube_join_field_with_limit_error() {
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx();
+    let query = convert_sql_to_cube_query(
+        &r#"
+            SELECT *
+            FROM (SELECT customer_gender, __cubeJoinField FROM KibanaSampleDataEcommerce LIMIT 10) kibana
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) logs
+                ON (kibana.__cubeJoinField = logs.__cubeJoinField)
+            "#
+        .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await;
+
+    let error = query.unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
+}
+
+/// Same shape as [`test_join_cubes_on_cube_join_field_with_limit_error`] but without
+/// the LIMIT: a proper `__cubeJoinField` join must still merge into a single
+/// CubeScan with join hints - the standalone-subquery join rule must not hijack it
+/// (defense in depth: both the member-based and the name-based rejections cover it).
+#[tokio::test]
+async fn test_join_cubes_on_cube_join_field_no_limit_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = convert_select_to_query_plan(
+        r#"
+            SELECT *
+            FROM (SELECT customer_gender, __cubeJoinField FROM KibanaSampleDataEcommerce) kibana
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) logs
+                ON (kibana.__cubeJoinField = logs.__cubeJoinField)
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan();
+
+    // Single merged CubeScan, not a join of standalone subqueries
+    let request = logical_plan.find_cube_scan().request;
+    assert_eq!(
+        request.join_hints,
+        Some(vec![vec![
+            "KibanaSampleDataEcommerce".to_string(),
+            "Logs".to_string(),
+        ]])
+    );
+}
+
+/// Joining cubes on a regular field (not `__cubeJoinField`) is not a cube join:
+/// with SQL push down it is planned as a plain SQL join of two standalone
+/// ungrouped subqueries.
+#[tokio::test]
+async fn test_join_cubes_on_regular_field_pushdown() {
     init_testing_logger();
 
     let meta = get_test_tenant_ctx();
@@ -537,11 +601,22 @@ async fn test_join_cubes_on_wrong_field_error() {
     )
     .await;
 
-    let error = query.unwrap_err();
-    assert!(matches!(error, CompilationError::Rewrite(..)));
-    assert_eq!(
-        error.message(),
-        "Use __cubeJoinField to join Cubes".to_string()
+    if !Rewriter::sql_push_down_enabled() {
+        let error = query.unwrap_err();
+        assert!(matches!(error, CompilationError::Rewrite(..)));
+        assert_eq!(
+            error.message(),
+            "Use __cubeJoinField to join Cubes".to_string()
+        );
+        return;
+    }
+
+    let logical_plan = query.unwrap().as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains("LEFT JOIN ("),
+        "wrapped SQL is missing LEFT JOIN of standalone subqueries:\n{}",
+        sql
     );
 }
 
