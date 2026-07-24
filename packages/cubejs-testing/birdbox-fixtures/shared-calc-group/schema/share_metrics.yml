@@ -1,0 +1,213 @@
+cubes:
+  - name: share_metrics
+    sql: >
+      SELECT 'A1' AS account, 'P1' AS product, 'P1' AS competitor_product, '2017-01-15T00:00:00.000Z'::timestamptz AS sale_date, 1.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'P1' AS competitor_product, '2017-02-15T00:00:00.000Z'::timestamptz AS sale_date, 2.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'P1' AS competitor_product, '2017-03-15T00:00:00.000Z'::timestamptz AS sale_date, 3.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'P1' AS competitor_product, '2017-04-15T00:00:00.000Z'::timestamptz AS sale_date, 4.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'P1' AS competitor_product, '2017-05-15T00:00:00.000Z'::timestamptz AS sale_date, 5.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'P1' AS competitor_product, '2017-06-15T00:00:00.000Z'::timestamptz AS sale_date, 6.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'Q' AS competitor_product, '2017-01-15T00:00:00.000Z'::timestamptz AS sale_date, 9.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'Q' AS competitor_product, '2017-02-15T00:00:00.000Z'::timestamptz AS sale_date, 8.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'Q' AS competitor_product, '2017-03-15T00:00:00.000Z'::timestamptz AS sale_date, 7.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'Q' AS competitor_product, '2017-04-15T00:00:00.000Z'::timestamptz AS sale_date, 6.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'Q' AS competitor_product, '2017-05-15T00:00:00.000Z'::timestamptz AS sale_date, 5.0 AS qty UNION ALL
+      SELECT 'A1' AS account, 'P1' AS product, 'Q' AS competitor_product, '2017-06-15T00:00:00.000Z'::timestamptz AS sale_date, 4.0 AS qty
+    public: false
+
+    joins:
+      # Virtual edge to the shared rolling-window calc group cube (single
+      # row, 1 = 1) so the join graph connects; the switch dimension itself
+      # is cross-joined as a virtual values table, not via this SQL.
+      - name: rolling_window_dim
+        sql: "1 = 1"
+        relationship: many_to_one
+
+      - name: sales
+        sql: "{CUBE}.account = {sales.account} AND {CUBE}.product = {sales.product} AND {CUBE}.sale_date = {sales.date}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.account || '|' || {CUBE}.product || '|' || {CUBE}.competitor_product || '|' || CAST({CUBE}.sale_date AS TEXT)"
+        type: string
+        primary_key: true
+        public: false
+
+      - name: account
+        sql: account
+        type: string
+
+      - name: product
+        sql: product
+        type: string
+
+      - name: competitor_product
+        sql: competitor_product
+        type: string
+
+      - name: date
+        sql: sale_date
+        type: time
+
+    measures:
+      - name: numerator_r3
+        type: sum
+        public: false
+        rolling_window:
+          trailing: 3 month
+        sql: "CASE WHEN {CUBE}.competitor_product = {CUBE}.product THEN {CUBE}.qty ELSE 0 END"
+
+      - name: denominator_r3
+        type: sum
+        public: false
+        rolling_window:
+          trailing: 3 month
+        sql: qty
+
+      - name: numerator_r3_new
+        multi_stage: true
+        sql: "{numerator_r3}"
+        type: number
+        public: false
+
+      - name: denominator_r3_new
+        multi_stage: true
+        sql: "{denominator_r3}"
+        type: number
+        public: false
+
+      - name: share_r3
+        multi_stage: true
+        type: number
+        public: false
+        sql: "CASE WHEN {denominator_r3_new} = 0 THEN NULL ELSE {numerator_r3_new} / {denominator_r3_new} END"
+
+      - name: prev_numerator_r3
+        multi_stage: true
+        sql: "{numerator_r3}"
+        type: number
+        public: false
+        time_shift:
+          - time_dimension: date
+            interval: 3 month
+            type: prior
+
+      - name: prev_denominator_r3
+        multi_stage: true
+        sql: "{denominator_r3}"
+        type: number
+        public: false
+        time_shift:
+          - time_dimension: date
+            interval: 3 month
+            type: prior
+
+      - name: prev_share_r3
+        multi_stage: true
+        type: number
+        public: false
+        sql: "CASE WHEN {prev_denominator_r3} = 0 THEN NULL ELSE {prev_numerator_r3} / {prev_denominator_r3} END"
+
+      - name: share_change_r3
+        multi_stage: true
+        type: number
+        public: false
+        sql: "({share_r3} - {prev_share_r3})"
+
+      - name: numerator_ytd
+        type: sum
+        public: false
+        rolling_window:
+          type: to_date
+          granularity: year
+        sql: "CASE WHEN {CUBE}.competitor_product = {CUBE}.product THEN {CUBE}.qty ELSE 0 END"
+
+      - name: denominator_ytd
+        type: sum
+        public: false
+        rolling_window:
+          type: to_date
+          granularity: year
+        sql: qty
+
+      - name: numerator_ytd_new
+        multi_stage: true
+        sql: "{numerator_ytd}"
+        type: number
+        public: false
+
+      - name: denominator_ytd_new
+        multi_stage: true
+        sql: "{denominator_ytd}"
+        type: number
+        public: false
+
+      - name: share_ytd
+        multi_stage: true
+        type: number
+        public: false
+        sql: "CASE WHEN {denominator_ytd_new} = 0 THEN NULL ELSE {numerator_ytd_new} / {denominator_ytd_new} END"
+
+      - name: prev_numerator_ytd
+        multi_stage: true
+        sql: "{numerator_ytd}"
+        type: number
+        public: false
+        time_shift:
+          - time_dimension: date
+            interval: 1 year
+            type: prior
+
+      - name: prev_denominator_ytd
+        multi_stage: true
+        sql: "{denominator_ytd}"
+        type: number
+        public: false
+        time_shift:
+          - time_dimension: date
+            interval: 1 year
+            type: prior
+
+      - name: prev_share_ytd
+        multi_stage: true
+        type: number
+        public: false
+        sql: "CASE WHEN {prev_denominator_ytd} = 0 THEN NULL ELSE {prev_numerator_ytd} / {prev_denominator_ytd} END"
+
+      - name: share_change_ytd
+        multi_stage: true
+        type: number
+        public: false
+        sql: "({share_ytd} - {prev_share_ytd})"
+
+      - name: rolling_share_change
+        multi_stage: true
+        type: number
+        case:
+          switch: "{rolling_window_dim.rolling_window}"
+          when:
+            - value: R3
+              sql: "{CUBE.share_change_r3}"
+          else:
+            sql: "{CUBE.share_change_ytd}"
+
+    pre_aggregations:
+      - name: perf_share
+        measures:
+          - numerator_r3
+          - denominator_r3
+          - numerator_ytd
+          - denominator_ytd
+        dimensions:
+          - account
+          - product
+          - sales.account
+          - sales.product
+          - rolling_window_dim.rolling_window
+        time_dimension: date
+        granularity: month
+        allow_non_strict_date_range_match: true
+        scheduled_refresh: false
+        refresh_key:
+          every: 1 hour
