@@ -59,6 +59,10 @@ export class SqlEscaper {
   }
 
   public escapeValue(value: unknown): string {
+    return this.escapeValueInternal(value, false);
+  }
+
+  private escapeValueInternal(value: unknown, stringifyObjects: boolean): string {
     if (value === null || value === undefined) {
       return 'NULL';
     }
@@ -69,9 +73,6 @@ export class SqlEscaper {
       case 'bigint':
         return value.toString();
       case 'number':
-        if (!Number.isFinite(value)) {
-          throw new Error(`Cannot safely render non-finite number as SQL: ${value}`);
-        }
         return String(value);
       case 'string':
         return this.escapeString(value);
@@ -83,15 +84,34 @@ export class SqlEscaper {
 
         if (Array.isArray(value)) {
           return value
-            .map((v) => (Array.isArray(v) ? `(${this.escapeValue(v)})` : this.escapeValue(v)))
+            .map((v) => (
+              Array.isArray(v)
+                ? `(${this.escapeValueInternal(v, true)})`
+                : this.escapeValueInternal(v, true)
+            ))
             .join(', ');
+        }
+
+        if (Buffer.isBuffer(value)) {
+          return `X${this.escapeString(value.toString('hex'))}`;
         }
 
         if (typeof obj.toSqlString === 'function') {
           return String(obj.toSqlString());
         }
 
-        throw new Error('Unsupported object passed as a SQL parameter (no toSqlString())');
+        if (stringifyObjects) {
+          return this.escapeString(String(value));
+        }
+
+        return Object.keys(value)
+          .filter((key) => typeof (value as Record<string, unknown>)[key] !== 'function')
+          .map((key) => (
+            `${this.escapeIdentifier(key)} = ${
+              this.escapeValueInternal((value as Record<string, unknown>)[key], true)
+            }`
+          ))
+          .join(', ');
       }
       default:
         throw new Error(`Unsupported parameter type for SQL escaping: ${typeof value}`);

@@ -258,10 +258,10 @@ describe('sql-escape', () => {
       expect(presto.escapeValue("x'y")).toBe("'x''y'");
     });
 
-    it('rejects non-finite numbers', () => {
-      expect(() => presto.escapeValue(Infinity)).toThrow(/non-finite/);
-      expect(() => presto.escapeValue(-Infinity)).toThrow(/non-finite/);
-      expect(() => presto.escapeValue(NaN)).toThrow(/non-finite/);
+    it('preserves sqlstring rendering for non-finite numbers', () => {
+      expect(presto.escapeValue(Infinity)).toBe('Infinity');
+      expect(presto.escapeValue(-Infinity)).toBe('-Infinity');
+      expect(presto.escapeValue(NaN)).toBe('NaN');
     });
 
     it('renders arrays as a comma list', () => {
@@ -304,10 +304,25 @@ describe('sql-escape', () => {
       expect(presto.escapeValue(0n)).toBe('0');
     });
 
-    it('rejects unsupported objects', () => {
-      expect(() => presto.escapeValue({ foo: 1 })).toThrow(/Unsupported object/);
-      expect(() => presto.escapeValue({ toSqlString: 'DROP TABLE users' }))
-        .toThrow(/Unsupported object/);
+    it('renders buffers as hexadecimal varbinary literals', () => {
+      expect(presto.escapeValue(Buffer.from([0x00, 0xab, 0xff]))).toBe("X'00abff'");
+      expect(mysql.escapeValue(Buffer.alloc(0))).toBe("X''");
+    });
+
+    it('renders object properties as assignments', () => {
+      expect(presto.escapeValue({ foo: "a'b", count: 2, active: true }))
+        .toBe(`"foo" = 'a''b', "count" = 2, "active" = TRUE`);
+      expect(mysql.escapeValue({ 'odd`key': 'value' }))
+        .toBe("`odd``key` = 'value'");
+    });
+
+    it('stringifies nested objects and skips function-valued properties like sqlstring', () => {
+      expect(presto.escapeValue({
+        nested: { foo: 1 },
+        ignored: () => 'NOW()',
+      })).toBe(`"nested" = '[object Object]'`);
+      expect(presto.escapeValue([{ foo: 1 }])).toBe("'[object Object]'");
+      expect(presto.escapeValue({})).toBe('');
     });
 
     it('rejects values that cannot be represented as SQL literals', () => {
@@ -370,11 +385,11 @@ describe('sql-escape', () => {
       expect(presto.format('SELECT ???', ["'; DROP TABLE users; --"])).toBe('SELECT ???');
     });
 
-    it('rejects JSON-shaped objects instead of expanding them into query structure', () => {
-      expect(() => presto.format('DELETE FROM entries WHERE id = ?', [{ id: true }]))
-        .toThrow(/Unsupported object/);
-      expect(() => presto.format('SELECT ?', [{ toSqlString: 'OR TRUE' }]))
-        .toThrow(/Unsupported object/);
+    it('formats JSON-shaped objects as escaped assignments', () => {
+      expect(presto.format('DELETE FROM entries WHERE ?', [{ id: true }]))
+        .toBe('DELETE FROM entries WHERE "id" = TRUE');
+      expect(presto.format('SELECT ?', [{ toSqlString: 'OR TRUE' }]))
+        .toBe('SELECT "toSqlString" = \'OR TRUE\'');
     });
 
     it('substitutes placeholders adjacent to arithmetic operators', () => {
