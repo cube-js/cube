@@ -444,6 +444,22 @@ fn test_contains_filter() {
 }
 
 #[test]
+fn test_contains_filter_escapes_wildcards_and_escape_characters() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.source
+            operator: contains
+            values:
+              - folder\\name_%
+    "});
+    assert_filter(
+        &result,
+        r#"(("visitors".source ILIKE '%' || $_0_$|| '%'))"#,
+        &[r#"folder\\name\_\%"#],
+    );
+}
+
+#[test]
 fn test_not_contains_filter() {
     let result = build(indoc! {"
         filters:

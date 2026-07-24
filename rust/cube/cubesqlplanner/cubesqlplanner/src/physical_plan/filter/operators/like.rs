@@ -4,10 +4,16 @@ use cubenativeutils::CubeError;
 
 impl FilterOperationSql for LikeOp {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
+        let escape_char = ctx.plan_templates.like_escape_char()?;
         let allocated = self
             .values
             .iter()
-            .map(|v| ctx.allocate_and_cast_str(v, &self.member_type))
+            .map(|value| {
+                let escaped = escape_char
+                    .map(|character| escape_like_pattern(value, character))
+                    .unwrap_or_else(|| value.clone());
+                ctx.allocate_and_cast_str(&escaped, &self.member_type)
+            })
             .collect::<Result<Vec<_>, _>>()?;
 
         let like_parts = allocated
@@ -42,4 +48,15 @@ impl FilterOperationSql for LikeOp {
             null_check
         ))
     }
+}
+
+fn escape_like_pattern(value: &str, escape_char: char) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        if character == escape_char || matches!(character, '%' | '_') {
+            escaped.push(escape_char);
+        }
+        escaped.push(character);
+    }
+    escaped
 }
