@@ -382,6 +382,54 @@ below for steps to isolate the failure.
 
 </Warning>
 
+## Chrome local network access permission
+
+<Warning>
+
+Chromium-based browsers block requests from a page served over the public
+internet to a host that resolves to a **private** address, unless the site has
+the **Local network access** permission. The Cube UI is served from the public
+`https://<customer>.cubecloud.dev` origin while your private API hostname
+resolves to an RFC 1918 address over the VPN — so every browser that loads the
+Cube UI needs this permission before charts, the Semantic Model IDE, the
+playground, and any other data-driven view will render.
+
+</Warning>
+
+This is a browser policy that Cube cannot grant on your behalf, and it applies
+to both TLS options above: the browser decides from the **resolved IP address**,
+not the hostname, so reusing `<cube-region>.cubecloudapp.dev` does not avoid it.
+Non-browser clients — `curl`, `psql`, your application servers, BI gateways — are
+unaffected, which is why `curl` from a laptop can succeed while the Cube UI on
+the same laptop shows **"Network Error"**.
+
+Chrome enforces this as [Local Network Access][chrome-lna] from Chrome 142
+onwards; earlier versions enforced its predecessor,
+[Private Network Access][chrome-pna]. A blocked call appears in DevTools as a
+failed request with `ERR_BLOCKED_BY_PRIVATE_NETWORK_ACCESS_CHECKS`, or as a
+CORS-style console error naming a private or local target address space.
+
+**Individual users** can accept Chrome's *"wants to look for and connect to any
+device on your local network"* prompt, or set **Local network access** to
+**Allow** under the padlock icon → **Site settings** on the Cube UI origin.
+
+**Managed fleets** should pre-grant the permission with a Chrome Enterprise
+policy, since the prompt is easy to dismiss and reappears per profile. Set the
+policy value to your Cube UI origin (e.g. `https://<customer>.cubecloud.dev`):
+
+| Chrome version | Policy                                                     |
+| -------------- | ---------------------------------------------------------- |
+| 142 and later  | [`LocalNetworkAccessAllowedForUrls`][chrome-policy-lna]     |
+| Before 142     | [`InsecurePrivateNetworkRequestsAllowedForUrls`][chrome-policy-pna] |
+
+If some users still fail after the policy is rolled out, have them check
+`chrome://policy` and confirm the policy is listed with the expected value. A
+missing entry means it has not synced to that device or profile — most often
+because the user is signed in to Chrome with a personal, unmanaged Google
+profile, which enterprise policies do not reach. That is the usual explanation
+for the same page working for one colleague and failing for another on the same
+VPN.
+
 ## Configuring the private domain
 
 Configure the private hostname for each Cube Region from the Cube admin panel,
@@ -550,6 +598,12 @@ hop is failing:
       domain), make sure your proxy is presenting a certificate whose
       CN/SAN matches the override hostname and is signed by a CA the
       user's machine trusts.
+    - **`ERR_BLOCKED_BY_PRIVATE_NETWORK_ACCESS_CHECKS`, or the URL
+      loads fine in its own tab but still fails from the Cube UI** —
+      the browser is blocking the call because the private hostname
+      resolves to a private address and the site lacks Chrome's
+      **Local network access** permission. See
+      [Chrome local network access permission](#chrome-local-network-access-permission).
     - **HTTP 4xx/5xx from Cube** — the network path is fine; the error
       is on the API itself. Inspect the response body in the new tab to
       see Cube's error message and proceed as you would for any other
@@ -590,3 +644,7 @@ hop is failing:
 [aws-acm]: https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html
 [aws-privatelink-az]: https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html#endpoint-service-availability-zones
 [aws-route53-phz]: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-private.html
+[chrome-lna]: https://developer.chrome.com/blog/local-network-access
+[chrome-pna]: https://developer.chrome.com/blog/private-network-access-update
+[chrome-policy-lna]: https://chromeenterprise.google/policies/local-network-access-allowed-for-urls/
+[chrome-policy-pna]: https://chromeenterprise.google/policies/insecure-private-network-requests-allowed-for-urls/
