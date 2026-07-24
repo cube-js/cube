@@ -1210,7 +1210,7 @@ class ApiGateway {
   ): Promise<false | string> {
     let inQueue = false;
     let status: string = 'n/a';
-    const queuedList = await orchestrator.getPreAggregationQueueStates();
+    const queuedList = await orchestrator.getPreAggregationQueueStates(job.dataSource);
     queuedList.forEach((item) => {
       if (
         item.queryHandler &&
