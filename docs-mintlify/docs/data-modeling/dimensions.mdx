@@ -408,7 +408,7 @@ Dimension `links` require Cube **v1.6.53** or newer.
 | `url` | **Either `url` or `dashboard`** | SQL expression that builds an **external** URL per row. May [reference][ref-references] columns and other dimensions. |
 | `dashboard` | **Either `url` or `dashboard`** | The target Cube Cloud dashboard's **slug** (a **drill-in**). Each link sets exactly one of `url` or `dashboard` — never both — but different links on the same dimension can mix the two. |
 | `icon` | Optional | A [Tabler icon][link-tabler] name (see [Icons](#icons)). Defaults to a generic link icon. |
-| `target` | Optional | Where to open the link: `blank` (default — new tab) or `self` (same tab). Applies to **external** links only — drill-ins always navigate in-app (see [Behavior](#behavior)). |
+| `target` | Optional | Where to open the link: `blank` (new tab) or `self` (same tab). The default depends on the link kind — `url:` links default to `blank`, `dashboard:` drill-ins default to `self` (in-app). An explicit `target` is honored for both (on `dashboard:` drill-ins this requires Cube **v1.7.5** or newer; see [Behavior](#behavior)). |
 | `params` | Optional | Extra per-row parameters. For `url:` they are appended as query parameters. For `dashboard:` they become **equality filters** on the target dashboard — each `key` is a member of the target dashboard's view (a cube path such as `orders.status` is auto-resolved to the matching view member), and `value` is the per-row value. |
 
 ### Example
@@ -513,8 +513,11 @@ working as soon as both sides use the same slug.
   and Explore / SQL results). A left-click on a cell opens the menu listing the
   dimension's links, alongside **Copy value** and, on measures, **Drill down**.
 - **Drill-in vs external** — a `dashboard:` link navigates **in-app, in the same
-  tab** (Cmd/Ctrl-click opens a new tab), ignoring `target`; a `url:` link opens
-  per its `target` (`blank` by default).
+  tab** by default; an explicit `target` is honored (`blank` opens a new tab,
+  `self` stays in-app), and a Cmd/Ctrl-click always opens a new tab. A `url:`
+  link opens per its `target` (`blank` by default). Honoring an explicit `target`
+  on a drill-in requires Cube **v1.7.5** or newer — older runtimes always navigate
+  drill-ins in-app regardless of `target`.
 - **Filters** — for `dashboard:` links, each `params` entry becomes an
   **equality filter** on the target (the `key` is a view member, the `value` is
   the per-row value). An unknown or inaccessible target slug is skipped
