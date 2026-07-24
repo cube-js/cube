@@ -51,10 +51,10 @@ network, and each has its own connectivity story:
 - **Frontend connectivity** — traffic that flows **from your network into
   Cube**. Anything that needs to query Cube falls in this bucket: the Cube UI
   running in employee browsers, application servers, BI tools, embedded
-  analytics clients, and Semantic Layer Sync-generated configs. Frontend
-  connectivity is currently documented for AWS in
-  [Private API Connectivity on AWS][aws-private-api-connectivity], and
-  equivalent patterns are available on Azure and GCP on request.
+  analytics clients, and Semantic Layer Sync-generated configs. See the
+  Private API Connectivity page for your provider —
+  [AWS][aws-private-api-connectivity], [Azure][azure-private-api-connectivity],
+  or [GCP][gcp-private-api-connectivity].
 
 Most enterprise deployments end up using both: a backend
 PrivateLink/PSC/peering into the customer's data network, plus a frontend
@@ -68,7 +68,7 @@ private fabric.
     Dedicated Infrastructure, BYOC, and private connectivity on AWS.
   </Card>
   <Card title="Google Cloud Platform" icon="google" href="/admin/deployment/dedicated/gcp">
-    Dedicated Infrastructure and BYOC on GCP.
+    Dedicated Infrastructure, BYOC, and private connectivity on GCP.
   </Card>
   <Card title="Microsoft Azure" icon="microsoft" href="/admin/deployment/dedicated/azure">
     Dedicated Infrastructure, BYOC, and private connectivity on Azure.
@@ -77,4 +77,6 @@ private fabric.
 
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[azure-private-api-connectivity]: /admin/deployment/dedicated/azure/private-api-connectivity
+[gcp-private-api-connectivity]: /admin/deployment/dedicated/gcp/private-api-connectivity
 [cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region

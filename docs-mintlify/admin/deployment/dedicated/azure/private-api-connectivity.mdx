@@ -1,0 +1,430 @@
+---
+title: Private API Connectivity on Azure
+sidebarTitle: Private API Connectivity
+description: Expose Cube's HTTP and SQL APIs to your Azure network and internal BI tools over Azure Private Link so traffic from your applications, browsers, and BI clients never traverses the public internet.
+---
+
+<Note>
+
+This page covers **frontend connectivity** — exposing Cube's HTTP and SQL APIs
+to your applications, browsers, BI tools, embedded analytics clients, and
+Semantic Layer Sync-generated configs over a private network. For **backend
+connectivity** (letting Cube reach into your network to query data sources,
+auth providers, BI APIs targeted by SLS, and other upstream services), see
+[Azure Private Link][azure-private-link] or [VNet Peering][azure-vnet-peering].
+
+</Note>
+
+With Dedicated Infrastructure and Bring Your Own Cloud on Azure, Cube supports
+establishing **Azure Private Link** connections from your virtual networks to
+the Cube API endpoints. This lets your applications, internal BI tools, and
+end-user browsers reach the Cube HTTP, SQL, and AI APIs entirely over the Azure
+backbone — never touching the public internet. When private connectivity is in
+place, the public API endpoints can be disabled completely on request.
+
+<Note>
+
+Available on the [Enterprise plan](https://cube.dev/pricing) with Dedicated
+Infrastructure or BYOC on Azure, and provisioned per tenant on request —
+[contact us](https://cube.dev/contact) to have Cube publish the Private Link
+Services for your region before you design around this setup.
+
+</Note>
+
+## Architecture
+
+Cube runs as two cooperating planes:
+
+- The **control plane** powers the Cube UI and the product surface area
+  (deployment management, schema editor, dashboards, Semantic Layer Sync,
+  etc.) and is always served from Cube's public domain at
+  `https://<customer>.cubecloud.dev`. The control plane itself does not need
+  private connectivity — it is a SaaS UI like any other.
+- The **data plane** runs your Cube deployments and serves all Cube HTTP and
+  SQL **data API** traffic — REST/GraphQL queries from your applications, live
+  data calls issued by the Cube UI while rendering charts, SQL connections from
+  BI tools, and AI traffic to the [Chat API][chat-api] and other AI endpoints.
+  The data plane is the part that talks to your databases and returns query
+  results, and the part this document teaches you how to expose privately.
+
+[Azure Private Link][azure-docs-private-link] lets a service behind an internal
+Standard Load Balancer in one virtual network be consumed from another VNet —
+in a different subscription or tenant — over the Azure backbone, without VNet
+peering and without routing through the internet. The service provider
+publishes a [Private Link Service][azure-docs-pls]; the consumer creates a
+[Private Endpoint][azure-docs-private-endpoint] in their VNet, which appears as
+a network interface holding a private IP that routes to the service.
+
+Cube publishes two Private Link Services per [Cube Region][cube-region]:
+
+| Private Link Service | Fronts                                            | Port |
+| -------------------- | ------------------------------------------------- | ---- |
+| HTTP data API        | the internal load balancer for Cube's ingress      | 443  |
+| SQL data API         | the internal load balancer for the SQL API router  | 5432 |
+
+Connections are **manually approved**: Cube approves your private endpoint's
+connection request on the provider side once it confirms the request came from
+you. Cube can also restrict each service to specific subscriptions, so share
+the subscription IDs that will hold endpoints.
+
+On the HTTP side, the load balancer forwards traffic to Cube's ingress
+controller, which terminates TLS using a certificate that only covers
+`*.<cube-region>.cubecloudapp.dev`. Because that certificate is bound to the
+Cube-managed hostname, you have two options for presenting HTTPS to your own
+clients (covered in [TLS options for HTTPS](#tls-options-for-https) below). On
+the SQL side, TLS is terminated inside the SQL API service, and SQL clients
+connect with `sslmode=require` (or equivalent) straight to the endpoint IP.
+
+{/* TODO: diagram — Azure control plane vs data plane topology, Private Link Services on the Cube side, consumer private endpoints and Azure Private DNS zone on the customer side, browser traffic arriving over the corporate VPN */}
+
+## Cube Region
+
+The Private Link Services described here are scoped to a **Cube Region** — the
+unit of infrastructure that hosts one or more of your deployments. Each region
+has a stable identifier of the form `<provider>-<geo-region>-<infrastructure>`
+(e.g. `azure-eastus-t-12345`). The hostname you override on your side — either
+privately remapping `<cube-region>.cubecloudapp.dev` or fronting it with your
+own domain — applies to **every** deployment in that region. See
+[Cube Regions][cube-region] for the full reference, including how to find the
+exact region identifier for your tenant.
+
+## How queries are routed
+
+A single private endpoint per region serves all deployments inside that region;
+there is no per-deployment endpoint to provision separately.
+
+<Info>
+
+On Cube's shared, public-facing infrastructure, traffic is routed to a
+deployment by **subdomain** — `<deployment-slug>.<cube-region>.cubecloudapp.dev`
+maps to a specific deployment. When private connectivity is enabled, Cube
+switches to **path-based routing** so that a single private hostname can serve
+every deployment in the region.
+
+</Info>
+
+For the HTTP API, the prefix has the shape:
+
+```
+https://<your-private-hostname>/deployment/<deployment-slug>/cubejs-api/v1/...
+```
+
+where `<deployment-slug>` is the leftmost label of the deployment's Cube-issued
+hostname (e.g. `thirsty-raccoon` from
+`thirsty-raccoon.azure-eastus-t-12345.cubecloudapp.dev`). The same prefix
+applies to all HTTP endpoints — `/cubejs-api/v1/load`, `/livez`, the GraphQL
+endpoint, and so on:
+
+```bash
+curl https://http.cube.internal/deployment/thirsty-raccoon/cubejs-api/v1/load \
+  -H "Authorization: $CUBE_JWT" \
+  -d '{"query":{"measures":["orders.count"]}}'
+```
+
+The SQL API uses a TCP protocol that does not carry an HTTP path, so SQL
+connections are routed at the protocol layer (via the database name and
+credentials in the connection string) rather than by URL prefix. SQL clients
+connect to the same private hostname on port 5432 and identify the deployment
+through the SQL connection parameters.
+
+## Creating the private endpoints
+
+Cube shares one Private Link Service resource ID per API. For each one, create a
+private endpoint in a subnet of your VNet that is reachable from both your
+workloads and your corporate VPN.
+
+**Portal** — under **Private Link Center → Private endpoints → Create**, choose
+**Connect to an Azure resource by resource ID or alias**, paste the Private Link
+Service resource ID, and select your VNet and subnet.
+
+**Azure CLI**:
+
+```bash
+az network private-endpoint create \
+  --name cube-http-pe \
+  --resource-group <your-rg> \
+  --vnet-name <your-vnet> --subnet <your-subnet> \
+  --private-connection-resource-id <cube-http-pls-resource-id> \
+  --connection-name cube-http --manual-request true
+
+# Watch for Cube to approve the request
+az network private-endpoint show \
+  --name cube-http-pe --resource-group <your-rg> \
+  --query 'privateLinkServiceConnections[0].privateLinkServiceConnectionState'
+
+# Private IP assigned to the endpoint's NIC — you need this for DNS
+az network private-endpoint show \
+  --name cube-http-pe --resource-group <your-rg> \
+  --query 'customDnsConfigs[].ipAddresses' -o tsv
+```
+
+Repeat for the SQL Private Link Service. If the connection state stays
+`Pending`, the approval has not happened yet — tell the Cube team the
+subscription and endpoint name you used.
+
+<Info>
+
+Private endpoints and the services behind them are network-policy sensitive: if
+your subnet applies network security groups or user-defined routes to private
+endpoints, make sure they permit outbound 443 (HTTP) and 5432 (SQL) to the
+endpoint's private IP.
+
+</Info>
+
+## TLS options for HTTPS
+
+Cube's ingress controller can terminate TLS only for the Cube-issued domain
+`*.<cube-region>.cubecloudapp.dev`. Pick the option that fits your DNS and
+certificate posture:
+
+### Option A — Reuse the Cube hostname via private DNS
+
+Create an [Azure Private DNS zone][azure-docs-private-dns] for
+`<cube-region>.cubecloudapp.dev`, link it to the VNets that need it, and point
+these records at the private endpoint IPs:
+
+| Record name                            | Type | Target                    |
+| -------------------------------------- | ---- | ------------------------- |
+| `<cube-region>.cubecloudapp.dev`       | A    | HTTP private endpoint IP  |
+| `*.<cube-region>.cubecloudapp.dev`     | A    | HTTP private endpoint IP  |
+| `sql.<cube-region>.cubecloudapp.dev`   | A    | SQL private endpoint IP   |
+| `*.sql.<cube-region>.cubecloudapp.dev` | A    | SQL private endpoint IP   |
+
+Clients then dial:
+
+```
+https://<cube-region>.cubecloudapp.dev/deployment/<deployment-slug>/cubejs-api/v1/...
+```
+
+TLS is terminated by Cube's ingress controller using Cube's own certificate for
+`*.cubecloudapp.dev` — you don't need to manage a certificate yourself. This is
+the simplest setup if you control DNS resolution on the networks your clients
+live on. Configure the same hostname as the
+[domain override](#configuring-the-private-domain) so the UI and Semantic Layer
+Sync generate links and configs against it.
+
+### Option B — Front the endpoint with your own domain and certificate
+
+If you'd rather present clients a hostname inside your own domain (e.g.
+`cube.example.com`), stand up a customer-side proxy that terminates TLS with
+your certificate and **re-encrypts** to the HTTP private endpoint on port 443 —
+either an [Application Gateway][azure-docs-app-gateway] whose backend pool holds
+the endpoint's private IP, or a reverse proxy (nginx, Envoy, HAProxy) on a VM.
+
+<Warning>
+
+The upstream leg must be **HTTPS**, not plaintext. Cube's ingress expects a TLS
+handshake on 443, so a proxy that forwards decrypted bytes will never complete a
+request. Because Cube's certificate covers `*.cubecloudapp.dev` and not your
+custom hostname, the proxy must send `<cube-region>.cubecloudapp.dev` as the
+upstream SNI/`Host` — on Application Gateway, set the backend setting's
+**Override with specific domain name** to that hostname; in nginx, use
+`proxy_ssl_name`. Traffic stays encrypted end to end either way.
+
+</Warning>
+
+Then bind your hostname to the proxy with an A record in a private DNS zone or
+your corporate resolver, resolvable from every network that reaches Cube —
+corporate VPN included — and set that hostname as the
+[domain override](#configuring-the-private-domain).
+
+## Reaching Cube from every client
+
+The same private hostname is used by three distinct classes of client, and each
+imposes a requirement on how the name resolves:
+
+1. **Your application servers** inside a VNet that holds or reaches the private
+   endpoint resolve the private hostname via Azure DNS and connect over Private
+   Link directly.
+2. **End-user browsers loading the Cube UI.** When a developer opens
+   `https://<customer>.cubecloud.dev` and renders a dashboard, the page issues
+   live queries against the Cube data API from the user's browser. Those calls
+   originate on the user's laptop, not from a Cube backend, so the URL embedded
+   in the UI must be a hostname the user's machine can resolve and reach. For
+   this to use Private Link, the hostname has to resolve to the endpoint IP over
+   your corporate VPN's DNS and route over the VPN into your VNet. A purely
+   internal name that only resolves inside the VNet will fail when the user is on
+   the corporate network but not in the VNet; a public name that resolves outside
+   the VPN will bypass Private Link entirely.
+3. **Internal BI tools configured by Semantic Layer Sync (SLS).** If you publish
+   Cube datasets to BI tools via SLS, Cube generates connection configs that
+   embed the Cube API hostname. Those configs are used by BI desktop clients, BI
+   gateways, or other clients running inside your network — so SLS must be
+   configured with a hostname those clients can resolve and reach over your VPN.
+
+In short, the **private hostname must be visible and routable from every place
+the Cube API needs to be reached** — your VNets, your corporate VPN-connected
+laptops, and any BI gateway hosts. Cube cannot infer your internal DNS; you tell
+us the hostname you want to use, and you point it at the private endpoint on
+your side.
+
+## Chrome local network access permission
+
+<Warning>
+
+Chromium-based browsers block requests from a page served over the public
+internet to a host that resolves to a **private** address, unless the site has
+the **Local network access** permission. The Cube UI is served from the public
+`https://<customer>.cubecloud.dev` origin while your private API hostname
+resolves to a private address over the VPN — so every browser that loads the
+Cube UI needs this permission before charts, the Semantic Model IDE, the
+playground, and any other data-driven view will render.
+
+</Warning>
+
+This is a browser policy that Cube cannot grant on your behalf, and it applies
+to both TLS options above: the browser decides from the **resolved IP address**,
+not the hostname, so reusing `<cube-region>.cubecloudapp.dev` does not avoid it.
+Non-browser clients — `curl`, `psql`, your application servers, BI gateways — are
+unaffected, which is why `curl` from a laptop can succeed while the Cube UI on
+the same laptop shows **"Network Error"**.
+
+Chrome enforces this as [Local Network Access][chrome-lna] from Chrome 142
+onwards; earlier versions enforced its predecessor,
+[Private Network Access][chrome-pna]. A blocked call appears in DevTools as a
+failed request with `ERR_BLOCKED_BY_PRIVATE_NETWORK_ACCESS_CHECKS`, or as a
+CORS-style console error naming a private or local target address space.
+
+**Individual users** can accept Chrome's *"wants to look for and connect to any
+device on your local network"* prompt, or set **Local network access** to
+**Allow** under the padlock icon → **Site settings** on the Cube UI origin.
+
+**Managed fleets** should pre-grant the permission with a Chrome Enterprise
+policy, since the prompt is easy to dismiss and reappears per profile. Set the
+policy value to your Cube UI origin (e.g. `https://<customer>.cubecloud.dev`):
+
+| Chrome version | Policy                                                              |
+| -------------- | ------------------------------------------------------------------- |
+| 142 and later  | [`LocalNetworkAccessAllowedForUrls`][chrome-policy-lna]              |
+| Before 142     | [`InsecurePrivateNetworkRequestsAllowedForUrls`][chrome-policy-pna]  |
+
+If some users still fail after the policy is rolled out, have them check
+`chrome://policy` and confirm the policy is listed with the expected value. A
+missing entry means it has not synced to that device or profile — most often
+because the user is signed in to Chrome with a personal, unmanaged Google
+profile, which enterprise policies do not reach. That is the usual explanation
+for the same page working for one colleague and failing for another on the same
+VPN.
+
+## Configuring the private domain
+
+Configure the private hostname for each Cube Region from the Cube admin panel,
+under **Regions → \<your region\> → Path-based routing → Domain override**.
+
+The domain override tells Cube **where the data plane lives from the caller's
+point of view**. It does *not* re-route traffic on Cube's side and it does *not*
+open a new tunnel — it is purely a string Cube embeds when generating outbound
+references to the data API: links inside the Cube UI, connection configs
+generated by Semantic Layer Sync, and the API connection details surfaced on the
+deployment's API page.
+
+Because every one of those callers — the browser, the BI client, your
+application — connects to the hostname **directly**, the override only works if
+that hostname is resolvable and reachable from each of those networks. Use the
+hostname your clients will actually dial: the custom-domain front-end from
+Option B (e.g. `http.cube.internal`), or the Cube-issued
+`<cube-region>.cubecloudapp.dev` if you went with Option A. Leaving the field
+empty falls back to the default public hostname, and clients will not use
+Private Link even if the endpoints are approved.
+
+HTTP and SQL APIs are typically published under two separate hostnames
+(`http.cube.internal` and `sql.cube.internal`), since the HTTP endpoint may sit
+behind your TLS-terminating proxy on port 443 while the SQL endpoint is accessed
+directly on port 5432.
+
+## Provisioning checklist
+
+1. **Request private API connectivity for your tenant.** Contact Cube and
+   provide your tenant name and every Azure subscription ID that will hold a
+   private endpoint.
+2. **Receive the Private Link Service resource IDs.** Cube publishes one HTTP
+   and one SQL Private Link Service per region and shares their resource IDs
+   along with the Cube Region identifier.
+3. **Create the private endpoints in your subscription.** See
+   [Creating the private endpoints](#creating-the-private-endpoints).
+4. **Have Cube approve the connections.** Cube approves each request on the
+   provider side; confirm the connection state reads `Approved`.
+5. **Bind the private hostname.** Pick a TLS option above and create the
+   corresponding DNS records. Make sure they resolve from every network that
+   needs to reach Cube, corporate VPN included.
+6. **Set the domain in Cube.** In the admin panel under
+   **Regions → \<your region\> → Path-based routing → Domain override**, enter
+   the chosen hostname.
+7. **Grant browsers local network access.** Roll out the Chrome Enterprise
+   policy described [above](#chrome-local-network-access-permission) before
+   users try the UI.
+8. **(Optional) Disable public endpoints.** Once private connectivity is
+   verified end-to-end, ask Cube support to disable the public HTTP and SQL
+   endpoints for your deployment.
+
+## Verifying connectivity
+
+From a host inside the consumer VNet or attached to the corporate VPN:
+
+```bash
+# DNS resolves the HTTP and SQL names to the private endpoint IPs
+dig +short http.cube.internal
+dig +short sql.cube.internal
+
+# HTTPS reachable over Private Link, routed to a specific deployment by path prefix
+curl -v https://http.cube.internal/deployment/<deployment-slug>/livez
+
+# SQL API reachable
+psql "host=sql.cube.internal port=5432 user=… dbname=… sslmode=require" -c "select 1;"
+```
+
+If DNS resolves but connections hang, check that the private endpoint connection
+state is `Approved`, that NSGs allow the traffic to the endpoint IP on 443 and
+5432, and that your VPN's routes cover the endpoint's subnet.
+
+## Troubleshooting "Network Error" in the Cube UI
+
+When the domain override is configured, the Cube UI stops calling the public
+Cube data API and starts calling the private hostname you supplied **directly
+from the user's browser**. If that hostname is not reachable from the machine
+the UI is loaded on, the UI surfaces a red **"Network Error"** banner on charts,
+the Semantic Model IDE, the playground, and any other view that issues data
+queries — even though direct API calls (e.g. `curl` from inside the VNet) keep
+working.
+
+Reload the page with the DevTools **Network** tab open, filter for `Fetch/XHR`,
+and find the failing call — it will target your override hostname, not
+`*.cubecloud.dev`. If it still targets the public hostname, the override has not
+been picked up; re-check it and reload with cache disabled. Otherwise copy the
+request URL into a new tab, which takes the Cube UI out of the picture:
+
+- **`ERR_NAME_NOT_RESOLVED` / "This site can't be reached"** — DNS for the
+  private hostname is not reachable from the user's machine. Confirm the user is
+  on the corporate VPN, that the VPN pushes the private DNS zone (or the
+  corporate resolver answers for the override hostname), and that the record
+  points at the private endpoint IP.
+- **`ERR_CONNECTION_TIMED_OUT` / `ERR_CONNECTION_REFUSED`** — DNS resolves but
+  TCP is blocked. Check the VPN routes cover the endpoint's subnet and that NSGs
+  permit the traffic.
+- **`ERR_BLOCKED_BY_PRIVATE_NETWORK_ACCESS_CHECKS`, or the URL loads fine in its
+  own tab but still fails from the Cube UI** — the browser is blocking the call.
+  See [Chrome local network access
+  permission](#chrome-local-network-access-permission).
+- **`NET::ERR_CERT_COMMON_NAME_INVALID` / `NET::ERR_CERT_AUTHORITY_INVALID`** —
+  TLS termination is misconfigured. With Option A, make sure the private DNS
+  record really is for `<cube-region>.cubecloudapp.dev` so Cube's certificate
+  matches. With Option B, make sure your proxy presents a certificate whose
+  CN/SAN matches the override hostname and is signed by a CA the user's machine
+  trusts.
+- **HTTP 4xx/5xx from Cube** — the network path is fine; the error is on the API
+  itself. Inspect the response body and proceed as you would for any other API
+  error.
+
+[cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[azure-private-link]: /admin/deployment/dedicated/azure/private-link
+[azure-vnet-peering]: /admin/deployment/dedicated/azure/vpc-peering
+[chat-api]: /reference/embed-apis/chat-api
+[azure-docs-private-link]: https://learn.microsoft.com/azure/private-link/private-link-overview
+[azure-docs-pls]: https://learn.microsoft.com/azure/private-link/private-link-service-overview
+[azure-docs-private-endpoint]: https://learn.microsoft.com/azure/private-link/private-endpoint-overview
+[azure-docs-private-dns]: https://learn.microsoft.com/azure/dns/private-dns-privatednszone
+[azure-docs-app-gateway]: https://learn.microsoft.com/azure/application-gateway/overview
+[chrome-lna]: https://developer.chrome.com/blog/local-network-access
+[chrome-pna]: https://developer.chrome.com/blog/private-network-access-update
+[chrome-policy-lna]: https://chromeenterprise.google/policies/local-network-access-allowed-for-urls/
+[chrome-policy-pna]: https://chromeenterprise.google/policies/insecure-private-network-requests-allowed-for-urls/

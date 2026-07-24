@@ -1,0 +1,430 @@
+---
+title: Private API Connectivity on GCP
+sidebarTitle: Private API Connectivity
+description: Expose Cube's HTTP and SQL APIs to your GCP network and internal BI tools over Private Service Connect so traffic from your applications, browsers, and BI clients never traverses the public internet.
+---
+
+<Note>
+
+This page covers **frontend connectivity** — exposing Cube's HTTP and SQL APIs
+to your applications, browsers, BI tools, embedded analytics clients, and
+Semantic Layer Sync-generated configs over a private network. For **backend
+connectivity** (letting Cube reach into your network to query data sources,
+auth providers, BI APIs targeted by SLS, and other upstream services), see
+[Private Service Connect][gcp-private-service-connect] or
+[VPC Peering][gcp-vpc-peering].
+
+</Note>
+
+With Dedicated Infrastructure and Bring Your Own Cloud on GCP, Cube supports
+establishing **Private Service Connect** connections from your VPC networks to
+the Cube API endpoints. This lets your applications, internal BI tools, and
+end-user browsers reach the Cube HTTP, SQL, and AI APIs entirely over private
+Google Cloud networking — never touching the public internet. When private
+connectivity is in place, the public API endpoints can be disabled completely
+on request.
+
+<Note>
+
+Available on the [Enterprise plan](https://cube.dev/pricing) with Dedicated
+Infrastructure or BYOC on GCP. [Contact us](https://cube.dev/contact) to enable
+private API connectivity for your tenant.
+
+</Note>
+
+## Architecture
+
+Cube runs as two cooperating planes:
+
+- The **control plane** powers the Cube UI and the product surface area
+  (deployment management, schema editor, dashboards, Semantic Layer Sync,
+  etc.) and is always served from Cube's public domain at
+  `https://<customer>.cubecloud.dev`. The control plane itself does not need
+  private connectivity — it is a SaaS UI like any other.
+- The **data plane** runs your Cube deployments and serves all Cube HTTP and
+  SQL **data API** traffic — REST/GraphQL queries from your applications, live
+  data calls issued by the Cube UI while rendering charts, SQL connections from
+  BI tools, and AI traffic to the [Chat API][chat-api] and other AI endpoints.
+  The data plane is the part that talks to your databases and returns query
+  results, and the part this document teaches you how to expose privately.
+
+[Private Service Connect][gcp-docs-psc] (PSC) lets a service running in one VPC
+network be consumed from another VPC network — in a different project or
+organization — over Google's internal network, without VPC peering and without
+routing through the internet. The service producer publishes a
+[service attachment][gcp-docs-service-attachment] in front of an internal load
+balancer; the consumer creates a **PSC endpoint** — a forwarding rule bound to
+an internal IP address in their own VPC — that targets that attachment.
+
+Cube publishes two service attachments per [Cube Region][cube-region]:
+
+| Service attachment | Fronts                                           | Port |
+| ------------------ | ------------------------------------------------ | ---- |
+| HTTP data API      | the internal load balancer for Cube's ingress     | 443  |
+| SQL data API       | the internal load balancer for the SQL API router | 5432 |
+
+Each attachment is backed by a dedicated **PSC NAT subnet** in the Cube VPC,
+which Google uses to source-NAT consumer traffic. Cube also adds your consumer
+**project IDs** to each attachment's accept list, so endpoints created from
+those projects are approved automatically and endpoints from anywhere else are
+rejected — tell the Cube team every project that will hold an endpoint.
+
+On the HTTP side, the load balancer forwards traffic to Cube's ingress
+controller, which terminates TLS using a certificate that only covers
+`*.<cube-region>.cubecloudapp.dev`. Because that certificate is bound to the
+Cube-managed hostname, you have two options for presenting HTTPS to your own
+clients (covered in [TLS options for HTTPS](#tls-options-for-https) below). On
+the SQL side, TLS is terminated inside the SQL API service, and SQL clients
+connect with `sslmode=require` (or equivalent) straight to the endpoint IP.
+
+{/* TODO: diagram — GCP control plane vs data plane topology, service attachments and PSC NAT subnets on the Cube side, consumer PSC endpoints and Cloud DNS private zone on the customer side, browser traffic arriving over the corporate VPN */}
+
+## Cube Region
+
+The service attachments described here are scoped to a **Cube Region** — the
+unit of infrastructure that hosts one or more of your deployments. Each region
+has a stable identifier of the form `<provider>-<geo-region>-<infrastructure>`
+(e.g. `gcp-us-east4-t-12345`). The hostname you override on your side — either
+privately remapping `<cube-region>.cubecloudapp.dev` or fronting it with your
+own domain — applies to **every** deployment in that region. See
+[Cube Regions][cube-region] for the full reference, including how to find the
+exact region identifier for your tenant.
+
+PSC endpoints are regional: create each endpoint in the same Google Cloud
+region as the service attachment.
+
+## How queries are routed
+
+A single private endpoint per region serves all deployments inside that region;
+there is no per-deployment endpoint to provision separately.
+
+<Info>
+
+On Cube's shared, public-facing infrastructure, traffic is routed to a
+deployment by **subdomain** — `<deployment-slug>.<cube-region>.cubecloudapp.dev`
+maps to a specific deployment. When private connectivity is enabled, Cube
+switches to **path-based routing** so that a single private hostname can serve
+every deployment in the region.
+
+</Info>
+
+For the HTTP API, the prefix has the shape:
+
+```
+https://<your-private-hostname>/deployment/<deployment-slug>/cubejs-api/v1/...
+```
+
+where `<deployment-slug>` is the leftmost label of the deployment's Cube-issued
+hostname (e.g. `thirsty-raccoon` from
+`thirsty-raccoon.gcp-us-east4-t-12345.cubecloudapp.dev`). The same prefix
+applies to all HTTP endpoints — `/cubejs-api/v1/load`, `/livez`, the GraphQL
+endpoint, and so on:
+
+```bash
+curl https://http.cube.internal/deployment/thirsty-raccoon/cubejs-api/v1/load \
+  -H "Authorization: $CUBE_JWT" \
+  -d '{"query":{"measures":["orders.count"]}}'
+```
+
+The SQL API uses a TCP protocol that does not carry an HTTP path, so SQL
+connections are routed at the protocol layer (via the database name and
+credentials in the connection string) rather than by URL prefix. SQL clients
+connect to the same private hostname on port 5432 and identify the deployment
+through the SQL connection parameters.
+
+## Creating the PSC endpoints
+
+Cube shares one service attachment URI per API, of the form
+`projects/<cube-project>/regions/<region>/serviceAttachments/<cube-region>-traefik-psc`.
+For each URI, reserve an internal IP in your VPC and create a forwarding rule
+that targets the attachment.
+
+**Console** — under **Network services → Private Service Connect → Connected
+endpoints → Connect endpoint**, choose **Target: Published service**, paste the
+service attachment URI, then pick your network, subnetwork, and a reserved
+internal IP.
+
+**gcloud**:
+
+```bash
+# Reserve an internal IP for the endpoint
+gcloud compute addresses create cube-http-psc-ip \
+  --region=us-east4 --subnet=<your-subnet>
+
+# Create the PSC endpoint (a forwarding rule targeting Cube's attachment)
+gcloud compute forwarding-rules create cube-http-psc \
+  --region=us-east4 \
+  --network=<your-vpc> \
+  --address=cube-http-psc-ip \
+  --target-service-attachment=<service-attachment-uri>
+
+# Confirm the producer accepted the connection
+gcloud compute forwarding-rules describe cube-http-psc \
+  --region=us-east4 --format='get(pscConnectionStatus)'
+# → ACCEPTED
+```
+
+Repeat for the SQL attachment. A `pscConnectionStatus` of `PENDING` or
+`REJECTED` means the endpoint's project is not on the attachment's accept list —
+send the Cube team the project ID.
+
+## TLS options for HTTPS
+
+Cube's ingress controller can terminate TLS only for the Cube-issued domain
+`*.<cube-region>.cubecloudapp.dev`. Pick the option that fits your DNS and
+certificate posture:
+
+### Option A — Reuse the Cube hostname via private DNS
+
+Create a [Cloud DNS private zone][gcp-docs-private-zone] for
+`<cube-region>.cubecloudapp.dev`, authorize it for the VPC networks that need
+it, and point these records at the endpoint IPs:
+
+| Record name                            | Type | Target                   |
+| -------------------------------------- | ---- | ------------------------ |
+| `<cube-region>.cubecloudapp.dev`       | A    | HTTP PSC endpoint IP     |
+| `*.<cube-region>.cubecloudapp.dev`     | A    | HTTP PSC endpoint IP     |
+| `sql.<cube-region>.cubecloudapp.dev`   | A    | SQL PSC endpoint IP      |
+| `*.sql.<cube-region>.cubecloudapp.dev` | A    | SQL PSC endpoint IP      |
+
+Clients then dial:
+
+```
+https://<cube-region>.cubecloudapp.dev/deployment/<deployment-slug>/cubejs-api/v1/...
+```
+
+TLS is terminated by Cube's ingress controller using Cube's own certificate for
+`*.cubecloudapp.dev` — you don't need to manage a certificate yourself. This is
+the simplest setup if you control DNS resolution on the networks your clients
+live on. Configure the same hostname as the
+[domain override](#configuring-the-private-domain) so the UI and Semantic Layer
+Sync generate links and configs against it.
+
+### Option B — Front the endpoint with your own domain and certificate
+
+If you'd rather present clients a hostname inside your own domain (e.g.
+`cube.example.com`), stand up a customer-side proxy that terminates TLS with
+your certificate and **re-encrypts** to the HTTP PSC endpoint on port 443 —
+either a reverse proxy (nginx, Envoy, HAProxy) on a VM behind an
+[internal passthrough Network Load Balancer][gcp-docs-internal-lb], or an
+internal Application Load Balancer with a
+[hybrid connectivity NEG][gcp-docs-hybrid-neg] whose endpoint is the PSC
+endpoint IP on port 443.
+
+<Warning>
+
+The upstream leg must be **HTTPS**, not plaintext. Cube's ingress expects a TLS
+handshake on 443, so a proxy that forwards decrypted bytes will never complete a
+request. Because Cube's certificate covers `*.cubecloudapp.dev` and not your
+custom hostname, either disable upstream certificate-name verification or set
+the upstream SNI/`Host` to `<cube-region>.cubecloudapp.dev` (in nginx,
+`proxy_ssl_name`; on an internal Application Load Balancer, the backend
+service's hostname override). Traffic stays encrypted end to end either way.
+
+</Warning>
+
+Then bind your hostname to the proxy with an A record in a Cloud DNS private
+zone or your corporate resolver, resolvable from every network that reaches Cube
+— corporate VPN included — and set that hostname as the
+[domain override](#configuring-the-private-domain).
+
+## Reaching Cube from every client
+
+The same private hostname is used by three distinct classes of client, and each
+imposes a requirement on how the name resolves:
+
+1. **Your application servers** inside a VPC that holds or reaches the PSC
+   endpoint resolve the private hostname via Cloud DNS and connect over PSC
+   directly.
+2. **End-user browsers loading the Cube UI.** When a developer opens
+   `https://<customer>.cubecloud.dev` and renders a dashboard, the page issues
+   live queries against the Cube data API from the user's browser. Those calls
+   originate on the user's laptop, not from a Cube backend, so the URL embedded
+   in the UI must be a hostname the user's machine can resolve and reach. For
+   this to use PSC, the hostname has to resolve to the endpoint IP over your
+   corporate VPN's DNS and route over the VPN into your VPC. A purely internal
+   name that only resolves inside the VPC will fail when the user is on the
+   corporate network but not in the VPC; a public name that resolves outside the
+   VPN will bypass PSC entirely.
+3. **Internal BI tools configured by Semantic Layer Sync (SLS).** If you publish
+   Cube datasets to BI tools via SLS, Cube generates connection configs that
+   embed the Cube API hostname. Those configs are used by BI desktop clients, BI
+   gateways, or other clients running inside your network — so SLS must be
+   configured with a hostname those clients can resolve and reach over your VPN.
+
+In short, the **private hostname must be visible and routable from every place
+the Cube API needs to be reached** — your VPC networks, your corporate
+VPN-connected laptops, and any BI gateway hosts. Cube cannot infer your internal
+DNS; you tell us the hostname you want to use, and you point it at the PSC
+endpoint on your side.
+
+## Chrome local network access permission
+
+<Warning>
+
+Chromium-based browsers block requests from a page served over the public
+internet to a host that resolves to a **private** address, unless the site has
+the **Local network access** permission. The Cube UI is served from the public
+`https://<customer>.cubecloud.dev` origin while your private API hostname
+resolves to a private address over the VPN — so every browser that loads the
+Cube UI needs this permission before charts, the Semantic Model IDE, the
+playground, and any other data-driven view will render.
+
+</Warning>
+
+This is a browser policy that Cube cannot grant on your behalf, and it applies
+to both TLS options above: the browser decides from the **resolved IP address**,
+not the hostname, so reusing `<cube-region>.cubecloudapp.dev` does not avoid it.
+Non-browser clients — `curl`, `psql`, your application servers, BI gateways — are
+unaffected, which is why `curl` from a laptop can succeed while the Cube UI on
+the same laptop shows **"Network Error"**.
+
+Chrome enforces this as [Local Network Access][chrome-lna] from Chrome 142
+onwards; earlier versions enforced its predecessor,
+[Private Network Access][chrome-pna]. A blocked call appears in DevTools as a
+failed request with `ERR_BLOCKED_BY_PRIVATE_NETWORK_ACCESS_CHECKS`, or as a
+CORS-style console error naming a private or local target address space.
+
+**Individual users** can accept Chrome's *"wants to look for and connect to any
+device on your local network"* prompt, or set **Local network access** to
+**Allow** under the padlock icon → **Site settings** on the Cube UI origin.
+
+**Managed fleets** should pre-grant the permission with a Chrome Enterprise
+policy, since the prompt is easy to dismiss and reappears per profile. Set the
+policy value to your Cube UI origin (e.g. `https://<customer>.cubecloud.dev`):
+
+| Chrome version | Policy                                                              |
+| -------------- | ------------------------------------------------------------------- |
+| 142 and later  | [`LocalNetworkAccessAllowedForUrls`][chrome-policy-lna]              |
+| Before 142     | [`InsecurePrivateNetworkRequestsAllowedForUrls`][chrome-policy-pna]  |
+
+If some users still fail after the policy is rolled out, have them check
+`chrome://policy` and confirm the policy is listed with the expected value. A
+missing entry means it has not synced to that device or profile — most often
+because the user is signed in to Chrome with a personal, unmanaged Google
+profile, which enterprise policies do not reach. That is the usual explanation
+for the same page working for one colleague and failing for another on the same
+VPN.
+
+## Configuring the private domain
+
+Configure the private hostname for each Cube Region from the Cube admin panel,
+under **Regions → \<your region\> → Path-based routing → Domain override**.
+
+The domain override tells Cube **where the data plane lives from the caller's
+point of view**. It does *not* re-route traffic on Cube's side and it does *not*
+open a new tunnel — it is purely a string Cube embeds when generating outbound
+references to the data API: links inside the Cube UI, connection configs
+generated by Semantic Layer Sync, and the API connection details surfaced on the
+deployment's API page.
+
+Because every one of those callers — the browser, the BI client, your
+application — connects to the hostname **directly**, the override only works if
+that hostname is resolvable and reachable from each of those networks. Use the
+hostname your clients will actually dial: the custom-domain front-end from
+Option B (e.g. `http.cube.internal`), or the Cube-issued
+`<cube-region>.cubecloudapp.dev` if you went with Option A. Leaving the field
+empty falls back to the default public hostname, and clients will not use PSC
+even if the endpoints are connected.
+
+HTTP and SQL APIs are typically published under two separate hostnames
+(`http.cube.internal` and `sql.cube.internal`), since the HTTP endpoint may sit
+behind your TLS-terminating proxy on port 443 while the SQL endpoint is accessed
+directly on port 5432.
+
+## Provisioning checklist
+
+1. **Request private API connectivity for your tenant.** Contact Cube and
+   provide your tenant name and every GCP project ID that will hold a PSC
+   endpoint.
+2. **Receive the service attachment URIs.** Cube publishes one HTTP and one SQL
+   service attachment per region, adds your projects to their accept lists, and
+   shares the URIs along with the Cube Region identifier.
+3. **Create the PSC endpoints in your project.** See
+   [Creating the PSC endpoints](#creating-the-psc-endpoints). Place them in
+   subnets reachable from both your workloads and your corporate VPN, and
+   confirm `pscConnectionStatus` is `ACCEPTED`.
+4. **Bind the private hostname.** Pick a TLS option above and create the
+   corresponding DNS records. Make sure they resolve from every network that
+   needs to reach Cube, corporate VPN included.
+5. **Set the domain in Cube.** In the admin panel under
+   **Regions → \<your region\> → Path-based routing → Domain override**, enter
+   the chosen hostname.
+6. **Grant browsers local network access.** Roll out the Chrome Enterprise
+   policy described [above](#chrome-local-network-access-permission) before
+   users try the UI.
+7. **(Optional) Disable public endpoints.** Once private connectivity is
+   verified end-to-end, ask Cube support to disable the public HTTP and SQL
+   endpoints for your deployment.
+
+## Verifying connectivity
+
+From a host inside the consumer VPC or attached to the corporate VPN:
+
+```bash
+# DNS resolves the HTTP and SQL names to the PSC endpoint IPs
+dig +short http.cube.internal
+dig +short sql.cube.internal
+
+# HTTPS reachable over PSC, routed to a specific deployment by path prefix
+curl -v https://http.cube.internal/deployment/<deployment-slug>/livez
+
+# SQL API reachable
+psql "host=sql.cube.internal port=5432 user=… dbname=… sslmode=require" -c "select 1;"
+```
+
+If DNS resolves but connections hang, check that `pscConnectionStatus` is
+`ACCEPTED`, that firewall rules allow egress from your clients to the endpoint IP
+on 443 and 5432, and that your VPN's routes cover the endpoint's subnet.
+
+## Troubleshooting "Network Error" in the Cube UI
+
+When the domain override is configured, the Cube UI stops calling the public
+Cube data API and starts calling the private hostname you supplied **directly
+from the user's browser**. If that hostname is not reachable from the machine
+the UI is loaded on, the UI surfaces a red **"Network Error"** banner on charts,
+the Semantic Model IDE, the playground, and any other view that issues data
+queries — even though direct API calls (e.g. `curl` from inside the VPC) keep
+working.
+
+Reload the page with the DevTools **Network** tab open, filter for `Fetch/XHR`,
+and find the failing call — it will target your override hostname, not
+`*.cubecloud.dev`. If it still targets the public hostname, the override has not
+been picked up; re-check it and reload with cache disabled. Otherwise copy the
+request URL into a new tab, which takes the Cube UI out of the picture:
+
+- **`ERR_NAME_NOT_RESOLVED` / "This site can't be reached"** — DNS for the
+  private hostname is not reachable from the user's machine. Confirm the user is
+  on the corporate VPN, that the VPN pushes the private zone (or the corporate
+  resolver answers for the override hostname), and that the record points at the
+  PSC endpoint IP.
+- **`ERR_CONNECTION_TIMED_OUT` / `ERR_CONNECTION_REFUSED`** — DNS resolves but
+  TCP is blocked. Check the VPN routes cover the endpoint's subnet and that
+  firewall rules permit the traffic.
+- **`ERR_BLOCKED_BY_PRIVATE_NETWORK_ACCESS_CHECKS`, or the URL loads fine in its
+  own tab but still fails from the Cube UI** — the browser is blocking the call.
+  See [Chrome local network access
+  permission](#chrome-local-network-access-permission).
+- **`NET::ERR_CERT_COMMON_NAME_INVALID` / `NET::ERR_CERT_AUTHORITY_INVALID`** —
+  TLS termination is misconfigured. With Option A, make sure the private DNS
+  record really is for `<cube-region>.cubecloudapp.dev` so Cube's certificate
+  matches. With Option B, make sure your proxy presents a certificate whose
+  CN/SAN matches the override hostname and is signed by a CA the user's machine
+  trusts.
+- **HTTP 4xx/5xx from Cube** — the network path is fine; the error is on the API
+  itself. Inspect the response body and proceed as you would for any other API
+  error.
+
+[cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[gcp-private-service-connect]: /admin/deployment/dedicated/gcp/private-service-connect
+[gcp-vpc-peering]: /admin/deployment/dedicated/gcp/vpc-peering
+[chat-api]: /reference/embed-apis/chat-api
+[gcp-docs-psc]: https://cloud.google.com/vpc/docs/private-service-connect
+[gcp-docs-service-attachment]: https://cloud.google.com/vpc/docs/configure-private-service-connect-producer
+[gcp-docs-private-zone]: https://cloud.google.com/dns/docs/zones/zones-overview#private_zones
+[gcp-docs-internal-lb]: https://cloud.google.com/load-balancing/docs/internal
+[gcp-docs-hybrid-neg]: https://cloud.google.com/load-balancing/docs/negs/hybrid-neg-concepts
+[chrome-lna]: https://developer.chrome.com/blog/local-network-access
+[chrome-pna]: https://developer.chrome.com/blog/private-network-access-update
+[chrome-policy-lna]: https://chromeenterprise.google/policies/local-network-access-allowed-for-urls/
+[chrome-policy-pna]: https://chromeenterprise.google/policies/insecure-private-network-requests-allowed-for-urls/

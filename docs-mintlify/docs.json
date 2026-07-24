@@ -339,6 +339,7 @@
                     "pages": [
                       "admin/deployment/dedicated/azure/private-link",
                       "admin/deployment/dedicated/azure/vpc-peering",
+                      "admin/deployment/dedicated/azure/private-api-connectivity",
                       "admin/deployment/dedicated/azure/byoc"
                     ]
                   },
@@ -348,6 +349,7 @@
                     "pages": [
                       "admin/deployment/dedicated/gcp/private-service-connect",
                       "admin/deployment/dedicated/gcp/vpc-peering",
+                      "admin/deployment/dedicated/gcp/private-api-connectivity",
                       "admin/deployment/dedicated/gcp/byoc"
                     ]
                   },
