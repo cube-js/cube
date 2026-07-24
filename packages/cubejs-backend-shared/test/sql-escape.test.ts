@@ -269,9 +269,20 @@ describe('sql-escape', () => {
       expect(presto.escapeValue([])).toBe('');
     });
 
+    it('wraps nested arrays as sqlstring-compatible row groups', () => {
+      expect(presto.escapeValue([[1, 2, 3]])).toBe('(1, 2, 3)');
+      expect(presto.escapeValue([[[1]], [[2]]])).toBe('((1)), ((2))');
+      expect(presto.format('WHERE id IN (?)', [[1, 2, 3]]))
+        .toBe('WHERE id IN (1, 2, 3)');
+      expect(presto.format('WHERE id IN (?)', [[[1, 2, 3]]]))
+        .toBe('WHERE id IN ((1, 2, 3))');
+      expect(presto.format('INSERT INTO t VALUES ?', [[[1, 'a'], [2, 'b']]]))
+        .toBe("INSERT INTO t VALUES (1, 'a'), (2, 'b')");
+    });
+
     it('recursively escapes injection payloads in nested arrays', () => {
       expect(presto.escapeValue(["x') OR TRUE --", ["'; DROP TABLE users; --"]]))
-        .toBe("'x'') OR TRUE --', '''; DROP TABLE users; --'");
+        .toBe("'x'') OR TRUE --', ('''; DROP TABLE users; --')");
     });
 
     it('renders valid dates as escaped strings and invalid dates as NULL', () => {

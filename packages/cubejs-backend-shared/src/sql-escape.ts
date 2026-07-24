@@ -82,7 +82,9 @@ export class SqlEscaper {
         }
 
         if (Array.isArray(value)) {
-          return value.map((v) => this.escapeValue(v)).join(', ');
+          return value
+            .map((v) => (Array.isArray(v) ? `(${this.escapeValue(v)})` : this.escapeValue(v)))
+            .join(', ');
         }
 
         if (typeof obj.toSqlString === 'function') {
