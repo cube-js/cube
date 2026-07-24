@@ -20,6 +20,7 @@
             "group": "Getting Started",
             "pages": [
               "docs/introduction",
+              "docs/preferences",
               {
                 "group": "Getting Started",
                 "pages": [
