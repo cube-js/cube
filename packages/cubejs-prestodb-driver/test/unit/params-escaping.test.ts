@@ -62,6 +62,41 @@ describe('PrestoDriver SQL parameter escaping', () => {
     expect(sql).toBe(`SELECT * FROM orders WHERE name = 'foo\\'' OR 1=1 --'`);
   });
 
+  it('keeps a literal percent sign in an equality parameter verbatim', () => {
+    // `%` is only special inside a LIKE pattern; as plain data it must not be
+    // escaped or mangled by the driver.
+    const sql = driver.prepareQueryWithParams(
+      'SELECT * FROM orders WHERE discount_label = ?',
+      ['100% cotton'],
+    );
+
+    expect(sql).toBe(`SELECT * FROM orders WHERE discount_label = '100% cotton'`);
+  });
+
+  it('passes an unescaped percent sign through a LIKE parameter untouched', () => {
+    // Escaping wildcards is the schema compiler's job (`50\%`); when a raw `%`
+    // reaches the driver it must stay a wildcard, not get double-escaped.
+    const sql = driver.prepareQueryWithParams(
+      `SELECT * FROM orders WHERE LOWER(name) LIKE CONCAT('%', LOWER(?), '%') ESCAPE '\\'`,
+      ['50%'],
+    );
+
+    expect(sql).toBe(
+      `SELECT * FROM orders WHERE LOWER(name) LIKE CONCAT('%', LOWER('50%'), '%') ESCAPE '\\'`
+    );
+  });
+
+  it('escapes quotes in a value that also contains percent signs', () => {
+    const sql = driver.prepareQueryWithParams(
+      `SELECT * FROM orders WHERE LOWER(name) LIKE CONCAT('%', LOWER(?), '%') ESCAPE '\\'`,
+      [`50%' OR 1=1 --`],
+    );
+
+    expect(sql).toBe(
+      `SELECT * FROM orders WHERE LOWER(name) LIKE CONCAT('%', LOWER('50%'' OR 1=1 --'), '%') ESCAPE '\\'`
+    );
+  });
+
   it('substitutes multiple placeholders in order', () => {
     const sql = driver.prepareQueryWithParams(
       `SELECT * FROM orders WHERE LOWER(name) LIKE CONCAT('%', LOWER(?), '%') ESCAPE '\\' AND status = ? AND amount > ?`,
