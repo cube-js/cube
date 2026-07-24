@@ -16,7 +16,9 @@
 //! distinct, limit, offset or own CTEs, reading from a single table
 //! reference.
 
-use super::super::{Cte, From, FromSource, Join, JoinItem, QueryPlan, Select, SingleAliasedSource, SingleSource};
+use super::super::{
+    Cte, From, FromSource, Join, JoinItem, QueryPlan, Select, SingleAliasedSource, SingleSource,
+};
 use crate::physical_plan::CalcGroupsJoin;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -97,9 +99,7 @@ fn optimize_from(from: &Rc<From>) -> Result<Rc<From>, CubeError> {
     Ok(From::new(source))
 }
 
-fn optimize_single_source(
-    source: &SingleAliasedSource,
-) -> Result<SingleAliasedSource, CubeError> {
+fn optimize_single_source(source: &SingleAliasedSource) -> Result<SingleAliasedSource, CubeError> {
     match &source.source {
         SingleSource::Subquery(plan) => {
             let optimized = optimize_plan(plan)?;

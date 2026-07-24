@@ -649,7 +649,9 @@ describe('PreAggregationsSharedCalcGroup', () => {
         const sqlAndParams = query.buildSqlAndParams();
         const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
         expect(tableNames).toContain('sales_perf_rolling');
+        expect(tableNames).not.toContain('share_metrics_perf_share');
         expect(sqlAndParams[0]).toContain('sales_perf_rolling');
+        expect(sqlAndParams[0]).not.toContain('share_metrics_perf_share');
       }));
     });
   } else {
