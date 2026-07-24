@@ -346,6 +346,16 @@ describe('sql-escape', () => {
     it('returns sql unchanged when no values', () => {
       expect(presto.format('SELECT 1', [])).toBe('SELECT 1');
       expect(presto.format('SELECT 1')).toBe('SELECT 1');
+      expect(presto.format('SELECT ?', null)).toBe('SELECT ?');
+    });
+
+    it('normalizes a scalar values argument to one parameter like sqlstring', () => {
+      expect(presto.format('SELECT ?, ?', 'whole string'))
+        .toBe("SELECT 'whole string', ?");
+      expect(presto.format('SELECT ?', '')).toBe("SELECT ''");
+      expect(presto.format('SELECT ?', 0)).toBe('SELECT 0');
+      expect(presto.format('SELECT ?', false)).toBe('SELECT FALSE');
+      expect(presto.format('SELECT ??', 'column"name')).toBe('SELECT "column""name"');
     });
 
     it('closes the injection that the old PrestoDriver escaper allowed', () => {
@@ -417,6 +427,11 @@ describe('sql-escape', () => {
     it('helpers tolerate missing values', () => {
       expect(formatAnsi('SELECT 1')).toBe('SELECT 1');
       expect(formatMySql('SELECT 1')).toBe('SELECT 1');
+    });
+
+    it('helpers normalize scalar values', () => {
+      expect(formatAnsi('SELECT ?, ?', "a'b")).toBe("SELECT 'a''b', ?");
+      expect(formatMySql('SELECT ?', false)).toBe('SELECT FALSE');
     });
   });
 });

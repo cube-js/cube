@@ -125,8 +125,13 @@ export class SqlEscaper {
    * Longer runs of `?` are left untouched. This mirrors `sqlstring.format`'s
    * placeholder semantics so it can be a drop-in replacement in drivers.
    */
-  public format(sql: string, values?: unknown[]): string {
-    if (!values || values.length === 0) {
+  public format(sql: string, values?: unknown): string {
+    if (values === null || values === undefined) {
+      return sql;
+    }
+
+    const valueList = Array.isArray(values) ? values : [values];
+    if (valueList.length === 0) {
       return sql;
     }
 
@@ -136,14 +141,14 @@ export class SqlEscaper {
     let valuesIndex = 0;
     let match: RegExpExecArray | null = placeholders.exec(sql);
 
-    while (valuesIndex < values.length && match !== null) {
+    while (valuesIndex < valueList.length && match !== null) {
       const len = match[0].length;
       // `?` -> value, `??` -> identifier. Longer runs (`???`+) are not placeholders
       // we understand, so we leave them verbatim and consume no value.
       if (len <= 2) {
         const rendered = len === 2
-          ? this.escapeIdentifier(String(values[valuesIndex]))
-          : this.escapeValue(values[valuesIndex]);
+          ? this.escapeIdentifier(String(valueList[valuesIndex]))
+          : this.escapeValue(valueList[valuesIndex]);
 
         result += sql.slice(chunkIndex, match.index) + rendered;
         chunkIndex = placeholders.lastIndex;
@@ -163,7 +168,7 @@ export class SqlEscaper {
  * Format a query for standard-SQL engines (Presto, Trino, Postgres, ...):
  * `?` -> escaped value, `??` -> escaped identifier.
  */
-export function formatAnsi(sql: string, values?: unknown[]): string {
+export function formatAnsi(sql: string, values?: unknown): string {
   return new SqlEscaper(AnsiSqlDialect).format(sql, values);
 }
 
@@ -171,6 +176,6 @@ export function formatAnsi(sql: string, values?: unknown[]): string {
  * Format a query for MySQL / MariaDB: `?` -> escaped value, `??` -> escaped
  * identifier.
  */
-export function formatMySql(sql: string, values?: unknown[]): string {
+export function formatMySql(sql: string, values?: unknown): string {
   return new SqlEscaper(MySqlDialect).format(sql, values);
 }
