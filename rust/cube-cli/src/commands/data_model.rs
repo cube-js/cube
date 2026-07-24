@@ -38,7 +38,7 @@ enum Cmd {
         #[arg(long)]
         branch: Option<String>,
     },
-    /// Create or overwrite a file
+    /// Create or overwrite a file (writes require a dev-mode branch)
     Put {
         /// Deployment id
         deployment: i64,
@@ -50,11 +50,12 @@ enum Cmd {
         /// Inline content (use `-` to read stdin)
         #[arg(long)]
         content: Option<String>,
-        /// Branch name (defaults to the deployment default branch)
+        /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
+        /// your active dev-mode branch)
         #[arg(long)]
         branch: Option<String>,
     },
-    /// Delete files
+    /// Delete files (writes require a dev-mode branch)
     #[command(alias = "rm")]
     Delete {
         /// Deployment id
@@ -62,11 +63,12 @@ enum Cmd {
         /// One or more file paths to delete
         #[arg(required = true)]
         paths: Vec<String>,
-        /// Branch name (defaults to the deployment default branch)
+        /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
+        /// your active dev-mode branch)
         #[arg(long)]
         branch: Option<String>,
     },
-    /// Rename (move) a file
+    /// Rename (move) a file (writes require a dev-mode branch)
     Rename {
         /// Deployment id
         deployment: i64,
@@ -74,7 +76,8 @@ enum Cmd {
         from: String,
         /// Destination path
         to: String,
-        /// Branch name (defaults to the deployment default branch)
+        /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
+        /// your active dev-mode branch)
         #[arg(long)]
         branch: Option<String>,
     },
@@ -93,11 +96,12 @@ enum Cmd {
         #[arg(long)]
         dev_mode: bool,
     },
-    /// Enter dev mode / switch to a branch
+    /// Enter dev mode on a branch (prints the personal dev-mode branch that
+    /// file writes must target)
     DevMode {
         /// Deployment id
         deployment: i64,
-        /// Branch to switch to (required by the API)
+        /// Branch to base dev mode on (required by the API)
         branch: String,
     },
     /// Exit dev mode
@@ -350,7 +354,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if ctx.json {
                 output::print_json(&res);
             } else {
-                output::success(&format!("Created branch {name}"));
+                // With --dev-mode the server forks a personal dev-mode branch off
+                // the new branch; that's the branch file writes must target.
+                let dev_branch = output::field(&res, "branchName");
+                if dev_mode && !dev_branch.is_empty() && dev_branch != name {
+                    output::success(&format!(
+                        "Created branch {name}; entered dev mode on {dev_branch}"
+                    ));
+                    println!("Data-model writes target it: pass --branch {dev_branch} (or omit --branch to use your active dev-mode branch).");
+                } else {
+                    output::success(&format!("Created branch {name}"));
+                }
             }
         }
         Cmd::DevMode { deployment, branch } => {
@@ -364,7 +378,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if ctx.json {
                 output::print_json(&res);
             } else {
-                output::success(&format!("Entered dev mode on {branch}"));
+                // Dev mode runs on a personal `dev-…` branch forked from the
+                // requested one — expose it, since file writes only accept it.
+                let dev_branch = output::field(&res, "branchName");
+                if dev_branch.is_empty() || dev_branch == branch {
+                    output::success(&format!("Entered dev mode on {branch}"));
+                } else {
+                    output::success(&format!(
+                        "Entered dev mode on {dev_branch} (forked from {branch})"
+                    ));
+                    println!("Data-model writes target it: pass --branch {dev_branch} (or omit --branch to use your active dev-mode branch).");
+                }
             }
         }
         Cmd::ExitDevMode { deployment } => {
