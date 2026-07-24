@@ -12,7 +12,11 @@ export type TQueryOrderArray = Array<[string, QueryOrder]>;
 
 export type GranularityAnnotation = {
   name: string;
+  type?: 'built-in' | 'custom';
   title: string;
+  /** d3-time-format string for displaying bucketed timestamps. */
+  format?: string;
+  /** Always present: built-ins use "1 <unit>"; customs carry the user-defined interval. */
   interval: string;
   offset?: string;
   origin?: string;
@@ -433,9 +437,25 @@ export type TCubeMeasure = BaseCubeMember & {
   currency?: string;
 };
 
+/**
+ * @deprecated Use `EffectiveGranularity` / `CubeTimeDimension.effectiveGranularities`.
+ * Legacy meta shape: model-defined custom granularities only.
+ */
 export type CubeTimeDimensionGranularity = {
   name: string;
   title: string;
+};
+
+/** Reconciled granularity for a time dimension: enabled built-ins + global and local customs. */
+export type EffectiveGranularity = {
+  name: string;
+  type: 'built-in' | 'custom';
+  title: string;
+  /** d3-time-format string for displaying bucketed timestamps. */
+  format?: string;
+  interval?: string;
+  offset?: string;
+  origin?: string;
 };
 
 export type BaseCubeDimension = BaseCubeMember & {
@@ -448,7 +468,12 @@ export type BaseCubeDimension = BaseCubeMember & {
 };
 
 export type CubeTimeDimension = BaseCubeDimension &
-  { type: 'time'; granularities?: CubeTimeDimensionGranularity[] };
+  {
+    type: 'time';
+    /** @deprecated Use `effectiveGranularities`. */
+    granularities?: CubeTimeDimensionGranularity[];
+    effectiveGranularities?: EffectiveGranularity[];
+  };
 
 export type TCubeDimension =
   (BaseCubeDimension & { type: Exclude<BaseCubeDimension['type'], 'time'> }) |

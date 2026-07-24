@@ -5,6 +5,7 @@ import { camelize } from 'inflection';
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
+import { normalizeGranularitiesBlock, NormalizedGranularitiesBlock } from './GranularityResolver';
 
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerSymbolResolver } from './transpilers';
@@ -16,6 +17,8 @@ export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
   name?: string;
   title?: string;
+  /** d3-time-format string used by the client to display bucketed timestamps. */
+  format?: string;
   interval?: string;
   offset?: string;
   origin?: string;
@@ -33,6 +36,7 @@ export type CubeSymbolDefinition = {
   sql?: (...args: any[]) => string;
   primaryKey?: boolean;
   granularities?: Record<string, GranularityDefinition>;
+  granularitiesBlock?: NormalizedGranularitiesBlock;
   timeShift?: TimeshiftDefinition[];
   format?: string;
   currency?: string;
@@ -581,6 +585,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     this.camelCaseTypes(cube.preAggregations);
     this.camelCaseTypes(cube.accessPolicy);
 
+    this.normalizeDimensionGranularities(cube.dimensions);
+
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
     }
@@ -601,6 +607,30 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       ...cube.segments || {},
       ...cube.preAggregations || {}
     } as CubeSymbolsDefinition;
+  }
+
+  // Stores the canonical `granularitiesBlock` on each time dimension and rewrites
+  // `granularities` to the dict of locally-defined customs only — preserving the legacy shape
+  // that BaseQuery, prepare-annotation, and CubeToMetaTransformer already read.
+  private normalizeDimensionGranularities(dimensions: Record<string, any> | undefined) {
+    if (!dimensions) {
+      return;
+    }
+
+    for (const dim of Object.values(dimensions)) {
+      // A view's included dimension already carries a propagated granularitiesBlock (with the
+      // source dimension's includes/excludes) alongside the custom-only `granularities` map.
+      // Re-normalizing the custom-only map here would reset includes to '*' and drop the source's
+      // includes/excludes, so only normalize dimensions that haven't been normalized yet.
+      if (dim && dim.type === 'time' && 'granularities' in dim && !dim.granularitiesBlock) {
+        // Keep the raw user value for the validator (it runs after this and would otherwise only
+        // see the extracted customs, never the includes/excludes/custom dict).
+        dim.rawGranularities = dim.granularities;
+        const block: NormalizedGranularitiesBlock = normalizeGranularitiesBlock(dim.granularities);
+        dim.granularitiesBlock = block;
+        dim.granularities = block.custom;
+      }
+    }
   }
 
   private camelCaseTypes(obj: Object | Array<any> | undefined) {
@@ -1138,6 +1168,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           format: memberRef.override?.format || resolvedMember.format,
           ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
+          ...(resolvedMember.granularitiesBlock ? { granularitiesBlock: resolvedMember.granularitiesBlock } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.keyReference && this.processKeyReferenceForView(resolvedMember.keyReference, targetCube.name, viewAllMembers, memberRef.member)),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
@@ -1496,7 +1527,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         }
         if (refProperty &&
           cube[refProperty].type === 'time' &&
-          self.resolveGranularity([cubeName, refProperty, 'granularities', propertyName], cube)
+          self.resolveGranularity(
+            [cubeName, refProperty, 'granularities', propertyName],
+            cube
+          )
         ) {
           return {
             toString: () => this.withSymbolsCallContext(
@@ -1527,7 +1561,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * @param {string|string[]} path
    * @param [refCube] Optional cube object to operate on
    */
-  public resolveGranularity(path: string | string[], refCube?: any) {
+  public resolveGranularity(
+    path: string | string[],
+    refCube?: any,
+  ) {
     const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
     const cube = refCube || this.symbols[cubeName];
 
@@ -1545,6 +1582,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       return { interval: `1 ${granName}` };
     }
 
+    // Custom granularities (local + baked-in globals) resolve from the compiled cube symbols.
     return cube?.[dimName]?.[gr]?.[granName];
   }
 

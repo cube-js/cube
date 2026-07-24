@@ -4,6 +4,30 @@ info:
   version: "1.0.0"
   title: "Cube.js"
 paths:
+  "/v1/granularities":
+    get:
+      summary: "List the granularities available for this deployment"
+      description: "Returns the granularities enabled in this deployment — built-ins plus any custom granularities defined via `CUBEJS_GRANULARITIES` or `config.granularities`. Resolved once per application ID at data-model compile time and served from the compiled model."
+      operationId: "granularitiesV1"
+      responses:
+        "200":
+          description: "successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1GranularitiesResponse"
+        "4XX":
+          description: "Request could not be completed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1Error"
+        "5XX":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V1Error"
   "/v1/meta":
     get:
       summary: "Load Metadata"
@@ -109,6 +133,8 @@ components:
           type: "object"
     V1CubeMetaDimensionGranularity:
       type: "object"
+      deprecated: true
+      description: "Deprecated. Legacy shape listing only model-defined custom granularities. Use V1CubeMetaDimensionEffectiveGranularity via `effectiveGranularities`."
       required:
         - name
         - title
@@ -125,6 +151,44 @@ components:
           type: "string"
         origin:
           type: "string"
+    V1CubeMetaDimensionEffectiveGranularity:
+      type: "object"
+      description: "Reconciled granularity: enabled built-ins plus global and per-dimension custom granularities."
+      required:
+        - name
+        - type
+        - title
+      properties:
+        name:
+          type: "string"
+        type:
+          type: "string"
+          description: "Built-in (year/quarter/month/...) or user-defined custom granularity."
+          enum:
+            - built-in
+            - custom
+        title:
+          type: "string"
+        format:
+          type: "string"
+          description: "d3-time-format string used by clients to display bucketed timestamps."
+        interval:
+          type: "string"
+        offset:
+          type: "string"
+        origin:
+          type: "string"
+    V1GranularitiesResponse:
+      type: "object"
+      description: "Response shape of GET /v1/granularities."
+      properties:
+        data:
+          type: "object"
+          properties:
+            granularities:
+              type: array
+              items:
+                $ref: "#/components/schemas/V1CubeMetaDimensionEffectiveGranularity"
     V1CubeMetaDimension:
       type: "object"
       required:
@@ -145,9 +209,15 @@ components:
           description: "When dimension is defined in View, it keeps the original path: Cube.dimension"
           type: "string"
         granularities:
+          deprecated: true
+          description: "Deprecated. Use `effectiveGranularities`."
           type: array
           items:
             $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
+        effectiveGranularities:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1CubeMetaDimensionEffectiveGranularity"
         meta:
           type: "object"
         format:

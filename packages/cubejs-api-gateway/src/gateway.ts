@@ -14,6 +14,7 @@ import {
   QueryAlias,
   CacheMode,
   LoggerFn,
+  isPredefinedGranularity,
 } from '@cubejs-backend/shared';
 import {
   ResultArrayWrapper,
@@ -466,6 +467,17 @@ class ApiGateway {
       })
     );
 
+    app.get(
+      `${this.basePath}/v1/granularities`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        await this.granularities({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      })
+    );
+
     app.post(
       `${this.basePath}/v1/cubesql`,
       userMiddlewares,
@@ -727,6 +739,27 @@ class ApiGateway {
         response.compilerId = metaConfig.compilerId;
       }
       res(response);
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        // @ts-ignore
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  public async granularities({ context, res }: {
+    context: RequestContext,
+    res: ResponseResultFn,
+  }) {
+    const requestStarted = new Date();
+    try {
+      await this.assertApiScope('meta', context.securityContext);
+      const compilerApi = await this.getCompilerApi(context);
+      const granularities = await compilerApi.getGranularities({ requestId: context.requestId });
+      res({ data: { granularities } });
     } catch (e: any) {
       this.handleError({
         e,
@@ -1164,7 +1197,10 @@ class ApiGateway {
           } else {
             const metaCacheKey = JSON.stringify(ctx);
             if (!metaCache.has(metaCacheKey)) {
-              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(context, ctx));
+              // `ctx` (outer context merged with the job's own context) is the request context;
+              // passing the outer `context` here would select visibility and granularities for
+              // the wrong tenant.
+              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(ctx, { requestId: ctx.requestId }));
             }
 
             // checking and fetching result status

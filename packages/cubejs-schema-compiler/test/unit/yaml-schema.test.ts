@@ -796,7 +796,10 @@ cubes:
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('must be defined as array');
+        // `granularities: { name: half_year }` is neither the legacy array nor the dict
+        // (includes/excludes/custom) form; it's read as a custom map whose `name` entry is an
+        // invalid (non-object) granularity definition.
+        expect(e.message).toContain('dimensions.created_at.granularities.name');
       }
     });
 

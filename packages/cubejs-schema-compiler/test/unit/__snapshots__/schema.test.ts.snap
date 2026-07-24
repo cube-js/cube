@@ -78,7 +78,39 @@ Object {
           "sql": [Function],
         },
       },
+      "granularitiesBlock": Object {
+        "custom": Object {
+          "month": Object {
+            "sql": [Function],
+          },
+          "quarter": Object {
+            "sql": [Function],
+          },
+          "week": Object {
+            "sql": [Function],
+          },
+          "year": Object {
+            "sql": [Function],
+          },
+        },
+        "excludes": Array [],
+        "includes": "*",
+      },
       "ownedByCube": true,
+      "rawGranularities": Object {
+        "month": Object {
+          "sql": [Function],
+        },
+        "quarter": Object {
+          "sql": [Function],
+        },
+        "week": Object {
+          "sql": [Function],
+        },
+        "year": Object {
+          "sql": [Function],
+        },
+      },
       "sql": [Function],
       "timeShift": Array [
         Object {
@@ -263,7 +295,47 @@ Object {
           "sql": [Function],
         },
       },
+      "granularitiesBlock": Object {
+        "custom": Object {
+          "fortnight": Object {
+            "interval": "2 week",
+            "origin": "2025-01-01",
+          },
+          "month": Object {
+            "sql": [Function],
+          },
+          "quarter": Object {
+            "sql": [Function],
+          },
+          "week": Object {
+            "sql": [Function],
+          },
+          "year": Object {
+            "sql": [Function],
+          },
+        },
+        "excludes": Array [],
+        "includes": "*",
+      },
       "ownedByCube": true,
+      "rawGranularities": Object {
+        "fortnight": Object {
+          "interval": "2 week",
+          "origin": "2025-01-01",
+        },
+        "month": Object {
+          "sql": [Function],
+        },
+        "quarter": Object {
+          "sql": [Function],
+        },
+        "week": Object {
+          "sql": [Function],
+        },
+        "year": Object {
+          "sql": [Function],
+        },
+      },
       "sql": [Function],
       "timeShift": Array [
         Object {
@@ -1921,6 +1993,29 @@ Object {
       "interval": "6 months",
       "origin": "2020-03-01",
     },
+  },
+  "granularitiesBlock": Object {
+    "custom": Object {
+      "half_year": Object {
+        "interval": "6 months",
+        "title": "6 month intervals",
+      },
+      "half_year_by_1st_april": Object {
+        "interval": "6 months",
+        "offset": "3 months",
+        "title": "Half year from Apr to Oct",
+      },
+      "half_year_by_1st_june": Object {
+        "interval": "6 months",
+        "origin": "2020-06-01 10:00:00",
+      },
+      "half_year_by_1st_march": Object {
+        "interval": "6 months",
+        "origin": "2020-03-01",
+      },
+    },
+    "excludes": Array [],
+    "includes": "*",
   },
   "meta": undefined,
   "ownedByCube": false,

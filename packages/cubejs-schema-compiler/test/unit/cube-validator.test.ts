@@ -1716,6 +1716,103 @@ describe('Cube Validation', () => {
     });
   });
 
+  describe('Granularities dict shape (includes/excludes/custom):', () => {
+    const newCube = (granularities: any) => ({
+      name: 'Orders',
+      fileName: 'fileName',
+      sql: () => 'select * from tbl',
+      public: true,
+      dimensions: {
+        createdAt: {
+          public: true,
+          sql: () => 'created_at',
+          type: 'time',
+          granularities,
+        },
+      },
+      measures: {
+        count: { sql: () => 'count', type: 'count' },
+      },
+    });
+
+    it('accepts includes-only with built-in names', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({ includes: ['year', 'quarter'] });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('accepts excludes-only with built-in names', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({ excludes: ['day'] });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('accepts includes "*" wildcard', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({ includes: '*' });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('accepts custom-only', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        custom: { fiscal_year: { interval: '1 year', origin: '2026-04-01' } },
+      });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('accepts includes "*" combined with excludes', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({ includes: '*', excludes: ['day'] });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('accepts excludes "*" combined with custom', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        excludes: '*',
+        custom: { fiscal_year: { interval: '1 year', origin: '2026-04-01' } },
+      });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('rejects includes + excludes both as lists (mutually exclusive)', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({ includes: ['year'], excludes: ['day'] });
+      let captured: string | undefined;
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any) => { captured = message; },
+      } as any);
+      expect(validationResult.error).toBeTruthy();
+      expect(captured).toContain('"includes" and "excludes" cannot be used together');
+    });
+
+    it('legacy flat-array form (post yamlArrayToObj) still validates', () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        fiscal_year: { interval: '1 year', origin: '2026-04-01' },
+      });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    // Regression: a legacy custom granularity literally named includes/excludes/custom (value is a
+    // definition object) must be accepted as the legacy map, not misread as the dict form. Mirrors
+    // the value-shape disambiguation in normalizeGranularitiesBlock.
+    it.each(['includes', 'excludes', 'custom'])('accepts a legacy custom granularity named "%s"', (name) => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({ [name]: { interval: '1 year', origin: '2026-04-01' } });
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+  });
+
   describe('Access Policy group/groups support:', () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
 

@@ -26,6 +26,7 @@ import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import type { ErrorReporter } from './ErrorReporter';
+import type { GlobalGranularitiesConfig } from './GlobalGranularitiesConfig';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -40,6 +41,9 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
+  // Resolved global granularities config (all forms resolved by CompilerApi before compile), baked
+  // into the compiled model by CubeToMetaTransformer.
+  granularitiesConfig?: GlobalGranularitiesConfig;
 };
 
 export interface CompilerInterface {
@@ -69,7 +73,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator, cubeValidator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
-  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph);
+  const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, viewGroupEvaluator, joinGraph, options.granularitiesConfig);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);

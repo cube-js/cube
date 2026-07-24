@@ -22,7 +22,12 @@ export type SqlInterval = string;
 // TODO: Define a better type as unitOfTime.DurationConstructor in moment.js
 export type ParsedInterval = Record<string, number>;
 
+// Runtime shape for custom-granularity time-series math. For built-ins, see
+// TimeDimensionPredefinedGranularity (query value) and GranularityAnnotation (response field).
 export type Granularity = {
+  type?: 'built-in' | 'custom';
+  title?: string;
+  format?: string;
   interval: SqlInterval;
   origin?: string;
   offset?: SqlInterval;
