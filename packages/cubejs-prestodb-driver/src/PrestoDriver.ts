@@ -16,6 +16,7 @@ import {
 import {
   getEnv,
   assertDataSource,
+  formatAnsi,
 } from '@cubejs-backend/shared';
 
 import { Transform, TransformCallback } from 'stream';
@@ -24,7 +25,6 @@ import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 import {
   map, zipObj, prop, concat
 } from 'ramda';
-import SqlString from 'sqlstring';
 
 const presto = require('presto-client');
 
@@ -208,8 +208,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async testConnectionViaSelect() {
-    const query = SqlString.format('SELECT 1', []);
-    await this.queryPromised(query, false);
+    await this.queryPromised('SELECT 1', false);
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {
@@ -217,9 +216,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   public prepareQueryWithParams(query: string, values: unknown[]) {
-    return SqlString.format(query, (values || []).map(value => (typeof value === 'string' ? {
-      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1'),
-    } : value)));
+    return formatAnsi(query, values || []);
   }
 
   public queryPromised(query: string, streaming: boolean): Promise<any[] | StreamTableData> {
