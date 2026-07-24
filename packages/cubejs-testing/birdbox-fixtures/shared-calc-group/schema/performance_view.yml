@@ -9,6 +9,7 @@ views:
           - total
           - rolling_amount
           - rolling_amount_change
+          - rolling_amount_growth_pct
 
       - join_path: share_metrics
         includes:

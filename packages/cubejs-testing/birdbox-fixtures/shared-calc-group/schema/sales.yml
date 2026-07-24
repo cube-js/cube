@@ -98,6 +98,30 @@ cubes:
         public: false
         sql: "({ytd_amount} - {prev_ytd_amount})"
 
+      - name: r3_amount_growth_pct
+        multi_stage: true
+        type: number
+        public: false
+        format: percent
+        sql: >
+          CASE
+            WHEN {r3_amount} IS NULL OR {prev_r3_amount} IS NULL OR {prev_r3_amount} = 0
+            THEN NULL
+            ELSE ({r3_amount} - {prev_r3_amount}) / {prev_r3_amount}
+          END
+
+      - name: ytd_amount_growth_pct
+        multi_stage: true
+        type: number
+        public: false
+        format: percent
+        sql: >
+          CASE
+            WHEN {ytd_amount} IS NULL OR {prev_ytd_amount} IS NULL OR {prev_ytd_amount} = 0
+            THEN NULL
+            ELSE ({ytd_amount} - {prev_ytd_amount}) / {prev_ytd_amount}
+          END
+
       - name: rolling_amount
         multi_stage: true
         type: number
@@ -119,6 +143,18 @@ cubes:
               sql: "{CUBE.r3_amount_change}"
           else:
             sql: "{CUBE.ytd_amount_change}"
+
+      - name: rolling_amount_growth_pct
+        multi_stage: true
+        type: number
+        format: percent
+        case:
+          switch: "{rolling_window_dim.rolling_window}"
+          when:
+            - value: R3
+              sql: "{CUBE.r3_amount_growth_pct}"
+          else:
+            sql: "{CUBE.ytd_amount_growth_pct}"
 
     pre_aggregations:
       - name: perf_rolling

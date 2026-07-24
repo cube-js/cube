@@ -125,4 +125,30 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
     expect(tables.some(t => t.includes('perf_share'))).toBe(true);
     expect(result.rawData().map((r: any) => r['performance_view.product'])).toEqual(['P1', 'P2']);
   });
+
+  // Mirrors the production query shape: rolling amount + growth percentage
+  // (an extra multi-stage layer over the same rolling leaves) + cross-cube
+  // share change. The deep FullKeyAggregate plan this produces is the shape
+  // that can overflow Cube Store's serialized-plan decode recursion limit
+  // ("Error decoding expr as protobuf: ... recursion limit reached").
+  test('deep multi-stage query with growth percentage executes in Cube Store', async () => {
+    const query: Query = {
+      measures: [
+        'performance_view.rolling_amount',
+        'performance_view.rolling_amount_change',
+        'performance_view.rolling_amount_growth_pct',
+        'performance_view.rolling_share_change',
+      ],
+      dimensions: ['performance_view.product'],
+      filters: REPRO_FILTERS,
+      order: {
+        'performance_view.product': 'asc',
+      },
+    };
+    const result = await client.load(query);
+    const tables = usedPreAggregations(result);
+    expect(tables.some(t => t.includes('perf_rolling'))).toBe(true);
+    expect(tables.some(t => t.includes('perf_share'))).toBe(true);
+    expect(result.rawData().map((r: any) => r['performance_view.product'])).toEqual(['P1', 'P2']);
+  });
 });
