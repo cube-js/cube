@@ -110,12 +110,34 @@ saved to the user's account and apply across all devices.
 
 | Preference | Description | Default |
 | --- | --- | --- |
+| Language | Set the display language for the Cube Cloud console and transactional emails | English (US) |
 | Theme | Choose between System, Light, or Dark visual theme | System |
 | Sidebar drawer | Show only icons and expand the sidebar on hover | Off |
 | Pointer cursors | Use pointer cursors on interactive elements | On |
 | Code editor | Switch to the new CodeMirror-based code editor for data models | Off |
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
+
+### Language
+
+The **Language** preference sets the display language for the entire Cube Cloud
+console UI. It is **per-user** — each user picks their own language, and the choice
+does not affect anyone else in the account. The same language also determines the
+locale of the transactional emails you receive (for example,
+[budget alerts][ref-budgets]).
+
+Cube supports the same 12 languages listed for
+[embedded surfaces](/embedding/iframe/localization#supported-languages), with
+English (US) as the default. You can also switch languages from the sign-in,
+sign-up, and forgot-password pages using the language switcher before you log in.
+
+<Note>
+
+Setting a language for [embedded surfaces](/embedding/iframe/localization) —
+dashboards, Analytics Chat, and Creator Mode — is configured separately and is
+account-wide, not per-user.
+
+</Note>
 
 ## Provisioning users via SCIM
 
@@ -132,6 +154,7 @@ configuration. The setting is shared between SAML and SCIM.
 
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-budgets]: /admin/account-billing/budgets
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-attributes]: /admin/users-and-permissions/user-attributes
 [ref-groups]: /admin/users-and-permissions/user-groups
