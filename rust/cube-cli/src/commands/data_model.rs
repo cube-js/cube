@@ -185,6 +185,13 @@ fn flatten(nodes: &[serde_json::Value], out: &mut Vec<serde_json::Value>) {
     }
 }
 
+/// The source tree reports absolute paths (`/model/cubes/orders.yml`) while the
+/// write endpoints accept them with or without the leading slash, so compare
+/// paths without it.
+fn same_path(a: &str, b: &str) -> bool {
+    a.trim_start_matches('/') == b.trim_start_matches('/')
+}
+
 fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
     let mut out = Vec::new();
     if let Some(arr) = res.get("data").and_then(|d| d.as_array()) {
@@ -256,9 +263,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut query: Query = vec![("withContent".into(), "true".into())];
             util::push(&mut query, "branchName", &branch);
             let res = api.get(&base(deployment), &query).await?;
-            let file = tree_nodes(&res)
-                .into_iter()
-                .find(|f| output::field(f, "path") == path && output::field(f, "type") == "file");
+            let file = tree_nodes(&res).into_iter().find(|f| {
+                same_path(&output::field(f, "path"), &path) && output::field(f, "type") == "file"
+            });
             match file {
                 Some(f) => print!("{}", output::field(&f, "content")),
                 None => anyhow::bail!("file not found: {path}"),
@@ -307,9 +314,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             to,
             branch,
         } => {
+            // Like put/delete, the rename endpoint expects `files` as an array
+            // of objects — here `{ path, newPath }`.
             let mut map = serde_json::Map::new();
-            map.insert("from".into(), json!(from));
-            map.insert("to".into(), json!(to));
+            map.insert("files".into(), json!([{ "path": from, "newPath": to }]));
             let res = api
                 .post(
                     &format!("{}/rename", base(deployment)),
