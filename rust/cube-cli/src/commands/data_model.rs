@@ -185,6 +185,15 @@ fn flatten(nodes: &[serde_json::Value], out: &mut Vec<serde_json::Value>) {
     }
 }
 
+/// Printed after entering dev mode, so the user knows which branch the write
+/// commands accept.
+fn dev_branch_hint(dev_branch: &str) -> String {
+    format!(
+        "Data-model writes target it: pass --branch {dev_branch} \
+         (or omit --branch to use your active dev-mode branch)."
+    )
+}
+
 /// The source tree reports absolute paths (`/model/cubes/orders.yml`) while the
 /// write endpoints accept them with or without the leading slash, so compare
 /// paths without it.
@@ -369,7 +378,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     output::success(&format!(
                         "Created branch {name}; entered dev mode on {dev_branch}"
                     ));
-                    println!("Data-model writes target it: pass --branch {dev_branch} (or omit --branch to use your active dev-mode branch).");
+                    println!("{}", dev_branch_hint(&dev_branch));
                 } else {
                     output::success(&format!("Created branch {name}"));
                 }
@@ -395,7 +404,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     output::success(&format!(
                         "Entered dev mode on {dev_branch} (forked from {branch})"
                     ));
-                    println!("Data-model writes target it: pass --branch {dev_branch} (or omit --branch to use your active dev-mode branch).");
+                    println!("{}", dev_branch_hint(&dev_branch));
                 }
             }
         }
