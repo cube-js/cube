@@ -284,7 +284,10 @@ to the branch you're syncing.
 
 When an automated sync produces a branch that's ready to review, Cube emails the
 recipients you configure — a comma-separated list in the settings card — with a link
-straight to the review. No one has to poll the UI to notice that dbt changed.
+straight to the review. No one has to poll the UI to notice that dbt changed. Recipients
+who can edit the data model land on the branch in [development
+mode](/docs/data-modeling/dev-mode), ready to make changes; recipients without edit access
+see a read-only diff instead.
 
 ## What gets generated
 
