@@ -145,7 +145,7 @@ Every endpoint of the Console Server public API is covered:
 | `attributes` | list, create, update, delete, values get/set |
 | `policies` | get, set-user, set-group |
 | `tenant` | settings, update |
-| `embed` | generate-session, token, dashboard, tenant delete/groups/delete-group |
+| `embed` | generate-session, token, dashboard, enable-dashboard, disable-dashboard, tenant delete/groups/delete-group |
 | `integrations` | list, get, create, update, delete, tokens list/get/revoke/initiate |
 | `oidc` | list, get, create, update, delete |
 | `agents` | list, skills |

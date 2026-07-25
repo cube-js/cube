@@ -29,6 +29,16 @@ enum Cmd {
         /// Public id
         public_id: String,
     },
+    /// Enable signed embedding for a dashboard (admin only)
+    EnableDashboard {
+        /// Public id
+        public_id: String,
+    },
+    /// Disable signed embedding for a dashboard (admin only)
+    DisableDashboard {
+        /// Public id
+        public_id: String,
+    },
     /// Manage embed tenants
     Tenant {
         #[command(subcommand)]
@@ -96,6 +106,36 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .get(&format!("/api/v1/embed/dashboard/{public_id}"), &Vec::new())
                 .await?;
             output::print_json(&res);
+        }
+        Cmd::EnableDashboard { public_id } => {
+            let res = api
+                .patch(
+                    &format!("/api/v1/embed/dashboard/{public_id}"),
+                    Some(&json!({ "allowEmbed": true })),
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success(&format!(
+                    "Enabled signed embedding for dashboard `{public_id}`"
+                ));
+            }
+        }
+        Cmd::DisableDashboard { public_id } => {
+            let res = api
+                .patch(
+                    &format!("/api/v1/embed/dashboard/{public_id}"),
+                    Some(&json!({ "allowEmbed": false })),
+                )
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success(&format!(
+                    "Disabled signed embedding for dashboard `{public_id}`"
+                ));
+            }
         }
         Cmd::Tenant { cmd } => match cmd {
             TenantCmd::Delete { name } => {
