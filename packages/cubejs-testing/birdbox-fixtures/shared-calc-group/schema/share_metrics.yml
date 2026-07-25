@@ -204,7 +204,6 @@ cubes:
           - product
           - sales.account
           - sales.product
-          - rolling_window_dim.rolling_window
         time_dimension: date
         granularity: month
         allow_non_strict_date_range_match: true

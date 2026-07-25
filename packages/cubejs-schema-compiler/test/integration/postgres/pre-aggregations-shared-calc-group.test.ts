@@ -11,14 +11,16 @@ import { dbRunner } from './PostgresDBRunner';
 // combined in one view and accelerated with rollup pre-aggregations.
 //
 // When every cube declares its OWN switch dimension, a query that combines
-// measures from both cubes can only pin one of the switches with a filter.
-// The other cube's switch stays unresolved, its case measure can't be
-// collapsed, and no pre-aggregation can match.
+// measures from both cubes can only pin one of the switches with a filter;
+// the other stays unresolved and falls through to its cross-joined
+// enumeration. Hosting the switch dimension on a shared single-row cube
+// (joined with `1 = 1` into both fact cubes) makes all case entrypoints
+// dispatch on the SAME dimension, so a single filter resolves every measure.
 //
-// Hosting the switch dimension on a shared single-row cube (joined with
-// `1 = 1` into both fact cubes) makes all case entrypoints dispatch on the
-// SAME dimension, so a single filter resolves every measure and the query
-// is served from the rollups.
+// Calc-group dimensions are virtual (no stored data), so rollups serve them
+// whether or not they are listed in the rollup definition: the pinned value
+// renders as a literal over the rollup scan, an unresolved enumeration is
+// re-cross-joined — same semantics as over the raw source.
 
 const ROLLING_WINDOW_DIM_CUBE = `
   - name: rolling_window_dim
@@ -185,8 +187,8 @@ ${includePreAggs ? `
           - ytd_amount
         dimensions:
           - account
-          - product
-          - ${rollingWindowPreAggDim}
+          - product${rollingWindowPreAggDim ? `
+          - ${rollingWindowPreAggDim}` : ''}
         time_dimension: date
         granularity: month
         allow_non_strict_date_range_match: true
@@ -381,8 +383,8 @@ ${includePreAggs ? `
           - account
           - product
           - sales.account
-          - sales.product
-          - ${rollingWindowPreAggDim}
+          - sales.product${rollingWindowPreAggDim ? `
+          - ${rollingWindowPreAggDim}` : ''}
         time_dimension: date
         granularity: month
         allow_non_strict_date_range_match: true
@@ -457,6 +459,35 @@ views:
           - rolling_share_change
           - name: rolling_window
             alias: share_metrics_rolling_window
+`;
+
+// Shared calc-group switch, but the rollups do NOT store the calc-group
+// dimension: the planner must still match them (the dimension is virtual)
+// and resolve the filtered value as a literal over the rollup scan.
+const sharedSwitchModelSlimRollups = `
+cubes:
+${ROLLING_WINDOW_DIM_CUBE}
+${salesCube('{rolling_window_dim.rolling_window}', '', SHARED_JOIN, '')}
+${shareMetricsCube('{rolling_window_dim.rolling_window}', '', SHARED_JOIN, '')}
+views:
+  - name: performance_view
+    cubes:
+      - join_path: sales
+        includes:
+          - account
+          - product
+          - date
+          - total
+          - rolling_amount
+          - rolling_amount_change
+
+      - join_path: share_metrics
+        includes:
+          - rolling_share_change
+
+      - join_path: rolling_window_dim
+        includes:
+          - rolling_window
 `;
 
 // Same model without pre-aggregations: used to verify the plain-SQL results
@@ -571,6 +602,34 @@ describe('PreAggregationsSharedCalcGroup', () => {
       }));
     });
 
+    describe('shared calc-group switch dimension with slim rollups', () => {
+      const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(sharedSwitchModelSlimRollups);
+
+      // The calc-group dimension is virtual (a cross-joined enumeration),
+      // so rollups that don't store it must still match: the filtered value
+      // is rendered as a literal over the rollup scan.
+      it('matches rollups that do not store the calc-group dimension', () => compiler.compile().then(() => {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, REPRO_QUERY);
+
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const sqlAndParams = query.buildSqlAndParams();
+        const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
+        expect(tableNames).toContain('sales_perf_rolling');
+        expect(tableNames).toContain('share_metrics_perf_share');
+        expect(sqlAndParams[0]).toContain('sales_perf_rolling');
+        expect(sqlAndParams[0]).toContain('share_metrics_perf_share');
+        // The rollup build must not cross-join the calc-group values table.
+        const loadSql = preAggregationsDescription
+          .map((d: any) => d.loadSql[0])
+          .join('\n');
+        expect(loadSql).not.toContain('rolling_window_values');
+
+        return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+          expect(Array.isArray(res)).toBe(true);
+        });
+      }));
+    });
+
     describe('shared calc-group switch dimension without rollups', () => {
       const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(sharedSwitchModelNoPreAggs);
 
@@ -626,14 +685,21 @@ describe('PreAggregationsSharedCalcGroup', () => {
     describe('per-cube switch dimensions (anti-pattern)', () => {
       const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(perCubeSwitchModel);
 
-      it('cross-cube rolling measures do not match any rollup', () => compiler.compile().then(() => {
+      // Calc-group dimensions are virtual, so rollups serve this query too.
+      // The anti-pattern remains semantic: the view filter pins only the
+      // sales switch, while the share_metrics switch stays unresolved and
+      // falls through to its cross-joined enumeration — same behavior as
+      // over the raw source, just accelerated.
+      it('cross-cube rolling measures still match rollups with per-cube switches', () => compiler.compile().then(() => {
         const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, REPRO_QUERY);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const sqlAndParams = query.buildSqlAndParams();
-        expect(preAggregationsDescription).toEqual([]);
-        expect(sqlAndParams[0]).not.toContain('sales_perf_rolling');
-        expect(sqlAndParams[0]).not.toContain('share_metrics_perf_share');
+        const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
+        expect(tableNames).toContain('sales_perf_rolling');
+        expect(tableNames).toContain('share_metrics_perf_share');
+        expect(sqlAndParams[0]).toContain('sales_perf_rolling');
+        expect(sqlAndParams[0]).toContain('share_metrics_perf_share');
       }));
 
       it('single-cube rolling measures still match their own rollup', () => compiler.compile().then(() => {

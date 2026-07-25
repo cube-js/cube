@@ -162,10 +162,11 @@ cubes:
           - total
           - r3_amount
           - ytd_amount
+        # The rolling_window calc group is virtual and resolved at query
+        # time, so it is intentionally NOT stored in the rollup.
         dimensions:
           - account
           - product
-          - rolling_window_dim.rolling_window
         time_dimension: date
         granularity: month
         allow_non_strict_date_range_match: true

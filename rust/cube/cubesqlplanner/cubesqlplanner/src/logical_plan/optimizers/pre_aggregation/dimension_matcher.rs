@@ -198,6 +198,13 @@ impl<'a> DimensionMatcher<'a> {
                 *found = true;
             }
             Ok(MatchState::Full)
+        } else if dimension.is_calc_group() {
+            // Calc-group dimensions are virtual enumerations: they carry no
+            // stored data, so any rollup can serve them. At query time the
+            // value is either pinned by a filter (rendered as a literal) or
+            // re-cross-joined over the rollup scan, exactly like over a raw
+            // source.
+            Ok(MatchState::Full)
         } else if dimension.owned_by_cube() {
             Ok(MatchState::NotMatched)
         } else if dimension.is_multi_stage() {
