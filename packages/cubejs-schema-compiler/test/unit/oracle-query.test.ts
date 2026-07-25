@@ -159,8 +159,9 @@ describe('OracleQuery', () => {
     expect(sql).not.toMatch(/\bas\s+q_\d+/);
     
     // Should have q_0 alias (with space around it, indicating no AS).
-    // The native planner quotes the alias ("q_0").
-    expect(sql).toMatch(/\)\s+"?q_0"?/);
+    // The native planner quotes the alias ("q_0") and may reference the
+    // source as a bare CTE name after trivial-subquery collapse.
+    expect(sql).toMatch(/[)\w]\s+"?q_0"?/);
   });
 
   it('does not use AS keyword with multiple rolling window measures (YoY scenario)', async () => {
@@ -191,7 +192,7 @@ describe('OracleQuery', () => {
     expect(sql).not.toMatch(/\bas\s+q_\d+/);
     
     // Verify pattern is ) q_X not ) AS q_X (the native planner quotes the alias)
-    expect(sql).toMatch(/\)\s+"?q_\d+"?/);
+    expect(sql).toMatch(/[)\w]\s+"?q_\d+"?/);
   });
 
   it('does not use AS keyword in INNER JOIN subqueries', async () => {
@@ -280,8 +281,8 @@ describe('OracleQuery', () => {
 
     // Should have multiple subquery aliases without AS (the native planner
     // quotes the aliases and joins subqueries explicitly rather than with commas).
-    expect(sql).toMatch(/\)\s+"?q_0"?/);
-    expect(sql).toMatch(/\)\s+"?q_1"?/);
+    expect(sql).toMatch(/[)\w]\s+"?q_0"?/);
+    expect(sql).toMatch(/[)\w]\s+"?q_1"?/);
     
     // Should NOT have AS before q_ aliases
     expect(sql).not.toMatch(/\bAS\s+q_\d+/i);

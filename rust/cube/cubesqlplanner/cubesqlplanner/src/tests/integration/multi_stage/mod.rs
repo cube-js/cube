@@ -12,6 +12,7 @@ mod joins;
 mod multi_fact;
 mod multiple_measures;
 mod order_limit;
+mod plan_optimizers;
 mod rank;
 mod reduce_by;
 mod time_shift_basic;
