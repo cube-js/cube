@@ -490,6 +490,36 @@ views:
           - rolling_window
 `;
 
+// Per-cube switch model without pre-aggregations: used to demonstrate the
+// semantic problem of the anti-pattern with deterministic values — the view
+// filter pins only the sales switch, so share_metrics computes its case
+// measure across its whole cross-joined enumeration.
+const perCubeSwitchModelNoPreAggs = `
+cubes:
+${salesCube('{CUBE.rolling_window}', 'rolling_window', '', OWN_SWITCH_DIMENSION, false)}
+${shareMetricsCube('{CUBE.rolling_window}', 'rolling_window', '', OWN_SWITCH_DIMENSION, false)}
+views:
+  - name: performance_view
+    cubes:
+      - join_path: sales
+        includes:
+          - account
+          - product
+          - date
+          - total
+          - rolling_amount
+          - rolling_amount_change
+          - rolling_window
+
+      - join_path: share_metrics
+        includes:
+          - rolling_share_change
+          - name: rolling_window
+            alias: share_metrics_rolling_window
+          - name: date
+            alias: ms_date
+`;
+
 // Same model without pre-aggregations: used to verify the plain-SQL results
 // of the repro query deterministically (rolling windows anchored to the
 // query date range instead of the current date).
@@ -684,6 +714,38 @@ describe('PreAggregationsSharedCalcGroup', () => {
 
     describe('per-cube switch dimensions (anti-pattern)', () => {
       const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(perCubeSwitchModel);
+      const noPreAggs = prepareYamlCompiler(perCubeSwitchModelNoPreAggs);
+
+      // This is what makes per-cube switches an anti-pattern: the view
+      // filter pins only the sales switch, while share_metrics falls
+      // through to its own cross-joined enumeration, so every enumeration
+      // value emits its own result row even though the switch dimension is
+      // not projected. The same query against the shared-switch model
+      // returns a single row of 0.3 (see the deterministic test above);
+      // here a duplicate P1 row from the YTD branch (null: its 1-year prior
+      // window has no data) leaks into the result.
+      it('produces a divergent share change because one switch stays unresolved', async () => {
+        await dbRunner.runQueryTest({
+          ...REPRO_QUERY,
+          measures: [
+            'performance_view.rolling_share_change',
+          ],
+          timeDimensions: [{
+            dimension: 'performance_view.ms_date',
+            dateRange: ['2017-01-01', '2017-06-30'],
+          }],
+        }, [
+          {
+            performance_view__product: 'P1',
+            performance_view__rolling_share_change: '0.30000000000000000000',
+          },
+          {
+            performance_view__product: 'P1',
+            performance_view__rolling_share_change: null,
+          },
+        ],
+        { joinGraph: noPreAggs.joinGraph, cubeEvaluator: noPreAggs.cubeEvaluator, compiler: noPreAggs.compiler });
+      });
 
       // Calc-group dimensions are virtual, so rollups serve this query too.
       // The anti-pattern remains semantic: the view filter pins only the

@@ -67,11 +67,17 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
     },
   ];
 
+  // Every reference to a rollup in a multi-stage plan is keyed separately
+  // (`__usage_N` suffix), so dedupe to the distinct rollup tables used.
   function usedPreAggregations(resultSet: any): string[] {
-    return Object.keys(
+    const keys = Object.keys(
       resultSet.serialize().loadResponse.results[0].usedPreAggregations || {}
     );
+    return [...new Set(keys.map(t => t.replace(/__usage_\d+$/, '')))].sort();
   }
+
+  const SALES_ROLLUP = 'dev_pre_aggregations.sales_perf_rolling';
+  const SHARE_ROLLUP = 'dev_pre_aggregations.share_metrics_perf_share';
 
   test('single-cube rolling measure is served from the rollup', async () => {
     const query: Query = {
@@ -83,7 +89,7 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
       },
     };
     const result = await client.load(query);
-    expect(usedPreAggregations(result).some(t => t.includes('perf_rolling'))).toBe(true);
+    expect(usedPreAggregations(result)).toEqual([SALES_ROLLUP]);
     expect(result.rawData().map((r: any) => r['performance_view.product'])).toEqual(['P1', 'P2']);
   });
 
@@ -100,9 +106,7 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
       },
     };
     const result = await client.load(query);
-    const tables = usedPreAggregations(result);
-    expect(tables.some(t => t.includes('perf_rolling'))).toBe(true);
-    expect(tables.some(t => t.includes('perf_share'))).toBe(true);
+    expect(usedPreAggregations(result)).toEqual([SALES_ROLLUP, SHARE_ROLLUP]);
     expect(result.rawData().map((r: any) => r['performance_view.product'])).toEqual(['P1', 'P2']);
   });
 
@@ -120,9 +124,7 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
       },
     };
     const result = await client.load(query);
-    const tables = usedPreAggregations(result);
-    expect(tables.some(t => t.includes('perf_rolling'))).toBe(true);
-    expect(tables.some(t => t.includes('perf_share'))).toBe(true);
+    expect(usedPreAggregations(result)).toEqual([SALES_ROLLUP, SHARE_ROLLUP]);
     expect(result.rawData().map((r: any) => r['performance_view.product'])).toEqual(['P1', 'P2']);
   });
 
@@ -148,9 +150,7 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
       },
     };
     const result = await client.load(query);
-    const tables = usedPreAggregations(result);
-    expect(tables.some(t => t.includes('perf_rolling'))).toBe(true);
-    expect(tables.some(t => t.includes('perf_share'))).toBe(true);
+    expect(usedPreAggregations(result)).toEqual([SALES_ROLLUP, SHARE_ROLLUP]);
     expect(result.rawData().map((r: any) => r['performance_view.product'])).toEqual(['P1', 'P2']);
   });
 });
