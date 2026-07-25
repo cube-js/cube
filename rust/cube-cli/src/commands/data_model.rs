@@ -38,7 +38,7 @@ enum Cmd {
         #[arg(long)]
         branch: Option<String>,
     },
-    /// Create or overwrite a file
+    /// Create or overwrite a file (writes require a dev-mode branch)
     Put {
         /// Deployment id
         deployment: i64,
@@ -50,11 +50,12 @@ enum Cmd {
         /// Inline content (use `-` to read stdin)
         #[arg(long)]
         content: Option<String>,
-        /// Branch name (defaults to the deployment default branch)
+        /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
+        /// your active dev-mode branch)
         #[arg(long)]
         branch: Option<String>,
     },
-    /// Delete files
+    /// Delete files (writes require a dev-mode branch)
     #[command(alias = "rm")]
     Delete {
         /// Deployment id
@@ -62,11 +63,12 @@ enum Cmd {
         /// One or more file paths to delete
         #[arg(required = true)]
         paths: Vec<String>,
-        /// Branch name (defaults to the deployment default branch)
+        /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
+        /// your active dev-mode branch)
         #[arg(long)]
         branch: Option<String>,
     },
-    /// Rename (move) a file
+    /// Rename (move) a file (writes require a dev-mode branch)
     Rename {
         /// Deployment id
         deployment: i64,
@@ -74,7 +76,8 @@ enum Cmd {
         from: String,
         /// Destination path
         to: String,
-        /// Branch name (defaults to the deployment default branch)
+        /// Dev-mode branch to write to, as returned by `dev-mode` (defaults to
+        /// your active dev-mode branch)
         #[arg(long)]
         branch: Option<String>,
     },
@@ -93,11 +96,12 @@ enum Cmd {
         #[arg(long)]
         dev_mode: bool,
     },
-    /// Enter dev mode / switch to a branch
+    /// Enter dev mode on a branch (prints the personal dev-mode branch that
+    /// file writes must target)
     DevMode {
         /// Deployment id
         deployment: i64,
-        /// Branch to switch to (required by the API)
+        /// Branch to base dev mode on (required by the API)
         branch: String,
     },
     /// Exit dev mode
@@ -181,6 +185,22 @@ fn flatten(nodes: &[serde_json::Value], out: &mut Vec<serde_json::Value>) {
     }
 }
 
+/// Printed after entering dev mode, so the user knows which branch the write
+/// commands accept.
+fn dev_branch_hint(dev_branch: &str) -> String {
+    format!(
+        "Data-model writes target it: pass --branch {dev_branch} \
+         (or omit --branch to use your active dev-mode branch)."
+    )
+}
+
+/// The source tree reports absolute paths (`/model/cubes/orders.yml`) while the
+/// write endpoints accept them with or without the leading slash, so compare
+/// paths without it.
+fn same_path(a: &str, b: &str) -> bool {
+    a.trim_start_matches('/') == b.trim_start_matches('/')
+}
+
 fn tree_nodes(res: &serde_json::Value) -> Vec<serde_json::Value> {
     let mut out = Vec::new();
     if let Some(arr) = res.get("data").and_then(|d| d.as_array()) {
@@ -252,9 +272,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let mut query: Query = vec![("withContent".into(), "true".into())];
             util::push(&mut query, "branchName", &branch);
             let res = api.get(&base(deployment), &query).await?;
-            let file = tree_nodes(&res)
-                .into_iter()
-                .find(|f| output::field(f, "path") == path && output::field(f, "type") == "file");
+            let file = tree_nodes(&res).into_iter().find(|f| {
+                same_path(&output::field(f, "path"), &path) && output::field(f, "type") == "file"
+            });
             match file {
                 Some(f) => print!("{}", output::field(&f, "content")),
                 None => anyhow::bail!("file not found: {path}"),
@@ -303,9 +323,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             to,
             branch,
         } => {
+            // Like put/delete, the rename endpoint expects `files` as an array
+            // of objects — here `{ path, newPath }`.
             let mut map = serde_json::Map::new();
-            map.insert("from".into(), json!(from));
-            map.insert("to".into(), json!(to));
+            map.insert("files".into(), json!([{ "path": from, "newPath": to }]));
             let res = api
                 .post(
                     &format!("{}/rename", base(deployment)),
@@ -350,7 +371,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if ctx.json {
                 output::print_json(&res);
             } else {
-                output::success(&format!("Created branch {name}"));
+                // With --dev-mode the server forks a personal dev-mode branch off
+                // the new branch; that's the branch file writes must target.
+                let dev_branch = output::field(&res, "branchName");
+                if dev_mode && !dev_branch.is_empty() && dev_branch != name {
+                    output::success(&format!(
+                        "Created branch {name}; entered dev mode on {dev_branch}"
+                    ));
+                    println!("{}", dev_branch_hint(&dev_branch));
+                } else {
+                    output::success(&format!("Created branch {name}"));
+                }
             }
         }
         Cmd::DevMode { deployment, branch } => {
@@ -364,7 +395,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             if ctx.json {
                 output::print_json(&res);
             } else {
-                output::success(&format!("Entered dev mode on {branch}"));
+                // Dev mode runs on a personal `dev-…` branch forked from the
+                // requested one — expose it, since file writes only accept it.
+                let dev_branch = output::field(&res, "branchName");
+                if dev_branch.is_empty() || dev_branch == branch {
+                    output::success(&format!("Entered dev mode on {branch}"));
+                } else {
+                    output::success(&format!(
+                        "Entered dev mode on {dev_branch} (forked from {branch})"
+                    ));
+                    println!("{}", dev_branch_hint(&dev_branch));
+                }
             }
         }
         Cmd::ExitDevMode { deployment } => {
