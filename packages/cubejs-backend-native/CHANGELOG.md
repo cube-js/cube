@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Bug Fixes
+
+- **native:** Jinja - forward kwargs on sync Python function/method calls ([#11325](https://github.com/cube-js/cube/issues/11325)) ([fd038e4](https://github.com/cube-js/cube/commit/fd038e452de3128fc4916bae67b7f2c8cd41afd3))
+
+### Features
+
+- **cubesql:** Support parsing date-only timestamp strings ([#11316](https://github.com/cube-js/cube/issues/11316)) ([c9bf776](https://github.com/cube-js/cube/commit/c9bf77684d743344134a7af0c3f42e52e74c54b1))
+
 ## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
 
 **Note:** Version bump only for package @cubejs-backend/native

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Features
+
+- **tesseract:** pre-agg matching without stored calc-group dims; collapse trivial pass-through subqueries; e2e specs for cross-cube rolling measures over rollups ([#11346](https://github.com/cube-js/cube/issues/11346)) ([0730e31](https://github.com/cube-js/cube/commit/0730e31df3cb9e0f7ac0a2f73ccb41d3b20013e5))
+
 ## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
 
 **Note:** Version bump only for package @cubejs-backend/testing

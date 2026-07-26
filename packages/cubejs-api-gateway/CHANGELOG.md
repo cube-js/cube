@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Bug Fixes
+
+- **api-gateway:** pass job data source when checking pre-agg queue status ([#11321](https://github.com/cube-js/cube/issues/11321)) ([9f13a7f](https://github.com/cube-js/cube/commit/9f13a7ff8fd0ab77dac9925fc37bd13ea84c4f22)), closes [#11313](https://github.com/cube-js/cube/issues/11313) [#11313](https://github.com/cube-js/cube/issues/11313) [#11313](https://github.com/cube-js/cube/issues/11313)
+
 ## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

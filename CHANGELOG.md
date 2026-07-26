@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Bug Fixes
+
+- **api-gateway:** pass job data source when checking pre-agg queue status ([#11321](https://github.com/cube-js/cube/issues/11321)) ([9f13a7f](https://github.com/cube-js/cube/commit/9f13a7ff8fd0ab77dac9925fc37bd13ea84c4f22)), closes [#11313](https://github.com/cube-js/cube/issues/11313) [#11313](https://github.com/cube-js/cube/issues/11313) [#11313](https://github.com/cube-js/cube/issues/11313)
+- **cube-cli:** default to https:// for scheme-less Cube Cloud URLs ([#11335](https://github.com/cube-js/cube/issues/11335)) ([46aedb9](https://github.com/cube-js/cube/commit/46aedb9a749e849b4d6ca3c1112ee65e3c143a5d))
+- **cubesql:** Bound Bind/Parse parameter allocations in PG wire protocol ([#11341](https://github.com/cube-js/cube/issues/11341)) ([240936d](https://github.com/cube-js/cube/commit/240936db80a86d31212a69c229a042f8b3078d15))
+- **cubesql:** Bound PostgreSQL packet sizes ([#11339](https://github.com/cube-js/cube/issues/11339)) ([8a4dd6f](https://github.com/cube-js/cube/commit/8a4dd6f8a66fba95ba52a8ee58dfbfca54e37c95))
+- **cubesql:** Escape PatchMeasure filters for member expression evaluation ([#11329](https://github.com/cube-js/cube/issues/11329)) ([eb87c43](https://github.com/cube-js/cube/commit/eb87c43e42a9b600748268e82d8b4d78a3082ce2))
+- **cubesql:** Keep PostgreSQL integer division semantics in pushdown SQL ([#11319](https://github.com/cube-js/cube/issues/11319)) ([ae248c4](https://github.com/cube-js/cube/commit/ae248c446651790483212dd68176a9b78fe7844b))
+- **native:** Jinja - forward kwargs on sync Python function/method calls ([#11325](https://github.com/cube-js/cube/issues/11325)) ([fd038e4](https://github.com/cube-js/cube/commit/fd038e452de3128fc4916bae67b7f2c8cd41afd3))
+- **schema-compiler:** Allow dimension-only measure expressions over multiple cubes ([#11330](https://github.com/cube-js/cube/issues/11330)) ([69e8728](https://github.com/cube-js/cube/commit/69e8728d13caa247fad6612dc9b05ca722229b98))
+
+### Features
+
+- **cube-cli:** add embed enable-dashboard / disable-dashboard commands ([#11356](https://github.com/cube-js/cube/issues/11356)) ([2e557fb](https://github.com/cube-js/cube/commit/2e557fbfe3b465d51b5c8280ac2cca1e238ccd3c))
+- **cube-cli:** expose the dev-mode branch name and document dev-mode-only data-model writes ([#11351](https://github.com/cube-js/cube/issues/11351)) ([a80729c](https://github.com/cube-js/cube/commit/a80729c42381fe93826c33bc5479792c54d676fb))
+- **cube-cli:** show CLI version when run without a command ([#11344](https://github.com/cube-js/cube/issues/11344)) ([aa09649](https://github.com/cube-js/cube/commit/aa0964916dbd2b88e4d612965f644106c6d90214))
+- **cubesql:** Support parsing date-only timestamp strings ([#11316](https://github.com/cube-js/cube/issues/11316)) ([c9bf776](https://github.com/cube-js/cube/commit/c9bf77684d743344134a7af0c3f42e52e74c54b1))
+- **tesseract:** pre-agg matching without stored calc-group dims; collapse trivial pass-through subqueries; e2e specs for cross-cube rolling measures over rollups ([#11346](https://github.com/cube-js/cube/issues/11346)) ([0730e31](https://github.com/cube-js/cube/commit/0730e31df3cb9e0f7ac0a2f73ccb41d3b20013e5))
+
 ## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
 
 **Note:** Version bump only for package cubejs
