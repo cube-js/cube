@@ -218,7 +218,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
   public prepareQueryWithParams(query: string, values: unknown[]) {
     return SqlString.format(query, (values || []).map(value => (typeof value === 'string' ? {
-      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1'),
+      toSqlString: () => `'${value.replace(/'/g, '\'\'')}'`,
     } : value)));
   }
 
