@@ -30,10 +30,6 @@ describe('sanitizeTraceId', () => {
     expect(sanitizeTraceId('++abc')).toBe('abc');
   });
 
-  test('caps the length', () => {
-    expect(sanitizeTraceId('a'.repeat(500))).toHaveLength(128);
-  });
-
   test('returns empty for ids with nothing usable left', () => {
     expect(sanitizeTraceId(undefined)).toBe('');
     expect(sanitizeTraceId(null)).toBe('');
@@ -67,6 +63,19 @@ describe('buildTraceComment', () => {
   test('drops the span suffix of a scheduler id', () => {
     expect(buildTraceComment('scheduler-abc-span-2'))
       .toBe('/* trace_id: scheduler-abc */');
+  });
+
+  test('caps the length of the emitted id', () => {
+    expect(buildTraceComment('a'.repeat(500)))
+      .toBe(`/* trace_id: ${'a'.repeat(128)} */`);
+  });
+
+  // Capping the raw id first would cut this one mid-`-span-` and emit the
+  // partial marker, which no longer matches the export's trace_id.
+  test('caps after stripping the span, never mid-suffix', () => {
+    const traceId = 'a'.repeat(125);
+
+    expect(buildTraceComment(`${traceId}-span-1`)).toBe(`/* trace_id: ${traceId} */`);
   });
 
   test('returns null when nothing usable remains', () => {

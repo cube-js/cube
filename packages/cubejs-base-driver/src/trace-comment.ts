@@ -27,9 +27,7 @@ export function sanitizeTraceId(requestId: string | undefined | null): string {
     return '';
   }
 
-  return String(requestId)
-    .replace(ALLOWED_CHARS, '')
-    .slice(0, MAX_TRACE_ID_LENGTH);
+  return String(requestId).replace(ALLOWED_CHARS, '');
 }
 
 /**
@@ -46,7 +44,9 @@ function toTraceId(requestId: string): string {
 }
 
 export function buildTraceComment(requestId: string | undefined | null): string | null {
-  const traceId = toTraceId(sanitizeTraceId(requestId));
+  // Cap only after the span is stripped: capping the raw id first can cut it
+  // mid-`-span-`, leaving a partial marker in what gets emitted.
+  const traceId = toTraceId(sanitizeTraceId(requestId)).slice(0, MAX_TRACE_ID_LENGTH);
   if (!traceId) {
     return null;
   }
