@@ -50,6 +50,29 @@ Likewise, if `orders_view` exposes an `address_country` column pointing to
 `country.country`, cross-filtering will not be applied, because the column
 names differ between the views.
 
+## Measure names
+
+Because all views share a single perspective, measures are identified by their
+view name and measure name, joined with a dot: `<view>.<measure>`. This keeps
+measures with the same name in different views from colliding.
+
+Field names shown in Power BI are unaffected, so a `count` measure still appears
+as `Count` in the field list. However, when writing DAX explicitly, reference
+measures by their qualified name:
+
+```text
+CALCULATE('orders_view'[orders_view.count])
+```
+
+The view name can also be omitted from the table qualifier, in which case the
+prefix identifies the view:
+
+```text
+[orders_view.count]
+```
+
+Dimensions are not prefixed and are referenced by their column name.
+
 
 [ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-views]: /docs/data-modeling/views
