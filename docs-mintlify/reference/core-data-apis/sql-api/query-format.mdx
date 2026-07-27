@@ -140,10 +140,11 @@ is supported and whether it can be used in [selection][link-selection-projection
 (e.g., `WHERE`) or [projection][link-selection-projection] (e.g., `SELECT`) parts
 of SQL queries.
 
-Expressions that have no [post-processing][ref-queries-wpp] shape, such as a `CASE`
-expression used as a grouping key, are handled by [query pushdown](#query-pushdown)
-instead. For example, the following query derives a fiscal year that starts in
-April and groups a measure by it:
+Expressions over dimensions, such as a `CASE` expression used as a grouping key,
+can't be translated into a [regular query][ref-regular-queries] or
+[post-processing][ref-queries-wpp]; they are handled by
+[query pushdown](#query-pushdown) instead. For example, the following query
+derives a fiscal year that starts in April and groups a measure by it:
 
 ```sql
 SELECT
@@ -164,7 +165,7 @@ rewritten and fail with the following error if pushdown is disabled via the
 data source doesn't support pushing down one of the expressions used:
 
 ```text
-Can't detect Cube query and it may be not supported yet.
+Can't detect Cube query and it may be not supported yet
 ```
 
 If you hit this error, check that query pushdown is enabled and that every
@@ -185,11 +186,11 @@ SELECT
     THEN EXTRACT(YEAR FROM month)
     ELSE EXTRACT(YEAR FROM month) - 1
   END AS fiscal_year,
-  SUM(count) AS total
+  SUM(orders_count) AS total
 FROM (
   SELECT
     DATE_TRUNC('month', created_at) AS month,
-    MEASURE(count) AS count
+    MEASURE(count) AS orders_count
   FROM orders
   GROUP BY 1
 ) AS inner_query
@@ -197,6 +198,11 @@ GROUP BY 1
 ORDER BY 1;
 --- You can also use CTEs to achieve the same result
 ```
+
+This works because `count` is additive, so monthly values can be re-aggregated
+with `SUM`. For non-additive measures, such as `count_distinct` or `avg`, group
+the inner query by the same granularity you need in the output — re-aggregating
+their partial results would produce incorrect values.
 
 ### Query pushdown
 
