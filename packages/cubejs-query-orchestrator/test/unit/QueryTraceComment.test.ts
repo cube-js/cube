@@ -45,8 +45,8 @@ class TraceMockDriver {
 
 const SQL = 'SELECT 1';
 const TRACE_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479-span-1';
-// What the comment carries: the export's trace_id (span suffix split off).
-const EXPECTED_COMMENT = '/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 span: 1 */';
+// What the comment carries: the export's trace_id (span suffix dropped).
+const EXPECTED_COMMENT = '/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 */';
 
 describe('SQL trace comment', () => {
   let driver;
@@ -179,12 +179,31 @@ describe('SQL trace comment and the cache key', () => {
     expect(withFlag).not.toContain('trace_id');
   });
 
-  test('does not vary the cache key between two requests', () => {
+  // The property the deferral actually buys: the SQL handed to the driver
+  // carries the id, while the key used to look the result up does not.
+  test('is derived from the untagged SQL of the very query that gets tagged', async () => {
     process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
 
-    const first = QueryCache.queryCacheKey({ query: SQL, values: [], requestId: 'request-one' });
-    const second = QueryCache.queryCacheKey({ query: SQL, values: [], requestId: 'request-two' });
+    const driver = new TraceMockDriver();
+    const orchestrator = new QueryOrchestrator(
+      'TRACE_TEST_CACHE_KEY',
+      () => driver as any,
+      () => undefined,
+      {
+        cacheAndQueueDriver: 'memory',
+        queryCacheOptions: { queueOptions: () => ({ concurrency: 1 }) },
+      },
+    );
 
-    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+    const queryBody = { query: SQL, values: [], requestId: TRACE_ID };
+
+    try {
+      await orchestrator.fetchQuery(queryBody);
+    } finally {
+      await orchestrator.cleanup();
+    }
+
+    expect(driver.executedQueries).toContain(`${SQL}\n${EXPECTED_COMMENT}`);
+    expect(JSON.stringify(QueryCache.queryCacheKey(queryBody))).not.toContain('trace_id');
   });
 });

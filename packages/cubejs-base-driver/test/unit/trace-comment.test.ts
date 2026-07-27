@@ -53,21 +53,20 @@ describe('buildTraceComment', () => {
   });
 
   // The Query History export drops the -span-N suffix when deriving trace_id,
-  // so the comment must carry the stem for the join to match, and the span
-  // separately to tell fanned-out queries apart.
-  test('splits the span suffix out of the trace id', () => {
+  // so the comment must carry the stem for the join to match.
+  test('drops the span suffix', () => {
     expect(buildTraceComment('f47ac10b-58cc-4372-a567-0e02b2c3d479-span-1'))
-      .toBe('/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 span: 1 */');
+      .toBe('/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 */');
   });
 
-  test('keeps a uuid span suffix intact', () => {
+  test('drops a uuid span suffix', () => {
     expect(buildTraceComment('conn1-msg2-span-abc-def'))
-      .toBe('/* trace_id: conn1-msg2 span: abc-def */');
+      .toBe('/* trace_id: conn1-msg2 */');
   });
 
-  test('handles a scheduler id with a span', () => {
+  test('drops the span suffix of a scheduler id', () => {
     expect(buildTraceComment('scheduler-abc-span-2'))
-      .toBe('/* trace_id: scheduler-abc span: 2 */');
+      .toBe('/* trace_id: scheduler-abc */');
   });
 
   test('returns null when nothing usable remains', () => {
@@ -83,8 +82,8 @@ describe('addTraceComment', () => {
     expect(addTraceComment(sql, 'abc-123')).toBe('SELECT 1\n/* trace_id: abc-123 */');
   });
 
-  test('appends trace id and span for a canonical request id', () => {
-    expect(addTraceComment(sql, 'abc-123-span-4')).toBe('SELECT 1\n/* trace_id: abc-123 span: 4 */');
+  test('appends the trace id of a canonical request id', () => {
+    expect(addTraceComment(sql, 'abc-123-span-4')).toBe('SELECT 1\n/* trace_id: abc-123 */');
   });
 
   test('keeps the comment inside a trailing semicolon', () => {

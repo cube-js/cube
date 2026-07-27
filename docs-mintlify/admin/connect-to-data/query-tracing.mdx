@@ -8,8 +8,7 @@ comment, letting you match a query in your data source's query history back to
 the API request that caused it.
 
 This is useful when one API request fans out into several data source
-queries — every one of them carries the same `trace_id`, distinguished by a
-`-span-N` suffix.
+queries — every one of them carries the same `trace_id`.
 
 ## Configuration
 
@@ -24,12 +23,14 @@ Queries then reach your data source with the comment appended:
 
 ```sql
 SELECT ...
-/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 span: 1 */
+/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 */
 ```
 
 `trace_id` identifies the API request and matches the field of the same name in
-the [Query History export][ref-query-history-export]. `span` identifies the
-attempt within that request.
+the [Query History export][ref-query-history-export].
+
+Trace ids longer than 128 characters are truncated, and any character outside
+`A-Z a-z 0-9 . _ : -` is removed.
 
 <Warning>
 
@@ -46,23 +47,17 @@ would have stayed suspended may resume.
 Some query history views truncate long SQL, and a few omit comments entirely.
 If you can't find the `trace_id`, check where you're reading it from:
 
-| Data source | Where to look |
-| ----------- | ------------- |
-| Snowflake | `QUERY_HISTORY`. Note that Snowflake strips *leading* comments, which is why Cube appends. |
-| Redshift | `SYS_QUERY_TEXT`, reassembled with `LISTAGG`. `SYS_QUERY_HISTORY` and `STL_QUERY` truncate at 4000 characters. |
-| BigQuery | `INFORMATION_SCHEMA.JOBS`. Cloud Audit Logs truncate at 50K characters. |
-| Databricks | `system.query.history`. Empty when customer-managed keys are enabled. |
-| Postgres | Server logs (`log_statement`). `pg_stat_activity.query` truncates at `track_activity_query_size` (1024 bytes by default). |
-| MySQL | The general or slow query log. |
-
-<Warning>
-
-`pg_stat_statements` and MySQL's digest tables normalize queries and discard
-comments, keeping only the text of the first query with a given fingerprint.
-The `trace_id` you see there belongs to some earlier request, not the one you
-are looking at. Use the query logs instead.
-
-</Warning>
+- **Snowflake**: `QUERY_HISTORY`. Note that Snowflake strips *leading* comments,
+  which is why Cube appends.
+- **Redshift**: `SYS_QUERY_TEXT`, reassembled with `LISTAGG`.
+  `SYS_QUERY_HISTORY` and `STL_QUERY` truncate at 4000 characters.
+- **BigQuery**: `INFORMATION_SCHEMA.JOBS`. Cloud Audit Logs truncate at 50K
+  characters.
+- **Databricks**: `system.query.history`. Empty when customer-managed keys are
+  enabled.
+- **Postgres**: server logs (`log_statement`). `pg_stat_activity.query`
+  truncates at `track_activity_query_size` (1024 bytes by default).
+- **MySQL**: the general or slow query log.
 
 ## Supplying your own identifier
 
@@ -80,13 +75,5 @@ queries are left untagged, since there is no API request to trace them back to.
 Not every request produces a tagged query to find: one served from the cache
 never reaches your data source, and when identical queries arrive together Cube
 runs them once, under whichever request got there first.
-
-## Snowflake query tagging
-
-Snowflake also supports a connection-level
-[query tag](/admin/connect-to-data/data-sources/snowflake#query-tagging), which
-labels every query on a connection with the same static value. The two are
-complementary: a query tag identifies the deployment, while `trace_id`
-identifies the individual request.
 
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
