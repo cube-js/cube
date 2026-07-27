@@ -17,6 +17,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "unit": "jest --verbose dist/test/unit",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
@@ -28,8 +29,7 @@
     "@cubejs-backend/base-driver": "1.4.3",
     "@cubejs-backend/node-java-maven": "^0.1.3",
     "@cubejs-backend/shared": "1.4.3",
-    "generic-pool": "^3.9.0",
-    "sqlstring": "^2.3.0"
+    "generic-pool": "^3.9.0"
   },
   "optionalDependencies": {
     "@cubejs-backend/jdbc": "^0.8.1",
@@ -45,7 +45,6 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.4.3",
     "@types/node": "^20",
-    "@types/sqlstring": "^2.3.0",
     "typescript": "~5.2.2"
   }
 }

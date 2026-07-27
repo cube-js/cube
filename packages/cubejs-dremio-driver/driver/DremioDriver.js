@@ -7,10 +7,10 @@
 const {
   getEnv,
   assertDataSource,
+  formatAnsi,
   pausePromise,
 } = require('@cubejs-backend/shared');
 const axios = require('axios');
-const SqlString = require('sqlstring');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
 const DremioQuery = require('./DremioQuery');
 
@@ -18,7 +18,7 @@ const DremioQuery = require('./DremioQuery');
 // @see https://docs.dremio.com/rest-api/jobs/get-job.html
 const DREMIO_JOB_LIMIT = 500;
 
-const applyParams = (query, params) => SqlString.format(query, params);
+const applyParams = (query, params) => formatAnsi(query, params);
 
 /**
  * Dremio driver class.
@@ -207,12 +207,7 @@ class DremioDriver extends BaseDriver {
   }
 
   async query(query, values) {
-    const queryString = applyParams(
-      query,
-      (values || []).map(s => (typeof s === 'string' ? {
-        toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
-      } : s))
-    );
+    const queryString = applyParams(query, values || []);
 
     await this.getToken();
     const jobId = await this.executeQuery(queryString);
@@ -280,3 +275,4 @@ class DremioDriver extends BaseDriver {
 }
 
 module.exports = DremioDriver;
+module.exports.applyParams = applyParams;

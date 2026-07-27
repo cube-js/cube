@@ -149,7 +149,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false);
   }
 
-  public prepareQueryWithParams(query: string, values: unknown[]) {
+  protected prepareQueryWithParams(query: string, values: unknown[]) {
     return formatAnsi(query, values || []);
   }
 

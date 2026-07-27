@@ -17,7 +17,7 @@ import {
   TableColumn,
   UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
+import { EscapeDialect, JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
@@ -679,6 +679,10 @@ export class DatabricksDriver extends JDBCDriver {
     }
 
     return result;
+  }
+
+  protected escapeDialect(): EscapeDialect {
+    return 'spark';
   }
 
   /**
