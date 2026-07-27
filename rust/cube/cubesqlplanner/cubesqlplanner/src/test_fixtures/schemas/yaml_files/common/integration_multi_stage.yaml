@@ -462,13 +462,11 @@ cubes:
                 type: to_date
                 granularity: year
 
-          # Real-model shape (mirrors valid_license_seats.licensed_seats_*):
-          # the rolling-window leaf declares `add_group_by` AND the parent
-          # calc re-declares it. `orders.category` must be carried through the
-          # leaf's rollup CTE. NB: the leaf's own `add_group_by` is inert on
-          # the rolling-window path — `try_plan_rolling_window` builds the leaf
-          # before the inode `grain.include` is applied — so it is the parent
-          # calc's pushed-down grain that actually reaches the rollup here.
+          # rolling-window leaf declaring `add_group_by`, with the parent calc
+          # re-declaring it. The leaf's own `add_group_by` is inert on the
+          # rolling path — `try_plan_rolling_window` builds the leaf before the
+          # inode `grain.include` is applied — so it is the parent's pushed-down
+          # grain that reaches the rollup CTE.
           - name: rolling_leaf_own_category
             type: sum
             sql: "{CUBE.total_amount}"
@@ -493,10 +491,8 @@ cubes:
             reduce_by:
                 - orders.category
 
-          # Parent-pushed grain: the rolling-window leaf declares NO grain of
-          # its own; the parent multi-stage calc pushes `orders.category` down
-          # into the leaf, which must still reach the leaf's rollup CTE. This
-          # isolates the parent-push propagation the fix targets.
+          # Same shape with no grain declared on the leaf, so only the parent's
+          # pushed-down `add_group_by` reaches the rollup CTE.
           - name: rolling_leaf_plain
             type: sum
             sql: "{CUBE.total_amount}"

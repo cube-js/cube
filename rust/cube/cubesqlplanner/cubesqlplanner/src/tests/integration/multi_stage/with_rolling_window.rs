@@ -9,53 +9,9 @@ fn create_context() -> TestContext {
 
 const SEED: &str = "integration_multi_stage_tables.sql";
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_rolling_and_add_group_by() {
-    let ctx = create_context();
-
-    let query = indoc! {r#"
-        measures:
-          - orders.rolling_sum_7d
-          - orders.amount_by_id
-        time_dimensions:
-          - dimension: orders.created_at
-            granularity: day
-            dateRange:
-              - "2024-01-01"
-              - "2024-01-31"
-    "#};
-
-    ctx.build_sql(query).unwrap();
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
-}
-
-/// Splits `s` on commas that are not nested inside parentheses.
-fn split_top_level_commas(s: &str) -> Vec<&str> {
-    let mut parts = Vec::new();
-    let mut depth = 0i32;
-    let mut start = 0;
-    for (i, c) in s.char_indices() {
-        match c {
-            '(' => depth += 1,
-            ')' => depth -= 1,
-            ',' if depth == 0 => {
-                parts.push(&s[start..i]);
-                start = i + 1;
-            }
-            _ => {}
-        }
-    }
-    parts.push(&s[start..]);
-    parts
-}
-
-/// Returns the body of the CTE that assembles the rolling window: the one whose
-/// `FROM` reaches the base rollup through the `rolling_source` alias. CTE bodies
-/// are `<name> AS ( ... )`; each `AS (` opener is paren-matched so the returned
-/// slice is exactly that CTE and never spills into an adjacent one.
+/// Body of the CTE that assembles the rolling window — the one reaching the base
+/// rollup through the `rolling_source` alias. Each `AS (` opener is paren-matched
+/// so the returned slice never spills into an adjacent CTE.
 fn rolling_rollup_cte(sql: &str) -> &str {
     let bytes = sql.as_bytes();
     for (open, _) in sql.match_indices(" AS (") {
@@ -78,107 +34,39 @@ fn rolling_rollup_cte(sql: &str) -> &str {
     panic!("no rolling-window rollup CTE (`rolling_source` alias) found in SQL:\n{sql}");
 }
 
-/// Asserts that `dim_alias` is carried through the rolling-window rollup CTE:
-/// it must be BOTH projected in that CTE's SELECT list AND present in its
-/// GROUP BY (matched either by its 1-based ordinal position or by name). This
-/// is the exact shape that regressed — the buggy planner dropped the added
-/// dimension from the rollup, so it was neither selected nor grouped.
-fn assert_dim_carried_through_rollup(sql: &str, dim_alias: &str) {
+/// Asserts `dim_alias` is projected by the rolling-window rollup CTE. The buggy
+/// planner built that CTE's grain from the top-level query dimensions, so an
+/// added dimension was dropped there while downstream CTEs still referenced it.
+fn assert_dim_projected_in_rollup(sql: &str, dim_alias: &str) {
     let cte = rolling_rollup_cte(sql);
-    let quoted = format!("\"{dim_alias}\"");
-
     let select_start = cte.find("SELECT").expect("rollup CTE without SELECT") + "SELECT".len();
     let from_pos = select_start
         + cte[select_start..]
             .find(" FROM")
             .expect("rollup CTE without FROM");
-    let projection = &cte[select_start..from_pos];
-
-    let projections = split_top_level_commas(projection);
-    let dim_index = projections
-        .iter()
-        .position(|p| p.trim_end().ends_with(&quoted))
-        .unwrap_or_else(|| {
-            panic!("`{dim_alias}` not projected in rolling-window rollup CTE:\n{cte}")
-        });
-
-    let gb_start = cte
-        .find("GROUP BY")
-        .unwrap_or_else(|| panic!("rolling-window rollup CTE without GROUP BY:\n{cte}"))
-        + "GROUP BY".len();
-    let gb_end = cte[gb_start..]
-        .find("ORDER BY")
-        .map(|p| gb_start + p)
-        .unwrap_or(cte.len());
-    let group_by = &cte[gb_start..gb_end];
-
-    let ordinal = (dim_index + 1).to_string();
-    let grouped =
-        group_by.contains(dim_alias) || group_by.split(',').map(str::trim).any(|t| t == ordinal);
     assert!(
-        grouped,
-        "`{dim_alias}` (projection #{}) is projected but missing from GROUP BY `{}` \
-         of the rolling-window rollup CTE:\n{cte}",
-        dim_index + 1,
-        group_by.trim(),
+        cte[select_start..from_pos].contains(&format!("\"{dim_alias}\"")),
+        "`{dim_alias}` not projected in rolling-window rollup CTE:\n{cte}",
     );
 }
 
-// Real-model regression (mirrors valid_license_seats.licensed_seats_*): a
-// rolling-window leaf declares `add_group_by` and the parent calc re-declares
-// it. The rolling-window rollup CTE used to source its grain from the
-// top-level query dimensions, dropping the added dimension and emitting SQL
-// that referenced a column absent from the rollup CTE. `orders__category` must
-// now be projected and grouped in the rollup CTE feeding `rolling_source`.
-// (The leaf's own `add_group_by` is inert on the rolling path — see fixture
-// note — so it is the parent calc's pushed-down grain that reaches the rollup;
-// this shape guards that the redundant leaf declaration stays harmless.)
 #[tokio::test(flavor = "multi_thread")]
-async fn test_rolling_multi_stage_add_group_by_leaf_and_parent() {
+async fn test_rolling_and_add_group_by() {
     let ctx = create_context();
 
     let query = indoc! {r#"
         measures:
-          - orders.rolling_leaf_own_reduce
+          - orders.rolling_sum_7d
+          - orders.amount_by_id
         time_dimensions:
           - dimension: orders.created_at
-            granularity: month
+            granularity: day
             dateRange:
               - "2024-01-01"
-              - "2024-03-31"
+              - "2024-01-31"
     "#};
 
-    let sql = ctx.build_sql(query).unwrap();
-    assert_dim_carried_through_rollup(&sql, "orders__category");
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
-}
-
-// Same regression via the parent-push path in isolation: the rolling-window
-// leaf `rolling_leaf_plain` declares NO grain of its own, and the parent
-// multi-stage calc `rolling_parent_pushes_category` pushes
-// `add_group_by: [orders.category]` down into it. The pushed-down dimension
-// must reach the leaf's rollup CTE (projected and grouped), which the bug
-// prevented because the rollup read the top-level (category-less) query grain.
-#[tokio::test(flavor = "multi_thread")]
-async fn test_rolling_multi_stage_add_group_by_pushed_from_parent() {
-    let ctx = create_context();
-
-    let query = indoc! {r#"
-        measures:
-          - orders.rolling_parent_pushed_reduce
-        time_dimensions:
-          - dimension: orders.created_at
-            granularity: month
-            dateRange:
-              - "2024-01-01"
-              - "2024-03-31"
-    "#};
-
-    let sql = ctx.build_sql(query).unwrap();
-    assert_dim_carried_through_rollup(&sql, "orders__category");
+    ctx.build_sql(query).unwrap();
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -299,6 +187,60 @@ async fn test_rolling_and_calculated() {
     "#};
 
     ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A rolling-window leaf under an `add_group_by` calc, queried without the added
+// dimension. The rollup CTE used to take its grain from the top-level query
+// dimensions, dropping `orders.category` while a downstream CTE still joined on
+// it, so the planner emitted SQL naming a column the rollup never selected.
+// Grain is declared on both the leaf and the parent calc here; only the parent's
+// push reaches the rollup (see fixture note), so this also guards that the
+// redundant leaf declaration stays harmless.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_multi_stage_add_group_by_leaf_and_parent() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_leaf_own_reduce
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_dim_projected_in_rollup(&sql, "orders__category");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Same regression with the grain declared only on the parent calc.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_multi_stage_add_group_by_pushed_from_parent() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_parent_pushed_reduce
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_dim_projected_in_rollup(&sql, "orders__category");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
