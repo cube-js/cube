@@ -523,6 +523,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         // TODO: move envs to config
         let stream_mode = self.config_obj.stream_mode();
         let query_limit = self.config_obj.non_streaming_query_max_row_limit();
+        let max_batch_rows = self.config_obj.cube_scan_max_batch_rows();
 
         let stream_mode = match (stream_mode, self.request.limit) {
             (true, None) => true,
@@ -571,6 +572,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 Some(main_stream),
                 one_shot_stream,
                 self.schema.clone(),
+                max_batch_rows,
             )));
         }
 
@@ -596,6 +598,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             None,
             one_shot_stream,
             rb_schema,
+            max_batch_rows,
         )))
     }
 
@@ -700,10 +703,75 @@ impl CubeScanMemoryStream {
     }
 }
 
+/// Splits oversized `RecordBatch`es coming out of a `CubeScan` into chunks of at most
+/// `max_rows` rows. Cube can hand back a whole result set as a single batch (see
+/// `CubeScanOneShotStream`), which forces every downstream consumer to materialize it
+/// in one piece — most visibly the `/v1/cubesql` JSONL writer, which emits one line
+/// per batch. Slicing is zero-copy, so only the batch wrappers are allocated.
+struct RecordBatchSplitter {
+    /// Maximum rows per emitted batch. `None` disables splitting.
+    max_rows: Option<usize>,
+    /// Chunks left to emit, in reverse row order so `pop()` yields them front-to-back.
+    pending: Vec<RecordBatch>,
+}
+
+impl RecordBatchSplitter {
+    pub fn new(max_rows: usize) -> Self {
+        Self {
+            // 0 turns splitting off
+            max_rows: (max_rows > 0).then_some(max_rows),
+            pending: Vec::new(),
+        }
+    }
+
+    /// Takes the next buffered chunk, if any. Must be drained before feeding another
+    /// batch into `split`.
+    fn next_pending(&mut self) -> Option<RecordBatch> {
+        self.pending.pop()
+    }
+
+    /// Returns the first chunk of `batch`, buffering the rest for `next_pending`.
+    fn split(&mut self, batch: RecordBatch) -> ArrowResult<RecordBatch> {
+        debug_assert!(
+            self.pending.is_empty(),
+            "pending chunks must be drained before splitting the next batch"
+        );
+
+        let num_rows = batch.num_rows();
+        let Some(max_rows) = self.max_rows.filter(|max_rows| num_rows > *max_rows) else {
+            return Ok(batch);
+        };
+
+        let schema = batch.schema();
+        let mut chunks = Vec::with_capacity(num_rows.div_ceil(max_rows));
+        let mut offset = 0;
+        while offset < num_rows {
+            let len = max_rows.min(num_rows - offset);
+            let columns = batch
+                .columns()
+                .iter()
+                .map(|column| column.slice(offset, len))
+                .collect();
+            chunks.push(RecordBatch::try_new(schema.clone(), columns)?);
+            offset += len;
+        }
+
+        // `pending` is popped from the back, so reverse to keep rows in order
+        chunks.reverse();
+        let first = chunks
+            .pop()
+            .expect("num_rows > max_rows >= 1 always yields at least one chunk");
+        self.pending = chunks;
+
+        Ok(first)
+    }
+}
+
 struct CubeScanStreamRouter {
     main_stream: Option<CubeScanMemoryStream>,
     one_shot_stream: CubeScanOneShotStream,
     schema: SchemaRef,
+    splitter: RecordBatchSplitter,
 }
 
 impl CubeScanStreamRouter {
@@ -711,12 +779,41 @@ impl CubeScanStreamRouter {
         main_stream: Option<CubeScanMemoryStream>,
         one_shot_stream: CubeScanOneShotStream,
         schema: SchemaRef,
+        max_batch_rows: usize,
     ) -> Self {
         Self {
             main_stream,
             one_shot_stream,
             schema,
+            splitter: RecordBatchSplitter::new(max_batch_rows),
         }
+    }
+
+    /// Pulls the next batch from the streaming transport, falling back to a one-shot
+    /// load when it turns out to not implement streaming.
+    fn poll_next_batch(&mut self, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
+        let Some(main_stream) = &mut self.main_stream else {
+            return Poll::Ready(self.one_shot_stream.poll_next());
+        };
+
+        let next = main_stream.poll_next(cx);
+        if let Poll::Ready(Some(Err(ArrowError::ExternalError(err)))) = &next {
+            if err
+                .to_string()
+                .contains("streamQuery() method is not implemented yet")
+            {
+                warn!("{}", err);
+
+                self.main_stream = None;
+
+                return Poll::Ready(match load_to_stream_sync(&mut self.one_shot_stream) {
+                    Ok(_) => self.one_shot_stream.poll_next(),
+                    Err(e) => Some(Err(e.into())),
+                });
+            }
+        }
+
+        next
     }
 }
 
@@ -727,28 +824,14 @@ impl Stream for CubeScanStreamRouter {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        match &mut self.main_stream {
-            Some(main_stream) => {
-                let next = main_stream.poll_next(cx);
-                if let Poll::Ready(Some(Err(ArrowError::ExternalError(err)))) = &next {
-                    if err
-                        .to_string()
-                        .contains("streamQuery() method is not implemented yet")
-                    {
-                        warn!("{}", err);
+        // Emit the leftovers of an already split batch before pulling more data
+        if let Some(batch) = self.splitter.next_pending() {
+            return Poll::Ready(Some(Ok(batch)));
+        }
 
-                        self.main_stream = None;
-
-                        return Poll::Ready(match load_to_stream_sync(&mut self.one_shot_stream) {
-                            Ok(_) => self.one_shot_stream.poll_next(),
-                            Err(e) => Some(Err(e.into())),
-                        });
-                    }
-                }
-
-                return next;
-            }
-            None => Poll::Ready(self.one_shot_stream.poll_next()),
+        match self.poll_next_batch(cx) {
+            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(self.splitter.split(batch))),
+            next => next,
         }
     }
 }
@@ -1326,7 +1409,7 @@ mod tests {
     use datafusion::{
         arrow::{
             array::{
-                Array, BooleanArray, Date32Array, Float64Array, StringArray,
+                Array, BooleanArray, Date32Array, Float64Array, Int64Array, StringArray,
                 TimestampNanosecondArray,
             },
             datatypes::{Field, Schema},
@@ -1389,6 +1472,100 @@ mod tests {
             updated.metadata().get("external"),
             Some(&"true".to_string())
         );
+    }
+
+    /// Collects everything a splitter produces for a single input batch: the chunk
+    /// returned by `split` plus every buffered leftover, as row values.
+    fn split_to_rows(splitter: &mut RecordBatchSplitter, batch: RecordBatch) -> Vec<Vec<i64>> {
+        let to_rows = |batch: &RecordBatch| {
+            let column = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .expect("Int64 column");
+            (0..batch.num_rows()).map(|i| column.value(i)).collect()
+        };
+
+        let mut chunks = vec![to_rows(&splitter.split(batch).unwrap())];
+        while let Some(pending) = splitter.next_pending() {
+            chunks.push(to_rows(&pending));
+        }
+
+        chunks
+    }
+
+    fn build_int64_batch(rows: usize) -> RecordBatch {
+        RecordBatch::try_new(
+            build_schema(),
+            vec![Arc::new(Int64Array::from((0..rows as i64).collect::<Vec<_>>())) as ArrayRef],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn record_batch_splitter_passes_through_batches_within_limit() {
+        let mut splitter = RecordBatchSplitter::new(5);
+
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(5)),
+            vec![vec![0, 1, 2, 3, 4]]
+        );
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(0)),
+            vec![Vec::<i64>::new()]
+        );
+    }
+
+    #[test]
+    fn record_batch_splitter_splits_oversized_batches_preserving_row_order() {
+        let mut splitter = RecordBatchSplitter::new(2);
+
+        // Uneven split: the trailing chunk holds the remainder
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(5)),
+            vec![vec![0, 1], vec![2, 3], vec![4]]
+        );
+
+        // Even split: no short trailing chunk
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(4)),
+            vec![vec![0, 1], vec![2, 3]]
+        );
+    }
+
+    #[test]
+    fn record_batch_splitter_disabled_with_zero_max_rows() {
+        let mut splitter = RecordBatchSplitter::new(0);
+
+        assert_eq!(
+            split_to_rows(&mut splitter, build_int64_batch(3)),
+            vec![vec![0, 1, 2]]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_df_cube_scan_execute_splits_batches() -> Result<(), CubeError> {
+        // The test transport returns all 5 rows as a single batch; the splitter
+        // must break that into 3 batches of at most 2 rows each.
+        let scan_node = CubeScanExecutionPlan {
+            config_obj: crate::config::Config::test()
+                .update_config(|mut config| {
+                    config.cube_scan_max_batch_rows = 2;
+                    config
+                })
+                .config_obj(),
+            ..build_test_scan_node()
+        };
+
+        let batches =
+            common::collect(scan_node.execute(0, build_test_task_context()?).await?).await?;
+
+        assert_eq!(
+            batches.iter().map(|b| b.num_rows()).collect::<Vec<_>>(),
+            vec![2, 2, 1]
+        );
+
+        Ok(())
     }
 
     #[test]
@@ -1595,11 +1772,8 @@ mod tests {
         Arc::new(TestConnectionTransport {})
     }
 
-    #[tokio::test]
-    async fn test_df_cube_scan_execute() -> Result<(), CubeError> {
-        assert_eq!(std::mem::size_of::<FieldValue>(), 24);
-
-        let schema = Arc::new(Schema::new(vec![
+    fn build_test_scan_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
             Field::new(
@@ -1624,9 +1798,26 @@ mod tests {
                 DataType::Date32,
                 false,
             ),
-        ]));
+        ]))
+    }
 
-        let scan_node = CubeScanExecutionPlan {
+    fn build_test_task_context() -> Result<Arc<TaskContext>, CubeError> {
+        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
+
+        Ok(Arc::new(TaskContext::new(
+            "test".to_string(),
+            "session".to_string(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            runtime,
+        )))
+    }
+
+    fn build_test_scan_node() -> CubeScanExecutionPlan {
+        let schema = build_test_scan_schema();
+
+        CubeScanExecutionPlan {
             schema: schema.clone(),
             member_fields: schema
                 .fields()
@@ -1667,18 +1858,17 @@ mod tests {
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
             span_id: None,
             config_obj: crate::config::Config::test().config_obj(),
-        };
+        }
+    }
 
-        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
-        let task = Arc::new(TaskContext::new(
-            "test".to_string(),
-            "session".to_string(),
-            HashMap::new(),
-            HashMap::new(),
-            HashMap::new(),
-            runtime,
-        ));
-        let stream = scan_node.execute(0, task).await?;
+    #[tokio::test]
+    async fn test_df_cube_scan_execute() -> Result<(), CubeError> {
+        assert_eq!(std::mem::size_of::<FieldValue>(), 24);
+
+        let scan_node = build_test_scan_node();
+        let schema = scan_node.schema.clone();
+
+        let stream = scan_node.execute(0, build_test_task_context()?).await?;
         let batches = common::collect(stream).await?;
 
         assert_eq!(

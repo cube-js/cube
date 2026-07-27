@@ -1513,6 +1513,21 @@ Queries without an explicit `LIMIT` still use [`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS`
+
+Specifies the maximum number of rows in a single record batch produced when the
+[SQL API][ref-sql-api] reads data from a cube. Larger result sets are split into
+several batches, which lets downstream consumers process them incrementally
+instead of materializing the whole result set at once. In particular, the
+[`/v1/cubesql`][ref-ref-cubesql] endpoint emits one newline-delimited JSON chunk
+per batch.
+
+Set to `0` to disable splitting.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| A non-negative integer number  | `50000`                | `50000`               |
+
 ## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
 
 If `true`, prevents adding implicit [default `ORDER BY`
@@ -2140,6 +2155,7 @@ The port for a Cube deployment to listen to API connections on.
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
+[ref-ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
 [ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match

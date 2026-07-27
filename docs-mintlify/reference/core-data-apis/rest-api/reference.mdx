@@ -423,7 +423,9 @@ Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, and optionally
 `lastRefreshTime` indicating when the data was last refreshed.
 The following objects contain chunks of the result set under the `data` property.
-Each chunk includes one or more rows of the result set.
+Each chunk includes one or more rows of the result set; the maximum number of rows
+per chunk is set by
+[`CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS`](/reference/configuration/environment-variables#cubesql_cube_scan_max_batch_rows).
 
 ### Example
 
