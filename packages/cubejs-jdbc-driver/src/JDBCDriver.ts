@@ -237,7 +237,13 @@ export class JDBCDriver extends BaseDriver {
 
   protected escapeDialect(): EscapeDialect {
     const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
-    return dbTypeDescription?.escapeDialect || 'mysql';
+    if (dbTypeDescription?.escapeDialect) {
+      return dbTypeDescription.escapeDialect;
+    }
+
+    throw new Error(
+      `Unable to detect SQL escaping rules for db type "${this.config.dbType}"`
+    );
   }
 
   protected prepareQueryWithParams(query: string, values: unknown[]): string {

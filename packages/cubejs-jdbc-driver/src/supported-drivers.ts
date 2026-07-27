@@ -8,7 +8,7 @@ export interface DriverOptionsInterface {
   mavenDependency: Record<string, any>;
   properties: Record<string, any>;
   jdbcUrl: () => string;
-  escapeDialect?: EscapeDialect;
+  escapeDialect: EscapeDialect;
 }
 
 export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
