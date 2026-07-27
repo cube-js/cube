@@ -58,6 +58,10 @@ Instead of the access key pair above, Vector can authenticate to CloudWatch with
 the deployment's [OIDC][ref-oidc] identity — no static credentials stored in
 Cube, and nothing to rotate.
 
+The credentials apply to the **whole Vector agent**, not just this sink, so the
+same role also covers the [S3][ref-s3] and [Query History export][ref-query-history-export]
+sinks if you use them.
+
 <Note>
 
 Requires [OIDC][ref-oidc] enabled for your tenant with an `AWS` token config.
@@ -66,12 +70,15 @@ Requires [OIDC][ref-oidc] enabled for your tenant with an `AWS` token config.
 
 <Steps>
   <Step title="Create the IAM role">
-    Follow [CloudWatch for monitoring integrations][ref-oidc-aws-cloudwatch] to
-    register Cube as an OIDC provider (once per AWS account) and create a role
-    that trusts your deployment and can write to the log group.
+    [Register Cube as an OIDC provider][ref-oidc-aws-provider] in your AWS
+    account — a one-time step per account — then follow
+    [Monitoring integrations][ref-oidc-aws-cloudwatch] to create a role that
+    trusts your deployment and can write to the log group.
 
-    Note the `logs:DescribeLogGroups` caveat there — it must be scoped to `"*"`
-    or Vector's healthcheck fails at startup.
+    Two things to carry over from that section: the `sub` claim needs the
+    non-default `:component:` **Subject Claim Format**, and
+    `logs:DescribeLogGroups` must be scoped to `"*"` or Vector's healthcheck
+    fails at startup.
   </Step>
   <Step title="Set the deployment environment variables">
     Under **Settings → Environment variables**:
@@ -92,6 +99,7 @@ Requires [OIDC][ref-oidc] enabled for your tenant with an `AWS` token config.
     ```toml
     [sinks.aws_cloudwatch_logs]
     type = "aws_cloudwatch_logs"
+    # "warmup-job" is omitted deliberately — see the warning below.
     inputs = [
       "cubejs-server",
       "refresh-scheduler",
@@ -100,6 +108,8 @@ Requires [OIDC][ref-oidc] enabled for your tenant with an `AWS` token config.
     region = "us-east-1"
     group_name = "your-group-name"
     stream_name = "your-stream-name"
+    # Add create_missing_group = true only if you also grant
+    # logs:CreateLogGroup to the role.
     create_missing_stream = true
 
     [sinks.aws_cloudwatch_logs.encoding]
@@ -125,5 +135,8 @@ using the access key pair.
 [ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-monitoring-integrations-conf]: /admin/monitoring/monitoring-integrations#configuration
 [ref-oidc]: /admin/deployment/oidc
-[ref-oidc-aws-cloudwatch]: /admin/deployment/oidc/aws#cloudwatch-for-monitoring-integrations
+[ref-oidc-aws-cloudwatch]: /admin/deployment/oidc/aws#monitoring-integrations-cloudwatch-s3
+[ref-oidc-aws-provider]: /admin/deployment/oidc/aws#step-1-register-cube-as-an-oidc-provider-in-aws
+[ref-s3]: /admin/monitoring/monitoring-integrations/s3
+[ref-query-history-export]: /admin/monitoring/query-history-export
 [ref-preagg-warmup]: /admin/deployment/warm-up

@@ -566,17 +566,35 @@ the same Bedrock account).
   </Step>
 </Steps>
 
-## CloudWatch for monitoring integrations
+## Monitoring integrations (CloudWatch, S3)
 
 [Monitoring integrations][ref-monitoring-integrations] can ship deployment logs
-to Amazon CloudWatch without a static access key pair. The Vector agent that
-performs the export reads the deployment's OIDC token and assumes an IAM role,
-exactly like the targets above — so the `[sinks.*.auth]` block disappears from
-`vector.toml` entirely.
+to AWS without a static access key pair. The Vector agent that performs the
+export reads the deployment's OIDC token and assumes an IAM role, exactly like
+the targets above — so the `[sinks.*.auth]` block disappears from `vector.toml`
+entirely.
+
+The credentials are resolved by the AWS SDK's default chain **for the whole
+Vector agent**, not per sink, so one role serves every AWS sink you configure —
+[`aws_cloudwatch_logs`][ref-cloudwatch], [`aws_s3`][ref-s3], and the `aws_s3`
+sink used by [Query History export][ref-query-history-export]. Grant that single
+role whatever those sinks need.
 
 Vector authenticates as the deployment's **`cube_api`** component, so the trust
 policy is the standard one from [Step 3](#step-3-build-the-trust-policy) with
 `sub` set to `cube:deployment:<deployment-id>:component:cube_api`.
+
+<Warning>
+
+That `sub` uses the `:component:` form, which is **not** Cube's default — the
+default claim is `cube:deployment:<deployment-id>` with no `component` segment,
+and a trust policy written against the pattern above will never match it. Set
+**Subject Claim Format** on your `AWS` token config to
+`cube:deployment:{deployment_id}:component:{component}` first; see
+[Step 3](#step-3-build-the-trust-policy) for the full syntax and the ordering
+caveat when changing it on a config that is already in use.
+
+</Warning>
 
 <Steps>
   <Step title="Create the CloudWatch role">
@@ -610,6 +628,11 @@ policy is the standard one from [Step 3](#step-3-build-the-trust-policy) with
 
     Add `logs:CreateLogGroup` to the first statement if you set
     `create_missing_group = true` in the sink.
+
+    If the same agent also writes to S3 (the [S3][ref-s3] or
+    [Query History export][ref-query-history-export] sinks), add the bucket
+    permissions those need — `s3:PutObject` on `arn:aws:s3:::<bucket>/*` — to
+    this same role.
   </Step>
   <Step title="Point the deployment at the role">
     Set these on the deployment under **Settings → Environment variables**:
@@ -680,5 +703,7 @@ authenticating against which roles.
 [ref-export-bucket]: /admin/connect-to-data#export-bucket
 [ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-cloudwatch]: /admin/monitoring/monitoring-integrations/cloudwatch
+[ref-s3]: /admin/monitoring/monitoring-integrations/s3
+[ref-query-history-export]: /admin/monitoring/query-history-export
 [ref-athena-assume-role]: /admin/connect-to-data/data-sources/aws-athena#environment-variables
 [ref-redshift-driver-iam]: /admin/connect-to-data/data-sources/aws-redshift#iam-authentication
