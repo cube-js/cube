@@ -446,6 +446,7 @@ impl MockSqlTemplatesRender {
             "{% if start_wild %}'%' || {% endif %}{{ value }}{% if end_wild %}|| '%'{% endif %}"
                 .to_string(),
         );
+        templates.insert("filters/like_escape_char".to_string(), "\\".to_string());
         templates.insert("filters/always_true".to_string(), "1 = 1".to_string());
 
         // Quotes - based on BaseQuery.js:4417-4420
