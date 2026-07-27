@@ -97,7 +97,13 @@ describe('Repro #11367 - CASE dimension over a multi-stage measure with grain.in
     });
   `);
 
-  it('does not reference the base cube alias once it is out of scope', async () => {
+  // Reproduces https://github.com/cube-js/cube/issues/11367 — currently fails
+  // because the CASE-dimension CTE re-emits `"login_report".SCHOOL_CODE` /
+  // `"login_report".DATE_TIME` while its own FROM clause only exposes
+  // `cte_2 AS "fk_aggregate"`, so `login_report` is out of scope. Flip this to
+  // `it(...)` once the planner is fixed to read grain columns off the
+  // aggregate alias instead of re-deriving them from the base cube.
+  it.failing('does not reference the base cube alias once it is out of scope', async () => {
     await compiler.compile();
     compiler.throwIfAnyErrors();
 
@@ -116,6 +122,6 @@ describe('Repro #11367 - CASE dimension over a multi-stage measure with grain.in
     // read from the previous stage's aggregate alias, not re-derived from the
     // base `login_report` cube alias, which is no longer in scope in the CTE
     // that evaluates the CASE dimension.
-    expect(sql).not.toMatch(/\blogin_report\.(school_code|date_time)\b/i);
+    expect(sql).not.toMatch(/"login_report"\.(SCHOOL_CODE|DATE_TIME)/i);
   });
 });
