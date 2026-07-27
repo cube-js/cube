@@ -566,6 +566,92 @@ the same Bedrock account).
   </Step>
 </Steps>
 
+## CloudWatch for monitoring integrations
+
+[Monitoring integrations][ref-monitoring-integrations] can ship deployment logs
+to Amazon CloudWatch without a static access key pair. The Vector agent that
+performs the export reads the deployment's OIDC token and assumes an IAM role,
+exactly like the targets above — so the `[sinks.*.auth]` block disappears from
+`vector.toml` entirely.
+
+Vector authenticates as the deployment's **`cube_api`** component, so the trust
+policy is the standard one from [Step 3](#step-3-build-the-trust-policy) with
+`sub` set to `cube:deployment:<deployment-id>:component:cube_api`.
+
+<Steps>
+  <Step title="Create the CloudWatch role">
+    Create a role with that trust policy and attach a permissions policy that
+    can write to your log group:
+
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "logs:DescribeLogStreams"
+          ],
+          "Resource": [
+            "arn:aws:logs:<region>:<aws-account-id>:log-group:<log-group-name>",
+            "arn:aws:logs:<region>:<aws-account-id>:log-group:<log-group-name>:*"
+          ]
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["logs:DescribeLogGroups"],
+          "Resource": "*"
+        }
+      ]
+    }
+    ```
+
+    Add `logs:CreateLogGroup` to the first statement if you set
+    `create_missing_group = true` in the sink.
+  </Step>
+  <Step title="Point the deployment at the role">
+    Set these on the deployment under **Settings → Environment variables**:
+
+    ```dotenv
+    CUBE_CLOUD_MONITORING_AWS_ROLE_ARN=arn:aws:iam::<aws-account-id>:role/<role-name>
+    CUBE_CLOUD_MONITORING_AWS_REGION=<region>
+    ```
+
+    Then drop the `auth` block from your `vector.toml` — see
+    [Integration with Amazon CloudWatch][ref-cloudwatch] for the sink
+    configuration.
+  </Step>
+</Steps>
+
+<Warning>
+
+**`logs:DescribeLogGroups` must be scoped to `"*"`.** Vector's healthcheck calls
+it, and it is an account-level list operation that AWS evaluates against an
+*empty* resource. Scoping it to your log group ARN — the natural
+least-privilege instinct — denies it, and the sink is marked unhealthy at
+startup with:
+
+```
+not authorized to perform: logs:DescribeLogGroups on resource:
+arn:aws:logs:<region>:<aws-account-id>:log-group::log-stream:
+```
+
+Keep it in a separate statement from the log-group-scoped write actions, as
+shown above.
+
+</Warning>
+
+<Info>
+
+This role is separate from the deployment's default `AWS_ROLE_ARN`. Because
+both are assumed by the same `cube_api` identity, a trust policy written for
+one will also admit the other — scope each role's **permissions** policy
+tightly rather than relying on the trust policy to separate them.
+
+</Info>
+
 ## Verifying the setup
 
 The fastest way to confirm the trust policy is wired up correctly is the
@@ -592,5 +678,7 @@ authenticating against which roles.
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format
 [ref-cube-cloud-region]: /admin/deployment/infrastructure#what-is-a-cube-cloud-region
 [ref-export-bucket]: /admin/connect-to-data#export-bucket
+[ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
+[ref-cloudwatch]: /admin/monitoring/monitoring-integrations/cloudwatch
 [ref-athena-assume-role]: /admin/connect-to-data/data-sources/aws-athena#environment-variables
 [ref-redshift-driver-iam]: /admin/connect-to-data/data-sources/aws-redshift#iam-authentication
