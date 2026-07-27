@@ -770,7 +770,9 @@ impl BaseFilter {
         plan_templates: &PlanSqlTemplates,
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
-        let values = self.filter_cast_and_allocate_values(member_type, plan_templates)?;
+        let escape_char = plan_templates.like_escape_char()?;
+        let values =
+            self.filter_cast_and_allocate_values_escaped(member_type, plan_templates, escape_char)?;
         let like_parts = values
             .into_iter()
             .map(|v| plan_templates.ilike(member_sql, &v, start_wild, end_wild, not))
@@ -980,6 +982,15 @@ impl BaseFilter {
         member_type: &Option<String>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<Vec<String>, CubeError> {
+        self.filter_cast_and_allocate_values_escaped(member_type, plan_templates, None)
+    }
+
+    fn filter_cast_and_allocate_values_escaped(
+        &self,
+        member_type: &Option<String>,
+        plan_templates: &PlanSqlTemplates,
+        escape_char: Option<char>,
+    ) -> Result<Vec<String>, CubeError> {
         let map_fn: Box<dyn Fn(String) -> Result<String, CubeError>> =
             if let Some(member_type) = member_type {
                 match member_type.as_str() {
@@ -994,9 +1005,26 @@ impl BaseFilter {
         let res = self
             .values
             .iter()
-            .filter_map(|v| v.as_ref().map(|v| self.allocate_param(&v)))
+            .filter_map(|v| v.as_ref())
+            .map(|v| {
+                let escaped = escape_char
+                    .map(|character| escape_like_pattern(v, character))
+                    .unwrap_or_else(|| v.clone());
+                self.allocate_param(&escaped)
+            })
             .map(|s| map_fn(s))
             .collect::<Result<Vec<String>, _>>()?;
         Ok(res)
     }
+}
+
+fn escape_like_pattern(value: &str, escape_char: char) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        if character == escape_char || matches!(character, '%' | '_') {
+            escaped.push(escape_char);
+        }
+        escaped.push(character);
+    }
+    escaped
 }
