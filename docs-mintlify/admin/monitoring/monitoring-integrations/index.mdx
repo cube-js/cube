@@ -319,7 +319,7 @@ Exported data includes the following fields:
 
 | Field | Description |
 | --- | --- |
-| `trace_id` | Unique identifier of the API request. |
+| `trace_id` | Unique identifier of the API request. Can also be attached to data source queries, see [query tracing][ref-query-tracing]. |
 | `account_name` | Name of the Cube Cloud account. |
 | `deployment_id` | Identifier of the [deployment][ref-deployments]. |
 | `environment_name` | Name of the [environment][ref-environments], `NULL` for production. |
@@ -376,3 +376,4 @@ Query History export.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-cache-type]: /docs/pre-aggregations#cache-type
 [ref-query-history-export-recipe]: /admin/monitoring/query-history-export
+[ref-query-tracing]: /admin/connect-to-data/query-tracing
