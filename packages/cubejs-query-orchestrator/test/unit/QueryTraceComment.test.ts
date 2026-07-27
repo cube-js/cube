@@ -156,6 +156,29 @@ describe('SQL trace comment', () => {
     expect(executed.match(/\/\*/g)).toHaveLength(1);
     expect(executed.match(/\*\//g)).toHaveLength(1);
   });
+
+  // `queryWithRetryAndRelease` is public and takes `query` as `any`, so the
+  // tuple form is handled even though today's internal callers all unwrap it
+  // upstream and pass the SQL on its own.
+  describe('tuple-form queries', () => {
+    const traceQuery = (req: any) => (orchestrator as any).queryCache.traceQuery(req);
+
+    test('tags the SQL and leaves the parameters alone', () => {
+      process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+
+      expect(traceQuery({
+        query: [SQL, [1, 'two']],
+        requestId: TRACE_ID,
+        primaryQuery: true,
+      })).toEqual([`${SQL}\n${EXPECTED_COMMENT}`, [1, 'two']]);
+    });
+
+    test('is left untouched when the env var is unset', () => {
+      const query = [SQL, [1]];
+
+      expect(traceQuery({ query, requestId: TRACE_ID, primaryQuery: true })).toBe(query);
+    });
+  });
 });
 
 describe('SQL trace comment and the cache key', () => {
