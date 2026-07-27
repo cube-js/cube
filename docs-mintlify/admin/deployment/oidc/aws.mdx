@@ -631,8 +631,12 @@ caveat when changing it on a config that is already in use.
 
     If the same agent also writes to S3 (the [S3][ref-s3] or
     [Query History export][ref-query-history-export] sinks), add the bucket
-    permissions those need — `s3:PutObject` on `arn:aws:s3:::<bucket>/*` — to
-    this same role.
+    permissions those need to this same role: `s3:PutObject` on
+    `arn:aws:s3:::<bucket>/*`, plus `s3:ListBucket` on `arn:aws:s3:::<bucket>`
+    if you enable the sink's healthcheck. Both S3 examples in the docs ship with
+    `[sinks.aws_s3.healthcheck] enabled = false`, so `s3:PutObject` alone is
+    enough as written — but Vector's `aws_s3` healthcheck issues a `HeadBucket`,
+    which AWS authorizes as `s3:ListBucket` on the bucket ARN (not `/*`).
   </Step>
   <Step title="Point the deployment at the role">
     Set these on the deployment under **Settings → Environment variables**:
