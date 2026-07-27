@@ -16,6 +16,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
+    "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:athena",
     "integration:athena": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
@@ -31,8 +32,7 @@
     "@aws-sdk/client-athena": "^3.22.0",
     "@aws-sdk/credential-providers": "^3.22.0",
     "@cubejs-backend/base-driver": "1.6.69",
-    "@cubejs-backend/shared": "1.6.69",
-    "sqlstring": "^2.3.1"
+    "@cubejs-backend/shared": "1.6.69"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.69",
