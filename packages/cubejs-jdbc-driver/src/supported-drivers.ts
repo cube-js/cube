@@ -1,4 +1,6 @@
-export type EscapeDialect = 'ansi' | 'mysql';
+import type { EscapeDialect } from '@cubejs-backend/shared';
+
+export type { EscapeDialect };
 
 export interface DriverOptionsInterface {
   driverClass: string;
@@ -42,7 +44,7 @@ export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
     }
   },
   sparksql: {
-    escapeDialect: 'mysql',
+    escapeDialect: 'spark',
     driverClass: 'org.apache.hive.jdbc.HiveDriver',
     prepareConnectionQueries: [],
     mavenDependency: {
@@ -57,7 +59,7 @@ export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
     }
   },
   hive: {
-    escapeDialect: 'mysql',
+    escapeDialect: 'spark',
     driverClass: 'org.apache.hive.jdbc.HiveDriver',
     prepareConnectionQueries: [],
     mavenDependency: {

@@ -1,8 +1,10 @@
 /* eslint-disable quotes */
 import {
   escapeStringLiteral,
+  format,
   formatAnsi,
   formatMySql,
+  formatSparkSql,
 } from '../src/sql-escape';
 
 const injectionPayloads: Array<[string, string]> = [
@@ -66,6 +68,38 @@ function decodeMySqlLiteral(literal: string): string {
   return decoded;
 }
 
+/**
+ * Parses the subset of Spark SQL / Hive string-literal syntax emitted by
+ * SqlEscaper. A doubled quote is not an escape there, so any quote in the body
+ * must be backslash-prefixed — an unescaped one means the escaper let the
+ * literal close early (and Spark would concatenate whatever follows).
+ */
+function decodeSparkLiteral(literal: string): string {
+  if (literal.length < 2 || literal[0] !== "'" || literal[literal.length - 1] !== "'") {
+    throw new Error('Not a quoted Spark string literal');
+  }
+
+  const body = literal.slice(1, -1);
+  let decoded = '';
+  for (let i = 0; i < body.length; i++) {
+    const char = body[i];
+    if (char === "'") {
+      throw new Error('Unescaped quote in Spark string literal');
+    }
+    if (char === '\\') {
+      const next = body[i + 1];
+      if (next !== '\\' && next !== "'") {
+        throw new Error('Unescaped backslash in Spark string literal');
+      }
+      decoded += next;
+      i++;
+    } else {
+      decoded += char;
+    }
+  }
+  return decoded;
+}
+
 function stringsUpToLength(alphabet: string[], maxLength: number): string[] {
   const values = [''];
   let current = [''];
@@ -90,6 +124,12 @@ describe('sql-escape', () => {
     escapeIdentifier: (value: string) => formatMySql('??', [value]),
     escapeValue: (value: unknown) => formatMySql('?', [value]),
     format: formatMySql,
+  };
+  const spark = {
+    escapeString: (value: string) => formatSparkSql('?', [value]),
+    escapeIdentifier: (value: string) => formatSparkSql('??', [value]),
+    escapeValue: (value: unknown) => formatSparkSql('?', [value]),
+    format: formatSparkSql,
   };
 
   describe('escapeString — ANSI/Presto (double quotes, backslash literal)', () => {
@@ -194,10 +234,59 @@ describe('sql-escape', () => {
     });
   });
 
+  describe('escapeString — Spark SQL/Hive/Databricks (backslash escapes only)', () => {
+    it('escapes quotes with a backslash instead of doubling them', () => {
+      // Verified against apache/spark:3.5.1 — `SELECT 'O''Brien'` returns OBrien
+      // (two adjacent literals, silently concatenated), while `'O\'Brien'`
+      // returns O'Brien. Hive 2.3.5 concatenates the same way by grammar.
+      expect(spark.escapeString("O'Brien")).toBe("'O\\'Brien'");
+      expect(spark.escapeString("O'Brien")).not.toContain("''");
+    });
+
+    it('doubles backslashes', () => {
+      expect(spark.escapeString('a\\b')).toBe("'a\\\\b'");
+    });
+
+    it('neutralizes a trailing backslash + quote payload', () => {
+      expect(spark.escapeString("\\'")).toBe("'\\\\\\''");
+    });
+
+    it.each(injectionPayloads)('keeps the %s payload inside one literal', (_name, payload) => {
+      expect(decodeSparkLiteral(spark.escapeString(payload))).toBe(payload);
+    });
+
+    it('round-trips every short combination of dangerous characters', () => {
+      const candidates = stringsUpToLength(["'", '\\', '\0', '\n', '\r', 'a'], 4);
+
+      for (const candidate of candidates) {
+        expect(decodeSparkLiteral(spark.escapeString(candidate))).toBe(candidate);
+      }
+    });
+
+    it('escapes alternating backslashes and quote runs without changing their value', () => {
+      const value = "\\''\\\\'''";
+      expect(decodeSparkLiteral(spark.escapeString(value))).toBe(value);
+    });
+
+    it('preserves representative Unicode and invisible characters', () => {
+      const values = [
+        'Café 日本語 👨‍👩‍👧‍👦',
+        'cafe\u0301',
+        'مرحبا بالعالم',
+        'left\u200Dright',
+      ];
+
+      for (const value of values) {
+        expect(decodeSparkLiteral(spark.escapeString(value))).toBe(value);
+      }
+    });
+  });
+
   describe('escapeIdentifier', () => {
     it('quotes with the dialect identifier char and doubles it', () => {
       expect(presto.escapeIdentifier('my"col')).toBe('"my""col"');
       expect(mysql.escapeIdentifier('my`col')).toBe('`my``col`');
+      expect(spark.escapeIdentifier('my`col')).toBe('`my``col`');
     });
 
     it('keeps identifier injection payloads within the quoted identifier', () => {
@@ -386,6 +475,30 @@ describe('sql-escape', () => {
     it('substitutes placeholders adjacent to arithmetic operators', () => {
       expect(presto.format('SELECT ? - ? + ? / ?', [10, 3, 20, 4]))
         .toBe('SELECT 10 - 3 + 20 / 4');
+    });
+  });
+
+  describe('format (dialect-driven entry point)', () => {
+    it('escapes according to the requested dialect', () => {
+      const value = "a\\b'c";
+
+      expect(format('ansi', 'WHERE a = ?', [value])).toBe("WHERE a = 'a\\b''c'");
+      expect(format('mysql', 'WHERE a = ?', [value])).toBe("WHERE a = 'a\\\\b''c'");
+      expect(format('spark', 'WHERE a = ?', [value])).toBe("WHERE a = 'a\\\\b\\'c'");
+    });
+
+    it('escapes identifiers according to the requested dialect', () => {
+      expect(format('ansi', 'SELECT ??', ['col'])).toBe('SELECT "col"');
+      expect(format('mysql', 'SELECT ??', ['col'])).toBe('SELECT `col`');
+      expect(format('spark', 'SELECT ??', ['col'])).toBe('SELECT `col`');
+    });
+
+    it('backs the per-dialect convenience helpers', () => {
+      const args: [string, unknown[]] = ['WHERE a = ? AND b = ??', ["it's", 'col']];
+
+      expect(formatAnsi(...args)).toBe(format('ansi', ...args));
+      expect(formatMySql(...args)).toBe(format('mysql', ...args));
+      expect(formatSparkSql(...args)).toBe(format('spark', ...args));
     });
   });
 

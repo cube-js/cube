@@ -8,8 +8,7 @@ import {
   getEnv,
   assertDataSource,
   CancelablePromise,
-  formatAnsi,
-  formatMySql,
+  format,
   Pool,
 } from '@cubejs-backend/shared';
 import {
@@ -242,9 +241,7 @@ export class JDBCDriver extends BaseDriver {
   }
 
   protected prepareQueryWithParams(query: string, values: unknown[]): string {
-    return this.escapeDialect() === 'ansi'
-      ? formatAnsi(query, values || [])
-      : formatMySql(query, values || []);
+    return format(this.escapeDialect(), query, values || []);
   }
 
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {

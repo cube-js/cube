@@ -30,6 +30,19 @@ const MySqlDialect: SqlDialectEscapeRules = {
   identifierQuoteChar: '`',
 };
 
+/**
+ * Spark SQL / Hive / Databricks. Their lexers know backslash escapes only — a
+ * doubled quote is NOT an escape, it closes the literal and opens the next one.
+ * Because adjacent literals are concatenated, `'O''Brien'` silently evaluates to
+ * `OBrien` instead of raising, so quotes MUST be escaped as `\'` here.
+ */
+const SparkSqlDialect: SqlDialectEscapeRules = {
+  stringQuoteChar: '\'',
+  doubleQuoteToEscape: false,
+  escapeBackslash: true,
+  identifierQuoteChar: '`',
+};
+
 class SqlEscaper {
   public constructor(public readonly rules: SqlDialectEscapeRules) {}
 
@@ -166,11 +179,33 @@ class SqlEscaper {
 }
 
 /**
+ * Escaping dialect of the target engine:
+ *   - `ansi`  — standard SQL: Presto, Trino, Athena, Dremio, ksqlDB, Pinot, ...
+ *   - `mysql` — MySQL / MariaDB: quotes doubled, backslash is an escape char
+ *   - `spark` — Spark SQL / Hive / Databricks: backslash escapes only
+ */
+export type EscapeDialect = 'ansi' | 'mysql' | 'spark';
+
+const Dialects: Record<EscapeDialect, SqlDialectEscapeRules> = {
+  ansi: AnsiSqlDialect,
+  mysql: MySqlDialect,
+  spark: SparkSqlDialect,
+};
+
+/**
+ * Format a query for the given engine dialect: `?` -> escaped value,
+ * `??` -> escaped identifier.
+ */
+export function format(dialect: EscapeDialect, sql: string, values?: unknown): string {
+  return new SqlEscaper(Dialects[dialect]).format(sql, values);
+}
+
+/**
  * Format a query for standard-SQL engines (Presto, Trino, Postgres, ...):
  * `?` -> escaped value, `??` -> escaped identifier.
  */
 export function formatAnsi(sql: string, values?: unknown): string {
-  return new SqlEscaper(AnsiSqlDialect).format(sql, values);
+  return format('ansi', sql, values);
 }
 
 /**
@@ -178,7 +213,15 @@ export function formatAnsi(sql: string, values?: unknown): string {
  * identifier.
  */
 export function formatMySql(sql: string, values?: unknown): string {
-  return new SqlEscaper(MySqlDialect).format(sql, values);
+  return format('mysql', sql, values);
+}
+
+/**
+ * Format a query for Spark SQL / Hive / Databricks: `?` -> escaped value,
+ * `??` -> escaped identifier.
+ */
+export function formatSparkSql(sql: string, values?: unknown): string {
+  return format('spark', sql, values);
 }
 
 export function escapeStringLiteral(value: string): string {

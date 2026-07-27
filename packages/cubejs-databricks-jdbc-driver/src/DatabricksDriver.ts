@@ -688,7 +688,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   protected escapeDialect(): EscapeDialect {
-    return 'mysql';
+    return 'spark';
   }
 
   /**
