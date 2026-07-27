@@ -321,16 +321,12 @@ impl GCSRemoteFs {
     {
         let prefix = self.gcs_path(&remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
-        let result = list
-            .map(|objects| -> Result<Vec<T>, CubeError> {
-                Ok(objects?.into_iter().map(f).collect())
-            })
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .flatten()
-            .flatten()
-            .collect::<Vec<_>>();
+        tokio::pin!(list);
+        let mut result = Vec::new();
+        while let Some(objects) = list.next().await {
+            let objects = objects?;
+            result.extend(objects.into_iter().map(f));
+        }
         let mut pages_count = result.len() / 1_000;
         if result.len() % 1_000 > 0 {
             pages_count += 1;
