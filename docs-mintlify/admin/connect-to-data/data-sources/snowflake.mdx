@@ -205,6 +205,27 @@ Cube Cloud also supports connecting to data sources within private VPCs
 if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 [VPC connectivity guide][ref-cloud-conf-vpc] for details.
 
+### Query tagging
+
+Set a [query tag][snowflake-docs-query-tag] on the connection so that queries
+Cube sends to Snowflake are labeled in `QUERY_HISTORY`. There's no environment
+variable for this; set `queryTag` from a custom [`driverFactory`][ref-driver-factory]
+instead of returning a plain options object:
+
+```javascript
+const SnowflakeDriver = require('@cubejs-backend/snowflake-driver');
+
+module.exports = {
+  driverFactory: () =>
+    new SnowflakeDriver({
+      queryTag: 'cube',
+    }),
+};
+```
+
+The tag is set once per connection, not per query — all queries issued over
+that connection carry the same tag.
+
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /admin/deployment/dedicated
 ## Environment Variables
@@ -371,11 +392,13 @@ connections are made over HTTPS.
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [ref-oidc-overview]: /admin/deployment/oidc
+[ref-driver-factory]: /reference/configuration/config#driver_factory
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-account-id]:
   https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
 [snowflake-docs-connection-options]: https://docs.snowflake.com/en/developer-guide/node-js/nodejs-driver-options#additional-connection-options
+[snowflake-docs-query-tag]: https://docs.snowflake.com/en/developer-guide/node-js/nodejs-driver-options#additional-connection-options
 [snowflake-docs-aws-integration]: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration
 [snowflake-docs-gcs-integration]:
   https://docs.snowflake.com/en/user-guide/data-load-gcs-config.html
