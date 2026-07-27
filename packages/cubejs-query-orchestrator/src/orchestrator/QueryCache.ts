@@ -431,6 +431,8 @@ export class QueryCache {
       // helpers and background renewals ride the same path but answer to no
       // API request.
       !req.primaryQuery ||
+      // Independent guards, deliberately: `renewCycle` catches a refresh of a
+      // user's query, the prefix catches one the scheduler started itself.
       req.renewCycle ||
       req.requestId.startsWith('scheduler-')
     ) {

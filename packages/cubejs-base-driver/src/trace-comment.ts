@@ -14,6 +14,9 @@
  * Characters kept in a trace id. Covers every id shape Cube produces or
  * accepts: UUIDs, `-span-N` suffixes, W3C `traceparent`, and the `scheduler-`
  * and `datasources-` prefixes.
+ *
+ * Excluding `+` also keeps the payload from reading as an optimizer hint on
+ * Hive and Spark.
  */
 const ALLOWED_CHARS = /[^A-Za-z0-9._:-]/g;
 
@@ -26,46 +29,29 @@ export function sanitizeTraceId(requestId: string | undefined | null): string {
 
   return String(requestId)
     .replace(ALLOWED_CHARS, '')
-    // A payload starting with `+` reads as an optimizer hint on Hive and Spark.
-    .replace(/^\++/, '')
     .slice(0, MAX_TRACE_ID_LENGTH);
 }
 
 /**
- * Splits a request id into the trace id and the span that produced this
- * particular query.
+ * Strips the `-span-N` suffix Cube appends per data source query of a request.
  *
- * The trace id must match the `trace_id` of the Query History export, which
- * drops the `-span-N` suffix — joining on the full request id would never
- * match. The span is emitted alongside it, since one request fans out into
- * several data source queries that are otherwise indistinguishable.
+ * The emitted id has to match the `trace_id` of the Query History export, which
+ * carries the request id without that suffix — joining on the full request id
+ * would never match.
  */
-function splitRequestId(requestId: string): { traceId: string, span?: string } {
+function toTraceId(requestId: string): string {
   const idx = requestId.lastIndexOf('-span-');
-  if (idx === -1) {
-    return { traceId: requestId };
-  }
 
-  return {
-    traceId: requestId.substring(0, idx),
-    span: requestId.substring(idx + '-span-'.length),
-  };
+  return idx === -1 ? requestId : requestId.substring(0, idx);
 }
 
 export function buildTraceComment(requestId: string | undefined | null): string | null {
-  const sanitized = sanitizeTraceId(requestId);
-  if (!sanitized) {
-    return null;
-  }
-
-  const { traceId, span } = splitRequestId(sanitized);
+  const traceId = toTraceId(sanitizeTraceId(requestId));
   if (!traceId) {
     return null;
   }
 
-  return span
-    ? `/* trace_id: ${traceId} span: ${span} */`
-    : `/* trace_id: ${traceId} */`;
+  return `/* trace_id: ${traceId} */`;
 }
 
 /**
