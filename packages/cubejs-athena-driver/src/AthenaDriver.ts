@@ -8,6 +8,7 @@ import {
   getEnv,
   assertDataSource,
   checkNonNullable,
+  formatAnsi,
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
@@ -34,7 +35,6 @@ import {
   DownloadQueryResultsResult,
   DownloadQueryResultsOptions,
 } from '@cubejs-backend/base-driver';
-import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { URL } from 'url';
@@ -64,8 +64,8 @@ export interface AthenaQueryId {
   QueryExecutionId: string;
 }
 
-function applyParams(query: string, params: any[]): string {
-  return SqlString.format(query, params);
+export function applyParams(query: string, params: unknown[]): string {
+  return formatAnsi(query, params);
 }
 
 interface AthenaTable {
@@ -492,12 +492,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async startQuery(query: string, values: unknown[]): Promise<AthenaQueryId> {
-    const queryString = applyParams(
-      query,
-      (values || []).map(s => (typeof s === 'string' ? {
-        toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
-      } : s))
-    );
+    const queryString = applyParams(query, values || []);
     const request: StartQueryExecutionCommandInput = {
       QueryString: queryString,
       WorkGroup: this.config.workGroup,
