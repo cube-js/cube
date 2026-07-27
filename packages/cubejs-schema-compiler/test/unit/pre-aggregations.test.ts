@@ -1155,4 +1155,150 @@ describe('pre-aggregations', () => {
       expect(query.buildSqlAndParams()[0]).toMatch(/orders/);
     });
   });
+
+  // @link https://github.com/cube-js/cube/issues/11362
+  // Reported as: a rollupJoin spanning 4 cubes across 4 distinct data sources fails to match
+  // a dimensions/filters-only query (no measures), even though every requested member is
+  // declared in the rollupJoin's `dimensions`.
+  //
+  // Investigation: the specific mechanism described in the issue (a legacy JS matching
+  // helper dropped between two old releases) doesn't apply to current HEAD, and neither
+  // "zero measures" nor "distinct data sources per cube" alone reproduce a failure here —
+  // a rollupJoin over 3 cubes (same or different data sources, with or without measures)
+  // matches correctly (see 'rollupJoin pre-aggregation with three cubes' in
+  // test/integration/postgres/pre-aggregations.test.ts).
+  //
+  // What *does* reproduce, on current HEAD with the default Tesseract planner: extending
+  // that exact same working 3-cube chain (cube_x -> cube_y -> cube_z) by one more hop
+  // (cube_w -> cube_x -> cube_y -> cube_z) breaks matching outright, independent of data
+  // source layout and independent of measures. So the underlying defect is real — a
+  // correctly-defined rollupJoin fails to match — but it's a 4-cube (3-hop) join chain
+  // depth limitation in Tesseract's rollup-join resolution, not a multi-data-source or
+  // zero-measure regression as originally diagnosed.
+  describe('rollupJoin matching over a 4-cube join chain (cube_w -> cube_x -> cube_y -> cube_z)', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(
+      `
+        cube('cube_w', {
+          sql: \`SELECT 0 as id, 'dim_w' as dim_w\`,
+
+          joins: {
+            cube_x: {
+              relationship: 'many_to_one',
+              sql: \`\${CUBE.dim_w} = \${cube_x.dim_w}\`
+            }
+          },
+
+          dimensions: {
+            id: { sql: 'id', type: 'string', primary_key: true },
+            dim_w: { sql: 'dim_w', type: 'string' },
+          },
+
+          pre_aggregations: {
+            www: {
+              dimensions: [dim_w]
+            },
+            rollupJoinFourCubes: {
+              type: 'rollupJoin',
+              dimensions: [
+                dim_w,
+                cube_x.dim_x,
+                cube_y.dim_y,
+                cube_z.dim_z
+              ],
+              rollups: [
+                www,
+                cube_x.xxx,
+                cube_y.yyy,
+                cube_z.zzz
+              ]
+            }
+          }
+        });
+
+        cube('cube_x', {
+          sql: \`SELECT 1 as id, 'dim_w' as dim_w, 'dim_x' as dim_x\`,
+
+          joins: {
+            cube_y: {
+              relationship: 'many_to_one',
+              sql: \`\${CUBE.dim_x} = \${cube_y.dim_x}\`
+            }
+          },
+
+          dimensions: {
+            id: { sql: 'id', type: 'string', primary_key: true },
+            dim_w: { sql: 'dim_w', type: 'string' },
+            dim_x: { sql: 'dim_x', type: 'string' },
+          },
+
+          pre_aggregations: {
+            xxx: {
+              dimensions: [dim_x]
+            }
+          }
+        });
+
+        cube('cube_y', {
+          sql: \`SELECT 2 as id, 'dim_x' as dim_x, 'dim_y' as dim_y\`,
+
+          joins: {
+            cube_z: {
+              relationship: 'many_to_one',
+              sql: \`\${CUBE.dim_y} = \${cube_z.dim_y}\`
+            }
+          },
+
+          dimensions: {
+            id: { sql: 'id', type: 'string', primary_key: true },
+            dim_x: { sql: 'dim_x', type: 'string' },
+            dim_y: { sql: 'dim_y', type: 'string' },
+          },
+
+          pre_aggregations: {
+            yyy: {
+              dimensions: [dim_x, dim_y]
+            }
+          }
+        });
+
+        cube('cube_z', {
+          sql: \`SELECT 3 as id, 'dim_y' as dim_y, 'dim_z' as dim_z\`,
+
+          dimensions: {
+            id: { sql: 'id', type: 'string', primary_key: true },
+            dim_y: { sql: 'dim_y', type: 'string' },
+            dim_z: { sql: 'dim_z', type: 'string' },
+          },
+
+          pre_aggregations: {
+            zzz: {
+              dimensions: [dim_y, dim_z]
+            }
+          }
+        });
+      `
+    );
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it('matches a 4-cube rollupJoin chain for a dimensions-only query (see #11362)', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: ['cube_w.dim_w', 'cube_x.dim_x', 'cube_y.dim_y', 'cube_z.dim_z'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+      });
+
+      // Currently throws "No rollups found that can be used for rollup join" instead of
+      // matching rollupJoinFourCubes, even though every requested dimension is declared in
+      // it and the identical 3-cube pattern (cube_x -> cube_y -> cube_z alone) matches fine.
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.map((d: any) => d.preAggregationId)).toEqual(
+        expect.arrayContaining(['cube_w.rollupJoinFourCubes'])
+      );
+      expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    });
+  });
 });
