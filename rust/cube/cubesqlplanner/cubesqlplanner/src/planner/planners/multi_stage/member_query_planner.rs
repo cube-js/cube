@@ -171,8 +171,8 @@ impl MultiStageMemberQueryPlanner {
         };
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
-            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_dimensions(self.description.state().dimensions().clone())
+            .set_time_dimensions(self.description.state().time_dimensions().clone())
             .set_measures(vec![self.description.member().evaluation_node().clone()])
             .into_rc();
 
