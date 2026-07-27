@@ -21,6 +21,9 @@ pub struct MockDriverTools {
     /// When set, dialect-specific native methods mirror CubeStoreQuery
     /// instead of the Postgres defaults (used for external pre-aggregations).
     cubestore: bool,
+    /// Mirrors the JS `shouldReuseParams` dialect flag: `true` for the Postgres
+    /// defaults (`$1` addresses its value), `false` for positional `?`.
+    should_reuse_params: bool,
 }
 
 impl MockDriverTools {
@@ -31,6 +34,7 @@ impl MockDriverTools {
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
             visible_in_db_time_zone: false,
             cubestore: false,
+            should_reuse_params: true,
         }
     }
 
@@ -42,6 +46,7 @@ impl MockDriverTools {
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
             visible_in_db_time_zone: false,
             cubestore: false,
+            should_reuse_params: true,
         }
     }
 
@@ -53,6 +58,7 @@ impl MockDriverTools {
             sql_templates: Rc::new(sql_templates),
             visible_in_db_time_zone: false,
             cubestore: false,
+            should_reuse_params: true,
         }
     }
 
@@ -66,7 +72,16 @@ impl MockDriverTools {
             sql_templates: Rc::new(sql_templates),
             visible_in_db_time_zone: false,
             cubestore: false,
+            should_reuse_params: true,
         }
+    }
+
+    /// Renders params as positional `?`, so a value cannot be shared between
+    /// placeholders.
+    #[allow(dead_code)]
+    pub fn without_params_reuse(mut self) -> Self {
+        self.should_reuse_params = false;
+        self
     }
 
     #[allow(dead_code)]
@@ -203,6 +218,10 @@ impl DriverTools for MockDriverTools {
 
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
         Ok(Vec::new())
+    }
+
+    fn should_reuse_params(&self) -> Result<bool, CubeError> {
+        Ok(self.should_reuse_params)
     }
 
     fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError> {

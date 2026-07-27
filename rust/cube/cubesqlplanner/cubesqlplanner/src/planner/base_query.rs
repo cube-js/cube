@@ -87,9 +87,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         };
 
         let templates = self.query_tools.plan_sql_templates(is_external)?;
-        let (result_sql, params) = self
-            .query_tools
-            .build_sql_and_params(&sql, true, &templates)?;
+        let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, &templates)?;
 
         // For single usage, strip __usage_N suffix from SQL to maintain backward compat
         let final_sql = if usages.len() == 1 {

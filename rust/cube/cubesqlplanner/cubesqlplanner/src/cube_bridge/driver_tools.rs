@@ -26,6 +26,11 @@ pub trait DriverTools {
     fn date_time_cast(&self, field: String) -> Result<String, CubeError>; //TODO move to templates
     fn in_db_time_zone(&self, date: String) -> Result<String, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
+    /// True when a param placeholder addresses its value by index (`$1`), so a
+    /// single param can back several placeholders. Dialects with positional `?`
+    /// placeholders need one param per placeholder occurrence.
+    #[nbridge(field)]
+    fn should_reuse_params(&self) -> Result<bool, CubeError>;
     fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn interval_string(&self, interval: String) -> Result<String, CubeError>;

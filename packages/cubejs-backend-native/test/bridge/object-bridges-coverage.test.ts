@@ -155,6 +155,7 @@ const BRIDGES: BridgeSpec[] = [
       'in_db_time_zone',
       'interval_and_minimal_time_unit',
       'interval_string',
+      'should_reuse_params',
       'sql_templates',
       'subtract_interval',
       'support_generated_series_for_custom_td',

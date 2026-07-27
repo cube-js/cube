@@ -27,6 +27,11 @@ impl MockSqlTemplatesRender {
     }
 
     pub fn default_templates() -> Self {
+        Self::try_new(Self::default_templates_map())
+            .expect("Default templates should always parse successfully")
+    }
+
+    fn default_templates_map() -> HashMap<String, String> {
         let mut templates = HashMap::new();
 
         // Functions - based on BaseQuery.js:4241-4315
@@ -535,7 +540,16 @@ impl MockSqlTemplatesRender {
             "{% if original_sql %}{{ original_sql }}\n{% endif %}{% for group in groups  %}{% if original_sql or not loop.first %}CROSS JOIN\n{% endif %}(\n{% for value in group.values  %}SELECT {{ value }} as {{ group.name }}{% if not loop.last %} UNION ALL\n{% endif %}{% endfor %}) AS {{ group.alias }}\n{% endfor %}".to_string(),
         );
 
-        Self::try_new(templates).expect("Default templates should always parse successfully")
+        templates
+    }
+
+    /// Postgres defaults with positional `?` params instead of `$1`, mirroring
+    /// BigQuery, Snowflake, MySQL and the other `?` dialects.
+    pub fn default_templates_with_positional_params() -> Self {
+        let mut templates = Self::default_templates_map();
+        templates.insert("params/param".to_string(), "?".to_string());
+        Self::try_new(templates)
+            .expect("Positional params templates should always parse successfully")
     }
 
     pub fn default_templates_with_generated_time_series() -> Self {
@@ -587,8 +601,9 @@ impl MockSqlTemplatesRender {
     /// Templates matching `CubeStoreQuery.sqlTemplates()` from the JS
     /// schema-compiler: BaseQuery defaults plus CubeStore-specific overrides.
     pub fn cubestore_templates() -> Self {
-        let render = Self::default_templates();
-        let mut templates = render.templates;
+        let mut templates = Self::default_templates_map();
+        // CubeStoreQuery keeps the base dialect's positional `?` params.
+        templates.insert("params/param".to_string(), "?".to_string());
         templates.insert(
             "statements/time_series_select".to_string(),
             concat!(
