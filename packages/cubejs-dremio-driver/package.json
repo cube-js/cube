@@ -16,6 +16,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
+    "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:dremio",
     "integration:dremio": "jest --verbose dist/test",
     "lint": "eslint driver/*.js",
@@ -25,8 +26,7 @@
     "@cubejs-backend/base-driver": "1.6.69",
     "@cubejs-backend/schema-compiler": "1.6.69",
     "@cubejs-backend/shared": "1.6.69",
-    "axios": "^1.8.3",
-    "sqlstring": "^2.3.1"
+    "axios": "^1.8.3"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.6.69",

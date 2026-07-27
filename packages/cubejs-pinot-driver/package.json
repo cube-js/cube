@@ -21,6 +21,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:pinot",
     "integration:pinot": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
@@ -31,8 +32,7 @@
     "@cubejs-backend/schema-compiler": "1.6.69",
     "@cubejs-backend/shared": "1.6.69",
     "node-fetch": "^2.6.1",
-    "ramda": "^0.27.2",
-    "sqlstring": "^2.3.3"
+    "ramda": "^0.27.2"
   },
   "license": "Apache-2.0",
   "publishConfig": {

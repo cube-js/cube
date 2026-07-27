@@ -1,11 +1,17 @@
 /* eslint-disable quotes */
 import { PrestoDriver } from '../../src/PrestoDriver';
 
+class TestPrestoDriver extends PrestoDriver {
+  public override prepareQueryWithParams(query: string, values: unknown[]) {
+    return super.prepareQueryWithParams(query, values);
+  }
+}
+
 describe('PrestoDriver SQL parameter escaping', () => {
-  let driver: PrestoDriver;
+  let driver: TestPrestoDriver;
 
   beforeAll(() => {
-    driver = new PrestoDriver({
+    driver = new TestPrestoDriver({
       host: 'localhost',
       port: '8080',
       catalog: 'test',
