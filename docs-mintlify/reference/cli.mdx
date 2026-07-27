@@ -41,6 +41,9 @@ cube update          # install the latest release
 cube update --check  # only report what's available
 ```
 
+Running `cube` with no arguments prints the installed version above the help
+text.
+
 ## Authentication
 
 Sign in with the browser device flow — the CLI prints a URL and a short
@@ -154,7 +157,7 @@ Run `cube <command> --help` for the full options of any command.
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
 | `users`, `groups`, `attributes`, `policies` | Users, groups, and access control |
 | `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
-| `embed` | Embed sessions, tokens, and embed tenants |
+| `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
 | `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 |
 | `api` | Raw authenticated API request (escape hatch): `cube api GET /api/v1/... -q key=value -d '{...}'` |
 | `update` | Update the CLI to the latest release |
