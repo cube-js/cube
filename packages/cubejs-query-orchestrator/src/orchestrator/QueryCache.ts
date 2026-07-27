@@ -355,6 +355,7 @@ export class QueryCache {
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
         persistent: queryBody.persistent,
+        primaryQuery: true,
       }
     );
 
@@ -427,7 +428,8 @@ export class QueryCache {
     if (
       !getEnv('sqlIncludeTraceId') ||
       !req.requestId ||
-      // Only the query the user asked for. Refresh keys, pre-aggregation
+      // Queries issued to serve a request — usually just the user's own, though
+      // a lambda source-table read also qualifies. Refresh keys, pre-aggregation
       // helpers and background renewals ride the same path but answer to no
       // API request.
       !req.primaryQuery ||

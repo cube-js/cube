@@ -147,6 +147,25 @@ describe('SQL trace comment', () => {
     expect(driver.executedQueries).toContain(`${SQL}\n${EXPECTED_COMMENT}`);
   });
 
+  // `cache=stale-while-revalidate` is client-settable and takes the background
+  // fetch branch, which reaches the data source through its own call site — so
+  // it needs tagging of its own, or the feature silently does nothing for those
+  // requests.
+  test('is appended on the background fetch path', async () => {
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    const query = 'SELECT 9 AS background';
+
+    await orchestrator.fetchQuery({
+      query,
+      values: [],
+      requestId: TRACE_ID,
+      cacheMode: 'stale-while-revalidate',
+      cacheKeyQueries: { renewalThreshold: 120, queries: [] },
+    });
+
+    expect(driver.executedQueries).toContain(`${query}\n${EXPECTED_COMMENT}`);
+  });
+
   test('cannot be escaped by a hostile request id', async () => {
     process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
     await run({ requestId: '*/ DROP TABLE users; /*' });

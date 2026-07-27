@@ -68,9 +68,14 @@ Otherwise Cube generates one.
 
 ## Scope
 
-Only the query serving an API request is tagged. Pre-aggregation builds, export
-bucket operations, refresh keys, background refreshes, and Cube's own internal
-queries are left untagged, since there is no API request to trace them back to.
+Queries issued to serve an API request are tagged. Pre-aggregation builds,
+export bucket operations, refresh keys, background refreshes, and Cube's own
+internal queries are left untagged, since there is no API request to trace them
+back to.
+
+A single request usually produces one tagged query, but not always — a query
+reading a lambda pre-aggregation's source table, for instance, is tagged too.
+Match on `trace_id` rather than assuming one row per request.
 
 Not every request produces a tagged query to find: one served from the cache
 never reaches your data source, and when identical queries arrive together Cube
