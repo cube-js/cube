@@ -62,3 +62,51 @@ fn indexed_params_are_reused_across_placeholders() {
     assert_eq!(sql.matches("$1").count(), 2, "sql: {}", sql);
     assert_eq!(params, vec![FilterValue::Str("acme".to_string())]);
 }
+
+/// A query served from an external pre-aggregation is rendered with the CubeStore
+/// dialect, so params must follow *its* placeholder form — CubeStore accepts only
+/// positional `?`, consumed one per occurrence, whether they are bound over the
+/// WS protocol or inlined by the driver.
+#[test]
+fn external_pre_aggregation_renders_params_with_the_cubestore_dialect() {
+    let ctx = TestContext::new_with_external_cubestore(MockSchema::from_yaml_file(
+        "common/integration_cubestore_basic.yaml",
+    ))
+    .unwrap();
+
+    let query = indoc! {"
+        measures:
+          - visitors.count
+        dimensions:
+          - visitors.source
+        filters:
+          - dimension: visitors.source
+            operator: equals
+            values:
+              - some
+    "};
+
+    let (_, pre_aggregations) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        pre_aggregations
+            .iter()
+            .all(|u| u.pre_aggregation.external()),
+        "the query must be served from an external pre-aggregation"
+    );
+
+    let (sql, params) = ctx.build_sql_and_params(query).unwrap();
+
+    assert!(
+        !sql.contains("$1"),
+        "params must not render in the source dialect's indexed form\nsql: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches('?').count(),
+        params.len(),
+        "sql: {}\nparams: {:?}",
+        sql,
+        params
+    );
+    assert_eq!(params, vec![FilterValue::Str("some".to_string())]);
+}

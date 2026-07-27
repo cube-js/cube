@@ -1376,19 +1376,53 @@ impl TestContext {
         }
     }
 
-    #[cfg(feature = "integration-postgres")]
+    /// Inlines params as literals so the SQL can run without a bind protocol.
+    /// Both placeholder forms the dialects render are handled: indexed `$N`, and
+    /// positional `?` consumed in occurrence order.
     fn inline_params(sql: &str, params: &[FilterValue]) -> String {
-        let mut result = sql.to_string();
-        for (i, param) in params.iter().enumerate().rev() {
-            let placeholder = format!("${}", i + 1);
-            // `Null` must inline as the bare SQL keyword; every other variant is
-            // rendered through its canonical string form and quoted.
-            let literal = match param.to_param_string() {
-                Some(value) => format!("'{}'", value.replace('\'', "''")),
-                None => "NULL".to_string(),
-            };
-            result = result.replace(&placeholder, &literal);
+        // `Null` must inline as the bare SQL keyword; every other variant is
+        // rendered through its canonical string form and quoted.
+        let literal = |param: &FilterValue| match param.to_param_string() {
+            Some(value) => format!("'{}'", value.replace('\'', "''")),
+            None => "NULL".to_string(),
+        };
+        let at = |index: usize| {
+            params.get(index).unwrap_or_else(|| {
+                panic!(
+                    "Placeholder refers to param {} but only {} were built:\n{}",
+                    index + 1,
+                    params.len(),
+                    sql
+                )
+            })
+        };
+
+        let mut result = String::with_capacity(sql.len());
+        let mut next_positional = 0;
+        let mut chars = sql.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                '?' => {
+                    result.push_str(&literal(at(next_positional)));
+                    next_positional += 1;
+                }
+                '$' if chars.peek().is_some_and(|c| c.is_ascii_digit()) => {
+                    let mut index = String::new();
+                    while let Some(c) = chars.peek() {
+                        if !c.is_ascii_digit() {
+                            break;
+                        }
+                        index.push(*c);
+                        chars.next();
+                    }
+                    let index: usize = index.parse().expect("digits only");
+                    result.push_str(&literal(at(index - 1)));
+                }
+                _ => result.push(ch),
+            }
         }
+
         result
     }
 
@@ -1451,6 +1485,32 @@ impl TestContext {
 mod tests {
     use super::*;
     use crate::test_fixtures::cube_bridge::MockSchema;
+
+    #[test]
+    fn inline_params_handles_both_placeholder_forms() {
+        let params = vec![
+            FilterValue::Str("a'b".to_string()),
+            FilterValue::Null,
+            FilterValue::Num(42.0),
+        ];
+
+        assert_eq!(
+            TestContext::inline_params("SELECT $1, $2, $3, $1", &params),
+            "SELECT 'a''b', NULL, '42', 'a''b'"
+        );
+        // Positional placeholders bind by occurrence, so a value repeated in the
+        // SQL is repeated in the params.
+        assert_eq!(
+            TestContext::inline_params("SELECT ?, ?, ?", &params),
+            "SELECT 'a''b', NULL, '42'"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Placeholder refers to param 2 but only 1 were built")]
+    fn inline_params_rejects_more_placeholders_than_params() {
+        TestContext::inline_params("SELECT ?, ?", &[FilterValue::Str("a".to_string())]);
+    }
 
     #[test]
     fn test_yaml_filter_parsing() {
