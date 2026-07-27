@@ -600,12 +600,19 @@ impl MockViewBuilder {
                             "number" | "string" | "time" | "boolean" => original_type.clone(),
                             _ => "number".to_string(),
                         };
+                        // A view member re-exports the source measure's
+                        // multi_stage flag and order_by, so order_by templates
+                        // are resolved in the view's cube context (where their
+                        // referenced members may be absent), matching how view
+                        // members are materialized in the schema compiler.
                         all_measures.insert(
                             view_name,
                             Rc::new(
                                 MockMeasureDefinition::builder()
                                     .measure_type(view_type)
                                     .sql(view_member_sql)
+                                    .multi_stage(measure.static_data().multi_stage)
+                                    .order_by(measure.raw_order_by())
                                     .build(),
                             ),
                         );

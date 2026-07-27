@@ -72,13 +72,13 @@ cube('orders', {
 
   accessPolicy: [
     {
-      role: "*",
+      group: "*",
       rowLevel: {
         allowAll: true
       }
     },
     {
-      role: 'admin',
+      group: 'admin',
       conditions: [
         {
           if: `true`,

@@ -163,6 +163,45 @@ async fn test_rank_no_granularity() {
     }
 }
 
+// CORE-602: two multi-stage consumers of the same rank measure in one query.
+// A single consumer of `eop_rank` plans fine, but selecting both `balance_eop_a`
+// and `balance_eop_b` (identical consumers filtering on `{eop_rank} = 1`) made
+// the planner reach `to_sql` on the shared rank symbol instead of resolving it
+// through its multi-stage sub-query ref, failing with
+// "Rank measure doesn't support direct evaluation".
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_consumers_of_same_rank() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.balance_eop_a
+          - orders.balance_eop_b
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_single_consumer_of_rank() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.balance_eop_a
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rank_with_filter() {
     let ctx = create_context();

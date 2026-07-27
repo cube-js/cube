@@ -79,7 +79,6 @@
       "CUBEJS_SQL_PASSWORD": "admin_password",
       "CUBESQL_SQL_PUSH_DOWN": "true",
       "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
-      "CUBEJS_TESSERACT_PRE_AGGREGATIONS": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
       "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
     },
     "ports" : ["4000", "5656"]
@@ -263,7 +262,8 @@
     "SQL API: Nested Rollup",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asteriks",
-    "SQL API: Extended nested Rollup over asterisk"
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: Window function over measure (running total)"
   ],
   "tesseractSkip": [
     "must download query from the data source via memory",
@@ -295,6 +295,7 @@
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: SQL API: Timeshift measure from cube",
     "querying BigECommerce: SeveralMultiStageMeasures",
+    "SQL API: Window function over measure (running total)",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying ECommerce: dimensions",

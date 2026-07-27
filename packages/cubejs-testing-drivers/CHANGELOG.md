@@ -3,6 +3,77 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.9](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.9) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.8](https://github.com/cube-js/cube/compare/v1.7.7...v1.7.8) (2026-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+### Features
+
+- **questdb-driver:** Initial support for Tesseract, add integration tests ([#11259](https://github.com/cube-js/cube/issues/11259)) ([e6cd6e1](https://github.com/cube-js/cube/commit/e6cd6e12a05b256509fc94639e6bc3b2c7a1bb65))
+
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+### Features
+
+- **pinot-driver:** Retrieve types from database + small fixes ([#11241](https://github.com/cube-js/cube/issues/11241)) ([222dece](https://github.com/cube-js/cube/commit/222dece5469d94afda95157c82fef8944652ed7d))
+- **pinot-driver:** Tesseract SQL dialect fixes + incorrect timeout bug ([#11242](https://github.com/cube-js/cube/issues/11242)) ([076ad77](https://github.com/cube-js/cube/commit/076ad775254a9dcc105825315044bb41a17edf91)), closes [#11238](https://github.com/cube-js/cube/issues/11238) [#11239](https://github.com/cube-js/cube/issues/11239) [#11237](https://github.com/cube-js/cube/issues/11237)
+
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+### Bug Fixes
+
+- **mysql-driver:** Use string for decimal values ([4f2d3b9](https://github.com/cube-js/cube/commit/4f2d3b9416834ab87dbf84b24bed1e132bf2e512))
+
+- fix(cubeorchestrator)!: Serialize all numeric query results as JSON strings, fix #1879 ([bd88651](https://github.com/cube-js/cube/commit/bd8865113889b5153ed837c3dc51bc6bca5d3585)), closes [#1879](https://github.com/cube-js/cube/issues/1879)
+- feat(server-core)!: Remove deprecated dbType option (#11045) ([08a2a6b](https://github.com/cube-js/cube/commit/08a2a6b37efb450377383fbb0e5041fff106cff2)), closes [#11045](https://github.com/cube-js/cube/issues/11045)
+
+### BREAKING CHANGES
+
+- All numeric values in query results are now serialized
+  as JSON strings regardless of the data source driver. Previously the
+  JSON type of numeric values varied by driver (string or number).
+  Clients that relied on receiving JSON numbers must parse the string
+  values instead.
+- CreateOptions.dbType has been removed. Use driverFactory instead.
+
+## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
 ## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

@@ -3,6 +3,74 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.9](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.9) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.8](https://github.com/cube-js/cube/compare/v1.7.7...v1.7.8) (2026-07-22)
+
+### Bug Fixes
+
+- **query-orchestrator:** Drop touch/used keys when pre-aggregation build fails ([#11314](https://github.com/cube-js/cube/issues/11314)) ([44c965c](https://github.com/cube-js/cube/commit/44c965cf28300c04ddec3f83da341202119202af))
+
+### Features
+
+- **bigquery-driver:** Label jobs with requestId ([#11299](https://github.com/cube-js/cube/issues/11299)) ([326ff7c](https://github.com/cube-js/cube/commit/326ff7c3a42b11bb65d8c11ea53f96ba2dc6cbc0))
+- **cubestore:** Support SYS METASTORE/CACHESTORE TRUNCATE ([#11300](https://github.com/cube-js/cube/issues/11300)) ([78bb27f](https://github.com/cube-js/cube/commit/78bb27f3d8fd7dd36edd5a46e28d9f04444040a6))
+
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+- feat(query-orchestrator)!: Increase default continueWaitTimeout from 5s to 10s ([4625173](https://github.com/cube-js/cube/commit/462517392432a2e5c244af73c305fbb2bc543f4f))
+- feat(api-gateway)!: Remove deprecated renewQuery parameter (#11050) ([c2b8888](https://github.com/cube-js/cube/commit/c2b888885d6640c5a14ee49f1057fefdf703ead3)), closes [#11050](https://github.com/cube-js/cube/issues/11050)
+
+### BREAKING CHANGES
+
+- The default `continueWaitTimeout` changes from 5 to 10
+  seconds. Deployments relying on the previous 5s default will now wait up
+  to 10s before returning `Continue wait`. Set `continueWaitTimeout: 5`
+  explicitly in orchestratorOptions/queueOptions to keep the old behavior.
+- The `renewQuery` parameter of the `/v1/load` REST endpoint and the GraphQL `cube` query has been removed. Use the `cache` parameter instead: `cache: 'must-revalidate'` replaces `renewQuery: true`, and the default `stale-if-slow` replaces `renewQuery: false`.
+
+## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
 ## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

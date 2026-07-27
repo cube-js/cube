@@ -125,7 +125,6 @@ export type Filter =
     };
 
 export type AccessPolicyDefinition = {
-  role?: string;
   group?: string;
   groups?: string[];
   rowLevel?: {
@@ -513,6 +512,27 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       }
     },
     cubeDefinition);
+
+    if (cubeDefinition.isView) {
+      // Without this accessor, `Object.assign(cubeObject, cubeDefinition)` above would shadow
+      // `cubes` with the view's own un-merged, un-camelized `cubeDefinition.cubes`, bypassing
+      // `rawCubes()`. That breaks callers (e.g. `camelizeCube`) that read `cube.cubes` directly:
+      // for a view that `extends` another, the parent's cube-include entries would only get
+      // camelized (join_path -> joinPath) once the parent itself is transformed, making
+      // compilation depend on schema file processing order. `cubes` is only defined for views
+      // (see `viewSchema` in CubeValidator.ts), so this is scoped to `isView` to avoid adding
+      // an unexpected `cubes` key to plain cubes.
+      Object.defineProperty(cubeObject, 'cubes', {
+        enumerable: true,
+        configurable: true,
+        get(this: CubeDefinitionExtended) {
+          return this.rawCubes();
+        },
+        set(_v) {
+          // Dont allow to modify
+        },
+      });
+    }
 
     if (cubeDefinition.extends) {
       const superCube = this.resolveSymbolsCall(cubeDefinition.extends, (name: string) => this.cubeReferenceProxy(name));

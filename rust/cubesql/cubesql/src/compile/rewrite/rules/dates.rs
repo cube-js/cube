@@ -376,16 +376,6 @@ impl RewriteRules for DateRules {
                     "?alias",
                 ),
             ),
-            // TODO: TO_DATE should return Date32, but Timestamp works for all supported cases
-            transforming_rewrite(
-                "thoughtspot-to-date-to-timestamp",
-                udf_expr(
-                    "to_date",
-                    vec![literal_expr("?date"), literal_expr("?format")],
-                ),
-                udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
-                self.transform_to_date_to_timestamp("?format"),
-            ),
             // TODO turn this rule into generic DateTrunc merge
             transforming_rewrite(
                 "datastudio-dates",
@@ -613,25 +603,6 @@ impl DateRules {
                 },
                 _ => false,
             }
-        }
-    }
-
-    fn transform_to_date_to_timestamp(
-        &self,
-        format_var: &'static str,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let format_var = var!(format_var);
-        move |egraph, subst| {
-            for format in var_iter!(egraph[subst[format_var]], LiteralExprValue) {
-                match format {
-                    ScalarValue::Utf8(Some(format)) => match format.as_str() {
-                        "YYYY-MM-DD" | "yyyy-MM-dd" => return true,
-                        _ => (),
-                    },
-                    _ => (),
-                }
-            }
-            false
         }
     }
 

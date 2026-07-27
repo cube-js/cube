@@ -71,6 +71,7 @@ impl PhysicalPlanBuilder {
         } else {
             query
         };
+        let query = collapse_trivial_subqueries(&query)?;
         Ok(query)
     }
 

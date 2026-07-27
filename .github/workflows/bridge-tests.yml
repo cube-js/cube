@@ -36,7 +36,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Get yarn cache directory path

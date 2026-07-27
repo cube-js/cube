@@ -9,6 +9,7 @@ use crate::planner::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::get_filtered_values;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct QueryProcessor<'a> {
@@ -66,10 +67,28 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let filter = logical_plan.filter().all_filters();
         let having = logical_plan.filter().measures_filter();
 
-        //TODO pre-aggregations support for calc-groups
-        let from = if let QuerySource::LogicalJoin(_) = logical_plan.source() {
+        // Calc-group dimensions are resolved at query time: a value pinned by
+        // a filter renders as a literal, otherwise the enumeration is
+        // cross-joined as a virtual values table. Over a pre-aggregation this
+        // applies only to calc groups NOT stored in the rollup — stored ones
+        // keep resolving to the rollup column for backward compatibility.
+        let calc_group_stored_dims = match logical_plan.source() {
+            QuerySource::LogicalJoin(_) => Some(HashSet::new()),
+            QuerySource::PreAggregation(pre_aggregation) => Some(
+                pre_aggregation
+                    .all_dimensions_refererences()
+                    .into_keys()
+                    .collect::<HashSet<_>>(),
+            ),
+            QuerySource::FullKeyAggregate(_) => None,
+        };
+        let mut calc_group_value_references: Vec<(String, String)> = Vec::new();
+        let from = if let Some(stored_dims) = calc_group_stored_dims {
             let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
-            let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?;
+            let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?
+                .into_iter()
+                .filter(|dim| !stored_dims.contains(&dim.full_name()))
+                .collect_vec();
 
             let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
                 let values = get_filtered_values(&dim, &filter);
@@ -84,6 +103,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             {
                 context_factory
                     .add_render_reference(item.symbol.full_name(), item.values[0].clone());
+                calc_group_value_references.push((item.symbol.full_name(), item.values[0].clone()));
             }
             let calc_groups_to_join = calc_groups_items
                 .filter(|itm| itm.values.len() > 1)
@@ -190,6 +210,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         if is_pre_aggregation {
             context_factory.clear_render_references();
+            // Calc-group values are rendered as literals, not resolved from
+            // the rollup, so they must survive the render-reference reset.
+            for (name, value) in calc_group_value_references.into_iter() {
+                context_factory.add_render_reference(name, value);
+            }
         }
         if logical_plan.modifers().ungrouped {
             context_factory.set_ungrouped(true);

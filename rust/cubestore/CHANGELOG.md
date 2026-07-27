@@ -3,6 +3,73 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.9](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.9) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.8](https://github.com/cube-js/cube/compare/v1.7.7...v1.7.8) (2026-07-22)
+
+### Features
+
+- **cubestore:** Support SYS METASTORE/CACHESTORE TRUNCATE ([#11300](https://github.com/cube-js/cube/issues/11300)) ([78bb27f](https://github.com/cube-js/cube/commit/78bb27f3d8fd7dd36edd5a46e28d9f04444040a6))
+
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+### Bug Fixes
+
+- **cubestore:** do not log rate limit errors as errors in HTTP module ([#11293](https://github.com/cube-js/cube/issues/11293)) ([a23d5d6](https://github.com/cube-js/cube/commit/a23d5d663c47bd5918f1dfa62f4aa20cba8eef58))
+- **cubestore:** raise Kafka watermark fetch timeout to stop constant broker disconnects ([#11290](https://github.com/cube-js/cube/issues/11290)) ([d1d0846](https://github.com/cube-js/cube/commit/d1d0846500141c2bfc7a755a476935572cdad45c))
+- **cubestore:** send x-amz-server-side-encryption only on object-storing S3 requests ([#11278](https://github.com/cube-js/cube/issues/11278)) ([3013a46](https://github.com/cube-js/cube/commit/3013a46f3cb96b50d2f8b95f6e236b889692aa63)), closes [cube-js/rust-s3#2](https://github.com/cube-js/rust-s3/issues/2) [cube-js/rust-s3#2](https://github.com/cube-js/rust-s3/issues/2)
+
+### Features
+
+- **cubestore:** Introduce SYS CACHESTORE WIPE ([#11298](https://github.com/cube-js/cube/issues/11298)) ([9c91f60](https://github.com/cube-js/cube/commit/9c91f60a52c54a4324a4f618721459a6234597cc))
+
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+### Features
+
+- **cubestore:** Support sending x-amz-server-side-encryption header on S3 requests (CUBESTORE_S3_SSE) ([#11276](https://github.com/cube-js/cube/issues/11276)) ([1711f1f](https://github.com/cube-js/cube/commit/1711f1f0b2efe7c84b8d51ddcd10510a091a56fe))
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+### Features
+
+- **cubestore:** Upgrade docker image to Debian trixie and LLVM 22 ([1cb96ce](https://github.com/cube-js/cube/commit/1cb96ce2c788bd416c50bf6476c5533b403a44fa))
+- **native:** Initial support for Python 3.13 ([#9930](https://github.com/cube-js/cube/issues/9930)) ([f91a237](https://github.com/cube-js/cube/commit/f91a23728614dde9b9dc28b4e2a4662439670428))
+
+## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
 ## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
 
 ### Bug Fixes

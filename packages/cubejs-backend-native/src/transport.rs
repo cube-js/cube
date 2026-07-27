@@ -15,8 +15,8 @@ use crate::{
 use async_trait::async_trait;
 use cubeorchestrator::query_result_transform::RequestResultData;
 use cubesql::compile::engine::df::scan::{
-    build_response_schema, convert_transport_response_columnar, transform_columnar_response,
-    CacheMode, MemberField, RecordBatch, SchemaRef,
+    build_response_schema, convert_transport_response, transform_response, CacheMode, MemberField,
+    RecordBatch, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
@@ -524,11 +524,7 @@ impl TransportService for NodeBridgeTransport {
                             }
                         };
 
-                    break convert_transport_response_columnar(
-                        response,
-                        schema.clone(),
-                        member_fields,
-                    );
+                    break convert_transport_response(response, schema.clone(), member_fields);
                 }
                 ValueFromJs::ResultWrapper(result_wrappers) => {
                     break result_wrappers
@@ -540,11 +536,7 @@ impl TransportService for NodeBridgeTransport {
                                 wrapper.external,
                             );
 
-                            transform_columnar_response(
-                                &mut wrapper,
-                                updated_schema,
-                                &member_fields,
-                            )
+                            transform_response(&mut wrapper, updated_schema, &member_fields)
                         })
                         .collect::<Result<Vec<_>, _>>();
                 }

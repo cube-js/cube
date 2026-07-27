@@ -49,6 +49,19 @@ HAVING status = 'shipped'
 LIMIT 1 OFFSET 1;
 ```
 
+`SELECT DISTINCT ON (expression [, ...])` is also supported, with the same
+semantics as PostgreSQL: for each set of rows with matching values in the
+given expressions, only the first row is kept, using the order specified by
+`ORDER BY` (which must start with the `DISTINCT ON` expressions).
+
+Example:
+
+```sql
+SELECT DISTINCT ON (status) status, city
+FROM orders
+ORDER BY status, id DESC;
+```
+
 ### `EXPLAIN`
 
 Synopsis:

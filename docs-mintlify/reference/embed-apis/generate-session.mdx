@@ -46,6 +46,7 @@ POST https://{accountName}.cubecloud.dev/api/v1/embed/generate-session
 | `userAttributeDefinitions` | array    | No          | Idempotently upsert attribute definitions before applying values. Requires `creatorMode: true`. See [Creator mode bootstrap](#creator-mode-bootstrapping-groups-and-user-attributes).   |
 | `groupDefinitions`         | array    | No          | Idempotently upsert group definitions before assigning memberships. Requires `creatorMode: true`. See [Creator mode bootstrap](#creator-mode-bootstrapping-groups-and-user-attributes). |
 | `securityContext`          | object   | No          | Custom security context object passed to Cube queries. Not allowed with `internalId`.                                                                                                   |
+| `settings`                 | object   | No          | Per-session overrides for embed behavior, applied to every embed viewed with this session. See [Session settings](#session-settings).                                                   |
 
 <Info>
 
@@ -58,6 +59,25 @@ When using `internalId`, the user must already exist in Cube Cloud. You cannot s
 Accounts are limited to 10,000 external users. To increase this limit, please contact support.
 
 </Warning>
+
+## Session settings
+
+`settings` is an object of per-session overrides for embed behavior. Each key is
+**tri-state**: omit it to inherit the account-wide setting, or set `true`/`false`
+to force the behavior for every embed viewed with this session, taking precedence
+over the account-wide setting.
+
+```json
+{
+  "settings": {
+    "showDashboardChat": false
+  }
+}
+```
+
+| Property | Type | Required | Notes |
+|----------|------|----------|-------|
+| `showDashboardChat` | boolean | No | Show or hide the AI chat (agent panel and launcher bubble) on embedded dashboards for this session. Omit to inherit the account-wide **Show dashboard chat** toggle (**Embed → Settings**; shown by default); `false` hides it even if enabled account-wide, `true` shows it even if disabled. Affects embedded **published dashboards** only — not the standalone [embedded chat][ref-analytics-chat] surface. See [Hiding the AI chat][ref-signed-embedding]. |
 
 ## User profile
 
@@ -349,3 +369,4 @@ Use session ID in [signed embedding][ref-signed-embedding].
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-creator-mode]: /embedding/iframe/creator-mode
+[ref-analytics-chat]: /embedding/iframe/analytics-chat

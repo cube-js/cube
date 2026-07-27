@@ -930,8 +930,7 @@ a dimension. A dimension can only have one type.
 <Warning>
 
 `switch` dimensions are powered by Tesseract, the [next-generation data modeling
-engine][link-tesseract]. Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`](/reference/configuration/environment-variables#cubejs_tesseract_sql_planner) environment variable to enable it.
+engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
 
@@ -1314,7 +1313,7 @@ cube(`fiscal_calendar`, {
 [ref-schema-ref-joins]: /reference/data-modeling/joins
 [ref-subquery]: /docs/data-modeling/dimensions#subquery-dimensions
 [self-subquery]: #sub-query
-[ref-naming]: /docs/data-modeling/syntax#naming
+[ref-naming]: /docs/data-modeling/concepts/syntax#naming
 [ref-playground]: /docs/explore-analyze/playground
 [ref-apis]: /reference
 [ref-time-dimensions]: #type
@@ -1338,7 +1337,7 @@ cube(`fiscal_calendar`, {
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [link-target]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a#target
 [link-tabler]: https://tabler.io/icons
-[ref-references]: /docs/data-modeling/syntax#references
+[ref-references]: /docs/data-modeling/concepts/syntax#references
 [ref-filter-params]: /reference/data-modeling/context-variables#filter_params
 [link-encode-uri-component]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
 [ref-rest-filters]: /reference/core-data-apis/rest-api/query-format#query-properties

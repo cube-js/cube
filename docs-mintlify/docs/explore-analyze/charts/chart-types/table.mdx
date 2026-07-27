@@ -51,6 +51,8 @@ Configure individual columns in the **Columns** section of the **Style** tab (or
 | **Width** | **Flexible** (a weight) or **Fixed** (pixels) — see [Column width](#column-width) |
 | **Hide** | Show or hide the column |
 
+When a cell's value is too long for its column and word wrap is off, the value is truncated with an ellipsis. Hover over a truncated cell to see its full value in a tooltip.
+
 ## Column width
 
 Each column's width is set independently in the **Columns** section of the **Style** tab. A column is in one of two modes:
@@ -146,13 +148,13 @@ Internally, sparklines are powered by additional queries grouped by time dimensi
 | **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
 | **Line color** / **Area color** | Stroke color for line and bar; fill color for area. |
 | **Line width** | Stroke width in pixels (Line and Area types). |
-| **Show value** | Show the most recent value as a headline number next to the sparkline. Turn it off for a chart-only cell. |
+| **Show value** | Show the measure's value for the row — the same number the cell would show without a sparkline — as a headline next to it. Turn it off for a chart-only cell. |
 
 A row needs at least two data points to draw a sparkline; cells with fewer fall back to the formatted value.
 
 <Note>
 
-A granularity that is too fine for the data's time span (e.g. by the second over several years) makes each background query return many rows, which can make a table with sparklines slow to load for end users. Pick the coarsest granularity that still shows the trend you need.
+Choose a reasonable granularity for the data's time span. An overly fine granularity (e.g. by the second over several years) makes the background queries return many rows and can compromise the chart's performance.
 
 </Note>
 
@@ -162,8 +164,47 @@ A granularity that is too fine for the data's time span (e.g. by the second over
 
 Left-clicking a table cell opens a context menu with any [`links` defined on the
 dimension](/docs/data-modeling/dimensions#links) — drill into another dashboard
-(`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, on
-measure cells that support it, **Drill down**.
+(`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, where
+they apply, **Drill down** options.
+
+**Drill down** works in two ways:
+
+- On a **measure** cell whose data model defines drill members, it opens the
+  underlying rows behind that value.
+- On a **time-dimension** cell shown at a granularity, it opens a submenu of
+  finer granularities. Picking one re-buckets the **same measures** to that
+  granularity, scoped to the period you clicked — drilling `2024` to **Quarter**
+  shows the four quarters of 2024. You can keep drilling, then close the view to
+  return to the original table.
+
+Because a week can straddle two months or quarters, **Week** is never a drill
+target from a coarser granularity — a week cell drills only to **Day** and finer.
+
+## Selecting and copying cells
+
+You can copy a single cell or a rectangular block of cells straight out of the
+table — copied values paste cleanly into a spreadsheet or text editor.
+
+### Copy a single cell
+
+Click the cell to select it, then press **Cmd/Ctrl+C** or choose **Copy value**
+from the [cell menu](#cell-menu). Either way copies that cell's raw
+(unformatted) value.
+
+### Select and copy a range
+
+- **Click and drag** across the cells to sweep out a rectangle, or **Shift+click**
+  a second cell to extend the selection from the first.
+- Press **Cmd/Ctrl+C** to copy the selected cells. When more than one cell is
+  selected, the cell menu also offers **Copy values** and **Copy values with headers** — the
+  latter prepends a row of column titles.
+
+Copied cells use the raw (unformatted) values. A range is joined by tabs across
+columns and newlines across rows, so it lands in a spreadsheet as a matching
+grid; a single cell copies as just its value.
+
+The same single-cell and range selection works in the **Results** table on the query
+panel, not just the table visualization.
 
 ## Style options
 
@@ -232,6 +273,8 @@ The **Conditional formatting** tab applies cell or row styling based on conditio
 
 To make a background transparent, open the color picker and clear the hex value.
 
+A rule can apply to just its source column, to selected columns, or to the entire row. Under a column pivot, a row spans several values of the same measure (one per pivot combination), so a row-spanning rule (**Entire row** or **Selected columns**) styles each measure cell by its own combination's value. Cells with no single value to test — row headers, row dimensions, and any rule whose source dimension has been pivoted into columns — are left unstyled.
+
 {/* TODO screenshot: conditional formatting panel with a condition configured (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ### Color scale
@@ -272,3 +315,7 @@ The scale is normalized **per column** — each targeted column uses its own val
 ## Totals
 
 Enable column totals and row totals from the **Table** configuration tab. Totals rows and columns are styled separately from body cells.
+
+### Subtotals
+
+When the table is pivoted by two or more dimensions, you can also enable **subtotals** — a bold **Total for ‹value›** column appended after each pivot group's columns, at every nesting level. Subtotals combine freely with column and row totals, work in workbooks and on dashboards, and — like the other totals — carry over from the results table when you switch the chart type to Table. See [Subtotals](/docs/explore-analyze/workbooks/querying-data#subtotals) for details and limitations.

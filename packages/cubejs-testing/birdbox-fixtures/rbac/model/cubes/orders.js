@@ -31,7 +31,7 @@ cube('orders', {
 
   access_policy: [
     {
-      role: '*',
+      group: '*',
       memberLevel: {
         // This cube is "private" by default and only accessible via views
         includes: [],
@@ -47,7 +47,7 @@ cube('orders', {
       },
     },
     {
-      role: 'admin',
+      group: 'admin',
       memberLevel: {
         // This cube is "private" by default and only accessible via views
         includes: [],

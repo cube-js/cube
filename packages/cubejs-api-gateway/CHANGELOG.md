@@ -3,6 +3,76 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Bug Fixes
+
+- **api-gateway:** pass job data source when checking pre-agg queue status ([#11321](https://github.com/cube-js/cube/issues/11321)) ([9f13a7f](https://github.com/cube-js/cube/commit/9f13a7ff8fd0ab77dac9925fc37bd13ea84c4f22)), closes [#11313](https://github.com/cube-js/cube/issues/11313) [#11313](https://github.com/cube-js/cube/issues/11313) [#11313](https://github.com/cube-js/cube/issues/11313)
+
+## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.9](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.9) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.8](https://github.com/cube-js/cube/compare/v1.7.7...v1.7.8) (2026-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+### Features
+
+- add lastRefreshTime to Load Request Success telemetry events ([#11283](https://github.com/cube-js/cube/issues/11283)) ([802758c](https://github.com/cube-js/cube/commit/802758cb974d787fe5ff0e3f2297bf51b0710694))
+
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **api-gateway:** Accept timezone-suffixed timestamps in date filters, fix [#11213](https://github.com/cube-js/cube/issues/11213) ([#11208](https://github.com/cube-js/cube/issues/11208)) ([3a67f7d](https://github.com/cube-js/cube/commit/3a67f7dc4aa0e49ab6bc0e831ff079e8c8d03810))
+
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+- fix(cubeorchestrator)!: Serialize all numeric query results as JSON strings, fix #1879 ([bd88651](https://github.com/cube-js/cube/commit/bd8865113889b5153ed837c3dc51bc6bca5d3585)), closes [#1879](https://github.com/cube-js/cube/issues/1879)
+- feat(api-gateway)!: Remove deprecated renewQuery parameter (#11050) ([c2b8888](https://github.com/cube-js/cube/commit/c2b888885d6640c5a14ee49f1057fefdf703ead3)), closes [#11050](https://github.com/cube-js/cube/issues/11050)
+
+### BREAKING CHANGES
+
+- All numeric values in query results are now serialized
+  as JSON strings regardless of the data source driver. Previously the
+  JSON type of numeric values varied by driver (string or number).
+  Clients that relied on receiving JSON numbers must parse the string
+  values instead.
+- The `renewQuery` parameter of the `/v1/load` REST endpoint and the GraphQL `cube` query has been removed. Use the `cache` parameter instead: `cache: 'must-revalidate'` replaces `renewQuery: true`, and the default `stale-if-slow` replaces `renewQuery: false`.
+
+## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
+
+### Features
+
+- **api-gateway:** Support relative date ranges in OR/AND filters, thanks [@elijah-evans-deel](https://github.com/elijah-evans-deel) ([#11167](https://github.com/cube-js/cube/issues/11167)) ([a869654](https://github.com/cube-js/cube/commit/a869654e3eae264a0a67dce2e05101d49570fca4))
+
 ## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

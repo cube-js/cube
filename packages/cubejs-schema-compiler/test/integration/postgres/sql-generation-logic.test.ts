@@ -46,10 +46,6 @@ describe('SQL Generation', () => {
           }]
         },
         per_visitor_revenue: perVisitorRevenueMeasure,
-        revenueRunning: {
-          type: 'runningTotal',
-          sql: 'amount'
-        },
         revenueRolling: {
           type: 'sum',
           sql: 'amount',
@@ -80,14 +76,6 @@ describe('SQL Generation', () => {
             trailing: '2 day',
             offset: 'start'
           }
-        },
-        runningCount: {
-          type: 'runningTotal',
-          sql: '1'
-        },
-        runningRevenuePerCount: {
-          type: 'number',
-          sql: \`round(\${revenueRunning} / \${runningCount})\`
         },
         averageCheckins: {
           type: 'avg',

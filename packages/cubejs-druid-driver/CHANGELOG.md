@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Features
+
+- **cubesql:** Support parsing date-only timestamp strings ([#11316](https://github.com/cube-js/cube/issues/11316)) ([c9bf776](https://github.com/cube-js/cube/commit/c9bf77684d743344134a7af0c3f42e52e74c54b1))
+
+## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.9](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.9) (2026-07-23)
+
+### Features
+
+- **cubesql:** Support parsing date-only timestamp strings ([#11316](https://github.com/cube-js/cube/issues/11316)) ([c9bf776](https://github.com/cube-js/cube/commit/c9bf77684d743344134a7af0c3f42e52e74c54b1))
+
+## [1.7.8](https://github.com/cube-js/cube/compare/v1.7.7...v1.7.8) (2026-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **cubesql:** Push down `UTCTIMESTAMP` (`CURRENT_TIMESTAMP`) ([#11195](https://github.com/cube-js/cube/issues/11195)) ([cde0cca](https://github.com/cube-js/cube/commit/cde0ccaa79fa592c881f3df551b9963232ec9428))
+
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
 ## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver

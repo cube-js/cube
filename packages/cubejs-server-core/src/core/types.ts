@@ -114,8 +114,6 @@ export type DatabaseType =
   | 'mssql'
   | 'mysql'
   | 'mysqlauroraserverless'
-  | 'elasticsearch'
-  | 'awselasticsearch'
   | 'oracle'
   | 'postgres'
   | 'prestodb'
@@ -133,7 +131,6 @@ export type DatabaseType =
   | 'databricks-jdbc';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
-export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
@@ -164,8 +161,6 @@ export type DriverConfig = {
   type: DatabaseType,
 } & DriverOptions;
 
-export type DbTypeFn = (context: DriverContext) =>
-  DatabaseType | Promise<DatabaseType>;
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 
@@ -192,7 +187,6 @@ export type BiToolSyncConfig = {
 };
 
 export interface CreateOptions {
-  dbType?: DatabaseType | DbTypeFn;
   externalDbType?: DatabaseType | ExternalDbTypeFn;
   schemaPath?: string;
   basePath?: string;
@@ -207,7 +201,6 @@ export interface CreateOptions {
   externalDialectFactory?: ExternalDialectFactoryFn;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
-  contextToRoles?: ContextToRolesFn;
   contextToGroups?: ContextToGroupsFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;

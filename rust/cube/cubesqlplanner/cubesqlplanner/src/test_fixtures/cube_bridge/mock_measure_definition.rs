@@ -67,6 +67,10 @@ impl_static_data!(
 );
 
 impl MockMeasureDefinition {
+    pub fn raw_order_by(&self) -> Option<Vec<Rc<MockMemberOrderBy>>> {
+        self.order_by.clone()
+    }
+
     pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
         let yaml_def: YamlMeasureDefinition = serde_yaml::from_str(yaml)
             .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;

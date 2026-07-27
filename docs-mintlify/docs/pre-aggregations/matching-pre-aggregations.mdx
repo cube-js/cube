@@ -115,10 +115,7 @@ requiring a single pre-aggregation that covers the whole query.
 <Warning>
 
 Matching separate pre-aggregations to multi-fact and multi-stage subqueries is
-powered by Tesseract, the [next-generation data modeling engine][link-tesseract].
-Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-tesseract-env] environment variable to
-enable it.
+powered by Tesseract, the [next-generation data modeling engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
 
@@ -162,5 +159,4 @@ configuration option.
 [ref-views]: /docs/data-modeling/views
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
 [ref-multi-stage]: /docs/data-modeling/measures#multi_stage
-[ref-tesseract-env]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
 [link-tesseract]: https://cube.dev/blog/introducing-tesseract

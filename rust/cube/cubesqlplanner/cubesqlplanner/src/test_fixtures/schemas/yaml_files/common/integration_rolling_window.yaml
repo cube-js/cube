@@ -201,10 +201,6 @@ cubes:
             rolling_window:
                 leading: unbounded
                 offset: end
-          # Cat 15 — running total
-          - name: running_total
-            type: runningTotal
-            sql: amount
           # Cat 16 — count distinct
           - name: unique_customers
             type: count_distinct

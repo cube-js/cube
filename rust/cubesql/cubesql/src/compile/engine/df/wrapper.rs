@@ -26,11 +26,17 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
 use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
 use datafusion::{
     error::{DataFusionError, Result},
+    logical_expr::{ReturnTypeFunction, ScalarFunctionImplementation},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet, JoinType,
-        LogicalPlan, Operator, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, ExprRewritable,
+        ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan, Operator,
+        UserDefinedLogicalNode,
     },
-    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
+    physical_plan::{
+        aggregates::AggregateFunction,
+        functions::{BuiltinScalarFunction, Signature, Volatility},
+        udf::ScalarUDF,
+    },
     scalar::ScalarValue,
 };
 use futures::FutureExt;
@@ -575,18 +581,29 @@ impl Remapper {
         }
 
         if let Some(from_alias) = &self.from_alias {
-            // Always map the column under the new from_alias so plans above (which see
-            // this remapper's output through `from_alias`) can resolve it. When the
-            // source column already had a different relation, also keep a mapping under
-            // that original relation, so plans that still reference the inner qualifier
-            // continue to resolve.
-            self.remapping.insert(
-                Column {
-                    name: original_column.name.clone(),
-                    relation: Some(from_alias.clone()),
-                },
-                target_column.clone(),
-            );
+            // Map the column under the new from_alias so plans above (which see
+            // this remapper's output through `from_alias`) can resolve it. When join sides
+            // project colliding column names, the column actually qualified with `from_alias`
+            // owns this mapping; a column from another relation only fills a vacancy, so it
+            // cannot clobber the from-side column's mapping. When the source column has a
+            // different relation, also keep a mapping under that original relation, so plans
+            // that still reference the inner qualifier continue to resolve.
+            //
+            // NOTE: this relies on the from-side column being added before a colliding
+            // column from another relation. If the other side is added first, its vacancy
+            // fill maps `{from_alias}.{name}` to its own target, and a later add of the
+            // actual from-side column short-circuits on that entry in `add_column`/`add_expr`,
+            // returning the other side's alias. Callers iterate the from side's columns
+            // before joined sides' ones, preserving this invariant.
+            let from_alias_column = Column {
+                name: original_column.name.clone(),
+                relation: Some(from_alias.clone()),
+            };
+            let original_is_from_side = original_column.relation.as_ref() == Some(from_alias);
+            if original_is_from_side || !self.remapping.contains_key(&from_alias_column) {
+                self.remapping
+                    .insert(from_alias_column, target_column.clone());
+            }
             if let Some(original_relation) = &original_column.relation {
                 if original_relation != from_alias {
                     self.remapping
@@ -661,6 +678,82 @@ pub struct SqlGenerationResult {
 }
 
 static DATE_PART_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[A-Za-z_ ]+$").unwrap());
+
+/// Marker function for integer division. DataFusion types `int / int` as integer
+/// division (PostgreSQL semantics: truncation toward zero), but `/` in some dialects
+/// (Snowflake, BigQuery, MySQL, ...) performs decimal or float division. Integer
+/// divisions are rewritten to this marker during SQL generation, and the marker is
+/// rendered with the `expressions/int_division` template, so each dialect can map it
+/// to a construct that keeps PostgreSQL semantics. The marker never reaches execution.
+const INT_DIVISION_MARKER: &str = "__int_division";
+
+static INT_DIVISION_UDF: LazyLock<Arc<ScalarUDF>> = LazyLock::new(|| {
+    let fun: ScalarFunctionImplementation = Arc::new(|_| {
+        Err(DataFusionError::Internal(format!(
+            "{INT_DIVISION_MARKER} marker is only used for SQL generation and can't be evaluated"
+        )))
+    });
+    let return_type: ReturnTypeFunction = Arc::new(|types| Ok(Arc::new(types[0].clone())));
+    Arc::new(ScalarUDF::new(
+        INT_DIVISION_MARKER,
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    ))
+});
+
+fn is_integer_type(data_type: &DataType) -> bool {
+    matches!(
+        data_type,
+        DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+    )
+}
+
+/// Replaces `left / right` with the `__int_division` marker when both operands are
+/// integers per `schema`. Subtrees whose types can't be resolved are left unchanged.
+struct IntDivisionRewriter<'a> {
+    schema: &'a DFSchema,
+}
+
+impl ExprRewriter for IntDivisionRewriter<'_> {
+    fn mutate(&mut self, expr: Expr) -> Result<Expr> {
+        match expr {
+            Expr::BinaryExpr {
+                left,
+                op: Operator::Divide,
+                right,
+            } => {
+                let operand_is_integer = |operand: &Expr| {
+                    operand
+                        .get_type(self.schema)
+                        .map(|t| is_integer_type(&t))
+                        .unwrap_or(false)
+                };
+                let is_int_division = operand_is_integer(&left) && operand_is_integer(&right);
+                if is_int_division {
+                    Ok(Expr::ScalarUDF {
+                        fun: INT_DIVISION_UDF.clone(),
+                        args: vec![*left, *right],
+                    })
+                } else {
+                    Ok(Expr::BinaryExpr {
+                        left,
+                        op: Operator::Divide,
+                        right,
+                    })
+                }
+            }
+            _ => Ok(expr),
+        }
+    }
+}
 
 macro_rules! generate_sql_for_timestamp {
     (@generic $literal:ident, $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
@@ -1390,6 +1483,7 @@ impl WrappedSelectNode {
                             Some(push_to_cube_context),
                             subqueries,
                         )?;
+                        let filter = Self::escape_interpolation_quotes(filter, true);
 
                         let used_cubes = Self::prepare_used_cubes(&used_members);
 
@@ -1504,6 +1598,34 @@ impl WrappedSelectNode {
         Ok((patches, other, sql_query))
     }
 
+    /// Rewrites integer divisions in `exprs` to the `__int_division` marker (see
+    /// [`INT_DIVISION_UDF`]). When a rewrite changes an expression, it is wrapped in an
+    /// alias with the original expression name, so generated column aliases stay stable.
+    fn rewrite_int_divisions(exprs: Vec<Expr>, input_schema: &DFSchema) -> Vec<Expr> {
+        exprs
+            .into_iter()
+            .map(|expr| {
+                let Ok(rewritten) = expr.clone().rewrite(&mut IntDivisionRewriter {
+                    schema: input_schema,
+                }) else {
+                    return expr;
+                };
+                if rewritten == expr {
+                    return expr;
+                }
+                match &rewritten {
+                    // Sort and alias expressions can't be wrapped in an alias, and
+                    // their names are not used for generated column aliases
+                    Expr::Sort { .. } | Expr::Alias(_, _) => rewritten,
+                    _ => match expr.name(input_schema) {
+                        Ok(name) => Expr::Alias(Box::new(rewritten), name),
+                        Err(_) => rewritten,
+                    },
+                }
+            })
+            .collect()
+    }
+
     async fn generate_columns(
         &self,
         meta: &MetaContext,
@@ -1545,9 +1667,22 @@ impl WrappedSelectNode {
                 ))
             })?
             .clone();
+
+        // Integer division type detection needs a schema that resolves input columns
+        // of this select: `from` combined with any join inputs
+        let mut input_schema = self.from.schema().as_ref().clone();
+        for (join_plan, _, _) in &self.joins {
+            input_schema = input_schema.join(join_plan.schema()).map_err(|e| {
+                CubeError::internal(format!(
+                    "Can't join schemas for wrapped select input: {}",
+                    e
+                ))
+            })?;
+        }
+
         let (projection, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.projection_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.projection_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1560,7 +1695,7 @@ impl WrappedSelectNode {
         let flat_group_expr = extract_exprlist_from_groupping_set(&self.group_expr);
         let (group_by, sql) = Self::generate_column_expr(
             schema.clone(),
-            flat_group_expr.clone(),
+            Self::rewrite_int_divisions(flat_group_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1587,7 +1722,7 @@ impl WrappedSelectNode {
 
         let (aggregate, sql) = Self::generate_column_expr(
             schema.clone(),
-            aggr_expr.clone(),
+            Self::rewrite_int_divisions(aggr_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1600,7 +1735,7 @@ impl WrappedSelectNode {
 
         let (filter, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.filter_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.filter_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1613,7 +1748,7 @@ impl WrappedSelectNode {
 
         let (window, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.window_expr.iter().cloned(),
+            Self::rewrite_int_divisions(self.window_expr.clone(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -1624,9 +1759,33 @@ impl WrappedSelectNode {
         )
         .await?;
 
+        // Sort expressions can reference window expressions computed in this same select
+        // by their full DataFusion name. Those columns don't exist in the source SQL, so
+        // rewrite them to the generated window aliases, which ORDER BY can reference by name.
+        let order_expr = if window.is_empty() {
+            self.order_expr.clone()
+        } else {
+            let window_columns = self
+                .window_expr
+                .iter()
+                .zip(window.iter())
+                .map(|(window_expr, (aliased_column, _))| {
+                    Ok((
+                        Column::from_name(expr_name(window_expr, schema)?),
+                        Column::from_name(&aliased_column.alias),
+                    ))
+                })
+                .collect::<result::Result<HashMap<_, _>, CubeError>>()?;
+            let window_columns_ref = window_columns.iter().collect();
+            self.order_expr
+                .iter()
+                .map(|e| replace_col(e.clone(), &window_columns_ref))
+                .collect::<Result<Vec<_>>>()?
+        };
+
         let (order, sql) = Self::generate_column_expr(
             schema.clone(),
-            self.order_expr.iter().cloned(),
+            Self::rewrite_int_divisions(order_expr, &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -2934,6 +3093,37 @@ impl WrappedSelectNode {
                 "generate_sql_for_scalar_udf called with non-ScalarUDF expr".to_string(),
             ));
         };
+        if fun.name == INT_DIVISION_MARKER {
+            let [left, right]: [Expr; 2] = args.try_into().map_err(|args| {
+                DataFusionError::Internal(format!(
+                    "{INT_DIVISION_MARKER} marker expects exactly 2 arguments, got {args:?}"
+                ))
+            })?;
+            let (left, sql_query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                left,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            let (right, sql_query) = Self::generate_sql_for_expr(
+                sql_query,
+                sql_generator.clone(),
+                right,
+                push_to_cube_context,
+                subqueries,
+            )?;
+            let resulting_sql = sql_generator
+                .get_sql_templates()
+                .int_division_expr(left, right)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for integer division: {}",
+                        e
+                    ))
+                })?;
+            return Ok((resulting_sql, sql_query));
+        }
         let date_part_err = |dp| {
             DataFusionError::Internal(format!(
                 "Can't generate SQL for scalar function: date part '{}' is not supported",
@@ -3752,13 +3942,15 @@ impl WrappedSelectNode {
                                 let aliased_column = find_column(&self.aggr_expr, &aggregate)
                                     .or_else(|| find_column(&self.projection_expr, &projection))
                                     .or_else(|| find_column(&flat_group_expr, &group_by))
+                                    .or_else(|| find_column(&self.window_expr, &window))
                                     .ok_or_else(|| {
                                         DataFusionError::Execution(format!(
-                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
+                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?} or window {:?}",
                                             col_name,
                                             self.projection_expr,
                                             self.aggr_expr,
-                                            flat_group_expr
+                                            flat_group_expr,
+                                            self.window_expr
                                         ))
                                     })?;
                                 Ok(vec![

@@ -47,7 +47,7 @@ cube('line_items', {
 
   accessPolicy: [
     {
-      role: '*',
+      group: '*',
       rowLevel: {
         filters: [{
           member: 'id',
@@ -61,13 +61,13 @@ cube('line_items', {
       },
     },
     {
-      role: 'restricted',
+      group: 'restricted',
       memberLevel: {
         excludes: ['count', 'price', 'price_dim'],
       },
     },
     {
-      role: 'admin',
+      group: 'admin',
       conditions: [
         {
           if: security_context.auth?.userAttributes?.region === 'CA',
@@ -82,7 +82,7 @@ cube('line_items', {
       },
     },
     {
-      role: 'manager',
+      group: 'manager',
       conditions: [
         {
           if: security_context.auth?.userAttributes?.region === 'CA',

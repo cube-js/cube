@@ -3,6 +3,94 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Bug Fixes
+
+- **native:** Jinja - forward kwargs on sync Python function/method calls ([#11325](https://github.com/cube-js/cube/issues/11325)) ([fd038e4](https://github.com/cube-js/cube/commit/fd038e452de3128fc4916bae67b7f2c8cd41afd3))
+
+### Features
+
+- **cubesql:** Support parsing date-only timestamp strings ([#11316](https://github.com/cube-js/cube/issues/11316)) ([c9bf776](https://github.com/cube-js/cube/commit/c9bf77684d743344134a7af0c3f42e52e74c54b1))
+
+## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.9](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.9) (2026-07-23)
+
+### Features
+
+- **cubesql:** Support parsing date-only timestamp strings ([#11316](https://github.com/cube-js/cube/issues/11316)) ([c9bf776](https://github.com/cube-js/cube/commit/c9bf77684d743344134a7af0c3f42e52e74c54b1))
+
+## [1.7.8](https://github.com/cube-js/cube/compare/v1.7.7...v1.7.8) (2026-07-22)
+
+### Bug Fixes
+
+- **cubesql:** Support type coercion in multi-branch `UNION ALL` ([#11284](https://github.com/cube-js/cube/issues/11284)) ([d216ebc](https://github.com/cube-js/cube/commit/d216ebc59ef28e35299cd953649ecea7a35d300e))
+
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+### Features
+
+- add lastRefreshTime to Load Request Success telemetry events ([#11283](https://github.com/cube-js/cube/issues/11283)) ([802758c](https://github.com/cube-js/cube/commit/802758cb974d787fe5ff0e3f2297bf51b0710694))
+
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+### Bug Fixes
+
+- **cubesql:** Support `ORDER BY` over unprojected columns in CTEs ([#11261](https://github.com/cube-js/cube/issues/11261)) ([760a645](https://github.com/cube-js/cube/commit/760a64537f62ad527214381794ad30cc711090c8))
+
+### Features
+
+- **cubesql:** Support `SELECT DISTINCT ON` ([#11262](https://github.com/cube-js/cube/issues/11262)) ([909d9ee](https://github.com/cube-js/cube/commit/909d9ee3b7204aa08b09cc53a5215fedece639a6))
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+### Bug Fixes
+
+- **cubesql:** Reject `ORDER BY` over ungrouped columns with a clear error ([#11249](https://github.com/cube-js/cube/issues/11249)) ([ff5eac9](https://github.com/cube-js/cube/commit/ff5eac95c5dcf7a7fb14d978ae2fd597ffd6bf5e))
+- **cubesql:** Support `HAVING` on a measure combined with `ORDER BY` on the same measure ([#11254](https://github.com/cube-js/cube/issues/11254)) ([23b199e](https://github.com/cube-js/cube/commit/23b199e03be75596e150eec551fef68aaedc8251))
+
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+### Performance Improvements
+
+- **cubesql:** Migrate streaming to columnar JSON batches, 40-80% ([#11232](https://github.com/cube-js/cube/issues/11232)) ([7b4b124](https://github.com/cube-js/cube/commit/7b4b124e559867b992f8dafcb81f3b3082884c9a))
+
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **cubesql:** Resolve schema-qualified `pg_catalog` functions ([#11190](https://github.com/cube-js/cube/issues/11190)) ([fc0d82b](https://github.com/cube-js/cube/commit/fc0d82b7eb81559e0b2344ff721abfaae91cc76c))
+
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+- feat(server-core)!: Remove deprecated dbType option (#11045) ([08a2a6b](https://github.com/cube-js/cube/commit/08a2a6b37efb450377383fbb0e5041fff106cff2)), closes [#11045](https://github.com/cube-js/cube/issues/11045)
+- feat!: Remove deprecated context_to_roles configuration option (#11055) ([41d42d6](https://github.com/cube-js/cube/commit/41d42d669486e763ad984fda5e64e33438baa5a4)), closes [#11055](https://github.com/cube-js/cube/issues/11055)
+
+### Features
+
+- **cubeorchestrator:** Use Arrow format for CubeStore response format ([78ddac2](https://github.com/cube-js/cube/commit/78ddac22db3258f2f2cf60bb772ae90aa1cb0282)), closes [#1705](https://github.com/cube-js/cube/issues/1705)
+- **native:** Initial support for Python 3.13 ([#9930](https://github.com/cube-js/cube/issues/9930)) ([f91a237](https://github.com/cube-js/cube/commit/f91a23728614dde9b9dc28b4e2a4662439670428))
+
+### BREAKING CHANGES
+
+- CreateOptions.dbType has been removed. Use driverFactory instead.
+- The context_to_roles (contextToRoles) configuration option has been removed. It was deprecated in v1.6.4. Use context_to_groups (contextToGroups) instead.
+
+## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
 ## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
 
 **Note:** Version bump only for package @cubejs-backend/native

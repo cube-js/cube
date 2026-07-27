@@ -45,11 +45,10 @@ impl PrettyPrint for MultiStageToDateRollingWindow {
 }
 
 /// Flavour of rolling-window calculation: regular trailing/leading
-/// window, `to_date` window, or a running-total accumulation.
+/// window or a `to_date` window.
 pub enum MultiStageRollingWindowType {
     Regular(MultiStageRegularRollingWindow),
     ToDate(MultiStageToDateRollingWindow),
-    RunningTotal,
 }
 
 impl PrettyPrint for MultiStageRollingWindowType {
@@ -57,9 +56,6 @@ impl PrettyPrint for MultiStageRollingWindowType {
         match self {
             MultiStageRollingWindowType::Regular(window) => window.pretty_print(result, state),
             MultiStageRollingWindowType::ToDate(window) => window.pretty_print(result, state),
-            MultiStageRollingWindowType::RunningTotal => {
-                result.println("Running Total Rolling Window", state)
-            }
         }
     }
 }

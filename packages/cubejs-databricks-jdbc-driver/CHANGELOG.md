@@ -3,6 +3,66 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.11](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.11) (2026-07-26)
+
+### Bug Fixes
+
+- **cubesql:** Keep PostgreSQL integer division semantics in pushdown SQL ([#11319](https://github.com/cube-js/cube/issues/11319)) ([ae248c4](https://github.com/cube-js/cube/commit/ae248c446651790483212dd68176a9b78fe7844b))
+
+## [1.7.10](https://github.com/cube-js/cube/compare/v1.7.9...v1.7.10) (2026-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.7.9](https://github.com/cube-js/cube/compare/v1.7.8...v1.7.9) (2026-07-23)
+
+### Bug Fixes
+
+- **cubesql:** Keep PostgreSQL integer division semantics in pushdown SQL ([#11319](https://github.com/cube-js/cube/issues/11319)) ([ae248c4](https://github.com/cube-js/cube/commit/ae248c446651790483212dd68176a9b78fe7844b))
+
+## [1.7.8](https://github.com/cube-js/cube/compare/v1.7.7...v1.7.8) (2026-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.7.7](https://github.com/cube-js/cube/compare/v1.7.6...v1.7.7) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.7.6](https://github.com/cube-js/cube/compare/v1.7.5...v1.7.6) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.7.5](https://github.com/cube-js/cube/compare/v1.7.4...v1.7.5) (2026-07-21)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.7.4](https://github.com/cube-js/cube/compare/v1.7.3...v1.7.4) (2026-07-17)
+
+### Bug Fixes
+
+- **cubesql:** Translate PostgreSQL format tokens in `TO_CHAR` SQL push down ([#11279](https://github.com/cube-js/cube/issues/11279)) ([fc42b0c](https://github.com/cube-js/cube/commit/fc42b0c2282ec54feafe1e35a9b4cf588c7c8f82))
+
+## [1.7.3](https://github.com/cube-js/cube/compare/v1.7.2...v1.7.3) (2026-07-16)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.7.2](https://github.com/cube-js/cube/compare/v1.7.1...v1.7.2) (2026-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.7.1](https://github.com/cube-js/cube/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+### Bug Fixes
+
+- **cubesql:** Push down `UTCTIMESTAMP` (`CURRENT_TIMESTAMP`) ([#11195](https://github.com/cube-js/cube/issues/11195)) ([cde0cca](https://github.com/cube-js/cube/commit/cde0ccaa79fa592c881f3df551b9963232ec9428))
+
+# [1.7.0](https://github.com/cube-js/cube/compare/v1.6.67...v1.7.0) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.6.67](https://github.com/cube-js/cube/compare/v1.6.66...v1.6.67) (2026-07-06)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
 ## [1.6.66](https://github.com/cube-js/cube/compare/v1.6.65...v1.6.66) (2026-07-03)
 
 ### Features

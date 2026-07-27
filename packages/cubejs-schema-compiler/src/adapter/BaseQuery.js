@@ -345,12 +345,10 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
-    if (this.useNativeSqlPlanner && !this.canUseNativeSqlPlannerPreAggregation && !this.neverUseSqlPlannerPreaggregation()) {
-      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
-
-      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
-    }
+    // Tesseract pre-aggregation planning always follows the SQL planner and can't be
+    // toggled independently. The neverUseSqlPlannerPreaggregation() guard still opts
+    // specific query types (e.g. CubeStoreQuery) out for correctness.
+    this.canUseNativeSqlPlannerPreAggregation = this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation();
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -1018,6 +1016,7 @@ export class BaseQuery {
       preAggregationsMatchOnly: true,
       preAggregationId: this.options.preAggregationId || null,
       securityContext: this.contextSymbols.securityContext,
+      joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
       subqueryJoins: this.options.subqueryJoins,
@@ -1120,16 +1119,6 @@ export class BaseQuery {
       ...this.options,
       externalQueryClass: null
     });
-  }
-
-  runningTotalDateJoinCondition() {
-    return this.timeDimensions
-      .map(
-        d => [
-          d,
-          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
-        ]
-      );
   }
 
   rollingWindowToDateJoinCondition(granularity) {
@@ -2199,8 +2188,17 @@ export class BaseQuery {
       case 1:
         [cubeNameToAttach] = cubeNamesForMeasure;
         break;
-      default:
-        throw new Error(`Expected single cube for dimension-only measure ${measureName}, got ${cubeNamesForMeasure}`);
+      default: {
+        if (cubeNamesForMeasure.some(cubeName => this.multipliedJoinRowResult(cubeName))) {
+          throw new Error(`Dimension-only measure ${measureName} references cubes (${cubeNamesForMeasure}) that lead to row multiplication. Please rewrite it using sub query.`);
+        }
+        // Dimensions from several cubes, but none of them is on the multiplied
+        // side of a join - safe to evaluate the expression on top of join tree
+        return [measureName, [{
+          multiplied: false,
+          measure: m.measure,
+        }]];
+      }
     }
 
     const multiplied = this.multipliedJoinRowResult(cubeNameToAttach) || false;
@@ -3378,7 +3376,12 @@ export class BaseQuery {
           }
         }
         const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+        // order_by templates reference members of the measure's owning cube. When
+        // the measure is exposed through a view, those members may be absent or
+        // exposed only under an alias, so resolve them against the owning cube
+        // (from aliasMember, the underlying reference) instead of the view.
+        const orderByCubeName = symbol.aliasMember ? symbol.aliasMember.split('.')[0] : cubeName;
+        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(orderByCubeName, o.sql), dir: o.dir }));
         let sql;
         let patchedSymbol = symbol;
         if (symbol.type !== 'rank') {
@@ -3887,8 +3890,6 @@ export class BaseQuery {
         this.countDistinctApprox(evaluateSql);
     } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
       return `count(distinct ${evaluateSql})`;
-    } else if (symbol.type === 'runningTotal') {
-      return `sum(${evaluateSql})`; // TODO
     }
     if (multiplied) {
       if (symbol.type === 'number' && evaluateSql === 'count(*)') {
@@ -4617,6 +4618,10 @@ export class BaseQuery {
         case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '({{ expr }} IS {% if negate %}NOT {% endif %}NULL)',
         binary: '({{ left }} {{ op }} {{ right }})',
+        // Integer division with PostgreSQL semantics: truncation toward zero.
+        // Plain `/` is correct for dialects where int / int is integer division;
+        // dialects with decimal or float `/` must override this template
+        int_division: '({{ left }} / {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}',
         order_by: '{% if index %} {{ index }} {% else %} {{ expr }} {% endif %} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
@@ -4641,7 +4646,10 @@ export class BaseQuery {
         wrap_segment_select: '{{ expr }}',
         wrap_segment_filter: '{{ expr }}',
         rolling_window_expr_timestamp_cast: '{{ value }}',
-        timestamp_literal: '{{ value }}',
+        // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
+        // ANSI CAST of the quoted value is the most portable default; dialects override
+        // with their exact parsing construct. A bare unquoted value is never valid SQL
+        timestamp_literal: 'CAST(\'{{ value }}\' AS TIMESTAMP)',
         between: '{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}',
       },
       tesseract: {
@@ -5404,7 +5412,25 @@ export class BaseQuery {
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
-          { aliasGathering: true }
+          {
+            aliasGathering: true,
+            // Alias gathering may be triggered in the middle of some collection
+            // (e.g. join hints collection for a member whose sql uses FILTER_PARAMS).
+            // Inherited collectors must be shadowed here, otherwise members of the
+            // current query traversed during alias gathering leak into the outer
+            // collection result. Some of those results are cached in the long-lived
+            // compilerCache and would poison unrelated queries (e.g. with extra joins).
+            cubeNames: undefined,
+            joinHints: undefined,
+            memberNames: undefined,
+            subQueryDimensions: undefined,
+            leafMeasures: undefined,
+            compositeCubeMeasures: undefined,
+            foundCompositeCubeMeasures: undefined,
+            memberChildren: undefined,
+            inlineWhereConditions: undefined,
+            collectOriginalSqlPreAggregations: undefined,
+          }
         );
         const memberPath = member.expressionPath();
         let nonAliasSeen = false;

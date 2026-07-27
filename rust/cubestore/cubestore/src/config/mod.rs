@@ -135,11 +135,7 @@ impl CubeServices {
 
             let rocks_cache_store = self.rocks_cache_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                let loops = rocks_cache_store.spawn_processing_loops().await;
-
-                Self::wait_loops(loops).await?;
-
-                Ok(())
+                rocks_cache_store.run_processing_loops().await
             }));
 
             let cluster = self.cluster.clone();
@@ -463,6 +459,8 @@ pub trait ConfigObj: DIService {
 
     fn stale_stream_timeout(&self) -> u64;
 
+    fn streaming_lag_timeout_ms(&self) -> u64;
+
     fn select_workers(&self) -> &Vec<String>;
 
     fn worker_bind_address(&self) -> &Option<String>;
@@ -717,6 +715,7 @@ pub struct ConfigObjImpl {
     pub meta_store_snapshot_interval: u64,
     pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
+    pub streaming_lag_timeout_ms: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
@@ -943,6 +942,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn stale_stream_timeout(&self) -> u64 {
         self.stale_stream_timeout
+    }
+
+    fn streaming_lag_timeout_ms(&self) -> u64 {
+        self.streaming_lag_timeout_ms
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -1734,6 +1737,7 @@ impl Config {
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stale_stream_timeout: env_parse("CUBESTORE_STALE_STREAM_TIMEOUT", 600),
+                streaming_lag_timeout_ms: env_parse("CUBESTORE_STREAMING_LAG_TIMEOUT_MS", 5000),
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -2099,6 +2103,7 @@ impl Config {
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
                 stale_stream_timeout: 60,
+                streaming_lag_timeout_ms: 5000,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,

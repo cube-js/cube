@@ -174,8 +174,10 @@ describe('PostgresQuery', () => {
         timezone: 'America/Los_Angeles'
       });
 
+      // The native planner orders by all granularity columns (result-equivalent
+      // to the legacy planner's min-granularity-only ordering).
       let queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('ORDER BY 2 ASC');
+      expect(queryAndParams[0]).toContain('ORDER BY  1  ASC,  2  ASC,  3  ASC');
 
       query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
@@ -202,7 +204,7 @@ describe('PostgresQuery', () => {
       });
 
       queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('ORDER BY 1 ASC');
+      expect(queryAndParams[0]).toContain('ORDER BY  1  ASC,  2  ASC,  3  ASC');
 
       query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
@@ -225,7 +227,7 @@ describe('PostgresQuery', () => {
       });
 
       queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('ORDER BY 2 ASC');
+      expect(queryAndParams[0]).toContain('ORDER BY  1  ASC,  2  ASC');
     });
 
     it('multi granularity ordered by specified granularity', async () => {
@@ -252,7 +254,7 @@ describe('PostgresQuery', () => {
       });
 
       let queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('ORDER BY 2 ASC');
+      expect(queryAndParams[0]).toMatch(/ORDER BY\s+2\s+ASC/);
 
       query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
@@ -275,7 +277,7 @@ describe('PostgresQuery', () => {
       });
 
       queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('ORDER BY 1 ASC');
+      expect(queryAndParams[0]).toMatch(/ORDER BY\s+1\s+ASC/);
 
       query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
@@ -298,7 +300,7 @@ describe('PostgresQuery', () => {
       });
 
       queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('ORDER BY 2 ASC');
+      expect(queryAndParams[0]).toMatch(/ORDER BY\s+2\s+ASC/);
 
       query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
@@ -325,7 +327,7 @@ describe('PostgresQuery', () => {
       });
 
       queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('ORDER BY 3 ASC');
+      expect(queryAndParams[0]).toMatch(/ORDER BY\s+3\s+ASC/);
     });
   });
 
@@ -401,7 +403,8 @@ describe('PostgresQuery', () => {
     const queryAndParams = query.buildSqlAndParams();
     const sql = queryAndParams[0];
 
-    // PostgreSQL should use AS keyword for subquery aliases
-    expect(sql).toMatch(/\s+AS\s+q_0\s+/);
+    // PostgreSQL should use AS keyword for subquery aliases (the native planner
+    // quotes the alias, e.g. AS "q_0").
+    expect(sql).toMatch(/\s+AS\s+"?q_0"?/);
   });
 });

@@ -168,7 +168,6 @@ impl MultiStageMemberQueryPlanner {
                     granularity_obj: Rc::new(granularity_obj),
                 })
             }
-            RollingWindowType::RunningTotal => MultiStageRollingWindowType::RunningTotal,
         };
 
         let schema = LogicalSchema::default()

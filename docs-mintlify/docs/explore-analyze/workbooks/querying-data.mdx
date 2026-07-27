@@ -24,6 +24,14 @@ A data model author can change the default for a semantic view with the
 views that are expensive to query. You can still toggle auto-run back on at
 any time.
 
+An admin can also turn auto-run off by default for every tab in the
+deployment, from **Model Configuration**. Per-view and per-tab settings still
+take precedence over this deployment-wide default. See
+[Auto-run][ref-configuration-auto-run] in the Model Configuration reference.
+
+When a cell's value is too long for its column, it is truncated with an
+ellipsis. Hover over a truncated cell to see its full value in a tooltip.
+
 ## Filtering
 
 Dimensions and measures can be added as filters to focus on specific rows of data.
@@ -43,15 +51,24 @@ views:
 
     meta:
       default_ui_filters:
+        - member: created_at
+          operator: between
+          values: ["7 days ago", "today"]
         - member: status
-          operator: equals
-          values:
-            - completed
+          operator: is
+          values: ["completed"]
 ```
 
 When you select such a view in a new tab, those filters are added to the query
 automatically. They behave exactly like filters you add yourself: you can
 change their values, switch operators, or remove them.
+
+Date range filters can use relative bounds like `7 days ago` or `this month`.
+A relative range resolves each time the query runs, so the window rolls
+forward day over day, and the filter's date editor opens on the **Relative**
+tab showing its bounds. See
+[`default_ui_filters`][ref-default-ui-filters] for the full list of accepted
+operators and values.
 
 Resetting the tab or going back to the view list clears default filters
 along with the rest of the query; they are seeded again the next time you
@@ -62,6 +79,46 @@ select a view.
 You can add dimensions to the pivot by right-clicking on the left pane or in the results header.
 
 Note that chart tables are different from results tables. You can configure pivots in chart tables separately.
+
+## Totals
+
+The totals menu (the **Σ** button) in the results toolbar adds summary rows
+and columns to the results table: **Column Totals** (a pinned row at the
+bottom with a total for each measure column), **Row Totals** (a total for
+each row across the pivoted columns), and **Subtotals** (see below). All
+three can be enabled at once; each setting is saved with the report and
+carries over when you switch the chart type to [Table][ref-table-chart].
+
+### Subtotals
+
+When the table is [pivoted](#pivoting) by two or more dimensions,
+**Subtotals** appends a bold **Total for ‹value›** column after each pivot
+group's columns, at every nesting level — for example, pivoting by year and
+then status adds a **Total for 2024** column after 2024's status columns.
+With fewer than two pivot dimensions the menu item is disabled, and if the
+query changes so the pivot no longer qualifies, subtotals switch off
+automatically.
+
+<Frame>
+  <img src="https://ucarecdn.com/61d36ecc-020f-4d04-b449-b7c983e269ea/92a1bd7f-light.png" alt="Pivoted results table with subtotal columns" />
+</Frame>
+
+Subtotal values are computed by the database — one extra query per pivot
+level — rather than by summing the visible cells, so they are correct for
+non-additive measures such as counts of distinct values and averages, and
+when the [row limit](#limiting) truncates the table. With **Column Totals**
+also enabled, the pinned totals row shows a grand total for each pivot group.
+
+<Note>
+
+- The toggle adds subtotals for all pivot levels at once; there is no
+  per-group control.
+- Subtotals are not available for flat (non-pivoted) tables or in the
+  values-as-rows table layout.
+- [Calculations][ref-calculated-fields] based on window functions, such as
+  **Running total**, are excluded — same as for row and column totals.
+
+</Note>
 
 ## Limiting
 
@@ -164,6 +221,13 @@ The **Semantic SQL** tab also has a dropdown for viewing the same query in the f
 
 These views are convenient when you want to take a query you've built interactively in a workbook and reuse it directly through one of the Core Data APIs from your own application.
 
+## Result freshness and provenance
+
+Two indicators next to each result describe the data behind it.
+
+- **Freshness** — a leaf icon shows how recently the underlying data was refreshed. Hover over it to see the last refresh time (for example, "Refreshed 5 minutes ago"); its color shifts as the data ages, so you can tell fresh from stale results at a glance. If the refresh time can't be determined, the leaf turns gray with a "Data age unknown" label. When you have access to [Query History](/admin/monitoring/query-history), clicking the leaf opens the underlying request for that result.
+- **Pre-aggregation** — for those same users, a lightning-bolt icon appears next to the leaf with a "Served from a pre-aggregation" label whenever the result was served from a [pre-aggregation](/docs/pre-aggregations). If no icon is shown, the query ran directly against your data source.
+
 ## Editing Semantic SQL by hand
 
 You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert.
@@ -260,5 +324,8 @@ behaves as intended.
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
+[ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
+[ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
+[ref-configuration-auto-run]: /docs/data-modeling/configuration#auto-run
 

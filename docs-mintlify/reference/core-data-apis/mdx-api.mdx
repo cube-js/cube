@@ -217,9 +217,17 @@ This is going to be harmonized in the future.
 
 ## Authentication and authorization
 
-Authentication and authorization work the same as for the [SQL API](/reference/core-data-apis/sql-api/security).
+The MDX API shares its authentication layer with the [DAX API][ref-dax-api]:
+[Kerberos][ref-kerberos] and [NTLM][ref-ntlm] are supported, as well as user name and
+password authentication. Configuration is done on the **Settings → Power BI** page of
+your deployment — the same XMLA service account, SPN, and keytab setup applies to both
+APIs.
 
 [ref-excel]: /admin/connect-to-data/visualization-tools/excel
+[ref-time-dimensions]: /docs/data-modeling/dimensions#time-dimensions
+[ref-dax-api]: /reference/core-data-apis/dax-api
+[ref-kerberos]: /docs/integrations/power-bi/kerberos
+[ref-ntlm]: /docs/integrations/power-bi/ntlm
 [link-mdx]: https://learn.microsoft.com/en-us/analysis-services/multidimensional-models/mdx/multidimensional-model-data-access-analysis-services-multidimensional-data?view=asallproducts-allversions#bkmk_querylang
 [link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
 [ref-cube-cloud-for-excel]: /docs/integrations/microsoft-excel

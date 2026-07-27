@@ -121,11 +121,9 @@ describe('MssqlQuery', () => {
       const queryAndParams = query.buildSqlAndParams();
 
       const queryString = queryAndParams[0];
-      const lastGroupByIdx = queryString.lastIndexOf('GROUP BY');
-      const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
-      const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
-
-      expect(finalGroupBy).toEqual('GROUP BY "visitors.createdAt_series"."date_from"');
+      // The native planner groups by the calculated-granularity expression
+      // directly (the legacy planner grouped by a time-series CTE alias).
+      expect(queryString).toContain('GROUP BY dateadd(week, DATEDIFF(week, 0, CAST("visitors".created_at AT TIME ZONE \'UTC\' AT TIME ZONE \'Pacific Standard Time\' AS DATETIME2)), 0)');
     }));
 
   it('should group by both time and regular dimensions on rolling windows',
@@ -154,11 +152,9 @@ describe('MssqlQuery', () => {
       const queryAndParams = query.buildSqlAndParams();
 
       const queryString = queryAndParams[0];
-      const lastGroupByIdx = queryString.lastIndexOf('GROUP BY');
-      const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
-      const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
-
-      expect(finalGroupBy).toEqual('GROUP BY "visitors.createdAt_series"."date_from", "visitors__source"');
+      // The native planner groups by the regular dimension and the
+      // calculated-granularity expression (legacy used a time-series CTE alias).
+      expect(queryString).toContain('GROUP BY "visitors".source, dateadd(week, DATEDIFF(week, 0, CAST("visitors".created_at AT TIME ZONE \'UTC\' AT TIME ZONE \'Pacific Standard Time\' AS DATETIME2)), 0)');
     }));
 
   it('should not include order by clauses in subqueries',

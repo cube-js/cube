@@ -184,7 +184,7 @@ impl ConfigObjImpl {
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
-            tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", false),
+            tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", true),
         }
     }
 }

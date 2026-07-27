@@ -66,6 +66,8 @@ yarn dev    # Start the Mintlify dev server
   relevant `group` to appear in the sidebar).
 - Use Mintlify components: `<Note>`, `<Warning>`, `<Info>`, `<Tip>`, `<Steps>`/`<Step>`,
   `<CardGroup>`/`<Card>`. Internal links are root-relative (e.g. `/admin/ai/rules`).
+- Keep docs concise — most changes are small, surgical edits to existing pages, not new
+  pages or walls of text. Prefer editing an existing page over creating a new one.
 - See `docs-mintlify/CLAUDE.md` for full conventions.
 
 ## Architecture Overview
@@ -87,7 +89,7 @@ yarn dev    # Start the Mintlify dev server
 3. **API Gateway**: Provides REST, GraphQL, and SQL APIs
 4. **CubeSQL**: Postgres-compatible SQL interface (Rust)
 5. **CubeStore**: Distributed OLAP storage engine (Rust)
-6. **Tesseract**: Native SQL planner (Rust) located in `/rust/cube/cubesqlplanner` - enabled via `CUBESQL_SQL_PUSH_DOWN=true` environment variable
+6. **Tesseract**: Native SQL planner (Rust) located in `/rust/cube/cubesqlplanner` - the default planner; set `CUBEJS_TESSERACT_SQL_PLANNER=false` to fall back to the deprecated legacy planner. Tesseract pre-aggregation planning follows this flag and cannot be toggled independently
 
 ### Package Management
 - Uses Yarn workspaces with Lerna for package management

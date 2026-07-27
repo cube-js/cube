@@ -63,7 +63,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {
@@ -96,7 +96,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {
@@ -129,7 +129,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {
@@ -162,7 +162,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {
@@ -195,7 +195,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {
@@ -228,7 +228,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {
@@ -261,7 +261,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {
@@ -294,7 +294,7 @@ describe('Transpilers', () => {
           },
           accessPolicy: [
             {
-              role: \`*\`,
+              group: \`*\`,
               rowLevel: {
                 filters: [
                   {

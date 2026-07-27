@@ -1,0 +1,247 @@
+use anyhow::Result;
+use clap::Subcommand;
+
+use crate::{output, util, Ctx};
+
+#[derive(clap::Args)]
+pub struct Args {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// List deployments
+    #[command(alias = "ls")]
+    List {
+        /// Filter by creation step (repeatable): project, upload, schema, github, ssh, databases, ready, demo
+        #[arg(long = "creation-step")]
+        creation_step: Vec<String>,
+        /// Pagination offset
+        #[arg(long)]
+        offset: Option<u64>,
+        /// Maximum number of items to return
+        #[arg(long)]
+        limit: Option<u64>,
+        /// Page size for cursor-based pagination
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for fetching the next page
+        #[arg(long)]
+        after: Option<String>,
+    },
+    /// Show a single deployment
+    Get {
+        /// Deployment id
+        deployment: i64,
+    },
+    /// Create a deployment
+    Create {
+        /// Deployment name
+        #[arg(long)]
+        name: Option<String>,
+        /// Region name (see `cube regions`), e.g. aws-us-east-1-2
+        #[arg(long)]
+        region: Option<String>,
+        /// Cloud provider: cubecloud, aws, gcp
+        #[arg(long, default_value = "cubecloud")]
+        cloud_provider: String,
+        /// Target platform, e.g. aws, gcp
+        #[arg(long, default_value = "aws")]
+        target_platform: String,
+        /// Provision a self-managed (BYOC/k8s-hybrid) deployment instead of managed
+        #[arg(long)]
+        unmanaged: bool,
+        /// Creation step: project, upload, schema, github, ssh, databases, ready, demo
+        #[arg(long, default_value = "project")]
+        creation_step: String,
+        /// Deprecated no-op: create always scaffolds and builds now
+        #[arg(long, short = 'b', hide = true)]
+        bootstrap: bool,
+        /// Full CreateDeploymentInput as JSON (overrides the flags above)
+        #[arg(long, short = 'd')]
+        data: Option<String>,
+    },
+    /// Update a deployment (rename, or full UpdateDeploymentInput via --data)
+    Update {
+        /// Deployment id
+        deployment: i64,
+        /// Name
+        #[arg(long)]
+        name: Option<String>,
+        /// Request body as JSON (inline, @file, or - for stdin)
+        #[arg(long, short = 'd')]
+        data: Option<String>,
+    },
+    /// Delete a deployment
+    #[command(alias = "rm")]
+    Delete {
+        /// Deployment id
+        deployment: i64,
+    },
+    /// Generate a Cube API token for a deployment
+    Token {
+        /// Deployment id
+        deployment: i64,
+    },
+    /// Show the latest build status for a branch
+    BuildStatus {
+        /// Deployment id
+        deployment: i64,
+        /// Branch (defaults to the active dev-mode branch, else the deploy branch)
+        #[arg(long)]
+        branch: Option<String>,
+    },
+    /// Advance onboarding to a target creation step
+    AdvanceStep {
+        /// Deployment id
+        deployment: i64,
+        /// Target step: project, upload, schema, github, ssh, databases, ready, demo
+        step: String,
+    },
+    /// Reset onboarding back to the first creation step (project)
+    ResetStep {
+        /// Deployment id
+        deployment: i64,
+    },
+}
+
+pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
+    let api = ctx.api()?;
+    match args.cmd {
+        Cmd::List {
+            creation_step,
+            offset,
+            limit,
+            first,
+            after,
+        } => {
+            let mut query = Vec::new();
+            for step in creation_step {
+                query.push(("creationStep".to_string(), step));
+            }
+            util::push(&mut query, "offset", &offset);
+            util::push(&mut query, "limit", &limit);
+            util::push(&mut query, "first", &first);
+            util::push(&mut query, "after", &after);
+            let res = api.get("/api/v1/deployments/", &query).await?;
+            output::print_list(
+                ctx.json,
+                &res,
+                &[
+                    ("ID", "id"),
+                    ("NAME", "name"),
+                    ("URL", "deploymentUrl"),
+                    ("STEP", "creationStep"),
+                ],
+            );
+        }
+        Cmd::Get { deployment } => {
+            let res = api
+                .get(&format!("/api/v1/deployments/{deployment}"), &Vec::new())
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::Create {
+            name,
+            region,
+            cloud_provider,
+            target_platform,
+            unmanaged,
+            creation_step,
+            bootstrap,
+            data,
+        } => {
+            // Flags populate the body; --data (if given) overrides them.
+            let mut body = serde_json::Map::new();
+            util::set(&mut body, "name", &name);
+            util::set(&mut body, "region", &region);
+            body.insert("cloudProvider".into(), serde_json::json!(cloud_provider));
+            body.insert("targetPlatform".into(), serde_json::json!(target_platform));
+            body.insert("isManaged".into(), serde_json::json!(!unmanaged));
+            body.insert("creationStep".into(), serde_json::json!(creation_step));
+            for (k, v) in util::parse_data(data.as_deref())? {
+                body.insert(k, v);
+            }
+            for required in ["name", "region"] {
+                if !body.contains_key(required) {
+                    anyhow::bail!("--{required} is required (or provide it via --data)");
+                }
+            }
+            // Deployment creation is build-served: it scaffolds the project
+            // (unless creationMethod says otherwise) and runs the first
+            // build. The old row-only POST /api/v1/deployments is gone —
+            // --bootstrap is kept as a hidden no-op for compatibility.
+            let _ = bootstrap;
+            let res = api
+                .post("/build/api/v1/deployments", Some(&util::body(body)))
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::Update {
+            deployment,
+            name,
+            data,
+        } => {
+            let mut body = util::parse_data(data.as_deref())?;
+            util::set(&mut body, "name", &name);
+            let res = api
+                .put(
+                    &format!("/api/v1/deployments/{deployment}"),
+                    Some(&util::body(body)),
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::Delete { deployment } => {
+            let res = api
+                .delete(&format!("/api/v1/deployments/{deployment}"), None)
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                output::success(&format!("Deleted deployment {deployment}"));
+            }
+        }
+        Cmd::BuildStatus { deployment, branch } => {
+            let mut query = Vec::new();
+            util::push(&mut query, "branchName", &branch);
+            let res = api
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/build-status"),
+                    &query,
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::AdvanceStep { deployment, step } => {
+            let res = api
+                .post(
+                    &format!("/api/v1/deployments/{deployment}/creation-step/advance"),
+                    Some(&serde_json::json!({ "creationStep": step })),
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::ResetStep { deployment } => {
+            let res = api
+                .post(
+                    &format!("/api/v1/deployments/{deployment}/creation-step/reset"),
+                    None,
+                )
+                .await?;
+            output::print_json(&res);
+        }
+        Cmd::Token { deployment } => {
+            let res = api
+                .post(&format!("/api/v1/deployments/{deployment}/token"), None)
+                .await?;
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                println!("{}", output::field(&res, "cubeApiToken"));
+            }
+        }
+    }
+    Ok(())
+}

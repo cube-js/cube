@@ -23,9 +23,19 @@ tags:
   - name: Workbooks
   - name: Notifications
   - name: Workspace
+  - name: User Attributes
   - name: App Theme
   - name: Embed
   - name: Embed Tenants
+  - name: Dbt Sync
+  - name: Env Variables
+  - name: OAuth Integrations
+  - name: OIDC Token Configs
+  - name: Regions
+  - name: Tenant Settings
+  - name: User Attribute Values
+  - name: User OAuth Tokens
+  - name: Users Admin
 paths:
   /v1/app-config:
     get:
@@ -110,6 +120,24 @@ paths:
       tags:
         - Deployments
   /v1/deployments/{deploymentId}:
+    delete:
+      operationId: deleteDeployment
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentDeleteResponse'
+          description: ''
+      summary: Delete deployment
+      tags:
+        - Deployments
     get:
       operationId: getDeployment
       parameters:
@@ -128,6 +156,110 @@ paths:
       summary: Get deployment
       tags:
         - Deployments
+    put:
+      operationId: updateDeployment
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeploymentInput'
+        description: UpdateDeploymentInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+          description: ''
+      summary: Update deployment
+      tags:
+        - Deployments
+  /v1/deployments/{deploymentId}/dbt-sync:
+    post:
+      operationId: startDbtSync
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDbtSyncInput'
+        description: StartDbtSyncInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbtSyncResponse'
+          description: ''
+      summary: Start a dbt sync for a deployment
+      tags:
+        - Dbt Sync
+  /v1/deployments/{deploymentId}/env-vars:
+    get:
+      operationId: getEnvVariables
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvVariablesListResponse'
+          description: ''
+      summary: Get env variables
+      tags:
+        - Env Variables
+      x-mint:
+        content: >-
+          Lists the deployment environment variables. Values of secret-named variables (containing
+          PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are returned as `[ENCRYPTED]`.
+    put:
+      operationId: setEnvVariables
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEnvVariablesInput'
+        description: SetEnvVariablesInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvVariablesListResponse'
+          description: ''
+      summary: Set env variables
+      tags:
+        - Env Variables
+      x-mint:
+        content: >-
+          Upserts deployment environment variables by name; variables not included keep their
+          existing values. Passing the `[ENCRYPTED]` placeholder (the masked read value) is rejected
+          — omit variables you do not intend to change.
   /v1/deployments/{deploymentId}/environments:
     get:
       operationId: getDeploymentEnvironments
@@ -955,6 +1087,24 @@ paths:
               - type: integer
               - type: 'null'
         - in: query
+          name: folderId
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: externalWorkbookId
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
           name: limit
           schema:
             oneOf:
@@ -1108,6 +1258,46 @@ paths:
       summary: Update report
       tags:
         - Reports
+  /v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook:
+    put:
+      operationId: connectReportToWorkbook
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectReportToWorkbookInput'
+        description: ConnectReportToWorkbookInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Connect a report to the calling spreadsheet
+      tags:
+        - Reports
+      x-mint:
+        content: |-
+          Link a report to the caller's own spreadsheet by recording its placement
+          (workbook id + result location) so the add-in can list and refresh it there.
+
+          This upserts only the placement for the given workbook and never changes the
+          report's query, name, or other definition — so, like refresh, it requires only
+          read access to the report. A user who can view a report can place its data into
+          their own sheet without being its creator or having edit rights.
   /v1/deployments/{deploymentId}/reports/{reportId}/refresh:
     put:
       operationId: refreshReport
@@ -1416,6 +1606,37 @@ paths:
       summary: Update workbook dashboard
       tags:
         - Workbooks
+  /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread:
+    post:
+      operationId: updatePublishedDashboardAiWidgetThread
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePublishedAiWidgetThreadInput'
+        description: UpdatePublishedAiWidgetThreadInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: ''
+      summary: Update published dashboard AI widget thread
+      tags:
+        - Workbooks
   /v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
     post:
       operationId: duplicateWorkbook
@@ -1655,6 +1876,23 @@ paths:
           Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
           rejected with `400`. Returns `404` if the item does not exist or belongs to a different
           deployment.
+  /v1/embed-tenants/{embedTenantName}:
+    delete:
+      operationId: deleteEmbedTenant
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete embed tenant
+      tags:
+        - Embed Tenants
   /v1/embed-tenants/{embedTenantName}/groups:
     get:
       operationId: getGroups
@@ -1707,60 +1945,6 @@ paths:
             application/json: {}
           description: Successful response
       summary: Delete group
-      tags:
-        - Embed Tenants
-  /v1/embed-tenants/{embedTenantName}/user-attributes:
-    get:
-      operationId: getUserAttributes
-      parameters:
-        - in: path
-          name: embedTenantName
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: after
-          schema:
-            oneOf:
-              - type: string
-              - type: 'null'
-        - in: query
-          name: first
-          schema:
-            oneOf:
-              - minimum: 1
-                type: integer
-              - type: 'null'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAttributesConnectionResponse'
-          description: ''
-      summary: Get user attributes
-      tags:
-        - Embed Tenants
-  /v1/embed-tenants/{embedTenantName}/user-attributes/{id}:
-    delete:
-      operationId: deleteUserAttribute
-      parameters:
-        - in: path
-          name: embedTenantName
-          required: true
-          schema:
-            type: string
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: number
-      responses:
-        '200':
-          content:
-            application/json: {}
-          description: Successful response
-      summary: Delete user attribute
       tags:
         - Embed Tenants
   /v1/embed/dashboard/{publicId}:
@@ -1829,9 +2013,29 @@ paths:
 
           The session captures the embed context that will be baked into the embed token once
           redeemed — the target `deploymentId`, the end user's identity (`externalId` / `email` /
-          `userProfile`), their `groups` and `userAttributes`, and an optional `securityContext`.
-          Exchange the returned `sessionId` for a signed embed JWT via `POST
+          `userProfile`), their group memberships, `userAttributes`, and an optional
+          `securityContext`. Exchange the returned `sessionId` for a signed embed JWT via `POST
           /api/v1/embed/session/token` (single use).
+
+
+          The end user can be assigned to two independent kinds of group, which serve different
+          purposes:
+
+
+          - **`groups`** — global, tenant-wide groups for **data-model access control**. Their names
+          are passed verbatim into the Cube security context (`cubeCloud.groups`), where your data
+          model's `access_policy` rules use them to gate cubes, views, members, and
+          row-/column-level filters. They must already exist in the tenant.
+
+          - **`tenantGroups`** — per-embed-tenant groups for **sharing and organizing content within
+          a single embed tenant** (e.g. sharing a workbook or dashboard with a group in Creator
+          Mode). Requires `creatorMode: true` and `embedTenantName`; create them inline via
+          `tenantGroupDefinitions`. In the security context they are namespaced as
+          `system:tenant:{embedTenantName}:group:{group}`, so they never collide with a same-named
+          global group.
+
+
+          See the individual request-body fields for the full contract.
 
 
           `deploymentId` is required and the caller must have read access to it. Embedding must be
@@ -1871,6 +2075,492 @@ paths:
           This endpoint is unauthenticated — it is called from the embedding client and the session
           id itself is the credential. Returns `401` if the session id is unknown or has already
           been redeemed.
+  /v1/oauth-integrations:
+    get:
+      operationId: listOAuthIntegrations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OAuthIntegration'
+                type: array
+          description: ''
+      summary: List OAuth integrations
+      tags:
+        - OAuth Integrations
+    post:
+      operationId: createOAuthIntegration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthIntegrationInput'
+        description: CreateOAuthIntegrationInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthIntegration'
+          description: ''
+      summary: Create OAuth integration
+      tags:
+        - OAuth Integrations
+  /v1/oauth-integrations/{id}:
+    delete:
+      operationId: deleteOAuthIntegration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete OAuth integration
+      tags:
+        - OAuth Integrations
+    get:
+      operationId: getOAuthIntegration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthIntegration'
+          description: ''
+      summary: Get OAuth integration
+      tags:
+        - OAuth Integrations
+    put:
+      operationId: updateOAuthIntegration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOAuthIntegrationInput'
+        description: UpdateOAuthIntegrationInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthIntegration'
+          description: ''
+      summary: Update OAuth integration
+      tags:
+        - OAuth Integrations
+  /v1/oidc-token-configs:
+    get:
+      operationId: listOidcTokenConfigs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OidcTokenConfig'
+                type: array
+          description: ''
+      summary: List OIDC token configs
+      tags:
+        - OIDC Token Configs
+    post:
+      operationId: createOidcTokenConfig
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOidcTokenConfigInput'
+        description: CreateOidcTokenConfigInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcTokenConfig'
+          description: ''
+      summary: Create OIDC token config
+      tags:
+        - OIDC Token Configs
+  /v1/oidc-token-configs/{id}:
+    delete:
+      operationId: deleteOidcTokenConfig
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete OIDC token config
+      tags:
+        - OIDC Token Configs
+    get:
+      operationId: getOidcTokenConfig
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcTokenConfig'
+          description: ''
+      summary: Get OIDC token config
+      tags:
+        - OIDC Token Configs
+    put:
+      operationId: updateOidcTokenConfig
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOidcTokenConfigInput'
+        description: UpdateOidcTokenConfigInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcTokenConfig'
+          description: ''
+      summary: Update OIDC token config
+      tags:
+        - OIDC Token Configs
+  /v1/regions:
+    get:
+      operationId: listRegions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegionsListResponse'
+          description: ''
+      summary: List regions
+      tags:
+        - Regions
+  /v1/tenant/settings:
+    get:
+      operationId: getTenantSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantSettings'
+          description: ''
+      summary: Get tenant settings
+      tags:
+        - Tenant Settings
+    put:
+      operationId: updateTenantSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantSettingsInput'
+        description: TenantSettingsInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantSettings'
+          description: ''
+      summary: Update tenant settings
+      tags:
+        - Tenant Settings
+  /v1/user-attribute-values:
+    post:
+      operationId: upsertUserAttributeValue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAttributeValueCreateInput'
+        description: UserAttributeValueCreateInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAttributeValueDTO'
+          description: ''
+      summary: Upsert user attribute value
+      tags:
+        - User Attribute Values
+  /v1/user-attribute-values/{userId}:
+    get:
+      operationId: getUserAttributeValues
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/UserAttributeValueDTO'
+                type: array
+          description: ''
+      summary: Get user attribute values
+      tags:
+        - User Attribute Values
+  /v1/user-attributes:
+    get:
+      operationId: getUserAttributes
+      parameters:
+        - in: query
+          name: offset
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: limit
+          schema:
+            oneOf:
+              - type: integer
+              - type: 'null'
+        - in: query
+          name: name
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: type
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/GetUserAttributesQueryType'
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAttributesListResponse'
+          description: ''
+      summary: Get user attributes
+      tags:
+        - User Attributes
+    post:
+      operationId: createUserAttribute
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAttributeCreateInput'
+        description: UserAttributeCreateInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAttribute'
+          description: ''
+      summary: Create user attribute
+      tags:
+        - User Attributes
+  /v1/user-attributes/{id}:
+    put:
+      operationId: updateUserAttribute
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAttributeUpdateInput'
+        description: UserAttributeUpdateInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAttribute'
+          description: ''
+      summary: Update user attribute
+      tags:
+        - User Attributes
+  /v1/user-oauth-tokens:
+    get:
+      operationId: listUserOAuthTokens
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/UserOAuthToken'
+                type: array
+          description: ''
+      summary: List user OAuth tokens
+      tags:
+        - User OAuth Tokens
+  /v1/user-oauth-tokens/{integrationId}:
+    delete:
+      operationId: revokeUserOAuthToken
+      parameters:
+        - in: path
+          name: integrationId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Revoke user OAuth token
+      tags:
+        - User OAuth Tokens
+    get:
+      operationId: getUserOAuthToken
+      parameters:
+        - in: path
+          name: integrationId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOAuthToken'
+          description: ''
+      summary: Get user OAuth token
+      tags:
+        - User OAuth Tokens
+  /v1/user-oauth-tokens/{integrationId}/initiate:
+    post:
+      operationId: initiateOAuthFlow
+      parameters:
+        - in: path
+          name: integrationId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Initiate OAuth flow
+      tags:
+        - User OAuth Tokens
+  /v1/users:
+    post:
+      operationId: createUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateInput'
+        description: UserCreateInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+      summary: Create user
+      tags:
+        - Users Admin
+  /v1/users/{id}:
+    delete:
+      operationId: deleteUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete user
+      tags:
+        - Users Admin
+    put:
+      operationId: updateUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateInput'
+        description: UserUpdateInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+      summary: Update user
+      tags:
+        - Users Admin
 components:
   securitySchemes:
     bearerAuth:
@@ -1901,6 +2591,10 @@ components:
         creatorMode:
           oneOf:
             - $ref: '#/components/schemas/CreatorMode'
+            - type: 'null'
+        embedding:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedSettings'
             - type: 'null'
       required:
         - applyThemeGlobally
@@ -1980,6 +2674,20 @@ components:
         - percent
         - number
       type: string
+    ConnectReportToWorkbookInput:
+      properties:
+        endResultCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalWorkbookId:
+          type: string
+        resultLocation:
+          type: string
+      required:
+        - externalWorkbookId
+        - resultLocation
+      type: object
     ControlThemeBorderSectionInput:
       properties:
         color:
@@ -2163,6 +2871,77 @@ components:
         - MONTHLY
         - CUSTOM
       type: string
+    CreateOAuthIntegrationInput:
+      properties:
+        authUrl:
+          format: url
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        config:
+          additionalProperties: true
+          type: object
+        name:
+          type: string
+        redirectUri:
+          format: url
+          type: string
+        scopes:
+          items:
+            type: string
+          type: array
+        tokenUrl:
+          format: url
+          type: string
+        type:
+          type: string
+      required:
+        - clientSecret
+        - name
+        - type
+        - authUrl
+        - tokenUrl
+        - clientId
+        - redirectUri
+      type: object
+    CreateOidcTokenConfigInput:
+      properties:
+        audienceType:
+          type: string
+        customAudience:
+          oneOf:
+            - type: string
+            - type: 'null'
+        customClaims:
+          oneOf:
+            - type: object
+            - type: 'null'
+        isEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        name:
+          oneOf:
+            - pattern: ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$
+              type: string
+            - type: 'null'
+        subFormat:
+          oneOf:
+            - pattern: ^(?:[A-Za-z0-9:_-]|\{(?:deployment_id|component|region)\})+$
+              type: string
+              maxLength: 200
+            - type: 'null'
+        targetEnvVar:
+          oneOf:
+            - pattern: ^[A-Z_][A-Z0-9_]*$
+              type: string
+              maxLength: 128
+            - type: 'null'
+      required:
+        - audienceType
+      type: object
     CreateReportInput:
       properties:
         endResultCell:
@@ -2258,6 +3037,21 @@ components:
       type: string
     CreatorMode:
       properties:
+        localizedTitles:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/LocalizedValue'
+              type: array
+              maxItems: 50
+            - type: 'null'
+        showGeneratedSql:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        showSemanticSql:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         showWorkspaceTitle:
           oneOf:
             - type: boolean
@@ -2295,11 +3089,19 @@ components:
           items:
             $ref: '#/components/schemas/ReportSnapshot'
           type: array
+        restrictDataDownload:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         status:
           $ref: '#/components/schemas/DashboardDtoStatus'
         title:
           oneOf:
             - type: string
+            - type: 'null'
+        useBoardDashboards:
+          oneOf:
+            - type: boolean
             - type: 'null'
         versionId:
           type: integer
@@ -2470,11 +3272,11 @@ components:
             - type: string
             - type: 'null'
         widgets:
-          items:
-            $ref: '#/components/schemas/DashboardWidgetInput'
-          type: array
-      required:
-        - widgets
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardWidgetInput'
+              type: array
+            - type: 'null'
       type: object
     DashboardDtoStatus:
       enum:
@@ -2858,6 +3660,19 @@ components:
         - w
         - h
       type: object
+    DbtSyncResponse:
+      properties:
+        branchName:
+          type: string
+        syncJobId:
+          type: string
+        workflowId:
+          type: string
+      required:
+        - syncJobId
+        - workflowId
+        - branchName
+      type: object
     Deployment:
       properties:
         creationStep:
@@ -2873,6 +3688,13 @@ components:
         - name
         - deploymentUrl
         - creationStep
+      type: object
+    DeploymentDeleteResponse:
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
       type: object
     DeploymentEnvironment:
       properties:
@@ -3045,6 +3867,37 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    EmbedSessionSettings:
+      properties:
+        showDashboardChat:
+          oneOf:
+            - type: boolean
+              description: >-
+                Whether embedded published dashboards viewed with this session show the AI chat
+                (agent panel and launcher bubble). Omit to inherit the account-wide embed setting
+                (shown by default); `false` hides the chat even if it is enabled account-wide,
+                `true` shows it even if it is disabled account-wide. Only affects the dashboard
+                surface.
+            - type: 'null'
+      type: object
+    EmbedSettings:
+      properties:
+        locale:
+          oneOf:
+            - type: string
+            - type: 'null'
+        showDashboardChat:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
+    EmbedTenantProfile:
+      properties:
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
     EmbedTheme:
       properties:
         analyticsChat:
@@ -3107,6 +3960,38 @@ components:
             - format: url
               type: string
             - type: 'null'
+      type: object
+    EnvVariableDto:
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+      required:
+        - name
+        - value
+      type: object
+    EnvVariablesListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/EnvVariableDto'
+          type: array
+      required:
+        - data
+      type: object
+    FillMissingRows:
+      properties:
+        excludedDimensions:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        member:
+          type: string
+      required:
+        - member
       type: object
     Folder:
       properties:
@@ -3210,14 +4095,15 @@ components:
             - pattern: ^[a-z][a-z0-9-]{0,34}[a-z0-9]$
               type: string
             - type: 'null'
+        embedTenantProfile:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedTenantProfile'
+              type: object
+            - type: 'null'
         embedTheme:
           oneOf:
             - $ref: '#/components/schemas/EmbedTheme'
               type: object
-            - type: 'null'
-        ephemeralTtlSeconds:
-          oneOf:
-            - type: number
             - type: 'null'
         externalId:
           oneOf:
@@ -3228,12 +4114,29 @@ components:
             - items:
                 $ref: '#/components/schemas/GroupDefinition'
               type: array
+              deprecated: true
+              description: >-
+                Deprecated and ignored. Global groups can no longer be created through this endpoint
+                — define them beforehand via the Cube Cloud UI or admin API. Still accepted for
+                backward compatibility (no error), but it has no effect. To create per-embed-tenant
+                groups, use `tenantGroupDefinitions`.
             - type: 'null'
         groups:
           oneOf:
             - items:
                 type: string
               type: array
+              description: >-
+                Global user groups — defined once at the tenant level and shared across every embed
+                tenant — to assign this embed user to. Use `groups` for **data-model access
+                control**: each name is placed verbatim into the Cube security context as
+                `cubeCloud.groups`, where your data model's `access_policy` rules reference it to
+                gate cubes, views, members, and row-/column-level filters. The groups must already
+                exist in the tenant (create them via the Cube Cloud UI or admin API beforehand) —
+                this endpoint never creates global groups, and names that do not resolve to an
+                existing group are rejected. Global groups are NOT shown in an embed tenant’s
+                Creator Mode UI. To share or organize content inside a single embed tenant, use
+                `tenantGroups` instead.
             - type: 'null'
         internalId:
           oneOf:
@@ -3257,6 +4160,44 @@ components:
           oneOf:
             - type: object
               additionalProperties: true
+            - type: 'null'
+        settings:
+          oneOf:
+            - $ref: '#/components/schemas/EmbedSessionSettings'
+              type: object
+              description: >-
+                Per-session overrides for embed behavior. Each key is tri-state: omit it to inherit
+                the account-wide setting, or set `true`/`false` to force the behavior for every
+                embed viewed with this session, taking precedence over the account-wide setting.
+            - type: 'null'
+        tenantGroupDefinitions:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/GroupDefinition'
+              type: array
+              description: >-
+                Idempotently create or update the per-embed-tenant groups referenced by
+                `tenantGroups`, before they are assigned. Requires `creatorMode: true` and
+                `embedTenantName`. Use this to declare a tenant’s groups in the same call that
+                assigns them, so you do not need a separate admin request. Applies only to
+                per-embed-tenant groups; global groups must be defined beforehand.
+            - type: 'null'
+        tenantGroups:
+          oneOf:
+            - items:
+                type: string
+              type: array
+              description: >-
+                Per-embed-tenant user groups — scoped to the single embed tenant named by
+                `embedTenantName` — to assign this embed user to. Use `tenantGroups` for **content
+                sharing and organization within one embed tenant**: for example, so a creator can
+                share a workbook, dashboard, or folder with a group of that tenant’s users. These
+                are the only groups shown in the embed tenant’s Creator Mode UI. Requires
+                `creatorMode: true` and `embedTenantName`. Define the groups beforehand — or in the
+                same request — via `tenantGroupDefinitions`. In the Cube security context they
+                appear namespaced as `system:tenant:{embedTenantName}:group:{groupName}`, so a
+                tenant group can never collide with — or be mistaken for — a global `groups` entry
+                of the same name. For organization-wide data-model access policies, use `groups`.
             - type: 'null'
         userAttributeDefinitions:
           oneOf:
@@ -3303,6 +4244,14 @@ components:
         - ASC
         - DESC
       type: string
+    GetUserAttributesQueryType:
+      enum:
+        - string
+        - number
+        - boolean
+        - string_array
+        - number_array
+      type: string
     GetWorkspaceObjectsQueryOrderByDirection:
       enum:
         - ASC
@@ -3325,6 +4274,18 @@ components:
           type: string
       required:
         - name
+      type: object
+    LocalizedValue:
+      properties:
+        locale:
+          maxLength: 35
+          type: string
+        value:
+          maxLength: 1000
+          type: string
+      required:
+        - locale
+        - value
       type: object
     MoveWorkspaceObjectInput:
       properties:
@@ -3556,6 +4517,103 @@ components:
       required:
         - items
       type: object
+    OAuthIntegration:
+      properties:
+        authUrl:
+          format: url
+          type: string
+        clientId:
+          type: string
+        config:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        id:
+          type: integer
+        name:
+          type: string
+        redirectUri:
+          format: url
+          type: string
+        scopes:
+          oneOf:
+            - items: {}
+              type: array
+            - type: 'null'
+        tokenUrl:
+          format: url
+          type: string
+        type:
+          type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - id
+        - name
+        - type
+        - authUrl
+        - tokenUrl
+        - clientId
+        - redirectUri
+        - createdAt
+        - updatedAt
+      type: object
+    OidcTokenConfig:
+      properties:
+        audience:
+          type: string
+        audienceType:
+          type: string
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        customClaims:
+          oneOf:
+            - type: object
+            - type: 'null'
+        id:
+          type: integer
+        isEnabled:
+          type: boolean
+        name:
+          type: string
+        subFormat:
+          oneOf:
+            - type: string
+            - type: 'null'
+        targetEnvVar:
+          oneOf:
+            - type: string
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - id
+        - audienceType
+        - audience
+        - name
+        - isEnabled
+        - createdAt
+        - updatedAt
+      type: object
     PageInfo:
       properties:
         endCursor:
@@ -3652,6 +4710,49 @@ components:
       required:
         - workbookId
       type: object
+    RegionDto:
+      properties:
+        id:
+          type: integer
+        isDedicated:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        isHybrid:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        isPublic:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        name:
+          type: string
+        provider:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        useAiEngineer:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      required:
+        - id
+        - name
+      type: object
+    RegionsListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/RegionDto'
+          type: array
+      required:
+        - data
+      type: object
     RemoveNotificationRecipientInput:
       properties:
         embedTenantName:
@@ -3694,6 +4795,14 @@ components:
       type: object
     Report:
       properties:
+        canEdit:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        canManage:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         createdAt:
           oneOf:
             - format: date
@@ -3715,6 +4824,12 @@ components:
         externalWorkbookId:
           oneOf:
             - type: string
+            - type: 'null'
+        externalWorkbookPlacements:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/ReportPlacement'
+              type: array
             - type: 'null'
         folderId:
           oneOf:
@@ -3815,11 +4930,29 @@ components:
         - WORKBOOK
         - REPORT
       type: string
+    ReportPlacement:
+      properties:
+        endResultCell:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resultLocation:
+          type: string
+        workbookId:
+          type: string
+      required:
+        - workbookId
+        - resultLocation
+      type: object
     ReportSnapshot:
       properties:
         description:
           oneOf:
             - type: string
+            - type: 'null'
+        fillMissingRows:
+          oneOf:
+            - $ref: '#/components/schemas/FillMissingRows'
             - type: 'null'
         id:
           type: integer
@@ -3938,6 +5071,8 @@ components:
               - DeploymentRead
               - DeploymentUpdate
               - DeploymentDelete
+              - SecretsManage
+              - DownloadData
               - PlaygroundRead
               - SchemaRead
               - SchemaUpdate
@@ -3993,6 +5128,84 @@ components:
         - name
         - actions
       type: object
+    SetEnvVariablesInput:
+      properties:
+        env_variables:
+          items:
+            $ref: '#/components/schemas/EnvVariableDto'
+          type: array
+      required:
+        - env_variables
+      type: object
+    StartDbtSyncInput:
+      properties:
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    TenantSettings:
+      properties:
+        auditLogEnabled:
+          type: boolean
+        auditLogEnabledCurrent:
+          type: boolean
+        auditLogEnabledTimestamp:
+          type: integer
+        hasSupportAccess:
+          type: boolean
+        maintenanceWindowDay:
+          type: string
+        maintenanceWindowEnabled:
+          type: boolean
+        maintenanceWindowTime:
+          type: string
+        oidcEnabled:
+          type: boolean
+        useAIBIUserInterface:
+          type: boolean
+      required:
+        - auditLogEnabled
+        - auditLogEnabledCurrent
+        - auditLogEnabledTimestamp
+        - hasSupportAccess
+        - useAIBIUserInterface
+        - maintenanceWindowEnabled
+        - maintenanceWindowDay
+        - maintenanceWindowTime
+        - oidcEnabled
+      type: object
+    TenantSettingsInput:
+      properties:
+        auditLogEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        hasSupportAccess:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        maintenanceWindowDay:
+          oneOf:
+            - type: string
+            - type: 'null'
+        maintenanceWindowEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        maintenanceWindowTime:
+          oneOf:
+            - type: string
+            - type: 'null'
+        oidcEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        useAIBIUserInterface:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
     ThemeFont:
       properties:
         family:
@@ -4014,6 +5227,65 @@ components:
         - url
         - format
       type: object
+    UpdateDeploymentInput:
+      properties:
+        cloudProvider:
+          oneOf:
+            - type: string
+            - type: 'null'
+        creationMethod:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputCreationMethod'
+            - type: 'null'
+        creationStep:
+          oneOf:
+            - $ref: '#/components/schemas/CreationStep'
+            - type: 'null'
+        customDomain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deployBranchMergeAllowed:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        deployBranchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deployBranchReadOnly:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        deployMode:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateDeploymentInputDeployMode'
+            - type: 'null'
+        deployProjectRoot:
+          oneOf:
+            - type: string
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        region:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    UpdateDeploymentInputCreationMethod:
+      enum:
+        - upload
+        - cubecloud
+        - github
+        - ssh
+      type: string
+    UpdateDeploymentInputDeployMode:
+      enum:
+        - git
+        - cli
+      type: string
     UpdateFolderInput:
       properties:
         name:
@@ -4101,6 +5373,88 @@ components:
         - MONTHLY
         - CUSTOM
       type: string
+    UpdateOAuthIntegrationInput:
+      properties:
+        authUrl:
+          format: url
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          oneOf:
+            - type: string
+            - type: 'null'
+        config:
+          additionalProperties: true
+          type: object
+        name:
+          type: string
+        redirectUri:
+          format: url
+          type: string
+        scopes:
+          items:
+            type: string
+          type: array
+        tokenUrl:
+          format: url
+          type: string
+        type:
+          type: string
+      required:
+        - name
+        - type
+        - authUrl
+        - tokenUrl
+        - clientId
+        - redirectUri
+      type: object
+    UpdateOidcTokenConfigInput:
+      properties:
+        customAudience:
+          oneOf:
+            - type: string
+            - type: 'null'
+        customClaims:
+          oneOf:
+            - type: object
+            - type: 'null'
+        isEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        name:
+          oneOf:
+            - pattern: ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$
+              type: string
+            - type: 'null'
+        subFormat:
+          oneOf:
+            - pattern: ^(?:[A-Za-z0-9:_-]|\{(?:deployment_id|component|region)\})+$
+              type: string
+              maxLength: 200
+            - type: 'null'
+        targetEnvVar:
+          oneOf:
+            - pattern: ^[A-Z_][A-Z0-9_]*$
+              type: string
+              maxLength: 128
+            - type: 'null'
+      type: object
+    UpdatePublishedAiWidgetThreadInput:
+      properties:
+        checksum:
+          oneOf:
+            - type: string
+            - type: 'null'
+        threadId:
+          type: string
+        widgetId:
+          type: string
+      required:
+        - widgetId
+        - threadId
+      type: object
     UpdateReportInput:
       properties:
         endResultCell:
@@ -4164,7 +5518,146 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        slug:
+          oneOf:
+            - type: string
+            - type: 'null'
+        slugTakeover:
+          oneOf:
+            - type: boolean
+            - type: 'null'
       type: object
+    User:
+      properties:
+        activeRoleId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        aliases:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/UserAlias'
+              type: array
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        defaultRoles:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        email:
+          type: string
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gitUser:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        impersonation:
+          oneOf:
+            - $ref: '#/components/schemas/UserImpersonationDTO'
+            - type: 'null'
+        isAdmin:
+          type: boolean
+        isDeactivated:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        lastLogin:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        notifications:
+          additionalProperties: true
+          type: object
+        picture:
+          oneOf:
+            - type: string
+            - type: 'null'
+        samlId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        settings:
+          oneOf:
+            - $ref: '#/components/schemas/UserSettingsInput'
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        tosAccepted:
+          oneOf:
+            - type: object
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        username:
+          type: string
+      required:
+        - id
+        - email
+        - username
+        - isAdmin
+        - notifications
+      type: object
+    UserAlias:
+      properties:
+        createdAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        id:
+          type: integer
+        source:
+          $ref: '#/components/schemas/UserAliasDTOSource'
+        updatedAt:
+          pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
+          type: string
+        userId:
+          type: integer
+        username:
+          type: string
+      required:
+        - id
+        - userId
+        - username
+        - source
+        - createdAt
+        - updatedAt
+      type: object
+    UserAliasDTOSource:
+      enum:
+        - ldap
+        - saml
+        - scim
+        - manual
+      type: string
     UserAttribute:
       properties:
         defaultValue:
@@ -4190,10 +5683,42 @@ components:
         - name
         - type
       type: object
+    UserAttributeCreateInput:
+      properties:
+        defaultValue:
+          oneOf:
+            - type: string
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        name:
+          minLength: 1
+          type: string
+        type:
+          $ref: '#/components/schemas/UserAttributeCreateInputType'
+      required:
+        - name
+        - type
+      type: object
+    UserAttributeCreateInputType:
+      enum:
+        - string
+        - number
+        - boolean
+        - string_array
+        - number_array
+      type: string
     UserAttributeDTOType:
       enum:
         - string
         - number
+        - boolean
         - string_array
         - number_array
       type: string
@@ -4223,6 +5748,7 @@ components:
       enum:
         - string
         - number
+        - boolean
         - string_array
         - number_array
       type: string
@@ -4235,6 +5761,7 @@ components:
             - oneOf:
                 - type: string
                 - type: number
+                - type: boolean
                 - type: array
                   items:
                     type: string
@@ -4245,17 +5772,116 @@ components:
       required:
         - name
       type: object
-    UserAttributesConnectionResponse:
+    UserAttributeUpdateInput:
       properties:
-        items:
+        defaultValue:
+          oneOf:
+            - type: string
+            - type: 'null'
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    UserAttributeValueCreateInput:
+      properties:
+        userAttributeId:
+          minLength: 1
+          type: string
+        userId:
+          minLength: 1
+          type: string
+      required:
+        - userId
+        - userAttributeId
+      type: object
+    UserAttributeValueDTO:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        formattedValue:
+          oneOf:
+            - {}
+            - type: 'null'
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/UserAttributeValueDTOType'
+        userAttributeId:
+          type: integer
+        userId:
+          type: integer
+        value:
+          oneOf:
+            - {}
+            - type: 'null'
+      required:
+        - userId
+        - userAttributeId
+        - name
+        - type
+      type: object
+    UserAttributeValueDTOType:
+      enum:
+        - string
+        - number
+        - boolean
+        - string_array
+        - number_array
+      type: string
+    UserAttributesListResponse:
+      properties:
+        count:
+          type: integer
+        data:
           items:
             $ref: '#/components/schemas/UserAttribute'
           type: array
-        pageInfo:
-          $ref: '#/components/schemas/PageInfo'
       required:
-        - items
-        - pageInfo
+        - data
+        - count
+      type: object
+    UserCreateInput:
+      properties:
+        defaultRoles:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        email:
+          type: string
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        isAdmin:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        password:
+          oneOf:
+            - type: string
+            - type: 'null'
+        username:
+          type: string
+      required:
+        - email
+        - username
       type: object
     UserGroupDTO:
       properties:
@@ -4286,6 +5912,141 @@ components:
       required:
         - items
         - pageInfo
+      type: object
+    UserImpersonationDTO:
+      properties:
+        expiresAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        impersonatedUser:
+          oneOf:
+            - $ref: '#/components/schemas/User'
+            - type: 'null'
+        startedAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+      type: object
+    UserOAuthToken:
+      properties:
+        accessTokenExpiresAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        id:
+          type: integer
+        integrationId:
+          type: integer
+        lastError:
+          oneOf:
+            - {}
+            - type: 'null'
+        refreshTokenExpiresAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        status:
+          type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        userId:
+          type: integer
+      required:
+        - id
+        - userId
+        - integrationId
+        - status
+        - createdAt
+        - updatedAt
+      type: object
+    UserSettingsInput:
+      properties:
+        alternatingRowColors:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        lastSeenChangelogId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        locale:
+          oneOf:
+            - type: string
+            - type: 'null'
+        theme:
+          oneOf:
+            - type: string
+            - type: 'null'
+        timezone:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    UserUpdateInput:
+      properties:
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        isAdmin:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        isDeactivated:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        notifications:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        password:
+          oneOf:
+            - type: string
+            - type: 'null'
+        settings:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        tosAccepted:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
       type: object
     WidgetThemeBorderSectionInput:
       properties:
@@ -4411,6 +6172,10 @@ components:
         publishedDashboard:
           oneOf:
             - $ref: '#/components/schemas/Dashboard'
+            - type: 'null'
+        slug:
+          oneOf:
+            - type: string
             - type: 'null'
         type:
           $ref: '#/components/schemas/WorkbookDtoType'

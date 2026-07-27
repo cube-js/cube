@@ -263,6 +263,7 @@ export class ClickHouseQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.UTCTIMESTAMP = 'now(\'UTC\')';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
@@ -278,6 +279,10 @@ export class ClickHouseQuery extends BaseQuery {
     delete templates.types.interval;
     delete templates.types.binary;
     templates.expressions.is_not_distinct_from = 'isNotDistinctFrom({{ left }}, {{ right }})';
+    // ClickHouse `/` always returns Float64; intDiv is integer division truncating
+    // toward zero, matching PostgreSQL (intDiv(-7, 2) = -3 despite docs saying
+    // "rounded down")
+    templates.expressions.int_division = 'intDiv({{ left }}, {{ right }})';
 
     templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
     'FROM (\n' +

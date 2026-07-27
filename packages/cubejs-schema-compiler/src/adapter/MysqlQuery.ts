@@ -186,12 +186,22 @@ export class MysqlQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.STRING_AGG = 'GROUP_CONCAT({% if distinct %}DISTINCT {% endif %}{{ args[0] }} SEPARATOR {{ args[1] }})';
+    templates.functions.UTCTIMESTAMP = 'UTC_TIMESTAMP()';
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // MySQL `/` returns DECIMAL even for integer operands; DIV discards the
+    // fractional part (truncation toward zero), matching PostgreSQL (-5 DIV 2 = -2)
+    templates.expressions.int_division = '({{ left }} DIV {{ right }})';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
+    // MySQL parses the 'T'/'Z' markers only with a "Truncated incorrect datetime value"
+    // warning and ignores the zone, so both markers are stripped instead. The driver
+    // pins the session time zone to UTC, which keeps the naive literal on the same
+    // instant. The base template renders the value bare, which is invalid MySQL syntax
+    templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value | replace("T", " ") | replace("Z", "") }}\')';
     delete templates.expressions.ilike;
     templates.types.string = 'CHAR';
     templates.types.boolean = 'TINYINT';

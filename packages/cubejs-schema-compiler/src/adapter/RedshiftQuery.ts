@@ -84,6 +84,9 @@ export class RedshiftQuery extends PostgresQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
+    // Redshift clusters always run in UTC and GETDATE() is supported on compute
+    // nodes, unlike NOW(), which is a leader node–only function.
+    templates.functions.UTCTIMESTAMP = 'GETDATE()';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.statements.time_series_select = 'SELECT dates.f::timestamp date_from, dates.t::timestamp date_to \n' +

@@ -108,12 +108,17 @@ export class SnowflakeQuery extends BaseQuery {
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.NOW = 'CURRENT_TIMESTAMP';
+    templates.functions.UTCTIMESTAMP = 'SYSDATE()';
     templates.functions.LOG = 'LOG({% if args[1] is undefined %}10, {% endif %}{{ args_concat }})';
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
     templates.functions.CHARACTERLENGTH = 'LENGTH({{ args[0] }})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    // Snowflake `/` is decimal division even for integer operands (output scale
+    // is dividend scale + 6), while this template must keep PostgreSQL integer
+    // division semantics. TRUNC rounds toward zero, matching PostgreSQL.
+    templates.expressions.int_division = 'CAST(TRUNC({{ left }} / {{ right }}) AS BIGINT)';
     // Snowflake can't EXTRACT(EPOCH FROM <interval>), so the epoch of a timestamp
     // difference (left - right) is rendered as fractional seconds between them.
     // TIMESTAMPDIFF is measured once at microsecond granularity (no per-second
