@@ -1,6 +1,7 @@
 mod add_group_by;
 mod bucketing;
 mod calculated;
+mod case_dimension_grain_include;
 mod case_switch;
 mod dimensions;
 mod edge_cases;

@@ -1520,3 +1520,58 @@ async fn test_rollup_lambda_cross_cube_union_aliases() -> Result<(), CubeError> 
 
     Ok(())
 }
+
+// Repro for https://github.com/cube-js/cube/issues/11383:
+// `joined_rollup` is a monthly/daily-granularity rollup on the fact cube
+// `visitor_checkins` that includes a cross-cube dimension from the
+// many_to_one joined `visitors` cube (`visitors.source`), plus a
+// `time_dimension`. An `ungrouped: true` query with NO measures and NO
+// time dimension bound, asking only for `visitor_checkins.visitor_id` and
+// `visitors.source`, should NOT be able to use this rollup: the rollup
+// can't answer an unbounded (no time dimension) raw-row scan across the
+// join, and reading flat rollup columns would silently drop the
+// relational JOIN between the two cubes. It should fall back to base SQL
+// with a join.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_no_measures_cross_cube_query_should_not_match_rollup_with_time_dimension()
+-> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml")
+        .only_pre_aggregations(&["joined_rollup"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - visitor_checkins.visitor_id
+          - visitors.source
+        filters:
+          - dimension: visitors.source
+            operator: equals
+            values:
+              - google
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    eprintln!("=== generated SQL ===\n{sql}\n=== used pre-aggregations: {} ===",
+        pre_aggrs.iter().map(|p| p.name().clone()).collect::<Vec<_>>().join(", "));
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "BUG (cube-js/cube#11383): ungrouped query with no measures and no time \
+         dimension incorrectly matched rollup `{}` that has a time_dimension and a \
+         cross-cube dimension, dropping the JOIN. Generated SQL:\n{sql}",
+        pre_aggrs
+            .iter()
+            .map(|p| p.name().clone())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    assert!(
+        sql.to_lowercase().contains("join"),
+        "expected base SQL with a JOIN between visitor_checkins and visitors, got:\n{sql}"
+    );
+
+    Ok(())
+}
