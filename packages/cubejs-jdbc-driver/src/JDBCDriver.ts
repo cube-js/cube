@@ -8,6 +8,8 @@ import {
   getEnv,
   assertDataSource,
   CancelablePromise,
+  formatAnsi,
+  formatMySql,
   Pool,
 } from '@cubejs-backend/shared';
 import {
@@ -17,12 +19,11 @@ import {
   DownloadQueryResultsResult,
   StreamOptions,
 } from '@cubejs-backend/base-driver';
-import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
 import path from 'path';
 
 import { SupportedDrivers } from './supported-drivers';
-import type { DriverOptionsInterface } from './supported-drivers';
+import type { DriverOptionsInterface, EscapeDialect } from './supported-drivers';
 import type { JDBCDriverConfiguration } from './types';
 import { QueryStream, transformRow } from './QueryStream';
 import type { nextFn } from './QueryStream';
@@ -64,8 +65,6 @@ const initMvn = (customClassPath: any) => {
   }
   return mvnPromise;
 };
-
-const applyParams = (query: string, params: object | any[]) => SqlString.format(query, params);
 
 // promisify Connection methods
 Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaData);
@@ -237,8 +236,19 @@ export class JDBCDriver extends BaseDriver {
       [];
   }
 
+  protected escapeDialect(): EscapeDialect {
+    const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
+    return dbTypeDescription?.escapeDialect || 'mysql';
+  }
+
+  protected prepareQueryWithParams(query: string, values: unknown[]): string {
+    return this.escapeDialect() === 'ansi'
+      ? formatAnsi(query, values || [])
+      : formatMySql(query, values || []);
+  }
+
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
-    const queryWithParams = applyParams(query, values);
+    const queryWithParams = this.prepareQueryWithParams(query, values);
     const cancelObj: {cancel?: Function} = {};
     const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
     (promise as CancelablePromise<any>).cancel =
@@ -282,7 +292,7 @@ export class JDBCDriver extends BaseDriver {
 
   public async stream(sql: string, values: unknown[], { highWaterMark }: StreamOptions): Promise<DownloadQueryResultsResult> {
     const conn = await this.pool.acquire();
-    const query = applyParams(sql, values);
+    const query = this.prepareQueryWithParams(sql, values);
     const cancelObj: {cancel?: Function} = {};
     try {
       const createStatement = promisify(conn.createStatement.bind(conn));

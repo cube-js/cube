@@ -1,5 +1,6 @@
 /* eslint-disable quotes */
 import {
+  escapeStringLiteral,
   formatAnsi,
   formatMySql,
 } from '../src/sql-escape';
@@ -412,6 +413,32 @@ describe('sql-escape', () => {
     it('helpers normalize scalar values', () => {
       expect(formatAnsi('SELECT ?, ?', "a'b")).toBe("SELECT 'a''b', ?");
       expect(formatMySql('SELECT ?', false)).toBe('SELECT FALSE');
+    });
+  });
+
+  describe('escapeStringLiteral', () => {
+    it('wraps the value in quotes', () => {
+      expect(escapeStringLiteral('orders_rollup')).toBe("'orders_rollup'");
+    });
+
+    it('doubles an embedded quote so the literal cannot be escaped', () => {
+      expect(escapeStringLiteral("pre_agg_x'; DROP TABLE victim; --"))
+        .toBe("'pre_agg_x''; DROP TABLE victim; --'");
+    });
+
+    it('leaves a backslash as data', () => {
+      expect(escapeStringLiteral('folder\\name')).toBe("'folder\\name'");
+      expect(escapeStringLiteral('trailing\\')).toBe("'trailing\\'");
+    });
+
+    it.each(injectionPayloads)('neutralizes the %s payload', (_name, payload) => {
+      const literal = escapeStringLiteral(payload);
+
+      expect(literal.startsWith("'")).toBe(true);
+      expect(literal.endsWith("'")).toBe(true);
+      // Every inner quote is doubled, so the literal has no odd-length quote run
+      // that could terminate it early.
+      expect(literal.slice(1, -1).split("'").length % 2).toBe(1);
     });
   });
 });

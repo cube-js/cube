@@ -8,6 +8,7 @@ import {
 import {
   getEnv,
   assertDataSource,
+  formatAnsi,
   Required,
 } from '@cubejs-backend/shared';
 
@@ -16,7 +17,6 @@ import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 import {
   map, zipObj
 } from 'ramda';
-import SqlString from 'sqlstring';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import { PinotQuery } from './PinotQuery';
 
@@ -133,9 +133,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
   }
 
   public testConnection() {
-    const query = SqlString.format('select 1');
-
-    return (<Promise<any[]>> this.queryPromised(query))
+    return (<Promise<any[]>> this.queryPromised('select 1'))
       .then(response => {
         if (response.length === 0) {
           throw new Error('Unable to connect to your Pinot instance');
@@ -147,10 +145,8 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values));
   }
 
-  public prepareQueryWithParams(query: string, values: unknown[]) {
-    return SqlString.format(query, (values || []).map(value => (typeof value === 'string' ? {
-      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1'),
-    } : value)));
+  protected prepareQueryWithParams(query: string, values: unknown[]) {
+    return formatAnsi(query, values || []);
   }
 
   public authorizationHeaders(): AuthorizationHeaders | {} {

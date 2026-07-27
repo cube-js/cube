@@ -46,6 +46,7 @@ class SqlEscaper {
     if (escapeBackslash) {
       escaped = escaped.split('\\').join('\\\\');
     }
+
     escaped = doubleQuoteToEscape
       ? escaped.split(stringQuoteChar).join(stringQuoteChar + stringQuoteChar)
       : escaped.split(stringQuoteChar).join(`\\${stringQuoteChar}`);
@@ -178,4 +179,8 @@ export function formatAnsi(sql: string, values?: unknown): string {
  */
 export function formatMySql(sql: string, values?: unknown): string {
   return new SqlEscaper(MySqlDialect).format(sql, values);
+}
+
+export function escapeStringLiteral(value: string): string {
+  return new SqlEscaper(AnsiSqlDialect).escapeString(String(value));
 }

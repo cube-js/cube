@@ -33,8 +33,7 @@
     "@cubejs-backend/schema-compiler": "1.7.11",
     "@cubejs-backend/shared": "1.7.11",
     "node-fetch": "^2.6.1",
-    "presto-client": "^1.2.0",
-    "sqlstring": "^2.3.1"
+    "presto-client": "^1.2.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
