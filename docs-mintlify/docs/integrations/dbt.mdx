@@ -42,10 +42,12 @@ Cube spins up a short-lived, isolated sandbox and:
 5. **Commits the generated files** to a branch for review, then tears the sandbox
    down.
 
-**No connection to your data warehouse is made during a pull.** Cube uses
+**By default, no connection to your data warehouse is made during a pull.** Cube uses
 `dbt parse`, not `dbt run` or `dbt compile`, so it reads your project's structure
 without ever querying your warehouse. dbt pull generates cube definitions; it assumes
-the underlying tables were already built by your own production `dbt run`.
+the underlying tables were already built by your own production `dbt run`. The one
+exception is [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog),
+an opt-in option that reads real column types from your warehouse.
 
 ## Prerequisites
 
@@ -146,6 +148,33 @@ automated — uses the same configuration:
 | **Add default measures** | On | Adds a `count` measure to every cube, and `sum` measures for additive numeric columns. |
 | **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
 | **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
+| **Infer column types from dbt catalog** | Off | Reads real warehouse column types from dbt's `catalog.json` instead of guessing from column names. See [below](#infer-column-types-from-dbt-catalog). |
+
+### Infer column types from dbt catalog
+
+<Warning>
+
+This option is currently in preview, and its behavior may still change. Reach out to the
+[Cube support team](/admin/account-billing/support) if you run into issues.
+
+</Warning>
+
+Without it, a dimension's type comes from a `data_type` declared in your dbt YAML, and —
+when none is declared — from a column-name heuristic (`*_id` → `number`, `created_at` →
+`time`, …). Enable this option and the pull additionally runs `dbt docs generate` to
+produce dbt's `catalog.json`, which carries the **actual warehouse column types**.
+
+Type precedence becomes: **declared `data_type` → catalog type → column-name heuristic**.
+An explicit `data_type` in your dbt YAML still wins; the catalog only fills the gaps.
+
+- **This step connects to your warehouse** (`dbt docs generate` queries the warehouse
+  metadata), unlike the rest of the pull. The models must already be built.
+- **Supported on Snowflake, Amazon Redshift, and PostgreSQL.** It's skipped on Google
+  BigQuery, Databricks, and Amazon Athena, whose sandbox profiles can't open a
+  connection.
+- **Best-effort.** If catalog generation or the catalog read fails — no connectivity,
+  unbuilt models, unreadable file — it's logged and skipped, and the pull completes on
+  declared and name-based types exactly as it would with the option off.
 
 ## Pass environment variables to dbt
 
@@ -302,14 +331,21 @@ For each dbt model in your project:
   value of the deployment's `CUBEJS_DB_DATABRICKS_CATALOG` environment variable,
   or `hive_metastore` if it isn't set.
 - **Each column becomes a dimension.** The dimension type is inferred from the
-  column's `data_type` where available, otherwise from the column name:
+  column's `data_type` where available, then — if
+  [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) is
+  enabled — from the warehouse type in `catalog.json`, and otherwise from the column
+  name:
 
-  | dbt `data_type` | Cube dimension type |
+  | Column type | Cube dimension type |
   | --- | --- |
-  | `varchar`, `text`, `string`, `char` | `string` |
-  | `integer`, `int`, `bigint`, `smallint`, `decimal`, `numeric`, `float`, `double`, `real` | `number` |
+  | `varchar`, `text`, `string`, `char`, and non-scalar types (`json`, `variant`, `array`, …) | `string` |
+  | `integer`, `int`, `bigint`, `smallint`, `decimal`, `numeric`, `number`, `float`, `double`, `real` | `number` |
   | `date`, `datetime`, `timestamp`, `timestamptz`, `time` | `time` |
   | `boolean`, `bool` | `boolean` |
+
+  Vendor spellings and parameters are normalized, so `NUMBER(38,0)`,
+  `character varying(256)`, `TIMESTAMP_NTZ(9)`, `INT64`, and `double precision` all map
+  as expected.
 
 - **Model and column descriptions** from your dbt project are carried over to the
   cubes and dimensions.
@@ -503,7 +539,10 @@ Each push creates exactly two new files:
 - **Pull is one-directional** — dbt pull never writes back to your dbt repository.
   Promoting cubes into dbt is the [dbt push](#push-cubes-to-dbt) direction (in preview).
 - **No warehouse connection** — a pull doesn't trigger a `dbt run`; it assumes your
-  tables are already built.
+  tables are already built. The only exception is the opt-in
+  [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) option
+  (in preview), which runs `dbt docs generate` on Snowflake, Amazon Redshift, and
+  PostgreSQL.
 - **One dbt project per deployment.**
 
 ## Troubleshooting
