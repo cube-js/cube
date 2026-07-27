@@ -1028,3 +1028,31 @@ fn escape_like_pattern(value: &str, escape_char: char) -> String {
     }
     escaped
 }
+
+#[cfg(test)]
+mod tests {
+    use super::escape_like_pattern;
+
+    #[test]
+    fn escapes_wildcards_and_the_escape_character() {
+        assert_eq!(
+            escape_like_pattern(r"folder\name_%", '\\'),
+            r"folder\\name\_\%"
+        );
+    }
+
+    #[test]
+    fn leaves_values_without_special_characters_untouched() {
+        assert_eq!(escape_like_pattern("plain value", '\\'), "plain value");
+    }
+
+    #[test]
+    fn escapes_repeated_special_characters() {
+        assert_eq!(escape_like_pattern("%%__", '\\'), r"\%\%\_\_");
+    }
+
+    #[test]
+    fn honours_a_non_backslash_escape_character() {
+        assert_eq!(escape_like_pattern("50%_off!", '!'), "50!%!_off!!");
+    }
+}
