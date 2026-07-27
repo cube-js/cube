@@ -158,20 +158,22 @@ GROUP BY 1
 ORDER BY 1;
 ```
 
-Query pushdown is enabled by default. If it is disabled via the
-[`CUBESQL_SQL_PUSH_DOWN`][ref-env-var-push-down] environment variable, queries
-like the one above can't be rewritten and fail with the following error:
+Query pushdown is enabled by default. Queries like the one above can't be
+rewritten and fail with the following error if pushdown is disabled via the
+[`CUBESQL_SQL_PUSH_DOWN`][ref-env-var-push-down] environment variable, or if the
+data source doesn't support pushing down one of the expressions used:
 
 ```text
 Can't detect Cube query and it may be not supported yet.
 ```
 
-If you hit this error, check that query pushdown is enabled. Alternatively, you
+If you hit this error, check that query pushdown is enabled and that every
+expression in the query is supported for your data source. Alternatively, you
 can leverage nested queries: wrap your `SELECT` statement from a cube table
 (**inner query**) into another `SELECT` statement (**outer query**) to perform
-calculations with expressions like `CASE`. This outer `SELECT` is **not** part of
-the SQL query that is being rewritten and thus allows you to use more SQL
-functions, operators, and expressions.
+calculations with expressions like `CASE`. The outer `SELECT` is applied as
+post-processing on top of the cube query rather than being rewritten into it,
+which allows you to use more SQL functions, operators, and expressions.
 
 Keep the inner query to shapes that a [regular query][ref-regular-queries]
 supports, and move every expression to the outer query:
