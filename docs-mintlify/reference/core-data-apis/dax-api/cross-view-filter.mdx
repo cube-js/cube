@@ -13,7 +13,8 @@ that span multiple views and apply filters consistently across visualizations.
 
 To use cross-view filters such as slicers, you must enable single-perspective mode
 in the DAX API. To enable single-perspective mode in the DAX API,
-set the `CUBEJS_DAX_SINGLE_PERSPECTIVE` environment variable to `true`.
+set the [`CUBEJS_DAX_SINGLE_PERSPECTIVE`](/reference/configuration/environment-variables#cubejs_dax_single_perspective)
+environment variable to `true`.
 
 In single-perspective mode, all views are exposed as part of a single perspective.
 This allows you to use a single connection and show visualizations from different
@@ -50,6 +51,28 @@ Likewise, if `orders_view` exposes an `address_country` column pointing to
 `country.country`, cross-filtering will not be applied, because the column
 names differ between the views.
 
+## Measure names
+
+Because all views share a single perspective, measures are identified by their
+view name and measure name, joined with a dot: `<view>.<measure>`. This keeps
+measures with the same name in different views from colliding.
+
+Field names shown in Power BI are unaffected, so a `count` measure still appears
+as `Count` in the field list. However, when writing DAX explicitly, reference
+measures by their qualified name:
+
+```text
+CALCULATE('orders_view'[orders_view.count], 'orders_view'[status] = "completed")
+```
+
+The table qualifier can also be omitted, since the prefix already identifies the
+view:
+
+```text
+[orders_view.count]
+```
+
+Dimensions are not prefixed and are referenced by their column name.
 
 [ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-views]: /docs/data-modeling/views
