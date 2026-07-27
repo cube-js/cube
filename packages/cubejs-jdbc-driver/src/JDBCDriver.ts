@@ -292,9 +292,11 @@ export class JDBCDriver extends BaseDriver {
 
   public async stream(sql: string, values: unknown[], { highWaterMark }: StreamOptions): Promise<DownloadQueryResultsResult> {
     const conn = await this.pool.acquire();
-    const query = this.prepareQueryWithParams(sql, values);
-    const cancelObj: {cancel?: Function} = {};
+
     try {
+      const query = this.prepareQueryWithParams(sql, values);
+      const cancelObj: {cancel?: Function} = {};
+
       const createStatement = promisify(conn.createStatement.bind(conn));
       const statement = await createStatement();
 
@@ -335,6 +337,7 @@ export class JDBCDriver extends BaseDriver {
       }));
     } catch (ex: any) {
       await this.pool.release(conn);
+
       if (ex.cause) {
         throw new Error(ex.cause.getMessageSync());
       } else {
