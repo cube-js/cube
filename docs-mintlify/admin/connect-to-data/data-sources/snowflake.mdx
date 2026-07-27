@@ -248,7 +248,9 @@ that connection carry the same tag. Without `queryTag`, queries Cube runs on
 behalf of an API request are tagged with that request's ID, so they can be
 matched to the request in `QUERY_HISTORY`. A statement-level tag takes
 precedence over a `QUERY_TAG` set on the Snowflake user or account.
+To tag the query text itself, use [query tracing][ref-query-tracing].
 
+[ref-query-tracing]: /admin/connect-to-data/query-tracing
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /admin/deployment/dedicated
 ## Environment Variables
