@@ -432,13 +432,15 @@ describe('sql-escape', () => {
     });
 
     it.each(injectionPayloads)('neutralizes the %s payload', (_name, payload) => {
-      const literal = escapeStringLiteral(payload);
+      expect(decodeAnsiLiteral(escapeStringLiteral(payload))).toBe(payload);
+    });
 
-      expect(literal.startsWith("'")).toBe(true);
-      expect(literal.endsWith("'")).toBe(true);
-      // Every inner quote is doubled, so the literal has no odd-length quote run
-      // that could terminate it early.
-      expect(literal.slice(1, -1).split("'").length % 2).toBe(1);
+    it('round-trips every short combination of dangerous characters', () => {
+      const candidates = stringsUpToLength(["'", '\\', '\0', '\n', '\r', 'a'], 4);
+
+      for (const candidate of candidates) {
+        expect(decodeAnsiLiteral(escapeStringLiteral(candidate))).toBe(candidate);
+      }
     });
   });
 });
