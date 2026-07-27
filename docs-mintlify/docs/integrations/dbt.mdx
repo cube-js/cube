@@ -22,9 +22,10 @@ your dbt repository — so your semantic layer stays in sync with dbt as it evol
 
 <Info>
 
-The integration is one-directional: **dbt → Cube**. Cube never writes back to your
-dbt project. dbt stays the source of truth for how tables are transformed; Cube
-serves those models to BI tools, APIs, and AI agents.
+**dbt pull** runs in one direction — **dbt → Cube**. dbt stays the source of truth for how
+tables are transformed; Cube serves those models to BI tools, APIs, and AI agents. The
+reverse direction — promoting a cube back into your dbt project as a pull request — is
+available via [dbt push](#push-cubes-to-dbt), currently in preview.
 
 </Info>
 
@@ -383,13 +384,125 @@ pull. Keep customizations in a separate cube that `extends` the generated one �
 
 </Warning>
 
+## Push cubes to dbt
+
+<Warning>
+
+dbt push is currently in preview, and its behavior may still change. Reach out to the
+[Cube support team](/admin/account-billing/support) to activate this feature for your
+account.
+
+</Warning>
+
+**dbt push** is the reverse direction: it promotes a cube back into your dbt project as a
+reviewed pull request. A cube you built in Cube on an inline `sql:` becomes a dbt model —
+a `<model>.sql` plus a per-model `<model>.yml` properties file — validated by a real
+`dbt parse` in Cube's sandbox **before** the PR is opened, so the change arrives green.
+
+This closes the modeling loop: prototype fast in Cube, then harden the logic in dbt where
+it's materialized, tested, and owned by analytics engineering. Once the pull request
+merges, your existing [pull](#keep-cube-in-sync-automatically) picks the new model back up.
+
+### Before you push
+
+- **Write access to the dbt repository.** Pull only needs read access; push needs a PAT
+  with write scope, or an SSH deploy key registered with write access. Cube verifies this
+  without pushing anything (see below).
+- Push is **off by default** and enabled per deployment.
+
+### Enable push
+
+<Steps>
+
+<Step title="Open the dbt settings">
+
+Edit the **default data source** under **Settings → Data Sources**, expand the
+**dbt project** section, and find **Push to dbt**.
+
+</Step>
+
+<Step title="Turn push on and verify write access">
+
+Enable **push**, then click **Verify write access**. Cube checks that the stored
+credential can write to the repository — a `git-receive-pack` probe for a PAT, a
+`push --dry-run` for SSH — without creating any branch or commit.
+
+</Step>
+
+<Step title="Choose where models land and how they're delivered">
+
+| Setting | Description |
+| --- | --- |
+| **Models path** | Directory in the dbt project where generated model files are written. Defaults to `models/marts/cube/`. |
+| **Delivery mode** | **Open a pull request** (default) pushes to a `cube/dbt-push/*` branch and opens a PR/MR. **Commit directly to a branch** commits straight to a branch you name — validation still runs. |
+
+Then **Save dbt settings**.
+
+</Step>
+
+</Steps>
+
+### Push a cube
+
+<Steps>
+
+<Step title="Enter development mode">
+
+Open the deployment's **data model** page and enter **development mode** — push runs from a
+dev branch, like a manual pull.
+
+</Step>
+
+<Step title="Open the push dialog">
+
+Open the **Integrations** menu → **dbt** → **Push**, pick the cube to promote, and give the
+dbt model a name. Only cubes defined in YAML with an inline `sql:` are eligible; a cube
+backed only by `sql_table` (nothing to materialize) or defined in JavaScript/Python is
+reported as ineligible.
+
+</Step>
+
+<Step title="Review the preview">
+
+Cube shows the generated `<model>.sql` and `<model>.yml` in an editable preview, along with
+any conversion warnings. **What you see is what ships** — edit either file here if you need
+to.
+
+</Step>
+
+<Step title="Push">
+
+Confirm. Cube clones the repo, writes the files (**create-only** — it never overwrites an
+existing model and never force-pushes), and runs `dbt deps` + `dbt parse`. If parse fails,
+the push stops with dbt's own output and **no pull request is opened**. On success, a
+progress toast ends with a link to the pull request — or, for SSH or non-GitHub/GitLab
+hosts, a prefilled compare link to open it yourself.
+
+</Step>
+
+</Steps>
+
+### What gets pushed
+
+Each push creates exactly two new files:
+
+- **`<model>.sql`** — the cube's `sql:` wrapped in a CTE that projects one column per
+  dimension, so every column the properties file documents exists by construction. Table
+  references that match a [pulled](#what-gets-generated) dbt model are rewritten to
+  `{{ ref('<model>') }}`, making the generated model a first-class node in your dbt DAG.
+- **`<model>.yml`** — a per-model properties file: model and column descriptions,
+  `unique` + `not_null` tests on primary-key dimensions, `relationships` tests synthesized
+  from the cube's joins (only to targets that originated in dbt), and the cube's measures
+  preserved under `meta.cube.measures` for context.
+
 ## Limitations
 
 - **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, Google
   BigQuery, Databricks, and Amazon Athena.
 - **Imports models, columns, and relationships only** — not dbt metrics, semantic
   models, tests, or exposures.
-- **One-directional** — Cube never pushes anything back to your dbt repository.
+- **Pull is one-directional** — dbt pull never writes back to your dbt repository.
+  Promoting cubes into dbt is the [dbt push](#push-cubes-to-dbt) direction (in preview).
 - **No warehouse connection** — a pull doesn't trigger a `dbt run`; it assumes your
   tables are already built.
 - **One dbt project per deployment.**
