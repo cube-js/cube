@@ -15,6 +15,12 @@
  *  - Class components are compared through their props and state rather than
  *    as a whole, because `Component#setState` is generic over `keyof S` and
  *    the implementation state is a superset of the declared one.
+ *  - `useCubeQuery` is compared through its parameters and its applied result
+ *    rather than as a whole. Relating two generic signatures makes TypeScript
+ *    compare their type parameters' constraints for identity, and it cannot
+ *    establish that for `DeeplyReadonly<Query | Query[]>` once `index.d.ts` is
+ *    reachable both from this project and through `node_modules`, as it is
+ *    wherever the package is installed.
  */
 import type * as Declared from '@cubejs-client/react';
 import type * as Impl from '../src/index';
@@ -47,7 +53,24 @@ export type QueryBuilderStateConforms = Assert<
 >;
 
 // Hooks
-export type UseCubeQueryConforms = Assert<Extends<typeof Impl.useCubeQuery, typeof Declared.useCubeQuery>>;
+type ExampleQuery = { measures: ['Orders.count'] };
+type ExampleRow = { 'Orders.count': number };
+
+// Inferred row type: `useCubeQuery(query)`
+type ImplInferred = ReturnType<typeof Impl.useCubeQuery<unknown, ExampleQuery>>;
+type DeclaredInferred = ReturnType<typeof Declared.useCubeQuery<unknown, ExampleQuery>>;
+
+// Explicit row type: `useCubeQuery<Row>(query)`
+type ImplTyped = ReturnType<typeof Impl.useCubeQuery<ExampleRow, ExampleQuery>>;
+type DeclaredTyped = ReturnType<typeof Declared.useCubeQuery<ExampleRow, ExampleQuery>>;
+
+export type UseCubeQueryAcceptsDeclaredArgs = Assert<
+  Extends<Parameters<typeof Declared.useCubeQuery>, Parameters<typeof Impl.useCubeQuery>>
+>;
+export type UseCubeQueryInfersRows = Assert<Extends<ImplInferred, DeclaredInferred>>;
+export type UseCubeQueryInfersRowsBack = Assert<Extends<DeclaredInferred, ImplInferred>>;
+export type UseCubeQueryTakesRowType = Assert<Extends<ImplTyped, DeclaredTyped>>;
+export type UseCubeQueryTakesRowTypeBack = Assert<Extends<DeclaredTyped, ImplTyped>>;
 export type UseCubeMetaConforms = Assert<Extends<typeof Impl.useCubeMeta, typeof Declared.useCubeMeta>>;
 export type UseDryRunConforms = Assert<Extends<typeof Impl.useDryRun, typeof Declared.useDryRun>>;
 export type UseLazyDryRunConforms = Assert<Extends<typeof Impl.useLazyDryRun, typeof Declared.useLazyDryRun>>;
