@@ -749,8 +749,8 @@ Query parameters:
 
 | Parameter | Description | Required |
 | --- | --- | --- |
-| `offset` | Pagination offset | No |
-| `limit` | Maximum number of items to return | No |
+| `offset` | Pagination offset. Defaults to `0` | No |
+| `limit` | Maximum number of items to return. Defaults to all items | No |
 
 Example request:
 
@@ -760,22 +760,21 @@ curl \
   "https://example.cubecloud.dev/cubejs-api/v1/entities?limit=10"
 ```
 
-Example response:
+Example response. `data` is an array of entities; `pagination` reports the
+total number of entities before `offset` and `limit` are applied:
 
 ```json
 {
-  "data": {
-    "entities": [
-      {
-        "type": "cube",
-        "name": "orders"
-      },
-      {
-        "type": "view",
-        "name": "orders_view"
-      }
-    ]
-  },
+  "data": [
+    {
+      "type": "cube",
+      "name": "orders"
+    },
+    {
+      "type": "view",
+      "name": "orders_view"
+    }
+  ],
   "pagination": {
     "offset": 0,
     "limit": 10,
@@ -799,11 +798,17 @@ Response includes:
 - `type` - Either `cube` or `view`
 - `name` - The cube or view name
 - `title` - Human-readable title
-- `description` - Description from the data model
-- `table_references` - Data lineage to source tables
-- `cube_references` - Relationships to other cubes
-- `measures` - Array of measures with `member_references` and `column_references`
-- `dimensions` - Array of dimensions with `is_primary_key` flag
+- `description` - Description from the data model, or an empty string
+- `table_references` - Data lineage to source tables, each with `data_source`,
+  `table`, and, if the table is qualified, `schema`
+- `cube_references` - Relationships to other cubes, each as an object with
+  `type` (currently always `upstream`) and `cube`
+- `measures` and `dimensions` - Arrays of members, sorted by name. Each member has
+  `name`, `title`, `description`, `type`, `member_references` (upstream members it
+  is derived from), and `column_references` (source columns, each with
+  `data_source`, `table`, `column`, and, if the table is qualified, `schema`).
+  Members also carry `sql` when the member's SQL expression can be resolved, and
+  dimensions carry an `is_primary_key` flag.
 
 Example request:
 
@@ -824,22 +829,29 @@ Example response:
     "description": "Order transactions",
     "table_references": [
       {
+        "data_source": "default",
         "schema": "public",
         "table": "orders"
       }
     ],
-    "cube_references": ["customers", "products"],
+    "cube_references": [
+      { "type": "upstream", "cube": "customers" },
+      { "type": "upstream", "cube": "products" }
+    ],
     "measures": [
       {
-        "name": "count",
-        "title": "Count",
-        "type": "count",
+        "name": "total_amount",
+        "title": "Total Amount",
+        "description": "",
+        "type": "sum",
+        "sql": "${CUBE}.amount",
         "member_references": [],
         "column_references": [
           {
+            "data_source": "default",
             "schema": "public",
             "table": "orders",
-            "column": "id"
+            "column": "amount"
           }
         ]
       }
@@ -848,14 +860,36 @@ Example response:
       {
         "name": "id",
         "title": "Id",
+        "description": "",
         "type": "number",
-        "is_primary_key": true
+        "sql": "${CUBE}.id",
+        "is_primary_key": true,
+        "member_references": [],
+        "column_references": [
+          {
+            "data_source": "default",
+            "schema": "public",
+            "table": "orders",
+            "column": "id"
+          }
+        ]
       },
       {
         "name": "status",
         "title": "Status",
+        "description": "",
         "type": "string",
-        "is_primary_key": false
+        "sql": "${CUBE}.status",
+        "is_primary_key": false,
+        "member_references": [],
+        "column_references": [
+          {
+            "data_source": "default",
+            "schema": "public",
+            "table": "orders",
+            "column": "status"
+          }
+        ]
       }
     ]
   }
@@ -877,8 +911,10 @@ Query parameters:
 
 | Parameter | Description | Required |
 | --- | --- | --- |
-| `offset` | Pagination offset | No |
-| `limit` | Maximum number of items to return | No |
+| `offset` | Pagination offset. Defaults to `0` | No |
+| `limit` | Maximum number of items to return. Defaults to all items | No |
+
+If neither `cubes` nor `views` is provided, all cubes and views are returned.
 
 Example request:
 
@@ -891,28 +927,122 @@ curl \
   https://example.cubecloud.dev/cubejs-api/v1/entities/all
 ```
 
-Example response:
+Example response. `data` is an array of entities, each in the same format as the
+single-entity response above; `pagination` reports the total number of matching
+entities before `offset` and `limit` are applied:
 
 ```json
 {
-  "data": {
-    "entities": [
-      {
-        "type": "cube",
-        "name": "orders",
-        "title": "Orders",
-        "measures": [...],
-        "dimensions": [...]
-      },
-      {
-        "type": "view",
-        "name": "orders_view",
-        "title": "Orders View",
-        "measures": [...],
-        "dimensions": [...]
-      }
-    ]
-  },
+  "data": [
+    {
+      "type": "cube",
+      "name": "orders",
+      "title": "Orders",
+      "description": "Order transactions",
+      "table_references": [
+        {
+          "data_source": "default",
+          "schema": "public",
+          "table": "orders"
+        }
+      ],
+      "cube_references": [],
+      "measures": [
+        {
+          "name": "total_amount",
+          "title": "Total Amount",
+          "description": "",
+          "type": "sum",
+          "sql": "${CUBE}.amount",
+          "member_references": [],
+          "column_references": [
+            {
+              "data_source": "default",
+              "schema": "public",
+              "table": "orders",
+              "column": "amount"
+            }
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "status",
+          "title": "Status",
+          "description": "",
+          "type": "string",
+          "sql": "${CUBE}.status",
+          "is_primary_key": false,
+          "member_references": [],
+          "column_references": [
+            {
+              "data_source": "default",
+              "schema": "public",
+              "table": "orders",
+              "column": "status"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "view",
+      "name": "orders_view",
+      "title": "Orders View",
+      "description": "",
+      "table_references": [
+        {
+          "data_source": "default",
+          "schema": "public",
+          "table": "orders"
+        }
+      ],
+      "cube_references": [
+        { "type": "upstream", "cube": "orders" }
+      ],
+      "measures": [
+        {
+          "name": "total_amount",
+          "title": "Total Amount",
+          "description": "",
+          "type": "sum",
+          "sql": "${orders.total_amount}",
+          "member_references": [
+            { "cube": "orders", "member": "total_amount" }
+          ],
+          "column_references": [
+            {
+              "data_source": "default",
+              "schema": "public",
+              "table": "orders",
+              "column": "amount"
+            }
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "status",
+          "title": "Status",
+          "description": "",
+          "type": "string",
+          "sql": "${orders.status}",
+          "is_primary_key": false,
+          "member_references": [
+            { "cube": "orders", "member": "status" }
+          ],
+          "column_references": [
+            {
+              "data_source": "default",
+              "schema": "public",
+              "table": "orders",
+              "column": "status"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "pagination": {
     "offset": 0,
     "limit": 20,
