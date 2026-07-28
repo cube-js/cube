@@ -817,7 +817,13 @@ class CubeApi {
             }
 
             if (parsed.data) {
-              rows.push(...parsed.data);
+              // Append rows one at a time instead of spreading the whole chunk as
+              // call arguments (`rows.push(...parsed.data)`). A large single-chunk
+              // result (e.g. 130k+ rows) otherwise exceeds V8's argument-count
+              // limit and throws "RangeError: Maximum call stack size exceeded".
+              for (let i = 0; i < parsed.data.length; i++) {
+                rows.push(parsed.data[i]);
+              }
             }
           }
         }
