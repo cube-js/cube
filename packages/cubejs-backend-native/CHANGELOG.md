@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.13](https://github.com/cube-js/cube/compare/v1.7.12...v1.7.13) (2026-07-28)
+
+### Bug Fixes
+
+- **cubesql:** Support `GROUP BY ()` empty grouping set ([#11331](https://github.com/cube-js/cube/issues/11331)) ([92cc127](https://github.com/cube-js/cube/commit/92cc127b10d1583d6bf60645947676c227567ef0))
+
 ## [1.7.12](https://github.com/cube-js/cube/compare/v1.7.11...v1.7.12) (2026-07-27)
 
 **Note:** Version bump only for package @cubejs-backend/native
