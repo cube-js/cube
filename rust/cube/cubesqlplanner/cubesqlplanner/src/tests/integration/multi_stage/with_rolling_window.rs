@@ -152,8 +152,9 @@ async fn test_rolling_and_calculated() {
     }
 }
 
-/// A `case` entrypoint dispatching between two rolling windows on a
-/// `type: switch` calc-group dimension, queried with a granular time
+/// A `case` entrypoint dispatching between two month-based rolling windows
+/// (trailing 3 month / year-to-date, the grain a monthly rollup can serve)
+/// on a `type: switch` calc-group dimension, queried with a month time
 /// dimension. The switch dimension is added to the grain of the rolling
 /// leaves, so the rolling-window CTE must project it — building the CTE
 /// from the root query dimensions instead of the requested state made
@@ -173,7 +174,7 @@ async fn test_rolling_window_switch_with_granular_time_dimension() {
           - member: orders.window_kind
             operator: equals
             values:
-              - R7
+              - R3
         time_dimensions:
           - dimension: orders.created_at
             granularity: month
@@ -190,7 +191,7 @@ async fn test_rolling_window_switch_with_granular_time_dimension() {
     // The pinned switch value renders as a literal, and the calc-group
     // dimension is projected by the CTEs feeding the case measure.
     assert!(
-        sql.contains("'R7'"),
+        sql.contains("'R3'"),
         "Expected the pinned calc-group value in the generated SQL:\n{}",
         sql
     );

@@ -88,7 +88,7 @@ cubes:
           - name: window_kind
             type: switch
             values:
-                - R7
+                - R3
                 - YTD
 
           - name: customer_name
@@ -464,6 +464,16 @@ cubes:
                 trailing: 7 day
                 offset: start
 
+          # Month-based rolling window: whole-month steps are what a rollup
+          # stored at `granularity: month` can serve, so the calc-group case
+          # entrypoints below dispatch between this and the year-to-date
+          # window rather than the 7-day one.
+          - name: rolling_sum_3m
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 3 month
+
           # Case entrypoint dispatching between two rolling windows on the
           # `window_kind` calc group: the switch dimension is added to the
           # grain of the rolling leaves, so every CTE feeding the case must
@@ -474,8 +484,8 @@ cubes:
             case:
                 switch: "{CUBE.window_kind}"
                 when:
-                    - value: R7
-                      sql: "{CUBE.rolling_sum_7d}"
+                    - value: R3
+                      sql: "{CUBE.rolling_sum_3m}"
                 else:
                     sql: "{CUBE.total_amount_ytd}"
 
@@ -483,18 +493,18 @@ cubes:
           # arithmetic layer consumes two rolling-window CTEs and partitions
           # by the grain it is requested at — which, under the case
           # entrypoint below, includes the `window_kind` calc group.
-          - name: rolling_sum_7d_prev_month
+          - name: rolling_sum_3m_prev
             type: number
             multi_stage: true
-            sql: "{CUBE.rolling_sum_7d}"
+            sql: "{CUBE.rolling_sum_3m}"
             time_shift:
-                - interval: 1 month
+                - interval: 3 month
                   type: prior
 
-          - name: rolling_sum_7d_change
+          - name: rolling_sum_3m_change
             type: number
             multi_stage: true
-            sql: "({CUBE.rolling_sum_7d} - {CUBE.rolling_sum_7d_prev_month})"
+            sql: "({CUBE.rolling_sum_3m} - {CUBE.rolling_sum_3m_prev})"
 
           - name: total_amount_ytd_prev_year
             type: number
@@ -515,8 +525,8 @@ cubes:
             case:
                 switch: "{CUBE.window_kind}"
                 when:
-                    - value: R7
-                      sql: "{CUBE.rolling_sum_7d_change}"
+                    - value: R3
+                      sql: "{CUBE.rolling_sum_3m_change}"
                 else:
                     sql: "{CUBE.total_amount_ytd_change}"
 
