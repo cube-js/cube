@@ -9,6 +9,9 @@ The driver for Oracle is community-supported and is not maintained by Cube or th
 
 </Warning>
 
+The Oracle driver supports the [Tesseract SQL planner][ref-tesseract], including the
+`quarter` [granularity][ref-granularities].
+
 ## Prerequisites
 
 - The hostname for the [Oracle][oracle] database server
@@ -59,6 +62,8 @@ To enable SSL-encrypted connections between Cube and Oracle, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+[ref-tesseract]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
+[ref-granularities]: /reference/data-modeling/dimensions#granularities
 [oracle]: https://www.oracle.com/uk/index.html
 [node-oracledb]: https://node-oracledb.readthedocs.io/en/latest/user_guide/introduction.html#architecture
 [node-oracledb-thick]: https://node-oracledb.readthedocs.io/en/latest/user_guide/initialization.html#enabling-node-oracledb-thick-mode

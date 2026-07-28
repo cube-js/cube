@@ -27,6 +27,7 @@ tags:
   - name: App Theme
   - name: Embed
   - name: Embed Tenants
+  - name: GitHub
   - name: Dbt Sync
   - name: Env Variables
   - name: OAuth Integrations
@@ -1697,6 +1698,85 @@ paths:
           If the deployment's plan enforces a workbook limit and it has been reached, the request is
           rejected with `400`. Returns `404` if the workbook does not exist or belongs to a
           different deployment.
+  /v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access:
+    get:
+      operationId: DashboardEmbedAccessPublicController.getEmbedAccess
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedAccessResponse'
+          description: ''
+      summary: List a dashboard's embed access
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns the embed audience of a workbook's published dashboard: the global `allowEmbed`
+          (signed-embedding) flag, whether it is shared with **all embed users**, and the list of
+          individual embed **tenants** it is shared with.
+
+
+          Embed access is a read-only share of the workbook with a system sharing group, so this is
+          scoped to the workbook that owns the dashboard. Requires **read** access to the workbook.
+          Returns `404` if the workbook does not exist or belongs to a different deployment.
+    put:
+      operationId: DashboardEmbedAccessPublicController.updateEmbedAccess
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmbedAccessInput'
+        description: UpdateEmbedAccessInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedAccessResponse'
+          description: ''
+      summary: Update a dashboard's embed access
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Adds, updates, or removes one embed audience from a workbook's published dashboard, and/or
+          toggles signed embedding. Returns the updated embed-access view.
+
+
+          Provide exactly one target — `embedTenantName` (a single embed tenant) or `allEmbedUsers:
+          true` (every embed tenant) — together with `action`: `"read"` grants access, `"none"`
+          removes it. Include `allowEmbed` to also flip "Allow signed embedding" in the same request;
+          omit both targets to change only `allowEmbed`.
+
+
+          Requires **manage** access to the workbook. Returns `404` if the workbook or the named
+          embed tenant does not exist, and `400` if the request specifies no change or sets
+          `allowEmbed` on a workbook that has no published dashboard.
   /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish:
     post:
       operationId: publishDashboard
@@ -1876,6 +1956,40 @@ paths:
           Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
           rejected with `400`. Returns `404` if the item does not exist or belongs to a different
           deployment.
+  /v1/embed-tenants/:
+    get:
+      operationId: EmbedTenantAdminPublicController.listEmbedTenants
+      parameters:
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedTenantsPublicResponse'
+          description: ''
+      summary: List embed tenants
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          Lists the account's embed tenants, cursor-paginated. Supports `first`/`after` pagination
+          and a case-insensitive `search` substring match on the tenant name. Requires an admin API
+          key.
   /v1/embed-tenants/{embedTenantName}:
     delete:
       operationId: deleteEmbedTenant
@@ -2075,6 +2189,85 @@ paths:
           This endpoint is unauthenticated — it is called from the embedding client and the session
           id itself is the credential. Returns `401` if the session id is unknown or has already
           been redeemed.
+  /v1/github/installations:
+    get:
+      operationId: GitHubPublicController.installations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubInstallationsListResponse'
+          description: ''
+      summary: List the user's GitHub App installations (orgs/accounts)
+      tags:
+        - GitHub
+  /v1/github/installations/{installationId}/repositories:
+    get:
+      operationId: GitHubPublicController.repositories
+      parameters:
+        - in: path
+          name: installationId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubReposListResponse'
+          description: ''
+      summary: List repositories accessible to a GitHub App installation
+      tags:
+        - GitHub
+  /v1/github/repositories/{owner}/{repo}/branches:
+    get:
+      operationId: GitHubPublicController.branches
+      parameters:
+        - in: path
+          name: owner
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: repo
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: installationId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubBranchesListResponse'
+          description: ''
+      summary: List branches of a repository
+      tags:
+        - GitHub
+  /v1/github/status:
+    get:
+      operationId: GitHubPublicController.status
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubConnectStatusResponse'
+          description: ''
+      summary: Whether GitHub is linked, plus the link/install URLs
+      tags:
+        - GitHub
+      x-mint:
+        content: >-
+          Requires the `github.read` scope. Use `linkUrl`/`settingsUrl` from an unlinked response to
+          send the caller through the GitHub account-linking / App-installation browser flow, then
+          read `installationId` from `GET /api/v1/github/installations` once connected.
   /v1/oauth-integrations:
     get:
       operationId: listOAuthIntegrations
@@ -3867,6 +4060,58 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    EmbedAccessAllEmbedUsers:
+      properties:
+        action:
+          $ref: '#/components/schemas/EmbedAccessAllEmbedUsersAction'
+        enabled:
+          type: boolean
+        groupId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - enabled
+        - action
+      type: object
+    EmbedAccessAllEmbedUsersAction:
+      enum:
+        - read
+        - none
+      type: string
+    EmbedAccessResponse:
+      properties:
+        allEmbedUsers:
+          $ref: '#/components/schemas/EmbedAccessAllEmbedUsers'
+        allowEmbed:
+          type: boolean
+        tenants:
+          items:
+            $ref: '#/components/schemas/EmbedAccessTenantEntry'
+          type: array
+      required:
+        - allowEmbed
+        - allEmbedUsers
+        - tenants
+      type: object
+    EmbedAccessTenantEntry:
+      properties:
+        action:
+          $ref: '#/components/schemas/EmbedAccessTenantEntryAction'
+        embedTenantName:
+          type: string
+        groupId:
+          type: integer
+      required:
+        - embedTenantName
+        - groupId
+        - action
+      type: object
+    EmbedAccessTenantEntryAction:
+      enum:
+        - read
+        - none
+      type: string
     EmbedSessionSettings:
       properties:
         showDashboardChat:
@@ -3891,12 +4136,49 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    EmbedTenant:
+      properties:
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        name:
+          type: string
+        userCount:
+          type: integer
+      required:
+        - id
+        - name
+        - userCount
+      type: object
     EmbedTenantProfile:
       properties:
         displayName:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    EmbedTenantsPublicResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedTenant'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
       type: object
     EmbedTheme:
       properties:
@@ -4264,6 +4546,85 @@ components:
         - name
         - viewer_last_viewed_at
       type: string
+    GitHubBranchDto:
+      properties:
+        isDefault:
+          type: boolean
+        name:
+          type: string
+      required:
+        - name
+        - isDefault
+      type: object
+    GitHubBranchesListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/GitHubBranchDto'
+          type: array
+      required:
+        - data
+      type: object
+    GitHubConnectStatusResponse:
+      properties:
+        connected:
+          type: boolean
+        linkUrl:
+          type: string
+        settingsUrl:
+          type: string
+      required:
+        - connected
+        - linkUrl
+        - settingsUrl
+      type: object
+    GitHubInstallationDto:
+      properties:
+        avatarUrl:
+          type: string
+        id:
+          type: string
+        installationId:
+          type: string
+        login:
+          type: string
+      required:
+        - installationId
+        - id
+        - login
+        - avatarUrl
+      type: object
+    GitHubInstallationsListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/GitHubInstallationDto'
+          type: array
+      required:
+        - data
+      type: object
+    GitHubRepoDto:
+      properties:
+        htmlUrl:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - htmlUrl
+      type: object
+    GitHubReposListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/GitHubRepoDto'
+          type: array
+      required:
+        - data
+      type: object
     GroupDefinition:
       properties:
         description:
@@ -4689,6 +5050,10 @@ components:
       type: object
     PublishDashboardInput:
       properties:
+        allowEmbed:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         config:
           oneOf:
             - $ref: '#/components/schemas/DashboardConfigInput'
@@ -5285,6 +5650,30 @@ components:
       enum:
         - git
         - cli
+      type: string
+    UpdateEmbedAccessInput:
+      properties:
+        action:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateEmbedAccessInputAction'
+            - type: 'null'
+        allEmbedUsers:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        allowEmbed:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        embedTenantName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    UpdateEmbedAccessInputAction:
+      enum:
+        - read
+        - none
       type: string
     UpdateFolderInput:
       properties:
