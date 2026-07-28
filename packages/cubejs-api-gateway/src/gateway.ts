@@ -1971,7 +1971,7 @@ class ApiGateway {
   }> {
     const requestStarted = new Date();
     try {
-      this.log({ type: 'Load Request', query, streaming: true, requestSource: context.requestSource }, context);
+      this.log({ type: 'Load Request', query, streaming: true }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
       const q: QueryBody = {
@@ -2035,8 +2035,7 @@ class ApiGateway {
       this.log({
         type: 'Load Request',
         apiType,
-        query,
-        requestSource: context.requestSource,
+        query
       }, context);
 
       const [queryType, normalizedQueries] =
@@ -2104,7 +2103,6 @@ class ApiGateway {
           query,
           duration: this.duration(requestStarted),
           apiType,
-          requestSource: context.requestSource,
           isPlayground: Boolean(
             context.signedWithPlaygroundAuthSecret
           ),
@@ -2378,11 +2376,14 @@ class ApiGateway {
       // Deprecated, but let's allow it for now.
       authInfo: securityContext,
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
-      // Origin marker for APM attribution, read from the (already verified)
-      // security context. Only trusted callers that hold the signing secret can
-      // set it, so it can't be spoofed by an arbitrary client.
+      // Origin marker for APM attribution, lifted off the security context.
+      // Only as trustworthy as the deployment's `checkAuth`: with the default,
+      // signature-verifying `checkAuth` only a holder of the signing secret can
+      // set it, but a custom `checkAuth` may derive the security context from
+      // unverified input — so this is a telemetry label, NOT an authorization
+      // input. Bounded to keep APM label cardinality and log size in check.
       requestSource: typeof securityContext?.requestSource === 'string'
-        ? securityContext.requestSource
+        ? securityContext.requestSource.slice(0, 64)
         : undefined,
       requestId,
       ...extensions,
@@ -2883,6 +2884,10 @@ class ApiGateway {
         ...(!context.appName ? undefined : { appName: context.appName }),
         ...(!context.protocol ? undefined : { protocol: context.protocol }),
         ...(!context.apiType ? undefined : { apiType: context.apiType }),
+        // Centralized here so every logged event — including Load Request SQL
+        // and the error paths through handleError — carries the APM origin
+        // marker, not just the three explicit Load Request call sites.
+        ...(!context.requestSource ? undefined : { requestSource: context.requestSource }),
       })
     });
   }
