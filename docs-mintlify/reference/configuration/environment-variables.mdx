@@ -1336,9 +1336,18 @@ data source's pre-aggregations, instead of its own connection. They mirror the r
 `CUBEJS_PRE_AGGREGATIONS_DB_SSL`. For a [named data source][ref-config-multiple-ds-decorating-env],
 use the decorated form `CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*`.
 
-| Possible Values                              | Default in Development | Default in Production |
-| -------------------------------------------- | ---------------------- | --------------------- |
-| Same as the corresponding `CUBEJS_DB_*` variable | N/A                | N/A                   |
+Driver-specific connection variables take the same segment, so the dedicated connection
+is not limited to the `_DB_*` family — for example `CUBEJS_PRE_AGGREGATIONS_JDBC_URL`,
+`CUBEJS_PRE_AGGREGATIONS_AWS_REGION`, and `CUBEJS_PRE_AGGREGATIONS_FIREBOLT_ENGINE_NAME`.
+In the decorated form for a named data source, the `DB_`, `JDBC_`, `AWS_`, `DATABASE`,
+and `FIREBOLT_` variable families are supported.
+
+| Possible Values                                  | Default in Development | Default in Production |
+| ------------------------------------------------ | ---------------------- | --------------------- |
+| Same as the corresponding `CUBEJS_DB_*` variable | Not set                | Not set               |
+
+Setting any one of these variables switches the data source's pre-aggregations onto the
+dedicated connection.
 
 See [pre-aggregation data source][ref-preagg-data-source] for details and examples.
 

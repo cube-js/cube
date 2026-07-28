@@ -54,6 +54,29 @@ The `PRE_AGGREGATIONS` variant supports the same connection variables as the reg
 `CUBEJS_DB_*` / `CUBEJS_DS_<NAME>_DB_*` data source variables (for example `_DB_TYPE`,
 `_DB_HOST`, `_DB_PORT`, `_DB_USER`, `_DB_PASS`, and `_DB_SSL`).
 
+Driver-specific variables take the same segment, so the dedicated connection is not
+limited to the `_DB_*` family — for example `CUBEJS_PRE_AGGREGATIONS_JDBC_URL` or
+`CUBEJS_PRE_AGGREGATIONS_AWS_REGION`. In the decorated form for a named data source, the
+`DB_`, `JDBC_`, `AWS_`, `DATABASE`, and `FIREBOLT_` families are supported.
+
+Setting any one of these variables switches the data source onto the dedicated
+connection; there is no separate flag to enable it.
+
+<Info>
+
+[`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](/reference/configuration/environment-variables#cubejs_pre_aggregations_schema),
+[`CUBEJS_PRE_AGGREGATIONS_BUILDER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_builder),
+[`CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME`](/reference/configuration/environment-variables#cubejs_pre_aggregations_backoff_max_time),
+and [`CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`](/reference/configuration/environment-variables#cubejs_pre_aggregations_allow_non_strict_date_range_match)
+share the prefix but configure pre-aggregation behavior rather than a connection, so they
+do not switch the data source onto a dedicated connection.
+
+</Info>
+
+A custom [`driver_factory`][ref-config-driver-factory] takes precedence over these
+variables: if both are configured, the `driver_factory` connection is used for
+pre-aggregations as well and a `Pre-aggregation driver conflict` warning is logged.
+
 ## Troubleshooting
 
 ### `Refresh scheduler interval error`
@@ -83,3 +106,4 @@ that would automatically do this for you.
 [ref-preaggs]: /docs/pre-aggregations/using-pre-aggregations
 [ref-production-multi-cluster]: /admin/deployment/deployment-types#multi-cluster
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
+[ref-config-driver-factory]: /reference/configuration/config#driver_factory
