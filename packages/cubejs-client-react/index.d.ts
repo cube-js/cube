@@ -547,7 +547,19 @@ declare module '@cubejs-client/react' {
     sql: string;
   };
 
-  export function useCubeMeta(options?: Omit<CubeFetchOptions, 'query'>): CubeFetchResult<Meta>;
+  /**
+   * @hidden
+   */
+  type CubeMetaFetchOptions = Omit<CubeFetchOptions, 'query'> & {
+    /**
+     * Request views only — the response's `cubes` array then contains only entries
+     * whose `type` is `view`. Servers predating the flag ignore it and return the
+     * full model, so callers should not assume the response is filtered.
+     */
+    onlyViews?: boolean;
+  };
+
+  export function useCubeMeta(options?: CubeMetaFetchOptions): CubeFetchResult<Meta>;
 
   /**
    * @hidden

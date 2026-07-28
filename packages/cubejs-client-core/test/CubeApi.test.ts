@@ -756,6 +756,96 @@ describe('CubeApi with baseRequestId', () => {
   });
 });
 
+describe('CubeApi meta onlyViews', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  const metaResponse = {
+    cubes: [{
+      name: 'OrdersView',
+      title: 'Orders View',
+      type: 'view',
+      measures: [{
+        name: 'count',
+        title: 'Count',
+        shortTitle: 'Count',
+        type: 'number'
+      }],
+      dimensions: [],
+      segments: []
+    }]
+  };
+
+  const mockMetaRequest = () => vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    subscribe: (cb) => Promise.resolve(cb({
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify(metaResponse)),
+      json: () => Promise.resolve(metaResponse)
+    } as any,
+    async () => undefined as any))
+  }));
+
+  test('should pass onlyViews as a string to meta request', async () => {
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta({ onlyViews: true });
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe('true');
+  });
+
+  test('should not send onlyViews when the option is omitted', async () => {
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta();
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]).not.toHaveProperty('onlyViews');
+  });
+
+  test('should not send onlyViews when the option is false', async () => {
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta({ onlyViews: false });
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]).not.toHaveProperty('onlyViews');
+  });
+
+  test('should keep other meta options working alongside onlyViews', async () => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    const baseRequestId = 'meta-only-views-request-id';
+
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta({ onlyViews: true, signal, baseRequestId });
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe('true');
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+});
+
 describe('CubeApi Mutex Cancellation', () => {
   afterEach(() => {
     vi.clearAllMocks();

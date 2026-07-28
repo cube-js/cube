@@ -111,6 +111,15 @@ export type DryRunResponse = {
   transformedQueries: TransformedQuery[];
 };
 
+export type MetaMethodOptions = LoadMethodOptions & {
+  /**
+   * Request views only — the response's `cubes` array then contains only entries
+   * whose `type` is `view`. Servers predating the flag ignore it and return the
+   * full model, so callers should not assume the response is filtered.
+   */
+  onlyViews?: boolean;
+};
+
 export type CubeSqlOptions = LoadMethodOptions & {
   /**
    * Query timeout in milliseconds
@@ -702,18 +711,28 @@ class CubeApi {
     );
   }
 
-  public meta(options?: LoadMethodOptions): Promise<Meta>;
+  public meta(options?: MetaMethodOptions): Promise<Meta>;
 
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
 
   /**
    * Get meta description of cubes available for querying.
+   *
+   * Pass `onlyViews: true` to request views only — the response's `cubes` array
+   * then contains only entries whose `type` is `view`. Servers predating the flag
+   * ignore it and return the full model, so callers should not assume the response
+   * is filtered.
+   *
+   * ```js
+   * const meta = await cubeApi.meta({ onlyViews: true });
+   * ```
    */
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal,
         baseRequestId: options?.baseRequestId,
+        ...(options?.onlyViews ? { onlyViews: 'true' } : {}),
       }),
       (body: MetaResponse) => new Meta(body),
       options,

@@ -195,11 +195,25 @@ callback? | [LoadMethodCallback](#loadmethodcallback)‹[ResultSet](#resultset)�
 
 ### `meta`
 
->  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[Meta](#meta-2)›*
+>  **meta**(**options?**: [MetaMethodOptions](#metamethodoptions)): *Promise‹[Meta](#meta-2)›*
 
->  **meta**(**options?**: [LoadMethodOptions](#loadmethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[Meta](#meta-2)›): *void*
+>  **meta**(**options?**: [MetaMethodOptions](#metamethodoptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[Meta](#meta-2)›): *void*
 
 Get meta description of cubes available for querying.
+
+Pass `onlyViews: true` to request views only. On large data models this keeps cubes
+out of the response payload:
+
+```js
+const meta = await cubeApi.meta({ onlyViews: true });
+```
+
+**Parameters:**
+
+Name | Type | Description |
+------ | ------ | ------ |
+options? | [MetaMethodOptions](#metamethodoptions) | - |
+callback? | [LoadMethodCallback](#loadmethodcallback)‹[Meta](#meta-2)› | - |
 
 ### `sql`
 
@@ -865,6 +879,14 @@ Name | Type | Optional? | Description |
 `subscribe` | `boolean` | ✅ Yes | Pass `true` to use continuous fetch behavior. |
 `signal` | `AbortSignal` | ✅ Yes | AbortSignal to cancel the request. This allows you to manually abort requests using AbortController. |
 `baseRequestId` | `string` | ✅ Yes | Base request ID ([`spanId`](https://cube.dev/docs/product/apis-integrations/core-data-apis/rest-api#request-span-annotation)) to be used for the request. If not provided a random request ID will be generated. |
+
+### `MetaMethodOptions`
+
+Extends [`LoadMethodOptions`](#loadmethodoptions) with the options accepted by [`meta`](#meta).
+
+Name | Type | Optional? | Description |
+------ | ------ | ------ | --- |
+`onlyViews` | `boolean` | ✅ Yes | Pass `true` to request views only — the response's `cubes` array then contains only entries whose `type` is `view`. Cube versions predating this flag ignore it and return the full data model, so don't assume the response is filtered. |
 
 ### `LoadResponse`
 
