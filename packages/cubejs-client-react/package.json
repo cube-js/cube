@@ -29,7 +29,7 @@
     "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.13.8",
+    "@babel/core": "^8.0.0",
     "@babel/eslint-parser": "^7",
     "@types/ramda": "^0.27.40",
     "@types/react": "^16.9.41",
