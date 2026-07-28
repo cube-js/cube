@@ -1971,7 +1971,7 @@ class ApiGateway {
   }> {
     const requestStarted = new Date();
     try {
-      this.log({ type: 'Load Request', query, streaming: true }, context);
+      this.log({ type: 'Load Request', query, streaming: true, requestSource: context.requestSource }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
       const q: QueryBody = {
@@ -2035,7 +2035,8 @@ class ApiGateway {
       this.log({
         type: 'Load Request',
         apiType,
-        query
+        query,
+        requestSource: context.requestSource,
       }, context);
 
       const [queryType, normalizedQueries] =
@@ -2103,6 +2104,7 @@ class ApiGateway {
           query,
           duration: this.duration(requestStarted),
           apiType,
+          requestSource: context.requestSource,
           isPlayground: Boolean(
             context.signedWithPlaygroundAuthSecret
           ),
@@ -2376,6 +2378,12 @@ class ApiGateway {
       // Deprecated, but let's allow it for now.
       authInfo: securityContext,
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
+      // Origin marker for APM attribution, read from the (already verified)
+      // security context. Only trusted callers that hold the signing secret can
+      // set it, so it can't be spoofed by an arbitrary client.
+      requestSource: typeof securityContext?.requestSource === 'string'
+        ? securityContext.requestSource
+        : undefined,
       requestId,
       ...extensions,
     };

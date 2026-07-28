@@ -21,6 +21,12 @@ interface RequestContext {
   securityContext: any;
   requestId: string;
   signedWithPlaygroundAuthSecret?: boolean;
+  /**
+   * Opaque origin marker carried in the (signed) security context, used to
+   * attribute Load Request events in APM to the caller — e.g. `ai-engineer-chat`.
+   * Tamper-proof: only present when the JWT that minted the security context set it.
+   */
+  requestSource?: string;
   appName?: string,
   protocol?: string,
   apiType?: string,
