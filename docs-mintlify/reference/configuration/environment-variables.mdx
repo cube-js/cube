@@ -2022,6 +2022,18 @@ If `true`, then sends telemetry to Cube.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBESTORE_TOPK_STRATEGY`
+
+The merge strategy Cube Store's router uses for distributed top-k queries
+(`SELECT ... GROUP BY ... ORDER BY ... LIMIT k`). `vectorized` keeps the same
+early-termination behavior as the default `streaming` strategy but processes
+rows in batches; `full_merge` re-aggregates every distinct group on the router
+before sorting, trading router memory for a ClickHouse-style merge. Optional.
+
+| Possible Values                       | Default in Development | Default in Production |
+| -------------------------------------- | ---------------------- | --------------------- |
+| `streaming`, `vectorized`, `full_merge` | `streaming`             | `streaming`            |
+
 ## `CUBESTORE_WAL_SPLIT_THRESHOLD`
 
 The maximum number of rows to keep in a single chunk of data right after

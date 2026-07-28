@@ -59,6 +59,17 @@ Embed users in Creator Mode can share the workbooks and dashboards they build wi
   Sharing is scoped to the [embed tenant](#embed-tenant-scoping): users can only share with others in the same tenant, never across tenants.
 </Note>
 
+## SQL visibility
+
+By default, embed users in Creator Mode can view both the Semantic SQL and the Generated SQL for a query — in Analytics Chat, in a workbook's SQL panel, and in the Error/SQL switcher. Generated SQL is the query sent to your underlying data source, so it can expose physical table and schema names.
+
+Control this from **Admin → Embed → Settings**:
+
+- **Show Semantic SQL** — on by default.
+- **Show Generated SQL** — off by default, since it exposes your data source's schema.
+
+Turning a toggle off removes the corresponding tab and entry points (including the chat **Show SQL** button) from every Creator Mode embed for your account. A workbook's own SQL-based reports keep their SQL editor regardless of these settings, since that SQL is the report definition, not a derived schema view. These settings don't affect the authenticated Cube app, where both are always visible.
+
 ## Example
 
 ```javascript

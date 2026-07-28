@@ -170,7 +170,15 @@ CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 Cube does not require any additional configuration to enable SSL as Google
 BigQuery connections are made over HTTPS.
 
+## Query labels
+
+Every query job that Cube submits to BigQuery is automatically tagged with a
+`cube_request_id` [job label][bq-docs-labels]. Use it to find a specific
+Cube-issued query in BigQuery's job history, audit logs, or cost breakdowns by
+`cube_request_id`. No configuration is required.
+
 [bq]: https://cloud.google.com/bigquery
+[bq-docs-labels]: https://cloud.google.com/bigquery/docs/labels-intro
 [bq-docs-getting-started]:
   https://cloud.google.com/docs/authentication/getting-started
 [bq-docs-regional-locations]:
