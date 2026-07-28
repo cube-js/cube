@@ -846,6 +846,7 @@
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /v1/embed/dashboard/{publicId}",
+                  "PATCH /v1/embed/dashboard/{publicId}",
                   "POST /v1/embed/generate-session",
                   "POST /v1/embed/session/token"
                 ]
