@@ -38,6 +38,9 @@ pub struct TestContext {
     /// dialect templates, so queries fully covered by external
     /// pre-aggregations render CubeStore SQL.
     external_cubestore: bool,
+    /// Mirrors the dialect's `shouldReuseParams`. Carried through `for_options`
+    /// rebuilds together with `custom_sql_templates`.
+    should_reuse_params: bool,
 }
 
 impl TestContext {
@@ -64,6 +67,7 @@ impl TestContext {
             false,
             self.custom_sql_templates.clone(),
             true,
+            self.should_reuse_params,
         )
     }
 
@@ -72,10 +76,14 @@ impl TestContext {
         schema: MockSchema,
         base_tools: MockBaseTools,
     ) -> Result<Self, CubeError> {
+        use crate::cube_bridge::base_tools::BaseTools;
         let join_graph = Rc::new(schema.create_join_graph()?);
         let evaluator = schema.clone().create_evaluator();
         let security_context: Rc<dyn crate::cube_bridge::security_context::SecurityContext> =
             Rc::new(MockSecurityContext);
+        // Taken from the tools the caller built, so a `for_options` rebuild can't
+        // silently disagree with them.
+        let should_reuse_params = base_tools.driver_tools(false)?.should_reuse_params()?;
 
         let query_tools = State::try_new(
             evaluator,
@@ -95,18 +103,48 @@ impl TestContext {
             security_context,
             custom_sql_templates: None,
             external_cubestore: false,
+            should_reuse_params,
         })
     }
 
     #[allow(dead_code)]
     pub fn new_with_generated_time_series(schema: MockSchema) -> Result<Self, CubeError> {
-        use crate::test_fixtures::cube_bridge::{MockDriverTools, MockSqlTemplatesRender};
-        let sql_templates = MockSqlTemplatesRender::default_templates_with_generated_time_series();
-        let driver_tools = MockDriverTools::with_sql_templates(sql_templates.clone());
-        let base_tools = schema.create_base_tools_with_driver(driver_tools)?;
-        let mut ctx = Self::new_with_base_tools(schema, base_tools)?;
-        ctx.custom_sql_templates = Some(sql_templates);
-        Ok(ctx)
+        use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
+        Self::new_with_custom_templates(
+            schema,
+            MockSqlTemplatesRender::default_templates_with_generated_time_series(),
+            true,
+        )
+    }
+
+    /// Context rendering params as positional `?` (BigQuery, Snowflake, MySQL, ...)
+    /// instead of the Postgres `$1` default.
+    #[allow(dead_code)]
+    pub fn new_with_positional_params(schema: MockSchema) -> Result<Self, CubeError> {
+        use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
+        Self::new_with_custom_templates(
+            schema,
+            MockSqlTemplatesRender::default_templates_with_positional_params(),
+            false,
+        )
+    }
+
+    fn new_with_custom_templates(
+        schema: MockSchema,
+        sql_templates: crate::test_fixtures::cube_bridge::MockSqlTemplatesRender,
+        should_reuse_params: bool,
+    ) -> Result<Self, CubeError> {
+        Self::new_with_options_internal_ext(
+            schema,
+            Tz::UTC,
+            None,
+            None,
+            false,
+            false,
+            Some(sql_templates),
+            false,
+            should_reuse_params,
+        )
     }
 
     #[allow(dead_code)]
@@ -154,6 +192,7 @@ impl TestContext {
                 .unwrap_or(false),
             self.custom_sql_templates.clone(),
             self.external_cubestore,
+            self.should_reuse_params,
         )
     }
 
@@ -174,6 +213,7 @@ impl TestContext {
             convert_tz_for_raw_time_dimension,
             None,
             false,
+            true,
         )
     }
 
@@ -187,22 +227,28 @@ impl TestContext {
         convert_tz_for_raw_time_dimension: bool,
         custom_sql_templates: Option<crate::test_fixtures::cube_bridge::MockSqlTemplatesRender>,
         external_cubestore: bool,
+        should_reuse_params: bool,
     ) -> Result<Self, CubeError> {
         use crate::test_fixtures::cube_bridge::MockDriverTools;
-        let mut base_tools = if let Some(templates) = custom_sql_templates.clone() {
-            let driver_tools =
-                MockDriverTools::with_sql_templates_and_timezone(templates, timezone.to_string());
-            schema.create_base_tools_with_driver(driver_tools)?
-        } else {
-            schema.create_base_tools_with_timezone(timezone.to_string())?
+        let mut driver_tools = match custom_sql_templates.clone() {
+            Some(templates) => {
+                MockDriverTools::with_sql_templates_and_timezone(templates, timezone.to_string())
+            }
+            None => MockDriverTools::with_timezone(timezone.to_string()),
         };
+        if !should_reuse_params {
+            driver_tools = driver_tools.without_params_reuse();
+        }
+        let mut base_tools = schema.create_base_tools_with_driver(driver_tools)?;
         if external_cubestore {
             use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
             let driver_tools = MockDriverTools::with_sql_templates_and_timezone(
                 MockSqlTemplatesRender::cubestore_templates(),
                 timezone.to_string(),
             )
-            .with_cubestore_dialect();
+            .with_cubestore_dialect()
+            // CubeStoreQuery renders positional `?`, so it never reuses params.
+            .without_params_reuse();
             base_tools.set_external_driver_tools(Rc::new(driver_tools));
         }
         let join_graph = Rc::new(schema.create_join_graph()?);
@@ -228,6 +274,7 @@ impl TestContext {
             security_context,
             custom_sql_templates,
             external_cubestore,
+            should_reuse_params,
         })
     }
 
@@ -521,6 +568,24 @@ impl TestContext {
         Ok(sql)
     }
 
+    /// Renders the query the way `BaseQuery::build_sql_and_params` does: plan,
+    /// then resolve param placeholders with the dialect the SQL is rendered for.
+    #[allow(dead_code)]
+    pub fn build_sql_and_params(
+        &self,
+        query: &str,
+    ) -> Result<(String, Vec<FilterValue>), CubeError> {
+        let options = self.create_query_options_from_yaml(query);
+        let ctx = self.for_options(options.as_ref())?;
+        let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let (raw_sql, usages) = planner.plan()?;
+
+        let is_external = !usages.is_empty() && usages.iter().all(|u| u.pre_aggregation.external());
+        let templates = ctx.query_tools.plan_sql_templates(is_external)?;
+        ctx.query_tools.build_sql_and_params(&raw_sql, &templates)
+    }
+
     #[allow(dead_code)]
     pub fn build_sql_from_options(
         &self,
@@ -627,7 +692,7 @@ impl TestContext {
             .expect("Failed to get SQL templates");
         let (sql, params) = ctx
             .query_tools
-            .build_sql_and_params(&raw_sql, true, &templates)
+            .build_sql_and_params(&raw_sql, &templates)
             .expect("Failed to build SQL and params");
 
         // Strip __usage_N suffixes from SQL, same as base_query.rs does for single usage
@@ -752,7 +817,7 @@ impl TestContext {
             .expect("Failed to get SQL templates");
         let (sql, params) = pa_ctx
             .query_tools
-            .build_sql_and_params(&raw_sql, true, &templates)
+            .build_sql_and_params(&raw_sql, &templates)
             .expect("Failed to build pre-agg SQL and params");
         Self::inline_params(&sql, &params)
     }
@@ -949,7 +1014,7 @@ impl TestContext {
             .expect("Failed to get SQL templates");
         let (sql, params) = ctx
             .query_tools
-            .build_sql_and_params(&raw_sql, true, &templates)
+            .build_sql_and_params(&raw_sql, &templates)
             .expect("Failed to build SQL and params");
 
         let sql = pre_aggregations
@@ -1311,19 +1376,77 @@ impl TestContext {
         }
     }
 
-    #[cfg(feature = "integration-postgres")]
+    /// Inlines params as literals so the SQL can run without a bind protocol.
+    /// Both placeholder forms the dialects render are handled: indexed `$N`, and
+    /// positional `?` consumed in occurrence order.
+    ///
+    /// Placeholders are recognized anywhere in the text, so SQL carrying `?` or
+    /// `$1` inside a string literal would be rewritten — no fixture does that,
+    /// and the values inlined here are never rescanned.
     fn inline_params(sql: &str, params: &[FilterValue]) -> String {
-        let mut result = sql.to_string();
-        for (i, param) in params.iter().enumerate().rev() {
-            let placeholder = format!("${}", i + 1);
-            // `Null` must inline as the bare SQL keyword; every other variant is
-            // rendered through its canonical string form and quoted.
-            let literal = match param.to_param_string() {
-                Some(value) => format!("'{}'", value.replace('\'', "''")),
-                None => "NULL".to_string(),
-            };
-            result = result.replace(&placeholder, &literal);
+        // `Null` must inline as the bare SQL keyword; every other variant is
+        // rendered through its canonical string form and quoted.
+        let literal = |param: &FilterValue| match param.to_param_string() {
+            Some(value) => format!("'{}'", value.replace('\'', "''")),
+            None => "NULL".to_string(),
+        };
+        let at = |index: usize| {
+            params.get(index).unwrap_or_else(|| {
+                panic!(
+                    "Placeholder refers to param {} but only {} were built:\n{}",
+                    index + 1,
+                    params.len(),
+                    sql
+                )
+            })
+        };
+
+        let mut result = String::with_capacity(sql.len());
+        let mut next_positional = 0;
+        let mut chars = sql.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                '?' => {
+                    result.push_str(&literal(at(next_positional)));
+                    next_positional += 1;
+                }
+                '$' if chars.peek().is_some_and(|c| c.is_ascii_digit()) => {
+                    let mut index = String::new();
+                    while let Some(c) = chars.peek() {
+                        if !c.is_ascii_digit() {
+                            break;
+                        }
+                        index.push(*c);
+                        chars.next();
+                    }
+                    let index: usize = index.parse().expect("digits only");
+                    // Dialect placeholders are 1-based. `$0` means this is
+                    // annotated SQL (`$0$`), whose indexes live in another space
+                    // and must not be inlined as if they were dialect params.
+                    let index = index.checked_sub(1).unwrap_or_else(|| {
+                        panic!("Annotated SQL cannot be inlined, got `$0` in:\n{}", sql)
+                    });
+                    result.push_str(&literal(at(index)));
+                }
+                _ => result.push(ch),
+            }
         }
+
+        // Every placeholder form must be consumed above. MSSQL's `@_N` has no
+        // fixture driving it yet, so catch it here instead of letting it reach
+        // the database as text.
+        if let Some(leftover) = regex::Regex::new(r"@_\d+")
+            .expect("Failed to build placeholder regex")
+            .find(&result)
+        {
+            panic!(
+                "Placeholder {} was left unresolved in:\n{}",
+                leftover.as_str(),
+                result
+            );
+        }
+
         result
     }
 
@@ -1386,6 +1509,44 @@ impl TestContext {
 mod tests {
     use super::*;
     use crate::test_fixtures::cube_bridge::MockSchema;
+
+    #[test]
+    fn inline_params_handles_both_placeholder_forms() {
+        let params = vec![
+            FilterValue::Str("a'b".to_string()),
+            FilterValue::Null,
+            FilterValue::Num(42.0),
+        ];
+
+        assert_eq!(
+            TestContext::inline_params("SELECT $1, $2, $3, $1", &params),
+            "SELECT 'a''b', NULL, '42', 'a''b'"
+        );
+        // Positional placeholders bind by occurrence, so a value repeated in the
+        // SQL is repeated in the params.
+        assert_eq!(
+            TestContext::inline_params("SELECT ?, ?, ?", &params),
+            "SELECT 'a''b', NULL, '42'"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Placeholder refers to param 2 but only 1 were built")]
+    fn inline_params_rejects_more_placeholders_than_params() {
+        TestContext::inline_params("SELECT ?, ?", &[FilterValue::Str("a".to_string())]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Annotated SQL cannot be inlined")]
+    fn inline_params_rejects_annotated_sql() {
+        TestContext::inline_params("SELECT $0$", &[FilterValue::Str("a".to_string())]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Placeholder @_1 was left unresolved")]
+    fn inline_params_rejects_unknown_placeholder_form() {
+        TestContext::inline_params("SELECT @_1", &[FilterValue::Str("a".to_string())]);
+    }
 
     #[test]
     fn test_yaml_filter_parsing() {
