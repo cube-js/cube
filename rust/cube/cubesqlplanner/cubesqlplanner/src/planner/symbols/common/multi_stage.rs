@@ -117,45 +117,6 @@ impl MultiStageProperties {
             time_shift: None,
         }))
     }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        let map_refs = |refs: &Option<Vec<Rc<MemberSymbol>>>| -> Result<_, CubeError> {
-            match refs {
-                Some(items) => Ok(Some(items.iter().map(f).collect::<Result<Vec<_>, _>>()?)),
-                None => Ok(None),
-            }
-        };
-
-        let filter = match &self.filter {
-            Some(f_old) => Some(MultiStageFilter {
-                mode: f_old.mode.clone(),
-                exclude: map_refs(&f_old.exclude)?,
-                keep_only: map_refs(&f_old.keep_only)?,
-                // include_* items are FilterItems that already hold their own
-                // resolved member references; transformations of dependency
-                // chains apply at the symbol level, so we keep them as-is.
-                include_dimension: f_old.include_dimension.clone(),
-                include_time_dimension: f_old.include_time_dimension.clone(),
-                include_measure: f_old.include_measure.clone(),
-            }),
-            None => None,
-        };
-
-        let grain = MultiStageGrain {
-            exclude: map_refs(&self.grain.exclude)?,
-            keep_only: map_refs(&self.grain.keep_only)?,
-            include: map_refs(&self.grain.include)?,
-        };
-
-        Ok(Self {
-            grain,
-            filter,
-            time_shift: self.time_shift.clone(),
-        })
-    }
 }
 
 fn resolve_reference_paths(

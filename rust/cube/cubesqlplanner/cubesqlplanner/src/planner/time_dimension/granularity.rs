@@ -1,6 +1,7 @@
 use super::{GranularityHelper, QueryDateTime, SqlInterval};
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{MemberSymbol, SqlCall};
+use crate::planner::symbols::deps::symbol_deps;
+use crate::planner::SqlCall;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -15,6 +16,18 @@ pub struct Granularity {
     is_predefined_granularity: bool,
     is_natural_aligned: bool,
     calendar_sql: Option<Rc<SqlCall>>,
+}
+
+symbol_deps! {
+    Granularity {
+        calendar_sql: dep,
+        granularity: skip,
+        granularity_interval: skip,
+        granularity_offset: skip,
+        origin: skip,
+        is_predefined_granularity: skip,
+        is_natural_aligned: skip,
+    }
 }
 
 impl Granularity {
@@ -81,17 +94,6 @@ impl Granularity {
             is_natural_aligned,
             calendar_sql,
         })
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        let mut result = self.clone();
-        if let Some(calendar_sql) = &self.calendar_sql {
-            result.calendar_sql = Some(calendar_sql.apply_recursive(f)?);
-        }
-        Ok(result)
     }
 
     pub fn is_natural_aligned(&self) -> bool {
