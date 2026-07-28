@@ -1379,6 +1379,10 @@ impl TestContext {
     /// Inlines params as literals so the SQL can run without a bind protocol.
     /// Both placeholder forms the dialects render are handled: indexed `$N`, and
     /// positional `?` consumed in occurrence order.
+    ///
+    /// Placeholders are recognized anywhere in the text, so SQL carrying `?` or
+    /// `$1` inside a string literal would be rewritten — no fixture does that,
+    /// and the values inlined here are never rescanned.
     fn inline_params(sql: &str, params: &[FilterValue]) -> String {
         // `Null` must inline as the bare SQL keyword; every other variant is
         // rendered through its canonical string form and quoted.
@@ -1417,10 +1421,30 @@ impl TestContext {
                         chars.next();
                     }
                     let index: usize = index.parse().expect("digits only");
-                    result.push_str(&literal(at(index - 1)));
+                    // Dialect placeholders are 1-based. `$0` means this is
+                    // annotated SQL (`$0$`), whose indexes live in another space
+                    // and must not be inlined as if they were dialect params.
+                    let index = index.checked_sub(1).unwrap_or_else(|| {
+                        panic!("Annotated SQL cannot be inlined, got `$0` in:\n{}", sql)
+                    });
+                    result.push_str(&literal(at(index)));
                 }
                 _ => result.push(ch),
             }
+        }
+
+        // Every placeholder form must be consumed above. MSSQL's `@_N` has no
+        // fixture driving it yet, so catch it here instead of letting it reach
+        // the database as text.
+        if let Some(leftover) = regex::Regex::new(r"@_\d+")
+            .expect("Failed to build placeholder regex")
+            .find(&result)
+        {
+            panic!(
+                "Placeholder {} was left unresolved in:\n{}",
+                leftover.as_str(),
+                result
+            );
         }
 
         result
@@ -1510,6 +1534,18 @@ mod tests {
     #[should_panic(expected = "Placeholder refers to param 2 but only 1 were built")]
     fn inline_params_rejects_more_placeholders_than_params() {
         TestContext::inline_params("SELECT ?, ?", &[FilterValue::Str("a".to_string())]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Annotated SQL cannot be inlined")]
+    fn inline_params_rejects_annotated_sql() {
+        TestContext::inline_params("SELECT $0$", &[FilterValue::Str("a".to_string())]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Placeholder @_1 was left unresolved")]
+    fn inline_params_rejects_unknown_placeholder_form() {
+        TestContext::inline_params("SELECT @_1", &[FilterValue::Str("a".to_string())]);
     }
 
     #[test]

@@ -1,20 +1,7 @@
-import { AthenaQuery } from '../../src/adapter/AthenaQuery';
+import fs from 'fs';
+import path from 'path';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
-import { ClickHouseQuery } from '../../src/adapter/ClickHouseQuery';
-import { CrateQuery } from '../../src/adapter/CrateQuery';
-import { CubeStoreQuery } from '../../src/adapter/CubeStoreQuery';
-import { HiveQuery } from '../../src/adapter/HiveQuery';
-import { MongoBiQuery } from '../../src/adapter/MongoBiQuery';
-import { MssqlQuery } from '../../src/adapter/MssqlQuery';
-import { MysqlQuery } from '../../src/adapter/MysqlQuery';
-import { OracleQuery } from '../../src/adapter/OracleQuery';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { PrestodbQuery } from '../../src/adapter/PrestodbQuery';
-import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
-import { SnowflakeQuery } from '../../src/adapter/SnowflakeQuery';
-import { SqliteQuery } from '../../src/adapter/SqliteQuery';
-import { TrinoQuery } from '../../src/adapter/TrinoQuery';
-import { VerticaQuery } from '../../src/adapter/VerticaQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 // `?` placeholders are positional: a value referenced from two places in the
@@ -76,11 +63,22 @@ function placeholdersCount(sql: string) {
   return (sql.match(/\?/g) || []).length;
 }
 
-const DIALECTS = [
-  AthenaQuery, BigqueryQuery, ClickHouseQuery, CrateQuery, CubeStoreQuery, HiveQuery,
-  MongoBiQuery, MssqlQuery, MysqlQuery, OracleQuery, PostgresQuery, PrestodbQuery,
-  RedshiftQuery, SnowflakeQuery, SqliteQuery, TrinoQuery, VerticaQuery,
-];
+// Read off the directory rather than listed by hand, so a dialect added later
+// cannot quietly escape the invariant below.
+const ADAPTER_DIR = path.join(__dirname, '..', '..', 'src', 'adapter');
+
+function allDialects() {
+  const classes = fs.readdirSync(ADAPTER_DIR)
+    // Tests run from `dist`, so the adapter dir holds `.js`; `.ts` keeps this
+    // working if they are ever run from source.
+    .map(file => file.match(/^(\w+Query)\.(?:ts|js)$/)?.[1])
+    .filter((name): name is string => !!name && name !== 'BaseQuery')
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    .map(name => require(path.join(ADAPTER_DIR, name))[name]);
+
+  expect(classes.length).toBeGreaterThan(10);
+  return classes;
+}
 
 describe('positional params', () => {
   // Dialects whose placeholder carries the param index are free to share a param
@@ -90,7 +88,7 @@ describe('positional params', () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
     await compiler.compile();
 
-    const reusingPositionalDialects = DIALECTS.filter(QueryClass => {
+    const reusingPositionalDialects = allDialects().filter(QueryClass => {
       const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
         measures: ['orders.count'],
         timezone: 'UTC',

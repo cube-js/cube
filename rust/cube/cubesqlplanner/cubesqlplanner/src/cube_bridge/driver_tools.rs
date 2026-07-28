@@ -26,9 +26,11 @@ pub trait DriverTools {
     fn date_time_cast(&self, field: String) -> Result<String, CubeError>; //TODO move to templates
     fn in_db_time_zone(&self, date: String) -> Result<String, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
-    /// True when a param placeholder addresses its value by index (`$1`), so a
-    /// single param can back several placeholders. Dialects with positional `?`
-    /// placeholders need one param per placeholder occurrence.
+    /// The dialect's own answer to whether one param may back several
+    /// placeholders. It is an opt-in, not a property of the rendered
+    /// placeholder: a dialect whose placeholder omits the param index
+    /// (positional `?`) cannot opt in, while one that carries the index is free
+    /// to stay opted out and get a param per placeholder instead.
     #[nbridge(field)]
     fn should_reuse_params(&self) -> Result<bool, CubeError>;
     fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
