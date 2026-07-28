@@ -16,6 +16,9 @@ import type {
   UseCubeFetchResult,
 } from '../types';
 
+/**
+ * @hidden
+ */
 export function useCubeFetch<T>(
   method: CubeFetchMethod,
   options?: UseCubeFetchOptions
@@ -62,14 +65,14 @@ export function useCubeFetch<T>(
       const fetchMethod = cubeApi[method] as CubeFetchDispatch;
 
       try {
-        const response = await fetchMethod.apply(cubeApi, args) as T;
+        const fetchResponse = await fetchMethod.apply(cubeApi, args) as T;
 
         setResponse({
-          response,
+          response: fetchResponse,
           isLoading: false,
         });
-      } catch (error) {
-        setError(error as Error);
+      } catch (fetchError) {
+        setError(fetchError as Error);
         setResponse({
           isLoading: false,
           response: null,
@@ -90,6 +93,6 @@ export function useCubeFetch<T>(
   return {
     ...response,
     error,
-    refetch: (options?: UseCubeFetchLoadOptions) => load(options, true),
+    refetch: (refetchOptions?: UseCubeFetchLoadOptions) => load(refetchOptions, true),
   };
 }

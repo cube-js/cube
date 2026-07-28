@@ -77,6 +77,70 @@ const granularities: GranularityOption[] = [
   { name: 'year', title: 'Year' },
 ];
 
+/**
+ * `<QueryBuilder />` is used to build interactive analytics query builders. It abstracts state management and API calls to Cube.js Backend. It uses render prop technique and doesn’t render anything itself, but calls the render function instead.
+ *
+ * **Example**
+ *
+ * [Open in CodeSandbox](https://codesandbox.io/s/z6r7qj8wm)
+ * ```js
+ * import React from 'react';
+ * import ReactDOM from 'react-dom';
+ * import { Layout, Divider, Empty, Select } from 'antd';
+ * import { QueryBuilder } from '@cubejs-client/react';
+ * import cube from '@cubejs-client/core';
+ * import 'antd/dist/antd.css';
+ *
+ * import ChartRenderer from './ChartRenderer';
+ *
+ * const cubeApi = cube('YOUR-CUBE-API-TOKEN', {
+ *   apiUrl: 'http://localhost:4000/cubejs-api/v1',
+ * });
+ *
+ * const App = () => (
+ *   <QueryBuilder
+ *     query={{
+ *       timeDimensions: [
+ *         {
+ *           dimension: 'LineItems.createdAt',
+ *           granularity: 'month',
+ *         },
+ *       ],
+ *     }}
+ *     cubeApi={cubeApi}
+ *     render={({ resultSet, measures, availableMeasures, updateMeasures }) => (
+ *       <Layout.Content style={{ padding: '20px' }}>
+ *         <Select
+ *           mode="multiple"
+ *           style={{ width: '100%' }}
+ *           placeholder="Please select"
+ *           onSelect={(measure) => updateMeasures.add(measure)}
+ *           onDeselect={(measure) => updateMeasures.remove(measure)}
+ *         >
+ *           {availableMeasures.map((measure) => (
+ *             <Select.Option key={measure.name} value={measure}>
+ *               {measure.title}
+ *             </Select.Option>
+ *           ))}
+ *         </Select>
+ *         <Divider />
+ *         {measures.length > 0 ? (
+ *           <ChartRenderer resultSet={resultSet} />
+ *         ) : (
+ *           <Empty description="Select measure or dimension to get started" />
+ *         )}
+ *       </Layout.Content>
+ *     )}
+ *   />
+ * );
+ *
+ * const rootElement = document.getElementById("root");
+ * ReactDOM.render(<App />, rootElement);
+ * ```
+ * @stickyTypes QueryBuilderProps, QueryBuilderRenderProps, QueryBuilderState
+ * @noInheritDoc
+ * @order 2
+ */
 export default class QueryBuilder extends React.Component<QueryBuilderProps, QueryBuilderInternalState> {
   static contextType = CubeContext;
 
@@ -210,9 +274,14 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
     }
   }
 
-  // `this.context` is typed as `any` by React and holds `CubeContextProps`.
-  // It is not re-declared here: a class field would be emitted at runtime and
-  // shadow the context React assigns.
+  // These sit after the lifecycle methods because `react/sort-comp` sorts
+  // TypeScript field declarations into `everything-else`, which the configured
+  // order puts after `lifecycle`. Runtime is unaffected: field initializers run
+  // right after `super()`, so the constructor's assignments still win.
+  //
+  // `this.context` is not re-declared: React types it as `any`, and a field
+  // declaration would be emitted at runtime and shadow the context React
+  // assigns.
   private mutexObj: MutexObj;
 
   private orderMembersOrderKeys: string[];

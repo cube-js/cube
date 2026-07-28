@@ -7,6 +7,9 @@ import type {
   UseCubeFetchOptions,
 } from '../types';
 
+/**
+ * @hidden
+ */
 export function useLazyDryRun(
   query?: Query | Query[],
   options: UseCubeFetchOptions = {}

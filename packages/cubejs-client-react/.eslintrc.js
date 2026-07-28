@@ -25,9 +25,8 @@ module.exports = {
     '@typescript-eslint/no-redeclare': 'error',
     'no-dupe-class-members': 0,
     '@typescript-eslint/no-dupe-class-members': 'error',
-    // The hooks shadow `error`/`response`/`options` in inner scopes. They were
-    // not linted before (the previous glob only covered `src/*.js`)
     'no-shadow': 0,
+    '@typescript-eslint/no-shadow': 'error',
     'object-curly-newline': 0,
     'react/jsx-no-bind': 0,
     'react/jsx-first-prop-new-line': 0,
@@ -63,7 +62,8 @@ module.exports = {
       2,
       {
         ignoreUrls: true,
-        ignoreComments: false,
+        // The published JSDoc is prose copied into the declarations
+        ignoreComments: true,
         ignoreRegExpLiterals: true,
         ignoreStrings: true,
         ignoreTemplateLiterals: true,

@@ -53,7 +53,8 @@
     "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
   ],
   "license": "MIT",
   "devDependencies": {

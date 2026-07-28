@@ -12,6 +12,11 @@ import type {
   QueryRendererState,
 } from './types';
 
+/**
+ * `<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
+ * @stickyTypes QueryRendererProps, QueryRendererRenderProps
+ * @noInheritDoc
+ */
 export default class QueryRenderer extends React.Component<QueryRendererProps, QueryRendererState> {
   static contextType = CubeContext;
 
@@ -74,9 +79,14 @@ export default class QueryRenderer extends React.Component<QueryRendererProps, Q
     }
   }
 
-  // `this.context` is typed as `any` by React and holds `CubeContextProps`.
-  // It is not re-declared here: a class field would be emitted at runtime and
-  // shadow the context React assigns.
+  // These sit after the lifecycle methods because `react/sort-comp` sorts
+  // TypeScript field declarations into `everything-else`, which the configured
+  // order puts after `lifecycle`. Runtime is unaffected: field initializers run
+  // right after `super()`, so the constructor's assignments still win.
+  //
+  // `this.context` is not re-declared: React types it as `any`, and a field
+  // declaration would be emitted at runtime and shadow the context React
+  // assigns.
   private mutexObj: MutexObj;
 
   cubeApi(): CubeApi {
@@ -178,7 +188,9 @@ export default class QueryRenderer extends React.Component<QueryRendererProps, Q
     };
 
     if (render) {
-      return render(loadState as QueryRendererRenderProps);
+      // The prop is declared as returning `void` for backwards compatibility,
+      // while what it returns is what gets rendered
+      return render(loadState as QueryRendererRenderProps) as React.ReactNode;
     }
 
     return null;

@@ -12,17 +12,17 @@
   "description": "React components for cube.js",
   "main": "dist/cubejs-client-react.cjs.js",
   "module": "dist/cubejs-client-react.esm.js",
-  "types": "index.d.ts",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "tsc": "tsc --noEmit",
-    "unit": "tsc --noEmit",
+    "build": "tsc --build",
+    "tsc": "tsc --build",
+    "watch": "tsc --build --watch",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint --fix src --ext .ts,.tsx"
   },
   "files": [
     "src",
-    "dist",
-    "index.d.ts"
+    "dist"
   ],
   "dependencies": {
     "@babel/runtime": "^7.1.2",

@@ -21,6 +21,41 @@ import type {
   UseCubeQueryResult,
 } from '../types';
 
+/**
+ * A React hook for executing Cube.js queries
+ * ```js
+ * import React from 'react';
+ * import { Table } from 'antd';
+ * import { useCubeQuery }  from '@cubejs-client/react';
+ *
+ * export default function App() {
+ *   const { resultSet, isLoading, error, progress } = useCubeQuery({
+ *     measures: ['Orders.count'],
+ *     dimensions: ['Orders.createdAt.month'],
+ *   });
+ *
+ *   if (isLoading) {
+ *     return <div>{progress?.stage || 'Loading...'}</div>;
+ *   }
+ *
+ *   if (error) {
+ *     return <div>{error.toString()}</div>;
+ *   }
+ *
+ *   if (!resultSet) {
+ *     return null;
+ *   }
+ *
+ *   const dataSource = resultSet.tablePivot();
+ *   const columns = resultSet.tableColumns();
+ *
+ *   return <Table columns={columns} dataSource={dataSource} />;
+ * }
+ *
+ * ```
+ * @order 1
+ * @stickyTypes
+ */
 export function useCubeQuery<
   Data,
   QueryInput extends ReadonlyQueryInput = ReadonlyQueryInput
@@ -74,8 +109,8 @@ export function useCubeQuery(
 
       setResultSet(response);
       setProgress(null);
-    } catch (error) {
-      setError(error as Error);
+    } catch (loadError) {
+      setError(loadError as Error);
       setResultSet(null);
       setProgress(null);
     }
