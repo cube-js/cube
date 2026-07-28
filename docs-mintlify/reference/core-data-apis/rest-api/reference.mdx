@@ -803,12 +803,25 @@ Response includes:
   `table`, and, if the table is qualified, `schema`
 - `cube_references` - Relationships to other cubes, each as an object with
   `type` (currently always `upstream`) and `cube`
-- `measures` and `dimensions` - Arrays of members, sorted by name. Each member has
-  `name`, `title`, `description`, `type`, `member_references` (upstream members it
-  is derived from), and `column_references` (source columns, each with
-  `data_source`, `table`, `column`, and, if the table is qualified, `schema`).
-  Members also carry `sql` when the member's SQL expression can be resolved, and
-  dimensions carry an `is_primary_key` flag.
+- `measures` and `dimensions` - Arrays of members, sorted by name
+
+Each member includes:
+
+| Field | Description |
+| --- | --- |
+| `name` | The member name, without the cube prefix |
+| `title` | Human-readable title |
+| `description` | Description from the data model, or an empty string |
+| `type` | The member type, e.g. `count`, `sum`, or `string` |
+| `sql` | The member's SQL definition (see below). Omitted when it can't be resolved |
+| `is_primary_key` | Whether the dimension is a primary key. Dimensions only |
+| `member_references` | Upstream members the member is derived from, each with `cube` and `member` |
+| `column_references` | Source columns, each with `data_source`, `table`, `column`, and, if the table is qualified, `schema` |
+
+`sql` is a quote-stripped expression such as `COUNT(*)`, `${CUBE}.status`, or
+`${total_amount} - ${refunds}`. References to other members appear as `${member}`
+interpolations, and `${CUBE}` refers to the cube's own table alias. Members of a
+view carry the alias expression they resolve to, e.g. `${orders.total_amount}`.
 
 Example request:
 
