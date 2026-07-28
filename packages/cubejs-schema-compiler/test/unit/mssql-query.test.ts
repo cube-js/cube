@@ -217,4 +217,38 @@ describe('MssqlQuery', () => {
     const re = new RegExp(`(GROUP BY)(\n|.)+("${QueryAlias.AGG_SUB_QUERY_KEYS}"\."e__eval")`);
     expect(re.test(sql[0])).toBeTruthy();
   });
+
+  // T-SQL has no default LIKE escape character, so MssqlFilter escapes wildcards with the
+  // bracket form instead of a backslash, and must leave literal backslashes untouched
+  describe('LIKE filter parameters', () => {
+    const containsParams = async (value: string) => {
+      await compiler.compile();
+
+      const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        filters: [
+          {
+            member: 'visitors.source',
+            operator: 'contains',
+            values: [value],
+          },
+        ],
+        timezone: 'UTC',
+      });
+
+      const [sql, params] = query.buildSqlAndParams();
+
+      expect(sql).toContain('LIKE CONCAT(\'%\', LOWER(@_1) , \'%\')');
+
+      return params;
+    };
+
+    it('escapes wildcards with brackets', async () => {
+      expect(await containsParams('a_b%')).toEqual(['a[_]b[%]']);
+    });
+
+    it('does not escape literal backslashes', async () => {
+      expect(await containsParams('c:\\users')).toEqual(['c:\\users']);
+    });
+  });
 });

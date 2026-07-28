@@ -14,6 +14,15 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class HiveFilter extends BaseFilter {
+  /**
+   * HiveQL's LIKE has no ESCAPE clause, and Hive unescapes only `\%` and `\_` when it
+   * converts the pattern to a regex — a `\\` stays two literal backslashes. So wildcards
+   * still have to be escaped, but the backslash itself must not be.
+   */
+  public escapeWildcardChars(param) {
+    return typeof param === 'string' ? param.replace(/([_%])/gi, '\\$1') : param;
+  }
+
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
