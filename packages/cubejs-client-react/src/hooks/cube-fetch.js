@@ -19,6 +19,7 @@ export function useCubeFetch(method, options = {}) {
   async function load(loadOptions = {}, ignoreSkip = false) {
     const cubeApi = options.cubeApi || context?.cubeApi;
     const query = loadOptions.query || options.query;
+    const onlyViews = 'onlyViews' in loadOptions ? loadOptions.onlyViews : options.onlyViews;
 
     const queryCondition =
       method === 'meta' ? true : query && isQueryPresent(query);
@@ -33,7 +34,8 @@ export function useCubeFetch(method, options = {}) {
       const coreOptions = {
         mutexObj: mutexRef.current,
         mutexKey: method,
-        ...(options.baseRequestId ? { baseRequestId: options.baseRequestId } : {})
+        ...(options.baseRequestId ? { baseRequestId: options.baseRequestId } : {}),
+        ...(method === 'meta' && onlyViews ? { onlyViews: true } : {})
       };
       const args = method === 'meta' ? [coreOptions] : [query, coreOptions];
 
