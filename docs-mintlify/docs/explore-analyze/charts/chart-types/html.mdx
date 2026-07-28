@@ -1,9 +1,9 @@
 ---
 title: HTML
-description: Build fully custom layouts using HTML templates with Handlebars and JavaScript.
+description: Build fully custom layouts using HTML templates with Handlebars.
 ---
 
-HTML charts let you render any layout that Vega-Lite cannot produce — custom scorecards, branded cards, rich tables, or any structure built with HTML, CSS, and JavaScript. Query results are available inside the template via [Handlebars](https://handlebarsjs.com/) expressions.
+HTML charts let you render any layout that Vega-Lite cannot produce — custom scorecards, branded cards, or rich tables built with HTML and CSS. Query results are available inside the template via [Handlebars](https://handlebarsjs.com/) expressions, which are evaluated before the chart is rendered.
 
 ## Variant
 
@@ -15,40 +15,81 @@ A free-form HTML document with Handlebars expressions. Write any markup and bind
 
 ## Template structure
 
-Query results are available in the template context under `result`.
+Query result rows are available as a flat `data` array. Each row is keyed by member name, e.g. `order_items.status`.
 
-**Access the first row** with `result._first`:
+**Access a row by index** with `data.<index>`:
 
 ```html
 <div class="scorecard">
-  <h2>{{result._first.order_items.status}}</h2>
-  <p>{{result._first.order_items.count}} orders</p>
+  <h2>{{data.0.order_items.status}}</h2>
+  <p>{{data.0.order_items.count}} orders</p>
 </div>
 ```
 
-**Iterate over all rows** with `{{#each result.data}}`:
+**Iterate over all rows** with `{{#each data}}`:
 
 ```html
 <ul>
-  {{#each result.data}}
+  {{#each data}}
     <li>{{this.order_items.status}}: {{this.order_items.count}}</li>
   {{/each}}
 </ul>
 ```
 
-## Using JavaScript
+Templates are compiled in strict mode, so referencing a property that doesn't exist raises an error instead of rendering an empty string. If a chart fails to render, check that every path in the template matches a member of the current query.
 
-Standard `<script>` tags are supported, enabling the use of charting libraries (D3, Chart.js, etc.) or any JavaScript that manipulates the rendered DOM.
+<Tip>
+The chart editor includes a **Handlebars reference** panel listing the bindings for your current query. Add `{{json data}}` to a template to inspect the full context.
+</Tip>
+
+### Context
+
+Alongside `data`, the following are available:
+
+| Binding | Description |
+| --- | --- |
+| `data` | Array of result rows, each keyed by member name |
+| `columns` | Array of columns in the result, each with `name` and `title` |
+| `rowCount` | Number of rows in `data` |
+| `columnCount` | Number of columns |
+| `pivot` | Pivot table structure and totals, when the report is pivoted |
+
+## Helpers
+
+In addition to the [built-in Handlebars helpers](https://handlebarsjs.com/guide/builtin-helpers.html), these are available:
+
+| Helper | Description |
+| --- | --- |
+| `formatNumber value "format"` | Format a number using a [d3-format](https://d3js.org/d3-format) string, e.g. `",.2f"` |
+| `formatDate value "format"` | Format a date, e.g. `"yyyy-LL-dd"` |
+| `formatMonth value "format"` | Format a date as a month, e.g. `"LLL yyyy"` |
+| `json value` | Serialize a value as JSON — useful for inspecting the context |
+| `get object "path"` | Read a nested value by dotted path |
+| `entries object` | Turn an object into `key`/`value` pairs for iteration |
+| `concat a b …` | Join values into a single string |
+| `coalesce value fallback` | Use `fallback` when `value` is null or undefined |
+| `eq`, `ne`, `and`, `or` | Comparison and boolean logic for `{{#if}}` blocks |
+| `now` | The current date |
 
 ```html
-<canvas id="myChart"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  const labels = [{{#each result.data}}"{{this.order_items.status}}"{{#unless @last}},{{/unless}}{{/each}}];
-  const data = [{{#each result.data}}{{this.order_items.count}}{{#unless @last}},{{/unless}}{{/each}}];
-  new Chart(document.getElementById('myChart'), {
-    type: 'bar',
-    data: { labels, datasets: [{ data }] }
-  });
-</script>
+<p>{{formatNumber data.0.order_items.count ",.0f"}} orders</p>
+<p>as of {{formatDate now "yyyy-LL-dd"}}</p>
 ```
+
+## Sandboxing
+
+HTML charts render inside a sandboxed iframe with a restrictive [content security policy](https://developer.mozilla.org/docs/Web/HTTP/Guides/CSP). This is intentional: a chart is authored by one user and viewed by others, so templates are not allowed to execute code or reach the network.
+
+Supported:
+
+- HTML markup and inline `<style>` blocks
+- Images and fonts embedded as [`data:` URLs](https://developer.mozilla.org/docs/Web/URI/Reference/Schemes/data)
+- Handlebars expressions, which are evaluated before the iframe is rendered
+
+Not supported:
+
+- `<script>` tags, inline event handlers, and any other JavaScript
+- Stylesheets, scripts, images, and fonts loaded from an external URL, including CDNs
+- Network requests from the template, such as `fetch`
+
+Charting libraries like D3 or Chart.js therefore can't be used in an HTML chart. To visualize data, use one of the [built-in chart types](/docs/explore-analyze/charts/chart-types) or a [custom visualization](/docs/explore-analyze/charts/custom), which lets you edit the Vega-Lite spec directly without custom code.
