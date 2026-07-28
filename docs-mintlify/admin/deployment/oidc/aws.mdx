@@ -643,8 +643,11 @@ caveat when changing it on a config that is already in use.
 
     ```dotenv
     CUBE_CLOUD_MONITORING_AWS_ROLE_ARN=arn:aws:iam::<aws-account-id>:role/<role-name>
-    CUBE_CLOUD_MONITORING_AWS_REGION=<region>
     ```
+
+    Setting the role ARN is what enables keyless authentication. The region for
+    the credential exchange is taken from the sink's own `region`; set
+    `CUBE_CLOUD_MONITORING_AWS_REGION` only to override it.
 
     Then drop the `auth` block from your `vector.toml` — see
     [Integration with Amazon CloudWatch][ref-cloudwatch] for the sink

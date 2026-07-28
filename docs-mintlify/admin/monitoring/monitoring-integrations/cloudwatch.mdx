@@ -85,12 +85,14 @@ Requires [OIDC][ref-oidc] enabled for your tenant with an `AWS` token config.
 
     ```dotenv
     CUBE_CLOUD_MONITORING_AWS_ROLE_ARN=arn:aws:iam::<aws-account-id>:role/<role-name>
-    CUBE_CLOUD_MONITORING_AWS_REGION=us-east-1
     ```
 
-    `CUBE_CLOUD_MONITORING_AWS_REGION` is the region Vector uses for the
-    credential exchange. Set it even if it matches the sink's `region` — without
-    it the exchange fails, and the error is only visible in Vector's own logs.
+    The role ARN is the only required variable — setting it is what turns
+    keyless authentication on.
+
+    The credential exchange also needs a region, which Cube takes from your
+    sink's `region`. Set `CUBE_CLOUD_MONITORING_AWS_REGION` only to override
+    that, for example when the STS region should differ from the sink's.
   </Step>
   <Step title="Drop the auth block from vector.toml">
     Omit `[sinks.*.auth]` entirely so Vector falls back to the AWS SDK's default

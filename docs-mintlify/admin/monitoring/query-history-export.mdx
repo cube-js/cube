@@ -77,6 +77,11 @@ The `aws_s3` sink can also authenticate with the deployment's OIDC identity
 instead of an access key pair — the credentials apply to the whole Vector agent.
 See [Keyless authentication][ref-keyless-auth].
 
+This replaces the `CUBE_CLOUD_MONITORING_AWS_*` pair above, which is Vector's
+**write** path only. The `CUBEJS_DB_DUCKDB_S3_*` variables are separate — they
+belong to the DuckDB data source that reads the exported files back in
+[Data modeling](#data-modeling), and are still required.
+
 </Note>
 
 ## Data modeling
