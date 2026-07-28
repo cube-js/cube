@@ -128,6 +128,94 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
     expect(result.rawData().map((r: any) => r['performance_view.product'])).toEqual(['P1', 'P2']);
   });
 
+  // A month-granularity time dimension over a bounded range — the shape a
+  // dashboard charting these rolling metrics per month sends. Both rollups
+  // are built at `granularity: month` on the same date and the planner picks
+  // them (verified in the schema-compiler Postgres suite), but Cube Store
+  // cannot execute the resulting plan:
+  //
+  //   Internal: Optimizer rule 'optimize_projections' failed
+  //   Schema error: No field named fk_aggregate.sales__r3_amount. Valid
+  //   fields are fk_aggregate.performance_view__date_month,
+  //   fk_aggregate.performance_view__product,
+  //   fk_aggregate.rolling_window_dim__rolling_window.
+  //
+  // The rolling-window CTE groups by (date, product, calc group) and its
+  // consumer projects a strict subset of those group-by columns — it drops
+  // the filter-pinned calc-group column but keeps the aggregate — and the
+  // Cube Store projection optimizer then prunes the aggregate out of the
+  // CTE's schema. The same SQL runs correctly on Postgres, and a plain
+  // rolling measure (no `case` entrypoint, so no calc-group column in the
+  // CTE) at month granularity is served from the same rollup by Cube Store
+  // without trouble.
+  //
+  // FIXME: unskip once Cube Store can execute this projection shape (or the
+  // planner stops projecting filter-pinned calc groups into these CTEs).
+  const MONTH_TIME_DIMENSION: Query['timeDimensions'] = [
+    {
+      dimension: 'performance_view.date',
+      granularity: 'month',
+      dateRange: ['2017-04-01', '2017-06-30'],
+    },
+  ];
+
+  const MONTH_ORDER: Query['order'] = {
+    'performance_view.product': 'asc',
+    'performance_view.date': 'asc',
+  };
+
+  // R3 (trailing 3 month) per month for account A1: P1 sells
+  // 10/20/30/40/50/60 from January to June, P2 sells 5 every month.
+  const EXPECTED_MONTHLY_AMOUNTS = [
+    ['P1', '2017-04-01T00:00:00.000', 90],
+    ['P1', '2017-05-01T00:00:00.000', 120],
+    ['P1', '2017-06-01T00:00:00.000', 150],
+    ['P2', '2017-04-01T00:00:00.000', 15],
+    ['P2', '2017-05-01T00:00:00.000', 15],
+    ['P2', '2017-06-01T00:00:00.000', 15],
+  ];
+
+  function monthlyAmounts(result: any) {
+    return result.rawData().map((r: any) => [
+      r['performance_view.product'],
+      r['performance_view.date.month'],
+      Number(r['performance_view.rolling_amount']),
+    ]);
+  }
+
+  test.skip('single-cube rolling measures with a month time dimension are served from the rollup', async () => {
+    const query: Query = {
+      measures: [
+        'performance_view.rolling_amount',
+        'performance_view.rolling_amount_change',
+      ],
+      dimensions: ['performance_view.product'],
+      timeDimensions: MONTH_TIME_DIMENSION,
+      filters: REPRO_FILTERS,
+      order: MONTH_ORDER,
+    };
+    const result = await client.load(query);
+    expect(usedPreAggregations(result)).toEqual([SALES_ROLLUP]);
+    expect(monthlyAmounts(result)).toEqual(EXPECTED_MONTHLY_AMOUNTS);
+  });
+
+  test.skip('cross-cube rolling measures with a month time dimension are served from both rollups', async () => {
+    const query: Query = {
+      measures: [
+        'performance_view.rolling_amount',
+        'performance_view.rolling_amount_change',
+        'performance_view.rolling_share_change',
+      ],
+      dimensions: ['performance_view.product'],
+      timeDimensions: MONTH_TIME_DIMENSION,
+      filters: REPRO_FILTERS,
+      order: MONTH_ORDER,
+    };
+    const result = await client.load(query);
+    expect(usedPreAggregations(result)).toEqual([SALES_ROLLUP, SHARE_ROLLUP]);
+    expect(monthlyAmounts(result)).toEqual(EXPECTED_MONTHLY_AMOUNTS);
+  });
+
   // Mirrors the production query shape: rolling amount + growth percentage
   // (an extra multi-stage layer over the same rolling leaves) + cross-cube
   // share change. Before the trivial-subquery collapse optimizer in the
