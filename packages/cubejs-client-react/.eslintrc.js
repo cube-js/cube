@@ -20,6 +20,11 @@ module.exports = {
     '@typescript-eslint/no-unused-vars': ['error', { args: 'none', ignoreRestSiblings: true }],
     'no-use-before-define': 0,
     '@typescript-eslint/no-use-before-define': 'error',
+    // The base rules count overload signatures as redeclarations
+    'no-redeclare': 0,
+    '@typescript-eslint/no-redeclare': 'error',
+    'no-dupe-class-members': 0,
+    '@typescript-eslint/no-dupe-class-members': 'error',
     // The hooks shadow `error`/`response`/`options` in inner scopes. They were
     // not linted before (the previous glob only covered `src/*.js`)
     'no-shadow': 0,

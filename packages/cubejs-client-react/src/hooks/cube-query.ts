@@ -1,7 +1,9 @@
 import { useContext, useEffect, useState, useRef } from 'react';
 import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 import type {
+  DeeplyReadonly,
   ProgressResponse,
+  Query,
   QueryRecordType,
   ResultSet,
   UnsubscribeObj,
@@ -10,9 +12,11 @@ import type {
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
 import type {
+  MutexObj,
   ProgressCallback,
   ProgressResultWithResponse,
   ReadonlyQueryInput,
+  UseCubeQueryInternalResult,
   UseCubeQueryOptions,
   UseCubeQueryResult,
 } from '../types';
@@ -22,18 +26,24 @@ export function useCubeQuery<
   QueryInput extends ReadonlyQueryInput = ReadonlyQueryInput
 >(
   query: QueryInput,
+  options?: UseCubeQueryOptions
+): UseCubeQueryResult<QueryInput, unknown extends Data ? QueryRecordType<QueryInput> : Data>;
+
+export function useCubeQuery(
+  query: ReadonlyQueryInput,
   options: UseCubeQueryOptions = {}
-): UseCubeQueryResult<QueryInput, unknown extends Data ? QueryRecordType<QueryInput> : Data> {
-  const mutexRef = useRef({});
-  const [currentQuery, setCurrentQuery] = useState<QueryInput | null>(null);
+): UseCubeQueryInternalResult {
+  const mutexRef = useRef<MutexObj>({});
+  const [currentQuery, setCurrentQuery] = useState<ReadonlyQueryInput | null>(null);
   const [isLoading, setLoading] = useState(!options.skip);
-  const [resultSet, setResultSet] = useState<ResultSet<any> | null>(null);
+  const [resultSet, setResultSet] = useState<ResultSet | null>(null);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const context = useContext(CubeContext);
 
   let subscribeRequest: UnsubscribeObj | null = null;
 
+  // `progressResponse` is not part of the public `ProgressResult` API
   const progressCallback: ProgressCallback = (progressResult) => setProgress(
     (progressResult as unknown as ProgressResultWithResponse).progressResponse
   );
@@ -64,8 +74,8 @@ export function useCubeQuery<
 
       setResultSet(response);
       setProgress(null);
-    } catch (error: any) {
-      setError(error);
+    } catch (error) {
+      setError(error as Error);
       setResultSet(null);
       setProgress(null);
     }
@@ -84,7 +94,11 @@ export function useCubeQuery<
 
     async function loadQuery() {
       if (!skip && isQueryPresent(query)) {
-        if (!areQueriesEqual(currentQuery as any, query as any)) {
+        // `areQueriesEqual` is declared for a single query, and reads no more
+        // than `order` off one when given an array of queries
+        const previousQuery = currentQuery as DeeplyReadonly<Query> | null;
+
+        if (!areQueriesEqual(previousQuery, query as DeeplyReadonly<Query>)) {
           if (resetResultSetOnChange == null || resetResultSetOnChange) {
             setResultSet(null);
           }
@@ -122,8 +136,8 @@ export function useCubeQuery<
           } else {
             await fetch();
           }
-        } catch (e: any) {
-          setError(e);
+        } catch (e) {
+          setError(e as Error);
           setResultSet(null);
           setLoading(false);
           setProgress(null);
@@ -139,11 +153,14 @@ export function useCubeQuery<
         subscribeRequest = null;
       }
     };
-  }, useDeepCompareMemoize([query, Object.keys((query as any)?.order || {}), options, context]));
+    // `order` is read off a single query; an array of queries does not carry it
+  }, useDeepCompareMemoize([
+    query,
+    Object.keys((query as DeeplyReadonly<Query> | undefined)?.order || {}),
+    options,
+    context,
+  ]));
 
-  // `progress` is `null` until the first `Continue wait` message and
-  // `previousQuery` until the first query runs, neither of which the public
-  // result type models
   return {
     isLoading,
     resultSet,
@@ -151,5 +168,5 @@ export function useCubeQuery<
     progress,
     previousQuery: currentQuery,
     refetch: fetch
-  } as UseCubeQueryResult<QueryInput, unknown extends Data ? QueryRecordType<QueryInput> : Data>;
+  };
 }

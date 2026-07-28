@@ -18,6 +18,7 @@ import type {
   DeeplyReadonly,
   DryRunResponse,
   Filter,
+  FilterOperator,
   LoadMethodOptions,
   MemberType,
   Meta,
@@ -25,6 +26,7 @@ import type {
   ProgressResponse,
   Query,
   QueryOrder,
+  RequestError,
   ResultSet,
   SqlQuery,
   TCubeDimension,
@@ -36,6 +38,16 @@ import type {
   TSourceAxis,
   UnaryOperator,
 } from '@cubejs-client/core';
+
+/**
+ * Object the API methods store their MUTEX in.
+ */
+export type MutexObj = NonNullable<LoadMethodOptions['mutexObj']>;
+
+/**
+ * A query as accepted by `useCubeQuery`.
+ */
+export type ReadonlyQueryInput = DeeplyReadonly<Query | Query[]>;
 
 export type CubeProviderOptions = {
   castNumerics?: boolean;
@@ -93,7 +105,7 @@ export type QueryRendererProps = {
  */
 export type QueryRendererState = {
   isLoading?: boolean;
-  error?: (Error & { response?: { plainError?: string } }) | null;
+  error?: RequestError | null;
   sqlQuery?: SqlQuery | null;
   resultSet?: ResultSet | { [key: string]: ResultSet } | null;
   /**
@@ -105,6 +117,18 @@ export type QueryRendererState = {
 
 export type QueryRendererWithTotalsProps = Omit<QueryRendererProps, 'queries' | 'query'> & {
   query: Query;
+};
+
+/**
+ * What `QueryRenderer` passes to its render prop. The public
+ * `QueryRendererRenderProps` declares `resultSet`, `loadingState.isLoading` and
+ * `sqlQuery` as always set, while they are only set once a request resolves.
+ */
+export type QueryRendererLoadState = {
+  error: Error | null;
+  resultSet: ResultSet | { [key: string]: ResultSet } | null | undefined;
+  loadingState: { isLoading?: boolean };
+  sqlQuery: SqlQuery | null | undefined;
 };
 
 export type SchemaChangeProps = {
@@ -220,6 +244,21 @@ export type QueryBuilderStateUpdate = Partial<QueryBuilderInternalState>;
 
 export type QueryMemberType = MemberType | 'timeDimensions';
 
+/**
+ * State `QueryBuilder.resolveMember` resolves members against.
+ */
+export type ResolveMemberArgs = {
+  meta?: Meta;
+  query: Query | Query[];
+};
+
+/**
+ * Resolved query members carry the position they hold in the query.
+ */
+export type IndexedMeasure = TCubeMeasure & { index: number };
+export type IndexedDimension = TCubeDimension & { index: number };
+export type IndexedSegment = TCubeSegment & { index: number };
+
 export type AvailableMembers = {
   measures: AvailableCube<TCubeMeasure>[];
   dimensions: AvailableCube<TCubeDimension>[];
@@ -244,14 +283,33 @@ export type UseCubeQueryOptions = {
   cache?: CacheMode;
 };
 
+/**
+ * `ResultSet` constrains its data to `Record<string, any>`, while `Data` is
+ * unconstrained in the public declaration of `useCubeQuery`.
+ */
+type ResultSetData<Data> = Data extends Record<string, any> ? Data : any;
+
 export type UseCubeQueryResult<QueryInput, Data> = {
   error: Error | null;
   isLoading: boolean;
-  // `Data` is unconstrained to mirror the public declaration, while `ResultSet`
-  // requires a record type
-  resultSet: ResultSet<Data extends Record<string, any> ? Data : any> | null;
+  resultSet: ResultSet<ResultSetData<Data>> | null;
   progress: ProgressResponse;
   previousQuery: QueryInput;
+  refetch: () => Promise<void>;
+};
+
+/**
+ * What `useCubeQuery` builds. Declared separately from the result type above
+ * because `progress` stays `null` until the first `Continue wait` message and
+ * `previousQuery` until the first query runs, neither of which the public
+ * declaration models.
+ */
+export type UseCubeQueryInternalResult = {
+  error: Error | null;
+  isLoading: boolean;
+  resultSet: ResultSet | null;
+  progress: ProgressResponse | null;
+  previousQuery: ReadonlyQueryInput | null;
   refetch: () => Promise<void>;
 };
 
@@ -316,6 +374,28 @@ export type UseCubeFetchResult<T> = CubeFetchResult<T> & {
 };
 
 /**
+ * What `useCubeFetch` returns before the first request resolves, which the
+ * public `CubeFetchResult` type does not model.
+ */
+export type UseCubeFetchInternalResult<T> = CubeFetchState<T> & {
+  error: Error | null;
+  refetch: (options?: UseCubeFetchLoadOptions) => Promise<void>;
+};
+
+/**
+ * Arguments the dispatched `CubeApi` method is called with: `meta` takes only
+ * options, `sql` and `dryRun` take a query as well.
+ */
+export type CubeFetchArgs = [LoadMethodOptions] | [Query | Query[], LoadMethodOptions];
+
+/**
+ * The `CubeApi` method `useCubeFetch` dispatches to. The three methods share
+ * neither their signatures nor their response type, so the response is narrowed
+ * by the caller.
+ */
+export type CubeFetchDispatch = (this: CubeApi, ...args: CubeFetchArgs) => Promise<unknown>;
+
+/**
  * `ProgressResult` keeps `progressResponse` private, but `useCubeQuery` has
  * always read it to expose the raw response.
  */
@@ -330,6 +410,15 @@ export type MemberUpdater<T> = {
   remove: (member: { index: number }) => void;
   update: (member: { index: number }, updateWith: T) => void;
 };
+
+/**
+ * Builds the updater for one kind of query member. `toQuery` turns a member
+ * into its query representation, and defaults to reading its name.
+ */
+export type MemberUpdaterFactory = <Member>(
+  memberType: QueryMemberType | 'filters',
+  toQuery?: (member: Member) => unknown
+) => MemberUpdater<Member>;
 
 export type FilterExtraFields = {
   dimension: TCubeDimension | TCubeMeasure;
@@ -377,6 +466,67 @@ export type FilterUpdateFields = {
 
 export type FilterUpdater = MemberUpdater<FilterUpdateFields>;
 
+/**
+ * The fields `toTimeDimension` reads off a member. The public updater takes
+ * either the ranged or the comparison variant, so both range fields are
+ * optional here.
+ */
+export type TimeDimensionUpdateInput = {
+  granularity?: TimeDimensionGranularity;
+  dateRange?: DateRange;
+  compareDateRange?: Array<DateRange>;
+  dimension: TCubeDimension;
+};
+
+/**
+ * The fields `toFilter` reads off a member. Unlike the public
+ * `FilterUpdateFields`, where `member` is declared as a string, the resolved
+ * member object is what is read here.
+ */
+export type FilterUpdateInput = {
+  member?: TCubeDimension | TCubeMeasure;
+  dimension?: TCubeDimension | TCubeMeasure;
+  operator: BinaryOperator | UnaryOperator;
+  values?: string[];
+};
+
+/**
+ * A time dimension as `QueryBuilder.resolveMember` returns it: the resolved
+ * dimension carries the granularity options the query builder offers.
+ */
+export type ResolvedTimeDimension = Omit<TimeDimension, 'dimension'> & {
+  dimension: TCubeDimension & { granularities: GranularityOption[] };
+  index: number;
+};
+
+/**
+ * A granularity the query builder offers. `name` is left out for the
+ * "w/o grouping" option.
+ */
+export type GranularityOption = {
+  name?: TimeDimensionGranularity;
+  title: string;
+};
+
+/**
+ * Either an `Error` or the `plainError` string from the API response, of which
+ * `fetchMeta` only reads `message`/`toString()`.
+ */
+export type MetaErrorSource = {
+  message?: string;
+  toString(): string;
+};
+
+/**
+ * A filter as it reaches the render props: the resolved member and the
+ * operators available for it, alongside the fields of the query filter.
+ */
+export type ResolvedFilter = Omit<Filter, 'dimension'> & {
+  dimension: TCubeDimension | TCubeMeasure;
+  operators: FilterOperator[];
+  index: number;
+};
+
 export type OrderUpdater = {
   set: (memberId: string, order: QueryOrder | 'none') => void;
   update: (order: Query['order']) => void;
@@ -398,8 +548,3 @@ export type PivotConfigUpdater = {
   moveItem: (args: PivotConfigUpdaterArgs) => void;
   update: (pivotConfig: PivotConfig & PivotConfigExtraUpdateFields) => void;
 };
-
-/**
- * A query as accepted by `useCubeQuery`.
- */
-export type ReadonlyQueryInput = DeeplyReadonly<Query | Query[]>;

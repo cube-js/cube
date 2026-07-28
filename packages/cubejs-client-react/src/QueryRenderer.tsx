@@ -5,6 +5,8 @@ import type { CubeApi, LoadMethodOptions, Query, ResultSet } from '@cubejs-clien
 
 import CubeContext from './CubeContext';
 import type {
+  MutexObj,
+  QueryRendererLoadState,
   QueryRendererProps,
   QueryRendererRenderProps,
   QueryRendererState,
@@ -75,11 +77,11 @@ export default class QueryRenderer extends React.Component<QueryRendererProps, Q
   // `this.context` is typed as `any` by React and holds `CubeContextProps`.
   // It is not re-declared here: a class field would be emitted at runtime and
   // shadow the context React assigns.
-  private mutexObj: Record<string, any>;
+  private mutexObj: MutexObj;
 
   cubeApi(): CubeApi {
     // eslint-disable-next-line react/destructuring-assignment
-    return (this.props.cubeApi || this.context && this.context.cubeApi) as CubeApi;
+    return this.props.cubeApi || this.context && this.context.cubeApi;
   }
 
   load(query: Query | Query[]) {
@@ -146,7 +148,7 @@ export default class QueryRenderer extends React.Component<QueryRendererProps, Q
         mutexObj: this.mutexObj,
         mutexKey: name,
         ...(cache ? { cache } : {}),
-      }).then(r => [name, r] as [string, ResultSet<any>])
+      }).then((r): [string, ResultSet] => [name, r])
     ));
 
     resultPromises
@@ -168,15 +170,15 @@ export default class QueryRenderer extends React.Component<QueryRendererProps, Q
     } = this.state;
     const { render } = this.props;
 
-    const loadState = {
+    const loadState: QueryRendererLoadState = {
       error: error ? new Error(error.response?.plainError || error.message || error.toString()) : null,
       resultSet: queries ? (resultSet || {}) : resultSet,
       loadingState: { isLoading },
       sqlQuery
-    } as QueryRendererRenderProps;
+    };
 
     if (render) {
-      return render(loadState);
+      return render(loadState as QueryRendererRenderProps);
     }
 
     return null;

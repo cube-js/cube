@@ -1,12 +1,16 @@
 import { useContext, useEffect, useState, useRef } from 'react';
 import { isQueryPresent } from '@cubejs-client/core';
-import type { MetaMethodOptions } from '@cubejs-client/core';
+import type { MetaMethodOptions, Query } from '@cubejs-client/core';
 
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
 import type {
+  CubeFetchArgs,
+  CubeFetchDispatch,
   CubeFetchMethod,
   CubeFetchState,
+  MutexObj,
+  UseCubeFetchInternalResult,
   UseCubeFetchLoadOptions,
   UseCubeFetchOptions,
   UseCubeFetchResult,
@@ -14,10 +18,15 @@ import type {
 
 export function useCubeFetch<T>(
   method: CubeFetchMethod,
+  options?: UseCubeFetchOptions
+): UseCubeFetchResult<T>;
+
+export function useCubeFetch<T>(
+  method: CubeFetchMethod,
   options: UseCubeFetchOptions = {}
-): UseCubeFetchResult<T> {
+): UseCubeFetchInternalResult<T> {
   const context = useContext(CubeContext);
-  const mutexRef = useRef({});
+  const mutexRef = useRef<MutexObj>({});
 
   const [response, setResponse] = useState<CubeFetchState<T>>({
     isLoading: false,
@@ -47,21 +56,20 @@ export function useCubeFetch<T>(
         ...(options.baseRequestId ? { baseRequestId: options.baseRequestId } : {}),
         ...(method === 'meta' && onlyViews ? { onlyViews: true } : {})
       };
-      const args = method === 'meta' ? [coreOptions] : [query, coreOptions];
-
-      // `method` is a union of overloaded `CubeApi` methods with different
-      // signatures, so the call is dispatched dynamically
-      const api = cubeApi as any;
+      const args: CubeFetchArgs = method === 'meta' ? [coreOptions] : [query!, coreOptions];
+      // `method` picks between overloaded `CubeApi` methods, so the call is
+      // dispatched dynamically while keeping `cubeApi` as the receiver
+      const fetchMethod = cubeApi[method] as CubeFetchDispatch;
 
       try {
-        const response: T = await api[method](...args);
+        const response = await fetchMethod.apply(cubeApi, args) as T;
 
         setResponse({
           response,
           isLoading: false,
         });
-      } catch (error: any) {
-        setError(error);
+      } catch (error) {
+        setError(error as Error);
         setResponse({
           isLoading: false,
           response: null,
@@ -72,13 +80,16 @@ export function useCubeFetch<T>(
 
   useEffect(() => {
     load();
-  }, useDeepCompareMemoize([Object.keys((options.query as any)?.order || {}), options, context]));
+    // `order` is read off a single query; an array of queries does not carry it
+  }, useDeepCompareMemoize([
+    Object.keys((options.query as Query | undefined)?.order || {}),
+    options,
+    context,
+  ]));
 
-  // `response` is `null` until the first request resolves, which the public
-  // `CubeFetchResult` type does not model
   return {
     ...response,
     error,
     refetch: (options?: UseCubeFetchLoadOptions) => load(options, true),
-  } as UseCubeFetchResult<T>;
+  };
 }

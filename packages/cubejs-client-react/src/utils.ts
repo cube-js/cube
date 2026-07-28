@@ -4,7 +4,7 @@ export function removeEmpty<T>(obj: T): T {
   }
 
   return Object.fromEntries(
-    Object.entries(obj as Record<string, any>)
+    Object.entries(obj as Record<string, unknown>)
       .filter(([, v]) => v != null)
       .map(([k, v]) => {
         if (Array.isArray(v)) {
