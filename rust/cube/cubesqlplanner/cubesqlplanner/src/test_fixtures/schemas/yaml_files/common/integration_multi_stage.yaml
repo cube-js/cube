@@ -82,6 +82,15 @@ cubes:
                 else:
                     label: Other
 
+          # A calc-group (virtual enumeration) dimension used as the switch of
+          # `rolling_amount_switch`: it selects which rolling window the case
+          # measure dispatches to, and carries no stored data.
+          - name: window_kind
+            type: switch
+            values:
+                - R7
+                - YTD
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -454,6 +463,62 @@ cubes:
             rolling_window:
                 trailing: 7 day
                 offset: start
+
+          # Case entrypoint dispatching between two rolling windows on the
+          # `window_kind` calc group: the switch dimension is added to the
+          # grain of the rolling leaves, so every CTE feeding the case must
+          # project it.
+          - name: rolling_amount_switch
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.window_kind}"
+                when:
+                    - value: R7
+                      sql: "{CUBE.rolling_sum_7d}"
+                else:
+                    sql: "{CUBE.total_amount_ytd}"
+
+          # Change-over-prior-period on top of each rolling window: the
+          # arithmetic layer consumes two rolling-window CTEs and partitions
+          # by the grain it is requested at — which, under the case
+          # entrypoint below, includes the `window_kind` calc group.
+          - name: rolling_sum_7d_prev_month
+            type: number
+            multi_stage: true
+            sql: "{CUBE.rolling_sum_7d}"
+            time_shift:
+                - interval: 1 month
+                  type: prior
+
+          - name: rolling_sum_7d_change
+            type: number
+            multi_stage: true
+            sql: "({CUBE.rolling_sum_7d} - {CUBE.rolling_sum_7d_prev_month})"
+
+          - name: total_amount_ytd_prev_year
+            type: number
+            multi_stage: true
+            sql: "{CUBE.total_amount_ytd}"
+            time_shift:
+                - interval: 1 year
+                  type: prior
+
+          - name: total_amount_ytd_change
+            type: number
+            multi_stage: true
+            sql: "({CUBE.total_amount_ytd} - {CUBE.total_amount_ytd_prev_year})"
+
+          - name: rolling_change_switch
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.window_kind}"
+                when:
+                    - value: R7
+                      sql: "{CUBE.rolling_sum_7d_change}"
+                else:
+                    sql: "{CUBE.total_amount_ytd_change}"
 
           - name: total_amount_ytd
             type: sum
