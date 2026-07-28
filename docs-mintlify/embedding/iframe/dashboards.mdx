@@ -37,6 +37,15 @@ Users will be prompted to sign in with their Cube credentials when accessing the
 
 ## Embed with signed embedding
 
+Signed embedding must be allowed on the dashboard first: open the dashboard,
+click **Share** → **Embed**, and turn on **Allow signed embedding**. You can
+also toggle it without opening the UI using the [Cube CLI](/reference/cli):
+
+```bash
+cube embed enable-dashboard YOUR_DASHBOARD_PUBLIC_ID
+cube embed disable-dashboard YOUR_DASHBOARD_PUBLIC_ID
+```
+
 To embed a dashboard for external/customer-facing applications, generate a session on your backend and pass the session ID into the iframe:
 
 ```html
