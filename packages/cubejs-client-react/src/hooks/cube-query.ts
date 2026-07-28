@@ -1,21 +1,42 @@
 import { useContext, useEffect, useState, useRef } from 'react';
 import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
+import type {
+  ProgressResponse,
+  QueryRecordType,
+  ResultSet,
+  UnsubscribeObj,
+} from '@cubejs-client/core';
 
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
+import type {
+  ProgressCallback,
+  ProgressResultWithResponse,
+  ReadonlyQueryInput,
+  UseCubeQueryOptions,
+  UseCubeQueryResult,
+} from '../types';
 
-export function useCubeQuery(query, options = {}) {
+export function useCubeQuery<
+  Data,
+  QueryInput extends ReadonlyQueryInput = ReadonlyQueryInput
+>(
+  query: QueryInput,
+  options: UseCubeQueryOptions = {}
+): UseCubeQueryResult<QueryInput, unknown extends Data ? QueryRecordType<QueryInput> : Data> {
   const mutexRef = useRef({});
-  const [currentQuery, setCurrentQuery] = useState(null);
+  const [currentQuery, setCurrentQuery] = useState<QueryInput | null>(null);
   const [isLoading, setLoading] = useState(!options.skip);
-  const [resultSet, setResultSet] = useState(null);
-  const [progress, setProgress] = useState(null);
-  const [error, setError] = useState(null);
+  const [resultSet, setResultSet] = useState<ResultSet<any> | null>(null);
+  const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const context = useContext(CubeContext);
 
-  let subscribeRequest = null;
+  let subscribeRequest: UnsubscribeObj | null = null;
 
-  const progressCallback = ({ progressResponse }) => setProgress(progressResponse);
+  const progressCallback: ProgressCallback = (progressResult) => setProgress(
+    (progressResult as unknown as ProgressResultWithResponse).progressResponse
+  );
 
   async function fetch() {
     const { resetResultSetOnChange } = options;
@@ -43,7 +64,7 @@ export function useCubeQuery(query, options = {}) {
 
       setResultSet(response);
       setProgress(null);
-    } catch (error) {
+    } catch (error: any) {
       setError(error);
       setResultSet(null);
       setProgress(null);
@@ -63,7 +84,7 @@ export function useCubeQuery(query, options = {}) {
 
     async function loadQuery() {
       if (!skip && isQueryPresent(query)) {
-        if (!areQueriesEqual(currentQuery, query)) {
+        if (!areQueriesEqual(currentQuery as any, query as any)) {
           if (resetResultSetOnChange == null || resetResultSetOnChange) {
             setResultSet(null);
           }
@@ -101,7 +122,7 @@ export function useCubeQuery(query, options = {}) {
           } else {
             await fetch();
           }
-        } catch (e) {
+        } catch (e: any) {
           setError(e);
           setResultSet(null);
           setLoading(false);
@@ -118,8 +139,11 @@ export function useCubeQuery(query, options = {}) {
         subscribeRequest = null;
       }
     };
-  }, useDeepCompareMemoize([query, Object.keys((query && query.order) || {}), options, context]));
+  }, useDeepCompareMemoize([query, Object.keys((query as any)?.order || {}), options, context]));
 
+  // `progress` is `null` until the first `Continue wait` message and
+  // `previousQuery` until the first query runs, neither of which the public
+  // result type models
   return {
     isLoading,
     resultSet,
@@ -127,5 +151,5 @@ export function useCubeQuery(query, options = {}) {
     progress,
     previousQuery: currentQuery,
     refetch: fetch
-  };
+  } as UseCubeQueryResult<QueryInput, unknown extends Data ? QueryRecordType<QueryInput> : Data>;
 }

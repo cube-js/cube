@@ -1,10 +1,10 @@
-export function removeEmpty(obj) {
+export function removeEmpty<T>(obj: T): T {
   if (Array.isArray(obj) || typeof obj !== 'object') {
     return obj;
   }
 
   return Object.fromEntries(
-    Object.entries(obj)
+    Object.entries(obj as Record<string, any>)
       .filter(([, v]) => v != null)
       .map(([k, v]) => {
         if (Array.isArray(v)) {
@@ -13,5 +13,5 @@ export function removeEmpty(obj) {
 
         return [k, typeof v === 'object' ? removeEmpty(v) : v];
       })
-  );
+  ) as T;
 }

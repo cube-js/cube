@@ -1,14 +1,28 @@
 module.exports = {
   extends: 'airbnb',
-  plugins: ['react', 'jsx-a11y', 'import'],
-  parser: '@babel/eslint-parser',
+  plugins: ['react', 'jsx-a11y', 'import', '@typescript-eslint'],
+  parser: '@typescript-eslint/parser',
   parserOptions: {
-    requireConfigFile: false,
-    babelOptions: {
-      parserOpts: { plugins: ['jsx'] },
+    ecmaVersion: 2020,
+    sourceType: 'module',
+    ecmaFeatures: { jsx: true },
+  },
+  settings: {
+    'import/resolver': {
+      node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
     },
   },
   rules: {
+    // Handled by the compiler
+    'no-undef': 0,
+    // Base rules replaced by their TypeScript-aware versions
+    'no-unused-vars': 0,
+    '@typescript-eslint/no-unused-vars': ['error', { args: 'none', ignoreRestSiblings: true }],
+    'no-use-before-define': 0,
+    '@typescript-eslint/no-use-before-define': 'error',
+    // The hooks shadow `error`/`response`/`options` in inner scopes. They were
+    // not linted before (the previous glob only covered `src/*.js`)
+    'no-shadow': 0,
     'object-curly-newline': 0,
     'react/jsx-no-bind': 0,
     'react/jsx-first-prop-new-line': 0,

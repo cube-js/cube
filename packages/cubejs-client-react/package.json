@@ -14,8 +14,10 @@
   "module": "dist/cubejs-client-react.esm.js",
   "types": "index.d.ts",
   "scripts": {
-    "lint": "eslint src/*.js src/*.jsx",
-    "lint:fix": "eslint --fix src/*.js src/*.jsx"
+    "tsc": "tsc --noEmit",
+    "unit": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint --fix src --ext .ts,.tsx"
   },
   "files": [
     "src",
@@ -30,16 +32,18 @@
   },
   "devDependencies": {
     "@babel/core": "^7.13.8",
-    "@babel/eslint-parser": "^7",
     "@types/ramda": "^0.27.40",
     "@types/react": "^16.9.41",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
     "eslint": "^7.21.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-node": "^10.0.0",
-    "eslint-plugin-react": "^7.15.1"
+    "eslint-plugin-react": "^7.15.1",
+    "typescript": "~5.2.2"
   },
   "peerDependencies": {
     "react": ">=16.10.2"

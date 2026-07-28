@@ -1,10 +1,16 @@
 import React from 'react';
 import { equals, toPairs, fromPairs } from 'ramda';
 import { isQueryPresent } from '@cubejs-client/core';
+import type { CubeApi, LoadMethodOptions, Query, ResultSet } from '@cubejs-client/core';
 
 import CubeContext from './CubeContext';
+import type {
+  QueryRendererProps,
+  QueryRendererRenderProps,
+  QueryRendererState,
+} from './types';
 
-export default class QueryRenderer extends React.Component {
+export default class QueryRenderer extends React.Component<QueryRendererProps, QueryRendererState> {
   static contextType = CubeContext;
 
   static defaultProps = {
@@ -19,11 +25,11 @@ export default class QueryRenderer extends React.Component {
   };
 
   // @deprecated use `isQueryPresent` from `@cubejs-client/core`
-  static isQueryPresent(query) {
+  static isQueryPresent(query: Query | Query[]) {
     return isQueryPresent(query);
   }
 
-  constructor(props) {
+  constructor(props: QueryRendererProps) {
     super(props);
     this.state = {};
     this.mutexObj = {};
@@ -39,7 +45,7 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  shouldComponentUpdate(nextProps, nextState) {
+  shouldComponentUpdate(nextProps: QueryRendererProps, nextState: QueryRendererState) {
     const {
       query, queries, render, cubeApi, loadSql, updateOnlyOnStateChange
     } = this.props;
@@ -55,7 +61,7 @@ export default class QueryRenderer extends React.Component {
       || nextProps.updateOnlyOnStateChange !== updateOnlyOnStateChange;
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: QueryRendererProps) {
     const { query, queries } = this.props;
     if (!equals(prevProps.query, query)) {
       this.load(query);
@@ -66,12 +72,17 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  cubeApi() {
+  // `this.context` is typed as `any` by React and holds `CubeContextProps`.
+  // It is not re-declared here: a class field would be emitted at runtime and
+  // shadow the context React assigns.
+  private mutexObj: Record<string, any>;
+
+  cubeApi(): CubeApi {
     // eslint-disable-next-line react/destructuring-assignment
-    return this.props.cubeApi || this.context && this.context.cubeApi;
+    return (this.props.cubeApi || this.context && this.context.cubeApi) as CubeApi;
   }
 
-  load(query) {
+  load(query: Query | Query[]) {
     const { resetResultSetOnChange, cache } = this.props;
     this.setState({
       isLoading: true,
@@ -82,7 +93,7 @@ export default class QueryRenderer extends React.Component {
     const { loadSql } = this.props;
     const cubeApi = this.cubeApi();
 
-    const loadOptions = {
+    const loadOptions: LoadMethodOptions = {
       mutexObj: this.mutexObj,
       mutexKey: 'query',
       ...(cache ? { cache } : {}),
@@ -121,7 +132,7 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  loadQueries(queries) {
+  loadQueries(queries?: { [key: string]: Query }) {
     const cubeApi = this.cubeApi();
     const { resetResultSetOnChange, cache } = this.props;
     this.setState({
@@ -130,12 +141,12 @@ export default class QueryRenderer extends React.Component {
       error: null
     });
 
-    const resultPromises = Promise.all(toPairs(queries).map(
+    const resultPromises = Promise.all(toPairs(queries as { [key: string]: Query }).map(
       ([name, query]) => cubeApi.load(query, {
         mutexObj: this.mutexObj,
         mutexKey: name,
         ...(cache ? { cache } : {}),
-      }).then(r => [name, r])
+      }).then(r => [name, r] as [string, ResultSet<any>])
     ));
 
     resultPromises
@@ -162,7 +173,7 @@ export default class QueryRenderer extends React.Component {
       resultSet: queries ? (resultSet || {}) : resultSet,
       loadingState: { isLoading },
       sqlQuery
-    };
+    } as QueryRendererRenderProps;
 
     if (render) {
       return render(loadState);
