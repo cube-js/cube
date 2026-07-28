@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.70](https://github.com/cube-js/cube/compare/v1.6.69...v1.6.70) (2026-07-28)
+
+### Bug Fixes
+
+- **athena-driver:** Correct SQL parameter escaping ([#11370](https://github.com/cube-js/cube/issues/11370)) ([5d28530](https://github.com/cube-js/cube/commit/5d28530e91a608eba85198735496bd76d66122c9))
+- **cubesql:** Bound Bind/Parse parameter allocations in PG wire protocol ([#11341](https://github.com/cube-js/cube/issues/11341)) ([6b94612](https://github.com/cube-js/cube/commit/6b94612f1918c83d83faca721f7e268740accbac))
+- **cubesql:** Bound PostgreSQL packet sizes ([#11339](https://github.com/cube-js/cube/issues/11339)) ([2d20dda](https://github.com/cube-js/cube/commit/2d20ddad6cbec4d7b3b9b771b73fda9b920f7860))
+- **pinot/dremio/ksql/databriks/hive/jdbc-driver:** Сorrect SQL parameter escaping ([#11374](https://github.com/cube-js/cube/issues/11374)) ([e77c444](https://github.com/cube-js/cube/commit/e77c44471a720d31b29c7741a8a6040ec5836739))
+- **trino/prestodb-driver:** Сorrect SQL parameter escaping ([#11345](https://github.com/cube-js/cube/issues/11345)) ([20931ca](https://github.com/cube-js/cube/commit/20931cafbb115bd37dc90b94dbd171f4d15ba7ab))
+
 ## [1.6.69](https://github.com/cube-js/cube/compare/v1.6.68...v1.6.69) (2026-07-10)
 
 ### Bug Fixes
