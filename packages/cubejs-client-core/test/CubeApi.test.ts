@@ -504,6 +504,34 @@ describe('CubeApi cubeSql', () => {
       cubeApi.cubeSql('SELECT created_date FROM deals')
     ).rejects.toThrow('Post-Processing Error: Cast error: Error parsing \'2026-05-01\' as timestamp');
   });
+
+  // Regression: a large result returned in a single data chunk must not be spread
+  // into `rows.push(...)` — beyond ~123k elements that overflows V8's argument-count
+  // limit with "RangeError: Maximum call stack size exceeded".
+  test('should handle a large single-chunk result without a call-stack overflow', async () => {
+    const rowCount = 130000;
+    const largeResponseBody = [
+      JSON.stringify({ schema: [{ name: 'id', column_type: 'Int64' }] }),
+      JSON.stringify({ data: Array.from({ length: rowCount }, (_, i) => [String(i)]) }),
+    ].join('\n');
+
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: largeResponseBody })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.cubeSql('SELECT id FROM big_table');
+    expect(res.data).toHaveLength(rowCount);
+    expect(res.data[0]).toEqual(['0']);
+    expect(res.data[rowCount - 1]).toEqual([String(rowCount - 1)]);
+  });
 });
 
 describe('CubeApi with baseRequestId', () => {
