@@ -40,4 +40,14 @@ export class AWSElasticSearchQuery extends ElasticSearchQuery {
   public override unixTimestampSql() {
     return 'EXTRACT(EPOCH FROM NOW())';
   }
+
+  public override sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // Unlike Elasticsearch's own SQL, the Open Distro / OpenSearch dialect follows MySQL and
+    // treats `\` as the default LIKE escape character, so restore the escape char that
+    // ElasticSearchQuery drops. AWSElasticSearchQueryFilter keeps the inherited
+    // BaseFilter.escapeWildcardChars for the same reason.
+    templates.filters.like_escape_char = '\\';
+    return templates;
+  }
 }

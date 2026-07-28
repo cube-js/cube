@@ -36,25 +36,44 @@ describe('DruidQuery', () => {
     })
     `, {});
 
+  const likeQuery = (operator: string, value: string) => new DruidQuery(
+    { joinGraph, cubeEvaluator, compiler },
+    {
+      measures: [],
+      filters: [
+        {
+          member: 'visitors.name',
+          operator,
+          values: [value],
+        },
+      ],
+    },
+  );
+
   it('druid query like test',
     () => compiler.compile().then(() => {
-      const query = new DruidQuery(
-        { joinGraph, cubeEvaluator, compiler },
-        {
-          measures: [],
-          filters: [
-            {
-              member: 'visitors.name',
-              operator: 'contains',
-              values: [
-                'demo',
-              ],
-            },
-          ],
-        },
+      const queryAndParams = likeQuery('contains', 'demo').buildSqlAndParams();
+      expect(queryAndParams[0]).toContain('LIKE CONCAT(\'%\', LOWER(?), \'%\') ESCAPE \'\\\')');
+    }));
+
+  // Druid SQL is Calcite-based: without the ESCAPE clause above there is no escape character at
+  // all, so the `\` BaseFilter.escapeWildcardChars binds would stay a literal backslash
+  it('druid query escapes LIKE wildcards in filter parameters',
+    () => compiler.compile().then(() => {
+      expect(likeQuery('contains', 'a_b%').buildSqlAndParams()[1]).toEqual(['a\\_b\\%']);
+      expect(likeQuery('startsWith', '100%').buildSqlAndParams()[1]).toEqual(['100\\%']);
+      expect(likeQuery('endsWith', 'c:\\users').buildSqlAndParams()[1]).toEqual(['c:\\\\users']);
+    }));
+
+  it('druid query renders an ESCAPE clause for the native planner too',
+    () => compiler.compile().then(() => {
+      const templates = likeQuery('contains', 'demo').sqlTemplates();
+      expect(templates.filters.like_escape_char).toEqual('\\');
+      expect(templates.filters.like_pattern).toContain('ESCAPE \'\\\'');
+      // Druid has no ILIKE, LOWER() on both sides stands in for it
+      expect(templates.tesseract.ilike).toEqual(
+        'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}'
       );
-      const queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('LIKE CONCAT(\'%\', LOWER(?), \'%\'))');
     }));
 
   it('druid query timezone shift test', () => compiler.compile().then(() => {

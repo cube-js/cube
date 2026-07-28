@@ -17,10 +17,16 @@ class KsqlFilter extends BaseFilter {
     super(query, filter);
   }
 
+  /**
+   * ksqlDB's grammar spells the predicate `NOT? LIKE pattern (ESCAPE escape=STRING)?` and has
+   * no default escape character, so the ESCAPE clause is required for
+   * BaseFilter.escapeWildcardChars to have any effect. A backslash is plain data inside a
+   * ksqlDB string literal, so `'\'` is a single-character escape.
+   */
   public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
+    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}') ESCAPE '\\'`;
   }
 }
 
@@ -85,6 +91,15 @@ export class KsqlQuery extends BaseQuery {
 
   public partitionInvalidateKeyQueries(_cube: string, _preAggregation: any) {
     return [];
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // ksqlDB has no default LIKE escape character, so `filters.like_escape_char` only takes
+    // effect with an explicit ESCAPE clause, as in KsqlFilter.likeIgnoreCase. It binds to the
+    // whole right operand.
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, {{ value }}, {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
+    return templates;
   }
 
   public preAggregationStartEndQueries(cube: string, preAggregation: any) {

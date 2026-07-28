@@ -13,10 +13,18 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class DremioFilter extends BaseFilter {
+  /**
+   * ILIKE(<expression>, <pattern> [, <escape_character>]) → boolean
+   * Dremio's ILIKE is a function, not an operator, so `NOT` negates the call from the outside
+   * and the escape character is its optional third argument — without it
+   * BaseFilter.escapeWildcardChars has no effect, as ILIKE has no default escape character.
+   * The 3-arg form is documented for Dremio Cloud and for Software down to 24.3.x.
+   * @see https://docs.dremio.com/cloud/reference/sql/sql-functions/functions/ILIKE/
+   */
   likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return ` ILIKE (${column}${not ? ' NOT' : ''}, CONCAT('${p}', ${this.allocateParam(param)}, '${s}'))`;
+    return `${not ? 'NOT ' : ''}ILIKE(${column}, CONCAT('${p}', ${this.allocateParam(param)}, '${s}'), '\\')`;
   }
 
   castParameter() {
@@ -165,6 +173,10 @@ class DremioQuery extends BaseQuery {
     templates.functions.DATEDIFF = 'DATE_DIFF(DATE, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
     templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
     templates.quotes.identifiers = '"';
+    // Dremio's ILIKE is a function whose optional third argument is the escape character, so
+    // `filters.like_escape_char` cannot be emitted as an ESCAPE clause. Mirror
+    // DremioFilter.likeIgnoreCase instead.
+    templates.tesseract.ilike = '{% if negated %}NOT {% endif %}ILIKE({{ expr }}, {{ pattern }}, \'\\\')';
     return templates;
   }
 }

@@ -84,4 +84,15 @@ export class SqliteQuery extends BaseQuery {
     // eslint-disable-next-line quotes
     return `strftime('%s','now')`;
   }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // SQLite has no ILIKE, case insensitivity comes from COLLATE NOCASE as in SqliteFilter.
+    templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    // SQLite has no default LIKE escape character, so `filters.like_escape_char` only takes
+    // effect with an explicit ESCAPE clause. Both bind to the whole right operand, so ESCAPE
+    // has to follow COLLATE NOCASE.
+    templates.filters.like_pattern = `${templates.filters.like_pattern} COLLATE NOCASE ESCAPE '\\'`;
+    return templates;
+  }
 }

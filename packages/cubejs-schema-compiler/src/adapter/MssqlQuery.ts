@@ -249,6 +249,12 @@ export class MssqlQuery extends BaseQuery {
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     delete templates.expressions.ilike;
+    // T-SQL has neither ILIKE nor `||` for concatenation, so mirror MssqlFilter.likeIgnoreCase.
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    // MssqlFilter escapes wildcards with the T-SQL bracket form (`a[_]b`), which can't be
+    // expressed as a single escape character, so the native planner uses the equivalent
+    // ESCAPE form instead — T-SQL has no default LIKE escape character.
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.types.string = 'VARCHAR';

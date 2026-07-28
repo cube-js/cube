@@ -117,6 +117,10 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.join_types.full = 'FULL';
+    // Snowflake has no default LIKE escape character, so `filters.like_escape_char` only takes
+    // effect with an explicit ESCAPE clause, which binds to the whole right operand. The escape
+    // character is doubled for the same reason as in SnowflakeFilter.likeIgnoreCase above.
+    templates.filters.like_pattern = `${templates.filters.like_pattern} ESCAPE '\\\\'`;
     delete templates.types.interval;
     return templates;
   }

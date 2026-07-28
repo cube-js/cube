@@ -138,4 +138,27 @@ describe('QuestQuery', () => {
 
       expect(queryAndParams[0]).toContain('ILIKE \'%\' || $1 || \'%\'');
     }));
+
+  // QuestDB has no ESCAPE clause because a backslash is always the escape character: its
+  // LIKE/ILIKE pattern-to-regex conversion (AbstractLikeStrFunctionFactory.escapeSpecialChars)
+  // reads `\%`, `\_` and `\\` as the literal character, and rejects a pattern that ends with a
+  // lone `\`. So the base BaseFilter.escapeWildcardChars is already dialect-correct here.
+  it('test query like escapes wildcards',
+    () => compiler.compile().then(() => {
+      const likeParams = (value: string) => new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        filters: [
+          {
+            member: 'visitors.name',
+            operator: 'contains',
+            values: [value],
+          },
+        ],
+      }).buildSqlAndParams()[1];
+
+      expect(likeParams('a_b%')).toEqual(['a\\_b\\%']);
+      expect(likeParams('c:\\users')).toEqual(['c:\\\\users']);
+      // a trailing backslash would otherwise raise "LIKE pattern must not end with escape character"
+      expect(likeParams('temp\\')).toEqual(['temp\\\\']);
+    }));
 });

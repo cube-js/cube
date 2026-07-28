@@ -114,6 +114,17 @@ export class HiveQuery extends BaseQuery {
     return 'unix_timestamp()';
   }
 
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // Hive needs `%` and `_` escaped but the backslash itself left alone, as in
+    // HiveFilter.escapeWildcardChars above. The native planner always escapes its escape
+    // character too, so Hive can't be expressed as a single escape character: drop it rather
+    // than turn `c:\users` into an unmatchable `c:\\users`. Wildcards in filter values stay
+    // wildcards under Tesseract on Hive until this is expressible.
+    delete templates.filters.like_escape_char;
+    return templates;
+  }
+
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }

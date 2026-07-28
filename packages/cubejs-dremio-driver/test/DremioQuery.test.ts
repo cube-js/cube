@@ -118,4 +118,49 @@ cube(\`sales\`, {
       '("sales".sales_datetime >= TO_TIMESTAMP(?, \'YYYY-MM-DD"T"HH24:MI:SS.FFF\') AND "sales".sales_datetime <= TO_TIMESTAMP(?, \'YYYY-MM-DD"T"HH24:MI:SS.FFF\'))'
     );
   }));
+
+  const likeQuery = (operator: string, value: string) => new DremioQuery(
+    { joinGraph, cubeEvaluator, compiler },
+    {
+      measures: ['sales.count'],
+      filters: [
+        {
+          member: 'sales.category',
+          operator,
+          values: [value],
+        },
+      ],
+    }
+  );
+
+  // Dremio's ILIKE is a function: `NOT` cannot sit inside the argument list and the escape
+  // character is the third argument, without which the `\` BaseFilter.escapeWildcardChars binds
+  // would stay a literal backslash
+  it('should call ILIKE as a function with an escape character', () => compiler.compile().then(() => {
+    const [sql, params] = likeQuery('contains', 'demo').buildSqlAndParams();
+
+    expect(sql).toContain('ILIKE("sales".category, CONCAT(\'%\', ?, \'%\'), \'\\\')');
+    expect(params).toEqual(['demo']);
+  }));
+
+  it('should negate the whole ILIKE call', () => compiler.compile().then(() => {
+    const [sql] = likeQuery('notContains', 'demo').buildSqlAndParams();
+
+    expect(sql).toContain('NOT ILIKE("sales".category, CONCAT(\'%\', ?, \'%\'), \'\\\')');
+  }));
+
+  it('should escape LIKE wildcards in filter parameters', () => compiler.compile().then(() => {
+    expect(likeQuery('contains', 'a_b%').buildSqlAndParams()[1]).toEqual(['a\\_b\\%']);
+    expect(likeQuery('startsWith', '100%').buildSqlAndParams()[1]).toEqual(['100\\%']);
+    expect(likeQuery('endsWith', 'c:\\users').buildSqlAndParams()[1]).toEqual(['c:\\\\users']);
+  }));
+
+  it('should pass the escape character to ILIKE for the native planner too', () => compiler.compile().then(() => {
+    const templates = likeQuery('contains', 'demo').sqlTemplates();
+
+    expect(templates.filters.like_escape_char).toEqual('\\');
+    expect(templates.tesseract.ilike).toEqual(
+      '{% if negated %}NOT {% endif %}ILIKE({{ expr }}, {{ pattern }}, \'\\\')'
+    );
+  }));
 });

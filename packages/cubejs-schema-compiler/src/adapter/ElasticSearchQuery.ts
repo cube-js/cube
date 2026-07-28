@@ -20,6 +20,17 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ElasticSearchQueryFilter extends BaseFilter {
+  /**
+   * `contains` is rendered as a full-text MATCH() below, where `%` and `_` are not wildcards
+   * and a backslash is ordinary data — escaping only corrupts the search term. The
+   * `starts`/`ends` branches do render LIKE, and Elasticsearch SQL has no default LIKE escape
+   * character, so escaping there needs an ESCAPE clause that the SQL they emit cannot carry
+   * while it is malformed (a stray `WHERE`, an unquoted `%`).
+   */
+  public escapeWildcardChars(param) {
+    return param;
+  }
+
   public likeIgnoreCase(column, not, param, type) {
     if (type === 'starts') {
       return `${not ? ' NOT' : ''} WHERE ${column} LIKE ${this.allocateParam(param)}%`;
@@ -153,5 +164,14 @@ export class ElasticSearchQuery extends BaseQuery {
 
   public override escapeColumnName(name) {
     return `${name}`;
+  }
+
+  public override sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // Nothing to escape with, for the reasons in ElasticSearchQueryFilter.escapeWildcardChars.
+    // Wildcards in filter values stay wildcards under Tesseract here, as they already do in the
+    // JS planner.
+    delete templates.filters.like_escape_char;
+    return templates;
   }
 }

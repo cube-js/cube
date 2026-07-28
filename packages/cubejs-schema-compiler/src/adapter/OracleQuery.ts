@@ -188,6 +188,16 @@ export class OracleQuery extends BaseQuery {
     return `((cast (systimestamp at time zone 'UTC' as date) - date '1970-01-01') * 86400)`;
   }
 
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // Oracle has no ILIKE. Case sensitivity is left as is to match OracleFilter.likeIgnoreCase.
+    templates.tesseract.ilike = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    // Oracle has no default LIKE escape character, so `filters.like_escape_char` only takes
+    // effect with an explicit ESCAPE clause, which binds to the whole right operand.
+    templates.filters.like_pattern = `${templates.filters.like_pattern} ESCAPE '\\'`;
+    return templates;
+  }
+
   public preAggregationTableName(cube, preAggregationName, skipSchema) {
     const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
     if (name.length > 128) {

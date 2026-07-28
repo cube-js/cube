@@ -149,6 +149,12 @@ export class PinotQuery extends BaseQuery {
       '{% if limit %}\nLIMIT {{ limit }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.timestamp_literal = `fromDateTime('{{ value }}', ${DATE_TIME_FORMAT})`;
+    // Pinot has neither ILIKE nor a default LIKE escape character, so mirror
+    // PinotFilter.likeIgnoreCase: case insensitivity comes from LOWER() on both sides and
+    // `filters.like_escape_char` only takes effect through an explicit ESCAPE clause, which
+    // binds to the whole right operand and so cannot sit inside LOWER().
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.quotes.identifiers = '"';

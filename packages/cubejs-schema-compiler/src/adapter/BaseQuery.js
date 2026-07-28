@@ -4412,6 +4412,11 @@ export class BaseQuery {
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
         like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
+        // Character the native planner escapes `%`/`_`/itself with in LIKE filter values,
+        // the Tesseract counterpart of BaseFilter.escapeWildcardChars. Dialects without a
+        // default LIKE escape character have to emit an ESCAPE clause for it to take effect,
+        // and dialects that can't express single-character escaping delete it (see HiveQuery).
+        like_escape_char: '\\',
         always_true: '1 = 1'
 
       },

@@ -76,4 +76,18 @@ describe('PrestodbQuery', () => {
     expect(sql).toContain("ESCAPE '\\'");
     expect(params).toEqual(['folder\\\\name\\_\\%']);
   });
+
+  // Presto relies on the base `like_escape_char` rather than re-declaring it, so the ESCAPE
+  // clause in `like_pattern` above and the character the planner escapes with stay in sync
+  it('inherits the escape character for the native planner', async () => {
+    await compiler.compile();
+
+    const query = new PrestodbQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['boolean_dimension.count'],
+      timezone: 'UTC',
+    });
+
+    expect(query.sqlTemplates().filters.like_escape_char).toEqual('\\');
+    expect(query.sqlTemplates().filters.like_pattern).toContain("ESCAPE '\\'");
+  });
 });

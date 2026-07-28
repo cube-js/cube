@@ -928,4 +928,31 @@ describe('OracleQuery', () => {
     expect(sql).toContain('LIKE \'%\' || ? || \'%\' ESCAPE \'\\\'');
     expect(params).toEqual(['folder\\\\name\\_\\%']);
   });
+
+  // startsWith/endsWith are rendered by the same likeIgnoreCase, so their values have to be
+  // escaped too. A raw value ending in a backslash under the ESCAPE clause raises
+  // ORA-01424: missing or illegal character following the escape character.
+  it('escapes endsWith values, they land under the same ESCAPE clause', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: ['visitors.count'],
+        filters: [
+          {
+            member: 'visitors.source',
+            operator: 'endsWith',
+            values: ['temp\\']
+          }
+        ],
+        timezone: 'UTC'
+      }
+    );
+
+    const [sql, params] = query.buildSqlAndParams();
+
+    expect(sql).toContain('LIKE \'%\' || ? ESCAPE \'\\\'');
+    expect(params).toEqual(['temp\\\\']);
+  });
 });

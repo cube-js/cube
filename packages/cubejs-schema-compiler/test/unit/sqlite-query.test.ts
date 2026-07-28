@@ -46,4 +46,28 @@ describe('SqliteQuery', () => {
     expect(sql).toContain("LIKE '%' || ? || '%' COLLATE NOCASE ESCAPE '\\'");
     expect(params).toEqual(['folder\\\\name\\_\\%']);
   });
+
+  // startsWith/endsWith are rendered by the same likeIgnoreCase, so their values have to be
+  // escaped too. With a raw value the ESCAPE clause would read the `\t` of 'C:\temp' as an
+  // escaped `t` and silently match 'C:temp%' instead.
+  it('escapes startsWith values, they land under the same ESCAPE clause', async () => {
+    await compiler.compile();
+
+    const query = new SqliteQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['visitors.count'],
+      filters: [
+        {
+          member: 'visitors.source',
+          operator: 'startsWith',
+          values: ['C:\\temp'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+
+    const [sql, params] = query.buildSqlAndParams();
+
+    expect(sql).toContain("LIKE ? || '%' COLLATE NOCASE ESCAPE '\\'");
+    expect(params).toEqual(['C:\\\\temp']);
+  });
 });

@@ -114,7 +114,15 @@ export class BaseFilter extends BaseDimension {
   }
 
   public isWildcardOperator() {
-    return this.camelizeOperator === 'contains' || this.camelizeOperator === 'notContains';
+    // All LIKE-based operators need wildcard chars escaped in user values
+    return (
+      this.camelizeOperator === 'contains' ||
+      this.camelizeOperator === 'notContains' ||
+      this.camelizeOperator === 'startsWith' ||
+      this.camelizeOperator === 'notStartsWith' ||
+      this.camelizeOperator === 'endsWith' ||
+      this.camelizeOperator === 'notEndsWith'
+    );
   }
 
   public filterParams() {
