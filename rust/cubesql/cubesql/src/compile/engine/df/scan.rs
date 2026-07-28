@@ -905,14 +905,32 @@ async fn load_data(
             })?;
 
         if let Some(data) = result.into_iter().next() {
+            // Mirror the result freshness metadata onto the span. The schema
+            // metadata only survives while this scan's batch is the root of the
+            // plan — any post-processing DataFusion node on top (a calculated
+            // projection over MEASURE(), a sort, a filter) builds its own schema
+            // and drops it. The span outlives the whole plan, so consumers that
+            // report freshness read it from there instead.
             if let Some(span_id) = &span_id {
-                if let Some(last_refresh_time) = data.schema().metadata().get("lastRefreshTime") {
+                let schema = data.schema();
+                let metadata = schema.metadata();
+
+                if let Some(last_refresh_time) = metadata.get("lastRefreshTime") {
                     if let Ok(last_refresh_time) = DateTime::parse_from_rfc3339(last_refresh_time) {
                         span_id
                             .set_last_refresh_time(last_refresh_time.with_timezone(&Utc))
                             .await;
                     }
                 }
+
+                span_id
+                    .set_external(
+                        metadata
+                            .get("external")
+                            .map(|v| v == "true")
+                            .unwrap_or(false),
+                    )
+                    .await;
             }
 
             match (options.max_records, data.num_rows()) {
