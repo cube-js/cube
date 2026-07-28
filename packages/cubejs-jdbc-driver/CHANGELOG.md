@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.4](https://github.com/cube-js/cube/compare/v1.4.3...v1.4.4) (2026-07-28)
+
+### Bug Fixes
+
+- **pinot/dremio/ksql/databriks/hive/jdbc-driver:** Сorrect SQL parameter escaping ([#11374](https://github.com/cube-js/cube/issues/11374)) ([e31ccf0](https://github.com/cube-js/cube/commit/e31ccf0e040bf6df0a0898797552302352b0aa99))
+
 ## [1.4.3](https://github.com/cube-js/cube/compare/v1.4.2...v1.4.3) (2026-06-08)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver

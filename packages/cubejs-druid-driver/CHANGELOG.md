@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.4](https://github.com/cube-js/cube/compare/v1.4.3...v1.4.4) (2026-07-28)
+
+### Bug Fixes
+
+- **schema-compiler:** Escape LIKE wildcards on Tesseract for all dialects ([0432799](https://github.com/cube-js/cube/commit/04327997e013d11432b007710db51913875680ab)), closes [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [#10862](https://github.com/cube-js/cube/issues/10862) [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [opensearch-project/sql#779](https://github.com/opensearch-project/sql/issues/779) [#11345](https://github.com/cube-js/cube/issues/11345)
+
 ## [1.4.3](https://github.com/cube-js/cube/compare/v1.4.2...v1.4.3) (2026-06-08)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver

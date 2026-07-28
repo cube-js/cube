@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.4](https://github.com/cube-js/cube/compare/v1.4.3...v1.4.4) (2026-07-28)
+
+### Bug Fixes
+
+- **cubesql:** Bound Bind/Parse parameter allocations in PG wire protocol ([#11341](https://github.com/cube-js/cube/issues/11341)) ([2301f3f](https://github.com/cube-js/cube/commit/2301f3f3af4a1b0baa0163b2fa3dc2818dfbfc3e))
+- **cubesql:** Bound PostgreSQL packet sizes ([#11339](https://github.com/cube-js/cube/issues/11339)) ([34fa1b0](https://github.com/cube-js/cube/commit/34fa1b00a35672cb5b02e6b0e02611948cc9810d))
+
 ## [1.4.3](https://github.com/cube-js/cube/compare/v1.4.2...v1.4.3) (2026-06-08)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

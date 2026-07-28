@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.4](https://github.com/cube-js/cube/compare/v1.4.3...v1.4.4) (2026-07-28)
+
+### Bug Fixes
+
+- **schema-compiler:** Don't escape backslashes in Hive LIKE filter params ([5ed14f8](https://github.com/cube-js/cube/commit/5ed14f81c3ecc07274f45b0b2d5464df57e22884)), closes [#11345](https://github.com/cube-js/cube/issues/11345) [pre-#11345](https://github.com/pre-/issues/11345)
+- **schema-compiler:** Emit ESCAPE for Oracle/SQLite LIKE filters ([30a2057](https://github.com/cube-js/cube/commit/30a2057b5b41cb4b5d9d178e90441262906110eb)), closes [#11345](https://github.com/cube-js/cube/issues/11345) [#11177](https://github.com/cube-js/cube/issues/11177)
+- **schema-compiler:** Escape LIKE wildcards on Tesseract for all dialects ([0432799](https://github.com/cube-js/cube/commit/04327997e013d11432b007710db51913875680ab)), closes [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [#10862](https://github.com/cube-js/cube/issues/10862) [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [#11345](https://github.com/cube-js/cube/issues/11345) [opensearch-project/sql#779](https://github.com/opensearch-project/sql/issues/779) [#11345](https://github.com/cube-js/cube/issues/11345)
+- **trino/prestodb-driver:** Сorrect SQL parameter escaping ([#11345](https://github.com/cube-js/cube/issues/11345)) ([2d9fc6d](https://github.com/cube-js/cube/commit/2d9fc6ddbfc381ca8dfe6199e4595fa1b5208280))
+
 ## [1.4.3](https://github.com/cube-js/cube/compare/v1.4.2...v1.4.3) (2026-06-08)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
