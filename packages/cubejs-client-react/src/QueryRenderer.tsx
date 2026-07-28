@@ -1,10 +1,23 @@
 import React from 'react';
 import { equals, toPairs, fromPairs } from 'ramda';
 import { isQueryPresent } from '@cubejs-client/core';
+import type { CubeApi, LoadMethodOptions, Query, ResultSet } from '@cubejs-client/core';
 
 import CubeContext from './CubeContext';
+import type {
+  MutexObj,
+  QueryRendererLoadState,
+  QueryRendererProps,
+  QueryRendererRenderProps,
+  QueryRendererState,
+} from './types';
 
-export default class QueryRenderer extends React.Component {
+/**
+ * `<QueryRenderer />` a react component that accepts a query, fetches the given query, and uses the render prop to render the resulting data
+ * @stickyTypes QueryRendererProps, QueryRendererRenderProps
+ * @noInheritDoc
+ */
+export default class QueryRenderer extends React.Component<QueryRendererProps, QueryRendererState> {
   static contextType = CubeContext;
 
   static defaultProps = {
@@ -19,11 +32,11 @@ export default class QueryRenderer extends React.Component {
   };
 
   // @deprecated use `isQueryPresent` from `@cubejs-client/core`
-  static isQueryPresent(query) {
+  static isQueryPresent(query: Query | Query[]) {
     return isQueryPresent(query);
   }
 
-  constructor(props) {
+  constructor(props: QueryRendererProps) {
     super(props);
     this.state = {};
     this.mutexObj = {};
@@ -39,7 +52,7 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  shouldComponentUpdate(nextProps, nextState) {
+  shouldComponentUpdate(nextProps: QueryRendererProps, nextState: QueryRendererState) {
     const {
       query, queries, render, cubeApi, loadSql, updateOnlyOnStateChange
     } = this.props;
@@ -55,7 +68,7 @@ export default class QueryRenderer extends React.Component {
       || nextProps.updateOnlyOnStateChange !== updateOnlyOnStateChange;
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: QueryRendererProps) {
     const { query, queries } = this.props;
     if (!equals(prevProps.query, query)) {
       this.load(query);
@@ -66,12 +79,22 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  cubeApi() {
+  // These sit after the lifecycle methods because `react/sort-comp` sorts
+  // TypeScript field declarations into `everything-else`, which the configured
+  // order puts after `lifecycle`. Runtime is unaffected: field initializers run
+  // right after `super()`, so the constructor's assignments still win.
+  //
+  // `this.context` is not re-declared: React types it as `any`, and a field
+  // declaration would be emitted at runtime and shadow the context React
+  // assigns.
+  private mutexObj: MutexObj;
+
+  cubeApi(): CubeApi {
     // eslint-disable-next-line react/destructuring-assignment
     return this.props.cubeApi || this.context && this.context.cubeApi;
   }
 
-  load(query) {
+  load(query: Query | Query[]) {
     const { resetResultSetOnChange, cache } = this.props;
     this.setState({
       isLoading: true,
@@ -82,7 +105,7 @@ export default class QueryRenderer extends React.Component {
     const { loadSql } = this.props;
     const cubeApi = this.cubeApi();
 
-    const loadOptions = {
+    const loadOptions: LoadMethodOptions = {
       mutexObj: this.mutexObj,
       mutexKey: 'query',
       ...(cache ? { cache } : {}),
@@ -121,7 +144,7 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  loadQueries(queries) {
+  loadQueries(queries?: { [key: string]: Query }) {
     const cubeApi = this.cubeApi();
     const { resetResultSetOnChange, cache } = this.props;
     this.setState({
@@ -130,12 +153,12 @@ export default class QueryRenderer extends React.Component {
       error: null
     });
 
-    const resultPromises = Promise.all(toPairs(queries).map(
+    const resultPromises = Promise.all(toPairs(queries as { [key: string]: Query }).map(
       ([name, query]) => cubeApi.load(query, {
         mutexObj: this.mutexObj,
         mutexKey: name,
         ...(cache ? { cache } : {}),
-      }).then(r => [name, r])
+      }).then((r): [string, ResultSet] => [name, r])
     ));
 
     resultPromises
@@ -157,7 +180,7 @@ export default class QueryRenderer extends React.Component {
     } = this.state;
     const { render } = this.props;
 
-    const loadState = {
+    const loadState: QueryRendererLoadState = {
       error: error ? new Error(error.response?.plainError || error.message || error.toString()) : null,
       resultSet: queries ? (resultSet || {}) : resultSet,
       loadingState: { isLoading },
@@ -165,7 +188,9 @@ export default class QueryRenderer extends React.Component {
     };
 
     if (render) {
-      return render(loadState);
+      // The prop is declared as returning `void` for backwards compatibility,
+      // while what it returns is what gets rendered
+      return render(loadState as QueryRendererRenderProps) as React.ReactNode;
     }
 
     return null;
