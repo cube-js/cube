@@ -20,12 +20,12 @@ class OracleFilter extends BaseFilter {
   }
 
   /**
-   * "ILIKE" is not supported
+   * Oracle has no default LIKE escape character, so the ESCAPE clause is required
    */
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
-    return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s}`;
+    return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s} ESCAPE '\\'`;
   }
 }
 

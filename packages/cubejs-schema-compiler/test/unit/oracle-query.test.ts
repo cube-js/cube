@@ -904,4 +904,28 @@ describe('OracleQuery', () => {
     expect(sql).toMatch(/GROUP BY\s+TRUNC/);
     expect(params).toEqual(['2024-01-01T00:00:00.000Z', '2024-12-31T23:59:59.999Z']);
   });
+
+  it('emits ESCAPE for LIKE filters, Oracle has no default escape character', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: ['visitors.count'],
+        filters: [
+          {
+            member: 'visitors.source',
+            operator: 'contains',
+            values: ['folder\\name_%']
+          }
+        ],
+        timezone: 'UTC'
+      }
+    );
+
+    const [sql, params] = query.buildSqlAndParams();
+
+    expect(sql).toContain('LIKE \'%\' || ? || \'%\' ESCAPE \'\\\'');
+    expect(params).toEqual(['folder\\\\name\\_\\%']);
+  });
 });
