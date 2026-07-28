@@ -208,6 +208,15 @@ out of the response payload:
 const meta = await cubeApi.meta({ onlyViews: true });
 ```
 
+<Info>
+
+Cube versions predating this option behave differently per transport: over HTTP they
+ignore it and return the full data model, while over
+[`WebSocketTransport`](/reference/javascript-sdk/reference/cubejs-client-ws-transport)
+they reject the message with a `400`, because `meta` params are validated strictly.
+
+</Info>
+
 **Parameters:**
 
 Name | Type | Description |
@@ -886,7 +895,7 @@ Extends [`LoadMethodOptions`](#loadmethodoptions) with the options accepted by [
 
 Name | Type | Optional? | Description |
 ------ | ------ | ------ | --- |
-`onlyViews` | `boolean` | ✅ Yes | Pass `true` to request views only — the response's `cubes` array then contains only entries whose `type` is `view`. Cube versions predating this flag ignore it and return the full data model, so don't assume the response is filtered. |
+`onlyViews` | `boolean` | ✅ Yes | Pass `true` to request views only — the response's `cubes` array then contains only entries whose `type` is `view`. Over HTTP, Cube versions predating this flag ignore it and return the full data model, so don't assume the response is filtered. |
 
 ### `LoadResponse`
 

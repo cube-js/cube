@@ -91,12 +91,14 @@ describe('HttpTransport', () => {
     expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta`);
   });
 
+  // CubeApi.meta() sends the boolean; URLSearchParams renders it as `onlyViews=true`,
+  // which is what the gateway's `req.query.onlyViews === 'true'` check expects.
   test('it sends onlyViews in the meta query string', async () => {
     const transport = new HttpTransport({
       authorization: 'token',
       apiUrl,
     });
-    const req = transport.request('meta', { signal: undefined, baseRequestId: undefined, onlyViews: 'true' });
+    const req = transport.request('meta', { signal: undefined, baseRequestId: undefined, onlyViews: true });
     await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(mockedFetch.mock.calls[0]?.[0]).toBe(`${apiUrl}/meta?onlyViews=true`);

@@ -787,7 +787,7 @@ describe('CubeApi meta onlyViews', () => {
     async () => undefined as any))
   }));
 
-  test('should pass onlyViews as a string to meta request', async () => {
+  test('should pass onlyViews to meta request', async () => {
     const requestSpy = mockMetaRequest();
 
     const cubeApi = new CubeApi('token', {
@@ -797,7 +797,7 @@ describe('CubeApi meta onlyViews', () => {
     await cubeApi.meta({ onlyViews: true });
 
     expect(requestSpy).toHaveBeenCalled();
-    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe('true');
+    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe(true);
   });
 
   test('should not send onlyViews when the option is omitted', async () => {
@@ -840,7 +840,7 @@ describe('CubeApi meta onlyViews', () => {
     await cubeApi.meta({ onlyViews: true, signal, baseRequestId });
 
     expect(requestSpy).toHaveBeenCalled();
-    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe('true');
+    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe(true);
     expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
     expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
   });
