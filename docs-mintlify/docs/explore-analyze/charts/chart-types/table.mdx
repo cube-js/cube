@@ -113,11 +113,11 @@ The URL must be publicly accessible without authentication.
 
 ### Inline bars
 
-Display a numeric column as a proportional in-cell bar. In the column's per-column section on the **Style** tab, use the **Display as** control to add a bar. Each bar's length reflects the value's magnitude within the column's range.
+Display a numeric column as a proportional in-cell bar. In the column's per-column section on the **Style** tab, use the **Display as** control — a segmented **Value / Bars / Sparkline** toggle — to switch the column to **Bars**. Each bar's length reflects the value's magnitude within the column's range.
 
 | Option | Description |
 |---|---|
-| **Display as** | Choose **Value**, **Inline bars**, or **Sparkline** — a single choice; the modes are mutually exclusive. Selecting **Inline bars** reveals the bar options below. |
+| **Display as** | A segmented toggle: **Value**, **Bars**, or **Sparkline** — a single choice; the modes are mutually exclusive. Selecting **Bars** reveals the bar options below. |
 | **Show value** | Show the formatted number alongside the bar. Turn it off for a bar-only cell. |
 | **Positive bar color** | Fill color for non-negative bars |
 | **Negative bar color** | Fill color for negative bars (used when the column contains both positive and negative values) |
@@ -142,7 +142,7 @@ Internally, sparklines are powered by additional queries grouped by time dimensi
 
 | Option | Description |
 |---|---|
-| **Display as** | Set to **Sparkline**. Available only for numeric columns, and only when the query has a time dimension. |
+| **Display as** | On the segmented **Value / Bars / Sparkline** toggle, choose **Sparkline**. Available only for numeric columns, and only when the query has a time dimension. |
 | **Horizontal axis** | The time dimension plotted along the sparkline. Auto-selected (the first time dimension in the query); change it here when the query has several. |
 | **Granularity** | The time bucket for the horizontal axis. Defaults to the dimension's granularity in the query if present, otherwise month. |
 | **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
@@ -208,30 +208,26 @@ panel, not just the table visualization.
 
 ## Style options
 
-The **Style** tab controls the visual appearance of the table:
+The **Style** tab controls the visual appearance of the table. It is organized into sections — **Headers**, **Values**, **Totals**, **Columns**, **Borders**, and **Pagination** — each with its own **Reset** button in the section header that appears once you've changed anything in that section.
 
-| Option | Description |
-|---|---|
-| **Row numbers** | Show or hide the row number column |
-| **Row banding** | Alternates row background between white and a secondary color |
-| **Font size** | Adjust size independently for Headers, Values, and Totals |
-| **Description** | Show a description below the table title |
+### Headers, Values, and Totals formatting
 
-### Colors
+Each of these sections has a compact formatting toolbar that sets, for that part of the table:
 
-Set background and text colors for table elements:
+- **Colors** — text and background color (the paired color chip).
+- **Text format** — **bold**, **italic**, and **underline** toggles.
+- **Alignment** — left, center, or right.
+- **Overflow** — truncate or wrap long content.
 
-- Table headers (background + text)
-- Values (background + text)
-- Banding (background)
-- Hover state
-- Totals row
+When you don't pick a color, the element uses the theme's default, which adapts to light and dark mode automatically.
 
-Use the three-dot menu in the Colors section to **reset to defaults** or **copy the color palette** as a JSON string for reuse:
+The **Values** section also holds these table-wide row toggles, shown as icon buttons:
 
-```json
-{"header":{"fontColor":"#fefefe","backgroundColor":"#5339CF"},"banding":{"backgroundColor":"#f5f3ff"}}
-```
+- **Row numbers** — show or hide the row number column.
+- **Hover row** — highlight the row under the pointer.
+- **Row banding** — alternate the row background with a secondary color (its color chip sits next to the toggle).
+
+The **Totals** section holds the **Column totals** and **Row totals** toggles (see [Totals](#totals)).
 
 ### Borders
 
@@ -247,6 +243,8 @@ The **Borders** section of the **Style** tab controls which table borders are dr
 
 Each border is a row in the section: click the **icon button** to toggle the border on or off, and use the **color** swatch and **width** input next to it to style it. Color and width are only available while the border is on. When you don't pick a color, the border uses the theme's default border color, which adapts to light and dark mode automatically.
 
+Next to the first border's width input is a **link** toggle that syncs all widths: while it's on, editing that width applies the same value to every border, so the whole table shares one line weight. It turns on automatically when all borders already share a width, and off as soon as they differ (for example after applying the Accounting preset).
+
 Because every border has its own color and width, styles like a financial report — a thick line under the header, above the totals, and around the table, with thin lines between value rows — are a few clicks away. Or one: see presets below.
 
 {/* TODO screenshot: Borders section with the accounting preset applied (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
@@ -261,7 +259,7 @@ Open the menu in the corner of the Borders section to apply a preset — a one-s
 - **Accounting** — thin light row lines with a thick dark header separator, totals separator, and outer frame; a financial-statement look.
 - **None** — no borders at all.
 
-Use **Reset to default** at the bottom of the section to clear all border settings.
+Use **Reset** in the section header to clear all border settings.
 
 ## Conditional formatting
 
