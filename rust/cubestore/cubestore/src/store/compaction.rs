@@ -24,7 +24,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use datafusion::arrow::array::UInt64Array;
 use datafusion::arrow::compute::{concat_batches, CastOptions, SortOptions};
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::display::FormatOptions;
 use datafusion::config::TableParquetOptions;
@@ -1579,6 +1579,23 @@ pub fn cast_plan_to_schema(
         let expr: Arc<dyn PhysicalExpr> = if source.data_type() == target.data_type() {
             col
         } else {
+            // Only a precision change of a decimal aggregate is a known-legitimate
+            // divergence. Anything else means the plan output no longer lines up with
+            // the index columns positionally, and casting it would silently corrupt
+            // the stored data — fail loudly instead.
+            let same_scale_decimals = match (source.data_type(), target.data_type()) {
+                (DataType::Decimal128(_, s1), DataType::Decimal128(_, s2)) => s1 == s2,
+                _ => false,
+            };
+            if !same_scale_decimals {
+                return Err(CubeError::internal(format!(
+                    "Cannot cast column {} of type {} to column {} of type {}: only a decimal precision change is expected here",
+                    source.name(),
+                    source.data_type(),
+                    target.name(),
+                    target.data_type()
+                )));
+            }
             needs_cast = true;
             // safe: false so a value that doesn't fit the declared type (e.g. a sum
             // overflowing the declared decimal precision) fails the job instead of

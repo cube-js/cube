@@ -294,6 +294,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         ),
         t("aggregate_index_errors", aggregate_index_errors),
         t("aggregate_index_decimal", aggregate_index_decimal),
+        t(
+            "aggregate_index_decimal_overflow",
+            aggregate_index_decimal_overflow,
+        ),
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
@@ -398,6 +402,7 @@ lazy_static::lazy_static! {
         "aggregate_index_errors",
         // Old versions panic building an aggregating index over a decimal measure.
         "aggregate_index_decimal",
+        "aggregate_index_decimal_overflow",
         "create_table_with_location_invalid_digit",
         "create_table_with_url",
         "hyperloglog_inserts",
@@ -8911,6 +8916,37 @@ async fn aggregate_index_decimal(service: Box<dyn SqlClient>) -> Result<(), Cube
             ],
         ]
     );
+    Ok(())
+}
+
+async fn aggregate_index_decimal_overflow(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(k varchar, v decimal(18, 5))
+                     AGGREGATIONS(sum(v))
+                     AGGREGATE INDEX k_agg (k)",
+        )
+        .await?;
+
+    // Each value fits Decimal128(18, 5) (13 integer digits), but the per-key sum does
+    // not. The aggregating index build runs that sum, and the cast back to the declared
+    // type uses safe: false, so the overflow must surface as a diagnosable error — not a
+    // panic in a background task and not a silently stored NULL.
+    let res = service
+        .exec_query("INSERT INTO s.Orders (k, v) VALUES ('a', 9000000000000), ('a', 9000000000000)")
+        .await;
+    match res {
+        Ok(_) => panic!("a sum overflowing the declared decimal precision must fail the insert"),
+        Err(e) => {
+            let msg = e.to_string();
+            assert!(
+                msg.contains("too large to store"),
+                "expected a decimal overflow error, got: {}",
+                msg
+            );
+        }
+    }
     Ok(())
 }
 

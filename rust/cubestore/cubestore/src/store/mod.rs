@@ -2877,14 +2877,14 @@ impl ChunkStore {
                     schema.clone(),
                 )?);
 
-                assert!(aggregate
-                    .properties()
-                    .output_ordering()
-                    .is_some_and(|ordering| ordering.len() == key_size));
-
                 // DataFusion may widen aggregate output types (e.g. a decimal sum gains
                 // precision); cast them back so chunk data keeps the index schema.
                 let plan = cast_plan_to_schema(aggregate, &schema)?;
+
+                assert!(plan
+                    .properties()
+                    .output_ordering()
+                    .is_some_and(|ordering| ordering.len() == key_size));
 
                 let task_context = QueryPlannerImpl::make_execution_context(
                     self.metadata_cache_factory
@@ -2893,7 +2893,14 @@ impl ChunkStore {
                 )
                 .task_ctx();
 
-                let batches = collect(plan, task_context).await?;
+                let batches = collect(plan, task_context).await.map_err(|e| {
+                    CubeError::internal(format!(
+                        "Failed to build aggregating index {} of table {}: {}",
+                        index.get_row().get_name(),
+                        table.get_row().get_table_name(),
+                        e
+                    ))
+                })?;
                 if batches.is_empty() {
                     Ok(vec![])
                 } else if batches.len() == 1 {
