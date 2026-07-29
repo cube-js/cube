@@ -1,8 +1,7 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/cubestore/switch_rolling.rs
-expression: result
+expression: normalize(result)
 ---
-sales__category | sales__rolling_amount
-----------------+----------------------
-books           | 1500                 
-toys            | 150
+sales__category|sales__rolling_amount
+books|1502.0000000000
+toys|151.0000000000

@@ -149,8 +149,15 @@ describe('shared calc group pre-aggregations in Cube Store', () => {
   // CTE) at month granularity is served from the same rollup by Cube Store
   // without trouble.
   //
-  // FIXME: unskip once Cube Store can execute this projection shape (or the
-  // planner stops projecting filter-pinned calc groups into these CTEs).
+  // Cube Store itself was fixed in #11410, and the Rust suite proves the shape
+  // runs: cubesqlplanner tests/integration/cubestore/switch_rolling.rs executes
+  // it against a live Cube Store and snapshots correct rows. What still blocks
+  // these two specs is the image split: birdbox pulls the published
+  // cubejs/cubestore:${BIRDBOX_CUBESTORE_VERSION:-latest}, while the Cube server
+  // is built from this working tree, so the planner fix is under test here but
+  // the Cube Store fix is not.
+  //
+  // FIXME: unskip once a Cube Store release containing #11410 is `latest`.
   const MONTH_TIME_DIMENSION: Query['timeDimensions'] = [
     {
       dimension: 'performance_view.date',

@@ -8,7 +8,8 @@
 //!
 //! Two shapes are `#[ignore]`d for CubeStore limitations unrelated to the
 //! calc-group grain — see the note on each; run them with `--ignored` to
-//! reproduce.
+//! reproduce. The rolling-rewrite defect these tests were originally written
+//! against was fixed in #11410.
 //! Note that a debug-built `cubestored` overflows its stack on rolling-window
 //! queries, so `CUBESTORED_BIN_PATH` must point at a release build.
 
@@ -136,7 +137,13 @@ fn normalize(table: &str) -> String {
 
     table
         .lines()
-        .filter(|line| !line.trim_start().starts_with('-'))
+        .filter(|line| {
+            // the `---+---` separator, not a data row whose first cell is negative
+            !line
+                .trim()
+                .chars()
+                .all(|c| matches!(c, '-' | '+' | ' ' | '|'))
+        })
         .map(|line| {
             line.split('|')
                 .map(normalize_cell)
@@ -174,8 +181,11 @@ async fn run_both(pre_aggs: &[&str], query: &str, expected_rollup: &str, snapsho
             "rollup and raw-source results disagree\n--- rollup ---\n{from_rollup}\n--- source ---\n{from_source}"
         );
     }
-    if let Some(result) = from_rollup {
-        insta::assert_snapshot!(snapshot, result);
+    // Snapshot the engine-independent form of whichever engine ran, so values are
+    // pinned in a plain `integration-postgres` run too, not only when CubeStore
+    // is available.
+    if let Some(result) = from_rollup.as_deref().or(from_source.as_deref()) {
+        insta::assert_snapshot!(snapshot, normalize(result));
     }
 }
 
@@ -192,6 +202,8 @@ fn test_switch_shapes_are_served_by_rollup() {
         ("prev_rolling_amount", "R3"),
         ("rolling_amount_change", "R3"),
         ("rolling_amount_growth", "R3"),
+        ("rolling_amount_change", "YTD"),
+        ("rolling_amount_growth", "YTD"),
     ] {
         assert_served_by(
             &by_category,
@@ -252,21 +264,15 @@ async fn test_rolling_measure() {
 
 /// The plain case entrypoint over a `trailing` window: nothing above the rolling
 /// windows consumes the calc-group dimension, so the outer projection prunes it.
-/// CubeStore's `RollingOptimizerRule` replaces that projection with a
-/// `RollingWindowAggregate` node which always emits
-/// `dimension + partition_by + rolling aggregates`, so the pruned GROUP BY
-/// column reappears and the replacement is wider than what it replaced. The
-/// ancestors still resolve columns by position, and the first rule to notice
-/// reports:
 ///
-/// ```text
-/// Optimizer rule 'optimize_projections' failed
-/// Schema error: No field named fk_aggregate.sales__r3_amount.
-/// Valid fields are ..created_at_month, ..category, ..window_kind.
-/// ```
-///
-/// The same shape is correct on Postgres, which is why the raw half of this
-/// test passes, and in plain DataFusion — the rewrite is CubeStore's own.
+/// This shape used to fail in CubeStore. `RollingOptimizerRule` replaced that
+/// projection with a `RollingWindowAggregate` node emitting
+/// `dimension + partition_by + rolling aggregates`, so the pruned GROUP BY column
+/// reappeared, the replacement was wider than what it replaced, and ancestors
+/// resolving columns by position hit `Optimizer rule 'optimize_projections'
+/// failed / Schema error: No field named fk_aggregate.sales__r3_amount`. Fixed in
+/// #11410; this test guards that rewrite together with the CTE-grain fix in this
+/// PR.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_case_entrypoint() {
     run_both(
@@ -410,6 +416,32 @@ async fn test_four_entrypoints_in_one_query() {
         ),
         "rolling_by_category",
         "switch_rolling_four_measures",
+    )
+    .await;
+}
+
+/// A derived entrypoint dispatching to its `else` branch: an arithmetic layer
+/// over a to-date window, which is planned without the time-series LEFT JOIN the
+/// trailing windows use, while still partitioning by the calc group.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_derived_case_entrypoint_else_branch() {
+    run_both(
+        &["rolling_by_category"],
+        &query(&["rolling_amount_change"], "YTD", "sales.category"),
+        "rolling_by_category",
+        "switch_rolling_derived_else_branch",
+    )
+    .await;
+}
+
+/// Same for the ratio layer.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_growth_case_entrypoint_else_branch() {
+    run_both(
+        &["rolling_by_category"],
+        &query(&["rolling_amount_growth"], "YTD", "sales.category"),
+        "rolling_by_category",
+        "switch_rolling_growth_else_branch",
     )
     .await;
 }

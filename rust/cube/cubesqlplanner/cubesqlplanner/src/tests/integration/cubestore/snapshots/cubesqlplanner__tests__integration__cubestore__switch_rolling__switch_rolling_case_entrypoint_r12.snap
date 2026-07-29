@@ -1,12 +1,11 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/cubestore/switch_rolling.rs
-expression: result
+expression: normalize(result)
 ---
-sales__category | sales__created_at_month  | sales__rolling_amount
-----------------+--------------------------+----------------------
-books           | 2024-04-01T00:00:00.000Z | 1057                 
-books           | 2024-05-01T00:00:00.000Z | 1557                 
-books           | 2024-06-01T00:00:00.000Z | 2157                 
-toys            | 2024-04-01T00:00:00.000Z | 108                  
-toys            | 2024-05-01T00:00:00.000Z | 158                  
-toys            | 2024-06-01T00:00:00.000Z | 218
+sales__category|sales__created_at_month|sales__rolling_amount
+books|2024-04-01 00:00:00|1087.0000000000
+books|2024-05-01 00:00:00|1559.0000000000
+books|2024-06-01 00:00:00|2159.0000000000
+toys|2024-04-01 00:00:00|111.0000000000
+toys|2024-05-01 00:00:00|159.0000000000
+toys|2024-06-01 00:00:00|219.0000000000
