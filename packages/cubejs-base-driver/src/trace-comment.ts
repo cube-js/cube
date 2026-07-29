@@ -31,13 +31,15 @@ export function sanitizeTraceId(requestId: string | undefined | null): string {
 }
 
 /**
- * Strips the `-span-N` suffix Cube appends per data source query of a request.
+ * Strips the `-span-` suffix Cube appends per data source query of a request.
  *
  * The emitted id has to match the `trace_id` of the Query History export, which
  * carries the request id without that suffix — joining on the full request id
- * would never match.
+ * would never match. That makes this the one piece of logic the emitting side
+ * and the export side must agree on, so it lives here and the orchestrator
+ * re-exports it as `extractRequestUUID` rather than keeping its own copy.
  */
-function toTraceId(requestId: string): string {
+export function toTraceId(requestId: string): string {
   const idx = requestId.lastIndexOf('-span-');
 
   return idx === -1 ? requestId : requestId.substring(0, idx);
