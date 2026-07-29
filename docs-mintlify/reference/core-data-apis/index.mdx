@@ -10,8 +10,6 @@ Core Data APIs enable you to query and retrieve data from your Cube semantic lay
 
 ## Choosing the Right API
 
-* To connect to Microsoft Power BI, use the [DAX API][ref-dax-api]
-
 * To connect to [Microsoft Excel][ref-excel], use [Cube Cloud for Excel][ref-cube-cloud-for-excel]
 
 * To connect to [Google Sheets][ref-sheets], use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets]
@@ -61,8 +59,8 @@ tools][ref-viz-tools]:
 
 | Method | ✅ Supported in |
 | --- | --- |
-| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[SQL API][ref-sql-api] |
-| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
+| [User name and password][ref-auth-user-pass] | [MDX API][ref-mdx-api]<br/>[SQL API][ref-sql-api] |
+| Kerberos and NTLM | [MDX API][ref-mdx-api] |
 | [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
 | [JSON Web Token][ref-auth-jwt] | [REST (JSON) API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
 
@@ -71,7 +69,6 @@ tools][ref-viz-tools]:
 [cube-rta]: https://cube.dev/use-cases/real-time-analytics
 [ref-queries]: /reference/core-data-apis/queries
 [ref-sql-api]: /reference/core-data-apis/sql-api
-[ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-mdx-api]: /reference/core-data-apis/mdx-api
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
@@ -93,5 +90,3 @@ tools][ref-viz-tools]:
 [ref-groups]: /admin/users-and-permissions/user-groups
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
 [ref-dap]: /docs/data-modeling/data-access-policies
-[ref-auth-kerberos]: /reference/core-data-apis/dax-api/kerberos
-[ref-auth-ntlm]: /reference/core-data-apis/dax-api/ntlm
