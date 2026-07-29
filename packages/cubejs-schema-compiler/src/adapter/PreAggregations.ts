@@ -202,6 +202,11 @@ export class PreAggregations {
 
       // Compute the union of all usage date ranges so that partitions cover
       // every usage (e.g. time_shift may require earlier partitions).
+      // This overwrites the base matched range rather than unioning with it: this path is
+      // Tesseract-only and mutually exclusive with expandRangeByTrailingWindow() below, and
+      // Tesseract matches rolling windows at the leaf-CTE level where the date range has
+      // already been widened by the trailing window. Unioning here mixed timestamp precisions
+      // and regressed time_shift queries.
       const mergedDateRange = PreAggregations.mergeUsageDateRanges(usageInfo.usages);
 
       return descriptions.map(desc => ({
@@ -355,6 +360,9 @@ export class PreAggregations {
       }
       if (rollingWindow.trailing) {
         const parsed = parseSqlInterval(rollingWindow.trailing);
+        // Approximate month/year lengths are fine here: this only picks which window to
+        // shift the start back by, and over-shifting builds a redundant partition rather
+        // than dropping a needed one.
         const seconds = moment.duration(parsed).asSeconds();
         if (seconds > maxTrailingSeconds) {
           maxTrailingSeconds = seconds;
