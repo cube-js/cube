@@ -112,7 +112,7 @@ export type LinkConfig = {
   label: string;
   dashboard?: string;
   icon?: string;
-  target: 'blank' | 'self';
+  target?: 'blank' | 'self';
   primary?: boolean;
   params?: string[];
 };
@@ -341,7 +341,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
               label: link.label,
               ...(link.dashboard ? { dashboard: typeof link.dashboard === 'function' ? link.dashboard() : link.dashboard } : {}),
               icon: link.icon,
-              target: link.target || 'blank',
+              ...(link.target ? { target: link.target } : {}),
               ...(link.primary ? { primary: true } : {}),
               ...(link.params && Array.isArray(link.params) && link.params.length > 0
                 ? { params: link.params.map((p: any) => (typeof p.key === 'function' ? p.key() : p.key)) }
@@ -473,7 +473,10 @@ export class CubeToMetaTransformer implements CompilerInterface {
   }
 
   private titleize(name: string): string {
-    return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    const titleized = inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+    // Capitalize common identifier acronyms so e.g. `userId` reads as "User ID"
+    // rather than "User Id" and an `id` member becomes "ID" instead of "Id".
+    return titleized.replace(/\bId(s?)\b/g, (_match, plural) => `ID${plural}`);
   }
 
   private transformDimensionFormat({ format: formatOrName, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {

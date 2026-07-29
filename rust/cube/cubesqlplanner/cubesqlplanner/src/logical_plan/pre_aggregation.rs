@@ -178,7 +178,10 @@ impl PrettyPrint for PreAggregation {
                 result.println("Union:", &state);
                 let state = state.new_level();
                 for item in union.items.iter() {
-                    result.println(&format!("-{}.{}", item.cube_name, item.name), &state);
+                    result.println(
+                        &format!("-{}.{}", item.table.cube_name, item.table.name),
+                        &state,
+                    );
                 }
             }
         }

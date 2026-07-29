@@ -19,6 +19,7 @@ fn legacy_rows(r: &QueryResult) -> &Vec<Vec<Option<String>>> {
     match &r.data {
         ResultData::Legacy { rows, .. } => rows,
         ResultData::Arrow { .. } => panic!("expected ResultData::Legacy, got Arrow"),
+        ResultData::Completed => panic!("expected ResultData::Legacy, got Completed"),
     }
 }
 

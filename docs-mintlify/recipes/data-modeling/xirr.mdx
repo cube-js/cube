@@ -29,8 +29,7 @@ Consequently, queries that don't hit pre-aggregations would fail with the follow
 <Warning>
 
 Multi-stage calculations are powered by Tesseract, the [next-generation data modeling
-engine][link-tesseract]. Tesseract is currently in preview. Use the
-[`CUBEJS_TESSERACT_SQL_PLANNER`](/reference/configuration/environment-variables#cubejs_tesseract_sql_planner) environment variable to enable it.
+engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
 
@@ -72,8 +71,9 @@ cubes:
         multi_stage: true
         sql: "XIRR({total_payments}, {date__day})"
         type: number_agg
-        add_group_by:
-          - date__day
+        grain:
+          include:
+            - date__day
 
     pre_aggregations:
       - name: main_xirr
@@ -122,9 +122,9 @@ cube(`payments`, {
       multi_stage: true,
       sql: `XIRR(${CUBE.total_payments}, ${CUBE.date__day})`,
       type: `number_agg`,
-      add_group_by: [
-        date__day
-      ]
+      grain: {
+        include: [date__day]
+      }
     }
   },
 
@@ -182,10 +182,10 @@ All queries above would yield the same result:
 ```
 
 
-[ref-sql-api]: /reference/sql-api/reference#custom-functions
-[ref-dax-api]: /reference/dax-api/reference#financial-functions
-[ref-rest-api]: /reference/rest-api
-[ref-query-wpp]: /reference/queries#query-with-post-processing
-[ref-query-regular]: /reference/queries#regular-query
+[ref-sql-api]: /reference/core-data-apis/sql-api/reference#custom-functions
+[ref-dax-api]: /reference/core-data-apis/dax-api/reference#financial-functions
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-query-wpp]: /reference/core-data-apis/queries#query-with-post-processing
+[ref-query-regular]: /reference/core-data-apis/queries#regular-query
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage-calculations]: /docs/data-modeling/measures#multi-stage-measures

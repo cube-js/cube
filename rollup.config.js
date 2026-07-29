@@ -20,7 +20,7 @@ const bundle = (
         extensions: ['.js'],
       }),
       resolve({
-        extensions: ['.ts', '.js', '.json'],
+        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
         mainFields: ['browser', 'module', 'main'],
         resolveOnly: [/^\.\.?/],
       }),
@@ -159,7 +159,7 @@ export default bundle(
   )
   .concat(
     bundle('cubejs-client-react', 'cubejsReact', {
-      input: 'packages/cubejs-client-react/src/index.js',
+      input: 'packages/cubejs-client-react/src/index.ts',
       external: ['react', 'prop-types'],
     })
   )

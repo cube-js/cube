@@ -1,0 +1,19 @@
+# Shared rolling-window selector (calc group): a single-row cube hosting a
+# `type: switch` dimension that case entrypoint measures in several fact
+# cubes dispatch on, so one filter resolves the window for all of them.
+cubes:
+  - name: rolling_window_dim
+    sql: SELECT 1 AS one
+    public: false
+    dimensions:
+      - name: one
+        sql: one
+        type: number
+        primary_key: true
+        public: false
+
+      - name: rolling_window
+        type: switch
+        values:
+          - R3
+          - YTD

@@ -7,6 +7,7 @@ use crate::planner::filter::typed_filter::{resolve_base_symbol, FilterOp, TypedF
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
+use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -34,7 +35,7 @@ impl ToSql for TypedFilter {
 
         let ctx = FilterSqlContext {
             member_sql: &member_sql,
-            query_tools: self.query_tools(),
+            query_tools: &query_tools,
             plan_templates: templates,
             use_db_time_zone: !filters_ctx.use_local_tz,
             use_raw_values: self.use_raw_values(),
@@ -48,6 +49,8 @@ impl TypedFilter {
     pub fn to_sql_for_filter_params(
         &self,
         column: &FilterParamsColumn,
+        time_shift: Option<&SqlInterval>,
+        query_tools: &Rc<QueryTools>,
         plan_templates: &PlanSqlTemplates,
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
@@ -55,9 +58,24 @@ impl TypedFilter {
 
         match column {
             FilterParamsColumn::String(column_sql) => {
+                // Inside a time-shifted CTE the FILTER_PARAMS column must carry the
+                // same shift as the regular time-dimension filter, otherwise its
+                // current-period bounds contradict the shifted predicate and empty
+                // the CTE.
+                let shifted_column;
+                let member_sql = if let Some(interval) = time_shift {
+                    shifted_column = format!(
+                        "({})",
+                        plan_templates
+                            .add_timestamp_interval(column_sql.clone(), interval.to_sql())?
+                    );
+                    shifted_column.as_str()
+                } else {
+                    column_sql.as_str()
+                };
                 let ctx = FilterSqlContext {
-                    member_sql: column_sql,
-                    query_tools: self.query_tools(),
+                    member_sql,
+                    query_tools,
                     plan_templates,
                     use_db_time_zone,
                     use_raw_values: self.use_raw_values(),
@@ -65,11 +83,17 @@ impl TypedFilter {
                 dispatch_to_sql(self.operation(), &ctx)
             }
             FilterParamsColumn::Callback(callback) => {
+                // A callback column is opaque SQL produced by user code, so a
+                // time shift can't be wrapped around it; it is rendered as-is.
                 let args = match self.operation() {
-                    FilterOp::DateRange(_) | FilterOp::DateSingle(_) => {
+                    // RollingWindowOffset carries [from, to, trailing, leading, offset];
+                    // only the from/to dates are filter-param args for the callback.
+                    FilterOp::DateRange(_)
+                    | FilterOp::DateSingle(_)
+                    | FilterOp::RollingWindowOffset(_) => {
                         let ctx = FilterSqlContext {
                             member_sql: "",
-                            query_tools: self.query_tools(),
+                            query_tools,
                             plan_templates,
                             use_db_time_zone,
                             use_raw_values: self.use_raw_values(),
@@ -77,21 +101,22 @@ impl TypedFilter {
                         let from = self
                             .values()
                             .first()
-                            .and_then(|v| v.as_ref())
-                            .map(|v| ctx.format_and_allocate_from_date(v))
+                            .and_then(|v| v.to_param_string())
+                            .map(|v| ctx.format_and_allocate_from_date_no_cast(&v))
                             .transpose()?;
                         let to = self
                             .values()
                             .get(1)
-                            .and_then(|v| v.as_ref())
-                            .map(|v| ctx.format_and_allocate_to_date(v))
+                            .and_then(|v| v.to_param_string())
+                            .map(|v| ctx.format_and_allocate_to_date_no_cast(&v))
                             .transpose()?;
                         [from, to].into_iter().flatten().collect()
                     }
                     _ => self
                         .values()
                         .iter()
-                        .filter_map(|v| v.as_ref().map(|v| self.query_tools().allocate_param(v)))
+                        .filter_map(|v| v.to_param_string())
+                        .map(|v| query_tools.allocate_param(&v))
                         .collect::<Vec<_>>(),
                 };
                 callback.call(&args)
@@ -113,6 +138,7 @@ fn dispatch_to_sql(op: &FilterOp, ctx: &FilterSqlContext) -> Result<String, Cube
         }
         FilterOp::Nullability(op) => op.to_sql(ctx),
         FilterOp::RegularRollingWindow(op) => op.to_sql(ctx),
+        FilterOp::RollingWindowOffset(op) => op.to_sql(ctx),
         FilterOp::ToDateRollingWindow(op) => op.to_sql(ctx),
     }
 }

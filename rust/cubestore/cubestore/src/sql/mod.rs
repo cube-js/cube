@@ -78,6 +78,7 @@ use deepsize::DeepSizeOf;
 
 pub mod cache;
 pub mod cachestore;
+mod explain_detailed;
 pub mod parser;
 mod table_creator;
 
@@ -139,7 +140,7 @@ impl QueryResult {
         };
 
         cube_ext::spawn_blocking(move || -> Result<Vec<u8>, CubeError> {
-            use datafusion::arrow::ipc::writer::StreamWriter;
+            use datafusion::arrow::ipc::writer::{IpcWriteOptions, StreamWriter};
             use std::io::Cursor;
 
             let (schema, batches) = match pending {
@@ -152,7 +153,21 @@ impl QueryResult {
                 Pending::Batches { schema, batches } => (schema, batches),
             };
 
-            let mut writer = StreamWriter::try_new(Cursor::new(Vec::new()), schema.as_ref())?;
+            // Our arrow-rs fork advertises a non-standard `bitWidth` (64/96)
+            // in IPC schemas for `Decimal128` fields with precision <= 27, so
+            // parquet-embedded schemas and inter-node IPC stay readable by
+            // older CubeStore versions (cube-js/arrow-rs#48). The buffers
+            // still hold 16 bytes per value, and standard Arrow readers trust
+            // the advertised width: the JS orchestrator (upstream arrow)
+            // reads bitWidth 64 with an 8-byte stride — interleaving real
+            // values with zeros — and rejects bitWidth 96 outright. This
+            // stream only feeds standard readers, so write the honest width.
+            let options = IpcWriteOptions::default().with_standard_decimal_bit_width(true);
+            let mut writer = StreamWriter::try_new_with_options(
+                Cursor::new(Vec::new()),
+                schema.as_ref(),
+                options,
+            )?;
 
             // Writes multiple batches, because it's Arrow IPC stream format, client should handle it
             for batch in &batches {
@@ -544,6 +559,7 @@ impl SqlServiceImpl {
         )))
     }
 
+    /// `analyze` builds and shows the physical plans on the router and the workers.
     async fn explain(
         &self,
         statement: Statement,
@@ -822,6 +838,7 @@ impl SqlService for SqlServiceImpl {
                         PlanningMeta {
                             indices: Vec::new(),
                             multi_part_subtree: HashMap::new(),
+                            pushable_chunk_filters: Vec::new(),
                         },
                         None,
                     )
@@ -873,6 +890,10 @@ impl SqlService for SqlServiceImpl {
                     }
                     MetaStoreCommand::Healthcheck => {
                         self.db.healthcheck().await?;
+                        Ok(DataFrame::empty().into())
+                    }
+                    MetaStoreCommand::Truncate => {
+                        self.db.truncate().await?;
                         Ok(DataFrame::empty().into())
                     }
                 },
@@ -1386,6 +1407,10 @@ impl SqlService for SqlServiceImpl {
             },
 
             CubeStoreStatement::Dump(q) => Ok(self.dump_select_inputs(query, q).await?.into()),
+
+            CubeStoreStatement::ExplainAnalyzeDetailed(q) => {
+                Ok(self.explain_detailed(Statement::Query(q)).await?.into())
+            }
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
@@ -1944,6 +1969,152 @@ mod tests {
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
     use crate::table::TableValue;
     use regex::Regex;
+
+    /// Reads `(precision, scale, bitWidth)` of a decimal field from the schema
+    /// message (the first encapsulated message of an Arrow IPC stream).
+    fn ipc_schema_decimal_field(
+        data: &[u8],
+        field_index: usize,
+    ) -> Result<(i32, i32, i32), CubeError> {
+        use datafusion::arrow::ipc;
+
+        // Encapsulated message: optional 0xFFFFFFFF continuation marker,
+        // i32 metadata length, then the flatbuffer message itself.
+        let offset = if data[0..4] == [0xff, 0xff, 0xff, 0xff] {
+            8
+        } else {
+            4
+        };
+        let metadata_len_bytes: [u8; 4] = data[offset - 4..offset]
+            .try_into()
+            .map_err(|e| CubeError::internal(format!("Malformed IPC message header: {}", e)))?;
+        let metadata_len = i32::from_le_bytes(metadata_len_bytes) as usize;
+        let message = ipc::root_as_message(&data[offset..offset + metadata_len])
+            .map_err(|e| CubeError::internal(format!("Failed to parse IPC message: {}", e)))?;
+        let schema = message
+            .header_as_schema()
+            .ok_or_else(|| CubeError::internal("IPC message is not a schema".to_string()))?;
+        let field = schema
+            .fields()
+            .ok_or_else(|| CubeError::internal("IPC schema has no fields".to_string()))?
+            .get(field_index);
+        let decimal = field.type_as_decimal().ok_or_else(|| {
+            CubeError::internal(format!("Field {:?} is not a decimal", field.name()))
+        })?;
+        Ok((decimal.precision(), decimal.scale(), decimal.bitWidth()))
+    }
+
+    /// Our arrow-rs fork advertises bitWidth 64/96 in IPC schemas for
+    /// Decimal128 fields with precision <= 27 (cube-js/arrow-rs#48) while the
+    /// buffers stay 16 bytes per value. Standard readers (the JS orchestrator
+    /// uses upstream arrow) mis-stride such data: bitWidth 64 interleaves real
+    /// values with zeros. The response stream must advertise the standard 128.
+    #[tokio::test]
+    async fn arrow_ipc_stream_advertises_standard_decimal_bit_width() -> Result<(), CubeError> {
+        use datafusion::arrow::datatypes::DataType;
+        use datafusion::arrow::ipc::reader::StreamReader;
+
+        let df = DataFrame::new(
+            vec![
+                Column::new("name".to_string(), ColumnType::String, 0),
+                Column::new(
+                    "totalSales".to_string(),
+                    ColumnType::Decimal {
+                        scale: 2,
+                        precision: 18,
+                    },
+                    1,
+                ),
+            ],
+            vec![
+                Row::new(vec![TableValue::String("a".to_string()), TableValue::Null]),
+                Row::new(vec![
+                    TableValue::String("b".to_string()),
+                    TableValue::Decimal(Decimal::new(239996)),
+                ]),
+                Row::new(vec![
+                    TableValue::String("c".to_string()),
+                    TableValue::Decimal(Decimal::new(224991)),
+                ]),
+            ],
+        );
+        let data = QueryResult::Frame(Arc::new(df))
+            .to_arrow_ipc_stream()
+            .await?;
+
+        assert_eq!(ipc_schema_decimal_field(&data, 1)?, (18, 2, 128));
+
+        // Values, precision and scale come through unchanged.
+        let mut reader = StreamReader::try_new(std::io::Cursor::new(data.as_slice()), None)?;
+        let batch = reader
+            .next()
+            .transpose()?
+            .ok_or_else(|| CubeError::internal("Empty IPC stream".to_string()))?;
+
+        let column = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Expected Decimal128Array, got {:?}",
+                    batch.column(1).data_type()
+                ))
+            })?;
+
+        assert_eq!(column.data_type(), &DataType::Decimal128(18, 2));
+        assert!(column.is_null(0));
+        assert_eq!(column.value(1), 239996);
+        assert_eq!(column.value(2), 224991);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn arrow_ipc_stream_advertises_standard_decimal_bit_width_for_batches(
+    ) -> Result<(), CubeError> {
+        use datafusion::arrow::datatypes::{DataType, Field, Schema as ArrowSchema};
+        use datafusion::arrow::ipc::reader::StreamReader;
+        use futures::StreamExt;
+
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "v",
+            DataType::Decimal128(20, 3),
+            true,
+        )]));
+        let array = Decimal128Array::from(vec![Some(1500_i128), None, Some(-250)])
+            .with_precision_and_scale(20, 3)?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)])?;
+        let result = QueryResult::Stream {
+            schema,
+            batches: futures::stream::iter(vec![Ok(batch)]).boxed(),
+        };
+        let data = result.to_arrow_ipc_stream().await?;
+
+        assert_eq!(ipc_schema_decimal_field(&data, 0)?, (20, 3, 128));
+
+        let mut reader = StreamReader::try_new(std::io::Cursor::new(data.as_slice()), None)?;
+        let batch = reader
+            .next()
+            .transpose()?
+            .ok_or_else(|| CubeError::internal("Empty IPC stream".to_string()))?;
+        let column = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Expected Decimal128Array, got {:?}",
+                    batch.column(0).data_type()
+                ))
+            })?;
+        assert_eq!(column.data_type(), &DataType::Decimal128(20, 3));
+        assert_eq!(column.value(0), 1500);
+        assert!(column.is_null(1));
+        assert_eq!(column.value(2), -250);
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn create_schema_test() -> Result<(), CubeError> {
@@ -3304,11 +3475,130 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn topk_full_merge() -> Result<(), CubeError> {
+        // The full-merge strategy replaces the streaming top-k node with a router-side
+        // re-aggregation + fetch-limited sort. Exercise it end-to-end (UNION -> multi-partition
+        // ClusterSend, which is what required the explicit CoalescePartitions fan-in) and check it
+        // returns the same top-k as the default streaming merge across Sum/Min/Max, both directions,
+        // and HAVING.
+        Config::test("topk_full_merge")
+            .update_config(|mut c| {
+                c.topk_aggregate_strategy = crate::config::TopKAggregateStrategy::FullMerge;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                fn url_hits(df: &crate::store::DataFrame) -> Vec<(String, i64)> {
+                    df.get_rows()
+                        .iter()
+                        .map(|r| {
+                            let url = match &r.values()[0] {
+                                TableValue::String(s) => s.clone(),
+                                v => panic!("unexpected url value: {:?}", v),
+                            };
+                            let hits = match &r.values()[1] {
+                                TableValue::Int(i) => *i,
+                                v => panic!("unexpected hits value: {:?}", v),
+                            };
+                            (url, hits)
+                        })
+                        .collect()
+                }
+
+                service.exec_query("CREATE SCHEMA s").await?.collect().await?;
+                service
+                    .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+                    .await?
+                    .collect()
+                    .await?;
+
+                let union = "(SELECT * FROM s.Data1 UNION ALL SELECT * FROM s.Data2) AS Data";
+
+                // SUM, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 52)]
+                );
+
+                // SUM, ascending.
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 ASC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("a".to_string(), 1), ("e".to_string(), 40), ("d".to_string(), 44)]
+                );
+
+                // MIN, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, MIN(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("e".to_string(), 5)]
+                );
+
+                // MAX, descending.
+                let r = service
+                    .exec_query(&format!("SELECT url, MAX(hits) hits FROM {union} GROUP BY 1 ORDER BY 2 DESC LIMIT 3"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 50)]
+                );
+
+                // HAVING (exercises the router-side FilterExec above the re-aggregate).
+                let r = service
+                    .exec_query(&format!("SELECT url, SUM(hits) hits FROM {union} GROUP BY 1 HAVING SUM(hits) > 50 ORDER BY 2 DESC LIMIT 5"))
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    url_hits(&r),
+                    vec![("z".to_string(), 100), ("y".to_string(), 80), ("b".to_string(), 52)]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn over_10k_join() -> Result<(), CubeError> {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
             c.compaction_chunks_count_threshold = 50;
-            c.max_joined_partitions = 10;
+            // Eager split-by-file-size fragments the right table further; lift the join cap
+            // above the resulting partition count (this test asserts join correctness, not the cap).
+            c.max_joined_partitions = 50;
             c
         }).start_test(async move |services| {
             let service = services.sql_service;
@@ -3498,6 +3788,381 @@ mod tests {
         Ok(())
     }
 
+    async fn assert_repartition_drains_and_keeps_data(
+        services: &CubeServices,
+    ) -> Result<(), CubeError> {
+        let service = &services.sql_service;
+
+        service
+            .exec_query("CREATE SCHEMA foo")
+            .await?
+            .collect()
+            .await?;
+
+        service
+            .exec_query("CREATE TABLE foo.numbers (num int)")
+            .await?
+            .collect()
+            .await?;
+
+        let n: i64 = 200;
+        for i in 0..n {
+            service
+                .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES ({})", i))
+                .await?
+                .collect()
+                .await?;
+        }
+
+        // Wait until repartition jobs have drained every inactive parent partition.
+        let mut drained = false;
+        for _ in 0..300 {
+            let pending = services
+                .meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?;
+            if pending.is_empty() {
+                drained = true;
+                break;
+            }
+            Delay::new(Duration::from_millis(50)).await;
+        }
+        assert!(
+            drained,
+            "inactive partitions were not fully repartitioned in time"
+        );
+
+        // The partition must have actually split.
+        let active = services
+            .meta_store
+            .get_active_partitions_by_index_id(1)
+            .await?;
+        assert!(
+            active.len() > 1,
+            "expected partition to split, got {} active partitions",
+            active.len()
+        );
+
+        // Data must be complete and correct after repartition.
+        let result = service
+            .exec_query("SELECT count(*) from foo.numbers")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(n)]));
+
+        let result = service
+            .exec_query("SELECT sum(num) from foo.numbers")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![TableValue::Int(n * (n - 1) / 2)])
+        );
+
+        Ok(())
+    }
+
+    // Same drain-and-verify flow, but on an aggregate-index table whose chunks share
+    // dimension keys across inserts. The repartition merge groups those rows by the
+    // sort key and emits fewer rows than it consumed, so the swap activates fewer rows
+    // than it deactivates. This is the production scenario that failed with "Deactivated
+    // row count (..) doesn't match activated row count (..) during swap"; the merge path
+    // must commit with the unchecked swap. `sum(m)` is conserved by the aggregation, so it
+    // is the invariant we assert end-to-end.
+    async fn assert_repartition_drains_and_keeps_aggregate_data(
+        services: &CubeServices,
+    ) -> Result<(), CubeError> {
+        let service = &services.sql_service;
+
+        service
+            .exec_query("CREATE SCHEMA foo")
+            .await?
+            .collect()
+            .await?;
+
+        service
+            .exec_query(
+                "CREATE TABLE foo.aggr (g int, m int) \
+                 AGGREGATIONS (sum(m)) AGGREGATE INDEX byg (g)",
+            )
+            .await?
+            .collect()
+            .await?;
+
+        // 200 single-row inserts cycling g over 0..40, so every g is inserted 5 times
+        // across distinct chunks. Aggregated, the table holds 40 rows; sum(m) stays 200.
+        let n: i64 = 200;
+        let distinct: i64 = 40;
+        for i in 0..n {
+            service
+                .exec_query(&format!(
+                    "INSERT INTO foo.aggr (g, m) VALUES ({}, 1)",
+                    i % distinct
+                ))
+                .await?
+                .collect()
+                .await?;
+        }
+
+        let mut drained = false;
+        for _ in 0..300 {
+            let pending = services
+                .meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?;
+            if pending.is_empty() {
+                drained = true;
+                break;
+            }
+            Delay::new(Duration::from_millis(50)).await;
+        }
+        assert!(
+            drained,
+            "inactive partitions were not fully repartitioned in time"
+        );
+
+        // The aggregate index must have actually split into more than one partition.
+        let aggr_index = services
+            .meta_store
+            .get_table_indexes(1)
+            .await?
+            .into_iter()
+            .find(|i| i.get_row().get_name() == "byg")
+            .expect("aggregate index byg must exist");
+        let active = services
+            .meta_store
+            .get_active_partitions_by_index_id(aggr_index.get_id())
+            .await?;
+        assert!(
+            active.len() > 1,
+            "expected aggregate index to split, got {} active partitions",
+            active.len()
+        );
+
+        let result = service
+            .exec_query("SELECT sum(m) from foo.aggr")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(n)]));
+
+        let result = service
+            .exec_query("SELECT g, sum(m) from foo.aggr GROUP BY g ORDER BY g")
+            .await?
+            .collect()
+            .await?;
+        assert_eq!(
+            result.get_rows().len(),
+            distinct as usize,
+            "every distinct dimension value must survive the repartition"
+        );
+        for (g, row) in result.get_rows().iter().enumerate() {
+            assert_eq!(
+                row,
+                &Row::new(vec![
+                    TableValue::Int(g as i64),
+                    TableValue::Int(n / distinct)
+                ]),
+                "aggregated sum for g={} must be conserved",
+                g
+            );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_range_jobs_aggregate_index_keeps_data_consistent() -> Result<(), CubeError>
+    {
+        // Range strategy on an aggregate-index table: the repartition merge dedups rows by
+        // the sort key, so the commit must use the unchecked swap. Guards the production
+        // RepartitionRange row-count-mismatch regression end-to-end.
+        Config::test("repartition_range_jobs_aggregate_index_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::Range;
+                c.repartition_merge_max_rows = 40;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_aggregate_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_merge_aggregate_index_keeps_data_consistent() -> Result<(), CubeError> {
+        // PerPartition merge on an aggregate-index table; same dedup invariant as the range
+        // variant above.
+        Config::test("repartition_merge_aggregate_index_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 4;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_aggregate_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_keeps_data_consistent() -> Result<(), CubeError> {
+        Config::test("repartition_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerChunk;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_legacy_per_chunk_path() -> Result<(), CubeError> {
+        Config::test("repartition_legacy_per_chunk_path")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerChunk;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_concurrent_download_keeps_data_consistent() -> Result<(), CubeError> {
+        // PerPartition merge with concurrent chunk download enabled must drain and keep
+        // data consistent end-to-end (real concurrent downloads in the merge group build).
+        Config::test("repartition_concurrent_download_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 4;
+                c.repartition_concurrent_download = true;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_merge_keeps_data_consistent() -> Result<(), CubeError> {
+        // Streaming merge-repartition path (group cap >= 2): the parent's chunks are
+        // merged and split into the children in one pass. Must drain and keep data
+        // consistent end-to-end.
+        Config::test("repartition_merge_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 4;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_range_jobs_keep_data_consistent() -> Result<(), CubeError> {
+        // Range-job mechanism: schedule_repartition slices the parent's chunks into
+        // RepartitionRange jobs (by row cap), each merging its range into the children
+        // in one swap. Must drain and keep data consistent end-to-end.
+        Config::test("repartition_range_jobs_keep_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::Range;
+                c.repartition_merge_max_rows = 40;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_range_jobs_small_rows_keep_data_consistent() -> Result<(), CubeError> {
+        // A tiny row cap plus a chunk-count cap forces many small RepartitionRange jobs.
+        Config::test("repartition_range_jobs_small_rows_keep_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::Range;
+                c.repartition_merge_max_rows = 10;
+                c.repartition_merge_max_input_files = 2;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_merge_small_group_keeps_data_consistent() -> Result<(), CubeError> {
+        // Group cap of exactly 2 forces many small merge+swap groups; data must stay
+        // consistent and the parent must fully drain.
+        Config::test("repartition_merge_small_group_keeps_data_consistent")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 2;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn repartition_small_time_budget_drains_via_cascade() -> Result<(), CubeError> {
+        // A 1s budget forces most per-partition jobs to yield before draining all
+        // chunks; the cascade must reschedule until the parent is empty.
+        Config::test("repartition_small_time_budget_drains_via_cascade")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c.compaction_chunks_count_threshold = 10;
+                c.repartition_strategy = crate::config::RepartitionStrategy::PerPartition;
+                c.repartition_merge_max_input_files = 2;
+                c.repartition_chunks_time_budget_secs = 1;
+                c
+            })
+            .start_test(async move |services| {
+                assert_repartition_drains_and_keeps_data(&services).await
+            })
+            .await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn decimal_partition_pruning() -> Result<(), CubeError> {
         Config::test("decimal_partition_pruning")
@@ -3619,14 +4284,13 @@ mod tests {
                 \n      CoalescePartitions\
                 \n        LinearPartialAggregate\
                 \n          Filter\
-                \n            MergeSort\
-                \n              Scan, index: default:1:[1]:sort_on[num], fields: *\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan\
-                \n                FilterByKeyRange\
-                \n                  CheckMemoryExec\
-                \n                    ParquetScan";
+                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan";
                 let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
                 let p = plan_regexp.replace_all(&plan, "ParquetScan");
                 println!("pp {}", p);
@@ -3916,6 +4580,8 @@ mod tests {
         Config::test("inactive_partitions_cleanup")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
+                // Keep a single active partition: this test covers inactive-file GC, not size split.
+                c.partition_size_split_threshold_bytes = 1024 * 1024;
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
                 c.meta_store_log_upload_interval = 1;
@@ -5160,6 +5826,8 @@ mod tests {
                             ).unwrap();
                             let matches = regex.captures_iter(&pp_plan).count();
                             assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
+                            // EXPLAIN ANALYZE only shows the plan, it doesn't execute it.
+                            assert!(!pp_plan.contains("metrics:"), "pp_plan = {}", pp_plan);
                         },
                         _ => {assert!(false);}
                     };
@@ -5170,6 +5838,71 @@ mod tests {
         }).await;
         Ok(())
     }
+
+    #[tokio::test]
+    async fn explain_analyze_detailed() -> Result<(), CubeError> {
+        Config::test("explain_detailed_router").update_config(|mut config| {
+            config.select_workers = vec!["127.0.0.1:14016".to_string()];
+            config.metastore_bind_address = Some("127.0.0.1:15016".to_string());
+            config.compaction_chunks_count_threshold = 0;
+            config
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            Config::test("explain_detailed_worker_1").update_config(|mut config| {
+                config.worker_bind_address = Some("127.0.0.1:14016".to_string());
+                config.server_name = "127.0.0.1:14016".to_string();
+                config.metastore_remote_address = Some("127.0.0.1:15016".to_string());
+                config.store_provider = FileStoreProvider::Filesystem {
+                    remote_dir: Some(env::current_dir()
+                        .unwrap()
+                        .join("explain_detailed_router-upstream".to_string())),
+                };
+                config.compaction_chunks_count_threshold = 0;
+                config
+            }).start_test_worker(async move |_| {
+                service.exec_query("CREATE SCHEMA foo").await?.collect().await?;
+                service.exec_query("CREATE TABLE foo.orders (id int, platform text, age int, amount int)").await?.collect().await?;
+                service.exec_query(
+                    "INSERT INTO foo.orders (id, platform, age, amount) VALUES (1, 'android', 18, 4), (2, 'ios', 17, 4), (3, 'ios', 20, 5)"
+                ).await?.collect().await?;
+
+                let result = service.exec_query(
+                    "EXPLAIN ANALYZE DETAILED SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
+                ).await?.collect().await?;
+
+                // Single "trace" cell holding the whole report.
+                assert_eq!(result.get_columns().len(), 1);
+                assert_eq!(result.get_rows().len(), 1);
+                let trace = match &result.get_rows()[0].values()[0] {
+                    TableValue::String(s) => s.clone(),
+                    v => panic!("expected string trace, got {:?}", v),
+                };
+
+                // Smoke check: the whole path produced the levels + the summary.
+                // (The test harness runs the worker in-process, without the select
+                // subprocess pool, so no `subprocess ·` section here.)
+                for marker in [
+                    "summary by category",
+                    "router",
+                    "Metastore",
+                    "main \u{b7}",
+                    "worker \u{b7}",
+                    "Planning",
+                    "Execution",
+                    "transport.",
+                    "plan:",
+                ] {
+                    assert!(trace.contains(marker), "trace missing '{}':\n{}", marker, trace);
+                }
+
+                Ok::<(), CubeError>(())
+            }).await;
+            Ok::<(), CubeError>(())
+        }).await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn create_aggr_index() -> Result<(), CubeError> {
         assert!(true);
@@ -5884,6 +6617,220 @@ mod tests {
                     })
                     .await;
             });
+    }
+
+    #[tokio::test]
+    async fn worker_sort_and_limit_cluster() -> Result<(), CubeError> {
+        Config::test("worker_sort_limit_router")
+            .update_config(|mut config| {
+                config.select_workers = vec![
+                    "127.0.0.1:24106".to_string(),
+                    "127.0.0.1:24107".to_string(),
+                ];
+                config.metastore_bind_address = Some("127.0.0.1:25106".to_string());
+                config.compaction_chunks_count_threshold = 0;
+                config
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                Config::test("worker_sort_limit_worker_1")
+                    .update_config(|mut config| {
+                        config.worker_bind_address = Some("127.0.0.1:24106".to_string());
+                        config.server_name = "127.0.0.1:24106".to_string();
+                        config.metastore_remote_address =
+                            Some("127.0.0.1:25106".to_string());
+                        config.store_provider = FileStoreProvider::Filesystem {
+                            remote_dir: Some(
+                                env::current_dir()
+                                    .unwrap()
+                                    .join("worker_sort_limit_router-upstream".to_string()),
+                            ),
+                        };
+                        config.compaction_chunks_count_threshold = 0;
+                        config
+                    })
+                    .start_test_worker(async move |_| {
+                        Config::test("worker_sort_limit_worker_2")
+                            .update_config(|mut config| {
+                                config.worker_bind_address =
+                                    Some("127.0.0.1:24107".to_string());
+                                config.server_name = "127.0.0.1:24107".to_string();
+                                config.metastore_remote_address =
+                                    Some("127.0.0.1:25106".to_string());
+                                config.store_provider = FileStoreProvider::Filesystem {
+                                    remote_dir: Some(
+                                        env::current_dir().unwrap().join(
+                                            "worker_sort_limit_router-upstream".to_string(),
+                                        ),
+                                    ),
+                                };
+                                config.compaction_chunks_count_threshold = 0;
+                                config
+                            })
+                            .start_test_worker(async move |_| {
+                                service
+                                    .exec_query("CREATE SCHEMA foo")
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                service
+                                    .exec_query(
+                                        "CREATE TABLE foo.data (category text, region text, amount int) \
+                                         INDEX idx1 (category, region)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                service
+                                    .exec_query(
+                                        "INSERT INTO foo.data (category, region, amount) VALUES \
+                                         ('A', 'East', 10), ('A', 'West', 20), ('B', 'East', 30), ('B', 'West', 40), \
+                                         ('C', 'East', 50), ('C', 'West', 60), ('D', 'East', 70), ('D', 'West', 80), \
+                                         ('A', 'North', 15), ('B', 'North', 25), ('C', 'North', 35), ('D', 'North', 45), \
+                                         ('A', 'South', 55), ('B', 'South', 65), ('C', 'South', 75), ('D', 'South', 85)",
+                                    )
+                                    .await?
+                                    .collect()
+                                    .await?;
+
+                                // Test 1: ORDER BY group-by column (matches index prefix) with LIMIT
+                                // Should use limit_and_reverse on the worker
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT category, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        !worker_plan.contains("Sort"),
+                                        "When ORDER BY matches index prefix, worker should use \
+                                         limit scan instead of Sort. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 2: ORDER BY non-prefix group-by column with LIMIT
+                                // Should push Sort(fetch=N) to the worker
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT category, region, sum(amount) \
+                                             FROM foo.data GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    assert!(
+                                        worker_plan.contains("Sort, fetch: 3"),
+                                        "Worker should have Sort with fetch=3. Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 3: Verify correctness of ORDER BY 2 LIMIT 3
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "SELECT category, region, sum(amount) \
+                                             FROM foo.data GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    assert_eq!(result.len(), 3);
+                                    // ORDER BY region ASC: East comes first
+                                    for row in result.get_rows() {
+                                        match &row.values()[1] {
+                                            TableValue::String(region) => {
+                                                assert_eq!(region, "East");
+                                            }
+                                            _ => panic!("expected string"),
+                                        }
+                                    }
+                                }
+
+                                // Test 4: ORDER BY DESC + LIMIT on a non-prefix column, grouped by a
+                                // non-prefix column (hash aggregate). The hash path bounds the worker
+                                // output with the trimming aggregate, not a Sort.
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "EXPLAIN ANALYZE SELECT region, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 DESC LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    let worker_row = &result.get_rows()[1];
+                                    let worker_plan = match &worker_row.values()[2] {
+                                        TableValue::String(s) => s.clone(),
+                                        _ => panic!("expected string"),
+                                    };
+                                    // Pin that the trim is actually configured to bound (fetch k=2,
+                                    // factor>0), not merely that the node is present -- a factor of 0
+                                    // would leave it a passthrough and reintroduce the memory pressure
+                                    // this path exists to avoid.
+                                    assert!(
+                                        worker_plan.contains("GroupByLimitAggregate, k: 2, factor: 2"),
+                                        "Hash-aggregate worker should bound output with a configured \
+                                         GroupByLimitAggregate (k=2, factor=2). Plan: {}",
+                                        worker_plan
+                                    );
+                                }
+
+                                // Test 5: Verify correctness of ORDER BY 1 DESC LIMIT 2
+                                {
+                                    let result = service
+                                        .exec_query(
+                                            "SELECT region, sum(amount) \
+                                             FROM foo.data GROUP BY 1 ORDER BY 1 DESC LIMIT 2",
+                                        )
+                                        .await?
+                                        .collect()
+                                        .await?;
+
+                                    assert_eq!(result.len(), 2);
+                                    let regions: Vec<&str> = result
+                                        .get_rows()
+                                        .iter()
+                                        .map(|r| match &r.values()[0] {
+                                            TableValue::String(s) => s.as_str(),
+                                            _ => panic!("expected string"),
+                                        })
+                                        .collect();
+                                    assert_eq!(regions, vec!["West", "South"]);
+                                }
+
+                                Ok::<(), CubeError>(())
+                            })
+                            .await;
+                        Ok::<(), CubeError>(())
+                    })
+                    .await;
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
     }
 }
 

@@ -36,25 +36,18 @@ impl FullKeyAggregateQueryPlanner {
     }
 
     /// Wraps `plan_logical_source` in a `Query` with the request's
-    /// filters, modifiers and multi-stage members.
+    /// filters and modifiers.
     pub fn plan_logical_plan(
         &self,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
-        all_multistage_members: Vec<Rc<LogicalMultiStageMember>>,
     ) -> Result<Rc<Query>, CubeError> {
         let source = self.plan_logical_source(multi_stage_subqueries)?;
         let source = source.into();
 
-        let multiplied_measures = self
-            .query_properties
-            .full_key_aggregate_measures()?
-            .rendered_as_multiplied_measures
-            .clone();
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
-            .set_measures(self.query_properties.measures().clone())
-            .set_multiplied_measures(multiplied_measures)
+            .set_measures(self.query_properties.select_measures()?)
             .into_rc();
 
         let logical_filter = Rc::new(LogicalFilter {
@@ -65,7 +58,6 @@ impl FullKeyAggregateQueryPlanner {
         });
         let result = Query::builder()
             .schema(schema)
-            .multistage_members(all_multistage_members)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),

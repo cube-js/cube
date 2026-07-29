@@ -53,7 +53,7 @@ configuration file:
 module.exports = {
   // Create a new appId for each team, this prevents teams from seeing each
   // other's data
-  // https://cube.dev/docs/product/configuration/reference/config#contexttoappid
+  // https://cube.dev/docs/product/configuration/reference/config#context_to_app_id
   contextToAppId: ({ securityContext }) => {
     return securityContext.team
   },
@@ -163,6 +163,6 @@ SELECT * FROM orders WHERE __user = 'anotheruser';
   https://docs.preset.io/docs/row-level-security-rls#define-inclusive-regular-rls-filter
 [ref-config-can-switch-sql-user]: /reference/configuration/config#canswitchsqluser
 [ref-config-check-sql-auth]: /reference/configuration/config#checksqlauth
-[ref-config-ctx-to-app-id]: /reference/configuration/config#contexttoappid
+[ref-config-ctx-to-app-id]: /reference/configuration/config#context_to_app_id
 [ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
 [ref-dynamic-schemas]: /docs/data-modeling/dynamic

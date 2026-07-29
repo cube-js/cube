@@ -2,35 +2,35 @@
   "name": "@cubejs-backend/dremio-driver",
   "description": "Cube.js Dremio driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.6.52",
+  "version": "1.7.14",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-dremio-driver"
   },
   "engines": {
-    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+    "node": ">=20.0.0"
   },
   "main": "driver/DremioDriver.js",
   "scripts": {
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "yarn integration",
+    "unit": "jest --verbose dist/test/unit",
     "integration": "npm run integration:dremio",
     "integration:dremio": "jest --verbose dist/test",
     "lint": "eslint driver/*.js",
     "lint:fix": "eslint driver/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.6.52",
-    "@cubejs-backend/schema-compiler": "1.6.52",
-    "@cubejs-backend/shared": "1.6.52",
-    "axios": "^1.8.3",
-    "sqlstring": "^2.3.1"
+    "@cubejs-backend/base-driver": "1.7.14",
+    "@cubejs-backend/schema-compiler": "1.7.14",
+    "@cubejs-backend/shared": "1.7.14",
+    "axios": "^1.8.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.6.52",
-    "@cubejs-backend/testing-shared": "1.6.52",
+    "@cubejs-backend/linter": "1.7.14",
+    "@cubejs-backend/testing-shared": "1.7.14",
     "jest": "^29"
   },
   "license": "Apache-2.0",

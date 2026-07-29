@@ -1,5 +1,6 @@
 use super::pretty_print::*;
 use super::*;
+use crate::planner::planners::multi_stage::EvaluationContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,6 +17,11 @@ pub struct AggregateMultipliedSubquery {
     pub keys_subquery: Rc<KeysSubQuery>,
     pub source: AggregateMultipliedSubquerySource,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
+    // `Some` when this CTE was hoisted out of a multi-stage leaf
+    // scope: the leaf's time shifts and measure-rendering flags it
+    // must render under. `None` for top-level multiplied measures —
+    // the ambient build context applies.
+    pub evaluation_context: Option<EvaluationContext>,
     // When Some, physical builder short-circuits to this query instead of
     // rendering the native multiplied-subquery SELECT. Set by the pre-aggregation
     // optimizer when a matching pre-aggregation replaces this CTE.
@@ -47,6 +53,7 @@ impl LogicalNode for AggregateMultipliedSubquery {
                 .iter()
                 .map(|itm| itm.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
+            evaluation_context: self.evaluation_context.clone(),
             pre_aggregation_override: match pre_aggregation_override {
                 Some(node) => Some(node.clone().into_logical_node()?),
                 None => None,

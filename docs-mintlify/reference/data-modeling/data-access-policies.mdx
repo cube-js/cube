@@ -11,9 +11,9 @@ can be configured using the following parameters:
 - [`group`](#group) or [`groups`](#groups) define which groups a policy applies to.
 - [`conditions`](#conditions) can be optionally used to specify when a policy
 takes effect.
-- [`member_level`](#member-level) and [`row_level`](#row-level) parameters are used
+- [`member_level`](#member_level) and [`row_level`](#row_level) parameters are used
 to configure [member-level][ref-dap-mls] and [row-level][ref-dap-rls] access.
-- [`member_masking`](#member-masking) can be optionally used to configure
+- [`member_masking`](#member_masking) can be optionally used to configure
 [data masking][ref-dap-masking] for members not included in `member_level`.
 
 <Info>
@@ -207,6 +207,72 @@ cube(`orders`, {
 ```
 
 </CodeGroup>
+
+#### Supported operators
+
+The `if` expression must evaluate to a boolean. The syntax you can use inside it
+depends on the data model format:
+
+- In **YAML** data models, the expression inside `{ }` is evaluated as a Python
+expression. Only logical operators, member access, and method calls are supported.
+- In **JavaScript** data models, the expression is evaluated as a JavaScript
+expression, so a broader set of operators is available.
+
+The following operators and constructs are supported:
+
+| Operator | Python (YAML) | JavaScript |
+| --- | --- | --- |
+| Logical AND | `and` | `&&` |
+| Logical OR | `or` | <code>&#124;&#124;</code> |
+| Logical NOT | `not` | `!` |
+| Member access | `.` | `.` |
+| Method call (e.g., `includes`) | `.includes(…)` | `.includes(…)` |
+| Equality and inequality | — | `===`, `!==`, `==`, `!=` |
+| Comparison | — | `<`, `>`, `<=`, `>=` |
+| Arithmetic | — | `+`, `-`, `*`, `/`, `%`, `**` |
+| Ternary | — | `? :` |
+| Optional chaining | — | `?.` |
+
+For example, the following policy applies to users who are not blocked, are either
+administrators or based in the EMEA region, and belong to the `admins` group. Each
+requirement is expressed as a separate condition, and all conditions must be `true`
+for the policy to take effect:
+
+<CodeGroup>
+
+```yaml title="YAML"
+conditions:
+  - if: "{ not userAttributes.is_blocked }"
+  - if: "{ userAttributes.is_admin or userAttributes.is_EMEA_based }"
+  - if: "{ userAttributes.groups.includes('admins') }"
+```
+
+```javascript title="JavaScript"
+conditions: [
+  { if: !userAttributes.is_blocked },
+  { if: userAttributes.is_admin || userAttributes.is_EMEA_based },
+  { if: userAttributes.groups.includes(`admins`) }
+]
+```
+
+</CodeGroup>
+
+<Tip>
+
+Prefer decomposing a condition chained with logical AND into separate
+conditions. Since conditions are combined with AND, the result is equivalent
+but easier to read and maintain.
+
+</Tip>
+
+<Note>
+
+The set of operators supported in JavaScript data models is currently broader than
+in YAML data models. If you'd like to use additional operators in YAML, please
+request support by opening an issue on
+[GitHub](https://github.com/cube-js/cube/issues?q=is%3Aissue+label%3A%22data+modeling%3Aaccess+policies%22).
+
+</Note>
 
 ### `member_level`
 
@@ -502,15 +568,15 @@ cube(`orders`, {
 
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-ref-views]: /reference/data-modeling/view
-[ref-dap]: /docs/data-modeling/access-control/data-access-policies
-[ref-dap-mls]: /docs/data-modeling/access-control/data-access-policies#member-level-access
-[ref-dap-rls]: /docs/data-modeling/access-control/data-access-policies#row-level-access
+[ref-dap]: /docs/data-modeling/data-access-policies
+[ref-dap-mls]: /docs/data-modeling/data-access-policies#member_level-access
+[ref-dap-rls]: /docs/data-modeling/data-access-policies#row_level-access
 [ref-mls]: /docs/data-modeling/access-control/member-level-security
 [ref-rls]: /docs/data-modeling/access-control/row-level-security
 [ref-sec-ctx]: /docs/data-modeling/access-control/context
 [ref-core-data-apis]: /reference/core-data-apis
-[ref-dap-masking]: /docs/data-modeling/access-control/data-access-policies#data-masking
+[ref-dap-masking]: /docs/data-modeling/data-access-policies#data-masking
 [ref-mask-dim]: /reference/data-modeling/dimensions#mask
-[ref-rest-query-filters]: /reference/rest-api/query-format#filters-format
-[ref-rest-query-ops]: /reference/rest-api/query-format#filters-operators
-[ref-rest-boolean-ops]: /reference/rest-api/query-format#boolean-logical-operators
+[ref-rest-query-filters]: /reference/core-data-apis/rest-api/query-format#filters-format
+[ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
+[ref-rest-boolean-ops]: /reference/core-data-apis/rest-api/query-format#boolean-logical-operators

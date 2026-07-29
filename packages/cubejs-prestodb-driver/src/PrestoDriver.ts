@@ -16,6 +16,7 @@ import {
 import {
   getEnv,
   assertDataSource,
+  formatAnsi,
 } from '@cubejs-backend/shared';
 
 import { Transform, TransformCallback } from 'stream';
@@ -24,7 +25,6 @@ import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 import {
   map, zipObj, prop, concat
 } from 'ramda';
-import SqlString from 'sqlstring';
 
 const presto = require('presto-client');
 
@@ -53,7 +53,7 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverI
   custom_auth?: string;
   // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
-  ssl?: string | TLSConnectionOptions;
+  ssl?: TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
   preAggregations?: boolean;
@@ -132,6 +132,61 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       engine: 'presto',
       ...this.config,
     });
+
+    this.applyCustomHeadersToAllRequests(this.client);
+  }
+
+  /**
+   * https://github.com/tagomoris/presto-client-node/pull/97
+   *
+   * Reason for monkey patching:
+   *
+   * The underlying `presto-client` only applies custom headers to the initial
+   * `POST /v1/statement` request. The follow-up `nextUri` GET polls (and the
+   * cancel/kill/node requests) are issued with a fresh, empty header set.
+   */
+  protected applyCustomHeadersToAllRequests(client: any) {
+    const customHeaders = this.config.headers;
+    if (!customHeaders || Object.keys(customHeaders).length === 0) {
+      return;
+    }
+
+    // `request` lives on the prototype; capture it before shadowing it on the instance.
+    const originalRequest = client.request;
+
+    client.request = function patchedRequest(opts: any, callback: any) {
+      if (typeof opts === 'string') {
+        // `opts` is a `nextUri` URL string. The upstream client rebuilds GET
+        // options from it with empty headers, dropping our custom headers. We
+        // recreate those options ourselves (seeded with the custom headers) and
+        // invoke the original `request` with a client "view" whose host/port/
+        // protocol point at the `nextUri` target. The original object branch
+        // otherwise forces the client's configured host, so the view preserves
+        // upstream's host-following behaviour.
+        let href;
+        try {
+          href = new URL(opts);
+        } catch (error) {
+          return callback(error);
+        }
+
+        const view = Object.create(this);
+        view.host = href.hostname;
+        view.port = href.port || (href.protocol === 'https:' ? '443' : '80');
+        view.protocol = href.protocol;
+
+        return originalRequest.call(view, {
+          method: 'GET',
+          path: href.pathname + href.search,
+          headers: { ...customHeaders },
+        }, callback);
+      }
+
+      // Object form (POST /v1/statement, DELETE cancel/kill, node list, ...).
+      // Merge in the custom headers, letting any explicitly-provided headers win.
+      opts.headers = { ...customHeaders, ...(opts.headers || {}) };
+      return originalRequest.call(this, opts, callback);
+    };
   }
 
   public async testConnection(): Promise<void> {
@@ -153,18 +208,15 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async testConnectionViaSelect() {
-    const query = SqlString.format('SELECT 1', []);
-    await this.queryPromised(query, false);
+    await this.queryPromised('SELECT 1', false);
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {
     return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false);
   }
 
-  public prepareQueryWithParams(query: string, values: unknown[]) {
-    return SqlString.format(query, (values || []).map(value => (typeof value === 'string' ? {
-      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1'),
-    } : value)));
+  protected prepareQueryWithParams(query: string, values: unknown[]) {
+    return formatAnsi(query, values || []);
   }
 
   public queryPromised(query: string, streaming: boolean): Promise<any[] | StreamTableData> {

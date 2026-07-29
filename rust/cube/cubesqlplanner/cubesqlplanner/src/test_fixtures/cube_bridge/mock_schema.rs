@@ -600,12 +600,19 @@ impl MockViewBuilder {
                             "number" | "string" | "time" | "boolean" => original_type.clone(),
                             _ => "number".to_string(),
                         };
+                        // A view member re-exports the source measure's
+                        // multi_stage flag and order_by, so order_by templates
+                        // are resolved in the view's cube context (where their
+                        // referenced members may be absent), matching how view
+                        // members are materialized in the schema compiler.
                         all_measures.insert(
                             view_name,
                             Rc::new(
                                 MockMeasureDefinition::builder()
                                     .measure_type(view_type)
                                     .sql(view_member_sql)
+                                    .multi_stage(measure.static_data().multi_stage)
+                                    .order_by(measure.raw_order_by())
                                     .build(),
                             ),
                         );
@@ -664,7 +671,8 @@ mod tests {
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
-    use crate::test_fixtures::cube_bridge::MockBaseTools;
+
+    use crate::test_fixtures::cube_bridge::mock_compiled;
 
     #[test]
     fn test_basic_schema() {
@@ -1201,9 +1209,6 @@ mod tests {
 
     #[test]
     fn test_view_with_multiple_long_join_paths() {
-        use crate::test_fixtures::cube_bridge::MockSecurityContext;
-        use std::rc::Rc;
-
         let schema = MockSchemaBuilder::new()
             .add_cube("visitors")
             .add_dimension(
@@ -1260,12 +1265,7 @@ mod tests {
         let checkin_id_sql = checkin_id_dim.sql().unwrap().unwrap();
 
         // Compile template and check symbol_paths structure
-        let (_template, args) = checkin_id_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(checkin_id_sql);
 
         // Should have exactly one symbol path
         assert_eq!(
@@ -1286,12 +1286,7 @@ mod tests {
             .unwrap();
         let checkin_count_sql = checkin_count_measure.sql().unwrap().unwrap();
 
-        let (_template, args) = checkin_count_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(checkin_count_sql);
 
         assert_eq!(
             args.symbol_paths.len(),
@@ -1309,12 +1304,7 @@ mod tests {
         let id_dim = schema.get_dimension("multi_path_view", "id").unwrap();
         let id_sql = id_dim.sql().unwrap().unwrap();
 
-        let (_template, args) = id_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(id_sql);
 
         assert_eq!(
             args.symbol_paths.len(),
@@ -1330,12 +1320,7 @@ mod tests {
         let count_measure = schema.get_measure("multi_path_view", "count").unwrap();
         let count_sql = count_measure.sql().unwrap().unwrap();
 
-        let (_template, args) = count_sql
-            .compile_template_sql(
-                Rc::new(MockBaseTools::default()),
-                Rc::new(MockSecurityContext),
-            )
-            .unwrap();
+        let (_template, args) = mock_compiled(count_sql);
 
         assert_eq!(
             args.symbol_paths.len(),

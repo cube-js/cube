@@ -253,6 +253,57 @@ describe('SubscriptionServer', () => {
       );
     });
 
+    it('should forward onlyViews param for meta', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const message = {
+        method: 'meta',
+        messageId: '123',
+        params: { onlyViews: true }
+      };
+      await server.processMessage('conn-1', JSON.stringify(message));
+
+      expect(mockApiGateway.handleError).not.toHaveBeenCalled();
+      expect(mockApiGateway.meta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          onlyViews: true,
+          connectionId: 'conn-1',
+          apiType: 'ws',
+        })
+      );
+    });
+
+    it('should reject a non-boolean onlyViews param for meta', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const message = {
+        method: 'meta',
+        messageId: '123',
+        params: { onlyViews: 'true' }
+      };
+      await server.processMessage('conn-1', JSON.stringify(message));
+
+      expect(mockApiGateway.meta).not.toHaveBeenCalled();
+      expect(mockApiGateway.handleError).toHaveBeenCalled();
+    });
+
+    it('should still reject unknown meta params', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      const message = {
+        method: 'meta',
+        messageId: '123',
+        params: { somethingElse: true }
+      };
+      await server.processMessage('conn-1', JSON.stringify(message));
+
+      expect(mockApiGateway.meta).not.toHaveBeenCalled();
+      expect(mockApiGateway.handleError).toHaveBeenCalled();
+    });
+
     it('should forward cache param as cacheMode for load', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);

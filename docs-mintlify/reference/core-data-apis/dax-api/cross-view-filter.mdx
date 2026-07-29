@@ -4,18 +4,17 @@ description: "Enable cross-view filtering in the DAX API to build dashboards tha
 ---
 
 By default, the [DAX API][ref-dax-api] exposes each [view][ref-views] as a
-separate perspective in [Power BI][ref-powerbi]. Visualizations from different
+separate perspective in Power BI. Visualizations from different
 views can't share the same filters, and a single report can't combine measures
 and dimensions across views.
 
 Cross-view filtering removes this limitation, letting you build dashboards
 that span multiple views and apply filters consistently across visualizations.
-It is supported in both [Live connection](#live-connection-mode) and
-[DirectQuery](#directquery-mode) modes.
 
 To use cross-view filters such as slicers, you must enable single-perspective mode
 in the DAX API. To enable single-perspective mode in the DAX API,
-set the `CUBEJS_DAX_SINGLE_PERSPECTIVE` environment variable to `true`.
+set the [`CUBEJS_DAX_SINGLE_PERSPECTIVE`](/reference/configuration/environment-variables#cubejs_dax_single_perspective)
+environment variable to `true`.
 
 In single-perspective mode, all views are exposed as part of a single perspective.
 This allows you to use a single connection and show visualizations from different
@@ -29,10 +28,10 @@ enabling this environment variable.
 
 </Warning>
 
-## Live connection mode
+## How it works
 
-In Live connection mode, cross-view filters work automatically, provided that
-the following two conditions are met:
+Cross-view filters work automatically, provided that the following two
+conditions are met:
 
 - The column used in the filter must be present in every view that the
 cross-filter has to be applied to, and named exactly the same in each view.
@@ -52,37 +51,28 @@ Likewise, if `orders_view` exposes an `address_country` column pointing to
 `country.country`, cross-filtering will not be applied, because the column
 names differ between the views.
 
-## DirectQuery mode
+## Measure names
 
-In DirectQuery mode, cross-view filters require the same two conditions as in
-[Live connection mode](#live-connection-mode): the filter column must be
-present in every view with the exact same name, and it must resolve to the
-same cube member across those views.
+Because all views share a single perspective, measures are identified by their
+view name and measure name, joined with a dot: `<view>.<measure>`. This keeps
+measures with the same name in different views from colliding.
 
-In addition, you must manually configure relationships between tables in Power
-BI so that filters propagate across views:
+Field names shown in Power BI are unaffected, so a `count` measure still appears
+as `Count` in the field list. However, when writing DAX explicitly, reference
+measures by their qualified name:
 
-- Open **Model view** in the left sidebar.
-- On the right, open the **Data** sidebar, then the **Model** tab.
-- Right-click **Relationships** and choose **New relationship**.
-- In the **Properties** sidebar, select a table and a column.
-- For cardinality, choose **Many to many (\*:\*)**. Ignore the warning.
-- Select another table with the same column.
-- For cross-filter direction, select **Both**.
-- Click **Apply changes**.
+```text
+CALCULATE('orders_view'[orders_view.count], 'orders_view'[status] = "completed")
+```
 
-Once the relationship is configured correctly, cross-view filters will work in
-DirectQuery mode.
+The table qualifier can also be omitted, since the prefix already identifies the
+view:
 
-The steps above describe configuring a relationship between two tables. When
-many views need to be cross-filtered, the best practice is to create a single
-view in the Cube data model that includes all the columns from the views that
-need to be cross-filtered, and then create relationships between this large
-view and each of the other views. This keeps the relationship graph in Power
-BI simple and avoids configuring pairwise relationships between every
-combination of views.
+```text
+[orders_view.count]
+```
 
+Dimensions are not prefixed and are referenced by their column name.
 
 [ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-views]: /docs/data-modeling/views
-[ref-powerbi]: /admin/connect-to-data/visualization-tools/powerbi

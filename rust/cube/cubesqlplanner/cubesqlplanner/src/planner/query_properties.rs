@@ -6,8 +6,10 @@
 //! For inputs that originate from `BaseQueryOptions`, see
 //! [`QueryPropertiesCompiler`](super::query_properties_compiler).
 
-use super::query_tools::QueryTools;
+use super::state::State;
 use super::MemberSymbol;
+use crate::cube_bridge::base_query_options::FilterValue;
+use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
@@ -21,7 +23,7 @@ use crate::planner::{
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::OnceCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -92,15 +94,34 @@ impl MultipliedMeasure {
 
 /// Measures classified by how the planner must compute them: directly
 /// aggregated alongside the rest of the query, wrapped in a multiplied
-/// subquery, or planned as a multi-stage CTE. `rendered_as_multiplied`
-/// tracks symbols that were originally multiplied even after additivity
-/// reclassification flips them into `regular_measures`.
+/// subquery, or planned as a multi-stage CTE.
+///
+/// `render_forms` maps a leaf measure's full name to its distinct
+/// render form (a `count` rewritten to `MultipliedCount`), recorded
+/// during the single classification pass. Applied via [`Self::render`].
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<MemberSymbol>>,
     pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    pub rendered_as_multiplied_measures: HashSet<String>,
+    render_forms: HashMap<String, Rc<MemberSymbol>>,
+}
+
+impl FullKeyAggregateMeasures {
+    /// Rewrite a selected measure into its render form: every multiplied
+    /// `count` in its dependency tree — the measure itself or one nested
+    /// in a calculated expression — is substituted with the distinct
+    /// form recorded during classification. Measures with no multiplied
+    /// count pass through unchanged.
+    pub fn render(&self, measure: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
+        measure.apply_recursive(&|node| {
+            Ok(self
+                .render_forms
+                .get(&node.full_name())
+                .cloned()
+                .unwrap_or_else(|| node.clone()))
+        })
+    }
 }
 
 /// The full description of a query: selected members, filters, ordering,
@@ -115,7 +136,7 @@ pub struct FullKeyAggregateMeasures {
 #[derive(Clone, TypedBuilder)]
 #[builder(build_method(into = Result<Rc<QueryProperties>, CubeError>))]
 pub struct QueryProperties {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     #[builder(default)]
     measures: Vec<Rc<MemberSymbol>>,
     #[builder(default)]
@@ -146,6 +167,17 @@ pub struct QueryProperties {
     ungrouped: bool,
     #[builder(default)]
     pre_aggregation_query: bool,
+    /// Pre-aggregation matching only: run the pre-aggregation optimizer to determine
+    /// which pre-aggregation a query would use, but skip building the outer query's
+    /// physical SQL. Used by the refresh/metadata path, which needs the match (and the
+    /// pre-agg's own load SQL) but not the outer query — that outer query may include a
+    /// rolling-window time series which requires a date range the refresh path doesn't have.
+    #[builder(default)]
+    pre_aggregations_match_only: bool,
+    /// When building a rollup pre-aggregation, source it from the cube's
+    /// `originalSql` pre-aggregation table instead of the raw cube SQL.
+    #[builder(default)]
+    use_original_sql_pre_aggregations_in_pre_aggregation: bool,
     #[builder(default)]
     total_query: bool,
     #[builder(default = Rc::new(JoinHints::new()))]
@@ -156,6 +188,10 @@ pub struct QueryProperties {
     disable_external_pre_aggregations: bool,
     #[builder(default)]
     pre_aggregation_id: Option<String>,
+    /// Query-level joins against opaque sub-queries, from the SQL API
+    /// `subqueryJoins`. Folded into the query's `LogicalJoin` source.
+    #[builder(default)]
+    subquery_joins: Vec<LogicalSubqueryJoinItem>,
     #[builder(setter(skip), default)]
     multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
 }
@@ -167,11 +203,15 @@ pub struct QueryProperties {
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
         if qp.order_by.is_none() {
-            qp.order_by = Some(QueryProperties::default_order(
-                &qp.dimensions,
-                &qp.time_dimensions,
-                &qp.measures,
-            ));
+            // Pre-aggregation build and total queries get no default order:
+            // it is pointless for materialization and breaks streaming
+            // pre-aggregations, whose target only accepts an unsorted
+            // projection/filter over the source.
+            qp.order_by = Some(if qp.pre_aggregation_query || qp.total_query {
+                vec![]
+            } else {
+                QueryProperties::default_order(&qp.dimensions, &qp.time_dimensions, &qp.measures)
+            });
         }
         qp.apply_static_filters()?;
         Ok(Rc::new(qp))
@@ -181,6 +221,10 @@ impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
 impl QueryProperties {
     pub fn allow_multi_stage(&self) -> bool {
         self.allow_multi_stage
+    }
+
+    pub fn subquery_joins(&self) -> &Vec<LogicalSubqueryJoinItem> {
+        &self.subquery_joins
     }
 
     // Push every entry of `dimensions_filters` into matching `case`
@@ -319,6 +363,14 @@ impl QueryProperties {
 
     pub fn is_pre_aggregation_query(&self) -> bool {
         self.pre_aggregation_query
+    }
+
+    pub fn is_pre_aggregations_match_only(&self) -> bool {
+        self.pre_aggregations_match_only
+    }
+
+    pub fn use_original_sql_pre_aggregations_in_pre_aggregation(&self) -> bool {
+        self.use_original_sql_pre_aggregations_in_pre_aggregation
     }
 
     pub fn disable_external_pre_aggregations(&self) -> bool {
@@ -480,31 +532,35 @@ impl QueryProperties {
                     .single_join()?
                     .expect("No join groups returned for single measure multi-fact join group");
                 for item in collect_multiplied_measures(m, &join)? {
-                    if item.multiplied {
-                        result
-                            .rendered_as_multiplied_measures
-                            .insert(item.measure.full_name());
-                    }
-                    let is_multiplied_measure = if item.multiplied {
-                        if let Ok(measure) = item.measure.as_measure() {
-                            if measure.is_additive_in_multiplied() {
-                                false
-                            } else {
-                                true
-                            }
-                        } else {
-                            true
-                        }
-                    } else {
-                        false
-                    };
-                    if is_multiplied_measure {
-                        result
-                            .multiplied_measures
-                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));
-                    } else {
+                    if !item.multiplied {
                         result.regular_measures.push(item.measure.clone());
+                        continue;
                     }
+                    let measure = item.measure.as_measure().ok();
+                    // The leaf's render form (a distinct `MultipliedCount`
+                    // for a count) — the same symbol whether it stays in the
+                    // main query or moves to a multiplied subquery.
+                    let rendered = match measure
+                        .as_ref()
+                        .and_then(|m| m.convert_multiplied_to_regular())
+                    {
+                        Some(regular) => {
+                            result.regular_measures.push(regular.clone());
+                            regular
+                        }
+                        None => {
+                            let rendered = measure
+                                .map(|m| m.into_multiplied())
+                                .unwrap_or_else(|| item.measure.clone());
+                            result
+                                .multiplied_measures
+                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_name));
+                            rendered
+                        }
+                    };
+                    result
+                        .render_forms
+                        .insert(item.measure.full_name(), rendered);
                 }
             }
         }
@@ -525,6 +581,13 @@ impl QueryProperties {
             .collect();
 
         Ok(result)
+    }
+
+    /// The query's selected measures in render form — see
+    /// [`FullKeyAggregateMeasures::render`].
+    pub fn select_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let classified = self.full_key_aggregate_measures()?;
+        self.measures.iter().map(|m| classified.render(m)).collect()
     }
 
     fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
@@ -833,26 +896,25 @@ impl QueryProperties {
         false
     }
 
-    /// Rewrite an `InDateRange` filter on `member_name` according to the
-    /// trailing/leading bounds: both `unbounded` removes the filter entirely;
-    /// trailing-`unbounded` rewrites to `BeforeOrOnDate(to)`; leading-
-    /// `unbounded` rewrites to `AfterOrOnDate(from)`. Other inputs are
-    /// no-ops.
+    /// Rewrite an `InDateRange(from, to)` filter on `member_name` into a single
+    /// rolling-window-over-date-range filter anchored by `offset`. The window is
+    /// rendered by `RollingWindowOffsetOp`; here we only carry the inputs
+    /// (`from`, `to`, `trailing`, `leading`, `offset`). No rolling interval on
+    /// either side (e.g. running total, to_date) keeps the filter as-is; both
+    /// sides `unbounded` drops it entirely.
     pub fn replace_date_range_for_rolling_window_without_granularity(
         &mut self,
         member_name: &str,
         trailing: &Option<String>,
         leading: &Option<String>,
+        offset: &str,
     ) -> Result<(), CubeError> {
-        let trailing_unbounded = trailing.as_deref() == Some("unbounded");
-        let leading_unbounded = leading.as_deref() == Some("unbounded");
-
-        if !trailing_unbounded && !leading_unbounded {
+        if trailing.is_none() && leading.is_none() {
             return Ok(());
         }
 
-        if trailing_unbounded && leading_unbounded {
-            // Both unbounded — remove the date range filter entirely
+        // Both sides unbounded: the window spans everything, drop the date filter.
+        if trailing.as_deref() == Some("unbounded") && leading.as_deref() == Some("unbounded") {
             self.time_dimensions_filters.retain(|item| match item {
                 FilterItem::Item(itm) => {
                     !(itm.member_name() == member_name
@@ -860,57 +922,25 @@ impl QueryProperties {
                 }
                 _ => true,
             });
-        } else if trailing_unbounded {
-            // Remove lower bound: InDateRange(from, to) → BeforeOrOnDate(to)
-            let mut new_filters = Vec::new();
-            for item in self.time_dimensions_filters.iter() {
-                match item {
-                    FilterItem::Item(itm)
-                        if itm.member_name() == member_name
-                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
-                    {
-                        let values = itm.values();
-                        let to_value = if values.len() >= 2 {
-                            vec![values[1].clone()]
-                        } else {
-                            values.clone()
-                        };
-                        new_filters.push(FilterItem::Item(itm.change_operator(
-                            FilterOperator::BeforeOrOnDate,
-                            to_value,
-                            itm.use_raw_values(),
-                        )?));
-                    }
-                    other => new_filters.push(other.clone()),
-                }
-            }
-            self.time_dimensions_filters = new_filters;
-        } else {
-            // leading unbounded: remove upper bound: InDateRange(from, to) → AfterOrOnDate(from)
-            let mut new_filters = Vec::new();
-            for item in self.time_dimensions_filters.iter() {
-                match item {
-                    FilterItem::Item(itm)
-                        if itm.member_name() == member_name
-                            && matches!(itm.filter_operator(), FilterOperator::InDateRange) =>
-                    {
-                        let values = itm.values();
-                        let from_value = if !values.is_empty() {
-                            vec![values[0].clone()]
-                        } else {
-                            values.clone()
-                        };
-                        new_filters.push(FilterItem::Item(itm.change_operator(
-                            FilterOperator::AfterOrOnDate,
-                            from_value,
-                            itm.use_raw_values(),
-                        )?));
-                    }
-                    other => new_filters.push(other.clone()),
-                }
-            }
-            self.time_dimensions_filters = new_filters;
+            self.invalidate_join_groups_cache();
+            return Ok(());
         }
+
+        // Keep the original [from, to] values and append the window inputs, so
+        // the filter carries [from, to, trailing, leading, offset].
+        let additional_values = vec![
+            FilterValue::from(trailing.clone()),
+            FilterValue::from(leading.clone()),
+            FilterValue::Str(offset.to_string()),
+        ];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &FilterOperator::RollingWindowOffsetDateRange,
+            None,
+            &additional_values,
+            &None,
+        )?;
         self.invalidate_join_groups_cache();
         Ok(())
     }
@@ -922,7 +952,10 @@ impl QueryProperties {
         right_interval: Option<String>,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::RegularRollingWindowDateRange;
-        let values = vec![left_interval.clone(), right_interval.clone()];
+        let values = vec![
+            FilterValue::from(left_interval),
+            FilterValue::from(right_interval),
+        ];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -941,7 +974,7 @@ impl QueryProperties {
         granularity: &String,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::ToDateRollingWindowDateRange;
-        let values = vec![Some(granularity.clone())];
+        let values = vec![FilterValue::Str(granularity.clone())];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -961,7 +994,7 @@ impl QueryProperties {
         new_to: String,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::InDateRange;
-        let replacement_values = vec![Some(new_from), Some(new_to)];
+        let replacement_values = vec![FilterValue::Str(new_from), FilterValue::Str(new_to)];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -983,7 +1016,7 @@ impl QueryProperties {
         new_to: String,
     ) -> Result<(), CubeError> {
         let operator = FilterOperator::InDateRange;
-        let replacement_values = vec![Some(new_from), Some(new_to)];
+        let replacement_values = vec![FilterValue::Str(new_from), FilterValue::Str(new_to)];
         self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
@@ -1002,8 +1035,8 @@ impl QueryProperties {
         filters: &[FilterItem],
         operator: &FilterOperator,
         use_raw_values: Option<bool>,
-        additional_values: &Vec<Option<String>>,
-        replacement_values: &Option<Vec<Option<String>>>,
+        additional_values: &Vec<FilterValue>,
+        replacement_values: &Option<Vec<FilterValue>>,
     ) -> Result<Vec<FilterItem>, CubeError> {
         let mut result = Vec::new();
         for item in filters.iter() {
@@ -1033,7 +1066,15 @@ impl QueryProperties {
                         };
                         values.extend(additional_values.iter().cloned());
                         let use_raw_values = use_raw_values.unwrap_or(itm.use_raw_values());
-                        itm.change_operator(operator.clone(), values, use_raw_values)?
+                        itm.change_operator(
+                            operator.clone(),
+                            values,
+                            use_raw_values,
+                            self.query_tools.query_tools().clone(),
+                            // FIXME: late compilation — only needed to recompile a
+                            // to_date rolling-window granularity here.
+                            Some(&mut self.query_tools.compiler().borrow_mut()),
+                        )?
                     } else {
                         itm.clone()
                     };
@@ -1085,11 +1126,14 @@ impl PartialEq for QueryProperties {
             ungrouped,
             ignore_cumulative,
             pre_aggregation_query,
+            pre_aggregations_match_only,
+            use_original_sql_pre_aggregations_in_pre_aggregation,
             total_query,
             allow_multi_stage,
             disable_external_pre_aggregations,
             pre_aggregation_id,
             query_join_hints,
+            subquery_joins,
             // Not part of semantic equality:
             query_tools: _,
             multi_fact_join_groups: _,
@@ -1109,10 +1153,27 @@ impl PartialEq for QueryProperties {
             && *ungrouped == other.ungrouped
             && *ignore_cumulative == other.ignore_cumulative
             && *pre_aggregation_query == other.pre_aggregation_query
+            && *pre_aggregations_match_only == other.pre_aggregations_match_only
+            && *use_original_sql_pre_aggregations_in_pre_aggregation
+                == other.use_original_sql_pre_aggregations_in_pre_aggregation
             && *total_query == other.total_query
             && *allow_multi_stage == other.allow_multi_stage
             && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
             && *pre_aggregation_id == other.pre_aggregation_id
             && *query_join_hints == other.query_join_hints
+            // Sub-query joins compared semantically: the request triple
+            // (`sql`, `alias`, `join_type`) plus the compiled ON condition
+            // (`on_sql` via `SqlCall::struct_eq`), so two joins differing
+            // only in their ON are not equal.
+            && subquery_joins.len() == other.subquery_joins.len()
+            && subquery_joins
+                .iter()
+                .zip(other.subquery_joins.iter())
+                .all(|(a, b)| {
+                    a.sql == b.sql
+                        && a.alias == b.alias
+                        && a.join_type == b.join_type
+                        && a.on_sql.struct_eq(&b.on_sql)
+                })
     }
 }

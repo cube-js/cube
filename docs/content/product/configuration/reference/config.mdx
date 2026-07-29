@@ -446,7 +446,7 @@ You can pass this object to set advanced options for the query orchestrator.
 
 | Option                                         | Description                                                                                                                                                                                                                                                                                                                                                                                       | Default Value           |
 |------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| `continueWaitTimeout`                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `5`                     |
+| `continueWaitTimeout`                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `10`                    |
 | `rollupOnlyMode`                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                  | `false`                 |
 | `queryCacheOptions`                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
 | `queryCacheOptions.refreshKeyRenewalThreshold` | Time in seconds to cache the result of [`refresh_key`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                     | `defined by DB dialect` |
@@ -1473,40 +1473,6 @@ Usually used for [multitenancy][ref-multitenancy].
 
 If not defined, Cube will lookup for environment variable
 <EnvVar>CUBEJS_DB_TYPE</EnvVar> to resolve the data source type.
-
-### `context_to_roles`
-
-<WarningBox>
-
-`context_to_roles` is deprecated and will be removed in a future release.
-Use [`context_to_groups`](#context_to_groups) instead.
-
-</WarningBox>
-
-Used by [access policies][ref-dap]. This option is used to derive a list of
-[data access roles][ref-dap-roles] from the [security context][ref-sec-ctx].
-
-<CodeTabs>
-
-```python
-from cube import config
-
-@config('context_to_roles')
-def context_to_roles(ctx: dict) -> list[str]:
-  return ctx['securityContext'].get('roles', ['default'])
-```
-
-```javascript
-
-module.exports = {
-  contextToRoles: ({ securityContext }) => {
-    return securityContext.roles || ['default']
-  }
-}
-```
-
-</CodeTabs>
-
 
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported

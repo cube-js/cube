@@ -815,15 +815,15 @@ const CubeRefreshKeySchema = condition(
 );
 
 const measureType = Joi.string().valid(
-  'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
+  'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'countDistinctApprox'
 );
 
 const measureTypeWithCount = Joi.string().valid(
-  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'countDistinctApprox'
 );
 
 const multiStageMeasureType = Joi.string().valid(
-  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox', 'numberAgg',
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'countDistinctApprox', 'numberAgg',
   'rank'
 );
 
@@ -1130,8 +1130,7 @@ const RowLevelPolicySchema = Joi.object().keys({
   allowAll: Joi.boolean().valid(true).strict(),
 }).xor('filters', 'allowAll');
 
-const RolePolicySchema = Joi.object().keys({
-  role: Joi.string(),
+const GroupPolicySchema = Joi.object().keys({
   group: Joi.string(),
   groups: Joi.array().items(Joi.string()),
   memberLevel: MemberLevelPolicySchema,
@@ -1142,9 +1141,7 @@ const RolePolicySchema = Joi.object().keys({
   })),
 })
   .nand('group', 'groups') // Cannot have both group and groups
-  .nand('role', 'group') // Cannot have both role and group
-  .nand('role', 'groups') // Cannot have both role and groups
-  .or('role', 'group', 'groups') // Must have at least one
+  .or('group', 'groups') // Must have at least one
   .with('memberMasking', 'memberLevel'); // memberMasking requires memberLevel
 
 /* *****************************
@@ -1199,7 +1196,7 @@ const baseSchema = {
   dimensions: DimensionsSchema,
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
-  accessPolicy: Joi.array().items(RolePolicySchema.required()),
+  accessPolicy: Joi.array().items(GroupPolicySchema.required()),
   hierarchies: hierarchySchema,
 };
 
@@ -1226,6 +1223,51 @@ const folderSchema = Joi.object().keys({
     ),
   ]).required(),
 }).id('folderSchema');
+
+// A view group's `includes`: a function, or an array of view references
+// (string/function) and nested view group definitions (resolved via the shared
+// `#nestedViewGroupSchema` link). Shared between the top-level and nested
+// schemas; the nested schema makes it `.required()`.
+const viewGroupIncludesSchema = Joi.alternatives([
+  Joi.func(),
+  Joi.array().items(
+    Joi.alternatives([
+      Joi.string().required(),
+      Joi.func(),
+      Joi.link('#nestedViewGroupSchema'), // Can contain nested view groups
+    ]),
+  ),
+]);
+
+// A nested view group authored inside another group's `includes`. Unlike a
+// top-level group, it MUST use `includes` (no legacy `views`), and `fileName`
+// is meaningless here, so neither is accepted. Enforcing this at validation
+// time prevents nested groups from being silently dropped by the evaluator.
+const nestedViewGroupSchema = Joi.object().keys({
+  name: Joi.string().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  includes: viewGroupIncludesSchema.required(),
+})
+  .id('nestedViewGroupSchema');
+
+const viewGroupSchema = Joi.object().keys({
+  name: Joi.string().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  // Legacy way of including views into a group, kept for backward compatibility.
+  views: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]),
+  // Preferred way of including views (and nested view groups) into a group.
+  includes: viewGroupIncludesSchema,
+  fileName: Joi.string(),
+})
+  .oxor('views', 'includes')
+  .messages({
+    'object.oxor': 'View group must use either "views" or "includes", but not both'
+  })
+  // Register the nested schema so the `#nestedViewGroupSchema` link above resolves.
+  .shared(nestedViewGroupSchema)
+  .id('viewGroupSchema');
 
 const ViewDefaultFilterSchema = Joi.object().keys({
   member: Joi.func().required(),
@@ -1384,6 +1426,22 @@ export class CubeValidator implements CompilerInterface {
       errorReporter.error(formatErrorMessage(result.error));
     } else {
       this.validCubes.set(cube.name, true);
+    }
+
+    return result;
+  }
+
+  public validateViewGroup(viewGroup, errorReporter: ErrorReporter) {
+    const options = {
+      nonEnumerables: true,
+      abortEarly: false, // This will allow all errors to be reported, not just the first one
+    };
+    const result = viewGroupSchema.validate(viewGroup, options);
+
+    if (result.error != null) {
+      errorReporter
+        .inContext(`${viewGroup?.name} view group`)
+        .error(formatErrorMessage(result.error));
     }
 
     return result;

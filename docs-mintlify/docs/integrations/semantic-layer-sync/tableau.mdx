@@ -2,6 +2,7 @@
 title: Semantic Layer Sync with Tableau
 sidebarTitle: Tableau
 description: This page details the support for Tableau in Semantic Layer Sync.
+hidden: true
 ---
 
 This page details the support for [Tableau](https://www.tableau.com)
@@ -166,6 +167,40 @@ or `process.env.CUBEJS_TABLEAU_PAT_SECRET` in JavaScript.
 When connecting a Cube Cloud data source to your Tableau workbook, you will be prompted
 to enter the user name and password for Cube Cloud. You can find them at the&nbsp;**SQL
 API Connection** tab on the&nbsp;**IDE → Integrations** page in Cube Cloud.
+
+### Least-privilege mode
+
+By default, Semantic Layer Sync manages Tableau project permissions, which
+requires the personal access token to belong to a Site Administrator.
+
+Enable **Least-privilege mode** to run the sync without Site Administrator
+privileges. When enabled, Cube does not manage Tableau project permissions, so:
+
+- `userNamesWithAccess` and `groupNamesWithAccess` are ignored — manage access
+  to the synced project in Tableau instead.
+- The top-level project must already exist, unless the personal access token
+  has permission to create it.
+
+You can enable it with the **Least-privilege mode** checkbox in the sync wizard,
+or by setting `leastPrivilegeMode` in your configuration:
+
+<CodeGroup>
+
+```python title="Python"
+'config': {
+  # ...
+  'leastPrivilegeMode': True,
+},
+```
+
+```javascript title="JavaScript"
+config: {
+  // ...
+  leastPrivilegeMode: true
+}
+```
+
+</CodeGroup>
 
 ## Features
 

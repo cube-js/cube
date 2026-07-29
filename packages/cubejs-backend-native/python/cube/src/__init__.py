@@ -65,7 +65,6 @@ class Configuration:
     context_to_cube_store_router_id: Union[str, Callable[[RequestContext], str]]
     driver_factory: Callable[[RequestContext], Dict]
     external_driver_factory: Callable[[RequestContext], Dict]
-    db_type: Union[str, Callable[[RequestContext], str]]
     check_auth: Callable
     check_sql_auth: Callable
     can_switch_sql_user: Callable
@@ -77,7 +76,6 @@ class Configuration:
     semantic_layer_sync: Union[Dict, Callable[[], Dict]]
     pre_aggregations_schema: Union[Callable[[RequestContext], str], str]
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
-    context_to_roles: Callable[[RequestContext], list[str]]
     context_to_groups: Callable[[RequestContext], list[str]]
     fast_reload: bool
 
@@ -114,7 +112,6 @@ class Configuration:
         self.context_to_cube_store_router_id = None
         self.driver_factory = None
         self.external_driver_factory = None
-        self.db_type = None
         self.check_auth = None
         self.check_sql_auth = None
         self.can_switch_sql_user = None
@@ -128,7 +125,6 @@ class Configuration:
         self.semantic_layer_sync = None
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
-        self.context_to_roles = None
         self.context_to_groups = None
         self.fast_reload = None
 

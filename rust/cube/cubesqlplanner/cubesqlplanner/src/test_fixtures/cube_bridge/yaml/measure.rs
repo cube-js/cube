@@ -1,4 +1,4 @@
-use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
+use crate::cube_bridge::base_query_options::{FilterItem as NativeFilterItem, FilterValue};
 use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::measure_definition::{RollingWindow, TimeShiftReference};
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
@@ -65,7 +65,7 @@ struct YamlIncludeFilter {
     #[serde(default)]
     operator: Option<String>,
     #[serde(default)]
-    values: Option<Vec<Option<String>>>,
+    values: Option<Vec<FilterValue>>,
     #[serde(default)]
     and: Option<Vec<YamlIncludeFilter>>,
     #[serde(default)]

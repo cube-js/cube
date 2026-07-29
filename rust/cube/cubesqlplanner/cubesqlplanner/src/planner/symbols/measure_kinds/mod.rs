@@ -28,14 +28,17 @@ pub enum AggregateWrap<'a> {
 /// - `Count` — `type: count`. Counts rows; falls back to the cube's
 ///   primary keys when no explicit `sql` is given.
 /// - `Aggregated` — built-in aggregation (`sum`, `avg`, `min`, `max`,
-///   `count_distinct`, `count_distinct_approx`, `number_agg`,
-///   `running_total`).
+///   `count_distinct`, `count_distinct_approx`, `number_agg`).
 /// - `Calculated` — `type: number / string / time / boolean`. A
 ///   plain expression with no aggregation wrapper.
 /// - `Rank` — `type: rank`. Window-function rank, no `sql`.
 #[derive(Clone)]
 pub enum MeasureKind {
     Count(CountMeasure),
+    /// A `Count` that sits under a row-multiplying join and must be
+    /// rendered as a distinct count to stay correct. Identical to
+    /// `Count` in every respect except the final aggregate wrap.
+    MultipliedCount(CountMeasure),
     Aggregated(AggregatedMeasure),
     Calculated(CalculatedMeasure),
     Rank,
@@ -76,7 +79,7 @@ impl MeasureKind {
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         match self {
-            Self::Count(c) => c.get_dependencies(),
+            Self::Count(c) | Self::MultipliedCount(c) => c.get_dependencies(),
             Self::Aggregated(a) => a.get_dependencies(),
             Self::Calculated(c) => c.get_dependencies(),
             Self::Rank => vec![],
@@ -89,6 +92,7 @@ impl MeasureKind {
     ) -> Result<Self, CubeError> {
         Ok(match self {
             Self::Count(c) => Self::Count(c.apply_to_deps(f)?),
+            Self::MultipliedCount(c) => Self::MultipliedCount(c.apply_to_deps(f)?),
             Self::Aggregated(a) => Self::Aggregated(a.apply_to_deps(f)?),
             Self::Calculated(c) => Self::Calculated(c.apply_to_deps(f)?),
             Self::Rank => Self::Rank,
@@ -97,7 +101,7 @@ impl MeasureKind {
 
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         match self {
-            Self::Count(c) => c.iter_sql_calls(),
+            Self::Count(c) | Self::MultipliedCount(c) => c.iter_sql_calls(),
             Self::Aggregated(a) => a.iter_sql_calls(),
             Self::Calculated(c) => c.iter_sql_calls(),
             Self::Rank => Box::new(std::iter::empty()),
@@ -106,7 +110,7 @@ impl MeasureKind {
 
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
         match self {
-            Self::Count(c) => c.get_cube_refs(),
+            Self::Count(c) | Self::MultipliedCount(c) => c.get_cube_refs(),
             Self::Aggregated(a) => a.get_cube_refs(),
             Self::Calculated(c) => c.get_cube_refs(),
             Self::Rank => vec![],
@@ -115,7 +119,7 @@ impl MeasureKind {
 
     pub fn is_owned_by_cube(&self) -> bool {
         match self {
-            Self::Count(c) => c.is_owned_by_cube(),
+            Self::Count(c) | Self::MultipliedCount(c) => c.is_owned_by_cube(),
             Self::Aggregated(a) => a.is_owned_by_cube(),
             Self::Calculated(c) => c.is_owned_by_cube(),
             Self::Rank => false,
@@ -131,7 +135,7 @@ impl MeasureKind {
     /// their `AggregationType`. Calculated and rank are not additive.
     pub fn is_additive(&self) -> bool {
         match self {
-            Self::Count(_) => true,
+            Self::Count(_) | Self::MultipliedCount(_) => true,
             Self::Aggregated(a) => a.agg_type().is_additive(),
             _ => false,
         }
@@ -139,7 +143,7 @@ impl MeasureKind {
 
     pub fn measure_type_str(&self) -> &str {
         match self {
-            Self::Count(_) => "count",
+            Self::Count(_) | Self::MultipliedCount(_) => "count",
             Self::Aggregated(a) => a.agg_type().as_str(),
             Self::Calculated(c) => c.calc_type().as_str(),
             Self::Rank => "rank",
@@ -175,10 +179,10 @@ impl MeasureKind {
 
     /// True if extra `measure_filters` can be merged into the kind.
     /// Counts and the basic aggregations support it; `number_agg`,
-    /// `running_total`, calculated and rank measures do not.
+    /// calculated and rank measures do not.
     pub fn supports_additional_filters(&self) -> bool {
         match self {
-            Self::Count(_) => true,
+            Self::Count(_) | Self::MultipliedCount(_) => true,
             Self::Aggregated(a) => matches!(
                 a.agg_type(),
                 AggregationType::Sum
@@ -194,7 +198,7 @@ impl MeasureKind {
 
     pub fn member_sql(&self) -> Option<&Rc<SqlCall>> {
         match self {
-            Self::Count(c) => match c.sql() {
+            Self::Count(c) | Self::MultipliedCount(c) => match c.sql() {
                 CountSql::Explicit(sql) => Some(sql),
                 CountSql::Auto(_) => None,
             },
@@ -205,26 +209,19 @@ impl MeasureKind {
     }
 
     /// How the kind wraps its inner SQL when rendered as a top-level
-    /// query measure. `is_multiplied` is true when the join below the
-    /// measure can produce duplicate rows — non-distinct counts then
-    /// switch to `count_distinct` over primary keys to stay correct.
-    pub fn aggregate_wrap(&self, is_multiplied: bool) -> AggregateWrap<'_> {
+    /// query measure. `MultipliedCount` switches to `count_distinct`
+    /// over primary keys to stay correct under row multiplication.
+    pub fn aggregate_wrap(&self) -> AggregateWrap<'_> {
         match self {
             Self::Calculated(_) => AggregateWrap::PassThrough,
             Self::Aggregated(a) => match a.agg_type() {
                 AggregationType::NumberAgg => AggregateWrap::PassThrough,
                 AggregationType::CountDistinctApprox => AggregateWrap::CountDistinctApprox,
                 AggregationType::CountDistinct => AggregateWrap::CountDistinct,
-                AggregationType::RunningTotal => AggregateWrap::Function("sum"),
                 _ => AggregateWrap::Function(a.agg_type().as_str()),
             },
-            Self::Count(_) => {
-                if is_multiplied {
-                    AggregateWrap::CountDistinct
-                } else {
-                    AggregateWrap::Function("count")
-                }
-            }
+            Self::Count(_) => AggregateWrap::Function("count"),
+            Self::MultipliedCount(_) => AggregateWrap::CountDistinct,
             Self::Rank => AggregateWrap::PassThrough,
         }
     }
@@ -235,7 +232,7 @@ impl MeasureKind {
     /// time / boolean values roll up via `max`.
     pub fn pre_aggregate_wrap(&self) -> AggregateWrap<'_> {
         match self {
-            Self::Count(_) => AggregateWrap::Function("sum"),
+            Self::Count(_) | Self::MultipliedCount(_) => AggregateWrap::Function("sum"),
             Self::Aggregated(a) => match a.agg_type() {
                 AggregationType::CountDistinctApprox => AggregateWrap::CountDistinctApprox,
                 AggregationType::Min => AggregateWrap::Function("min"),
@@ -253,12 +250,34 @@ impl MeasureKind {
     pub fn with_new_type(&self, new_type: &str) -> Result<Self, CubeError> {
         let member_sql = self.member_sql().cloned();
         let pk_sqls = match self {
-            Self::Count(c) => match c.sql() {
+            Self::Count(c) | Self::MultipliedCount(c) => match c.sql() {
                 CountSql::Auto(pks) => pks.clone(),
                 _ => vec![],
             },
             _ => vec![],
         };
         Self::from_type_str(new_type, member_sql, pk_sqls)
+    }
+
+    /// Render form when this kind sits under a row-multiplying join:
+    /// a `Count` becomes a distinct `MultipliedCount`; every other
+    /// kind is unchanged (only counts switch wrap under multiplication).
+    pub fn into_multiplied(&self) -> Self {
+        match self {
+            Self::Count(c) => Self::MultipliedCount(c.clone()),
+            other => other.clone(),
+        }
+    }
+
+    /// `Some(render form)` when this kind, under a row-multiplying join,
+    /// is still safe to compute directly in the main query: a key-based
+    /// count rolls up as a distinct `MultipliedCount`, distinct
+    /// aggregations are already immune and stay as-is. `None` otherwise.
+    pub fn regular_in_multiplied(&self) -> Option<Self> {
+        match self {
+            Self::Count(c) if c.convertible_to_distinct() => Some(Self::MultipliedCount(c.clone())),
+            Self::Aggregated(a) if a.agg_type().is_distinct() => Some(self.clone()),
+            _ => None,
+        }
     }
 }

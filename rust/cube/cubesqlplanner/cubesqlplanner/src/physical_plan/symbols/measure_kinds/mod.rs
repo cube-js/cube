@@ -9,7 +9,7 @@ use cubenativeutils::CubeError;
 impl ToSql for MeasureKind {
     fn to_sql(&self, ctx: &MemberSqlContext) -> Result<String, CubeError> {
         match self {
-            Self::Count(c) => c.to_sql(ctx),
+            Self::Count(c) | Self::MultipliedCount(c) => c.to_sql(ctx),
             Self::Aggregated(a) => a.to_sql(ctx),
             Self::Calculated(c) => c.to_sql(ctx),
             Self::Rank => Err(CubeError::internal(format!(

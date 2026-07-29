@@ -66,6 +66,7 @@ pub enum Statement {
     Queue(QueueCommand),
     System(SystemCommand),
     Dump(Box<Query>),
+    ExplainAnalyzeDetailed(Box<Query>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,7 +92,7 @@ pub enum CacheCommand {
     Remove {
         key: Ident,
     },
-    Truncate {},
+    Clear {},
     Incr {
         path: Ident,
     },
@@ -104,7 +105,7 @@ impl CacheCommand {
             CacheCommand::Get { .. } => "get",
             CacheCommand::Keys { .. } => "keys",
             CacheCommand::Remove { .. } => "remove",
-            CacheCommand::Truncate { .. } => "truncate",
+            CacheCommand::Clear { .. } => "clear",
             CacheCommand::Incr { .. } => "incr",
         }
     }
@@ -161,7 +162,7 @@ pub enum QueueCommand {
         key: QueueKey,
         timeout: u64,
     },
-    Truncate {},
+    Clear {},
 }
 
 impl QueueCommand {
@@ -182,7 +183,7 @@ impl QueueCommand {
             QueueCommand::Retrieve { .. } => "retrieve",
             QueueCommand::Result { .. } => "result",
             QueueCommand::ResultBlocking { .. } => "result_blocking",
-            QueueCommand::Truncate { .. } => "truncate",
+            QueueCommand::Clear { .. } => "clear",
         }
     }
 }
@@ -208,6 +209,7 @@ pub enum MetaStoreCommand {
     SetCurrent { id: u128 },
     Compaction,
     Healthcheck,
+    Truncate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -217,6 +219,8 @@ pub enum CacheStoreCommand {
     Eviction,
     Info,
     Persist,
+    Wipe,
+    Truncate,
 }
 
 type QueryParameterHolder = Option<QueryParameter>;
@@ -301,10 +305,27 @@ impl<'a> CubeStoreParser<'a> {
                     };
                     Ok(Statement::Dump(q))
                 }
+                _ if self.is_explain_analyze_detailed() => {
+                    self.parser.next_token(); // EXPLAIN
+                    self.parser.next_token(); // ANALYZE
+                    self.parser.next_token(); // DETAILED
+                    Ok(Statement::ExplainAnalyzeDetailed(
+                        self.parser.parse_query()?,
+                    ))
+                }
                 _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
             },
             _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
         }
+    }
+
+    fn is_explain_analyze_detailed(&self) -> bool {
+        fn is_word(token: Token, value: &str) -> bool {
+            matches!(token, Token::Word(w) if w.value.eq_ignore_ascii_case(value))
+        }
+        is_word(self.parser.peek_token().token, "explain")
+            && is_word(self.parser.peek_nth_token(1).token, "analyze")
+            && is_word(self.parser.peek_nth_token(2).token, "detailed")
     }
 
     fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
@@ -484,10 +505,10 @@ impl<'a> CubeStoreParser<'a> {
             "remove" => CacheCommand::Remove {
                 key: self.parse_identifier()?,
             },
-            "truncate" => CacheCommand::Truncate {},
+            "clear" => CacheCommand::Clear {},
             other => {
                 return Err(ParserError::ParserError(format!(
-                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE",
+                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|CLEAR",
                     other
                 )))
             }
@@ -587,6 +608,10 @@ impl<'a> CubeStoreParser<'a> {
             CacheStoreCommand::Info
         } else if self.parse_custom_token("healthcheck") {
             CacheStoreCommand::Healthcheck
+        } else if self.parse_custom_token("wipe") {
+            CacheStoreCommand::Wipe
+        } else if self.parse_custom_token("truncate") {
+            CacheStoreCommand::Truncate
         } else {
             return Err(ParserError::ParserError(
                 "Unknown cachestore command".to_string(),
@@ -605,6 +630,8 @@ impl<'a> CubeStoreParser<'a> {
             MetaStoreCommand::Compaction
         } else if self.parse_custom_token("healthcheck") {
             MetaStoreCommand::Healthcheck
+        } else if self.parse_custom_token("truncate") {
+            MetaStoreCommand::Truncate
         } else {
             return Err(ParserError::ParserError(
                 "Unknown metastore command".to_string(),
@@ -764,7 +791,7 @@ impl<'a> CubeStoreParser<'a> {
                     key: self.parse_queue_key()?,
                 }
             }
-            "truncate" => QueueCommand::Truncate {},
+            "clear" => QueueCommand::Clear {},
             other => {
                 return Err(ParserError::ParserError(format!(
                     "Unknown queue command: {}",
@@ -1031,6 +1058,53 @@ mod tests {
     fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
         let mut parser = CubeStoreParser::new(query, None)?;
         Ok(parser.parse_statement()?)
+    }
+
+    #[test]
+    fn parse_truncate_and_clear_commands() -> Result<(), CubeError> {
+        // New low-level whole-store wipes.
+        match parse_stmt("SYS CACHESTORE TRUNCATE")? {
+            Statement::System(SystemCommand::CacheStore(CacheStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS CACHESTORE TRUNCATE, got {:?}", s),
+        }
+        match parse_stmt("SYS METASTORE TRUNCATE")? {
+            Statement::System(SystemCommand::MetaStore(MetaStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS METASTORE TRUNCATE, got {:?}", s),
+        }
+
+        // Renamed logical per-table empties (were CACHE/QUEUE TRUNCATE).
+        match parse_stmt("CACHE CLEAR")? {
+            Statement::Cache(CacheCommand::Clear {}) => {}
+            s => panic!("Expected CACHE CLEAR, got {:?}", s),
+        }
+        match parse_stmt("QUEUE CLEAR")? {
+            Statement::Queue(QueueCommand::Clear {}) => {}
+            s => panic!("Expected QUEUE CLEAR, got {:?}", s),
+        }
+
+        // The old keywords must no longer parse.
+        assert!(parse_stmt("CACHE TRUNCATE").is_err());
+        assert!(parse_stmt("QUEUE TRUNCATE").is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_explain_variants() -> Result<(), CubeError> {
+        match parse_stmt("EXPLAIN ANALYZE DETAILED SELECT 1")? {
+            Statement::ExplainAnalyzeDetailed(_) => {}
+            s => panic!("Expected ExplainAnalyzeDetailed, got {:?}", s),
+        }
+        // The DETAILED interception must not affect plain EXPLAIN / EXPLAIN ANALYZE.
+        match parse_stmt("EXPLAIN ANALYZE SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: true, .. }) => {}
+            s => panic!("Expected Explain with analyze, got {:?}", s),
+        }
+        match parse_stmt("EXPLAIN SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: false, .. }) => {}
+            s => panic!("Expected Explain without analyze, got {:?}", s),
+        }
+        Ok(())
     }
 
     #[test]

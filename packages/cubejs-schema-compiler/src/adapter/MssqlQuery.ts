@@ -268,6 +268,7 @@ export class MssqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';
     // MSSQL ROUND requires 2 arguments: ROUND(number, length)
     templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
     // NOTE: MSSQL does not support DISTINCT clause. No workaround is available
@@ -280,6 +281,11 @@ export class MssqlQuery extends BaseQuery {
     templates.expressions.concat_strings = '{{ strings | join(\' + \' ) }}';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
+    // CONVERT style 127 is defined as exactly this format (yyyy-mm-ddThh:mi:ss.mmmZ,
+    // "ISO8601 with time zone Z"). The base template renders the value bare, which is
+    // invalid T-SQL syntax
+    templates.expressions.timestamp_literal = 'CONVERT(DATETIME2, \'{{ value }}\', 127)';
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'BIT';
     templates.types.integer = 'INT';
@@ -346,6 +352,11 @@ export class MssqlQuery extends BaseQuery {
       '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
       '\nFETCH NEXT {% if limit is not none %}{{ limit }}{% else %}2147483647{% endif %} ROWS ONLY{% endif %}' +
       '{% if ctes %}\nOPTION (MAXRECURSION 0){% endif %}';
+    // MSSQL has no boolean type — a segment projected as a dimension must be a BIT.
+    templates.expressions.wrap_segment_select = 'CAST((CASE WHEN {{ expr }} THEN 1 ELSE 0 END) AS BIT)';
+    // Reading a segment back from a pre-aggregation: it is a stored BIT column,
+    // which MSSQL can't use as a bare predicate, so compare it explicitly.
+    templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
     return templates;
   }
 }

@@ -8,6 +8,14 @@ description: We want to know the customer engagement of our store. To do this, w
 We want to know the customer engagement of our store. To do this, we need to use
 an [Active Users metric](https://en.wikipedia.org/wiki/Active_users).
 
+<Note>
+
+This recipe defines a separate measure for each fixed window (daily, weekly, monthly).
+To let a data consumer choose the window at query time instead, see [Configurable rolling
+windows](/recipes/data-modeling/dynamic-rolling-windows).
+
+</Note>
+
 ## Data modeling
 
 Daily, weekly, and monthly active users are commonly referred to as DAU, WAU,

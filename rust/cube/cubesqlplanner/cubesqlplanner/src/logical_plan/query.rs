@@ -3,14 +3,15 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Root node of a query in the logical plan: the data `source`
+/// Body of a query in the logical plan: the data `source`
 /// (join / aggregate / pre-aggregation), its output `schema`,
-/// `filter` tree, query-level `modifers` (limit / offset / order /
-/// ungrouped), and the multi-stage CTEs the source depends on.
+/// `filter` tree and query-level `modifers` (limit / offset / order /
+/// ungrouped). CTEs the source may reference by name live on the
+/// top-level `RootQuery` node, never here — so a `Query` can be
+/// embedded anywhere (CTE member, dimension subquery) without
+/// producing nested `WITH` clauses.
 #[derive(Clone, TypedBuilder)]
 pub struct Query {
-    #[builder(default)]
-    multistage_members: Vec<Rc<LogicalMultiStageMember>>,
     schema: Rc<LogicalSchema>,
     filter: Rc<LogicalFilter>,
     modifers: Rc<LogicalQueryModifiers>,
@@ -18,9 +19,6 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn multistage_members(&self) -> &Vec<Rc<LogicalMultiStageMember>> {
-        &self.multistage_members
-    }
     pub fn schema(&self) -> &Rc<LogicalSchema> {
         &self.schema
     }
@@ -44,20 +42,14 @@ impl LogicalNode for Query {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        QueryInputPacker::pack(self)
+        vec![self.source.as_plan_node()]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        let QueryInputUnPacker {
-            multistage_members,
-            source,
-        } = QueryInputUnPacker::new(&self, &inputs)?;
+        check_inputs_len(&inputs, 1, self.node_name())?;
+        let source = &inputs[0];
 
         Ok(Rc::new(Self {
-            multistage_members: multistage_members
-                .iter()
-                .map(|member| member.clone().into_logical_node())
-                .collect::<Result<Vec<_>, _>>()?,
             schema: self.schema.clone(),
             filter: self.filter.clone(),
             modifers: self.modifers.clone(),
@@ -77,52 +69,11 @@ impl LogicalNode for Query {
     }
 }
 
-pub struct QueryInputPacker;
-
-impl QueryInputPacker {
-    pub fn pack(query: &Query) -> Vec<PlanNode> {
-        let mut result = vec![];
-        result.extend(
-            query
-                .multistage_members
-                .iter()
-                .map(|member| member.as_plan_node()),
-        );
-        result.push(query.source.as_plan_node());
-        result
-    }
-}
-pub struct QueryInputUnPacker<'a> {
-    multistage_members: &'a [PlanNode],
-    source: &'a PlanNode,
-}
-
-impl<'a> QueryInputUnPacker<'a> {
-    pub fn new(query: &Query, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
-        check_inputs_len(&inputs, Self::inputs_len(query), query.node_name())?;
-        let multistage_members = &inputs[0..query.multistage_members.len()];
-        let source = &inputs[query.multistage_members.len()];
-        Ok(Self {
-            multistage_members,
-            source,
-        })
-    }
-    fn inputs_len(query: &Query) -> usize {
-        query.multistage_members.len() + 1
-    }
-}
-
 impl PrettyPrint for Query {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println("Query: ", state);
         let state = state.new_level();
         let details_state = state.new_level();
-        if !self.multistage_members.is_empty() {
-            result.println("multistage_members:", &state);
-            for member in self.multistage_members.iter() {
-                member.pretty_print(result, &details_state);
-            }
-        }
 
         result.println("schema:", &state);
         self.schema.pretty_print(result, &details_state);

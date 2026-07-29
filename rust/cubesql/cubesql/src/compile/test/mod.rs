@@ -14,7 +14,7 @@ use crate::{
     transport::{
         CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
         CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
-        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponse, TransportService,
+        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponseColumnar, TransportService,
     },
     CubeError, CubeErrorCauseType,
 };
@@ -32,6 +32,8 @@ pub mod test_bi_workarounds;
 pub mod test_cube_join;
 #[cfg(test)]
 pub mod test_cube_join_grouped;
+#[cfg(test)]
+pub mod test_cube_join_views;
 #[cfg(test)]
 pub mod test_cube_scan;
 #[cfg(test)]
@@ -670,6 +672,7 @@ pub fn sql_generator(
             SqlTemplates::new(
                 vec![
                     ("functions/COALESCE".to_string(), "COALESCE({{ args_concat }})".to_string()),
+                    ("functions/NULLIF".to_string(), "NULLIF({{ args_concat }})".to_string()),
                     ("functions/SUM".to_string(), "SUM({{ args_concat }})".to_string()),
                     ("functions/MIN".to_string(), "MIN({{ args_concat }})".to_string()),
                     ("functions/MAX".to_string(), "MAX({{ args_concat }})".to_string()),
@@ -692,6 +695,7 @@ pub fn sql_generator(
                     ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
                     ("functions/CURRENTDATE".to_string(), "CURRENT_DATE({{ args_concat }})".to_string()),
                     ("functions/NOW".to_string(), "NOW({{ args_concat }})".to_string()),
+                    ("functions/UTCTIMESTAMP".to_string(), "(NOW() AT TIME ZONE 'UTC')".to_string()),
                     ("functions/DATE_ADD".to_string(), "DATE_ADD({{ args_concat }})".to_string()),
                     ("functions/CONCAT".to_string(), "CONCAT({{ args_concat }})".to_string()),
                     ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
@@ -730,6 +734,7 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                         "{{expr}} {{quoted_alias}}".to_string(),
                     ),
                     ("expressions/binary".to_string(), "({{ left }} {{ op }} {{ right }})".to_string()),
+                    ("expressions/int_division".to_string(), "({{ left }} / {{ right }})".to_string()),
                     ("expressions/is_null".to_string(), "({{ expr }} IS {% if negate %}NOT {% endif %}NULL)".to_string()),
                     ("expressions/case".to_string(), "CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
                     ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),
@@ -754,6 +759,8 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/between".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}".to_string()),
                     ("join_types/inner".to_string(), "INNER".to_string()),
                     ("join_types/left".to_string(), "LEFT".to_string()),
+                    ("join_types/right".to_string(), "RIGHT".to_string()),
+                    ("join_types/full".to_string(), "FULL".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string()),
@@ -778,6 +785,11 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("types/binary".to_string(), "BINARY".to_string()),
                 ]
                     .into_iter().chain(custom_templates)
+                    .collect::<HashMap<_, _>>()
+                    .into_iter()
+                    // Custom template with an empty value removes the base template,
+                    // allowing tests to check behavior of data sources without it
+                    .filter(|(_, value)| !value.is_empty())
                     .collect(),
                     false,
             )
@@ -907,7 +919,7 @@ pub struct TestTransportLoadCall {
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
-    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponse)>>,
+    load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponseColumnar)>>,
     load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
 }
 
@@ -927,7 +939,7 @@ impl TestConnectionTransport {
     pub async fn add_cube_load_mock(
         &self,
         req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         self.load_mocks.lock().await.push((req, res));
     }
@@ -1137,7 +1149,7 @@ impl TestContext {
     pub async fn add_cube_load_mock(
         &self,
         mut req: TransportLoadRequestQuery,
-        res: TransportLoadResponse,
+        res: TransportLoadResponseColumnar,
     ) {
         // Fill in default limit to simplify passing queries as they were in logical plan
         let config_limit = self.config_obj.non_streaming_query_max_row_limit();

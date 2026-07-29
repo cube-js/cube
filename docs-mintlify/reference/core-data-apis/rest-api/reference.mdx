@@ -16,16 +16,17 @@ Run the query to the REST (JSON) API and get the results.
 
 | Parameter   | Description                                                                                                           | Required |
 | ----------- | --------------------------------------------------------------------------------------------------------------------- | --- |
-| `query`     | Either a single URL encoded Cube [Query](/reference/rest-api/query-format), or an array of queries    | ✅ Yes |
+| `query`     | Either a single URL encoded Cube [Query](/reference/core-data-apis/rest-api/query-format), or an array of queries    | ✅ Yes |
 | `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` | ❌ No |
 | `cache`     | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
+| `responseFormat` | Output format of the result `data` payload: `default` (row-oriented), `compact` (a `{ members, dataset }` object with rows of primitive arrays), or `columnar` (a `{ members, columns }` object with one primitive array per member). `default` by default | ❌ No |
 
 ### Headers
 
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_pathv1running-queryrequestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
 
 Response
 
@@ -38,6 +39,8 @@ Response
   - `shortTitle` - Short title for visualization usage (ex. chart overlay)
   - `type` - Data type
 - `lastRefreshTime` - An ISO 8601 timestamp indicating when the data was last refreshed.
+- `external` - A boolean indicating whether the query was served from a
+  pre-aggregation in Cube Store. Present only when the query hit a pre-aggregation.
 - `total` - The total number of rows returned for the query. Useful for
   paginating results.
 
@@ -133,6 +136,7 @@ The response will contain a JSON object with the following properties under the 
 | `sql`, `array` | Two-element array (see below) |
 | `sql[0]`, `string` | Generated query with parameter placeholders |
 | `sql[1]`, <nobr>`array` or `object`</nobr> | Generated query parameters |
+| `dataSource`, `string` | The name of the [data source][ref-datasources] the generated query targets |
 
 For queries with the `sql` format, the response will also include the following additional
 properties under the `sql` key:
@@ -413,7 +417,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_pathv1running-queryrequestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, and optionally
@@ -468,7 +472,7 @@ queries matching the given request ID across all query queues.
 
 The request ID can be obtained from the `x-request-id` header sent with
 the original query request to endpoints like
-[`/v1/load`](#base_pathv1load) or [`/v1/cubesql`](#base_pathv1cubesql).
+[`/v1/load`](#base_path/v1/load) or [`/v1/cubesql`](#base_path/v1/cubesql).
 
 | Parameter | Description | Required |
 | --- | --- | --- |
@@ -998,19 +1002,19 @@ Keep-Alive: timeout=5
 ```
 
 [ref-recipes-data-blending]: /docs/data-modeling/concepts/data-blending#data-blending
-[ref-rest-api]: /reference/rest-api
-[ref-basepath]: /reference/rest-api#base-path
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-basepath]: /reference/core-data-apis/rest-api#base-path
 [ref-datasources]: /admin/connect-to-data/multiple-data-sources
-[ref-sql-api]: /reference/sql-api
-[ref-rest-api]: /reference/rest-api
-[ref-regular-queries]: /reference/queries#regular-query
-[ref-query-wpp]: /reference/queries#query-with-post-processing
-[ref-query-wpd]: /reference/queries#query-with-pushdown
-[ref-sql-api]: /reference/sql-api
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-regular-queries]: /reference/core-data-apis/queries#regular-query
+[ref-query-wpp]: /reference/core-data-apis/queries#query-with-post-processing
+[ref-query-wpd]: /reference/core-data-apis/queries#query-with-pushdown
+[ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-orchestration-api]: /reference/orchestration-api
 [ref-folders]: /reference/data-modeling/view#folders
-[ref-cache-control]: /reference/rest-api#cache-control
-[ref-time-zone]: /reference/queries#time-zone
+[ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
 [ref-control-plane-api]: /reference/control-plane-api
 [self-metadata-api]: #metadata-api

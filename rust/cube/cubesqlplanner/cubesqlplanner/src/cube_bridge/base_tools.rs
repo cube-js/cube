@@ -1,8 +1,11 @@
 use super::driver_tools::{DriverTools, NativeDriverTools};
 use super::join_definition::{JoinDefinition, NativeJoinDefinition};
+use super::member_sql::{CompiledMemberTemplate, MemberSql, NativeMemberSql};
 use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
+use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use super::sql_utils::{NativeSqlUtils, SqlUtils};
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -22,7 +25,7 @@ pub trait BaseTools {
     fn driver_tools(&self, external: bool) -> Result<Rc<dyn DriverTools>, CubeError>;
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError>;
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError>;
-    fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
+    fn get_allocated_params(&self) -> Result<Vec<FilterValue>, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
     fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError>;
     fn get_pre_aggregation_by_name(
@@ -40,4 +43,11 @@ pub trait BaseTools {
         &self,
         hints: Vec<JoinHintItem>,
     ) -> Result<Rc<dyn JoinDefinition>, CubeError>;
+
+    fn compile_member_sql(
+        &self,
+        member_sql: Rc<dyn MemberSql>,
+        security_context: Rc<dyn SecurityContext>,
+        arg_names: Vec<String>,
+    ) -> Result<CompiledMemberTemplate, CubeError>;
 }

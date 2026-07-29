@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
 use crate::planner::QueryDateTimeHelper;
@@ -6,6 +7,12 @@ use std::rc::Rc;
 
 const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
 const TO_PARTITION_RANGE: &str = "__TO_PARTITION_RANGE";
+
+#[derive(Clone, Copy)]
+enum DateBound {
+    From,
+    To,
+}
 
 pub struct FilterSqlContext<'a> {
     pub member_sql: &'a str,
@@ -34,6 +41,17 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn allocate_and_cast(
         &self,
+        value: &FilterValue,
+        member_type: &Option<String>,
+    ) -> Result<String, CubeError> {
+        let value = value.to_param_string().ok_or_else(|| {
+            CubeError::internal("Unexpected null value for a single-value filter".to_string())
+        })?;
+        self.allocate_and_cast_str(&value, member_type)
+    }
+
+    pub fn allocate_and_cast_str(
+        &self,
         value: &str,
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
@@ -43,12 +61,12 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn allocate_and_cast_values(
         &self,
-        values: &[Option<String>],
+        values: &[FilterValue],
         member_type: &Option<String>,
     ) -> Result<Vec<String>, CubeError> {
         values
             .iter()
-            .filter_map(|v| v.as_ref())
+            .filter(|v| !v.is_null())
             .map(|v| self.allocate_and_cast(v, member_type))
             .collect()
     }
@@ -62,29 +80,47 @@ impl<'a> FilterSqlContext<'a> {
     }
 
     pub fn format_and_allocate_from_date(&self, value: &str) -> Result<String, CubeError> {
-        if self.use_raw_values {
-            return Ok(value.to_string());
-        }
-        if self.is_partition_range(value) {
-            return self.allocate_timestamp_param(value);
-        }
-        let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_from_date(value, precision)?;
-        let with_tz = self.apply_db_time_zone(formatted)?;
-        self.allocate_timestamp_param(&with_tz)
+        self.format_and_allocate_date(value, DateBound::From, true)
     }
 
     pub fn format_and_allocate_to_date(&self, value: &str) -> Result<String, CubeError> {
+        self.format_and_allocate_date(value, DateBound::To, true)
+    }
+
+    pub fn format_and_allocate_from_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
+        self.format_and_allocate_date(value, DateBound::From, false)
+    }
+
+    pub fn format_and_allocate_to_date_no_cast(&self, value: &str) -> Result<String, CubeError> {
+        self.format_and_allocate_date(value, DateBound::To, false)
+    }
+
+    fn format_and_allocate_date(
+        &self,
+        value: &str,
+        bound: DateBound,
+        cast: bool,
+    ) -> Result<String, CubeError> {
+        let allocate = |value: &str| {
+            if cast {
+                self.allocate_timestamp_param(value)
+            } else {
+                Ok(self.query_tools.allocate_param(value))
+            }
+        };
         if self.use_raw_values {
             return Ok(value.to_string());
         }
         if self.is_partition_range(value) {
-            return self.allocate_timestamp_param(value);
+            return allocate(value);
         }
         let precision = self.plan_templates.timestamp_precision()?;
-        let formatted = QueryDateTimeHelper::format_to_date(value, precision)?;
+        let formatted = match bound {
+            DateBound::From => QueryDateTimeHelper::format_from_date(value, precision)?,
+            DateBound::To => QueryDateTimeHelper::format_to_date(value, precision)?,
+        };
         let with_tz = self.apply_db_time_zone(formatted)?;
-        self.allocate_timestamp_param(&with_tz)
+        allocate(&with_tz)
     }
 
     fn is_partition_range(&self, value: &str) -> bool {
@@ -136,6 +172,7 @@ impl<'a> FilterSqlContext<'a> {
             None,
             None,
             false,
+            false,
         )?;
         let to = self.plan_templates.select(
             vec![],
@@ -147,6 +184,7 @@ impl<'a> FilterSqlContext<'a> {
             vec![],
             None,
             None,
+            false,
             false,
         )?;
         Ok((format!("({})", from), format!("({})", to)))

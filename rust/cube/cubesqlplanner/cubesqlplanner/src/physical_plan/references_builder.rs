@@ -272,6 +272,9 @@ impl ReferencesBuilder {
             }
             SingleSource::Cube(_) => None,
             SingleSource::TableReference(_, schema) => schema.resolve_member_reference(member),
+            // Opaque pre-rendered SQL: members are referenced via the alias as
+            // literals in the ON/projection SQL, not resolved against a schema.
+            SingleSource::RawSubquerySql(_) => None,
         };
         column_name.map(|col| QualifiedColumnName::new(Some(source.alias.clone()), col))
     }

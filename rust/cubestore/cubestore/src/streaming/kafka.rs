@@ -265,8 +265,13 @@ impl KafkaClientService for KafkaClientServiceImpl {
         let consumer = self.consumer.read().await.clone();
         match consumer {
             Some(consumer) => {
+                // Must exceed the consumer's `fetch.wait.max.ms` (500ms by default): the broker
+                // serves requests on a connection serially, so this request can wait behind an
+                // in-flight long-poll Fetch. A shorter timeout expires while the request is in
+                // flight, forcing librdkafka to drop the whole connection.
+                let timeout = Duration::from_millis(self.config_obj.streaming_lag_timeout_ms());
                 let last_offset = cube_ext::spawn_blocking(move || {
-                    match consumer.fetch_watermarks(&topic, partition, Duration::from_millis(200)) {
+                    match consumer.fetch_watermarks(&topic, partition, timeout) {
                         Ok((_, last_offset)) => Some(last_offset),
                         Err(e) => {
                             log::error!("KafraService: Error while fetching last_offset: {}", e);

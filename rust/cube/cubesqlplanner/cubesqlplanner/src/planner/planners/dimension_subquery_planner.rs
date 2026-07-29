@@ -3,7 +3,8 @@ use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
 use crate::physical_plan::QualifiedColumnName;
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::planners::multi_stage::PlanningScope;
+use crate::planner::state::State;
 use crate::planner::QueryProperties;
 use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
@@ -17,7 +18,7 @@ use std::rc::Rc;
 /// gets joined back into the host query on those keys.
 pub struct DimensionSubqueryPlanner {
     utils: CommonUtils,
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
     sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>>,
     dimensions_refs: RefCell<HashMap<String, QualifiedColumnName>>,
@@ -26,7 +27,7 @@ pub struct DimensionSubqueryPlanner {
 impl DimensionSubqueryPlanner {
     /// Planner with no sub-query dimensions — used when the host
     /// query has none.
-    pub fn empty(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
+    pub fn empty(query_tools: Rc<State>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
             sub_query_dims: HashMap::new(),
             utils: CommonUtils::new(query_tools.clone()),
@@ -39,7 +40,7 @@ impl DimensionSubqueryPlanner {
     /// by owning cube.
     pub fn try_new(
         dimensions: &Vec<Rc<MemberSymbol>>,
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         query_properties: Rc<QueryProperties>,
     ) -> Result<Self, CubeError> {
         let mut sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>> = HashMap::new();
@@ -61,13 +62,17 @@ impl DimensionSubqueryPlanner {
     }
 
     /// Plans one `DimensionSubQuery` per dimension in the input list.
+    /// `scope` is the plan-wide CTE accumulator: a non-simple
+    /// subquery (e.g. with a multiplied measure) registers its CTEs
+    /// there so they land in the root `WITH` list.
     pub fn plan_queries(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
+        scope: &mut PlanningScope,
     ) -> Result<Vec<Rc<DimensionSubQuery>>, CubeError> {
         let mut result = Vec::new();
         for subquery_dimension in dimensions.iter() {
-            result.push(self.plan_query(subquery_dimension.clone())?)
+            result.push(self.plan_query(subquery_dimension.clone(), scope)?)
         }
         Ok(result)
     }
@@ -75,6 +80,7 @@ impl DimensionSubqueryPlanner {
     fn plan_query(
         &self,
         subquery_dimension: Rc<MemberSymbol>,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<DimensionSubQuery>, CubeError> {
         let dim_name = subquery_dimension.name();
         let cube_name = subquery_dimension.cube_name().clone();
@@ -93,7 +99,7 @@ impl DimensionSubqueryPlanner {
 
         let cube_symbol = self
             .query_tools
-            .evaluator_compiler()
+            .compiler()
             .borrow_mut()
             .add_cube_table_evaluator(cube_name.clone(), vec![])?;
         let member_expression_symbol = MemberExpressionSymbol::try_new(
@@ -125,13 +131,17 @@ impl DimensionSubqueryPlanner {
             .dimensions(primary_keys_dimensions.clone())
             .time_dimensions_filters(time_dimensions_filters)
             .dimensions_filters(dimensions_filters)
+            // Aggregated per primary key and joined back by it — order is
+            // meaningless and a default one breaks targets that require
+            // OFFSET/FETCH (e.g. MSSQL) when this subquery sits in a derived table.
+            .order_by(Some(vec![]))
             .ignore_cumulative(true)
             .disable_external_pre_aggregations(
                 self.query_properties.disable_external_pre_aggregations(),
             )
             .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
-        let sub_query = query_planner.plan()?;
+        let sub_query = query_planner.plan(scope)?;
         let result = Rc::new(DimensionSubQuery {
             query: sub_query,
             primary_keys_dimensions,

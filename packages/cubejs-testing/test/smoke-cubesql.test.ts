@@ -530,6 +530,18 @@ describe('SQL API', () => {
       expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
 
+    test('current_timestamp subquery filter push down', async () => {
+      // CURRENT_TIMESTAMP-based bounds wrapped in scalar subqueries force
+      // SQL push down and require the functions/UTCTIMESTAMP template.
+      // All fixture rows are in the past, so the result is stable over time.
+      const res = await connection.query(`
+        SELECT COUNT(*) as cn
+        FROM "public"."Orders" "orders"
+        WHERE ("orders"."createdAt" < ((SELECT DATE_TRUNC('year', DATE_TRUNC('day', CURRENT_TIMESTAMP)))))
+      `);
+      expect(res.rows).toMatchSnapshot('current_timestamp_push_down');
+    });
+
     test('no limit for non matching count push down', async () => {
       const res = await connection.query(`
       select

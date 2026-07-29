@@ -7,14 +7,16 @@ use crate::logical_plan::PreAggregationJoin;
 use crate::logical_plan::PreAggregationJoinItem;
 use crate::logical_plan::PreAggregationTable;
 use crate::logical_plan::PreAggregationUnion;
+use crate::logical_plan::PreAggregationUnionItem;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::TimeDimensionSymbol;
+use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -49,16 +51,13 @@ impl PreAggregationFullName {
 }
 
 pub struct PreAggregationsCompiler {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     descriptions: Rc<Vec<(PreAggregationFullName, Rc<dyn PreAggregationDescription>)>>,
     compiled_cache: HashMap<PreAggregationFullName, Rc<CompiledPreAggregation>>,
 }
 
 impl PreAggregationsCompiler {
-    pub fn try_new(
-        query_tools: Rc<QueryTools>,
-        cube_names: &Vec<String>,
-    ) -> Result<Self, CubeError> {
+    pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<String>) -> Result<Self, CubeError> {
         let mut descriptions = Vec::new();
         for cube_name in cube_names.iter() {
             let pre_aggregations = query_tools
@@ -135,24 +134,15 @@ impl PreAggregationsCompiler {
         let time_dimensions = if let Some(td_refs) = description.time_dimension_references()? {
             let mut resolved = Vec::new();
             for td_ref in td_refs.iter() {
-                let dims = Self::symbols_from_ref(
+                let base_symbol = Self::time_dimension_symbol_from_ref(
                     self.query_tools.clone(),
-                    &name.cube_name,
+                    name,
                     td_ref.dimension()?,
-                    Self::check_is_time_dimension,
                 )?;
-                let base_symbol = dims.first().ok_or_else(|| {
-                    CubeError::internal(format!(
-                        "No time dimension symbols resolved for pre-aggregation '{:?}'",
-                        name
-                    ))
-                })?;
-                resolved.push((
-                    base_symbol.clone(),
-                    td_ref.static_data().granularity.clone(),
-                ));
+                resolved.push((base_symbol, td_ref.static_data().granularity.clone()));
             }
-            let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+
+            let evaluator_compiler_cell = self.query_tools.compiler().clone();
             let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
             let mut result = Vec::new();
             for (base_symbol, granularity) in resolved {
@@ -173,17 +163,12 @@ impl PreAggregationsCompiler {
             }
             result
         } else if let Some(refs) = description.time_dimension_reference()? {
-            let dims = Self::symbols_from_ref(
-                self.query_tools.clone(),
-                &name.cube_name,
-                refs,
-                Self::check_is_time_dimension,
-            )?;
+            let base_symbol =
+                Self::time_dimension_symbol_from_ref(self.query_tools.clone(), name, refs)?;
 
             if static_data.granularity.is_some() {
-                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let evaluator_compiler_cell = self.query_tools.compiler().clone();
                 let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-                let base_symbol = dims[0].clone();
 
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
@@ -201,7 +186,7 @@ impl PreAggregationsCompiler {
 
                 vec![symbol]
             } else {
-                vec![dims[0].clone()]
+                vec![base_symbol]
             }
         } else {
             Vec::new()
@@ -318,13 +303,22 @@ impl PreAggregationsCompiler {
         for (i, rollup) in pre_aggrs_for_lambda.clone().iter().enumerate() {
             match rollup.source.as_ref() {
                 PreAggregationSource::Single(table) => {
-                    sources.push(Rc::new(table.clone()));
+                    // Carry this branch's own symbols: each member rollup stores its
+                    // columns under its own cube aliases, while the lambda exposes the
+                    // first rollup's symbols. The physical builder maps lambda members
+                    // to each branch's stored column through these.
+                    sources.push(PreAggregationUnionItem {
+                        table: Rc::new(table.clone()),
+                        measures: rollup.measures.clone(),
+                        dimensions: rollup.dimensions.clone(),
+                        time_dimensions: rollup.time_dimensions.clone(),
+                    });
                 }
                 _ => {
                     return Err(CubeError::user(format!("Rollup lambda can't be nested")));
                 }
             }
-            if i > 1 {
+            if i >= 1 {
                 Self::match_symbols(&rollup.measures, &pre_aggrs_for_lambda[0].measures)?;
                 Self::match_symbols(&rollup.dimensions, &pre_aggrs_for_lambda[0].dimensions)?;
                 Self::match_time_dimensions(
@@ -347,12 +341,24 @@ impl PreAggregationsCompiler {
         let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
 
         let static_data = description.static_data();
+        // A rollupLambda is left without an `external` default in the data model;
+        // its storage is whatever its member rollups use. The union is rendered as a
+        // single query, so it is external only when every member rollup is — then the
+        // read renders with the right dialect (e.g. CubeStore `?` placeholders).
+        let external = if pre_aggrs_for_lambda
+            .iter()
+            .all(|p| p.external == Some(true))
+        {
+            Some(true)
+        } else {
+            static_data.external
+        };
         let res = Rc::new(CompiledPreAggregation {
             name: static_data.name.clone(),
             cube_name: name.cube_name.clone(),
             source: Rc::new(source),
             granularity,
-            external: static_data.external,
+            external,
             measures,
             dimensions,
             time_dimensions,
@@ -546,12 +552,12 @@ impl PreAggregationsCompiler {
     }
 
     fn symbols_from_ref<F: Fn(&MemberSymbol) -> Result<(), CubeError>>(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         cube_name: &String,
         ref_func: Rc<dyn MemberSql>,
         check_type_fn: F,
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         let sql_call = evaluator_compiler.compile_sql_call(cube_name, ref_func)?;
         let mut res = Vec::new();
@@ -560,6 +566,33 @@ impl PreAggregationsCompiler {
             res.push(symbol.clone());
         }
         Ok(res)
+    }
+
+    fn time_dimension_symbol_from_ref(
+        query_tools: Rc<State>,
+        name: &PreAggregationFullName,
+        ref_func: Rc<dyn MemberSql>,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let evaluator_compiler_cell = query_tools.compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+        let sql_call = evaluator_compiler.compile_sql_call(&name.cube_name, ref_func)?;
+
+        let mut symbols = Vec::new();
+
+        for symbol in sql_call.get_dependencies().into_iter() {
+            Self::check_is_time_dimension(&symbol)?;
+            symbols.push(symbol);
+        }
+
+        symbols.into_iter().next().ok_or_else(|| {
+            let path = sql_call.debug_sql(true);
+            let member_name = path.rsplit('.').next().unwrap_or(&path);
+
+            CubeError::user(format!(
+                "'{}' not found for path '{}' in pre-aggregation '{}.{}'",
+                member_name, path, name.cube_name, name.name
+            ))
+        })
     }
 
     fn check_is_measure(symbol: &MemberSymbol) -> Result<(), CubeError> {
@@ -605,6 +638,117 @@ mod tests {
     use super::*;
     use crate::test_fixtures::cube_bridge::MockSchema;
     use crate::test_fixtures::test_utils::TestContext;
+    use indoc::indoc;
+
+    fn create_time_dimension_context() -> TestContext {
+        // `time_dimension: \"{CUBE}.created_at\"` models a JS reference built
+        // via string interpolation — `(CUBE) => `${CUBE}.created_at``. The JS
+        // planner resolves it (reference evaluation stringifies `${CUBE}` to
+        // the cube name), but here `{CUBE}` compiles to a cube reference and
+        // `.created_at` stays literal text, so the compiled reference has no
+        // member symbol dependencies.
+        let schema = MockSchema::from_yaml(indoc! {"
+            cubes:
+              - name: orders
+                sql: SELECT * FROM orders
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: created_at
+                    type: time
+                    sql: created_at
+                measures:
+                  - name: count
+                    type: count
+                pre_aggregations:
+                  - name: working_rollup
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: created_at
+                    granularity: day
+                  - name: broken_rollup_unsupported
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: '{CUBE}.created_at'
+                    granularity: day
+                  - name: broken_rollup_no_granularity
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: '{CUBE}.created_at'
+                  - name: broken_rollup_granularity_suffix
+                    type: rollup
+                    measures:
+                      - count
+                    time_dimension: '{CUBE}.created_at_day'
+                    granularity: day
+        "})
+        .unwrap();
+        TestContext::new(schema).unwrap()
+    }
+
+    fn compile_pre_agg(
+        ctx: &TestContext,
+        pre_agg_name: &str,
+    ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
+        let cube_names = vec!["orders".to_string()];
+        let mut compiler =
+            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
+        let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
+        compiler.compile_pre_aggregation(&name)
+    }
+
+    #[test]
+    fn test_time_dimension_resolves_to_member_symbol() {
+        let ctx = create_time_dimension_context();
+        let compiled = compile_pre_agg(&ctx, "working_rollup").unwrap();
+
+        assert_eq!(compiled.time_dimensions.len(), 1);
+        assert_eq!(
+            compiled.time_dimensions[0].full_name(),
+            "orders.created_at_day"
+        );
+        assert_eq!(compiled.granularity, Some("day".to_string()));
+    }
+
+    #[test]
+    fn test_time_dimension_resolved_to_cube_ref_returns_error() {
+        let ctx = create_time_dimension_context();
+        let err = compile_pre_agg(&ctx, "broken_rollup_unsupported")
+            .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
+        assert_eq!(
+            err.message,
+            "'created_at' not found for path 'orders.created_at' in pre-aggregation 'orders.broken_rollup_unsupported'"
+        );
+    }
+
+    #[test]
+    fn test_time_dimension_resolved_to_cube_ref_without_granularity_returns_error() {
+        let ctx = create_time_dimension_context();
+        let err = compile_pre_agg(&ctx, "broken_rollup_no_granularity")
+            .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
+        assert_eq!(
+            err.message,
+            "'created_at' not found for path 'orders.created_at' in pre-aggregation 'orders.broken_rollup_no_granularity'"
+        );
+    }
+
+    // Interpolated reference with a granularity-suffixed member name,
+    // e.g. `(CUBE) => `${CUBE}.created_at_day``.
+    #[test]
+    fn test_time_dimension_with_granularity_suffix_returns_error() {
+        let ctx = create_time_dimension_context();
+        let err = compile_pre_agg(&ctx, "broken_rollup_granularity_suffix")
+            .expect_err("Pre-aggregation with unresolvable time dimension should fail to compile");
+        assert_eq!(
+            err.message,
+            "'created_at_day' not found for path 'orders.created_at_day' in pre-aggregation 'orders.broken_rollup_granularity_suffix'"
+        );
+    }
 
     #[test]
     fn test_compile_simple_rollup() {

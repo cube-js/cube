@@ -1,22 +1,20 @@
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 
 use super::pretty_print::*;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::MemberSymbol;
-use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 
 /// Output shape of a logical-plan node: the dimensions, time
-/// dimensions and measures it exposes, plus the full names of
-/// measures that need multiplied-aggregate handling downstream.
+/// dimensions and measures it exposes. Measures sitting under a
+/// row-multiplying join already carry their distinct render form
+/// (`MultipliedCount`), so no separate tracking is kept here.
 #[derive(Default, Clone)]
 pub struct LogicalSchema {
     pub time_dimensions: Vec<Rc<MemberSymbol>>,
     pub dimensions: Vec<Rc<MemberSymbol>>,
     pub measures: Vec<Rc<MemberSymbol>>,
-    pub multiplied_measures: HashSet<String>,
 }
 
 impl fmt::Debug for LogicalSchema {
@@ -38,11 +36,6 @@ impl LogicalSchema {
 
     pub fn set_measures(mut self, measures: Vec<Rc<MemberSymbol>>) -> Self {
         self.measures = measures;
-        self
-    }
-
-    pub fn set_multiplied_measures(mut self, multiplied_measures: HashSet<String>) -> Self {
-        self.multiplied_measures = multiplied_measures;
         self
     }
 
@@ -130,15 +123,6 @@ impl PrettyPrint for LogicalSchema {
             &format!("-measures: {}", print_symbols(&self.measures)),
             state,
         );
-        if !self.multiplied_measures.is_empty() {
-            result.println(
-                &format!(
-                    "-multiplied_measures: {}",
-                    self.multiplied_measures.iter().join(", ")
-                ),
-                state,
-            );
-        }
     }
 }
 

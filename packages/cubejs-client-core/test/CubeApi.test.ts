@@ -427,6 +427,21 @@ describe('CubeApi cubeSql', () => {
     JSON.stringify({ data: [['Active']] }),
   ].join('\n');
 
+  // The backend streams a schema chunk, then (on a post-processing failure) an error
+  // chunk. The error must surface as a rejection instead of being concatenated as an
+  // `undefined` phantom row.
+  const cubeSqlResponseBodyWithError = [
+    JSON.stringify({
+      schema: [
+        { name: 'created_date', column_type: 'String' },
+      ],
+    }),
+    JSON.stringify({
+      error: 'Post-Processing Error: Cast error: Error parsing \'2026-05-01\' as timestamp',
+      requestId: '2fbe44e4-df6f-420d-ae39-376c802323b4-span-1',
+    }),
+  ].join('\n');
+
   test('should parse lastRefreshTime from response', async () => {
     vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
@@ -470,6 +485,52 @@ describe('CubeApi cubeSql', () => {
     expect(res.lastRefreshTime).toBeUndefined();
     expect(res.schema).toEqual([{ name: 'status', column_type: 'String' }]);
     expect(res.data).toEqual([['Active']]);
+  });
+
+  test('should surface an error chunk that follows the schema instead of swallowing it', async () => {
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyWithError })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await expect(
+      cubeApi.cubeSql('SELECT created_date FROM deals')
+    ).rejects.toThrow('Post-Processing Error: Cast error: Error parsing \'2026-05-01\' as timestamp');
+  });
+
+  // Regression: a large result returned in a single data chunk must not be spread
+  // into `rows.push(...)` — beyond ~123k elements that overflows V8's argument-count
+  // limit with "RangeError: Maximum call stack size exceeded".
+  test('should handle a large single-chunk result without a call-stack overflow', async () => {
+    const rowCount = 130000;
+    const largeResponseBody = [
+      JSON.stringify({ schema: [{ name: 'id', column_type: 'Int64' }] }),
+      JSON.stringify({ data: Array.from({ length: rowCount }, (_, i) => [String(i)]) }),
+    ].join('\n');
+
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: largeResponseBody })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.cubeSql('SELECT id FROM big_table');
+    expect(res.data).toHaveLength(rowCount);
+    expect(res.data[0]).toEqual(['0']);
+    expect(res.data[rowCount - 1]).toEqual([String(rowCount - 1)]);
   });
 });
 
@@ -691,6 +752,96 @@ describe('CubeApi with baseRequestId', () => {
     await cubeApi.meta({ baseRequestId });
 
     expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
+  });
+});
+
+describe('CubeApi meta onlyViews', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  const metaResponse = {
+    cubes: [{
+      name: 'OrdersView',
+      title: 'Orders View',
+      type: 'view',
+      measures: [{
+        name: 'count',
+        title: 'Count',
+        shortTitle: 'Count',
+        type: 'number'
+      }],
+      dimensions: [],
+      segments: []
+    }]
+  };
+
+  const mockMetaRequest = () => vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    subscribe: (cb) => Promise.resolve(cb({
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify(metaResponse)),
+      json: () => Promise.resolve(metaResponse)
+    } as any,
+    async () => undefined as any))
+  }));
+
+  test('should pass onlyViews to meta request', async () => {
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta({ onlyViews: true });
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe(true);
+  });
+
+  test('should not send onlyViews when the option is omitted', async () => {
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta();
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]).not.toHaveProperty('onlyViews');
+  });
+
+  test('should not send onlyViews when the option is false', async () => {
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta({ onlyViews: false });
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]).not.toHaveProperty('onlyViews');
+  });
+
+  test('should keep other meta options working alongside onlyViews', async () => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    const baseRequestId = 'meta-only-views-request-id';
+
+    const requestSpy = mockMetaRequest();
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.meta({ onlyViews: true, signal, baseRequestId });
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.onlyViews).toBe(true);
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
     expect(requestSpy.mock.calls[0]?.[1]?.baseRequestId).toBe(baseRequestId);
   });
 });

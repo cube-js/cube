@@ -1,6 +1,7 @@
 use convert_case::{Case, Casing};
 use neon::prelude::*;
-use pyo3::{PyAny, PyResult};
+use pyo3::types::PyAnyMethods;
+use pyo3::{Bound, PyAny, PyResult};
 
 use crate::cross::{CLRepr, CLReprObject, CLReprObjectKind};
 
@@ -51,9 +52,7 @@ impl CubeConfigPy {
             "context_to_app_id",
             "context_to_orchestrator_id",
             "context_to_cube_store_router_id",
-            "context_to_roles",
             "context_to_groups",
-            "db_type",
             "driver_factory",
             "extend_context",
             "external_driver_factory",
@@ -69,10 +68,10 @@ impl CubeConfigPy {
         ]
     }
 
-    pub fn attr(&mut self, config_module: &PyAny, key: &str) -> PyResult<()> {
+    pub fn attr(&mut self, config_module: &Bound<'_, PyAny>, key: &str) -> PyResult<()> {
         let v = config_module.getattr(key)?;
         if !v.is_none() {
-            let value = CLRepr::from_python_ref(v)?;
+            let value = CLRepr::from_python_ref(&v)?;
             self.properties.insert(key.to_case(Case::Camel), value);
         };
 

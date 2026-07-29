@@ -59,6 +59,23 @@ You'll then be able to either resolve them manually or discard the changes.
   <img src="https://ucarecdn.com/4834bbf0-7b9c-41ae-b562-4362c25ec3fe/" alt="Conflict Resolution UI" />
 </Frame>
 
+## Deep-link into development mode
+
+You can link directly into development mode on the Semantic Model IDE by
+adding query parameters to the page URL:
+
+- `?branch=<name>` switches to the given branch, entering development mode
+  if you're already in it (or staying read-only otherwise).
+- `?devmode=true` enters development mode on the current branch. Combine it
+  with `?branch=` to enter development mode on a specific branch in one step:
+
+```text
+https://your-tenant.cubecloud.dev/d/DEPLOYMENT_ID/schema?branch=my-branch&devmode=true
+```
+
+Both parameters are stripped from the URL once applied. They're a no-op for
+users without permission to use development mode.
+
 ## Finding endpoints
 
 In Development Mode, you'll have dedicated endpoints that will track the branch you're on.

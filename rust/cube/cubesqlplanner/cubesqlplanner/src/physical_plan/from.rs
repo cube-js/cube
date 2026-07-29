@@ -10,6 +10,10 @@ pub enum SingleSource {
     Subquery(Rc<QueryPlan>),
     Cube(Rc<BaseCube>),
     TableReference(String, Rc<Schema>),
+    /// An opaque, pre-rendered SQL sub-query (a complete SELECT) emitted
+    /// verbatim wrapped in parentheses. Used for SQL-API `subqueryJoins`,
+    /// whose body is built outside the planner.
+    RawSubquerySql(String),
 }
 
 impl SingleSource {
@@ -25,6 +29,7 @@ impl SingleSource {
             }
             SingleSource::Subquery(s) => format!("({})", s.to_sql(templates)?),
             SingleSource::TableReference(r, _) => format!(" {} ", r),
+            SingleSource::RawSubquerySql(sql) => format!("({})", sql),
         };
         Ok(sql)
     }
@@ -34,6 +39,7 @@ impl SingleSource {
             SingleSource::Subquery(subquery) => subquery.schema(),
             SingleSource::Cube(_) => Rc::new(Schema::empty()),
             SingleSource::TableReference(_, schema) => schema.clone(),
+            SingleSource::RawSubquerySql(_) => Rc::new(Schema::empty()),
         }
     }
 }
@@ -91,7 +97,13 @@ impl SingleAliasedSource {
             }
         } */
 
-        templates.query_aliased(&sql, &self.alias)
+        match &self.source {
+            // The alias of a SQL-API sub-query join is already a final, quoted
+            // identifier and is referenced verbatim in the join ON condition.
+            // Re-quoting it would double the quotes and break the reference.
+            SingleSource::RawSubquerySql(_) => templates.query_aliased_prequoted(&sql, &self.alias),
+            _ => templates.query_aliased(&sql, &self.alias),
+        }
     }
 }
 

@@ -432,6 +432,7 @@ mod tests {
             PlanningMeta {
                 indices: Vec::new(),
                 multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
             },
             None,
         )
@@ -515,6 +516,7 @@ mod tests {
             PlanningMeta {
                 indices: Vec::new(),
                 multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
             },
             None,
         )
@@ -619,6 +621,7 @@ mod tests {
             PlanningMeta {
                 indices: Vec::new(),
                 multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
             },
             None,
         )
@@ -698,6 +701,7 @@ mod tests {
             PlanningMeta {
                 indices: Vec::new(),
                 multi_part_subtree: HashMap::new(),
+                pushable_chunk_filters: Vec::new(),
             },
             None,
         )

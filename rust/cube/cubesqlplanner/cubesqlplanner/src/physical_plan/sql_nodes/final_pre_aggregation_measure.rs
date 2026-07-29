@@ -17,11 +17,20 @@ use std::rc::Rc;
 pub struct FinalPreAggregationMeasureSqlNode {
     input: Rc<dyn SqlNode>,
     references: RenderReferences,
+    count_approx_as_state: bool,
 }
 
 impl FinalPreAggregationMeasureSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<Self> {
-        Rc::new(Self { input, references })
+    pub fn new(
+        input: Rc<dyn SqlNode>,
+        references: RenderReferences,
+        count_approx_as_state: bool,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            input,
+            references,
+            count_approx_as_state,
+        })
     }
 
     pub fn input(&self) -> &Rc<dyn SqlNode> {
@@ -55,7 +64,16 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                             );
                             match ev.kind().pre_aggregate_wrap() {
                                 AggregateWrap::CountDistinctApprox => {
-                                    templates.count_distinct_approx(pre_aggregation_measure)?
+                                    // The rollup column holds an HLL state, so it
+                                    // must be merged, not recomputed. Keep the
+                                    // merged state when this query itself feeds a
+                                    // further aggregation; otherwise take its
+                                    // cardinality.
+                                    if self.count_approx_as_state {
+                                        templates.hll_merge(pre_aggregation_measure)?
+                                    } else {
+                                        templates.hll_cardinality_merge(pre_aggregation_measure)?
+                                    }
                                 }
                                 AggregateWrap::Function(name) => {
                                     format!("{}({})", name, pre_aggregation_measure)

@@ -18,6 +18,12 @@ pub struct MockDriverTools {
     timestamp_precision: u32,
     sql_templates: Rc<MockSqlTemplatesRender>,
     visible_in_db_time_zone: bool,
+    /// When set, dialect-specific native methods mirror CubeStoreQuery
+    /// instead of the Postgres defaults (used for external pre-aggregations).
+    cubestore: bool,
+    /// Mirrors the JS `shouldReuseParams` dialect flag: `true` for the Postgres
+    /// defaults (`$1` addresses its value), `false` for positional `?`.
+    should_reuse_params: bool,
 }
 
 impl MockDriverTools {
@@ -27,6 +33,8 @@ impl MockDriverTools {
             timestamp_precision: 3,
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
             visible_in_db_time_zone: false,
+            cubestore: false,
+            should_reuse_params: true,
         }
     }
 
@@ -37,6 +45,8 @@ impl MockDriverTools {
             timestamp_precision: 3,
             sql_templates: Rc::new(MockSqlTemplatesRender::default_templates()),
             visible_in_db_time_zone: false,
+            cubestore: false,
+            should_reuse_params: true,
         }
     }
 
@@ -47,6 +57,8 @@ impl MockDriverTools {
             timestamp_precision: 3,
             sql_templates: Rc::new(sql_templates),
             visible_in_db_time_zone: false,
+            cubestore: false,
+            should_reuse_params: true,
         }
     }
 
@@ -59,13 +71,43 @@ impl MockDriverTools {
             timestamp_precision: 3,
             sql_templates: Rc::new(sql_templates),
             visible_in_db_time_zone: false,
+            cubestore: false,
+            should_reuse_params: true,
         }
+    }
+
+    /// Renders params as positional `?`, so a value cannot be shared between
+    /// placeholders.
+    #[allow(dead_code)]
+    pub fn without_params_reuse(mut self) -> Self {
+        self.should_reuse_params = false;
+        self
     }
 
     #[allow(dead_code)]
     pub fn with_visible_in_db_time_zone(mut self) -> Self {
         self.visible_in_db_time_zone = true;
         self
+    }
+
+    /// Switches dialect-specific native methods to their CubeStore form,
+    /// mirroring CubeStoreQuery.ts (used for external pre-aggregations).
+    pub fn with_cubestore_dialect(mut self) -> Self {
+        self.cubestore = true;
+        self
+    }
+
+    /// Mirrors CubeStoreQuery.formatInterval: a `"<n> <unit>"` interval
+    /// (possibly multi-unit) rendered in CubeStore (DataFusion) form, e.g.
+    /// `6 month` → `'6 MONTH'`.
+    fn format_interval(interval: &str) -> String {
+        let mut tokens = interval.split_whitespace();
+        let mut parts: Vec<String> = Vec::new();
+        while let (Some(num), Some(unit)) = (tokens.next(), tokens.next()) {
+            let unit = unit.trim_end_matches('s').to_uppercase();
+            parts.push(format!("{} {}", num, unit));
+        }
+        format!("'{}'", parts.join(" "))
     }
 }
 
@@ -81,6 +123,10 @@ impl DriverTools for MockDriverTools {
     }
 
     fn convert_tz(&self, field: String) -> Result<String, CubeError> {
+        if self.cubestore {
+            // CubeStoreQuery.convertTz; sessions are pinned to UTC here.
+            return Ok(format!("CONVERT_TZ({}, '+00:00')", field));
+        }
         Ok(format!(
             "({}::timestamptz AT TIME ZONE '{}')",
             field, self.timezone
@@ -122,10 +168,18 @@ impl DriverTools for MockDriverTools {
     }
 
     fn time_stamp_cast(&self, field: String) -> Result<String, CubeError> {
+        if self.cubestore {
+            // CubeStoreQuery.timeStampCast (DataFusion has no `::timestamptz`).
+            return Ok(format!("CAST({} as TIMESTAMP)", field));
+        }
         Ok(format!("{}::timestamptz", field))
     }
 
     fn date_time_cast(&self, field: String) -> Result<String, CubeError> {
+        if self.cubestore {
+            // CubeStoreQuery.dateTimeCast.
+            return Ok(format!("to_timestamp({})", field));
+        }
         Ok(format!("{}::timestamp", field))
     }
 
@@ -164,6 +218,10 @@ impl DriverTools for MockDriverTools {
 
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError> {
         Ok(Vec::new())
+    }
+
+    fn should_reuse_params(&self) -> Result<bool, CubeError> {
+        Ok(self.should_reuse_params)
     }
 
     fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
@@ -213,11 +271,11 @@ impl DriverTools for MockDriverTools {
     }
 
     fn hll_merge(&self, sql: String) -> Result<String, CubeError> {
-        Ok(format!("round(hll_cardinality(hll_union_agg({})))", sql))
+        Ok(format!("merge({})", sql))
     }
 
     fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError> {
-        self.hll_merge(sql)
+        Ok(format!("cardinality(merge({}))", sql))
     }
 
     fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError> {
@@ -237,6 +295,15 @@ impl DriverTools for MockDriverTools {
         source: String,
         origin: String,
     ) -> Result<String, CubeError> {
+        if self.cubestore {
+            // Mirror CubeStoreQuery.dateBin: DATE_BIN over to_timestamp casts.
+            return Ok(format!(
+                "DATE_BIN(INTERVAL {}, to_timestamp({}), to_timestamp('{}'))",
+                Self::format_interval(&interval),
+                source,
+                origin
+            ));
+        }
         Ok(format!(
             "('{}' ::timestamp + INTERVAL '{}' * FLOOR(EXTRACT(EPOCH FROM ({} - '{}'::timestamp)) / EXTRACT(EPOCH FROM INTERVAL '{}')))",
             origin, interval, source, origin, interval

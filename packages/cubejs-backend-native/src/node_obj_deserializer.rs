@@ -109,9 +109,9 @@ impl<'de> Deserializer<'de> for JsValueDeserializer<'_, '_> {
                 return visitor.visit_i64(value as i64);
             }
 
-            Err(JsDeserializationError(
-                "Unsupported number type for deserialization".to_string(),
-            ))
+            // Integer-valued, but too large to fit in any i64/u64 (e.g. 5.18e44).
+            // It originated as an f64 anyway, so keep it as one instead of failing.
+            visitor.visit_f64(value)
         } else if self.value.is_a::<JsBoolean, _>(self.cx) {
             let value = self
                 .value

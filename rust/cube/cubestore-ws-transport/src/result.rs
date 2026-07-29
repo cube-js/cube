@@ -9,6 +9,9 @@ pub enum ResponseFormat {
     #[default]
     Legacy,
     Arrow,
+    /// The command completed without a result set (zero columns). This is a
+    /// decoded-from-the-wire descriptor only — clients can never request it.
+    Completed,
 }
 
 impl std::fmt::Display for ResponseFormat {
@@ -16,6 +19,7 @@ impl std::fmt::Display for ResponseFormat {
         match self {
             ResponseFormat::Legacy => f.write_str("Legacy"),
             ResponseFormat::Arrow => f.write_str("Arrow"),
+            ResponseFormat::Completed => f.write_str("Completed"),
         }
     }
 }
@@ -38,6 +42,9 @@ pub enum ResultData {
         schema: SchemaRef,
         batches: Vec<RecordBatch>,
     },
+    /// The command completed without a result set (zero columns) — e.g. CREATE
+    /// TABLE/INSERT or queue/cache writes. Carries no columns and no rows.
+    Completed,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +61,7 @@ impl QueryResult {
         match &self.data {
             ResultData::Legacy { rows, .. } => rows.len(),
             ResultData::Arrow { batches, .. } => batches.iter().map(|b| b.num_rows()).sum(),
+            ResultData::Completed => 0,
         }
     }
 
@@ -62,6 +70,7 @@ impl QueryResult {
         match &self.data {
             ResultData::Legacy { .. } => ResponseFormat::Legacy,
             ResultData::Arrow { .. } => ResponseFormat::Arrow,
+            ResultData::Completed => ResponseFormat::Completed,
         }
     }
 
@@ -73,6 +82,7 @@ impl QueryResult {
             ResultData::Arrow { schema, .. } => {
                 schema.fields().iter().map(|f| f.name().clone()).collect()
             }
+            ResultData::Completed => Vec::new(),
         }
     }
 }

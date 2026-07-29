@@ -28,7 +28,7 @@ jobs:
       matrix:
         rust: [nightly-2025-08-01]
     container:
-      image: cubejs/rust-builder:bookworm-llvm-18
+      image: cubejs/rust-builder:trixie-llvm-22
     env:
       RUST: ${{ matrix.rust }}
     steps:
@@ -150,7 +150,7 @@ jobs:
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
-        run: choco install -y --force llvm --version 18.1.6
+        run: choco install -y --force llvm --version 22.1.0
       - name: Set Env Variables for Windows
         uses: allenevans/set-env@v4.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
@@ -203,13 +203,13 @@ jobs:
           # Please use minimal possible version of ubuntu, because it produces constraint on glibc
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024
+            image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025
             executable_name: cubestored
             strip: true
             compress: false
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-musl
-            image: cubejs/rust-cross:x86_64-unknown-linux-musl-15082024
+            image: cubejs/rust-cross:x86_64-unknown-linux-musl-31072025
             executable_name: cubestored
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890

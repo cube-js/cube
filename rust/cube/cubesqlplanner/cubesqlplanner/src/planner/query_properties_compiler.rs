@@ -8,18 +8,21 @@ use std::rc::Rc;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::cube_bridge::base_query_options::{BaseQueryOptions, FilterItem as NativeFilterItem};
+use crate::cube_bridge::base_query_options::{
+    BaseQueryOptions, FilterItem as NativeFilterItem, FilterValue,
+};
 use crate::cube_bridge::member_expression::{
     MemberExpressionDefinition, MemberExpressionExpressionDef,
 };
 use crate::cube_bridge::options_member::OptionsMember;
 use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
+use crate::logical_plan::LogicalSubqueryJoinItem;
 
 use super::filter::compiler::FilterCompiler;
 use super::filter::{BaseSegment, FilterItem};
 use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
-use super::query_tools::QueryTools;
+use super::state::State;
 use super::{
     Compiler, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
     TimeDimensionSymbol,
@@ -28,11 +31,11 @@ use super::{
 /// One-shot translator from [`BaseQueryOptions`] into a finalized
 /// [`QueryProperties`].
 pub struct QueryPropertiesCompiler {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
 }
 
 impl QueryPropertiesCompiler {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(query_tools: Rc<State>) -> Self {
         Self { query_tools }
     }
 
@@ -41,7 +44,7 @@ impl QueryPropertiesCompiler {
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Rc<QueryProperties>, CubeError> {
         let options = options.as_ref();
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
         let dimensions = self.compile_dimensions(&mut evaluator_compiler, options)?;
@@ -81,6 +84,14 @@ impl QueryPropertiesCompiler {
             .and_then(|v| v.parse::<usize>().ok());
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let pre_aggregations_match_only = options
+            .static_data()
+            .pre_aggregations_match_only
+            .unwrap_or(false);
+        let use_original_sql_pre_aggregations_in_pre_aggregation = options
+            .static_data()
+            .use_original_sql_pre_aggregations_in_pre_aggregation
+            .unwrap_or(false);
         let total_query = options.static_data().total_query.unwrap_or(false);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
@@ -89,6 +100,8 @@ impl QueryPropertiesCompiler {
         let query_join_hints = Rc::new(JoinHints::from_items(
             options.join_hints()?.unwrap_or_default(),
         ));
+
+        let subquery_joins = self.compile_subquery_joins(&mut evaluator_compiler, options)?;
 
         QueryProperties::builder()
             .query_tools(self.query_tools)
@@ -104,11 +117,59 @@ impl QueryPropertiesCompiler {
             .offset(offset)
             .ungrouped(ungrouped)
             .pre_aggregation_query(pre_aggregation_query)
+            .pre_aggregations_match_only(pre_aggregations_match_only)
+            .use_original_sql_pre_aggregations_in_pre_aggregation(
+                use_original_sql_pre_aggregations_in_pre_aggregation,
+            )
             .total_query(total_query)
             .query_join_hints(query_join_hints)
             .disable_external_pre_aggregations(disable_external_pre_aggregations)
             .pre_aggregation_id(pre_aggregation_id)
+            .subquery_joins(subquery_joins)
             .build()
+    }
+
+    /// Compiles SQL-API `subqueryJoins` into [`LogicalSubqueryJoinItem`]s:
+    /// keeps the opaque sub-query `sql`/`alias`/`joinType` and compiles the
+    /// `on` condition (a member expression) into a `SqlCall` bound to its
+    /// declared cube.
+    fn compile_subquery_joins(
+        &self,
+        evaluator_compiler: &mut Compiler,
+        options: &dyn BaseQueryOptions,
+    ) -> Result<Vec<LogicalSubqueryJoinItem>, CubeError> {
+        let Some(subquery_joins) = options.subquery_joins()? else {
+            return Ok(Vec::new());
+        };
+        subquery_joins
+            .iter()
+            .map(|join| -> Result<LogicalSubqueryJoinItem, CubeError> {
+                let static_data = join.static_data();
+                let on = join.on()?;
+                let on_cube_name = on.static_data().cube_name.clone().unwrap_or_default();
+                let on_sql = match on.expression()? {
+                    MemberExpressionExpressionDef::Sql(sql) => {
+                        evaluator_compiler.compile_sql_call(&on_cube_name, sql)?
+                    }
+                    MemberExpressionExpressionDef::Struct(_) => {
+                        return Err(CubeError::user(
+                            "Struct expression is not supported for subquery join condition"
+                                .to_string(),
+                        ));
+                    }
+                };
+                let join_type = static_data
+                    .join_type
+                    .clone()
+                    .unwrap_or_else(|| "LEFT".to_string());
+                Ok(LogicalSubqueryJoinItem {
+                    sql: static_data.sql.clone(),
+                    alias: static_data.alias.clone(),
+                    join_type,
+                    on_sql,
+                })
+            })
+            .collect()
     }
 
     fn compile_dimensions(
@@ -197,12 +258,26 @@ impl QueryPropertiesCompiler {
                 } else {
                     None
                 };
-                Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                    base_symbol,
-                    d.granularity.clone(),
-                    granularity_obj,
-                    date_range_tuple,
-                )))
+                // Honor an explicit `memberToAlias` override for the granularized
+                // member. The SQL API (cubesql) keys it `{member}.{granularity}`
+                // (dotted) and references the CubeScan column by that alias; the
+                // default `{base alias}_{granularity}` would otherwise mismatch.
+                let alias_override = d.granularity.as_ref().and_then(|granularity| {
+                    evaluator_compiler.alias_for_member(&format!(
+                        "{}.{}",
+                        base_symbol.full_name(),
+                        granularity
+                    ))
+                });
+                Ok(MemberSymbol::new_time_dimension(
+                    TimeDimensionSymbol::new_with_alias(
+                        base_symbol,
+                        d.granularity.clone(),
+                        granularity_obj,
+                        date_range_tuple,
+                        alias_override,
+                    ),
+                ))
             })
             .collect()
     }
@@ -272,7 +347,13 @@ impl QueryPropertiesCompiler {
                 }
                 let source_measure_compiled =
                     evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
-                let symbol = if let Ok(source_measure) = source_measure_compiled.as_measure() {
+                // A view measure is a reference wrapper whose type collapses to
+                // `number` (Calculated), which rejects additional filters. Resolve
+                // the reference chain to the owning cube measure so the filter is
+                // pushed inside the aggregation (`SUM(CASE WHEN ... END)`); a no-op
+                // for plain cube measures.
+                let resolved_source = source_measure_compiled.clone().resolve_reference_chain();
+                let symbol = if let Ok(source_measure) = resolved_source.as_measure() {
                     let patched_measure =
                         source_measure.new_patched(new_measure_type, filters_to_add)?;
                     MemberSymbol::new_measure(patched_measure)
@@ -391,7 +472,8 @@ impl QueryPropertiesCompiler {
         time_dimensions: &[Rc<MemberSymbol>],
         measures: &[Rc<MemberSymbol>],
     ) -> Result<(Vec<FilterItem>, Vec<FilterItem>, Vec<FilterItem>), CubeError> {
-        let mut filter_compiler = FilterCompiler::new(evaluator_compiler, self.query_tools.clone());
+        let mut filter_compiler =
+            FilterCompiler::new(evaluator_compiler, self.query_tools.query_tools().clone());
         if let Some(filters) = &options.static_data().filters {
             for filter in filters {
                 filter_compiler.add_item(filter)?;
@@ -470,7 +552,12 @@ impl QueryPropertiesCompiler {
                 member: Some(s.member_reference.clone()),
                 dimension: None,
                 operator: Some(s.operator.clone()),
-                values: s.values_references.clone(),
+                // `values_references` are SQL/member references resolved as
+                // plain strings; lift each into a typed `FilterValue`.
+                values: s
+                    .values_references
+                    .as_ref()
+                    .map(|vals| vals.iter().cloned().map(FilterValue::from).collect()),
             };
             filter_compiler.add_item(&native_filter)?;
         }

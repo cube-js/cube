@@ -1,3 +1,4 @@
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::filter::base_filter::{BaseFilter, FilterType};
 use crate::planner::filter::base_segment::BaseSegment;
 use crate::planner::filter::filter_operator::FilterOperator;
@@ -14,11 +15,12 @@ fn ctx() -> TestContext {
 fn make_dim_filter(ctx: &TestContext, member_path: &str, value: &str) -> Rc<BaseFilter> {
     let symbol = ctx.create_symbol(member_path).unwrap();
     BaseFilter::try_new(
-        ctx.query_tools().clone(),
+        ctx.query_tools().query_tools().clone(),
         symbol,
         FilterType::Dimension,
         FilterOperator::Equal,
-        Some(vec![Some(value.to_string())]),
+        Some(vec![FilterValue::Str(value.to_string())]),
+        None,
     )
     .unwrap()
 }

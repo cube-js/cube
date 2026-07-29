@@ -47,3 +47,24 @@ See [Signed embedding](/embedding/iframe/auth/signed) for the full session gener
 ## Personalize chat with user attributes
 
 When using signed embedding, you can pass [user attributes](/embedding/iframe/auth/signed#user-attributes) during session generation to personalize chat responses for each user — for example, scoping answers to a specific region, department, or tenant.
+
+## Customize the chat
+
+Add these query parameters to the embed URL to hide parts of the chat UI:
+
+| Parameter        | Effect                                             |
+| ----------------- | --------------------------------------------------- |
+| `hideNewChat=1`   | Hides the **New chat** button.                     |
+| `hideChatInput=1` | Hides the message input, for a read-only transcript. |
+| `hideHistory=1`   | Hides the **Chat History** button.                 |
+
+By default, the chat header shows a **Chat History** button that lists the
+user's past conversations (matched by `externalId` under signed embedding) so
+they can resume one instead of always starting fresh.
+
+To deep-link directly into a specific past conversation, pass its ID as
+`chatId` alongside `sessionId` on the short embed URL:
+
+```text
+https://your-tenant.cubecloud.dev/embed/chat?sessionId=YOUR_SESSION_ID&chatId=YOUR_CHAT_ID
+```

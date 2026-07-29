@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response, convert_transport_response_columnar, DataType, MemberField, Schema,
-    SchemaRef,
+    convert_transport_response, DataType, MemberField, Schema, SchemaRef,
 };
-use cubesql::transport::{TransportLoadResponse, TransportLoadResponseColumnar};
+use cubesql::transport::TransportLoadResponseColumnar;
 use datafusion::arrow::datatypes::{Field, TimeUnit};
 use serde_json::json;
 
@@ -113,33 +112,6 @@ fn annotation_value() -> serde_json::Value {
     })
 }
 
-fn build_row_json(rows: usize, kinds: &[ColKind]) -> String {
-    let names: Vec<String> = kinds
-        .iter()
-        .enumerate()
-        .map(|(i, k)| field_name(i, *k))
-        .collect();
-
-    let data: Vec<serde_json::Value> = (0..rows)
-        .map(|r| {
-            let mut row_obj = serde_json::Map::with_capacity(kinds.len());
-            for (c, kind) in kinds.iter().enumerate() {
-                row_obj.insert(names[c].clone(), cell_value(r, c, *kind));
-            }
-            serde_json::Value::Object(row_obj)
-        })
-        .collect();
-
-    let response = json!({
-        "results": [{
-            "annotation": annotation_value(),
-            "data": data,
-        }]
-    });
-
-    serde_json::to_string(&response).expect("serialize row json")
-}
-
 fn build_columnar_json(rows: usize, kinds: &[ColKind]) -> String {
     let names: Vec<String> = kinds
         .iter()
@@ -169,7 +141,6 @@ fn build_columnar_json(rows: usize, kinds: &[ColKind]) -> String {
 struct Inputs {
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
-    row_json: String,
     columnar_json: String,
 }
 
@@ -178,7 +149,6 @@ fn build_inputs(rows: usize, cols: usize, time_dims: usize) -> Inputs {
     Inputs {
         schema: build_schema(&kinds),
         member_fields: build_member_fields(&kinds),
-        row_json: build_row_json(rows, &kinds),
         columnar_json: build_columnar_json(rows, &kinds),
     }
 }
@@ -212,29 +182,8 @@ fn bench_transform_response(c: &mut Criterion) {
                 let Inputs {
                     schema,
                     member_fields,
-                    row_json,
                     columnar_json,
                 } = &inputs;
-
-                let row_id = format!("row/rows={}/cols={}/td={}", rows, cols, td);
-                group.bench_with_input(
-                    BenchmarkId::from_parameter(&row_id),
-                    row_json.as_str(),
-                    |b, json| {
-                        b.iter(|| {
-                            let value: serde_json::Value =
-                                serde_json::from_str(json).expect("row from_str");
-                            let response: TransportLoadResponse =
-                                serde_json::from_value(value).expect("row from_value");
-                            convert_transport_response(
-                                response,
-                                schema.clone(),
-                                member_fields.clone(),
-                            )
-                            .expect("convert_transport_response")
-                        })
-                    },
-                );
 
                 let col_id = format!("columnar/rows={}/cols={}/td={}", rows, cols, td);
                 group.bench_with_input(
@@ -246,17 +195,15 @@ fn bench_transform_response(c: &mut Criterion) {
                                 serde_json::from_str(json).expect("columnar from_str");
                             let response: TransportLoadResponseColumnar =
                                 serde_json::from_value(value).expect("columnar from_value");
-                            convert_transport_response_columnar(
+                            convert_transport_response(
                                 response,
                                 schema.clone(),
                                 member_fields.clone(),
                             )
-                            .expect("convert_transport_response_columnar")
+                            .expect("convert_transport_response")
                         })
                     },
                 );
-
-                drop(inputs);
             }
         }
     }

@@ -1,5 +1,6 @@
 use crate::test_fixtures::cube_bridge::{members_from_strings, MockBaseQueryOptions, MockSchema};
 use crate::test_fixtures::test_utils::TestContext;
+use cubenativeutils::CubeError;
 use indoc::indoc;
 use std::rc::Rc;
 
@@ -38,6 +39,40 @@ fn test_member_to_alias() {
         sql.contains("custom_created_at"),
         "SQL should contain custom alias for time dimension base, got: {sql}"
     );
+}
+
+#[test]
+fn test_member_to_alias_time_dimension_granularity() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let test_context = TestContext::new(schema)?;
+
+    // The SQL API references a granularized time-dimension column by an alias
+    // sent via `memberToAlias` keyed `{member}.{granularity}`. The planner must
+    // honor it instead of defaulting to `{base alias}_{granularity}`.
+    let query_yaml = indoc! {r#"
+        measures:
+          - visitors.count
+        time_dimensions:
+          - dimension: visitors.created_at
+            granularity: month
+        memberToAlias:
+          visitors.created_at.month: "td_month_alias"
+    "#};
+
+    let sql = test_context.build_sql(query_yaml)?;
+
+    // The override must be used as the projected alias …
+    assert!(
+        sql.contains("\"td_month_alias\""),
+        "expected granularized memberToAlias override, got: {sql}"
+    );
+    // … instead of the default `{base alias}_{granularity}`.
+    assert!(
+        !sql.contains("visitors__created_at_month"),
+        "should not fall back to default granularized alias, got: {sql}"
+    );
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]

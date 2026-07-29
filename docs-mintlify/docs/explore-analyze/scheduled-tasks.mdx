@@ -1,0 +1,142 @@
+---
+title: Scheduled Tasks
+description: Save a natural-language agent prompt and have Cube run it automatically on a schedule, producing a chat thread for each run.
+---
+
+Scheduled Tasks let you run tasks on a schedule — or whenever you need them.
+Save a natural-language prompt for the
+[agent](/docs/explore-analyze/analytics-chat) and have Cube run it
+automatically on a schedule or on demand. Each run produces a chat thread
+you can open later to read the agent's answer. You can also ask the agent to create a
+scheduled task for you from any of your chats.
+
+For example, you might schedule a task to *"every weekday at 9am, summarize
+yesterday's signups, flag anything anomalous, and email me the results"* and
+review the summary each morning.
+
+Scheduled Tasks are **scoped to a deployment** — each task belongs to the
+deployment it was created in.
+
+## Where to find it
+
+In the deployment sidebar, open **Scheduled** (the clock icon, below
+**Explore**). The page lists the deployment's tasks with their name,
+schedule, status, and description, and is searchable.
+
+{/* TODO: screenshot — Scheduled Tasks list page in the deployment sidebar, showing the New task dropdown */}
+
+## Anatomy of a task
+
+A task has:
+
+- **Name** (required) — how the task appears in the list.
+- **Description** (optional) — a short summary shown in the list.
+- **Instructions** (required) — the natural-language prompt the agent runs on
+  each execution.
+- **Schedule** — how often the task runs (see below).
+- **Enabled** — a toggle to activate or pause a scheduled task.
+
+## Schedule options
+
+Scheduled Tasks use the same schedule editor as
+[dashboard scheduled refresh](/docs/explore-analyze/scheduled-refreshes),
+offering these frequencies:
+
+- **Manual** — no schedule; the task runs only when you trigger it with
+  **Run now**.
+- **Hourly**, **Daily**, **Weekly** (with a day of the week), and **Monthly**
+  (with a day of the month) — each with a time picker.
+- **Custom** — a raw cron expression for full control.
+
+A **timezone** selector (defaulting to your browser's timezone) controls when
+the schedule fires; it is stored per task.
+
+## Managing tasks
+
+From the list, you can:
+
+- **Create** a new task. The **New task** button is a dropdown with two
+  options:
+  - **Create with agent** — opens a new Analytics Chat pre-seeded with a
+    message asking the agent to explain scheduled tasks and interview you
+    about what the task should do and when it should run. The agent then
+    creates the task for you (see
+    [Managing tasks from chat](#managing-tasks-from-chat)).
+  - **Set up manually** — opens the create dialog where you fill in the
+    task's details yourself.
+- **Edit** an existing task's instructions, schedule, or details.
+- **Enable / Pause** a scheduled task to control whether it runs on schedule.
+- **Run now** — trigger a one-off run immediately. This works for both manual
+  and scheduled tasks. Triggering a run shows a notification with a **View**
+  link straight to the run's chat thread, and the thread appears in the
+  Recent Chats sidebar immediately.
+- **Delete** a task. Deleting removes its schedule and stops all future runs.
+
+{/* TODO: screenshot — New task dropdown with Create with agent and Set up manually options */}
+
+## Task detail page
+
+Clicking a task in the list opens its detail page. The header shows a
+breadcrumb back to Scheduled Tasks, the task name, a status tag (**Manual**,
+**Active**, or **Paused**), and the description, along with actions to
+**Edit** (pencil), **Delete** (trash), and a primary **Run now** button.
+
+The page shows:
+
+- **History** — the task's runs, newest first. Each entry is a timestamped
+  link that opens that run's chat thread. Currently-executing runs
+  show a **Running** tag, and failed runs a **Failed** tag. The list shows
+  the latest 50 runs; a "Showing the latest 50 runs" note appears once the
+  cap is hit.
+- **Instructions** — the task's prompt.
+- **Repeats** — the schedule in plain language.
+
+{/* TODO: screenshot — task detail page with History, Instructions, and Repeats */}
+
+## Reading the output
+
+Each run creates a chat thread containing the agent's response. Open the
+thread in [Analytics Chat](/docs/explore-analyze/analytics-chat) to read the
+full answer, ask follow-up questions, or
+[save results to a Workbook](/docs/explore-analyze/workbooks).
+Scheduled-run threads are marked in the Recent Chats sidebar with a clock
+icon (hover over it to see the "Scheduled task" tooltip).
+
+A run shows as **Running** while it executes, then completes or fails. A
+failed run's thread shows a failure notice instead of an empty thread.
+
+The task runs headlessly under the security context of the user who created
+it, so it sees exactly the data that user can access.
+
+### What the agent can do in a scheduled run
+
+Beyond querying the semantic model, the agent in a scheduled run can:
+
+- **Send email to workspace members** — for example, *"summarize yesterday's
+  signups and email the summary to me."* This requires the agent email tool
+  to be enabled for the workspace; recipients are restricted to workspace
+  members.
+- **Use web search**.
+- **Create and update reports, workbooks, and dashboards**, using the task
+  creator's permissions.
+
+Scheduled runs do not yet have data-model access — editing the semantic
+layer is currently available only in interactive chat.
+
+## Managing tasks from chat
+
+You can also create and manage Scheduled Tasks conversationally in
+[Analytics Chat](/docs/explore-analyze/analytics-chat) — from any chat, not
+just ones started with **Create with agent** (that menu option simply opens
+a chat pre-seeded for this flow). Ask the agent to schedule, update, list,
+or delete tasks in plain language — for example, *"schedule a daily summary
+of yesterday's signups at 9am"* or *"list my scheduled tasks."*
+
+The agent's actions render in the chat as labeled steps with a clock icon —
+*"Creating scheduled task…"* / *"Created scheduled task"*, *"Listed
+scheduled tasks"*, *"Updated scheduled task"*, and *"Deleted scheduled
+task"*.
+
+The agent manages task definitions: when listing tasks, it can report each
+task's id, name, description, schedule, timezone, and enabled state. A
+task's run history lives on its [detail page](#task-detail-page).

@@ -17,7 +17,7 @@ cubes:
         type: number
 
     access_policy:
-      - role: "*"
+      - group: "*"
         member_level:
           includes: "*"
         row_level:

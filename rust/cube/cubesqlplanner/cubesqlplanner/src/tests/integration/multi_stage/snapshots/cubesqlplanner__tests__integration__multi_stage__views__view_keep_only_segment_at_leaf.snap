@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/views.rs
+expression: result
+---
+orders_ms_view__category | orders_ms_view__total_amount | orders_ms_view__amount_keep_only_segment
+-------------------------+------------------------------+-----------------------------------------
+books                    | 600.00                       | 600.00                                  
+clothing                 | NULL                         | 300.00                                  
+electronics              | NULL                         | 500.00

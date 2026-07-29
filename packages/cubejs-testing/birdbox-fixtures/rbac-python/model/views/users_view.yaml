@@ -5,7 +5,7 @@ views:
         includes: "*"
 
     access_policy:
-      - role: '*'
+      - group: '*'
         row_level:
           filters:
             - member: id

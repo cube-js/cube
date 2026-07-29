@@ -1321,10 +1321,16 @@ impl LanguageToLogicalPlanConverter {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
                 let window_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[1], WindowWindowExpr);
+                // Don't realias replaced columns inside window expressions: an alias
+                // inside e.g. ORDER BY would change the name of the whole window
+                // expression, while plans above reference it by the original name.
+                // Replacing a qualified column with its flat name keeps the rendered
+                // expression name intact, since `flat_name` of a qualified column
+                // matches the name of the unqualified flat column.
                 let window_expr = replace_qualified_col_with_flat_name_if_missing(
                     window_expr,
                     input.schema(),
-                    true,
+                    false,
                 )?;
                 let mut window_fields: Vec<DFField> =
                     exprlist_to_fields(window_expr.iter(), &input)?;

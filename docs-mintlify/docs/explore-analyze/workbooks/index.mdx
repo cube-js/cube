@@ -10,6 +10,73 @@ analysis, and share trusted insights with your team.
 
 Workbooks can contain one or more tabs, each providing a different way to query and analyze your data. Tabs enable you to organize multiple analyses within a single workbook, making it easy to explore different aspects of your data or combine insights from different sources.
 
+## New tab page
+
+When you open [Explore](/docs/explore-analyze/explore) or add a new tab in a workbook, Cube shows
+the **new tab page** — a single launchpad for starting a report. From here you can search across
+your data model, browse starting points by type, or jump straight to pasting a query or asking an
+AI agent.
+
+### Searching and browsing
+
+A search box sits at the top of the launchpad. Typing filters every category at once; categories
+with no matches appear disabled, so you can tell at a glance which ones hold results.
+
+The category selector lets you switch between starting-point types:
+
+- **View groups** — browse [view groups](/docs/data-modeling/view-groups) as folders. Drilling
+  into a group reveals its sub-groups and views.
+- **Views** — every [view](/docs/data-modeling/views) in the model. Search also matches a view's
+  measures and dimensions; when a view matches through a member, the row notes which one.
+- **Workbooks** — drill into an existing workbook and pick one of its reports to reuse its query
+  as the starting point for the new report. The workbook you are currently in and empty tabs
+  (which have no query to reuse) appear disabled.
+- **Source tables** — raw tables from your connected
+  [data sources](/admin/connect-to-data/data-sources), browsable by data source and schema.
+
+Click through the list to drill down to an individual view, report, or table. Once you reach a
+starting point, the data model sidebar activates so you can continue building your query there.
+
+### Starting from a pasted query or an agent
+
+The launchpad also offers shortcuts at the bottom:
+
+- **Paste semantic SQL query** — opens the SQL panel so you can paste a semantic SQL query. The
+  dropdown adds **Paste source SQL query** (raw data-source SQL), **Paste JSON query** (a
+  [REST API query](/reference/core-data-apis/rest-api/query-format)), and **Paste GraphQL query** (a
+  [GraphQL API query](/reference/core-data-apis/graphql-api)) — the JSON and GraphQL queries are
+  converted to a semantic query for you.
+- **Ask Cube agent** — opens the chat sidebar so you can describe the report you want in natural
+  language.
+
+### Configuring the launchpad
+
+Administrators can tailor the launchpad per deployment under **Settings → Configuration**, in the
+**Workbooks and Explore** section. Two settings are available.
+
+**Available tabs** — choose which categories appear on the launchpad. **View groups** and **Views**
+are always shown and cannot be turned off; **Workbooks** and **Source tables** can each be enabled
+or disabled to simplify the starting points your users see.
+
+**Default view group** — set a default view group so the launchpad opens inside a specific
+top-level view group instead of listing all of them, useful for steering users toward a curated set
+of governed starting points.
+
+<Steps>
+  <Step title="Open deployment settings">
+    Go to **Settings → Configuration** for your deployment.
+  </Step>
+  <Step title="Choose the available tabs and default group">
+    In the **Workbooks and Explore** section, select the tabs to show and, optionally, enter the
+    **name** of the view group the launchpad should open inside. Leave the group empty to show all
+    view groups. Save your changes.
+  </Step>
+</Steps>
+
+When a default view group is set, new Explore and workbook tabs open inside that group. You can
+still navigate up to **All view groups** to browse everything. If the configured group no longer
+exists, the launchpad falls back to showing all categories.
+
 ## Tab types
 
 Workbooks support two types of tabs, each designed for different querying approaches:

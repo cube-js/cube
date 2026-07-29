@@ -1,9 +1,8 @@
-/* globals jest, describe, beforeEach, test, expect */
+/* globals jest, describe, test, expect */
 
 import { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestrator';
 import type {
   DatabaseType,
-  DbTypeFn,
   DbTypeInternalFn,
   ExternalDbTypeFn,
   DriverFactoryFn,
@@ -43,12 +42,10 @@ class CubejsServerCoreExposed extends CubejsServerCore {
   }
 }
 
-let message: string;
-
 const conf = {
   apiSecret: 'testApiSecretToSuppressWarning',
-  logger: (msg: string) => {
-    message = msg;
+  logger: (_msg: string) => {
+    // noop
   },
   externalDbType: <DatabaseType>'postgres',
   externalDriverFactory: async () => <OriginalBaseDriver>({
@@ -58,23 +55,12 @@ const conf = {
 };
 
 describe('OptsHandler class', () => {
-  beforeEach(() => {
-    message = '';
+  test('must throw if CreateOptions.dbType is specified', () => {
+    expect(() => new CubejsServerCoreExposed(<any>{
+      ...conf,
+      dbType: (() => 'postgres'),
+    })).toThrow('CreateOptions.dbType was removed in v1.7.0');
   });
-
-  test.skip(
-    'deprecation warning must be printed if dbType was specified -- ' +
-    'need to be restored after documentation will be added',
-    async () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const core = new CubejsServerCoreExposed({
-        ...conf,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        dbType: ((context: DriverContext) => 'postgres'),
-      });
-      expect(message).toEqual('Cube.js `CreateOptions.dbType` Property Deprecation');
-    }
-  );
 
   test('must handle vanilla CreateOptions', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
@@ -83,7 +69,6 @@ describe('OptsHandler class', () => {
     {
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: undefined,
       });
 
@@ -129,7 +114,6 @@ describe('OptsHandler class', () => {
     {
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: 'postgres',
         driverFactory: ({ dataSource }) => createMockDriver(dataSource),
       });
 
@@ -151,7 +135,6 @@ describe('OptsHandler class', () => {
     {
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: () => 'postgres',
         driverFactory: ({ dataSource }) => createMockDriver(dataSource),
       });
 
@@ -173,7 +156,6 @@ describe('OptsHandler class', () => {
     {
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: () => 'postgres',
         driverFactory: async ({ dataSource }) => createMockDriver(dataSource),
       });
 
@@ -200,7 +182,6 @@ describe('OptsHandler class', () => {
     // Case 1
     core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: undefined,
       driverFactory: () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
@@ -220,7 +201,6 @@ describe('OptsHandler class', () => {
     // Case 2
     core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: 'postgres',
       driverFactory: () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
@@ -240,7 +220,6 @@ describe('OptsHandler class', () => {
     // Case 3
     core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: 'postgres',
       driverFactory: async () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
@@ -260,7 +239,6 @@ describe('OptsHandler class', () => {
     // Case 4
     core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: <DbTypeFn>(async () => 'postgres'),
       driverFactory: async () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
@@ -287,7 +265,6 @@ describe('OptsHandler class', () => {
     await expect(async () => {
       core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: (() => true) as unknown as DriverFactoryFn,
       });
       await core.options.driverFactory(<DriverContext>{ dataSource: 'default' });
@@ -300,7 +277,6 @@ describe('OptsHandler class', () => {
     await expect(async () => {
       core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: 1 as unknown as DriverFactoryFn,
       });
       await core.options.driverFactory(<DriverContext>{ dataSource: 'default' });
@@ -308,49 +284,7 @@ describe('OptsHandler class', () => {
       'Invalid cube-server-core options: "driverFactory" must be of type function'
     );
 
-    // Case 3 -- need to be restored after assertion will be restored.
-    //
-    // await expect(async () => {
-    //   const core = new CubejsServerCoreExposed({
-    //     ...conf,
-    //     dbType: undefined,
-    //     driverFactory: () => CubejsServerCore.createDriver('postgres'),
-    //   });
-    //   await core.options.driverFactory(<DriverContext>{ dataSource: 'default' });
-    // }).rejects.toThrow(
-    //   'CreateOptions.dbType is required if CreateOptions.driverFactory ' +
-    //   'returns driver instance'
-    // );
-
-    // Case 4
-    await expect(async () => {
-      core = new CubejsServerCoreExposed({
-        ...conf,
-        dbType: (() => true) as unknown as DbTypeFn,
-        driverFactory: async () => ({
-          type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
-        }),
-      });
-      await core.options.dbType(<DriverContext>{ dataSource: 'default' });
-    }).rejects.toThrow(
-      'Unexpected CreateOptions.dbType result type: <boolean>true'
-    );
-
-    // Case 5
-    await expect(async () => {
-      core = new CubejsServerCoreExposed({
-        ...conf,
-        dbType: true as unknown as DbTypeFn,
-        driverFactory: async () => ({
-          type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
-        }),
-      });
-      await core.options.dbType(<DriverContext>{ dataSource: 'default' });
-    }).rejects.toThrow(
-      'Invalid cube-server-core options: "dbType" does not match any of the allowed types'
-    );
-
-    // Case 6
+    // Case 3
     expect(() => {
       process.env.CUBEJS_DB_TYPE = undefined;
       process.env.NODE_ENV = 'production';
@@ -358,14 +292,13 @@ describe('OptsHandler class', () => {
       core = new CubejsServerCoreExposed({
         ...conf,
         apiSecret: undefined,
-        dbType: undefined,
         driverFactory: undefined,
       });
     }).toThrow(
       'apiSecret is required option(s)'
     );
 
-    // Case 7
+    // Case 4
     expect(() => {
       delete process.env.CUBEJS_DB_TYPE;
       process.env.NODE_ENV = 'production';
@@ -373,12 +306,10 @@ describe('OptsHandler class', () => {
       core = new CubejsServerCoreExposed({
         ...conf,
         apiSecret: 'apiSecret',
-        dbType: undefined,
         driverFactory: undefined,
       });
     }).toThrow(
-      'Either CUBEJS_DB_TYPE, CreateOptions.dbType or ' +
-      'CreateOptions.driverFactory must be specified'
+      'Either CUBEJS_DB_TYPE or CreateOptions.driverFactory must be specified'
     );
 
     delete process.env.NODE_ENV;
@@ -387,7 +318,6 @@ describe('OptsHandler class', () => {
   test('must configure/reconfigure contextToDbType', async () => {
     const core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: undefined,
       driverFactory: undefined,
     });
 
@@ -424,7 +354,6 @@ describe('OptsHandler class', () => {
     const core = new CubejsServerCoreExposed({
       ...conf,
       apiSecret: '44b87d4309471e5d9d18738450db0e49',
-      dbType: () => 'postgres',
       driverFactory: async () => (new CustomDriver()) as unknown as OriginalBaseDriver,
       orchestratorOptions: {},
     });
@@ -494,7 +423,6 @@ describe('OptsHandler class', () => {
     const core = new CubejsServerCoreExposed({
       ...conf,
       apiSecret: '44b87d4309471e5d9d18738450db0e49',
-      dbType: () => 'postgres',
       contextToOrchestratorId: ({ securityContext }) => (
         `ID_${securityContext.tenantId}`
       ),
@@ -541,7 +469,6 @@ describe('OptsHandler class', () => {
 
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: {},
       });
@@ -571,7 +498,6 @@ describe('OptsHandler class', () => {
 
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: {},
       });
@@ -601,7 +527,6 @@ describe('OptsHandler class', () => {
 
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
       });
@@ -631,7 +556,6 @@ describe('OptsHandler class', () => {
 
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
       });
@@ -661,7 +585,6 @@ describe('OptsHandler class', () => {
 
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
       });
@@ -694,7 +617,6 @@ describe('OptsHandler class', () => {
 
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
       });
@@ -729,7 +651,6 @@ describe('OptsHandler class', () => {
 
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({}),
       });
@@ -762,7 +683,6 @@ describe('OptsHandler class', () => {
       const concurrency = 15;
       const core = new CubejsServerCoreExposed({
         ...conf,
-        dbType: undefined,
         driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
         orchestratorOptions: () => ({
           queryCacheOptions: {
@@ -809,7 +729,6 @@ describe('OptsHandler class', () => {
     // Case 1
     core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: undefined,
       driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
       orchestratorOptions: () => ({
         queryCacheOptions: {
@@ -834,7 +753,6 @@ describe('OptsHandler class', () => {
     // Case 2
     core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: undefined,
       driverFactory: () => ({
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
         testConnectionTimeout,
@@ -861,7 +779,6 @@ describe('OptsHandler class', () => {
     // Case 3
     core = new CubejsServerCoreExposed({
       ...conf,
-      dbType: undefined,
       driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
       orchestratorOptions: () => ({
         queryCacheOptions: {

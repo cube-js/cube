@@ -52,23 +52,24 @@ features:
 | Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
 | Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
-| Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
+| Removed    | [`dbType`](#dbtype)                                                                                                               | v0.30.30   | v1.7.0    |
 | Removed    | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
 | Deprecated | [`SECURITY_CONTEXT`](#security_context)                                                                                           | v0.33.0    |           |
-| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
+| Removed    | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   | v1.7.0    |
 | Removed    | [Top-level `includes` parameter in views](#top-level-includes-parameter-in-views)                                                 | v0.34.34   | v1.3.0    |
 | Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
 | Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
 | Removed    | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    | v1.3.0    |
-| Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7    |           |
-| Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
-| Deprecated | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   |           |
-| Deprecated | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     |           |
-| Deprecated | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     |           |
+| Removed    | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7     | v1.7.0    |
+| Removed    | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    | v1.7.0    |
+| Removed    | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   | v1.7.0    |
+| Removed    | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     | v1.7.0    |
+| Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
+| Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 
 ### Node.js 8
 
@@ -85,7 +86,7 @@ This option for [`@cubejs-client/ws-transport`][link-hearbeatinterval] has been
 replaced by `heartBeatInterval`.
 
 [link-hearbeatinterval]:
-  https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
+  https://docs.cube.dev/reference/javascript-sdk/reference/cubejs-client-ws-transport#hearbeatinterval
 
 ### `CUBEJS_ENABLE_TLS`
 
@@ -96,7 +97,7 @@ TLS on a load balancer or reverse proxy instead. [Read more
 here][link-enable-https].
 
 [link-enable-https]:
-  https://cube.dev/docs/deployment/production-checklist#enable-https
+  https://docs.cube.dev/admin/deployment/core#set-up-reverse-proxy
 
 ### Embedding Cube.js within Express
 
@@ -112,7 +113,7 @@ microservices, if necessary).
 
 [link-cube-docker]: https://cube.dev/blog/cubejs-loves-docker
 [link-migration]:
-  https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
+  https://docs.cube.dev/admin/deployment/core
 
 ### Absolute import for `@cubejs-backend/query-orchestrator`
 
@@ -145,7 +146,7 @@ across different tenants, if need be. Single-tenant setups should consider
 removing the `contextToDataSourceId` property completely.
 
 [link-contexttoorchestratorid]:
-  https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
+  https://docs.cube.dev/reference/configuration/config#context_to_orchestrator_id
 
 ### Absolute import for `@cubejs-backend/server-core`
 
@@ -200,8 +201,8 @@ WebSockets transports.
 If you are using custom authorization, please take a [look at the
 documentation][link-custom-auth]
 
-[link-custom-auth]: https://cube.dev/docs/security#custom-authentication
-[ref-checkauth]: https://cube.dev/docs/config#options-reference-check-auth
+[link-custom-auth]: https://docs.cube.dev/docs/data-modeling/access-control#authentication
+[ref-checkauth]: https://docs.cube.dev/reference/configuration/config#check_auth
 
 ### Node.js 10
 
@@ -253,7 +254,7 @@ New shape of `authInfo`:
 }
 ```
 
-[ref-security-context]: https://cube.dev/docs/security/context
+[ref-security-context]: https://docs.cube.dev/docs/data-modeling/access-control/context
 
 Deprecated:
 
@@ -289,7 +290,7 @@ Cube no longer supports using databases such as MySQL and Postgres as external
 databases. [Please switch to using Cube Store][link-running-in-prod] as it is a
 more robust and reliable solution.
 
-[link-running-in-prod]: https://cube.dev/docs/caching/running-in-production
+[link-running-in-prod]: https://docs.cube.dev/cube-core/running-in-production
 
 ### `CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`
 
@@ -306,15 +307,17 @@ migration to Cube Store and are no longer necessary.
 Using external databases for pre-aggregations is now deprecated, and we strongly
 recommend [using Cube Store as a solution][ref-caching-in-prod].
 
-[ref-caching-in-prod]: https://cube.dev/docs/caching/running-in-production
+[ref-caching-in-prod]: https://docs.cube.dev/cube-core/running-in-production
 
 ### `dbType`
 
 **Deprecated in Release: v0.30.30**
 
-Using `dbType` is now deprecated, and we recommend using
-[`driverFactory`][self-driver-factory] to return a `DriverConfig` object
-instead.
+**Removed in Release: v1.7.0**
+
+`dbType` has been removed. Passing `CreateOptions.dbType` now throws an error.
+Use [`driverFactory`][self-driver-factory] to return a `DriverConfig` object
+(`{ type, ... }`) instead, or set the `CUBEJS_DB_TYPE` environment variable.
 
 ### Serverless Deployments
 
@@ -341,16 +344,18 @@ Redis](https://cube.dev/blog/replacing-redis-with-cube-store). Please migrate to
 **Deprecated in Release: v0.33.0**
 
 The `SECURITY_CONTEXT` context variable is deprecated. Use
-[`query_rewrite`](https://cube.dev/docs/reference/configuration/config#query_rewrite)
+[`query_rewrite`](https://docs.cube.dev/reference/configuration/config#query_rewrite)
 instead.
 
 ### `running_total` measure type
 
 **Deprecated in Release: v0.33.39**
 
-The `running_total` measure type is now deprecated, and we recommend using
-[`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
-to calculate running totals instead.
+**Removed in Release: v1.7.0**
+
+The `running_total` measure type has been removed. Use a
+[`rolling_window`](https://docs.cube.dev/reference/data-modeling/measures#rolling_window)
+with an `unbounded` trailing window to calculate running totals instead.
 
 ### Top-level `includes` parameter in views
 
@@ -358,7 +363,7 @@ to calculate running totals instead.
 
 The top-level `includes` parameter is now removed. Please always use the
 `includes` parameter within [`cubes` and `join_path`
-parameters](https://cube.dev/docs/reference/data-model/view#cubes) so you can
+parameters](https://docs.cube.dev/reference/data-modeling/view#cubes) so you can
 explicitly control the join path.
 
 ### Node.js 16
@@ -372,7 +377,7 @@ explicitly control the join path.
 **Removed in release: v0.35.0**
 
 Early prototype of the MySQL-based SQL API is removed in favor of the Postgres-compatible
-[SQL API](https://cube.dev/docs/product/apis-integrations/sql-api), together with the
+[SQL API](https://docs.cube.dev/reference/core-data-apis/sql-api), together with the
 `CUBEJS_SQL_PORT` environment variable.
 
 ### `initApp` hook
@@ -387,7 +392,7 @@ The `initApp` hook is removed as it's not relevant anymore for Docker-based arch
 
 The `/v1/run-scheduled-refresh` REST API endpoint is deprecated as it's not
 relevant anymore for Docker-based architecture. Use the [Orchestration
-API](https://cube.dev/docs/product/apis-integrations/orchestration-api) and
+API](https://docs.cube.dev/reference/orchestration-api) and
 `/v1/pre-aggregations/jobs` endpoint instead.
 
 ### Node.js 18
@@ -401,7 +406,9 @@ no more updates. Please upgrade to Node.js 20 or higher.
 
 **Deprecated in Release: v1.2.7**
 
-This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
+**Removed in Release: v1.7.0**
+
+This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
 
 ### Node.js 18
 
@@ -411,27 +418,39 @@ This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_
 
 ### Node.js 20
 
-**Deprecated in Release: v1.3.0**
+**Removed in Release: v1.7.0**
 
-Node.js 20 is in maintenance mode from [November 22, 2024][link-nodejs-eol]. This means
-no more new features, only security updates. Please upgrade to Node.js 22 or higher.
+Node.js 20 reached [End of Life on April 30, 2026][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 22 or higher.
 
 ### `renewQuery` parameter of the `/v1/load` endpoint
 
 **Deprecated in Release: v1.3.73**
 
-This parameter is deprecated and will be removed in future releases. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
-options and use the new `cache` parameter of the `/v1/load` endpoint instead.
+**Removed in Release: v1.7.0**
+
+This parameter has been removed. See [cache control](https://docs.cube.dev/reference/core-data-apis/rest-api#cache-control)
+options and use the `cache` parameter of the `/v1/load` endpoint instead.
 
 ### Elasticsearch driver
 
 **Deprecated in Release: v1.6.0**
 
-The Elasticsearch driver is deprecated and will be removed in a future release.
+**Removed in Release: v1.7.0**
+
+The Elasticsearch driver has been removed.
 
 ### `context_to_roles`
 
 **Deprecated in Release: v1.6.4**
 
-The `context_to_roles` configuration option is deprecated and will be removed in a future
-release. Please use `context_to_groups` instead.
+**Removed in Release: v1.7.0**
+
+The `context_to_roles` configuration option has been removed. Please use `context_to_groups` instead.
+
+### Node.js 22
+
+**Deprecated in Release: v1.7.0**
+
+Node.js 22 is in maintenance mode from [October 21, 2025][link-nodejs-eol]. This means
+no more new features, only security updates. Please upgrade to Node.js 24 or higher.

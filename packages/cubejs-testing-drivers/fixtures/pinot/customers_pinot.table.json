@@ -1,0 +1,27 @@
+{
+  "tableName": "customers_pinot",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "schemaName": "customers_pinot",
+    "replication": "1"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "nullHandlingEnabled": true
+  },
+  "metadata": {},
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "REFRESH",
+      "segmentIngestionFrequency": "DAILY"
+    }
+  },
+  "isDimTable": true,
+  "dimensionTableConfig": {
+    "disablePreload": false
+  }
+}

@@ -51,6 +51,10 @@ impl CacheStoreSqlService {
                 self.cachestore.compaction().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CacheStoreCommand::Truncate => {
+                self.cachestore.truncate().await?;
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
             CacheStoreCommand::Info => {
                 let result = self.cachestore.info().await?;
                 let mut rows = vec![];
@@ -175,6 +179,13 @@ impl CacheStoreSqlService {
                 self.cachestore.healthcheck().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CacheStoreCommand::Wipe => {
+                log::warn!(
+                    "Wiping cachestore state (SYSTEM CACHESTORE WIPE): truncating all tables and persisting a fresh snapshot"
+                );
+                self.cachestore.wipe().await?;
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
         }
     }
 
@@ -253,8 +264,8 @@ impl CacheStoreSqlService {
 
                 (Arc::new(DataFrame::new(vec![], vec![])), None, true)
             }
-            CacheCommand::Truncate {} => {
-                self.cachestore.cache_truncate().await?;
+            CacheCommand::Clear {} => {
+                self.cachestore.cache_clear().await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), None, false)
             }
@@ -366,8 +377,8 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::Truncate {} => {
-                self.cachestore.queue_truncate().await?;
+            QueueCommand::Clear {} => {
+                self.cachestore.queue_clear().await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), None, false)
             }

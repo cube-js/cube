@@ -5,20 +5,18 @@ use std::rc::Rc;
 use cubenativeutils::CubeError;
 use typed_builder::TypedBuilder;
 
-use crate::{
-    cube_bridge::{
-        base_query_options::{
-            BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, MaskedMemberItem, OrderByItem,
-            TimeDimension,
-        },
-        base_tools::BaseTools,
-        evaluator::CubeEvaluator,
-        join_graph::JoinGraph,
-        join_hints::JoinHintItem,
-        options_member::OptionsMember,
-        security_context::SecurityContext,
+use crate::cube_bridge::{
+    base_query_options::{
+        BaseQueryOptions, BaseQueryOptionsStatic, FilterItem, FilterValue, MaskedMemberItem,
+        OrderByItem, TimeDimension,
     },
-    impl_static_data,
+    base_tools::BaseTools,
+    evaluator::CubeEvaluator,
+    join_graph::JoinGraph,
+    join_hints::JoinHintItem,
+    options_member::OptionsMember,
+    security_context::SecurityContext,
+    subquery_join::SubqueryJoin,
 };
 
 /// Mock implementation of BaseQueryOptions for testing
@@ -39,6 +37,8 @@ pub struct MockBaseQueryOptions {
     segments: Option<Vec<OptionsMember>>,
     #[builder(default)]
     join_hints: Option<Vec<JoinHintItem>>,
+    #[builder(default)]
+    subquery_joins: Option<Vec<Rc<dyn SubqueryJoin>>>,
 
     // Fields from BaseQueryOptionsStatic
     #[builder(default)]
@@ -61,6 +61,10 @@ pub struct MockBaseQueryOptions {
     export_annotated_sql: bool,
     #[builder(default)]
     pre_aggregation_query: Option<bool>,
+    #[builder(default)]
+    pre_aggregations_match_only: Option<bool>,
+    #[builder(default)]
+    use_original_sql_pre_aggregations_in_pre_aggregation: Option<bool>,
     #[builder(default)]
     total_query: Option<bool>,
     #[builder(default)]
@@ -90,6 +94,8 @@ impl_static_data!(
     ungrouped,
     export_annotated_sql,
     pre_aggregation_query,
+    pre_aggregations_match_only,
+    use_original_sql_pre_aggregations_in_pre_aggregation,
     total_query,
     cubestore_support_multistage,
     disable_external_pre_aggregations,
@@ -116,7 +122,12 @@ pub fn filter_item<M: ToString, O: ToString, V: ToString>(
         member: Some(member.to_string()),
         dimension: None,
         operator: Some(operator.to_string()),
-        values: Some(values.into_iter().map(|v| Some(v.to_string())).collect()),
+        values: Some(
+            values
+                .into_iter()
+                .map(|v| FilterValue::Str(v.to_string()))
+                .collect(),
+        ),
         or: None,
         and: None,
     }
@@ -195,6 +206,14 @@ impl BaseQueryOptions for MockBaseQueryOptions {
 
     fn join_hints(&self) -> Result<Option<Vec<JoinHintItem>>, CubeError> {
         Ok(self.join_hints.clone())
+    }
+
+    fn has_subquery_joins(&self) -> Result<bool, CubeError> {
+        Ok(self.subquery_joins.is_some())
+    }
+
+    fn subquery_joins(&self) -> Result<Option<Vec<Rc<dyn SubqueryJoin>>>, CubeError> {
+        Ok(self.subquery_joins.clone())
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

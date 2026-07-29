@@ -6,7 +6,7 @@
       "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "athena",
       "CUBEJS_DB_EXPORT_BUCKET": "s3://athena-drivers-tests-preaggs/bucket",
-      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "${DRIVERS_TESTS_CUBEJS_PRE_AGGREGATIONS_SCHEMA:-drivers_tests_preaggs}",
       "CUBEJS_AWS_KEY": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY}",
       "CUBEJS_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
       "CUBEJS_AWS_REGION": "us-east-1",

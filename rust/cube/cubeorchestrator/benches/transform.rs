@@ -126,7 +126,6 @@ fn build_request(
         total: None,
         total_query: None,
         timezone: Some("UTC".to_string()),
-        renew_query: None,
         ungrouped: None,
         response_format: None,
         filters: None,

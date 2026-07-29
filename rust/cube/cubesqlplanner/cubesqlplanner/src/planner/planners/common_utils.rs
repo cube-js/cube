@@ -1,5 +1,5 @@
 use crate::cube_bridge::join_item::JoinItem;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::BaseCube;
 use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
@@ -10,11 +10,11 @@ use std::rc::Rc;
 /// ON SQL compilation and the list of primary-key dimensions for a
 /// given cube.
 pub struct CommonUtils {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
 }
 
 impl CommonUtils {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(query_tools: Rc<State>) -> Self {
         Self { query_tools }
     }
 
@@ -25,7 +25,7 @@ impl CommonUtils {
         join_item: Rc<dyn JoinItem>,
     ) -> Result<Rc<SqlCall>, CubeError> {
         let definition = join_item.join()?;
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         evaluator_compiler
             .compile_sql_call(&join_item.static_data().original_from, definition.sql()?)
@@ -33,12 +33,16 @@ impl CommonUtils {
 
     /// Resolves the planner-level `BaseCube` for the given cube path.
     pub fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
         let evaluator =
             evaluator_compiler.add_cube_table_evaluator(cube_path.to_string(), vec![])?;
-        BaseCube::try_new(cube_path.to_string(), self.query_tools.clone(), evaluator)
+        BaseCube::try_new(
+            cube_path.to_string(),
+            self.query_tools.query_tools().clone(),
+            evaluator,
+        )
     }
 
     /// Primary-key dimensions of `cube_name` as planner
@@ -47,7 +51,7 @@ impl CommonUtils {
         &self,
         cube_name: &String,
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         let primary_keys = self
             .query_tools

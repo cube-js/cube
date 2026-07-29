@@ -13,3 +13,4 @@ mod multi_stage_time_series;
 mod pre_aggregation;
 mod query;
 mod query_source;
+mod root_query;

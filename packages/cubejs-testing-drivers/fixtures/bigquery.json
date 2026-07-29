@@ -7,7 +7,7 @@
       "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "bigquery",
       "CUBEJS_DB_NAME": "test",
-      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "dev_pre_aggregations",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "${DRIVERS_TESTS_CUBEJS_PRE_AGGREGATIONS_SCHEMA:-dev_pre_aggregations}",
       "CUBEJS_DB_BQ_PROJECT_ID": "cube-open-source",
       "CUBEJS_DB_BQ_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS}",
 
@@ -204,7 +204,8 @@
     "SQL API: Complex Rollup",
     "SQL API: Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
-    "SQL API: Extended nested Rollup over asterisk"
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: Window function over measure (running total)"
   ],
   "tesseractSkip": [
     "must download query from the data source via memory",
@@ -244,6 +245,7 @@
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "SQL API: Timeshift measure from cube",
     "querying BigECommerce: multi-stage group by time dimension",
+    "SQL API: Window function over measure (running total)",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "SQL API: SQL push down push to cube quoted alias",

@@ -53,6 +53,9 @@ cubes:
       - name: unique_status_count
         type: count_distinct
         sql: status
+      - name: approx_unique_count
+        type: count_distinct_approx
+        sql: status
       - name: amount_per_count
         type: number
         sql: "{total_amount} / {count}"
@@ -125,6 +128,14 @@ cubes:
         type: rollup
         measures:
           - multi_level_measure
+        dimensions:
+          - status
+          - city
+
+      - name: approx_rollup
+        type: rollup
+        measures:
+          - approx_unique_count
         dimensions:
           - status
           - city

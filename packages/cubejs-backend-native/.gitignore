@@ -8,3 +8,4 @@ index.node
 npm-debug.log
 benchmarks/result.txt
 test/__pycache__/
+test/subdir_for_test/__pycache__/

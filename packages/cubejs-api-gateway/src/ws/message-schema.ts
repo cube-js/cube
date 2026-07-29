@@ -45,7 +45,9 @@ export const methodMessageSchema = z.discriminatedUnion('method', [
     method: z.literal('meta'),
     messageId,
     requestId,
-    params: z.object({}).strict().optional(),
+    params: z.object({
+      onlyViews: z.boolean().optional(),
+    }).strict().optional(),
   }).strict(),
   z.object({
     method: z.literal('subscribe'),

@@ -1,10 +1,10 @@
 use super::{
-    MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
-    MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
+    EvaluationContext, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
+    MultiStageQueryDescription, PlanningScope, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageGrain;
@@ -21,14 +21,14 @@ use std::vec;
 /// dimension / measure inode, or a leaf (base measure /
 /// time-series / time-series-get-range).
 pub struct MultiStageMemberQueryPlanner {
-    query_tools: Rc<QueryTools>,
+    query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
     description: Rc<MultiStageQueryDescription>,
 }
 
 impl MultiStageMemberQueryPlanner {
     pub fn new(
-        query_tools: Rc<QueryTools>,
+        query_tools: Rc<State>,
         query_properties: Rc<QueryProperties>,
         description: Rc<MultiStageQueryDescription>,
     ) -> Self {
@@ -41,8 +41,13 @@ impl MultiStageMemberQueryPlanner {
 
     /// Builds the `LogicalMultiStageMember` for this description,
     /// dispatching on `MultiStageMemberType` to the appropriate
-    /// `plan_*` builder.
-    pub fn plan_logical_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
+    /// `plan_*` builder. `scope` is the plan-wide CTE
+    /// accumulator: leaf planning may register additional CTEs into
+    /// it (e.g. multiplied-measure subqueries).
+    pub fn plan_logical_query(
+        &self,
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         match self.description.member().member_type() {
             MultiStageMemberType::Inode(member) => match member.inode_type() {
                 MultiStageInodeMemberType::RollingWindow(rolling_window_desc) => {
@@ -52,12 +57,12 @@ impl MultiStageMemberQueryPlanner {
                 _ => self.plan_for_cte_query(member),
             },
             MultiStageMemberType::Leaf(node) => match node {
-                super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(),
+                super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(scope),
                 super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
                     self.plan_time_series_query(time_dimension.clone())
                 }
                 super::MultiStageLeafMemberType::TimeSeriesGetRange(time_dimension) => {
-                    self.plan_time_series_get_range_query(time_dimension.clone())
+                    self.plan_time_series_get_range_query(time_dimension.clone(), scope)
                 }
             },
         }
@@ -70,6 +75,7 @@ impl MultiStageMemberQueryPlanner {
     fn plan_time_series_get_range_query(
         &self,
         time_dimension: Rc<MemberSymbol>,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let cte_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
@@ -84,7 +90,7 @@ impl MultiStageMemberQueryPlanner {
         let simple_query_planer =
             SimpleQueryPlanner::new(self.query_tools.clone(), cte_query_properties);
 
-        let source = simple_query_planer.source_and_subquery_dimensions()?;
+        let source = simple_query_planer.source_and_subquery_dimensions(scope)?;
 
         let result = MultiStageGetDateRange {
             time_dimension: time_dimension.clone(),
@@ -140,7 +146,7 @@ impl MultiStageMemberQueryPlanner {
                 let time_dimension = &rolling_window_desc.time_dimension;
                 let query_granularity = to_date_rolling_window.granularity.clone();
 
-                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let evaluator_compiler_cell = self.query_tools.compiler().clone();
                 let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
                 let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
@@ -162,7 +168,6 @@ impl MultiStageMemberQueryPlanner {
                     granularity_obj: Rc::new(granularity_obj),
                 })
             }
-            RollingWindowType::RunningTotal => MultiStageRollingWindowType::RunningTotal,
         };
 
         let schema = LogicalSchema::default()
@@ -401,13 +406,18 @@ impl MultiStageMemberQueryPlanner {
         Ok(Rc::new(result))
     }
 
-    /// Builds the leaf CTE for a base measure — runs a fresh
-    /// `QueryPlanner` on the description's state with
-    /// `allow_multi_stage = false`, then wraps the result in a
-    /// `MultiStageLeafMeasure`. Respects the `without-member-leaf`
-    /// shape for cases like `Rank` where the leaf selects only the
-    /// dimension grid.
-    fn plan_for_leaf_cte_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
+    /// Builds the leaf CTE for a base measure — runs a `QueryPlanner`
+    /// on the description's state with `allow_multi_stage = false`,
+    /// then wraps the result in a `MultiStageLeafMeasure`. The shared
+    /// `scope` receives any CTEs the leaf planning produces
+    /// (multiplied-measure subqueries), so they land in the root
+    /// `WITH` list instead of nesting. Respects the
+    /// `without-member-leaf` shape for cases like `Rank` where the
+    /// leaf selects only the dimension grid.
+    fn plan_for_leaf_cte_query(
+        &self,
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
         let mut dimensions = self.description.state().dimensions().clone();
         let mut time_dimensions = self.description.state().time_dimensions().clone();
@@ -455,13 +465,21 @@ impl MultiStageMemberQueryPlanner {
 
         let query_planner =
             QueryPlanner::new(cte_query_properties.clone(), self.query_tools.clone());
-        let query = query_planner.plan()?;
+        // CTEs hoisted out of this leaf (e.g. multiplied-measure
+        // subqueries) must render under the same context the leaf
+        // itself renders with.
+        let evaluation_context = EvaluationContext {
+            time_shifts: self.description.state().time_shifts().clone(),
+            measure_as_state: self.description.member().has_aggregates_on_top(),
+            measure_for_ungrouped: self.description.member().is_ungrupped(),
+        };
+        let query = scope.with_evaluation_context(evaluation_context.clone(), |scope| {
+            query_planner.plan(scope)
+        })?;
         let leaf_measure_plan = MultiStageLeafMeasure {
             measures: vec![member_node.clone()],
             query,
-            render_measure_as_state: self.description.member().has_aggregates_on_top(),
-            time_shifts: self.description.state().time_shifts().clone(),
-            render_measure_for_ungrouped: self.description.member().is_ungrupped(),
+            evaluation_context,
         };
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
@@ -523,7 +541,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(exclude) = &grain.exclude {
             dimensions
                 .into_iter()
-                .filter(|d| !exclude.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| !exclude.iter().any(|m| d.matches_grain_reference(m)))
                 .collect_vec()
         } else {
             dimensions
@@ -531,7 +549,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(keep_only) = &grain.keep_only {
             dimensions
                 .into_iter()
-                .filter(|d| keep_only.iter().any(|m| d.has_member_in_reference_chain(m)))
+                .filter(|d| keep_only.iter().any(|m| d.matches_grain_reference(m)))
                 .collect_vec()
         } else {
             dimensions

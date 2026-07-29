@@ -1,13 +1,14 @@
 use super::assert_filter;
+use crate::cube_bridge::base_query_options::FilterValue;
 use crate::test_fixtures::cube_bridge::{MockDriverTools, MockSchema};
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
-fn build(filter_yaml: &str) -> (String, Vec<String>) {
+fn build(filter_yaml: &str) -> (String, Vec<FilterValue>) {
     super::build_filter("common/visitors.yaml", filter_yaml)
 }
 
-fn build_with_visible_tz(filter_yaml: &str) -> (String, Vec<String>) {
+fn build_with_visible_tz(filter_yaml: &str) -> (String, Vec<FilterValue>) {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
     let driver = MockDriverTools::with_timezone("America/Los_Angeles".to_string())
         .with_visible_in_db_time_zone();

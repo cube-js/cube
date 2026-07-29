@@ -215,8 +215,12 @@ impl AsyncPostgresShim {
         };
 
         let message_tag_parser = self.session.server.pg_auth.get_pg_message_tag_parser();
-        let auth_secret =
-            buffer::read_message(&mut self.socket, Arc::clone(&message_tag_parser)).await?;
+        let auth_secret = buffer::read_message(
+            &mut self.socket,
+            Arc::clone(&message_tag_parser),
+            buffer::MAX_AUTH_MESSAGE_LENGTH,
+        )
+        .await?;
         if !self
             .authenticate(auth_method, auth_secret, initial_parameters)
             .await?
@@ -241,7 +245,7 @@ impl AsyncPostgresShim {
                 true = async { semifast_shutdownable && { semifast_shutdown_interruptor.cancelled().await; true } } => {
                     return Self::flush_and_write_admin_shutdown_fatal_message(self).await;
                 }
-                message_result = buffer::read_message(&mut self.socket, Arc::clone(&message_tag_parser)) => message_result?
+                message_result = buffer::read_message(&mut self.socket, Arc::clone(&message_tag_parser), buffer::MAX_FRONTEND_MESSAGE_LENGTH) => message_result?
             };
 
             let result = match message {
@@ -382,7 +386,8 @@ impl AsyncPostgresShim {
                                             "query": span_id.query_key.clone(),
                                             "apiType": "sql",
                                             "duration": span_id.duration(),
-                                            "isDataQuery": span_id.is_data_query().await
+                                            "isDataQuery": span_id.is_data_query().await,
+                                            "lastRefreshTime": span_id.last_refresh_time().await
                                         }),
                                     )
                                     .await?;
@@ -574,7 +579,8 @@ impl AsyncPostgresShim {
     }
 
     pub async fn process_initial_message(&mut self) -> Result<StartupState, ConnectionError> {
-        let mut buffer = buffer::read_contents(&mut self.socket, 0).await?;
+        let mut buffer =
+            buffer::read_contents(&mut self.socket, 0, buffer::MAX_STARTUP_PACKET_LENGTH).await?;
 
         let initial_message = protocol::InitialMessage::from(&mut buffer).await?;
         match initial_message {
@@ -1869,6 +1875,7 @@ impl AsyncPostgresShim {
                                 "apiType": "sql",
                                 "duration": start_time.elapsed().unwrap().as_millis() as u64,
                                 "isDataQuery": span_id.is_data_query().await,
+                                "lastRefreshTime": span_id.last_refresh_time().await,
                             }),
                         )
                         .await?;

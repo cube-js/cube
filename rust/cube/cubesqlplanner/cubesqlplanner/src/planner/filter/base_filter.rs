@@ -1,5 +1,7 @@
 use super::filter_operator::FilterOperator;
 use super::typed_filter::{resolve_base_symbol, TypedFilter};
+use crate::cube_bridge::base_query_options::FilterValue;
+use crate::planner::Compiler;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -30,12 +32,16 @@ impl PartialEq for BaseFilter {
 }
 
 impl BaseFilter {
+    // FIXME: late compilation. `compiler` is threaded through purely so a
+    // to_date rolling-window granularity can be (re)compiled while the filter
+    // is built during planning. With early compilation this disappears.
     pub fn try_new(
         query_tools: Rc<crate::planner::query_tools::QueryTools>,
         member_evaluator: Rc<MemberSymbol>,
         filter_type: FilterType,
         filter_operator: FilterOperator,
-        values: Option<Vec<Option<String>>>,
+        values: Option<Vec<FilterValue>>,
+        compiler: Option<&mut Compiler>,
     ) -> Result<Rc<Self>, CubeError> {
         let typed_filter = TypedFilter::builder()
             .query_tools(query_tools)
@@ -43,24 +49,29 @@ impl BaseFilter {
             .filter_type(filter_type)
             .operator(filter_operator)
             .values(values)
-            .build()?;
+            .build(compiler)?;
 
         Ok(Rc::new(Self { typed_filter }))
     }
 
+    // FIXME: late compilation — see `try_new`. `compiler` only feeds the
+    // rolling-window granularity recompute.
     pub fn change_operator(
         &self,
         filter_operator: FilterOperator,
-        values: Vec<Option<String>>,
+        values: Vec<FilterValue>,
         use_raw_values: bool,
+        query_tools: Rc<crate::planner::query_tools::QueryTools>,
+        compiler: Option<&mut Compiler>,
     ) -> Result<Rc<Self>, CubeError> {
         let typed_filter = self
             .typed_filter
             .to_builder()
+            .query_tools(query_tools)
             .operator(filter_operator)
             .values(Some(values))
             .use_raw_values(use_raw_values)
-            .build()?;
+            .build(compiler)?;
 
         Ok(Rc::new(Self { typed_filter }))
     }
@@ -87,11 +98,19 @@ impl BaseFilter {
         &self,
         member_evaluator: Rc<MemberSymbol>,
     ) -> Result<Rc<Self>, CubeError> {
+        // No compiler here (called from static-filter symbol rewriting, which
+        // has none). A member swap keeps the same operator/values, so the only
+        // branch that would need a compiler is a to_date rolling window — not
+        // reachable from this path. FIXME: removed once granularities are
+        // resolved during early compilation rather than at filter-build time.
         let typed_filter = self
             .typed_filter
             .to_builder()
             .member_evaluator(member_evaluator)
-            .build()?;
+            // A member swap leaves operator/values unchanged, so the operation
+            // is identical — carry it over so build() needs no Compiler.
+            .carry_op(self.typed_filter.operation().clone())
+            .build(None)?;
 
         Ok(Rc::new(Self { typed_filter }))
     }
@@ -111,7 +130,7 @@ impl BaseFilter {
         }
     }
 
-    pub fn values(&self) -> &Vec<Option<String>> {
+    pub fn values(&self) -> &Vec<FilterValue> {
         self.typed_filter.values()
     }
 
@@ -157,8 +176,7 @@ impl BaseFilter {
                 self.typed_filter
                     .values()
                     .iter()
-                    .cloned()
-                    .filter_map(|v| v)
+                    .filter_map(|v| v.to_param_string())
                     .collect_vec(),
             )
         } else {

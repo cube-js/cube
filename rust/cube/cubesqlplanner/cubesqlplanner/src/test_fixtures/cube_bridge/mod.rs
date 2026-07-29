@@ -37,6 +37,7 @@ mod mock_segment_definition;
 mod mock_sql_templates_render;
 mod mock_sql_utils;
 mod mock_struct_with_sql_member;
+mod mock_subquery_join;
 mod mock_timeshift_definition;
 mod mock_view_filter_definition;
 
@@ -62,10 +63,12 @@ pub use mock_join_item_definition::MockJoinItemDefinition;
 pub use mock_measure_definition::MockMeasureDefinition;
 pub use mock_member_expression_definition::MockMemberExpressionDefinition;
 pub use mock_member_order_by::MockMemberOrderBy;
-pub use mock_member_sql::MockMemberSql;
+pub use mock_member_sql::{mock_compiled, MockMemberSql};
 pub use mock_multi_stage_filter::MockMultiStageFilterReferences;
 pub use mock_multi_stage_grain::MockMultiStageGrainReferences;
-pub use mock_pre_aggregation_description::MockPreAggregationDescription;
+pub use mock_pre_aggregation_description::{
+    MockPreAggregationDescription, MockPreAggregationIndex,
+};
 pub use mock_pre_aggregation_time_dimension::MockPreAggregationTimeDimension;
 pub use mock_schema::{MockSchema, MockSchemaBuilder};
 pub use mock_security_context::MockSecurityContext;
@@ -73,5 +76,6 @@ pub use mock_segment_definition::MockSegmentDefinition;
 pub use mock_sql_templates_render::MockSqlTemplatesRender;
 pub use mock_sql_utils::MockSqlUtils;
 pub use mock_struct_with_sql_member::MockStructWithSqlMember;
+pub use mock_subquery_join::MockSubqueryJoin;
 pub use mock_timeshift_definition::MockTimeShiftDefinition;
 pub use mock_view_filter_definition::MockViewFilterDefinition;

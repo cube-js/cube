@@ -129,15 +129,45 @@ export class YamlCompiler {
   }
 
   private transpileViewGroup(viewGroupObj): string {
+    const viewGroupCall = t.callExpression(
+      t.identifier('view_group'),
+      [t.stringLiteral(viewGroupObj.name), this.viewGroupBodyAst(viewGroupObj)]
+    );
+
+    return babelGenerator(viewGroupCall, {}, '').code;
+  }
+
+  /**
+   * Builds the AST for a (possibly nested) view group definition body. View
+   * references inside `includes` are emitted as plain string literals and
+   * nested view groups as object literals, so no reference resolution is needed
+   * at evaluation time (YAML uses string view names, not bare identifiers).
+   */
+  private viewGroupBodyAst(viewGroupObj, nested = false): t.ObjectExpression {
     const properties: t.ObjectProperty[] = [];
 
+    if (nested && viewGroupObj.name) {
+      properties.push(t.objectProperty(t.stringLiteral('name'), t.stringLiteral(viewGroupObj.name)));
+    }
     if (viewGroupObj.title) {
       properties.push(t.objectProperty(t.stringLiteral('title'), t.stringLiteral(viewGroupObj.title)));
     }
     if (viewGroupObj.description) {
       properties.push(t.objectProperty(t.stringLiteral('description'), t.stringLiteral(viewGroupObj.description)));
     }
-    if (viewGroupObj.views && Array.isArray(viewGroupObj.views)) {
+    // Emit `views` and `includes` independently (not else-if) so that a YAML
+    // definition that wrongly specifies both still reaches the `viewGroupSchema`
+    // mutual-exclusion (oxor) validation instead of being silently coerced.
+    if (Array.isArray(viewGroupObj.includes)) {
+      properties.push(
+        t.objectProperty(
+          t.stringLiteral('includes'),
+          t.arrayExpression(viewGroupObj.includes.map((item) => this.viewGroupIncludeAst(item)))
+        )
+      );
+    }
+    if (Array.isArray(viewGroupObj.views)) {
+      // Legacy `views` parameter, kept for backward compatibility.
       properties.push(
         t.objectProperty(
           t.stringLiteral('views'),
@@ -146,12 +176,16 @@ export class YamlCompiler {
       );
     }
 
-    const viewGroupCall = t.callExpression(
-      t.identifier('view_group'),
-      [t.stringLiteral(viewGroupObj.name), t.objectExpression(properties)]
-    );
+    return t.objectExpression(properties);
+  }
 
-    return babelGenerator(viewGroupCall, {}, '').code;
+  private viewGroupIncludeAst(item): t.Expression {
+    if (item && typeof item === 'object') {
+      // A nested view group definition: keep its `name` inside the body so the
+      // evaluator can recognise it as a nested group.
+      return this.viewGroupBodyAst(item, true);
+    }
+    return t.stringLiteral(item);
   }
 
   private transpileAndPrepareJsFile(methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): string {

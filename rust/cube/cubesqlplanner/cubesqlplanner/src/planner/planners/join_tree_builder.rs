@@ -1,6 +1,6 @@
 use super::CommonUtils;
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::planner::query_tools::QueryTools;
+use crate::planner::state::State;
 use crate::planner::{JoinTree, JoinTreeItem};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -13,7 +13,7 @@ pub struct JoinTreeBuilder {
 }
 
 impl JoinTreeBuilder {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(query_tools: Rc<State>) -> Self {
         Self {
             utils: CommonUtils::new(query_tools),
         }
