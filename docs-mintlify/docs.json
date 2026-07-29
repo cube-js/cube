@@ -53,6 +53,7 @@
                   "docs/explore-analyze/workbooks/querying-data",
                   "docs/explore-analyze/workbooks/calculated-fields",
                   "docs/explore-analyze/workbooks/source-sql-tabs",
+                  "docs/explore-analyze/workbooks/python-analysis",
                   "docs/explore-analyze/workbooks/workbook-agent"
                 ]
               },

@@ -668,6 +668,7 @@ fn invoke_driver_tools<IT: InnerTypes>(b: &NativeDriverTools<IT>) -> InvokeResul
     r.record("date_time_cast", b.date_time_cast(s()));
     r.record("in_db_time_zone", b.in_db_time_zone(s()));
     r.record("get_allocated_params", b.get_allocated_params());
+    r.record("should_reuse_params", b.should_reuse_params());
     r.record("subtract_interval", b.subtract_interval(s(), s()));
     r.record("add_interval", b.add_interval(s(), s()));
     r.record("interval_string", b.interval_string(s()));

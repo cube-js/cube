@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "1.7.12",
+  "version": "1.7.13",
   "engines": {},
   "type": "module",
   "repository": {
@@ -53,11 +53,12 @@
     "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/tsconfig.tsbuildinfo"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.7.12",
+    "@cubejs-backend/linter": "1.7.13",
     "@types/d3-format": "^3",
     "@types/d3-time-format": "^4",
     "@types/moment-range": "^4.0.0",

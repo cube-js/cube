@@ -88,6 +88,10 @@ impl PlanSqlTemplates {
         self.driver_tools.timestamp_precision()
     }
 
+    pub fn should_reuse_params(&self) -> Result<bool, CubeError> {
+        self.driver_tools.should_reuse_params()
+    }
+
     pub fn time_stamp_cast(&self, field: String) -> Result<String, CubeError> {
         self.driver_tools.time_stamp_cast(field)
     }

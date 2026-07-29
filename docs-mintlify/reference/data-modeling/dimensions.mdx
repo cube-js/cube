@@ -454,7 +454,10 @@ browse the available names at [tabler.io/icons][link-tabler]. When omitted, a de
 icon is shown.
 
 Optionally, a link might use the `target` parameter to specify [where to open it][link-target]:
-`blank` (default) to open in a new tab/window or `self` to open in the same tab/window.
+`blank` to open in a new tab/window or `self` to open in the same tab/window. The default
+depends on the link kind: `url:` links default to `blank` (new tab), while `dashboard:`
+drill-ins default to `self` (in-app). An explicit `target` on a `dashboard:` drill-in is
+honored on Cube **v1.7.5** or newer.
 
 ```yaml
 cubes:

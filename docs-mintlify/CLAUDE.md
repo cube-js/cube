@@ -319,8 +319,61 @@ expose internal feature-flag names in public docs.
 
 ## Images and screenshots
 
-Wrap screenshots in `<Frame>` and store assets under `images/`. When a screenshot is
-needed but not yet available, leave an MDX comment placeholder: `{/* TODO: screenshot — ... */}`.
+**Do not commit images or other binaries to the repo.** Editorial media — screenshots,
+diagrams, logos, video — is uploaded to the `cube-dev-websites-shared` S3 bucket and
+served from `https://static.cube.dev/<key>`. Reference that URL from the `.mdx`.
+
+Wrap screenshots in `<Frame>`. When a screenshot is needed but not yet available, leave
+an MDX comment placeholder: `{/* TODO: screenshot — ... */}`.
+
+> The `images/` directory holds a handful of older assets that predate this rule. Don't
+> add to it — and don't take it as precedent.
+
+### Uploading
+
+Run from `docs-mintlify/` (**not** `pnpm upload-asset` — that's the landing repo's
+wrapper; this repo uses the script directly):
+
+```bash
+./scripts/upload-asset.sh <local-file> <dest-key>
+```
+
+It prints the `https://static.cube.dev/<key>` URL and copies it to the clipboard on
+macOS. Full setup and the complete path table are in `scripts/README.md`.
+
+Key prefixes — use kebab-case filenames:
+
+| Prefix | Purpose |
+| --- | --- |
+| `docs/<section>/<slug>/<file>` | Screenshots for a specific docs page |
+| `icons/<slug>.svg` | Provider / integration logos for `<Card>` |
+| `diagrams/<slug>.svg` | Architecture / flow diagrams |
+| `recipes/<slug>/<file>` | Recipe-specific screenshots |
+
+**Verify every upload before editing any `.mdx`:**
+
+```bash
+curl -sI https://static.cube.dev/<key>
+```
+
+Expect `200`, the right `content-type`, and a `content-length` matching the local file.
+Cheaper than finding a bad upload after rewriting ten pages.
+
+**Compress before uploading.** Nothing resizes these — the blog's image optimizer only
+rewrites Uploadcare (`ucarecdn.com`) URLs, and `static.cube.dev` passes through
+untouched. Retina screenshots straight from CleanShot are often 3000px+ and multiple
+megabytes; scale them down first. Prefer PNG for UI screenshots, WebP for large ones,
+SVG for logos.
+
+**Paths are immutable.** The script refuses to overwrite an existing key; upload a new
+one with a version suffix (`foo-v2.png`) and update the reference in the same PR.
+`--force` exists but objects carry `Cache-Control: max-age=31536000, immutable`, so an
+overwrite can sit stale in caches for a year — avoid it for anything already live.
+
+Credentials: AWS CLI plus a `cube-static` profile (region `us-west-2`) with
+`s3:PutObject` and `s3:HeadObject`. Check with
+`aws sts get-caller-identity --profile cube-static`. If it isn't configured, ask —
+don't guess credentials.
 
 ## AI / agent docs structure
 

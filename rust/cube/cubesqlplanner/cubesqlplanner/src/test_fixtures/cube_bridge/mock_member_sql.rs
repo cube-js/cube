@@ -139,6 +139,15 @@ impl MockMemberSql {
                     )));
                 }
 
+                // `{SECURITY_VALUE:<value>}` records a security context value and
+                // yields `{sv:N}`. Equal values collapse to one index, the way the
+                // JS member-sql compiler dedups them.
+                if let Some(value) = path.strip_prefix("SECURITY_VALUE:") {
+                    let index = args.insert_security_context_value(value.to_string());
+                    result.push_str(&format!("{{sv:{}}}", index));
+                    continue;
+                }
+
                 // Parse the path and add to symbol_paths
                 let path_parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
 

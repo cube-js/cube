@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.13](https://github.com/cube-js/cube/compare/v1.7.12...v1.7.13) (2026-07-28)
+
+### Bug Fixes
+
+- **cubejs-client-core:** avoid stack overflow on large cubeSql results ([#11390](https://github.com/cube-js/cube/issues/11390)) ([31de9b5](https://github.com/cube-js/cube/commit/31de9b5d7027903712905b815480aaf561ec8d0f))
+- **cubesql:** Support `GROUP BY ()` empty grouping set ([#11331](https://github.com/cube-js/cube/issues/11331)) ([92cc127](https://github.com/cube-js/cube/commit/92cc127b10d1583d6bf60645947676c227567ef0))
+
 ## [1.7.12](https://github.com/cube-js/cube/compare/v1.7.11...v1.7.12) (2026-07-27)
 
 ### Bug Fixes

@@ -8,6 +8,9 @@
       "path": "packages/cubejs-client-ws-transport"
     },
     {
+      "path": "packages/cubejs-client-react"
+    },
+    {
       "path": "packages/cubejs-backend-shared"
     },
     {
