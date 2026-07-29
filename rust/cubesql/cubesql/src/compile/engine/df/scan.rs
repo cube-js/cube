@@ -1474,6 +1474,55 @@ mod tests {
         assert_eq!(d.value(1), "plain");
     }
 
+    #[test]
+    fn convert_transport_response_out_of_range_timestamp_should_not_silently_null() {
+        // cube-js/cube#11407: a timestamp outside the range representable by
+        // Arrow's i64 nanosecond-since-epoch encoding (roughly years 1677-2262 --
+        // e.g. a SQL Server `datetime2` value such as year 0202) currently gets
+        // silently turned into NULL here instead of erroring or being preserved,
+        // so aggregates like MIN() return NULL with no indication anything went
+        // wrong. This test currently fails, demonstrating the reported bug.
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": {
+                        "members": ["d"],
+                        "columns": [
+                            ["0202-01-01T00:00:00.000", "2024-01-01T00:00:00.000"]
+                        ]
+                    }
+                }]
+            }
+        "#;
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "d",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+        let member_fields = vec![MemberField::regular("d".to_string())];
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+
+        let d = batches[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+
+        assert!(
+            !d.is_null(0),
+            "out-of-range datetime2 value (year 0202) was silently converted to NULL \
+             instead of erroring or preserving the value (cube-js/cube#11407)"
+        );
+        assert!(!d.is_null(1));
+    }
+
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
             protocol.get_name().to_string(),
