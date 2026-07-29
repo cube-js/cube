@@ -201,3 +201,32 @@ async fn test_rolling_window_switch_with_granular_time_dimension() {
         sql
     );
 }
+
+/// An Aggregate parent reducing by the time dimension narrows the child
+/// rolling-window state: the CTE must still project and group by the rolling
+/// time dimension, otherwise the `time_series` LEFT JOIN fans out and the
+/// rolling sum is multiplied.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_under_reduce_by_time() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_7d_reduce_time
+        dimensions:
+          - orders.category
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-10"
+        order:
+          - id: orders.category
+          - id: orders.created_at
+    "#};
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

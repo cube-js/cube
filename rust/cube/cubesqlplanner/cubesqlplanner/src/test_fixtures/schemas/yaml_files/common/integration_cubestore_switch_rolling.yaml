@@ -1,0 +1,269 @@
+cubes:
+  - name: sales
+    sql: "SELECT * FROM cs_switch_sales"
+    joins:
+      - name: accounts
+        relationship: many_to_one
+        sql: "{sales}.account_id = {accounts.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: created_at
+        type: time
+        sql: created_at
+      - name: category
+        type: string
+        sql: category
+
+      # Calc group: carries no stored data, so the rollup below does not list it.
+      - name: window_kind
+        type: switch
+        values:
+          - R3
+          - R12
+          - YTD
+
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+
+      - name: r3_amount
+        type: sum
+        sql: amount
+        rolling_window:
+          trailing: 3 month
+
+      - name: r12_amount
+        type: sum
+        sql: amount
+        rolling_window:
+          trailing: 12 month
+
+      - name: ytd_amount
+        type: sum
+        sql: amount
+        rolling_window:
+          type: to_date
+          granularity: year
+
+      # Consumer-facing entrypoint: dispatches the switch to the matching
+      # rolling window. Nothing above it needs the switch dimension.
+      - name: rolling_amount
+        type: number
+        multi_stage: true
+        case:
+          switch: "{CUBE.window_kind}"
+          when:
+            - value: R3
+              sql: "{CUBE.r3_amount}"
+            - value: R12
+              sql: "{CUBE.r12_amount}"
+          else:
+            sql: "{CUBE.ytd_amount}"
+
+      - name: prev_r3_amount
+        type: number
+        multi_stage: true
+        sql: "{CUBE.r3_amount}"
+        public: false
+        time_shift:
+          - interval: 3 month
+            type: prior
+
+      - name: prev_r12_amount
+        type: number
+        multi_stage: true
+        sql: "{CUBE.r12_amount}"
+        public: false
+        time_shift:
+          - interval: 12 month
+            type: prior
+
+      - name: prev_ytd_amount
+        type: number
+        multi_stage: true
+        sql: "{CUBE.ytd_amount}"
+        public: false
+        time_shift:
+          - interval: 1 year
+            type: prior
+
+      # Entrypoint dispatching straight onto a time_shift measure, with no
+      # arithmetic layer in between.
+      - name: prev_rolling_amount
+        type: number
+        multi_stage: true
+        case:
+          switch: "{CUBE.window_kind}"
+          when:
+            - value: R3
+              sql: "{CUBE.prev_r3_amount}"
+            - value: R12
+              sql: "{CUBE.prev_r12_amount}"
+          else:
+            sql: "{CUBE.prev_ytd_amount}"
+
+      - name: r3_amount_change
+        type: number
+        multi_stage: true
+        public: false
+        sql: "({CUBE.r3_amount} - {CUBE.prev_r3_amount})"
+
+      - name: r12_amount_change
+        type: number
+        multi_stage: true
+        public: false
+        sql: "({CUBE.r12_amount} - {CUBE.prev_r12_amount})"
+
+      # Ratio over two multi-stage layers, the shape a growth-percentage
+      # entrypoint has: a CASE guarding division by the shifted value.
+      - name: r3_growth
+        type: number
+        multi_stage: true
+        public: false
+        format: percent
+        sql: >
+          CASE WHEN {CUBE.prev_r3_amount} IS NULL OR {CUBE.prev_r3_amount} = 0 THEN NULL
+               ELSE ({CUBE.r3_amount} - {CUBE.prev_r3_amount}) * 1.0 / {CUBE.prev_r3_amount} END
+
+      - name: r12_growth
+        type: number
+        multi_stage: true
+        public: false
+        format: percent
+        sql: >
+          CASE WHEN {CUBE.prev_r12_amount} IS NULL OR {CUBE.prev_r12_amount} = 0 THEN NULL
+               ELSE ({CUBE.r12_amount} - {CUBE.prev_r12_amount}) * 1.0 / {CUBE.prev_r12_amount} END
+
+      - name: rolling_amount_growth
+        type: number
+        format: percent
+        multi_stage: true
+        case:
+          switch: "{CUBE.window_kind}"
+          when:
+            - value: R3
+              sql: "{CUBE.r3_growth}"
+            - value: R12
+              sql: "{CUBE.r12_growth}"
+          else:
+            sql: "{CUBE.ytd_amount}"
+
+      # Derived entrypoint: the arithmetic layer above the rolling windows
+      # partitions by the switch dimension, so every CTE below it must carry it.
+      - name: rolling_amount_change
+        type: number
+        multi_stage: true
+        case:
+          switch: "{CUBE.window_kind}"
+          when:
+            - value: R3
+              sql: "{CUBE.r3_amount_change}"
+            - value: R12
+              sql: "{CUBE.r12_amount_change}"
+          else:
+            sql: "{CUBE.ytd_amount}"
+
+    pre_aggregations:
+      # Stores the rolling measures unrolled to plain monthly sums — the shape
+      # the rolling-window leaf reads. The calc group is deliberately absent.
+      - name: rolling_by_category
+        type: rollup
+        external: true
+        measures:
+          - amount
+          - r3_amount
+          - r12_amount
+          - ytd_amount
+        dimensions:
+          - category
+        time_dimension: created_at
+        granularity: month
+        allow_non_strict_date_range_match: true
+        indexes:
+          - name: category_idx
+            columns:
+              - category
+
+      # Stores the calc group as an ordinary dimension — the shape rollups had
+      # to use before calc groups stopped being required, and which must keep
+      # working.
+      - name: rolling_by_category_stored_switch
+        type: rollup
+        external: true
+        measures:
+          - amount
+          - r3_amount
+          - r12_amount
+          - ytd_amount
+        dimensions:
+          - category
+          - window_kind
+        time_dimension: created_at
+        granularity: month
+        allow_non_strict_date_range_match: true
+        indexes:
+          - name: category_switch_idx
+            columns:
+              - category
+              - window_kind
+
+      # Aggregating index over the same grain.
+      - name: rolling_by_category_agg_idx
+        type: rollup
+        external: true
+        measures:
+          - amount
+          - r3_amount
+          - r12_amount
+          - ytd_amount
+        dimensions:
+          - category
+        time_dimension: created_at
+        granularity: month
+        allow_non_strict_date_range_match: true
+        indexes:
+          - name: category_regular_idx
+            columns:
+              - category
+          - name: category_agg_idx
+            type: aggregate
+            columns:
+              - category
+
+      # Same at the grain of a dimension owned by a joined cube, mirroring a
+      # rollup keyed by an attribute of the joined entity.
+      - name: rolling_by_account
+        type: rollup
+        external: true
+        measures:
+          - amount
+          - r3_amount
+          - r12_amount
+          - ytd_amount
+        dimensions:
+          - accounts.name
+        time_dimension: created_at
+        granularity: month
+        allow_non_strict_date_range_match: true
+        indexes:
+          - name: account_idx
+            columns:
+              - accounts.name
+
+  - name: accounts
+    sql: "SELECT * FROM cs_switch_accounts"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+    measures:
+      - name: count
+        type: count

@@ -474,6 +474,16 @@ cubes:
             rolling_window:
                 trailing: 3 month
 
+          # An Aggregate parent that reduces by the time dimension: the child
+          # rolling-window state ends up NARROWER than the root query (no time
+          # dimension), while the leaf still groups per date.
+          - name: rolling_sum_7d_reduce_time
+            type: sum
+            sql: "{CUBE.rolling_sum_7d}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+
           # Case entrypoint dispatching between two rolling windows on the
           # `window_kind` calc group: the switch dimension is added to the
           # grain of the rolling leaves, so every CTE feeding the case must
