@@ -112,11 +112,9 @@ describe('DruidDriver', () => {
   });
 
   it('stream', async () => {
-    jest.setTimeout(10 * 1000);
-
     return doWithDriver(async (driver) => {
       const tableData = await driver.stream(
-        'SELECT 1 as id, true as finished, \'netherlands\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created UNION ALL SELECT 2 as id, false as finished, \'spain\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created',
+        'SELECT 1 as id, true as finished, \'netherlands\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created UNION ALL SELECT 2 as id, false as finished, \'spain\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created ORDER BY id',
         [],
         { highWaterMark: 1000 }
       );
