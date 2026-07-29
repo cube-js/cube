@@ -1,5 +1,6 @@
 ---
 title: Kerberos authentication
+sidebarTitle: Kerberos
 description: "Kerberos is the most common authentication method for Windows environments. It can be used to authenticate requests to the DAX API and MDX API."
 hidden: true
 ---
@@ -155,8 +156,8 @@ format, e.g., `cube-pbi-svc-account@CUBE.DEV`. The match is case-sensitive, so k
 same letter case as the principal — the realm is typically uppercase. A NetBIOS format
 like `CUBE\cube-pbi-svc-account` will not match.
 
-Once the deployment is ready, you can test the Kerberos authentication by [connecting
-from Power BI][ref-power-bi] to the DAX API.
+Once the deployment is ready, you can test the Kerberos authentication by connecting
+to the DAX API from Power BI.
 
 ## Provisioning users with SCIM
 
@@ -248,10 +249,9 @@ connection actually used: `method=kerberos` vs. `method=ntlm`.
 [link-setspn]: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc731241(v=ws.11)
 [link-keytab-file]: https://web.mit.edu/Kerberos/krb5-1.16/doc/basic/keytab_def.html
 [link-ktpass]: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ktpass
-[ref-power-bi]: /admin/connect-to-data/visualization-tools/powerbi#connect-to-the-dax-api
 [link-kerberos]: https://en.wikipedia.org/wiki/Kerberos_(protocol)#Microsoft_Windows
 [ref-dax-api]: /reference/core-data-apis/dax-api
 [ref-mdx-api]: /reference/core-data-apis/mdx-api
-[ref-ntlm]: /docs/integrations/power-bi/ntlm
+[ref-ntlm]: /reference/core-data-apis/dax-api/ntlm
 [link-power-bi-opdg]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
 [ref-scim]: /admin/sso/microsoft-entra-id/scim

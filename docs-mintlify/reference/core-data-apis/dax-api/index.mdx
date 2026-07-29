@@ -1,6 +1,7 @@
 ---
 title: DAX API
 description: "Connect Microsoft Power BI to Cube natively using the DAX API for superior feature support over the SQL API."
+hidden: true
 ---
 
  DAX API
@@ -59,7 +60,7 @@ in the same cube or view), that would cause a conflict.
 
 ## Authentication
 
-The DAX API supports Kerberos and NTLM authentication
+The DAX API supports [Kerberos][ref-kerberos] and [NTLM][ref-ntlm] authentication
 methods, as well as user name and password authentication.
 
 While NTLM can be used for testing purposes, we strongly recommend configuring
@@ -96,3 +97,5 @@ and use it.
 [ref-ref-dax-api]: /reference/core-data-apis/dax-api/reference
 [ref-views]: /docs/data-modeling/views
 [ref-time-dimensions]: /docs/data-modeling/dimensions#time-dimensions
+[ref-kerberos]: /reference/core-data-apis/dax-api/kerberos
+[ref-ntlm]: /reference/core-data-apis/dax-api/ntlm
