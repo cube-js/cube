@@ -168,15 +168,22 @@ output, suitable for piping to `jq`.
 
 ## Data model Git workflow
 
-Edit the data model through branches without touching production:
+Edit the data model through branches without touching production. File writes
+(`put`, `delete`, `rename`) are only accepted on a **dev-mode branch**:
 
 ```bash
 cube data-model create-branch DEPLOYMENT_ID my-branch --dev-mode
-cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch my-branch
+# entered dev mode on dev-my-branch (forked from my-branch)
+cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file orders.yml --branch dev-my-branch
 cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders cube"
 ```
 
-`merge-to-default` merges into the deploy branch and rebuilds production.
+`--dev-mode` forks a personal `dev-…` branch off the branch you named and
+prints it — pass that forked name via `--branch` on write commands (or omit
+`--branch` to use your active dev-mode branch). Writes to any other branch are
+rejected. `cube data-model dev-mode DEPLOYMENT_ID my-branch` re-enters dev mode
+the same way if you're not already in it. `merge-to-default` merges into the
+deploy branch and rebuilds production.
 
 ## Environment variables
 

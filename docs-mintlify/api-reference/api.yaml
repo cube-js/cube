@@ -1982,6 +1982,46 @@ paths:
           Signed embedding additionally requires the dashboard to have "Allow signed embedding"
           enabled; the trusted screenshoter and creator-mode session flows are exempt. Returns `403`
           when embedding is not permitted for the dashboard.
+    patch:
+      operationId: updateDashboardEmbedding
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDashboardEmbeddingInput'
+        description: UpdateDashboardEmbeddingInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardEmbeddingResponse'
+          description: ''
+      summary: Enable or disable signed embedding for a dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Sets the dashboard's "Allow signed embedding" flag (`allowEmbed`), which gates the
+          customer-signed embedding path: with the flag off, embed sessions fetching `GET
+          /v1/embed/dashboard/{publicId}` receive `403`. Trusted cube-cloud session flows
+          (screenshoter, creator mode) and dashboards shared with all embed users are not affected
+          by this flag.
+
+
+          Note that the flag alone does not make a dashboard embeddable — it must also be published
+          and shared with the embed tenant. Returns `404` if the dashboard does not exist.
   /v1/embed/generate-session:
     post:
       operationId: generateSession
@@ -3284,6 +3324,16 @@ components:
         - published
         - archived
       type: string
+    DashboardEmbeddingResponse:
+      properties:
+        allowEmbed:
+          type: boolean
+        publicId:
+          type: string
+      required:
+        - publicId
+        - allowEmbed
+      type: object
     DashboardFilter:
       properties:
         caseSensitive:
@@ -5226,6 +5276,19 @@ components:
         - id
         - url
         - format
+      type: object
+    UpdateDashboardEmbeddingInput:
+      properties:
+        allowEmbed:
+          description: >-
+            Whether customer-signed embedding is allowed for this dashboard
+            ("Allow signed embedding" in the UI). `true` lets embed sessions
+            fetch the dashboard via `GET /v1/embed/dashboard/{publicId}`;
+            `false` makes that fetch return `403`. Does not affect
+            creator-mode sessions or dashboards shared with all embed users.
+          type: boolean
+      required:
+        - allowEmbed
       type: object
     UpdateDeploymentInput:
       properties:
