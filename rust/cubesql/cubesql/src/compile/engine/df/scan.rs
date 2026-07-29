@@ -432,6 +432,12 @@ impl ColumnarValueObject for LiteralRowsValueObject {
     }
 }
 
+/// Bounds of `DataType::Timestamp(TimeUnit::Nanosecond, _)`: an i64 count of
+/// nanoseconds since the epoch. Quoted back to the user so the error says what
+/// range a value has to fall into.
+const MIN_NANOSECOND_TIMESTAMP: &str = "1677-09-21 00:12:43.145224192";
+const MAX_NANOSECOND_TIMESTAMP: &str = "2262-04-11 23:47:16.854775807";
+
 macro_rules! build_column {
     ($data_type:expr, $builder_ty:ty, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         let len = $response.len()?;
@@ -1075,15 +1081,20 @@ macro_rules! transform_response_body {
                             (FieldValue::String(s), builder) => {
                                 let timestamp = parse_date_str(s.as_ref())?;
                                 // TODO switch parsing to microseconds
-                                if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
-                                    builder.append_value(nanos)?;
-                                } else {
-                                    log::error!(
-                                        "Unable to cast timestamp value to nanoseconds: {}",
-                                        timestamp
-                                    );
-                                    builder.append_null()?;
-                                }
+                                let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() else {
+                                    // Appending NULL here would hand the client an
+                                    // undetectable wrong answer: `MIN(ts)` comes back
+                                    // NULL for a column that holds no NULLs. Fail the
+                                    // query instead, the way an unparseable value
+                                    // already does just above.
+                                    return Err(CubeError::user(format!(
+                                        "Timestamp out of range: {}. Timestamps are \
+                                         represented with nanosecond precision and must be \
+                                         between {} and {}",
+                                        timestamp, MIN_NANOSECOND_TIMESTAMP, MAX_NANOSECOND_TIMESTAMP
+                                    )));
+                                };
+                                builder.append_value(nanos)?;
                             },
                         },
                         {
@@ -1474,6 +1485,47 @@ mod tests {
         assert_eq!(d.value(1), "plain");
     }
 
+    #[test]
+    fn convert_transport_response_errors_on_out_of_range_timestamp() {
+        // A timestamp the source can represent but `Timestamp(Nanosecond)` can't
+        // used to become NULL, so `MIN(t)` returned NULL over a column holding no
+        // NULLs — a wrong answer with nothing downstream able to spot it.
+        for value in ["0202-01-01 00:00:00.000", "9999-12-31 00:00:00.000"] {
+            let raw = format!(
+                r#"
+                {{
+                    "results": [{{
+                        "annotation": {{
+                            "measures": [],
+                            "dimensions": [],
+                            "segments": [],
+                            "timeDimensions": []
+                        }},
+                        "data": {{"members": ["t"], "columns": [["2024-01-01 00:00:00.000", "{value}"]]}}
+                    }}]
+                }}
+            "#
+            );
+            let response: V1LoadResponse<V1LoadResultDataColumnar> =
+                serde_json::from_str(&raw).unwrap();
+            let schema = Arc::new(Schema::new(vec![Field::new(
+                "t",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            )]));
+            let member_fields = vec![MemberField::regular("t".to_string())];
+
+            let error = convert_transport_response(response, schema, member_fields)
+                .expect_err(&format!("{value} should not be silently nulled"));
+
+            assert!(
+                error.message.contains("Timestamp out of range"),
+                "unexpected error for {value}: {}",
+                error.message
+            );
+        }
+    }
+
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
             protocol.get_name().to_string(),
@@ -1540,7 +1592,7 @@ mod tests {
                                 [null, 5, "5", null, null],
                                 [null, 5.05, "5.05", null, null],
                                 [null, true, false, "true", "false"],
-                                [null, "2022-01-01 00:00:00.000", "2023-01-01 00:00:00.000", "9999-12-31 00:00:00.000", null],
+                                [null, "2022-01-01 00:00:00.000", "2023-01-01 00:00:00.000", "2262-04-11 00:00:00.000", null],
                                 [null, "2022-01-01", "2023-01-01", "9999-12-31", null],
                                 ["City 1", "City 2", "City 3", "City 4", null]
                             ]
@@ -1711,7 +1763,7 @@ mod tests {
                         None,
                         Some(1640995200000000000),
                         Some(1672531200000000000),
-                        None,
+                        Some(9223286400000000000),
                         None
                     ])) as ArrayRef,
                     Arc::new(BooleanArray::from(vec![
