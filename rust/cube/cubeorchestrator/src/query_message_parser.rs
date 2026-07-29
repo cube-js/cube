@@ -348,10 +348,11 @@ mod tests {
     use cubeshared::flatbuffers::FlatBufferBuilder;
     use std::sync::Arc;
 
-    /// Materialize one column so assertions can compare against a plain slice,
-    /// whatever the column's backing storage is.
-    fn column(result: &QueryResult, idx: usize) -> ColumnarArray {
-        result.column(idx).unwrap().to_columnar().unwrap()
+    /// Read one column through the production accessor, so assertions can compare
+    /// against a plain slice whatever the column's backing storage is.
+    fn column(result: &QueryResult, idx: usize) -> Vec<DBResponsePrimitive> {
+        let reader = result.reader(idx).unwrap();
+        (0..reader.len()).map(|row| reader.value(row)).collect()
     }
 
     /// Helper function to create a test HttpMessage with a given number of rows and columns

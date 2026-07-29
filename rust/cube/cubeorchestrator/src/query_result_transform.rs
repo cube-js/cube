@@ -1424,6 +1424,7 @@ impl std::ops::DerefMut for ColumnarArray {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::query_result_column::QueryResultColumn;
     use crate::transport::JsRawColumnarData;
     use anyhow::Result;
     use serde_json::from_str;
@@ -3766,6 +3767,21 @@ pub(crate) mod tests {
     pub(crate) const ALL_RES_TYPES: [Option<ResultType>; 3] =
         [None, Some(ResultType::Compact), Some(ResultType::Columnar)];
 
+    /// Read every column of `source` into primitives, i.e. the shape the legacy
+    /// and JS-driver paths hand over.
+    fn materialize_columns(source: &QueryResult) -> Result<Vec<QueryResultColumn>> {
+        (0..source.members().len())
+            .map(|idx| {
+                let reader = source.reader(idx)?;
+                Ok(QueryResultColumn::from(
+                    (0..reader.len())
+                        .map(|row| reader.value(row))
+                        .collect::<Vec<_>>(),
+                ))
+            })
+            .collect()
+    }
+
     /// The same three-row result twice: once backed by Arrow memory (as CubeStore
     /// sends it) and once by materialized primitives (as the legacy and JS-driver
     /// paths hand it over). Types are mixed on purpose — string, float, decimal
@@ -3829,12 +3845,8 @@ pub(crate) mod tests {
             }
 
             let arrow = QueryResult::from_arrow(&ipc)?;
-            let columnar = QueryResult::try_new(
-                arrow.members().to_vec(),
-                (0..arrow.members().len())
-                    .map(|idx| arrow.column(idx)?.to_columnar().map(Into::into))
-                    .collect::<Result<Vec<_>, _>>()?,
-            )?;
+            let columnar =
+                QueryResult::try_new(arrow.members().to_vec(), materialize_columns(&arrow)?)?;
 
             let members = [
                 ("cube__city", "Cube.city", "string"),

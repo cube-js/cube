@@ -54,15 +54,6 @@ impl QueryResultColumn {
             QueryResultColumn::Arrow(a) => Ok(ColumnReader::Arrow(a.cell_reader()?)),
         }
     }
-
-    /// Materialize the column as primitives. Only for callers that genuinely need
-    /// an owned slice — the read paths use [`QueryResultColumn::reader`] instead.
-    pub fn to_columnar(&self) -> Result<ColumnarArray, ParseError> {
-        match self {
-            QueryResultColumn::Columnar(c) => Ok(c.clone()),
-            QueryResultColumn::Arrow(a) => a.to_columnar(),
-        }
-    }
 }
 
 impl From<ColumnarArray> for QueryResultColumn {
@@ -113,29 +104,6 @@ impl ArrowArray {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
-    }
-
-    #[inline]
-    pub fn data_type(&self) -> &DataType {
-        self.0.data_type()
-    }
-
-    #[inline]
-    pub fn array(&self) -> &ArrayRef {
-        &self.0
-    }
-
-    pub fn to_columnar(&self) -> Result<ColumnarArray, ParseError> {
-        let mut out = ColumnarArray::with_capacity(self.len());
-        // `member_type` is empty: materializing must not apply the `time` reformat
-        // that a transform would.
-        let Ok(()) = self
-            .cell_reader()?
-            .for_each_transformed::<Infallible>("", |value| {
-                out.push(value.into_owned());
-                Ok(())
-            });
-        Ok(out)
     }
 
     /// Downcast to the concrete Arrow array once, for the whole column.
