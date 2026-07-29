@@ -137,7 +137,8 @@ describe('DruidDriver', () => {
   });
 
   it('stream with an error', async () => {
-    jest.setTimeout(10 * 1000);
+  it('stream with an error', async () => {
+    return doWithDriver(async (driver) => {
 
     return doWithDriver(async (driver) => {
       await expect(
