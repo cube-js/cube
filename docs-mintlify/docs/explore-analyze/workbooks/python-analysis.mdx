@@ -86,6 +86,10 @@ These packages are pre-installed, along with their dependencies:
 | `prophet` | Time series forecasting with seasonality and holidays |
 | `matplotlib`, `seaborn`, `plotly` | Plotting |
 
+Figures are not a supported output. The report's chart is built from `output.json`, and
+anything a script writes to disk is discarded with the sandbox — so the plotting
+libraries are importable, but a saved figure has nowhere to go.
+
 <Info>
 
 Installing your own packages is not supported yet. Because the sandbox is recreated
