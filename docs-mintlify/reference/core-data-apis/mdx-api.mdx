@@ -218,7 +218,7 @@ This is going to be harmonized in the future.
 ## Authentication and authorization
 
 The MDX API shares its authentication layer with the [DAX API][ref-dax-api]:
-Kerberos and NTLM are supported, as well as user name and
+[Kerberos][ref-kerberos] and [NTLM][ref-ntlm] are supported, as well as user name and
 password authentication. Configuration is done on the **Settings → Power BI** page of
 your deployment — the same XMLA service account, SPN, and keytab setup applies to both
 APIs.
@@ -236,3 +236,5 @@ APIs.
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-rollup-only-mode]: /docs/pre-aggregations/using-pre-aggregations#rollup-only-mode
 [ref-measure-format]: /reference/data-modeling/measures#format
+[ref-kerberos]: /reference/core-data-apis/dax-api/kerberos
+[ref-ntlm]: /reference/core-data-apis/dax-api/ntlm
