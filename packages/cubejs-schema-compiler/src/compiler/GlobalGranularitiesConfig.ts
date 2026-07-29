@@ -205,6 +205,29 @@ export function buildBuiltInsCatalog(globalConfig: GlobalGranularitiesConfig): R
   return catalog;
 }
 
+// Wire shape of the `/v1/granularities` catalog: every built-in enabled for this model, plus the
+// global customs. A custom that shadows a built-in is already folded into the built-in entry.
+export function buildGranularitiesCatalog(config: GlobalGranularitiesConfig): Array<Record<string, string>> {
+  const catalog: Array<Record<string, string>> = Object.entries(buildBuiltInsCatalog(config))
+    .map(([name, entry]) => ({ type: 'built-in', name, ...entry }));
+
+  for (const [name, def] of Object.entries(config.customGranularities)) {
+    if (!isBuiltInGranularity(name)) {
+      catalog.push({
+        type: 'custom',
+        name,
+        title: def.title || name,
+        ...Object.fromEntries(
+          GRANULARITY_STRING_FIELDS
+            .filter((f) => f !== 'title' && def[f] !== undefined)
+            .map((f) => [f, def[f] as string]),
+        ),
+      });
+    }
+  }
+  return catalog;
+}
+
 // Fields that a config override actually changes in the emitted output, per granularity name. For
 // a name shadowing a built-in, buildBuiltInsCatalog honors only title/format (interval/offset/origin
 // are fixed at `1 <name>` for predefined granularities), so hashing the ignored fields would churn
