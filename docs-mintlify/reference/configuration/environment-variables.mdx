@@ -1549,9 +1549,10 @@ exhaust memory and break the client connection.
 
 <Warning>
 
-This value should not exceed
-[`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit). Non-streamed queries above that
-limit are rejected before they reach the data source.
+This value cannot exceed [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit). If you
+set it higher, Cube logs a warning at startup and falls back to
+`CUBEJS_DB_QUERY_LIMIT`, because non-streamed queries above that limit are rejected
+before they reach the data source.
 
 </Warning>
 
