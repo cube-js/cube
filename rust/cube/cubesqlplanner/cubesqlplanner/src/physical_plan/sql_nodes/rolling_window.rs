@@ -75,7 +75,10 @@ impl SqlNode for RollingWindowNode {
                         | AggregationType::CountDistinct
                         | AggregationType::NumberAgg => delegate()?,
                     },
-                    _ => delegate()?,
+                    MeasureKind::MultipliedCount(_)
+                    | MeasureKind::AggregatedState(_)
+                    | MeasureKind::Calculated(_)
+                    | MeasureKind::Rank => delegate()?,
                 }
             }
             MemberSymbol::Measure(_) => self.default_processor.to_sql(

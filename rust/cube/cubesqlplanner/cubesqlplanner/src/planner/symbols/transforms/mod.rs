@@ -8,6 +8,7 @@
 
 mod filter_symbols;
 mod ignore_timezone;
+mod measures_as_state;
 mod multiplied;
 mod patch_measure;
 mod static_filter;
@@ -17,6 +18,7 @@ mod unroll_rolling;
 
 pub use filter_symbols::*;
 pub use ignore_timezone::*;
+pub use measures_as_state::*;
 pub use multiplied::*;
 pub use patch_measure::*;
 pub use static_filter::*;

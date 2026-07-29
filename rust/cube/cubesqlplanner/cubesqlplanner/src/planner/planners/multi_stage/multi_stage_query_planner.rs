@@ -160,7 +160,10 @@ impl MultiStageQueryPlanner {
             let member_type = match measure.kind() {
                 MeasureKind::Rank => MultiStageInodeMemberType::Rank,
                 MeasureKind::Calculated(_) => MultiStageInodeMemberType::Calculate,
-                _ => MultiStageInodeMemberType::Aggregate,
+                MeasureKind::Count(_)
+                | MeasureKind::MultipliedCount(_)
+                | MeasureKind::Aggregated(_)
+                | MeasureKind::AggregatedState(_) => MultiStageInodeMemberType::Aggregate,
             };
 
             let time_shift = measure.time_shift().cloned();
@@ -276,7 +279,10 @@ impl MultiStageQueryPlanner {
         match inner.kind() {
             MeasureKind::Count(_) => true,
             MeasureKind::Aggregated(a) => a.agg_type() == AggregationType::Sum,
-            _ => false,
+            MeasureKind::MultipliedCount(_)
+            | MeasureKind::AggregatedState(_)
+            | MeasureKind::Calculated(_)
+            | MeasureKind::Rank => false,
         }
     }
 

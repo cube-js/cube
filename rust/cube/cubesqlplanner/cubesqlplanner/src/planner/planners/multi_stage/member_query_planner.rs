@@ -5,6 +5,7 @@ use super::{
 use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::state::State;
+use crate::planner::symbols::transforms;
 use crate::planner::GranularityHelper;
 use crate::planner::MemberSymbol;
 use crate::planner::MultiStageGrain;
@@ -424,7 +425,16 @@ impl MultiStageMemberQueryPlanner {
         &self,
         scope: &mut PlanningScope,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let member_node = self.description.member_node();
+        // An aggregating stage on top (a rolling window) merges the leaf's
+        // values, so measures with a mergeable state form must materialize
+        // the state, not the final value.
+        let leaf_as_state = self.description.member().has_aggregates_on_top();
+        let member_node = if leaf_as_state {
+            transforms::measures_as_state(self.description.member_node())?
+        } else {
+            self.description.member_node().clone()
+        };
+        let member_node = &member_node;
         let mut dimensions = self.description.state().dimensions().clone();
         let mut time_dimensions = self.description.state().time_dimensions().clone();
         let mut measures = vec![];
@@ -451,6 +461,16 @@ impl MultiStageMemberQueryPlanner {
             }
         }
 
+        let mut measures_filters = self.description.state().measures_filters().clone();
+        if leaf_as_state {
+            for filter_item in measures_filters.iter_mut() {
+                *filter_item = transforms::map_filter_item_symbols(
+                    filter_item,
+                    &transforms::measures_as_state,
+                )?;
+            }
+        }
+
         let cte_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .measures(measures)
@@ -458,7 +478,7 @@ impl MultiStageMemberQueryPlanner {
             .time_dimensions(time_dimensions)
             .time_dimensions_filters(self.description.state().time_dimensions_filters().clone())
             .dimensions_filters(self.description.state().dimensions_filters().clone())
-            .measures_filters(self.description.state().measures_filters().clone())
+            .measures_filters(measures_filters)
             .segments(self.description.state().segments().clone())
             .ignore_cumulative(true)
             .ungrouped(self.description.member().is_ungrupped())
@@ -476,7 +496,6 @@ impl MultiStageMemberQueryPlanner {
         // itself renders with.
         let evaluation_context = EvaluationContext {
             time_shifts: self.description.state().time_shifts().clone(),
-            measure_as_state: self.description.member().has_aggregates_on_top(),
             measure_for_ungrouped: self.description.member().is_ungrupped(),
         };
         let query = scope.with_evaluation_context(evaluation_context.clone(), |scope| {

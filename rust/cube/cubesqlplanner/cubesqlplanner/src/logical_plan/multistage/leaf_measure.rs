@@ -20,9 +20,6 @@ impl PrettyPrint for MultiStageLeafMeasure {
         for measure in self.measures.iter() {
             result.println(&format!("measure: {}", measure.full_name()), &state);
         }
-        if self.evaluation_context.measure_as_state {
-            result.println("render_measure_as_state: true", &state);
-        }
         if self.evaluation_context.measure_for_ungrouped {
             result.println("render_measure_for_ungrouped: true", &state);
         }

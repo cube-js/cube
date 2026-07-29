@@ -17,20 +17,11 @@ use std::rc::Rc;
 pub struct FinalPreAggregationMeasureSqlNode {
     input: Rc<dyn SqlNode>,
     references: RenderReferences,
-    count_approx_as_state: bool,
 }
 
 impl FinalPreAggregationMeasureSqlNode {
-    pub fn new(
-        input: Rc<dyn SqlNode>,
-        references: RenderReferences,
-        count_approx_as_state: bool,
-    ) -> Rc<Self> {
-        Rc::new(Self {
-            input,
-            references,
-            count_approx_as_state,
-        })
+    pub fn new(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<Self> {
+        Rc::new(Self { input, references })
     }
 
     pub fn input(&self) -> &Rc<dyn SqlNode> {
@@ -63,22 +54,23 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                                 templates.quote_identifier(&column_name.name())?
                             );
                             match ev.kind().pre_aggregate_wrap() {
+                                // The rollup column holds an HLL state, so it
+                                // must be merged, not recomputed. Keep the
+                                // merged state when this query itself feeds a
+                                // further aggregation; otherwise take its
+                                // cardinality.
+                                AggregateWrap::CountDistinctApproxState => {
+                                    templates.hll_merge(pre_aggregation_measure)?
+                                }
                                 AggregateWrap::CountDistinctApprox => {
-                                    // The rollup column holds an HLL state, so it
-                                    // must be merged, not recomputed. Keep the
-                                    // merged state when this query itself feeds a
-                                    // further aggregation; otherwise take its
-                                    // cardinality.
-                                    if self.count_approx_as_state {
-                                        templates.hll_merge(pre_aggregation_measure)?
-                                    } else {
-                                        templates.hll_cardinality_merge(pre_aggregation_measure)?
-                                    }
+                                    templates.hll_cardinality_merge(pre_aggregation_measure)?
                                 }
                                 AggregateWrap::Function(name) => {
                                     format!("{}({})", name, pre_aggregation_measure)
                                 }
-                                _ => format!("sum({})", pre_aggregation_measure),
+                                AggregateWrap::PassThrough | AggregateWrap::CountDistinct => {
+                                    format!("sum({})", pre_aggregation_measure)
+                                }
                             }
                         }
                         RenderReferencesType::LiteralValue(value) => {

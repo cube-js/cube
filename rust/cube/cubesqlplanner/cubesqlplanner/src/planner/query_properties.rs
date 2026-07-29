@@ -206,6 +206,20 @@ impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
             });
         }
         qp.apply_static_filters()?;
+        // A pre-aggregation build stores aggregations for later rollup, so
+        // measures with a mergeable state form must materialize the state,
+        // not the final value.
+        if qp.pre_aggregation_query {
+            for meas in qp.measures.iter_mut() {
+                *meas = transforms::measures_as_state(meas)?;
+            }
+            for filter_item in qp.measures_filters.iter_mut() {
+                *filter_item = transforms::map_filter_item_symbols(
+                    filter_item,
+                    &transforms::measures_as_state,
+                )?;
+            }
+        }
         Ok(Rc::new(qp))
     }
 }

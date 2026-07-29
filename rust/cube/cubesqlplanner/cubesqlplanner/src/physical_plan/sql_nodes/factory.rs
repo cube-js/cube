@@ -25,7 +25,6 @@ pub struct SqlNodesFactory {
     calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
     ungrouped: bool,
     ungrouped_measure: bool,
-    count_approx_as_state: bool,
     render_references: RenderReferences,
     pre_aggregation_dimensions_references: RenderReferences,
     pre_aggregation_measures_references: RenderReferences,
@@ -133,10 +132,6 @@ impl SqlNodesFactory {
 
     pub fn set_rolling_window(&mut self, value: bool) {
         self.rolling_window = value;
-    }
-
-    pub fn set_count_approx_as_state(&mut self, value: bool) {
-        self.count_approx_as_state = value;
     }
 
     pub fn add_ungrouped_measure_reference<T: Into<RenderReferencesType>>(
@@ -308,13 +303,11 @@ impl SqlNodesFactory {
                 input,
             ))
         } else {
-            let final_processor: Rc<dyn SqlNode> =
-                FinalMeasureSqlNode::new(input.clone(), self.count_approx_as_state);
+            let final_processor: Rc<dyn SqlNode> = FinalMeasureSqlNode::new(input.clone());
             let final_processor = if !self.pre_aggregation_measures_references.is_empty() {
                 FinalPreAggregationMeasureSqlNode::new(
                     final_processor,
                     self.pre_aggregation_measures_references.clone(),
-                    self.count_approx_as_state,
                 )
             } else {
                 final_processor

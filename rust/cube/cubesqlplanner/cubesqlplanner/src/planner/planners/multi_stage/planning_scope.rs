@@ -40,7 +40,6 @@ impl CteState {
 #[derive(Clone, Default)]
 pub struct EvaluationContext {
     pub time_shifts: TimeShiftState,
-    pub measure_as_state: bool,
     pub measure_for_ungrouped: bool,
 }
 
