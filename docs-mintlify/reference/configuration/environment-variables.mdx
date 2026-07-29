@@ -1540,7 +1540,7 @@ streamed instead.
 
 | Possible Values           | Default in Development                            | Default in Production                             |
 | ------------------------- | ------------------------------------------------- | ------------------------------------------------- |
-| A positive integer number | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) |
+| A positive integer number | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) (`50000`) | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) (`50000`) |
 
 Set it below `CUBEJS_DB_QUERY_LIMIT` to let other APIs return large result sets
 while keeping SQL API responses small enough to fit in a single batch, or streamed
