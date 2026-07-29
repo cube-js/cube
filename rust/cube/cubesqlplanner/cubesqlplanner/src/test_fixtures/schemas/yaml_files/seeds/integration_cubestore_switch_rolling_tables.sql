@@ -18,7 +18,7 @@ INSERT INTO cs_switch_accounts (id, name) VALUES
     (1, 'acme'),
     (2, 'globex');
 
--- One row per (category, month) with a distinct amount per month, so trailing
+-- One row per (account, category, month) with a distinct amount per month, so trailing
 -- windows of different lengths produce distinct sums. The 2023 rows put data
 -- outside the queried year, which is what separates a 12-month trailing window
 -- from year-to-date: without them the two coincide on every query below.
