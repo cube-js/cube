@@ -117,8 +117,6 @@ export class PreAggregations {
 
   private readonly cubeLattices: {};
 
-  private hasCumulativeMeasuresValue: boolean = false;
-
   private cumulativeMeasuresTrailingIntervalValue: ParsedInterval | null | undefined;
 
   private cumulativeMeasuresTrailingIntervalComputed: boolean = false;
@@ -296,13 +294,6 @@ export class PreAggregations {
     return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation));
   }
 
-  private hasCumulativeMeasures(): boolean {
-    if (!this.hasCumulativeMeasuresValue) {
-      this.hasCumulativeMeasuresValue = PreAggregations.hasCumulativeMeasures(this.query);
-    }
-    return this.hasCumulativeMeasuresValue;
-  }
-
   /**
    * For a query with cumulative (rolling window) measures, decide how the matched
    * time dimension date range can be narrowed for partition selection.
@@ -317,9 +308,8 @@ export class PreAggregations {
    * the whole build range. Returns `undefined` when there are no cumulative measures.
    */
   private cumulativeMeasuresTrailingInterval(): ParsedInterval | null | undefined {
-    // Memoized like hasCumulativeMeasures(): computeCumulativeMeasuresTrailingInterval()
-    // walks the leaf-measure graph, and preAggregationDescriptionFor() calls this once
-    // per pre-aggregation.
+    // Memoized: computeCumulativeMeasuresTrailingInterval() walks the leaf-measure graph,
+    // and preAggregationDescriptionFor() calls this once per pre-aggregation.
     if (!this.cumulativeMeasuresTrailingIntervalComputed) {
       this.cumulativeMeasuresTrailingIntervalValue = this.computeCumulativeMeasuresTrailingInterval();
       this.cumulativeMeasuresTrailingIntervalComputed = true;
@@ -328,7 +318,7 @@ export class PreAggregations {
   }
 
   private computeCumulativeMeasuresTrailingInterval(): ParsedInterval | null | undefined {
-    // Mirror hasCumulativeMeasures(): inspect the leaf measures so composed
+    // Mirror the static hasCumulativeMeasures(): inspect the leaf measures so composed
     // measures whose cumulative-ness lives in a leaf are handled too.
     const measures = [...this.query.measures, ...this.query.measureFilters];
     const collectLeafMeasures = this.query.collectLeafMeasures.bind(this.query);
@@ -387,7 +377,9 @@ export class PreAggregations {
       return range;
     }
     const format = `YYYY-MM-DDTHH:mm:ss.${'S'.repeat(this.query.timestampPrecision())}`;
-    const start = subtractInterval(moment(range[0], format), trailingInterval).format(format);
+    // Parse as UTC: the range carries query-timezone wall clock with no offset, and parsing it in
+    // the host timezone would let DST normalization shift the lookback start later.
+    const start = subtractInterval(moment.utc(range[0], format), trailingInterval).format(format);
     return [start, range[1]];
   }
 
