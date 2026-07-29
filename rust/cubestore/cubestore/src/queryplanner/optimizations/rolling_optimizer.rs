@@ -2,7 +2,9 @@ use crate::queryplanner::rolling::RollingWindowAggregate;
 use datafusion::arrow::array::Array;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::common::tree_node::Transformed;
-use datafusion::common::{Column, DataFusionError, JoinType, ScalarValue, TableReference};
+use datafusion::common::{
+    Column, DFSchema, DataFusionError, JoinType, ScalarValue, TableReference,
+};
 use datafusion::functions::datetime::date_part::DatePartFunc;
 use datafusion::functions::datetime::date_trunc::DateTruncFunc;
 use datafusion::logical_expr::expr::{
@@ -90,26 +92,37 @@ impl RollingOptimizerRule {
                     from,
                     to,
                     every,
-                    rolling_aggs_alias: expr
-                        .iter()
-                        .flat_map(|e| match e {
-                            Expr::Alias(Alias {
-                                expr,
-                                relation: _,
-                                name,
-                            }) => match expr.as_ref() {
-                                Expr::Column(col)
-                                    if &col.name != &from_col.name
-                                        && &col.name != &to_col.name
-                                        && !partition_by.iter().any(|p| &p.name == &col.name) =>
-                                {
-                                    Some(name.clone())
-                                }
+                    rolling_aggs_alias: {
+                        let aliases = expr
+                            .iter()
+                            .flat_map(|e| match e {
+                                Expr::Alias(Alias {
+                                    expr,
+                                    relation: _,
+                                    name,
+                                }) => match expr.as_ref() {
+                                    Expr::Column(col)
+                                        if &col.name != &from_col.name
+                                            && &col.name != &to_col.name
+                                            && !partition_by
+                                                .iter()
+                                                .any(|p| &p.name == &col.name) =>
+                                    {
+                                        Some(name.clone())
+                                    }
+                                    _ => None,
+                                },
                                 _ => None,
-                            },
-                            _ => None,
-                        })
-                        .collect(),
+                            })
+                            .collect::<Vec<_>>();
+                        // The schema pairs aggregates with these names positionally and a short
+                        // list silently drops the trailing aggregates from the output. Leave such
+                        // a projection alone instead of building a node that cannot describe it.
+                        if aliases.len() < rolling_aggs.len() {
+                            return None;
+                        }
+                        aliases
+                    },
                     partition_by,
                     rolling_aggs,
                     group_by_dimension,
@@ -165,6 +178,13 @@ impl RollingOptimizerRule {
         }
     }
 
+    fn output_columns(schema: &DFSchema) -> Vec<Column> {
+        schema
+            .iter()
+            .map(|(relation, field)| Column::new(relation.cloned(), field.name()))
+            .collect()
+    }
+
     pub fn extract_rolling_window_aggregate(
         node: &LogicalPlan,
     ) -> Option<RollingWindowAggregateExtractorResult> {
@@ -178,19 +198,35 @@ impl RollingOptimizerRule {
                 let rolling_aggs = aggr_expr
                     .iter()
                     .map(|e| match e {
-                        Expr::AggregateFunction(AggregateFunction {
-                            func,
-                            params: AggregateFunctionParams { args, .. },
-                        }) => Some(Expr::AggregateFunction(AggregateFunction {
-                            func: func.clone(),
-                            params: AggregateFunctionParams {
-                                args: args.clone(),
-                                distinct: false,
-                                filter: None,
-                                order_by: None,
-                                null_treatment: None,
-                            },
-                        })),
+                        Expr::AggregateFunction(AggregateFunction { func, params }) => {
+                            let AggregateFunctionParams {
+                                args,
+                                distinct,
+                                filter,
+                                order_by,
+                                null_treatment,
+                            } = params;
+                            // The rolling executor evaluates the aggregate over its own window and
+                            // honours none of these, so rebuilding without them would silently
+                            // answer a different question.
+                            if *distinct
+                                || filter.is_some()
+                                || order_by.is_some()
+                                || null_treatment.is_some()
+                            {
+                                return None;
+                            }
+                            Some(Expr::AggregateFunction(AggregateFunction {
+                                func: func.clone(),
+                                params: AggregateFunctionParams {
+                                    args: args.clone(),
+                                    distinct: false,
+                                    filter: None,
+                                    order_by: None,
+                                    null_treatment: None,
+                                },
+                            }))
+                        }
                         _ => None,
                     })
                     .collect::<Option<Vec<_>>>()?;
@@ -840,16 +876,27 @@ impl OptimizerRule for RollingOptimizerRule {
         _config: &dyn OptimizerConfig,
     ) -> datafusion::common::Result<Transformed<LogicalPlan>, DataFusionError> {
         if let Some(rolling) = Self::extract_rolling_window_projection(&plan) {
+            let projection_output = Self::output_columns(plan.schema());
+            let schema = match RollingWindowAggregate::schema_from(
+                &rolling.input,
+                &rolling.dimension,
+                &rolling.partition_by,
+                &rolling.rolling_aggs,
+                &rolling.dimension_alias,
+                &rolling.rolling_aggs_alias,
+                &rolling.from,
+            ) {
+                Ok(schema) => schema,
+                Err(e) => {
+                    // The rolling node cannot describe its own output for this shape (colliding
+                    // aliases, say). Run the query as a plain aggregate/range-join rather than
+                    // failing to plan it.
+                    log::debug!("Not rewriting a rolling window, no schema for it: {}", e);
+                    return Ok(Transformed::no(plan));
+                }
+            };
             let rolling_window = RollingWindowAggregate {
-                schema: RollingWindowAggregate::schema_from(
-                    &rolling.input,
-                    &rolling.dimension,
-                    &rolling.partition_by,
-                    &rolling.rolling_aggs,
-                    &rolling.dimension_alias,
-                    &rolling.rolling_aggs_alias,
-                    &rolling.from,
-                )?,
+                schema,
                 input: rolling.input,
                 dimension: rolling.dimension,
                 dimension_alias: rolling.dimension_alias,
@@ -865,9 +912,39 @@ impl OptimizerRule for RollingOptimizerRule {
                 upper_bound: rolling.upper_bound,
                 offset_to_end: rolling.offset_to_end,
             };
-            Ok(Transformed::yes(LogicalPlan::Extension(Extension {
+            let rolling_output = Self::output_columns(&rolling_window.schema);
+            let rolling_plan = LogicalPlan::Extension(Extension {
                 node: Arc::new(rolling_window),
-            })))
+            });
+
+            if rolling_output == projection_output {
+                return Ok(Transformed::yes(rolling_plan));
+            }
+
+            // The rolling node always emits dimension + partition_by + rolling aggregates, so a
+            // GROUP BY column the replaced projection did not select reappears in the output.
+            // A rewrite must not change the schema of the node it replaces: ancestors keep
+            // resolving their columns by position against the old one. Restore the original
+            // output with a projection on top, and leave the plan alone when it cannot be
+            // expressed from the rolling node's output.
+            let rolling_schema = rolling_plan.schema();
+            if let Some(missing) = projection_output
+                .iter()
+                .find(|c| rolling_schema.maybe_index_of_column(c).is_none())
+            {
+                log::debug!(
+                    "Not rewriting a rolling window, it does not output {}",
+                    missing
+                );
+                return Ok(Transformed::no(plan));
+            }
+            let exprs = projection_output
+                .into_iter()
+                .map(Expr::Column)
+                .collect_vec();
+            Ok(Transformed::yes(LogicalPlan::Projection(
+                Projection::try_new(exprs, Arc::new(rolling_plan))?,
+            )))
         } else {
             Ok(Transformed::no(plan))
         }
