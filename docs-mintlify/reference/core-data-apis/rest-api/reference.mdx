@@ -743,7 +743,9 @@ Example response:
 ### `{base_path}/v1/entities`
 
 Send a `GET` request to list all cubes and views in the data model. Results are
-sorted by type (cubes first), then by name.
+sorted by type (cubes first), then by name. Each item contains only `type` and
+`name`; use [`/v1/entities/{name}`](#base_path/v1/entities/name) or
+[`/v1/entities/all`](#base_path/v1/entities/all) for detailed metadata.
 
 Query parameters:
 
@@ -818,7 +820,8 @@ Each member includes:
 | `member_references` | Upstream members the member is derived from, each with `cube` and `member` |
 | `column_references` | Source columns, each with `data_source`, `table`, `column`, and, if the table is qualified, `schema` |
 
-`sql` is a quote-stripped expression such as `COUNT(*)`, `${CUBE}.status`, or
+`sql` is the member's SQL expression as written in the data model, with any
+enclosing quotes removed — for example `COUNT(*)`, `${CUBE}.status`, or
 `${total_amount} - ${refunds}`. References to other members appear as `${member}`
 interpolations, and `${CUBE}` refers to the cube's own table alias. Members of a
 view carry the alias expression they resolve to, e.g. `${orders.total_amount}`.
@@ -847,10 +850,7 @@ Example response:
         "table": "orders"
       }
     ],
-    "cube_references": [
-      { "type": "upstream", "cube": "customers" },
-      { "type": "upstream", "cube": "products" }
-    ],
+    "cube_references": [],
     "measures": [
       {
         "name": "total_amount",
@@ -980,6 +980,23 @@ entities before `offset` and `limit` are applied:
       ],
       "dimensions": [
         {
+          "name": "id",
+          "title": "Id",
+          "description": "",
+          "type": "number",
+          "sql": "${CUBE}.id",
+          "is_primary_key": true,
+          "member_references": [],
+          "column_references": [
+            {
+              "data_source": "default",
+              "schema": "public",
+              "table": "orders",
+              "column": "id"
+            }
+          ]
+        },
+        {
           "name": "status",
           "title": "Status",
           "description": "",
@@ -1058,7 +1075,7 @@ entities before `offset` and `limit` are applied:
   ],
   "pagination": {
     "offset": 0,
-    "limit": 20,
+    "limit": 2,
     "total": 2
   }
 }
