@@ -192,17 +192,19 @@ impl QueryTools {
     pub fn get_allocated_params(&self) -> Vec<FilterValue> {
         self.params_allocator.borrow().get_params().clone()
     }
+    /// Resolves param placeholders for the dialect the SQL is rendered for.
+    /// Params may only be shared between placeholders when the dialect's
+    /// placeholder addresses its value by index.
     pub fn build_sql_and_params(
         &self,
         sql: &str,
-        should_reuse_params: bool,
         templates: &PlanSqlTemplates,
     ) -> Result<(String, Vec<FilterValue>), CubeError> {
         let native_allocated_params = self.base_tools.get_allocated_params()?;
         self.params_allocator.borrow().build_sql_and_params(
             sql,
             native_allocated_params,
-            should_reuse_params,
+            templates.should_reuse_params()?,
             templates,
         )
     }

@@ -52,31 +52,34 @@ impl ParamsAllocator {
         let mut param_index_map: HashMap<usize, usize> = HashMap::new();
         let mut error = None;
 
+        let placeholder = |index: usize, error: &mut Option<CubeError>| {
+            if self.export_annotated_sql {
+                return format!("${}$", index);
+            }
+            match templates.param(index) {
+                Ok(res) => res,
+                Err(e) => {
+                    if error.is_none() {
+                        *error = Some(e);
+                    }
+                    "$error$".to_string()
+                }
+            }
+        };
+
         let result_sql = if should_reuse_params {
             PARAMS_MATCH_RE
                 .replace_all(&sql, |caps: &Captures| {
                     let ind: usize = caps[1].to_string().parse().unwrap();
                     let new_index = if let Some(index) = param_index_map.get(&ind) {
-                        index.clone()
+                        *index
                     } else {
                         let index = params_in_sql_order.len();
                         params_in_sql_order.push(params[ind].clone());
                         param_index_map.insert(ind, index);
                         index
                     };
-                    if self.export_annotated_sql {
-                        format!("${}$", new_index)
-                    } else {
-                        match templates.param(new_index) {
-                            Ok(res) => res,
-                            Err(e) => {
-                                if error.is_none() {
-                                    error = Some(e);
-                                }
-                                "$error$".to_string()
-                            }
-                        }
-                    }
+                    placeholder(new_index, &mut error)
                 })
                 .to_string()
         } else {
@@ -85,15 +88,7 @@ impl ParamsAllocator {
                     let ind: usize = caps[1].to_string().parse().unwrap();
                     let index = params_in_sql_order.len();
                     params_in_sql_order.push(params[ind].clone());
-                    match templates.param(index) {
-                        Ok(res) => res,
-                        Err(e) => {
-                            if error.is_none() {
-                                error = Some(e);
-                            }
-                            "$error$".to_string()
-                        }
-                    }
+                    placeholder(index, &mut error)
                 })
                 .to_string()
         };
@@ -139,6 +134,84 @@ impl ParamsAllocator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_fixtures::cube_bridge::{MockDriverTools, MockSqlTemplatesRender};
+    use std::rc::Rc;
+
+    /// Dialect rendering params as positional `?`, i.e. everything but Postgres.
+    fn positional_templates() -> PlanSqlTemplates {
+        let driver_tools = MockDriverTools::with_sql_templates(
+            MockSqlTemplatesRender::default_templates_with_positional_params(),
+        )
+        .without_params_reuse();
+        PlanSqlTemplates::try_new(Rc::new(driver_tools), false).unwrap()
+    }
+
+    fn allocator_with_two_params(export_annotated_sql: bool) -> ParamsAllocator {
+        let mut allocator = ParamsAllocator::new(export_annotated_sql);
+        allocator.allocate_param("alpha");
+        allocator.allocate_param("beta");
+        allocator
+    }
+
+    #[test]
+    fn positional_params_render_one_placeholder_per_param() {
+        let allocator = allocator_with_two_params(false);
+
+        let (sql, params) = allocator
+            .build_sql_and_params(
+                "SELECT $_0_$, $_0_$, $_1_$",
+                vec![],
+                false,
+                &positional_templates(),
+            )
+            .unwrap();
+
+        assert_eq!(sql, "SELECT ?, ?, ?");
+        assert_eq!(
+            params,
+            vec![
+                FilterValue::Str("alpha".to_string()),
+                FilterValue::Str("alpha".to_string()),
+                FilterValue::Str("beta".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn annotated_sql_keeps_placeholders_unrendered_without_reuse() {
+        let allocator = allocator_with_two_params(true);
+
+        // The SQL API asks for annotated SQL so that cubesql can re-allocate the
+        // params itself; the dialect placeholder must not be rendered here.
+        let (sql, params) = allocator
+            .build_sql_and_params(
+                "SELECT $_0_$, $_0_$, $_1_$",
+                vec![],
+                false,
+                &positional_templates(),
+            )
+            .unwrap();
+
+        assert_eq!(sql, "SELECT $0$, $1$, $2$");
+        assert_eq!(params.len(), 3);
+    }
+
+    #[test]
+    fn annotated_sql_keeps_placeholders_unrendered_with_reuse() {
+        let allocator = allocator_with_two_params(true);
+
+        let (sql, params) = allocator
+            .build_sql_and_params(
+                "SELECT $_0_$, $_0_$, $_1_$",
+                vec![],
+                true,
+                &positional_templates(),
+            )
+            .unwrap();
+
+        assert_eq!(sql, "SELECT $0$, $0$, $1$");
+        assert_eq!(params.len(), 2);
+    }
 
     #[test]
     fn allocated_params_enter_channel_as_str() {

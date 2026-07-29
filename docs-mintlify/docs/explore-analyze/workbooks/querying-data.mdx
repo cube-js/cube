@@ -201,6 +201,44 @@ happens, the column header indicator warns you.
 
 </Info>
 
+## Period-over-period comparison
+
+You can compare any measure against a prior period — for example, month over
+month or year over year. Hover over the header of a measure column in the
+results table, expand the context menu, and pick a comparison under
+**Compare periods**. The same menu on a time dimension column header applies
+the comparison to all measures at once.
+
+<Frame>
+  <img src="https://ucarecdn.com/b54e66aa-4435-466e-945e-7df4100774ee/68dc2dc0-light.png" alt="Results table with period comparison columns" />
+</Frame>
+
+The menu is available when the query includes a time dimension with a year,
+quarter, month, week, or day granularity. The presets depend on that
+granularity — a month grain offers **Previous period**, **Same period
+previous quarter**, and **Same period previous year** — so the comparison
+period always aligns exactly with the current buckets. A measure can have
+several comparisons active at once, such as month over month and year over
+year side by side.
+
+Each comparison adds derived columns next to the measure. Choose which ones
+to show under **Comparison columns** in the same menu:
+
+- **Previous value** (on by default) — the measure's value in the comparison
+  period
+- **Difference** — the absolute change from the comparison period
+- **% change** — the relative change from the comparison period
+
+To remove a single derived column, use **Remove Column** in its header menu;
+removing the last one turns the comparison off. You can also untoggle the
+preset under **Compare periods**.
+
+Comparisons are saved with the report and apply everywhere it appears —
+charts, totals, and [dashboards][ref-dashboards]. Cube fetches the
+comparison values with a companion query whose date filters are shifted back
+by the comparison offset; you can [inspect it](#inspecting-queries) to check
+the math.
+
 ## Inspecting queries
 
 Every query in the Semantic Query tab can be inspected as code. Open the SQL panel via the **SQL** button in the top-right toolbar to see the query that the workbook generates, switch between representations, and copy it for use elsewhere.

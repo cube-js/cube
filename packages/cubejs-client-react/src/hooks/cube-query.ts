@@ -1,21 +1,87 @@
 import { useContext, useEffect, useState, useRef } from 'react';
 import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
+import type {
+  DeeplyReadonly,
+  ProgressResponse,
+  Query,
+  QueryRecordType,
+  ResultSet,
+  UnsubscribeObj,
+} from '@cubejs-client/core';
 
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
+import type {
+  MutexObj,
+  ProgressCallback,
+  ProgressResultWithResponse,
+  ReadonlyQueryInput,
+  UseCubeQueryInternalResult,
+  UseCubeQueryOptions,
+  UseCubeQueryResult,
+} from '../types';
 
-export function useCubeQuery(query, options = {}) {
-  const mutexRef = useRef({});
-  const [currentQuery, setCurrentQuery] = useState(null);
+/**
+ * A React hook for executing Cube.js queries
+ * ```js
+ * import React from 'react';
+ * import { Table } from 'antd';
+ * import { useCubeQuery }  from '@cubejs-client/react';
+ *
+ * export default function App() {
+ *   const { resultSet, isLoading, error, progress } = useCubeQuery({
+ *     measures: ['Orders.count'],
+ *     dimensions: ['Orders.createdAt.month'],
+ *   });
+ *
+ *   if (isLoading) {
+ *     return <div>{progress?.stage || 'Loading...'}</div>;
+ *   }
+ *
+ *   if (error) {
+ *     return <div>{error.toString()}</div>;
+ *   }
+ *
+ *   if (!resultSet) {
+ *     return null;
+ *   }
+ *
+ *   const dataSource = resultSet.tablePivot();
+ *   const columns = resultSet.tableColumns();
+ *
+ *   return <Table columns={columns} dataSource={dataSource} />;
+ * }
+ *
+ * ```
+ * @order 1
+ * @stickyTypes
+ */
+export function useCubeQuery<
+  Data,
+  QueryInput extends ReadonlyQueryInput = ReadonlyQueryInput
+>(
+  query: QueryInput,
+  options?: UseCubeQueryOptions
+): UseCubeQueryResult<QueryInput, unknown extends Data ? QueryRecordType<QueryInput> : Data>;
+
+export function useCubeQuery(
+  query: ReadonlyQueryInput,
+  options: UseCubeQueryOptions = {}
+): UseCubeQueryInternalResult {
+  const mutexRef = useRef<MutexObj>({});
+  const [currentQuery, setCurrentQuery] = useState<ReadonlyQueryInput | null>(null);
   const [isLoading, setLoading] = useState(!options.skip);
-  const [resultSet, setResultSet] = useState(null);
-  const [progress, setProgress] = useState(null);
-  const [error, setError] = useState(null);
+  const [resultSet, setResultSet] = useState<ResultSet | null>(null);
+  const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const context = useContext(CubeContext);
 
-  let subscribeRequest = null;
+  let subscribeRequest: UnsubscribeObj | null = null;
 
-  const progressCallback = ({ progressResponse }) => setProgress(progressResponse);
+  // `progressResponse` is not part of the public `ProgressResult` API
+  const progressCallback: ProgressCallback = (progressResult) => setProgress(
+    (progressResult as unknown as ProgressResultWithResponse).progressResponse
+  );
 
   async function fetch() {
     const { resetResultSetOnChange } = options;
@@ -43,8 +109,8 @@ export function useCubeQuery(query, options = {}) {
 
       setResultSet(response);
       setProgress(null);
-    } catch (error) {
-      setError(error);
+    } catch (loadError) {
+      setError(loadError as Error);
       setResultSet(null);
       setProgress(null);
     }
@@ -63,7 +129,11 @@ export function useCubeQuery(query, options = {}) {
 
     async function loadQuery() {
       if (!skip && isQueryPresent(query)) {
-        if (!areQueriesEqual(currentQuery, query)) {
+        // `areQueriesEqual` is declared for a single query, and reads no more
+        // than `order` off one when given an array of queries
+        const previousQuery = currentQuery as DeeplyReadonly<Query> | null;
+
+        if (!areQueriesEqual(previousQuery, query as DeeplyReadonly<Query>)) {
           if (resetResultSetOnChange == null || resetResultSetOnChange) {
             setResultSet(null);
           }
@@ -102,7 +172,7 @@ export function useCubeQuery(query, options = {}) {
             await fetch();
           }
         } catch (e) {
-          setError(e);
+          setError(e as Error);
           setResultSet(null);
           setLoading(false);
           setProgress(null);
@@ -118,7 +188,13 @@ export function useCubeQuery(query, options = {}) {
         subscribeRequest = null;
       }
     };
-  }, useDeepCompareMemoize([query, Object.keys((query && query.order) || {}), options, context]));
+    // `order` is read off a single query; an array of queries does not carry it
+  }, useDeepCompareMemoize([
+    query,
+    Object.keys((query as DeeplyReadonly<Query> | undefined)?.order || {}),
+    options,
+    context,
+  ]));
 
   return {
     isLoading,

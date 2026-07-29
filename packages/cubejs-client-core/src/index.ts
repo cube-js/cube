@@ -111,6 +111,16 @@ export type DryRunResponse = {
   transformedQueries: TransformedQuery[];
 };
 
+export type MetaMethodOptions = LoadMethodOptions & {
+  /**
+   * Request views only — the response's `cubes` array then contains only entries
+   * whose `type` is `view`. Over HTTP, servers predating the flag ignore it and
+   * return the full model, so callers should not assume the response is filtered;
+   * over `WebSocketTransport` such servers reject the message with a 400.
+   */
+  onlyViews?: boolean;
+};
+
 export type CubeSqlOptions = LoadMethodOptions & {
   /**
    * Query timeout in milliseconds
@@ -702,18 +712,31 @@ class CubeApi {
     );
   }
 
-  public meta(options?: LoadMethodOptions): Promise<Meta>;
+  public meta(options?: MetaMethodOptions): Promise<Meta>;
 
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
 
   /**
    * Get meta description of cubes available for querying.
+   *
+   * Pass `onlyViews: true` to request views only — the response's `cubes` array
+   * then contains only entries whose `type` is `view`.
+   *
+   * ```js
+   * const meta = await cubeApi.meta({ onlyViews: true });
+   * ```
+   *
+   * Compatibility note: over HTTP, servers predating the flag ignore it and return
+   * the full model, so callers should not assume the response is filtered. Over
+   * `WebSocketTransport` such servers reject the message with a 400 instead, since
+   * they validate `meta` params strictly.
    */
-  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
+  public meta(options?: MetaMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal,
         baseRequestId: options?.baseRequestId,
+        ...(options?.onlyViews ? { onlyViews: true } : {}),
       }),
       (body: MetaResponse) => new Meta(body),
       options,
@@ -817,7 +840,13 @@ class CubeApi {
             }
 
             if (parsed.data) {
-              rows.push(...parsed.data);
+              // Append rows one at a time instead of spreading the whole chunk as
+              // call arguments (`rows.push(...parsed.data)`). A large single-chunk
+              // result (e.g. 130k+ rows) otherwise exceeds V8's argument-count
+              // limit and throws "RangeError: Maximum call stack size exceeded".
+              for (let i = 0; i < parsed.data.length; i++) {
+                rows.push(parsed.data[i]);
+              }
             }
           }
         }

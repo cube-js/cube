@@ -225,6 +225,7 @@ export const driverToolsFixture = (): unknown => ({
   dateTimeCast: () => 'dt',
   inDbTimeZone: () => 'tz',
   getAllocatedParams: () => [],
+  shouldReuseParams: false,
   subtractInterval: () => 'd',
   addInterval: () => 'd',
   intervalString: () => 's',
