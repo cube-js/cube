@@ -470,7 +470,6 @@ impl MultiStageMemberQueryPlanner {
                 )?;
             }
         }
-
         let cte_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .measures(measures)

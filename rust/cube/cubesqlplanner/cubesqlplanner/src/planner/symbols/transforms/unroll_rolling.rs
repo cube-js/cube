@@ -37,7 +37,7 @@ pub fn unroll_rolling(measure: &MeasureSymbol) -> Rc<MeasureSymbol> {
         measure_filters: measure.measure_filters.clone(),
         measure_drill_filters: measure.measure_drill_filters.clone(),
         measure_order_by: measure.measure_order_by.clone(),
-        is_splitted_source: measure.is_splitted_source,
         mask_sql: measure.mask_sql.clone(),
+        render_modifier: measure.render_modifier,
     })
 }

@@ -8,6 +8,7 @@ use crate::physical_plan::{
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::MeasureRenderModifier;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -107,6 +108,16 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         // are already timezone-converted and truncated, so they must render
         // without the conversion.
         let schema = transforms::ignore_timezone_in_schema(&rolling_window.schema)?;
+        // An ungrouped rolling select emits row-level values: count-like
+        // measures render a not-null indicator over the input column.
+        let schema = if rolling_window.is_ungrouped {
+            transforms::measures_render_modifier_in_schema(
+                &schema,
+                MeasureRenderModifier::UngroupedQueryValue,
+            )?
+        } else {
+            schema
+        };
 
         for dim in schema.time_dimensions.iter() {
             let alias = references_builder
@@ -151,8 +162,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
                 self.builder
                     .make_order_by(&schema, &rolling_window.order_by)?,
             );
-        } else {
-            context_factory.set_ungrouped(true);
         }
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));

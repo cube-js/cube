@@ -9,7 +9,7 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
-use crate::planner::MemberSymbol;
+use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -159,12 +159,28 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             QuerySource::FullKeyAggregate(_) => {}
         }
 
+        // An ungrouped select emits row-level measure values: raw ones
+        // under a measure-rendering context (multi-stage leaves), a
+        // not-null indicator form for count-likes otherwise.
+        let measure_modifier = if context.render_measure_for_ungrouped {
+            Some(MeasureRenderModifier::Ungrouped)
+        } else if logical_plan.modifers().ungrouped {
+            Some(MeasureRenderModifier::UngroupedQueryValue)
+        } else {
+            None
+        };
+        if let Some(modifier) = measure_modifier {
+            schema = logical_transforms::measures_render_modifier_in_schema(&schema, modifier)?;
+            having = transforms::map_filter_symbols(having, &|symbol| {
+                transforms::measures_render_modifier(symbol, modifier)
+            })?;
+        }
+
         let is_pre_aggregation = matches!(logical_plan.source(), QuerySource::PreAggregation(_));
 
         let references_builder = ReferencesBuilder::new(from.clone());
 
         let mut select_builder = SelectBuilder::new(from);
-        context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
 
         if !logical_plan.modifers().ungrouped {
             context_factory.set_group_by_members(
@@ -227,9 +243,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 context_factory.add_render_reference(name, value);
             }
         }
-        if logical_plan.modifers().ungrouped {
-            context_factory.set_ungrouped(true);
-        }
 
         // When reading from a pre-aggregation, drop ORDER BY keys on measures that
         // are not part of the selection. CubeStore cannot ORDER BY an aggregate of a
@@ -247,6 +260,19 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .collect()
         } else {
             logical_plan.modifers().order_by.clone()
+        };
+        let order_by = if let Some(modifier) = measure_modifier {
+            order_by
+                .iter()
+                .map(|o| -> Result<_, CubeError> {
+                    Ok(OrderByItem::new(
+                        transforms::measures_render_modifier(&o.member_symbol(), modifier)?,
+                        o.desc(),
+                    ))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            order_by
         };
         select_builder.set_order_by(self.builder.make_order_by(&schema, &order_by)?);
 

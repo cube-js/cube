@@ -48,7 +48,6 @@ impl PushDownBuilderContext {
 
         factory.set_time_shifts(common_time_shifts);
         factory.set_calendar_time_shifts(calendar_time_shifts);
-        factory.set_ungrouped_measure(self.render_measure_for_ungrouped);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
         Ok(factory)
     }

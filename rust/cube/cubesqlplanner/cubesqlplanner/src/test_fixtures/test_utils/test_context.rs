@@ -381,7 +381,6 @@ impl TestContext {
         group_by_members: Vec<String>,
     ) -> Result<String, CubeError> {
         let mut nodes_factory = SqlNodesFactory::default();
-        nodes_factory.set_ungrouped(false);
         nodes_factory.set_group_by_members(group_by_members.into_iter().collect());
         let cube_ref_evaluator = Rc::new(nodes_factory.cube_ref_evaluator());
         let visitor = SqlEvaluatorVisitor::new(

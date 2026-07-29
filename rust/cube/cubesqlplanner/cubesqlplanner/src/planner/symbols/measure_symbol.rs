@@ -81,6 +81,19 @@ pub enum MeasureTimeShifts {
     Named(String),
 }
 
+/// Render-time modifier of how the measure's value is emitted in its
+/// select. `None` on the symbol means the usual final aggregation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MeasureRenderModifier {
+    /// Raw row-level value without the aggregation wrap (measure
+    /// subqueries, ungrouped multi-stage leaves).
+    Ungrouped,
+    /// Row-level value in an ungrouped query: count-like measures
+    /// render a not-null indicator so an outer count can sum each
+    /// row's contribution.
+    UngroupedQueryValue,
+}
+
 /// `MemberSymbol::Measure` body: Tesseract representation of a
 /// `measure` declared in the data model — an aggregation, count or
 /// calculated value the query exposes.
@@ -96,8 +109,8 @@ pub struct MeasureSymbol {
     pub(super) measure_filters: Vec<Rc<SqlCall>>,
     pub(super) measure_drill_filters: Vec<Rc<SqlCall>>,
     pub(super) measure_order_by: Vec<MeasureOrderBy>,
-    pub(super) is_splitted_source: bool,
     pub(super) mask_sql: Option<Rc<SqlCall>>,
+    pub(super) render_modifier: Option<MeasureRenderModifier>,
 }
 
 symbol_deps! {
@@ -113,7 +126,7 @@ symbol_deps! {
         multi_stage: skip,
         is_reference: skip,
         is_view: skip,
-        is_splitted_source: skip,
+        render_modifier: skip,
     }
 }
 
@@ -142,13 +155,17 @@ impl MeasureSymbol {
             measure_drill_filters,
             measure_order_by,
             multi_stage,
-            is_splitted_source: false,
             mask_sql,
+            render_modifier: None,
         })
     }
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
+    }
+
+    pub fn render_modifier(&self) -> Option<MeasureRenderModifier> {
+        self.render_modifier
     }
 
     /// Full unique identifier of the symbol: cube path, member name
@@ -161,10 +178,6 @@ impl MeasureSymbol {
     /// path.
     pub fn alias(&self) -> String {
         self.compiled_path.alias().clone()
-    }
-
-    pub fn is_splitted_source(&self) -> bool {
-        self.is_splitted_source
     }
 
     pub fn time_shift(&self) -> Option<&MeasureTimeShifts> {
