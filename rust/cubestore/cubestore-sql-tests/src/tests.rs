@@ -5770,6 +5770,37 @@ LIMIT
     Ok(())
 }
 
+/// Fails unless the physical plan for `query` mentions `expected`. Result assertions alone cannot
+/// tell an optimized plan from the fallback it degrades to, so shapes whose whole point is that a
+/// rewrite fires need to say so explicitly.
+async fn assert_plan_contains(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected: &str,
+) -> Result<(), CubeError> {
+    let res = service
+        .exec_query(&format!("EXPLAIN ANALYZE {}", query))
+        .await?;
+    let plans = res
+        .get_rows()
+        .iter()
+        .flat_map(|r| r.values().iter())
+        .filter_map(|v| match v {
+            TableValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if !plans.iter().any(|p| p.contains(expected)) {
+        return Err(CubeError::internal(format!(
+            "`{}` not found in the plan for {}:\n{}",
+            expected,
+            query,
+            plans.join("\n")
+        )));
+    }
+    Ok(())
+}
+
 async fn rolling_window_unused_partition_by(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA s").await?;
     service
@@ -5819,10 +5850,11 @@ ORDER BY 1 ASC, 2 ASC"
     ]);
 
     // A calc-group style constant: the source column is not nullable, but the empty bucket at day 7
-    // still has to report a null key for it.
-    let r = service
-        .exec_query(&query("'R12'", "`b`.`win` `win`,", "`q`.`day`, `q`.`num`"))
-        .await?;
+    // still has to report a null key for it. The rewrite has to restore the projection's output on
+    // top of the rolling node here, since `win` is grouped by but not selected.
+    let pruned = query("'R12'", "`b`.`win` `win`,", "`q`.`day`, `q`.`num`");
+    assert_plan_contains(&service, &pruned, "RollingWindowAgg").await?;
+    let r = service.exec_query(&pruned).await?;
     assert_eq!(to_rows(&r), without_partition);
 
     // Same, but the projection omits the partition-by column outright instead of leaving it to
@@ -5834,13 +5866,13 @@ ORDER BY 1 ASC, 2 ASC"
 
     // Several partitions, all of them asked for: the rewrite outputs exactly what the projection
     // did, so nothing has to be restored on top of it.
-    let r = service
-        .exec_query(&query(
-            "name",
-            "`b`.`win` `win`,",
-            "`q`.`day`, `q`.`win`, `q`.`num`",
-        ))
-        .await?;
+    let selected = query(
+        "name",
+        "`b`.`win` `win`,",
+        "`q`.`day`, `q`.`win`, `q`.`num`",
+    );
+    assert_plan_contains(&service, &selected, "RollingWindowAgg").await?;
+    let r = service.exec_query(&selected).await?;
     assert_eq!(
         to_rows(&r),
         rows(&[

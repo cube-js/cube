@@ -92,37 +92,28 @@ impl RollingOptimizerRule {
                     from,
                     to,
                     every,
-                    rolling_aggs_alias: {
-                        let aliases = expr
-                            .iter()
-                            .flat_map(|e| match e {
+                    // The schema pairs these names with `rolling_aggs` positionally, so resolve each
+                    // one from the aggregate it belongs to rather than from the order the
+                    // projection happens to list them in. An aggregate the projection does not
+                    // read under its own name has no name to output, so decline the rewrite
+                    // instead of building a node that cannot describe its own output.
+                    rolling_aggs_alias: rolling_aggs
+                        .iter()
+                        .map(|agg| {
+                            let agg_name = agg.schema_name().to_string();
+                            expr.iter().find_map(|e| match e {
                                 Expr::Alias(Alias {
                                     expr,
                                     relation: _,
                                     name,
                                 }) => match expr.as_ref() {
-                                    Expr::Column(col)
-                                        if &col.name != &from_col.name
-                                            && &col.name != &to_col.name
-                                            && !partition_by
-                                                .iter()
-                                                .any(|p| &p.name == &col.name) =>
-                                    {
-                                        Some(name.clone())
-                                    }
+                                    Expr::Column(col) if col.name == agg_name => Some(name.clone()),
                                     _ => None,
                                 },
                                 _ => None,
                             })
-                            .collect::<Vec<_>>();
-                        // The schema pairs aggregates with these names positionally and a short
-                        // list silently drops the trailing aggregates from the output. Leave such
-                        // a projection alone instead of building a node that cannot describe it.
-                        if aliases.len() < rolling_aggs.len() {
-                            return None;
-                        }
-                        aliases
-                    },
+                        })
+                        .collect::<Option<Vec<_>>>()?,
                     partition_by,
                     rolling_aggs,
                     group_by_dimension,

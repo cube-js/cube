@@ -186,6 +186,13 @@ impl RollingWindowAggregate {
         // The keys inherit their nullability from the input columns, which are often non-nullable
         // (a calc-group dimension stored as a literal, say), so relax them or building the output
         // batch fails on "declared as non-nullable but contains null values".
+        //
+        // The range below addresses the partition keys by position, so pin the layout the chain
+        // above produces: the dimension, then one field per partition key, then the aggregates.
+        debug_assert_eq!(
+            fields.len(),
+            1 + partition_by.len() + rolling_aggs.len().min(rolling_aggs_alias.len())
+        );
         let partition_by_range = 1..1 + partition_by.len();
         let fields = fields
             .into_iter()
