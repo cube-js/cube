@@ -84,7 +84,7 @@ Common rules apply to names of entities within the data model. All names must:
 - Start with a letter.
 - Consist of letters, numbers, and underscore (`_`) symbols only.
 - Not be a [reserved keyword in Python][link-python-reserved-words], e.g., `from`, `return`, or `yield`.
-- When using the DAX API, not clash with the names of columns in [date hierarchies][ref-dax-api-date-hierarchies].
+- When using the DAX API, not clash with the names of columns in date hierarchies.
 - Be unique within their scope. Cube and view names must be unique across the data
   model; members (measures, dimensions, segments, pre-aggregations, hierarchies) must
   be unique within their cube; and folder names must be unique within their view. Cube
@@ -1014,7 +1014,6 @@ string values in time dimensions.
 [ref-data-blending]: /docs/data-modeling/concepts/data-blending
 [link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
 [link-python-reserved-words]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
-[ref-dax-api-date-hierarchies]: /reference/core-data-apis/dax-api#date-hierarchies
 [ref-time-dimension]: /docs/data-modeling/dimensions#time-dimensions
 [ref-recipe-string-time-dimensions]: /recipes/data-modeling/string-time-dimensions
 [ref-view-groups]: /reference/data-modeling/view-group

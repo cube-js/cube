@@ -1,11 +1,12 @@
 ---
 title: DAX API
 description: "Connect Microsoft Power BI to Cube natively using the DAX API for superior feature support over the SQL API."
+hidden: true
 ---
 
  DAX API
 
-The DAX API enables Cube to connect to [Microsoft Power BI][ref-powerbi].
+The DAX API enables Cube to connect to Microsoft Power BI.
 It derives its name from [data analysis expressions][link-dax], a query language
 for Power BI and SQL Server Analysis Services.
 
@@ -49,7 +50,7 @@ in the Cube Cloud sidebar, then **Configuration**, and then toggle the
 ### Date hierarchies
 
 By default, the DAX API exposes all [time dimensions][ref-time-dimensions] as _date
-hierarchies_ in [Power BI][ref-power-bi]. You can set the [`CUBEJS_DAX_CREATE_DATE_HIERARCHIES`](/reference/configuration/environment-variables#cubejs_dax_create_date_hierarchies)
+hierarchies_ in Power BI. You can set the [`CUBEJS_DAX_CREATE_DATE_HIERARCHIES`](/reference/configuration/environment-variables#cubejs_dax_create_date_hierarchies)
 environment variable to `false` to disable this behavior.
 
 Note that each date hierarchy will include additional columns, suffixed by `_year`,
@@ -90,13 +91,11 @@ See [Cross-view filtering][ref-cross-view-filter] for details on how to enable
 and use it.
 
 
-[ref-powerbi]: /admin/connect-to-data/visualization-tools/powerbi
 [ref-cross-view-filter]: /reference/core-data-apis/dax-api/cross-view-filter
 [link-dax]: https://learn.microsoft.com/en-us/dax/
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-ref-dax-api]: /reference/core-data-apis/dax-api/reference
 [ref-views]: /docs/data-modeling/views
 [ref-time-dimensions]: /docs/data-modeling/dimensions#time-dimensions
-[ref-kerberos]: /docs/integrations/power-bi/kerberos
-[ref-ntlm]: /docs/integrations/power-bi/ntlm
-[ref-power-bi]: /admin/connect-to-data/visualization-tools/powerbi
+[ref-kerberos]: /reference/core-data-apis/dax-api/kerberos
+[ref-ntlm]: /reference/core-data-apis/dax-api/ntlm
