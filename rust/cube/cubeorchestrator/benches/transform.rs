@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use cubeorchestrator::direct_result::DirectData;
 use cubeorchestrator::query_message_parser::QueryResult;
-use cubeorchestrator::query_result_transform::TransformedData;
+use cubeorchestrator::query_result_transform::{RequestResultData, TransformedData};
 use cubeorchestrator::transport::{
     ConfigItem, MemberOrMemberExpression, NormalizedQuery, QueryType, ResultType,
     TransformDataRequest,
@@ -12,7 +13,8 @@ use cubeorchestrator::transport::{
 #[path = "common/mod.rs"]
 mod common;
 use common::{
-    build_dataset, make_member_aliases, split_dim_measure, TimeColumn, COLUMN_COUNTS, ROW_COUNTS,
+    build_arrow_query_result, build_dataset, make_member_aliases, split_dim_measure, TimeColumn,
+    COLUMN_COUNTS, ROW_COUNTS,
 };
 
 /// Total columns and row count used by `bench_transform_time_scenarios`.
@@ -152,32 +154,43 @@ fn bench_transform(c: &mut Criterion) {
         let measures = make_member_aliases("measure", measure_count);
 
         for &row_count in ROW_COUNTS {
-            let raw = QueryResult::from_js_raw_data(build_dataset(
-                row_count,
-                &dimensions,
-                &measures,
-                &[],
-            ))
-            .expect("from_js_raw_data");
+            let sources = [
+                (
+                    "js_raw",
+                    QueryResult::from_js_raw_data(build_dataset(
+                        row_count,
+                        &dimensions,
+                        &measures,
+                        &[],
+                    ))
+                    .expect("from_js_raw_data"),
+                ),
+                (
+                    "arrow",
+                    build_arrow_query_result(row_count, &dimensions, &measures, &[]),
+                ),
+            ];
 
             // Throughput in cells/sec so numbers are comparable across widths.
             group.throughput(Throughput::Elements((row_count * col_count) as u64));
 
-            for (label, res_type) in [
-                ("compact", Some(ResultType::Compact)),
-                ("columnar", Some(ResultType::Columnar)),
-                ("vanilla", None),
-            ] {
-                let request = build_request(res_type, &dimensions, &measures, &[]);
-                let id_param = format!("c{:02}_r{}", col_count, row_count);
-                group.bench_with_input(BenchmarkId::new(label, id_param), &(), |b, _| {
-                    b.iter(|| {
-                        let result =
-                            TransformedData::transform(black_box(&request), black_box(&raw))
-                                .expect("transform");
-                        black_box(result);
+            for (source, raw) in &sources {
+                for (label, res_type) in [
+                    ("compact", Some(ResultType::Compact)),
+                    ("columnar", Some(ResultType::Columnar)),
+                    ("vanilla", None),
+                ] {
+                    let request = build_request(res_type, &dimensions, &measures, &[]);
+                    let id_param = format!("{}/c{:02}_r{}", source, col_count, row_count);
+                    group.bench_with_input(BenchmarkId::new(label, id_param), &(), |b, _| {
+                        b.iter(|| {
+                            let result =
+                                TransformedData::transform(black_box(&request), black_box(raw))
+                                    .expect("transform");
+                            black_box(result);
+                        });
                     });
-                });
+                }
             }
         }
     }
@@ -202,13 +215,22 @@ fn bench_transform_time_scenarios(c: &mut Criterion) {
         let dimensions = make_member_aliases("dim", dim_count);
         let measures = make_member_aliases("measure", measure_count);
 
-        let raw = QueryResult::from_js_raw_data(build_dataset(
-            SCENARIO_ROW_COUNT,
-            &dimensions,
-            &measures,
-            &time_dims,
-        ))
-        .expect("from_js_raw_data");
+        let sources = [
+            (
+                "js_raw",
+                QueryResult::from_js_raw_data(build_dataset(
+                    SCENARIO_ROW_COUNT,
+                    &dimensions,
+                    &measures,
+                    &time_dims,
+                ))
+                .expect("from_js_raw_data"),
+            ),
+            (
+                "arrow",
+                build_arrow_query_result(SCENARIO_ROW_COUNT, &dimensions, &measures, &time_dims),
+            ),
+        ];
 
         // Throughput in cells/sec; total cells = row_count * total_cols, where
         // total_cols == SCENARIO_COL_COUNT regardless of scenario.
@@ -216,30 +238,141 @@ fn bench_transform_time_scenarios(c: &mut Criterion) {
             (SCENARIO_ROW_COUNT * SCENARIO_COL_COUNT) as u64,
         ));
 
-        for (label, res_type) in [
-            ("compact", Some(ResultType::Compact)),
-            ("columnar", Some(ResultType::Columnar)),
-            ("vanilla", None),
-        ] {
-            let request = build_request(res_type, &dimensions, &measures, &time_dims);
-            let id_param = format!(
-                "{}/c{:02}_r{}",
-                scenario.label(),
-                SCENARIO_COL_COUNT,
-                SCENARIO_ROW_COUNT
-            );
-            group.bench_with_input(BenchmarkId::new(label, id_param), &(), |b, _| {
-                b.iter(|| {
-                    let result = TransformedData::transform(black_box(&request), black_box(&raw))
-                        .expect("transform");
-                    black_box(result);
+        for (source, raw) in &sources {
+            for (label, res_type) in [
+                ("compact", Some(ResultType::Compact)),
+                ("columnar", Some(ResultType::Columnar)),
+                ("vanilla", None),
+            ] {
+                let request = build_request(res_type, &dimensions, &measures, &time_dims);
+                let id_param = format!(
+                    "{}/{}/c{:02}_r{}",
+                    source,
+                    scenario.label(),
+                    SCENARIO_COL_COUNT,
+                    SCENARIO_ROW_COUNT
+                );
+                group.bench_with_input(BenchmarkId::new(label, id_param), &(), |b, _| {
+                    b.iter(|| {
+                        let result =
+                            TransformedData::transform(black_box(&request), black_box(raw))
+                                .expect("transform");
+                        black_box(result);
+                    });
                 });
-            });
+            }
         }
     }
 
     group.finish();
 }
 
-criterion_group!(benches, bench_transform, bench_transform_time_scenarios);
+/// The whole job the `getFinalQueryResult` bridge does: turn a source result
+/// into the response JSON. `materialized` builds a `TransformedData` first,
+/// `direct` renders the `data` member while serializing.
+fn bench_final_json(c: &mut Criterion) {
+    let mut group = c.benchmark_group("final_json");
+
+    let col_count = 16usize;
+    let (dim_count, measure_count) = split_dim_measure(col_count);
+    let dimensions = make_member_aliases("dim", dim_count);
+    let measures = make_member_aliases("measure", measure_count);
+
+    for &row_count in &[10_000usize, 100_000] {
+        let sources = [
+            (
+                "js_raw",
+                QueryResult::from_js_raw_data(build_dataset(
+                    row_count,
+                    &dimensions,
+                    &measures,
+                    &[],
+                ))
+                .expect("from_js_raw_data"),
+            ),
+            (
+                "arrow",
+                build_arrow_query_result(row_count, &dimensions, &measures, &[]),
+            ),
+        ];
+
+        group.throughput(Throughput::Elements((row_count * col_count) as u64));
+
+        for (source, raw) in &sources {
+            for (label, res_type) in [
+                ("compact", Some(ResultType::Compact)),
+                ("columnar", Some(ResultType::Columnar)),
+                ("vanilla", None),
+            ] {
+                let request = build_request(res_type, &dimensions, &measures, &[]);
+                let head = result_head();
+                let id_param = format!("{}/{}/c{:02}_r{}", label, source, col_count, row_count);
+
+                group.bench_with_input(BenchmarkId::new("materialized", &id_param), &(), |b, _| {
+                    b.iter(|| {
+                        let mut result = head.clone();
+                        result
+                            .prepare_results(black_box(&request), black_box(raw))
+                            .expect("prepare_results");
+                        black_box(serde_json::to_string(&result).expect("to_string"));
+                    });
+                });
+
+                group.bench_with_input(BenchmarkId::new("direct", &id_param), &(), |b, _| {
+                    b.iter(|| {
+                        let result = head
+                            .clone()
+                            .with_data(DirectData::new(black_box(&request), black_box(raw)));
+                        black_box(serde_json::to_string(&result).expect("to_string"));
+                    });
+                });
+            }
+        }
+    }
+
+    group.finish();
+}
+
+/// Response envelope the neon bridge deserializes from JS, with `data` still empty.
+fn result_head() -> RequestResultData {
+    RequestResultData {
+        query: NormalizedQuery {
+            measures: None,
+            dimensions: None,
+            time_dimensions: None,
+            segments: None,
+            limit: None,
+            offset: None,
+            total: None,
+            total_query: None,
+            timezone: Some("UTC".to_string()),
+            ungrouped: None,
+            response_format: None,
+            filters: None,
+            row_limit: None,
+            order: None,
+            query_type: Some(QueryType::RegularQuery),
+        },
+        last_refresh_time: None,
+        refresh_key_values: None,
+        used_pre_aggregations: None,
+        transformed_query: None,
+        request_id: Some("bench".to_string()),
+        annotation: HashMap::new(),
+        data_source: Some("default".to_string()),
+        db_type: Some("postgres".to_string()),
+        ext_db_type: None,
+        external: Some(false),
+        slow_query: false,
+        total: None,
+        data: None,
+    }
+}
+
+criterion_group!(
+    benches,
+    bench_transform,
+    bench_transform_time_scenarios,
+    bench_final_json
+);
 criterion_main!(benches);

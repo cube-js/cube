@@ -1,7 +1,13 @@
 #![allow(dead_code)]
 
+use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{ColumnarArray, DBResponsePrimitive};
 use cubeorchestrator::transport::JsRawColumnarData;
+use cubeshared::codegen::{
+    HttpCommand, HttpMessage, HttpMessageArgs, HttpQueryResult, HttpQueryResultArgs,
+    HttpQueryResultArrow, HttpQueryResultArrowArgs, HttpQueryResultData,
+};
+use cubeshared::flatbuffers::FlatBufferBuilder;
 
 pub const ROW_COUNTS: &[usize] = &[1_000, 10_000, 50_000, 100_000];
 pub const COLUMN_COUNTS: &[usize] = &[8, 16, 32, 64];
@@ -136,4 +142,56 @@ pub fn build_arrow_ipc(
         writer.finish().expect("finish arrow stream");
     }
     buf
+}
+
+/// Wrap raw Arrow IPC bytes in an `HttpMessage` FlatBuffer carrying
+/// `HttpQueryResultArrow`, exactly as CubeStore sends it.
+pub fn build_cubestore_fb_arrow_message(arrow_ipc: &[u8]) -> Vec<u8> {
+    let mut builder = FlatBufferBuilder::new();
+    let data_vec = builder.create_vector(arrow_ipc);
+    let arrow = HttpQueryResultArrow::create(
+        &mut builder,
+        &HttpQueryResultArrowArgs {
+            data: Some(data_vec),
+            is_last: true,
+        },
+    );
+    let query_result = HttpQueryResult::create(
+        &mut builder,
+        &HttpQueryResultArgs {
+            data_type: HttpQueryResultData::HttpQueryResultArrow,
+            data: Some(arrow.as_union_value()),
+        },
+    );
+    let connection_id = builder.create_string("bench_connection");
+    let message = HttpMessage::create(
+        &mut builder,
+        &HttpMessageArgs {
+            message_id: 1,
+            command_type: HttpCommand::HttpQueryResult,
+            command: Some(query_result.as_union_value()),
+            connection_id: Some(connection_id),
+        },
+    );
+    builder.finish(message, None);
+    builder.finished_data().to_vec()
+}
+
+/// An Arrow-backed `QueryResult` with the same logical shape as
+/// [`build_dataset`], so transform throughput can be compared column storage
+/// against column storage.
+///
+/// Note the time dimensions differ in kind, not just encoding: the Arrow fixture
+/// carries `Timestamp(Millisecond)` cells, which the `time` member type passes
+/// straight through, while [`build_dataset`] carries ISO strings that
+/// `transform_value` re-parses and re-formats per cell.
+pub fn build_arrow_query_result(
+    row_count: usize,
+    dimensions: &[(String, String)],
+    measures: &[(String, String)],
+    time_dims: &[TimeColumn],
+) -> QueryResult {
+    let ipc = build_arrow_ipc(row_count, dimensions, measures, time_dims);
+    let payload = build_cubestore_fb_arrow_message(&ipc);
+    QueryResult::from_cubestore_fb(&payload).expect("arrow query result")
 }

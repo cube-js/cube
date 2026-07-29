@@ -4,17 +4,16 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::transport::JsRawColumnarData;
 use cubeshared::codegen::{
-    HttpColumnValue, HttpColumnValueArgs, HttpCommand, HttpMessage, HttpMessageArgs,
-    HttpQueryResult, HttpQueryResultArgs, HttpQueryResultArrow, HttpQueryResultArrowArgs,
-    HttpQueryResultData, HttpResultSet, HttpResultSetArgs, HttpRow, HttpRowArgs,
+    HttpColumnValue, HttpColumnValueArgs, HttpCommand, HttpMessage, HttpMessageArgs, HttpResultSet,
+    HttpResultSetArgs, HttpRow, HttpRowArgs,
 };
 use cubeshared::flatbuffers::FlatBufferBuilder;
 
 #[path = "common/mod.rs"]
 mod common;
 use common::{
-    build_arrow_ipc, build_dataset, make_member_aliases, split_dim_measure, COLUMN_COUNTS,
-    ROW_COUNTS,
+    build_arrow_ipc, build_cubestore_fb_arrow_message, build_dataset, make_member_aliases,
+    split_dim_measure, COLUMN_COUNTS, ROW_COUNTS,
 };
 
 /// Build a FlatBuffer `HttpMessage` payload mirroring CubeStore's wire format
@@ -153,38 +152,6 @@ fn bench_from_js_raw_data(c: &mut Criterion) {
     group.finish();
 }
 
-/// Wrap raw Arrow IPC bytes in an `HttpMessage` FlatBuffer carrying
-fn build_cubestore_fb_arrow_message(arrow_ipc: &[u8]) -> Vec<u8> {
-    let mut builder = FlatBufferBuilder::new();
-    let data_vec = builder.create_vector(arrow_ipc);
-    let arrow = HttpQueryResultArrow::create(
-        &mut builder,
-        &HttpQueryResultArrowArgs {
-            data: Some(data_vec),
-            is_last: true,
-        },
-    );
-    let query_result = HttpQueryResult::create(
-        &mut builder,
-        &HttpQueryResultArgs {
-            data_type: HttpQueryResultData::HttpQueryResultArrow,
-            data: Some(arrow.as_union_value()),
-        },
-    );
-    let connection_id = builder.create_string("bench_connection");
-    let message = HttpMessage::create(
-        &mut builder,
-        &HttpMessageArgs {
-            message_id: 1,
-            command_type: HttpCommand::HttpQueryResult,
-            command: Some(query_result.as_union_value()),
-            connection_id: Some(connection_id),
-        },
-    );
-    builder.finish(message, None);
-    builder.finished_data().to_vec()
-}
-
 fn bench_from_cubestore_fb_arrow(c: &mut Criterion) {
     let mut group = c.benchmark_group("QueryResult::from_cubestore_fb_arrow");
 
@@ -214,8 +181,10 @@ fn bench_from_cubestore_fb_arrow(c: &mut Criterion) {
         group.throughput(Throughput::Elements((row_count * col_count) as u64));
 
         let id = format!("c{:02}_r{}", col_count, row_count);
-        // Arrow IPC parse always materializes the QueryResult, so this measures
-        // the equivalent of from_js_raw_data's `parse_plus_build`.
+        // Arrow columns are kept in Arrow memory, so this measures the IPC decode
+        // and the column wiring — not a per-cell conversion. The conversion cost
+        // moved to `TransformedData::transform`; see the `arrow` axis in
+        // benches/transform.rs.
         group.bench_with_input(BenchmarkId::from_parameter(id), &(), |b, _| {
             b.iter(|| {
                 let built = QueryResult::from_cubestore_fb(black_box(&payload))

@@ -1,5 +1,6 @@
 use crate::{
     query_message_parser::QueryResult,
+    query_result_column::ColumnReader,
     transport::{
         AnnotatedConfigItem, ConfigItem, MemberOrMemberExpression, MembersMap, NormalizedQuery,
         QueryTimeDimension, QueryType, ResultType, TransformDataRequest,
@@ -172,6 +173,15 @@ pub type VanillaRow = IndexMap<Arc<InternedKey>, DBResponsePrimitive, PrehashedB
 
 pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
     IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
+}
+
+/// True when [`transform_value`] would return `type_`'s values unchanged, so a
+/// caller that already holds the value can skip the call — and the clone it needs.
+/// Keep in step with [`transform_value`] below: it rewrites nothing but `String`
+/// cells of `time` members.
+#[inline]
+pub fn is_identity_transform(type_: &str) -> bool {
+    type_ != "time"
 }
 
 /// Transform specified `value` with specified `type` to the network protocol type.
@@ -452,17 +462,15 @@ pub fn get_members(
 
 /// One output cell in a compact row. Built once per request by
 /// [`build_compact_plan`] so the per-row materializer ([`get_compact_row`])
-/// only does a single bounds check (`column.get(row_idx)`) and the
-/// [`transform_value`] call. The plan borrows the column slice directly,
-/// eliminating the per-cell `db_data.data.get(col).and_then(...)` double
-/// lookup the row-major loop would otherwise do on every cell.
+/// only does a single column read and the [`transform_value`] call. The plan
+/// holds the column's reader directly, eliminating the per-cell
+/// `db_data.data.get(col).and_then(...)` double lookup the row-major loop would
+/// otherwise do on every cell — and, for Arrow-backed columns, the type
+/// dispatch and downcast too.
 pub(crate) enum CompactPlanEntry<'a> {
-    /// Read `column[row_idx]` and run [`transform_value`]. `column` is a slice
-    /// of the corresponding [`ColumnarArray`]; the fat pointer inlines
-    /// `(ptr, len)` so the per-cell access avoids the extra Vec metadata
-    /// indirection.
+    /// Read `column[row_idx]` and run [`transform_value`].
     Cell {
-        column: &'a [DBResponsePrimitive],
+        column: ColumnReader<'a>,
         member_type: &'a str,
     },
     /// Constant value replicated across every row (the
@@ -471,7 +479,7 @@ pub(crate) enum CompactPlanEntry<'a> {
 }
 
 pub struct CompactPlan<'a> {
-    entries: Vec<CompactPlanEntry<'a>>,
+    pub(crate) entries: Vec<CompactPlanEntry<'a>>,
 }
 
 pub(crate) fn build_compact_plan<'a>(
@@ -489,7 +497,7 @@ pub(crate) fn build_compact_plan<'a>(
             if let Some(alias) = members_to_alias_map.get(m) {
                 if let Some(&column_index) = cube_store_result.columns_pos.get(alias) {
                     entries.push(CompactPlanEntry::Cell {
-                        column: cube_store_result.data[column_index].as_slice(),
+                        column: cube_store_result.reader(column_index)?,
                         member_type: annotation_item.member_type.as_deref().unwrap_or(""),
                     });
                 }
@@ -513,7 +521,7 @@ pub(crate) fn build_compact_plan<'a>(
                     let member_type = annotation
                         .get(alias)
                         .map_or("", |a| a.member_type.as_deref().unwrap_or(""));
-                    let column = cube_store_result.data[column_index].as_slice();
+                    let column = cube_store_result.reader(column_index)?;
                     entries.push(CompactPlanEntry::Cell {
                         column,
                         member_type,
@@ -528,8 +536,8 @@ pub(crate) fn build_compact_plan<'a>(
 }
 
 /// Convert DB response row to the compact output. The plan carries the
-/// per-cell column slice directly, so this loop only does one bounds check
-/// (`column.get(row_idx)`) per cell — no `db_data.data.get(col)` indirection.
+/// per-cell column reader directly, so this loop only does one column read per
+/// cell — no `db_data.data.get(col)` indirection.
 pub fn get_compact_row(plan: &CompactPlan<'_>, row_idx: usize) -> Vec<DBResponsePrimitive> {
     let mut row: Vec<DBResponsePrimitive> = Vec::with_capacity(plan.entries.len());
 
@@ -539,7 +547,7 @@ pub fn get_compact_row(plan: &CompactPlan<'_>, row_idx: usize) -> Vec<DBResponse
                 column,
                 member_type,
             } => {
-                row.push(transform_value(column[row_idx].clone(), member_type));
+                row.push(transform_value(column.value(row_idx), member_type));
             }
             CompactPlanEntry::Constant(v) => {
                 row.push(v.clone());
@@ -552,14 +560,13 @@ pub fn get_compact_row(plan: &CompactPlan<'_>, row_idx: usize) -> Vec<DBResponse
 
 /// Per-column information that is constant across all rows for a given request.
 /// Built once and walked per row to avoid redoing hash lookups, annotation checks,
-/// and member-name parsing for every cell. Holds the column slice directly so
-/// the per-row materializer does one bounds check per cell instead of the
+/// and member-name parsing for every cell. Holds the column's reader directly so
+/// the per-row materializer does one column read per cell instead of the
 /// `db_data.data.get(col).and_then(...)` double lookup.
 pub struct VanillaColumnPlan<'a> {
-    /// Slice of the corresponding [`ColumnarArray`]. Fat pointer inlines
-    /// `(ptr, len)`, so the per-cell access avoids the extra Vec metadata
-    /// indirection.
-    column: &'a [DBResponsePrimitive],
+    /// Reader for the corresponding column, resolved once so Arrow-backed
+    /// columns skip the type dispatch and downcast on every cell.
+    column: ColumnReader<'a>,
     /// Interned IndexMap key for this column with a pre-computed hash.
     /// Cloned via [`Arc::clone`] per row (atomic refcount inc).
     key: Arc<InternedKey>,
@@ -634,7 +641,7 @@ pub fn build_vanilla_plan<'a>(
                 .push((track.level, Arc::clone(&key)));
         }
 
-        let column = cube_store_result.data[index].as_slice();
+        let column = cube_store_result.reader(index)?;
 
         columns.push(VanillaColumnPlan {
             column,
@@ -721,11 +728,11 @@ pub(crate) enum ColumnarColumnSource {
 }
 
 pub(crate) struct ColumnarColumnPlan<'a> {
-    member_type: &'a str,
-    source: ColumnarColumnSource,
+    pub(crate) member_type: &'a str,
+    pub(crate) source: ColumnarColumnSource,
 }
 
-fn build_columnar_plan<'a>(
+pub(crate) fn build_columnar_plan<'a>(
     members: &[String],
     members_to_alias_map: &IndexMap<String, String>,
     annotation: &'a HashMap<String, ConfigItem>,
@@ -802,7 +809,7 @@ fn build_columnar_plan<'a>(
 fn build_columnar_columns(
     plan: &[ColumnarColumnPlan<'_>],
     db_data: &QueryResult,
-) -> Vec<ColumnarArray> {
+) -> Result<Vec<ColumnarArray>> {
     let row_count = db_data.row_count;
     let mut columns: Vec<ColumnarArray> = plan
         .iter()
@@ -813,9 +820,11 @@ fn build_columnar_columns(
         let out = &mut columns[col_idx];
         match &plan_entry.source {
             ColumnarColumnSource::DbColumn { index } => {
-                for cell in db_data.data[*index].iter() {
-                    out.push(transform_value(cell.clone(), plan_entry.member_type));
-                }
+                // Column-major, so the reader resolves its type once for the
+                // whole column and the row loop stays a tight typed fill.
+                db_data
+                    .reader(*index)?
+                    .append_transformed(out, plan_entry.member_type);
             }
             ColumnarColumnSource::Constant(v) => {
                 out.resize(row_count, v.clone());
@@ -826,15 +835,15 @@ fn build_columnar_columns(
         }
     }
 
-    columns
+    Ok(columns)
 }
 
 /// Convert DB response object to the vanilla output format. Keys are
 /// pre-hashed [`InternedKey`] values shared via [`Arc::clone`] from the plan,
 /// turning per-cell hashing/key allocation into an atomic refcount inc. The
-/// plan also carries the column slice directly, so the per-row loop does one
-/// bounds check (`column.column.get(row_idx)`) per cell instead of the
-/// `db_data.data.get(col).and_then(...)` double lookup.
+/// plan also carries the column reader directly, so the per-row loop does one
+/// column read per cell instead of the `db_data.data.get(col).and_then(...)`
+/// double lookup.
 pub fn get_vanilla_row(plan: &VanillaPlan<'_>, row_idx: usize) -> Result<VanillaRow> {
     // +1 to cover the optional tail entry (compareDateRange / blending key).
     let mut row = IndexMap::with_capacity_and_hasher(
@@ -843,7 +852,7 @@ pub fn get_vanilla_row(plan: &VanillaPlan<'_>, row_idx: usize) -> Result<Vanilla
     );
 
     for column in &plan.columns {
-        let transformed_value = transform_value(column.column[row_idx].clone(), column.member_type);
+        let transformed_value = transform_value(column.column.value(row_idx), column.member_type);
         row.insert(Arc::clone(&column.key), transformed_value);
     }
 
@@ -970,22 +979,6 @@ pub fn get_pivot_query(
     Ok(pivot_query)
 }
 
-pub fn get_final_cubestore_result_array(
-    transform_requests: &[TransformDataRequest],
-    cube_store_results: &[Arc<QueryResult>],
-    result_data: &mut [RequestResultData],
-) -> Result<()> {
-    for (transform_data, cube_store_result, result) in multizip((
-        transform_requests.iter(),
-        cube_store_results.iter(),
-        result_data.iter_mut(),
-    )) {
-        result.prepare_results(transform_data, cube_store_result)?;
-    }
-
-    Ok(())
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum TransformedData {
@@ -1045,7 +1038,7 @@ impl TransformedData {
                     query_type,
                     query.time_dimensions.as_ref(),
                 )?;
-                let columns = build_columnar_columns(&plan, cube_store_result);
+                let columns = build_columnar_columns(&plan, cube_store_result)?;
                 Ok(TransformedData::Columnar { members, columns })
             }
             _ => {
@@ -1066,14 +1059,58 @@ impl TransformedData {
     }
 }
 
+/// The `data` member is generic so a response can carry either a materialized
+/// [`TransformedData`] or something that renders it while serializing (see
+/// [`crate::direct_result::DirectData`]). Defaulting the parameter keeps the
+/// derived `Serialize`/`Deserialize` — and with them the field names, order and
+/// `skip_serializing_if` rules — as the single definition of the wire shape.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RequestResultDataMulti {
+pub struct RequestResultDataMulti<D = TransformedData> {
     pub query_type: QueryType,
-    pub results: Vec<RequestResultData>,
+    pub results: Vec<RequestResultData<D>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pivot_query: Option<NormalizedQuery>,
     pub slow_query: bool,
+}
+
+impl<D> RequestResultDataMulti<D> {
+    /// Computes the pivot query from the per-result queries. Independent of the
+    /// result data, so it can run before serialization on the streaming path.
+    pub fn prepare_pivot_query(&mut self) -> Result<()> {
+        let normalized_queries = self
+            .results
+            .iter()
+            .map(|result| &result.query)
+            .collect::<Vec<_>>();
+
+        self.pivot_query = Some(get_pivot_query(&self.query_type, &normalized_queries)?);
+
+        Ok(())
+    }
+
+    /// Attach one data payload per result, keeping every other field as it is.
+    pub fn with_data<T>(self, data: Vec<T>) -> Result<RequestResultDataMulti<T>> {
+        if self.results.len() != data.len() {
+            bail!(
+                "Expected {} result data entries, got {}",
+                self.results.len(),
+                data.len()
+            );
+        }
+
+        Ok(RequestResultDataMulti {
+            query_type: self.query_type,
+            results: self
+                .results
+                .into_iter()
+                .zip(data)
+                .map(|(result, data)| result.with_data(data))
+                .collect(),
+            pivot_query: self.pivot_query,
+            slow_query: self.slow_query,
+        })
+    }
 }
 
 impl RequestResultDataMulti {
@@ -1092,21 +1129,13 @@ impl RequestResultDataMulti {
             result.prepare_results(transform_data, cube_store_result)?;
         }
 
-        let normalized_queries = self
-            .results
-            .iter()
-            .map(|result| &result.query)
-            .collect::<Vec<_>>();
-
-        self.pivot_query = Some(get_pivot_query(&self.query_type, &normalized_queries)?);
-
-        Ok(())
+        self.prepare_pivot_query()
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RequestResultData {
+pub struct RequestResultData<D = TransformedData> {
     pub query: NormalizedQuery,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_refresh_time: Option<String>,
@@ -1131,7 +1160,31 @@ pub struct RequestResultData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<TransformedData>,
+    pub data: Option<D>,
+}
+
+impl<D> RequestResultData<D> {
+    /// Replace the data payload, keeping every other field as it is. Written out
+    /// field by field on purpose: a field added later fails to compile here
+    /// instead of being silently dropped from the response.
+    pub fn with_data<T>(self, data: T) -> RequestResultData<T> {
+        RequestResultData {
+            query: self.query,
+            last_refresh_time: self.last_refresh_time,
+            refresh_key_values: self.refresh_key_values,
+            used_pre_aggregations: self.used_pre_aggregations,
+            transformed_query: self.transformed_query,
+            request_id: self.request_id,
+            annotation: self.annotation,
+            data_source: self.data_source,
+            db_type: self.db_type,
+            ext_db_type: self.ext_db_type,
+            external: self.external,
+            slow_query: self.slow_query,
+            total: self.total,
+            data: Some(data),
+        }
+    }
 }
 
 impl RequestResultData {
@@ -1353,13 +1406,6 @@ impl From<Vec<DBResponsePrimitive>> for ColumnarArray {
     }
 }
 
-impl From<ColumnarArray> for Vec<DBResponsePrimitive> {
-    #[inline]
-    fn from(c: ColumnarArray) -> Self {
-        c.0
-    }
-}
-
 impl std::ops::Deref for ColumnarArray {
     type Target = Vec<DBResponsePrimitive>;
     #[inline]
@@ -1376,7 +1422,7 @@ impl std::ops::DerefMut for ColumnarArray {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::transport::JsRawColumnarData;
     use anyhow::Result;
@@ -1392,13 +1438,13 @@ mod tests {
         assert_eq!(std::mem::size_of::<DBResponsePrimitive>(), 32);
     }
 
-    type TestSuiteData = HashMap<String, TestData>;
+    pub(crate) type TestSuiteData = HashMap<String, TestData>;
 
     #[derive(Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
-    struct TestData {
-        request: TransformDataRequest,
-        query_result: JsRawColumnarData,
+    pub(crate) struct TestData {
+        pub(crate) request: TransformDataRequest,
+        pub(crate) query_result: JsRawColumnarData,
         final_result_default: Option<TransformedData>,
         final_result_compact: Option<TransformedData>,
     }
@@ -2172,7 +2218,7 @@ mod tests {
 }
     "#;
 
-    static TEST_SUITE_DATA: LazyLock<TestSuiteData> =
+    pub(crate) static TEST_SUITE_DATA: LazyLock<TestSuiteData> =
         LazyLock::new(|| from_str(TEST_SUITE_JSON).unwrap());
 
     #[derive(Debug)]
@@ -3684,12 +3730,14 @@ mod tests {
         let raw_data = QueryResult::try_new(
             vec!["t_day".to_string(), "t_month".to_string()],
             vec![
-                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                vec![DBResponsePrimitive::String(
                     "2024-06-15T00:00:00.000".to_string(),
-                )]),
-                ColumnarArray::from(vec![DBResponsePrimitive::String(
+                )]
+                .into(),
+                vec![DBResponsePrimitive::String(
                     "2024-06-01T00:00:00.000".to_string(),
-                )]),
+                )]
+                .into(),
             ],
         )?;
         let plan = build_vanilla_plan(
@@ -3711,5 +3759,197 @@ mod tests {
             "bare base key must use the finest (day) candidate, not month"
         );
         Ok(())
+    }
+
+    /// Every response format, so a test can assert across all of them. `None` is
+    /// the vanilla (default) format.
+    pub(crate) const ALL_RES_TYPES: [Option<ResultType>; 3] =
+        [None, Some(ResultType::Compact), Some(ResultType::Columnar)];
+
+    /// The same three-row result twice: once backed by Arrow memory (as CubeStore
+    /// sends it) and once by materialized primitives (as the legacy and JS-driver
+    /// paths hand it over). Types are mixed on purpose — string, float, decimal
+    /// and timestamp cells all take different routes through the cell reader.
+    pub(crate) struct StorageFixture {
+        pub arrow: QueryResult,
+        pub columnar: QueryResult,
+        alias_to_member_name_map: HashMap<String, String>,
+        annotation: HashMap<String, ConfigItem>,
+        query: NormalizedQuery,
+    }
+
+    impl StorageFixture {
+        pub fn new() -> Result<Self> {
+            use arrow::array::{
+                Decimal128Array, Float64Array, StringArray, TimestampMillisecondArray,
+            };
+            use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+            use arrow::ipc::writer::StreamWriter;
+            use arrow::record_batch::RecordBatch;
+
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("cube__city", DataType::Utf8, true),
+                Field::new("cube__amount", DataType::Float64, true),
+                Field::new("cube__total", DataType::Decimal128(38, 2), true),
+                Field::new(
+                    "cube__created_at_day",
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
+                    true,
+                ),
+            ]));
+
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(StringArray::from(vec![
+                        Some("Berlin"),
+                        None,
+                        Some("Lisbon"),
+                    ])),
+                    Arc::new(Float64Array::from(vec![Some(1.5), Some(2.0), None])),
+                    Arc::new(
+                        Decimal128Array::from(vec![Some(239996i128), None, Some(215490)])
+                            .with_precision_and_scale(38, 2)
+                            .unwrap(),
+                    ),
+                    Arc::new(TimestampMillisecondArray::from(vec![
+                        Some(0i64),
+                        Some(1_000),
+                        None,
+                    ])),
+                ],
+            )
+            .unwrap();
+
+            let mut ipc = Vec::new();
+            {
+                let mut writer = StreamWriter::try_new(&mut ipc, schema.as_ref()).unwrap();
+                writer.write(&batch).unwrap();
+                writer.finish().unwrap();
+            }
+
+            let arrow = QueryResult::from_arrow(&ipc)?;
+            let columnar = QueryResult::try_new(
+                arrow.members().to_vec(),
+                (0..arrow.members().len())
+                    .map(|idx| arrow.column(idx)?.to_columnar().map(Into::into))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?;
+
+            let members = [
+                ("cube__city", "Cube.city", "string"),
+                ("cube__amount", "Cube.amount", "number"),
+                ("cube__total", "Cube.total", "number"),
+                ("cube__created_at_day", "Cube.createdAt.day", "time"),
+            ];
+
+            let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
+            let mut annotation: HashMap<String, ConfigItem> = HashMap::new();
+            for (alias, member, member_type) in members {
+                alias_to_member_name_map.insert(alias.to_string(), member.to_string());
+                annotation.insert(member.to_string(), make_config_item(member_type));
+            }
+
+            let query = make_query_with_dims(Some(
+                members
+                    .iter()
+                    .map(|(_, member, _)| MemberOrMemberExpression::Member(member.to_string()))
+                    .collect(),
+            ));
+
+            Ok(Self {
+                arrow,
+                columnar,
+                alias_to_member_name_map,
+                annotation,
+                query,
+            })
+        }
+
+        pub fn request(&self, res_type: Option<ResultType>) -> TransformDataRequest {
+            TransformDataRequest {
+                alias_to_member_name_map: self.alias_to_member_name_map.clone(),
+                annotation: self.annotation.clone(),
+                query: self.query.clone(),
+                query_type: Some(QueryType::RegularQuery),
+                res_type,
+            }
+        }
+    }
+
+    /// Arrow-backed and primitive-backed columns must transform identically in
+    /// every response format — the Arrow path reads cells lazily through
+    /// `ColumnReader`, the primitive path off a slice.
+    #[test]
+    fn test_transform_matches_across_column_storage() -> Result<()> {
+        let fixture = StorageFixture::new()?;
+
+        for res_type in ALL_RES_TYPES {
+            let request = fixture.request(res_type.clone());
+
+            let from_arrow = TransformedData::transform(&request, &fixture.arrow)?;
+            let from_columnar = TransformedData::transform(&request, &fixture.columnar)?;
+            assert_eq!(
+                from_arrow, from_columnar,
+                "res_type {res_type:?} must not depend on column storage"
+            );
+
+            // Serialized shape too, since that is what reaches the client.
+            assert_eq!(
+                serde_json::to_string(&from_arrow)?,
+                serde_json::to_string(&from_columnar)?,
+                "res_type {res_type:?} JSON must not depend on column storage"
+            );
+        }
+
+        // Spot-check the rendering rules the Arrow reader is responsible for.
+        let TransformedData::Compact { members, dataset } = TransformedData::transform(
+            &fixture.request(Some(ResultType::Compact)),
+            &fixture.arrow,
+        )?
+        else {
+            panic!("expected Compact");
+        };
+        let total_idx = members.iter().position(|m| m == "Cube.total").unwrap();
+        let created_idx = members
+            .iter()
+            .position(|m| m == "Cube.createdAt.day")
+            .unwrap();
+        assert_eq!(
+            dataset[0][total_idx],
+            DBResponsePrimitive::String("2399.96".to_string()),
+            "decimals render from mantissa and scale"
+        );
+        assert_eq!(
+            serde_json::to_value(&dataset[1][created_idx])?,
+            serde_json::json!("1970-01-01T00:00:01.000"),
+            "timestamps serialize in the legacy ISO shape"
+        );
+        assert_eq!(dataset[2][created_idx], DBResponsePrimitive::Null);
+
+        Ok(())
+    }
+
+    /// Response envelope with every kind of optional field represented, so the
+    /// direct-serialization tests also cover field order and `skip_serializing_if`.
+    pub(crate) fn make_result_head(query: NormalizedQuery) -> RequestResultData {
+        RequestResultData {
+            query,
+            last_refresh_time: Some("2024-06-15T00:00:00.000".to_string()),
+            refresh_key_values: None,
+            used_pre_aggregations: None,
+            transformed_query: None,
+            request_id: Some("test-request".to_string()),
+            // Left empty on purpose: `HashMap` iteration order is not stable
+            // across instances, and these tests compare serialized bytes.
+            annotation: HashMap::new(),
+            data_source: Some("default".to_string()),
+            db_type: Some("postgres".to_string()),
+            ext_db_type: None,
+            external: Some(false),
+            slow_query: false,
+            total: Some(3),
+            data: None,
+        }
     }
 }
