@@ -20,6 +20,7 @@ import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
+import type { GlobalGranularitiesConfig } from './GlobalGranularitiesConfig';
 import { FinishedJoinTree } from './JoinGraph';
 
 export type SegmentDefinition = {
@@ -210,13 +211,14 @@ export class CubeEvaluator extends CubeSymbols {
   private isRbacEnabledCache: boolean | null = null;
 
   public constructor(
-    protected readonly cubeValidator: CubeValidator
+    protected readonly cubeValidator: CubeValidator,
+    granularitiesResolver?: () => Promise<GlobalGranularitiesConfig>,
   ) {
-    super(true);
+    super(true, granularitiesResolver);
   }
 
-  public compile(cubes: any[], errorReporter: ErrorReporter) {
-    super.compile(cubes, errorReporter);
+  public async compile(cubes: any[], errorReporter: ErrorReporter) {
+    await super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {
         return 1;

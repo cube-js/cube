@@ -2,12 +2,12 @@ import { SchemaFileRepository } from '@cubejs-backend/shared';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { DbTypeInternalFn } from '../../src/core/types';
 
-// CUB-2567 rev 2: global granularity config is resolved ONCE per appId at compile time
-// (env | static list | function(ctx)), its hash folded into compilerVersion for ALL forms, and the
-// effective per-time-dimension set baked into the compiled model. Global CUSTOM granularities are
-// merged into each time dimension's `granularities` symbol map at compile (locals win). Both
-// /v1/meta and the SQL path read the baked values — no per-request resolution. This suite verifies
-// the bake, the fold-into-compilerVersion, and the resolve-once guarantee.
+// Global granularity config (env | static list | function(ctx)) is resolved once per compile and
+// applied by CubeSymbols: global CUSTOM granularities are merged into each time dimension's
+// `granularities` map (locals win), so both /v1/meta and the SQL path — including pre-aggregation
+// matching — read the same values with no per-request resolution. The resolved hash is folded into
+// compilerVersion, since the config affects the compiled model. This suite verifies the merge, the
+// fold-into-compilerVersion, and the resolve-once guarantee.
 
 // A CompilerApi that counts how many times the granularities FUNCTION form is invoked, so we can
 // assert it runs once per compile (per appId), not once per metaConfig/getSql call.
@@ -102,14 +102,14 @@ const bakedDimGranularities = async (api: CompilerApi, dimPath: string): Promise
   return compilers.cubeEvaluator.dimensionByPath(dimPath).granularities || {};
 };
 
-// The SEPARATE `symbols[cube][dim]` map that CubeSymbols.resolveGranularity reads for SQL. The
-// compile-time bake dual-writes here too; without it SQL can't resolve a baked global custom.
+// The `symbols[cube][dim]` map CubeSymbols.resolveGranularity reads for SQL. It derives from the
+// same dimension definition the merge writes, so a global custom is resolvable here too.
 const symbolsDimGranularities = async (api: CompilerApi, cube: string, dim: string): Promise<Record<string, any>> => {
   const compilers = await (api as any).getCompilers();
   return (compilers.cubeEvaluator as any).symbols?.[cube]?.[dim]?.granularities || {};
 };
 
-describe('granularities baked at compile time (CUB-2567 rev 2)', () => {
+describe('global granularities resolved and applied at compile time', () => {
   describe('env / static config', () => {
     afterEach(() => {
       delete process.env.CUBEJS_GRANULARITIES;
@@ -130,13 +130,12 @@ describe('granularities baked at compile time (CUB-2567 rev 2)', () => {
       api.dispose();
     });
 
-    // 2. Static global customs are baked into BOTH dimension object graphs the downstream paths
-    // read: the evaluatedCubes/cubeList copy (dimensionByPath, timeDimensionsForCube, pre-agg
-    // matching) AND the separate symbols copy (CubeSymbols.resolveGranularity for SQL). The merge
-    // must reach both — writing only the first makes SQL unable to resolve a global custom, and
-    // pre-agg matching (granularityHierarchies builds a Granularity for every baked custom) then
-    // throws. This test drives a real getSql() on a model with a configured global custom to lock
-    // that in, and confirms per-dimension excludes are honored.
+    // 2. Static global customs reach every dimension map the downstream paths read: the
+    // evaluatedCubes/cubeList copy (dimensionByPath, timeDimensionsForCube, pre-agg matching) and
+    // the symbols copy (CubeSymbols.resolveGranularity for SQL). Both derive from the definition
+    // the merge writes, so a global custom resolves in SQL and pre-agg matching doesn't throw
+    // "Granularity does not exist". Drives a real getSql() to lock that in, and confirms
+    // per-dimension excludes are honored.
     test('static global customs are baked into the consumed map; SQL resolves them; excludes honored', async () => {
       const api = createApi({
         granularities: [{ name: 'fiscal_year', interval: '1 year', origin: '2024-02-01' }],
@@ -177,16 +176,16 @@ describe('granularities baked at compile time (CUB-2567 rev 2)', () => {
       api.dispose();
     });
 
-    // 3. Time dimensions without local customization share ONE default set instance (memory saver).
-    test('time dimensions without local customization share one default set instance', async () => {
+    // 3. Time dimensions without local customization all resolve to the same effective set.
+    test('time dimensions without local customization resolve to the same set', async () => {
       const api = createApi();
       const cubes = await api.metaConfig(ctxFor('a'), {});
       const created = dimByName(cubes, 'Orders.created_at');
       const updated = dimByName(cubes, 'Orders.updated_at');
-      expect(created.effectiveGranularities).toBe(updated.effectiveGranularities);
-      // A dimension with a local block gets its own set, not the shared default.
+      expect(created.effectiveGranularities).toEqual(updated.effectiveGranularities);
+      // A dimension with a local block resolves to a different set.
       expect(dimByName(cubes, 'Events.ts').effectiveGranularities)
-        .not.toBe(created.effectiveGranularities);
+        .not.toEqual(created.effectiveGranularities);
       api.dispose();
     });
 
@@ -336,14 +335,14 @@ describe('granularities baked at compile time (CUB-2567 rev 2)', () => {
       const baked = await bakedDimGranularities(api, 'Orders.created_at');
       expect(baked.sprint).toMatchObject({ interval: '2 weeks', origin: '2024-01-01' });
 
-      // Plain dimensions (no local block) share the SAME globalCustoms object by reference — the
-      // by-reference merge assigns one shared map to every plain dim (copy-on-write only for locals).
+      // Every plain dimension (no local block) gets the same global customs merged in.
       const bakedUpdated = await bakedDimGranularities(api, 'Orders.updated_at');
-      expect(bakedUpdated).toBe(baked);
+      expect(bakedUpdated).toEqual(baked);
 
-      // A dimension with a local block gets a fresh copy-on-write object, not the shared map.
+      // A dimension with local customs keeps them alongside the global one.
       const bakedCollide = await bakedDimGranularities(api, 'Orders.collide_at');
-      expect(bakedCollide).not.toBe(baked);
+      expect(bakedCollide).not.toEqual(baked);
+      expect(bakedCollide.sprint).toBeDefined();
 
       // A dimension that excludes it does NOT get it baked in.
       const bakedExcluded = await bakedDimGranularities(api, 'Orders.excluded_at');

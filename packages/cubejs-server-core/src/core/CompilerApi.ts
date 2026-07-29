@@ -7,13 +7,12 @@ import {
   compile,
   Compiler,
   createQuery,
-  buildBuiltInsCatalog,
+  buildGranularitiesCatalog,
   CubeDefinition,
   EvaluatedCube,
   GlobalGranularitiesConfig,
   GranularitiesOption,
   granularityConfigHash,
-  isBuiltInGranularity,
   PreAggregationFilters,
   PreAggregationInfo,
   PreAggregationReferences,
@@ -142,10 +141,7 @@ export class CompilerApi {
 
   protected readonly granularities?: GranularitiesOption;
 
-  // Resolved-once-per-appId global granularities config, baked into the compiled model. Resolved in
-  // Memoized resolved global granularities config (+ hash) for the static/function forms; see
-  // getResolvedGranularities.
-  private resolvedGranularitiesPromise?: Promise<{ config: GlobalGranularitiesConfig; hash: string }>;
+  private resolvedGranularitiesPromise?: Promise<GlobalGranularitiesConfig>;
 
   protected queryFactory?: QueryFactory;
 
@@ -239,9 +235,11 @@ export class CompilerApi {
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
 
-    // Fold the resolved granularities hash into compilerVersion so a config change forces a recompile.
-    const { config: resolvedGranularities, hash: granularitiesHash } = await this.getResolvedGranularities();
-    compilerVersion += `_gran_${granularitiesHash}`;
+    // Global custom granularities are merged into the compiled model (they take part in
+    // pre-aggregation matching), so a config change must force a recompile. The resolved config is
+    // handed to the compiler so a `config.granularities` function runs once per compile.
+    const resolvedGranularities = await this.resolveGranularities();
+    compilerVersion += `_gran_${granularityConfigHash(resolvedGranularities)}`;
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
       this.compilers = this.compileSchema(compilerVersion, resolvedGranularities, options.requestId).catch(e => {
@@ -254,24 +252,18 @@ export class CompilerApi {
     return this.compilers;
   }
 
-  // Resolve `config.granularities` with the appId-level compile context. Static-list/function forms
-  // are immutable for the instance, so they memoize the in-flight promise (concurrent compiles share
-  // one await; the function runs once per appId). The env form re-resolves each call so a runtime
-  // CUBEJS_GRANULARITIES* change still flows through the folded hash to trigger a recompile.
-  private getResolvedGranularities(): Promise<{ config: GlobalGranularitiesConfig; hash: string }> {
-    const resolve = () => resolveGlobalGranularities(
-      this.granularities,
-      { securityContext: this.compileContext?.securityContext },
-    ).then(config => ({ config, hash: granularityConfigHash(config) }));
-
-    // Env form: always re-resolve (cheap env parse) so a runtime change is picked up.
+  /**
+   * The resolved global granularities config. Memoized for the static/function forms — both are
+   * fixed for the instance, and a `config.granularities` function must not run per request. The env
+   * form re-resolves (a cheap parse) so a runtime CUBEJS_GRANULARITIES change still forces a recompile.
+   */
+  private resolveGranularities(): Promise<GlobalGranularitiesConfig> {
     if (this.granularities === undefined) {
-      return resolve();
+      return resolveGlobalGranularities(undefined, this.compileContext);
     }
-
     if (!this.resolvedGranularitiesPromise) {
-      this.resolvedGranularitiesPromise = resolve();
-      // Allow a retry if the resolve (e.g. a throwing function form) fails.
+      this.resolvedGranularitiesPromise = resolveGlobalGranularities(this.granularities, this.compileContext);
+      // Let a failed resolve (e.g. a throwing function form) be retried.
       this.resolvedGranularitiesPromise.catch(() => {
         this.resolvedGranularitiesPromise = undefined;
       });
@@ -294,7 +286,11 @@ export class CompilerApi {
     });
   }
 
-  public async compileSchema(compilerVersion: string, granularitiesConfig: GlobalGranularitiesConfig, requestId?: string): Promise<Compiler> {
+  public async compileSchema(
+    compilerVersion: string,
+    resolvedGranularities: GlobalGranularitiesConfig,
+    requestId?: string,
+  ): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
@@ -311,7 +307,7 @@ export class CompilerApi {
         compiledScriptCache: this.compiledScriptCache,
         compiledJinjaCache: this.compiledJinjaCache,
         compiledYamlCache: this.compiledYamlCache,
-        granularitiesConfig,
+        resolvedGranularities,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
@@ -1126,32 +1122,11 @@ export class CompilerApi {
   }
 
   /**
-   * The `/v1/granularities` catalog for this appId — built-ins plus global customs — assembled from
-   * the config baked into the compiled model. No per-request resolution.
+   * The `/v1/granularities` catalog for this model — built-ins plus global customs.
    */
   public async getGranularities(options: { requestId?: string } = {}): Promise<any[]> {
     const compilers = await this.getCompilers(options);
-    const config = compilers.metaTransformer.globalGranularitiesConfig ?? (await this.getResolvedGranularities()).config;
-
-    const granularities: any[] = Object.entries(buildBuiltInsCatalog(config))
-      .map(([name, entry]) => ({ type: 'built-in', name, ...entry }));
-
-    for (const [name, def] of Object.entries<any>(config.customGranularities)) {
-      // Skip customs that override a built-in — those are already folded into the catalog above.
-      // hasOwnProperty (not `in`) so a custom named e.g. `toString` isn't dropped via the prototype.
-      if (!isBuiltInGranularity(name)) {
-        granularities.push({
-          type: 'custom',
-          name,
-          title: def.title || name,
-          ...(def.interval !== undefined ? { interval: def.interval } : {}),
-          ...(def.origin !== undefined ? { origin: def.origin } : {}),
-          ...(def.offset !== undefined ? { offset: def.offset } : {}),
-          ...(def.format !== undefined ? { format: def.format } : {}),
-        });
-      }
-    }
-    return granularities;
+    return buildGranularitiesCatalog(compilers.cubeEvaluator.globalGranularitiesConfig);
   }
 
   public async metaConfig(

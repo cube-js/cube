@@ -25,6 +25,7 @@ export {
   resolveGlobalGranularitiesSync,
   getBuiltInGranularityDefaults,
   buildBuiltInsCatalog,
+  buildGranularitiesCatalog,
   granularityConfigHash,
 } from './GlobalGranularitiesConfig';
 export {
