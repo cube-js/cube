@@ -77,8 +77,9 @@ A single request usually produces one tagged query, but not always — a query
 reading a lambda pre-aggregation's source table, for instance, is tagged too.
 Match on `trace_id` rather than assuming one row per request.
 
-Not every request produces a tagged query to find: one served from the cache
-never reaches your data source, and when identical queries arrive together Cube
-runs them once, under whichever request got there first.
+Not every request produces a tagged query to find: one served from the cache or
+from a pre-aggregation never reaches your data source, and when identical
+queries arrive together Cube runs them once, under whichever request got there
+first.
 
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
