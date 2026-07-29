@@ -68,10 +68,35 @@ The script runs in a sandbox against a fixed contract:
 A top-level dict or object is rejected — flatten any nested structure into one
 array of uniform rows.
 
-These libraries are available: pandas, numpy, scipy, scikit-learn, statsmodels,
-prophet, matplotlib, seaborn, plotly.
-
 {/* TODO: screenshot — the Add Python tab menu entry */}
+
+## Python environment
+
+Every run gets a fresh, isolated sandbox running **Python 3.11**. It is created for
+the run and destroyed when the run finishes — nothing carries over between runs.
+
+These packages are pre-installed, along with their dependencies:
+
+| Package | Use |
+| --- | --- |
+| `pandas`, `numpy` | Dataframes and numerical computing |
+| `scipy` | Statistical tests, optimization, interpolation |
+| `scikit-learn` | Regression, classification, clustering, anomaly detection |
+| `statsmodels` | ARIMA, exponential smoothing, econometric models |
+| `prophet` | Time series forecasting with seasonality and holidays |
+| `matplotlib`, `seaborn`, `plotly` | Plotting |
+
+Figures are not a supported output. The report's chart is built from `output.json`, and
+anything a script writes to disk is discarded with the sandbox — so the plotting
+libraries are importable, but a saved figure has nowhere to go.
+
+<Info>
+
+Installing your own packages is not supported yet. Because the sandbox is recreated
+for every run, anything a script installs is discarded when the run ends. Support for
+adding packages to the environment is coming.
+
+</Info>
 
 ## Running and refreshing
 
