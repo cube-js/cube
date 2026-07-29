@@ -33,6 +33,8 @@ fn main() {
         "--skip".to_string(),
         "rolling_window_unused_partition_by".to_string(),
         "--skip".to_string(),
+        "rolling_window_two_aggregates".to_string(),
+        "--skip".to_string(),
         "cross_join_empty_sort_on".to_string(),
     ];
     run_sql_tests("migration", extra_args, move |test_name, test_fn| {

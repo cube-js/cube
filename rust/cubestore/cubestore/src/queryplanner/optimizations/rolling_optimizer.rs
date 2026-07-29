@@ -233,6 +233,15 @@ impl RollingOptimizerRule {
                     return None;
                 }
 
+                // The executor advances one shared group counter per (aggregate, dimension point),
+                // while each aggregate accumulates into its own group space. With more than one
+                // aggregate they interleave, so every aggregate past the first reads the slots the
+                // others left empty and comes back null. Serve these as a plain aggregate until
+                // that accounting is fixed.
+                if rolling_aggs.len() > 1 {
+                    return None;
+                }
+
                 let RollingWindowJoinExtractorResult {
                     input,
                     dimension,
@@ -1085,6 +1094,14 @@ mod tests {
     /// `Projection(projection) -> Aggregate(group_by, [agg]) -> series LEFT JOIN source`, the shape
     /// `RollingOptimizerRule` is meant to rewrite.
     fn rolling_plan(agg: Expr, group_by: Vec<Expr>, projection: Vec<Expr>) -> LogicalPlan {
+        rolling_plan_with_aggs(vec![agg], group_by, projection)
+    }
+
+    fn rolling_plan_with_aggs(
+        aggs: Vec<Expr>,
+        group_by: Vec<Expr>,
+        projection: Vec<Expr>,
+    ) -> LogicalPlan {
         let (left, right) = (series(), source());
         let join_schema =
             build_join_schema(left.schema(), right.schema(), &JoinType::Left).unwrap();
@@ -1105,14 +1122,14 @@ mod tests {
             null_equals_null: false,
         });
         let aggregate =
-            Aggregate::try_new(Arc::new(join), group_by, vec![agg]).map(LogicalPlan::Aggregate);
+            Aggregate::try_new(Arc::new(join), group_by, aggs).map(LogicalPlan::Aggregate);
         LogicalPlan::Projection(
             Projection::try_new(projection, Arc::new(aggregate.unwrap())).unwrap(),
         )
     }
 
-    /// The column an aggregate is read back as, i.e. the name the aggregate node gives its output.
-    /// Hardcoding it makes the "declines" tests pass whether or not the rule really declines.
+    /// The column an aggregate is read back as. Derived rather than written out, because a
+    /// hardcoded name that does not match makes every "declines" case pass for the wrong reason.
     fn agg_col(agg: &Expr) -> Expr {
         col(agg.schema_name().to_string())
     }
@@ -1211,6 +1228,26 @@ mod tests {
             agg.clone(),
             vec![date_from(), win()],
             vec![date_from().alias("mon"), win(), agg_col(&agg).alias("num")],
+        );
+        assert!(!rewrite(plan).transformed);
+    }
+
+    #[test]
+    fn declines_more_than_one_rolling_aggregate() {
+        // The executor shares one group counter across the aggregates, so the second one reads
+        // empty slots and answers null. Two aggregates also make the shape where positional and
+        // name-based alias pairing could disagree, so declining keeps that question unobservable.
+        let n_total = sum_of("n", false, None);
+        let d_total = sum_of("d", false, None);
+        let plan = rolling_plan_with_aggs(
+            vec![n_total.clone(), d_total.clone()],
+            vec![date_from(), win()],
+            vec![
+                date_from().alias("mon"),
+                win(),
+                agg_col(&n_total).alias("n_total"),
+                agg_col(&d_total).alias("d_total"),
+            ],
         );
         assert!(!rewrite(plan).transformed);
     }

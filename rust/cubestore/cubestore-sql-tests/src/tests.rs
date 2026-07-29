@@ -218,6 +218,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "rolling_window_unused_partition_by",
             rolling_window_unused_partition_by,
         ),
+        t(
+            "rolling_window_two_aggregates",
+            rolling_window_two_aggregates,
+        ),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -5770,18 +5774,11 @@ LIMIT
     Ok(())
 }
 
-/// Fails unless the physical plan for `query` mentions `expected`. Result assertions alone cannot
-/// tell an optimized plan from the fallback it degrades to, so shapes whose whole point is that a
-/// rewrite fires need to say so explicitly.
-async fn assert_plan_contains(
-    service: &Box<dyn SqlClient>,
-    query: &str,
-    expected: &str,
-) -> Result<(), CubeError> {
+async fn plan_strings(service: &Box<dyn SqlClient>, query: &str) -> Result<String, CubeError> {
     let res = service
         .exec_query(&format!("EXPLAIN ANALYZE {}", query))
         .await?;
-    let plans = res
+    Ok(res
         .get_rows()
         .iter()
         .flat_map(|r| r.values().iter())
@@ -5789,13 +5786,37 @@ async fn assert_plan_contains(
             TableValue::String(s) => Some(s.as_str()),
             _ => None,
         })
-        .collect::<Vec<_>>();
-    if !plans.iter().any(|p| p.contains(expected)) {
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+/// Result assertions alone cannot tell an optimized plan from the fallback it degrades to, so
+/// shapes whose whole point is whether a rewrite fires need to say so about the plan itself.
+async fn assert_plan_contains(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected: &str,
+) -> Result<(), CubeError> {
+    let plan = plan_strings(service, query).await?;
+    if !plan.contains(expected) {
         return Err(CubeError::internal(format!(
             "`{}` not found in the plan for {}:\n{}",
-            expected,
-            query,
-            plans.join("\n")
+            expected, query, plan
+        )));
+    }
+    Ok(())
+}
+
+async fn assert_plan_omits(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    unexpected: &str,
+) -> Result<(), CubeError> {
+    let plan = plan_strings(service, query).await?;
+    if plan.contains(unexpected) {
+        return Err(CubeError::internal(format!(
+            "`{}` unexpectedly present in the plan for {}:\n{}",
+            unexpected, query, plan
         )));
     }
     Ok(())
@@ -5912,6 +5933,42 @@ ORDER BY 1 ASC, 2 ASC"
         ])
     );
 
+    Ok(())
+}
+
+async fn rolling_window_two_aggregates(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, n int, m int)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data(day, n, m) VALUES (1, 10, 100), (3, 3, 300), (5, 5, 500)")
+        .await?;
+
+    // The rolling executor advances one group counter across all of its aggregates while each of
+    // them accumulates into its own group space, so with two of them every aggregate past the
+    // first reads slots the others left empty and answers null. Until that is fixed the rewrite
+    // declines, and the query runs as a plain aggregate over the range join.
+    let query = "SELECT `q`.`day`, `q`.`sn`, `q`.`sm` FROM (
+  SELECT `s0`.`date_from` `day`, sum(`b`.`n`) `sn`, sum(`b`.`m`) `sm`
+  FROM (SELECT date_from `date_from`, date_from + 1 `date_to`
+        FROM (select unnest(generate_series(1, 5, 1))) AS series(date_from)) `s0`
+  LEFT JOIN (SELECT day `d`, n `n`, m `m` FROM s.Data) `b`
+    ON `b`.`d` > `s0`.`date_to` - 1 AND `b`.`d` <= `s0`.`date_to`
+  GROUP BY 1) `q`
+ORDER BY 1 ASC";
+    assert_plan_omits(&service, query, "RollingWindowAgg").await?;
+    let r = service.exec_query(query).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, None, None),
+            (2, Some(3i64), Some(300i64)),
+            (3, None, None),
+            (4, Some(5), Some(500)),
+            (5, None, None),
+        ])
+    );
     Ok(())
 }
 
