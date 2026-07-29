@@ -214,6 +214,14 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("rolling_window_offsets", rolling_window_offsets),
         t("rolling_window_filtered", rolling_window_filtered),
         t("rolling_window_no_aggregates", rolling_window_no_aggregates),
+        t(
+            "rolling_window_unused_partition_by",
+            rolling_window_unused_partition_by,
+        ),
+        t(
+            "rolling_window_two_aggregates",
+            rolling_window_two_aggregates,
+        ),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -5763,6 +5771,204 @@ LIMIT
         )
         .await?;
     assert_eq!(to_rows(&r), rows(&[1i64, 2, 3, 4, 5]));
+    Ok(())
+}
+
+async fn plan_strings(service: &Box<dyn SqlClient>, query: &str) -> Result<String, CubeError> {
+    let res = service
+        .exec_query(&format!("EXPLAIN ANALYZE {}", query))
+        .await?;
+    Ok(res
+        .get_rows()
+        .iter()
+        .flat_map(|r| r.values().iter())
+        .filter_map(|v| match v {
+            TableValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+/// Result assertions alone cannot tell an optimized plan from the fallback it degrades to, so
+/// shapes whose whole point is whether a rewrite fires need to say so about the plan itself.
+async fn assert_plan_contains(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected: &str,
+) -> Result<(), CubeError> {
+    let plan = plan_strings(service, query).await?;
+    if !plan.contains(expected) {
+        return Err(CubeError::internal(format!(
+            "`{}` not found in the plan for {}:\n{}",
+            expected, query, plan
+        )));
+    }
+    Ok(())
+}
+
+async fn assert_plan_omits(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    unexpected: &str,
+) -> Result<(), CubeError> {
+    let plan = plan_strings(service, query).await?;
+    if plan.contains(unexpected) {
+        return Err(CubeError::internal(format!(
+            "`{}` unexpectedly present in the plan for {}:\n{}",
+            unexpected, query, plan
+        )));
+    }
+    Ok(())
+}
+
+async fn rolling_window_unused_partition_by(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (1, 'john', 10), \
+                                                     (1, 'sara', 7), \
+                                                     (3, 'sara', 3), \
+                                                     (3, 'john', 9), \
+                                                     (3, 'john', 11), \
+                                                     (5, 'timmy', 5)",
+        )
+        .await?;
+
+    // A rolling window over a series of 7 points, grouped by a partition-by column. Bucket `d`
+    // covers days `d - 1` and `d`, so day 7 has no rows at all and every partition key there is
+    // null. `partition_expr` is how the source produces that column, `inner_partition` is how the
+    // projection above the aggregate exposes it (empty when it only groups by it), and `outer` is
+    // what the consumer selects.
+    let query = |partition_expr: &str, inner_partition: &str, outer: &str| {
+        format!(
+            "SELECT {outer} FROM (
+  SELECT `s0`.`date_from` `day`, {inner_partition} sum(`b`.`num`) `num`
+  FROM (SELECT date_from `date_from`, date_from + 1 `date_to`
+        FROM (select unnest(generate_series(1, 7, 1))) AS series(date_from)) `s0`
+  LEFT JOIN (SELECT day `d`, {partition_expr} `win`, SUM(n) `num` FROM s.Data GROUP BY 1, 2) `b`
+    ON `b`.`d` > `s0`.`date_to` - 1 AND `b`.`d` <= `s0`.`date_to`
+  GROUP BY 1, `b`.`win`) `q`
+ORDER BY 1 ASC, 2 ASC"
+        )
+    };
+
+    // The rolling window always emits dimension + partition_by + rolling aggregates, so a GROUP BY
+    // column the projection it replaces did not select reappears in its output. The rewrite must
+    // not widen the schema of the node it replaces, or every ancestor keeps resolving its columns
+    // against the old one and planning fails with `No field named ...`.
+    let without_partition = rows(&[
+        (1i64, Some(17i64)),
+        (2, Some(17)),
+        (3, Some(23)),
+        (4, Some(23)),
+        (5, Some(5)),
+        (6, Some(5)),
+        (7, None),
+    ]);
+
+    // A calc-group style constant: the source column is not nullable, but the empty bucket at day 7
+    // still has to report a null key for it. The rewrite has to restore the projection's output on
+    // top of the rolling node here, since `win` is grouped by but not selected.
+    let pruned = query("'R12'", "`b`.`win` `win`,", "`q`.`day`, `q`.`num`");
+    assert_plan_contains(&service, &pruned, "RollingWindowAgg").await?;
+    let r = service.exec_query(&pruned).await?;
+    assert_eq!(to_rows(&r), without_partition);
+
+    // Same, but the projection omits the partition-by column outright instead of leaving it to
+    // projection pruning.
+    let r = service
+        .exec_query(&query("'R12'", "", "`q`.`day`, `q`.`num`"))
+        .await?;
+    assert_eq!(to_rows(&r), without_partition);
+
+    // Several partitions, all of them asked for: the rewrite outputs exactly what the projection
+    // did, so nothing has to be restored on top of it.
+    let selected = query(
+        "name",
+        "`b`.`win` `win`,",
+        "`q`.`day`, `q`.`win`, `q`.`num`",
+    );
+    assert_plan_contains(&service, &selected, "RollingWindowAgg").await?;
+    let r = service.exec_query(&selected).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, Some("john"), Some(10i64)),
+            (1, Some("sara"), Some(7)),
+            (2, Some("john"), Some(10)),
+            (2, Some("sara"), Some(7)),
+            (3, Some("john"), Some(20)),
+            (3, Some("sara"), Some(3)),
+            (4, Some("john"), Some(20)),
+            (4, Some("sara"), Some(3)),
+            (5, Some("timmy"), Some(5)),
+            (6, Some("timmy"), Some(5)),
+            (7, None, None),
+        ])
+    );
+
+    // Several partitions, none of them asked for: the per-partition rows survive, which pins that
+    // the restored projection picks the aggregate and not one of the partition keys.
+    let r = service
+        .exec_query(&query("name", "", "`q`.`day`, `q`.`num`"))
+        .await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, Some(7i64)),
+            (1, Some(10)),
+            (2, Some(7)),
+            (2, Some(10)),
+            (3, Some(3)),
+            (3, Some(20)),
+            (4, Some(3)),
+            (4, Some(20)),
+            (5, Some(5)),
+            (6, Some(5)),
+            (7, None),
+        ])
+    );
+
+    Ok(())
+}
+
+async fn rolling_window_two_aggregates(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data(day int, n int, m int)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data(day, n, m) VALUES (1, 10, 100), (3, 3, 300), (5, 5, 500)")
+        .await?;
+
+    // The rolling executor advances one group counter across all of its aggregates while each of
+    // them accumulates into its own group space, so with two of them every aggregate past the
+    // first reads slots the others left empty and answers null. Until that is fixed the rewrite
+    // declines, and the query runs as a plain aggregate over the range join.
+    let query = "SELECT `q`.`day`, `q`.`sn`, `q`.`sm` FROM (
+  SELECT `s0`.`date_from` `day`, sum(`b`.`n`) `sn`, sum(`b`.`m`) `sm`
+  FROM (SELECT date_from `date_from`, date_from + 1 `date_to`
+        FROM (select unnest(generate_series(1, 5, 1))) AS series(date_from)) `s0`
+  LEFT JOIN (SELECT day `d`, n `n`, m `m` FROM s.Data) `b`
+    ON `b`.`d` > `s0`.`date_to` - 1 AND `b`.`d` <= `s0`.`date_to`
+  GROUP BY 1) `q`
+ORDER BY 1 ASC";
+    assert_plan_omits(&service, query, "RollingWindowAgg").await?;
+    let r = service.exec_query(query).await?;
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (1i64, None, None),
+            (2, Some(3i64), Some(300i64)),
+            (3, None, None),
+            (4, Some(5), Some(500)),
+            (5, None, None),
+        ])
+    );
     Ok(())
 }
 

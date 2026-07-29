@@ -205,14 +205,7 @@
             "pages": [
               "docs/integrations/slack",
               "docs/integrations/tableau",
-              {
-                "group": "Power BI",
-                "root": "docs/integrations/power-bi/index",
-                "pages": [
-                  "docs/integrations/power-bi/kerberos",
-                  "docs/integrations/power-bi/ntlm"
-                ]
-              },
+              "docs/integrations/power-bi/index",
               "docs/integrations/microsoft-excel",
               "docs/integrations/google-sheets",
               "docs/integrations/snowflake-semantic-views",
@@ -536,6 +529,8 @@
                 "root": "reference/core-data-apis/dax-api/index",
                 "pages": [
                   "reference/core-data-apis/dax-api/cross-view-filter",
+                  "reference/core-data-apis/dax-api/kerberos",
+                  "reference/core-data-apis/dax-api/ntlm",
                   "reference/core-data-apis/dax-api/reference"
                 ]
               }
@@ -1144,6 +1139,14 @@
     {
       "source": "/docs/deployment/cloud/scalability",
       "destination": "/admin/deployment/scalability"
+    },
+    {
+      "source": "/docs/integrations/power-bi/kerberos",
+      "destination": "/reference/core-data-apis/dax-api/kerberos"
+    },
+    {
+      "source": "/docs/integrations/power-bi/ntlm",
+      "destination": "/reference/core-data-apis/dax-api/ntlm"
     }
   ]
 }
