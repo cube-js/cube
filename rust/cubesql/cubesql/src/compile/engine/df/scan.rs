@@ -1474,6 +1474,68 @@ mod tests {
         assert_eq!(d.value(1), "plain");
     }
 
+    #[test]
+    fn convert_transport_response_out_of_range_datetime2_silently_becomes_null() {
+        // Regression test for https://github.com/cube-js/cube/issues/11407
+        //
+        // SQL Server's `datetime2` can represent dates from year 0001, but
+        // Arrow's `Timestamp(Nanosecond)` can only represent roughly
+        // 1677-09-21 .. 2262-04-11 (i64 nanoseconds since epoch). A driver
+        // value like `0202-01-01` parses fine as a `NaiveDateTime` (see
+        // `parse_date_str`), but `NaiveDateTime::timestamp_nanos_opt()`
+        // returns `None` for it because it overflows i64 nanoseconds.
+        //
+        // The current code in `transform_response_body!` (DataType::Timestamp
+        // Nanosecond branch) handles that `None` by logging an error and
+        // calling `builder.append_null()`, so an out-of-range but perfectly
+        // valid timestamp is silently turned into SQL NULL. This means
+        // aggregates like `MIN(d)` can silently return NULL/wrong answers
+        // instead of erroring, even though every row has a non-null value.
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": {
+                        "members": ["d"],
+                        "columns": [
+                            ["0202-01-01T00:00:00.000"]
+                        ]
+                    }
+                }]
+            }
+        "#;
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "d",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+        let member_fields = vec![MemberField::regular("d".to_string())];
+
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+        let column = batches[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+
+        // Correct/expected behavior: an in-range, non-null source value
+        // should not silently become NULL. This assertion is expected to
+        // FAIL against the current implementation, proving the bug from
+        // issue #11407 reproduces at the Arrow-conversion layer in cubesql
+        // (independent of any live MSSQL server).
+        assert!(
+            !column.is_null(0),
+            "out-of-range datetime2 value '0202-01-01' was silently converted to NULL \
+             instead of erroring or preserving the value (see issue #11407)"
+        );
+    }
+
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
             protocol.get_name().to_string(),
