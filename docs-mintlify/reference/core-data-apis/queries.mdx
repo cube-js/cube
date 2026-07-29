@@ -383,7 +383,7 @@ Additionally, note that ungrouped queries have additional requirements for
 
 You might encounter the following error when running an [ungrouped query](#ungrouped-query)
 that includes `HAVING COUNT(1) > 0` (or a similar expression) against a cube or a view that
-have no measure called `count`. [Tableau][ref-tableau] is knows to generate such queries.
+have no measure called `count`. Some BI tools are known to generate such queries.
 
 ```text
 Failed to deserialize: invalid type: unit value, expected struct JoinDefinitionStatic
@@ -417,4 +417,3 @@ called `count` to be defined in the cube or view. Please add one to resolve this
 [ref-query-rewrite]: /reference/configuration/config#query_rewrite
 [blog-compare-date-range]: https://cube.dev/blog/comparing-data-over-different-time-periods
 [ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
-[ref-tableau]: /admin/connect-to-data/visualization-tools/tableau

@@ -10,7 +10,7 @@ Core Data APIs enable you to query and retrieve data from your Cube semantic lay
 
 ## Choosing the Right API
 
-* To connect to [Microsoft Power BI][ref-powerbi], use the [DAX API][ref-dax-api]
+* To connect to Microsoft Power BI, use the [DAX API][ref-dax-api]
 
 * To connect to [Microsoft Excel][ref-excel], use [Cube Cloud for Excel][ref-cube-cloud-for-excel]
 
@@ -18,7 +18,7 @@ Core Data APIs enable you to query and retrieve data from your Cube semantic lay
 
 * To connect to AI assistants, use the [Model Context Protocol (MCP) server][ref-mcp-server]
 
-* For internal or self-serve [business intelligence][cube-issbi], use [Semantic Layer Sync][ref-sls] if it supports your BI tools. Otherwise, connect via the [SQL API][ref-sql-api] directly
+* For internal or self-serve [business intelligence][cube-issbi], connect via the [SQL API][ref-sql-api]
 
 * For [embedded analytics][cube-ea] and [real-time analytics][cube-rta], use [REST (JSON) API][ref-rest-api] or [GraphQL API][ref-graphql-api]. When using the REST (JSON) API, the [JavaScript SDK][ref-js-sdk] can simplify integration with your front-end code
 
@@ -38,9 +38,8 @@ tools][ref-viz-tools]. Some of the features with partial support are listed belo
 
 | Feature | ✅ Supported in |
 | --- | --- |
-| [Hierarchies][ref-hierarchies] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
-| Flat [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>[Apache Superset][ref-superset] via [Semantic Layer Sync][ref-sls]<br/>[Preset][ref-preset] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
-| Nested [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api] |
+| [Hierarchies][ref-hierarchies] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/><br/>Also, supported in [Playground][ref-playground] |
+| Flat [folders][ref-folders] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/><br/>Also, supported in [Playground][ref-playground] |
 | [Custom time formats][ref-custom-time-formats] | [Playground][ref-playground] and [Workbooks][ref-workbooks] |
 
 ## Personal Core Data API Token
@@ -62,8 +61,8 @@ tools][ref-viz-tools]:
 
 | Method | ✅ Supported in |
 | --- | --- |
-| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
-| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
+| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[SQL API][ref-sql-api] |
+| Kerberos and NTLM | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
 | [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
 | [JSON Web Token][ref-auth-jwt] | [REST (JSON) API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
 
@@ -76,7 +75,6 @@ tools][ref-viz-tools]:
 [ref-mdx-api]: /reference/core-data-apis/mdx-api
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
-[ref-sls]: /docs/integrations/semantic-layer-sync
 [ref-js-sdk]: /reference/javascript-sdk
 [ref-cube-cloud-for-excel]: /docs/integrations/microsoft-excel
 [ref-cube-cloud-for-sheets]: /docs/integrations/google-sheets
@@ -84,17 +82,11 @@ tools][ref-viz-tools]:
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
 [ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-folders]: /reference/data-modeling/view#folders
-[ref-powerbi]: /admin/connect-to-data/visualization-tools/powerbi
 [ref-excel]: /admin/connect-to-data/visualization-tools/excel
 [ref-sheets]: /admin/connect-to-data/visualization-tools/google-sheets
-[ref-tableau]: /admin/connect-to-data/visualization-tools/tableau
 [ref-auth-user-pass]: /embedding/authentication/jwt
 [ref-auth-idp]: /embedding/authentication/jwt
 [ref-auth-jwt]: /embedding/authentication/jwt
-[ref-auth-kerberos]: /docs/integrations/power-bi/kerberos
-[ref-auth-ntlm]: /docs/integrations/power-bi/ntlm
-[ref-superset]: /admin/connect-to-data/visualization-tools/superset
-[ref-preset]: /admin/connect-to-data/visualization-tools/superset
 [ref-playground]: /docs/explore-analyze/playground
 [ref-custom-time-formats]: /reference/data-modeling/dimensions#format
 [ref-workbooks]: /docs/explore-analyze/workbooks
