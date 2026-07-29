@@ -50,6 +50,12 @@ impl Debug for MemberSymbol {
     }
 }
 
+/// Member identity: two symbols are equal when they refer to the same
+/// data-model member (same `full_name`) as the same variant. The
+/// symbol *content* does not participate — derived forms of a member
+/// (a time shift, a state aggregation, a stripped join prefix) compare
+/// equal to the original. Do not use this equality to distinguish
+/// forms; it answers "the same member?", not "the same symbol?".
 impl PartialEq for MemberSymbol {
     fn eq(&self, other: &Self) -> bool {
         self.full_name() == other.full_name()
