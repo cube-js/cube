@@ -17,17 +17,37 @@ the local database (bootstrapped in the `docker-compose.yml` file) which has the
 same data model.
 
 To enable multitenancy, use the
-[`contextToAppId`](/reference/configuration/config#context_to_app_id) function to
-provide distinct identifiers for each tenant. Also, implement the
+[`contextToAppId`](/reference/configuration/config#context_to_app_id) and
+[`contextToOrchestratorId`](/reference/configuration/config#context_to_orchestrator_id)
+functions to provide distinct identifiers for each tenant. Also, implement the
 [`driverFactory`](/reference/configuration/config#driver_factory) function where
 you can select a data source based on the tenant name.
 [JSON Web Token](/docs/data-modeling/access-control) includes information about the tenant name in
 the `tenant` property of the `securityContext`.
 
+<Warning>
+
+Whenever `driverFactory` picks a connection based on the `securityContext`, you
+must also define `contextToOrchestratorId` and derive it from the same tenant
+identifier. `driverFactory` is called
+[once per data source for every orchestrator id](/reference/configuration/config#driver_factory),
+and the orchestrator id defaults to a single global value for all tenants — so
+without it, every tenant reuses the database connection resolved for whichever
+tenant queried first, and one tenant receives another tenant's data.
+
+</Warning>
+
 ```javascript
 module.exports = {
   // Provides distinct identifiers for each tenant which are used as caching keys
+  // for the data model compilation results
   contextToAppId: ({ securityContext }) =>
+    `CUBE_APP_${securityContext.tenant}`,
+
+  // Caching key for database connections, execution queues and pre-aggregation
+  // table caches. Must be tenant-specific because driverFactory below selects a
+  // connection based on the security context
+  contextToOrchestratorId: ({ securityContext }) =>
     `CUBE_APP_${securityContext.tenant}`,
 
   // Selects the database connection configuration based on the tenant name

@@ -1202,4 +1202,62 @@ describe('OptsHandler class', () => {
     expect(Array.isArray(permissions)).toBeTruthy();
     expect(permissions).toEqual(['graphql', 'meta', 'data', 'jobs']);
   });
+
+  describe('contextToOrchestratorId warning', () => {
+    const WARNING_MSG = 'Multitenancy Without ContextToOrchestratorId';
+
+    const tenantId = ({ securityContext }: any) => (
+      `CUBE_APP_${securityContext.tenant}`
+    );
+
+    const buildCore = (opts: CreateOptions) => {
+      const logger = jest.fn();
+      const core = new CubejsServerCoreExposed({
+        ...conf,
+        logger,
+        scheduledRefreshTimer: false,
+        ...opts,
+      });
+
+      expect(core.options).toBeDefined();
+
+      return logger.mock.calls.filter((call) => call[0] === WARNING_MSG);
+    };
+
+    test('must warn on tenant-specific driverFactory without contextToOrchestratorId', () => {
+      const warnings = buildCore({
+        contextToAppId: tenantId,
+        driverFactory: ({ securityContext }: any) => ({
+          type: <DatabaseType>'postgres',
+          database: `tenant_${securityContext.tenant}`,
+        }),
+      });
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0][1].warning).toContain('contextToOrchestratorId');
+    });
+
+    test('must not warn when contextToOrchestratorId is configured', () => {
+      const warnings = buildCore({
+        contextToAppId: tenantId,
+        contextToOrchestratorId: tenantId,
+        driverFactory: ({ securityContext }: any) => ({
+          type: <DatabaseType>'postgres',
+          database: `tenant_${securityContext.tenant}`,
+        }),
+      });
+
+      expect(warnings).toHaveLength(0);
+    });
+
+    test('must not warn without a custom driverFactory', () => {
+      process.env.CUBEJS_DB_TYPE = 'postgres';
+
+      const warnings = buildCore({
+        contextToAppId: tenantId,
+      });
+
+      expect(warnings).toHaveLength(0);
+    });
+  });
 });

@@ -2,7 +2,15 @@ const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 module.exports = {
   // Provides distinct identifiers for each tenant which are used as caching keys
+  // for the data model compilation results
   contextToAppId: ({ securityContext }) =>
+    `CUBEJS_APP_${securityContext.tenant}`,
+
+  // Caching key for database connections, execution queues and pre-aggregation
+  // table caches. It must be tenant-specific whenever driverFactory selects a
+  // connection based on the security context, otherwise every tenant shares the
+  // driver resolved for whichever tenant queried first.
+  contextToOrchestratorId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.tenant}`,
 
   // Selects the database connection configuration based on the tenant name

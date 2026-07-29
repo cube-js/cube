@@ -55,6 +55,11 @@ It's a [multitenancy][ref-multitenancy] option.
 caching key for various in-memory structures like data model compilation
 results, etc.
 
+It does not key database connections, execution queues, or pre-aggregation table
+caches — those use [`context_to_orchestrator_id`][self-orchestrator-id], which
+you must also define if [`driver_factory`][self-driver-factory] selects a
+connection based on the security context.
+
 Called on each request.
 
 <CodeGroup>
@@ -320,6 +325,15 @@ query orchestrator instance. The query orchestrator holds database connections,
 execution queues, pre-aggregation table caches. By default, the same instance is
 used for **all** tenants; override this property in situations where each tenant
 requires their own Query Orchestrator.
+
+Overriding it is **required** whenever [`driver_factory`][self-driver-factory]
+selects a connection based on the security context, and the id must be derived
+from the same tenant identifier. Setting
+[`context_to_app_id`][self-opts-ctx-to-appid] alone is not enough: the app id keys
+the data model compilation cache, while the driver is resolved once per data
+source per *orchestrator* id. With the default single global orchestrator id,
+every tenant reuses the connection resolved for whichever tenant queried first,
+so one tenant receives another tenant's data.
 
 <Warning>
 
@@ -1511,6 +1525,7 @@ module.exports = {
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#api-scopes
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
+[self-driver-factory]: #driver_factory
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [ref-websockets]: /recipes/core-data-api/real-time-data-fetch
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations
