@@ -9,6 +9,7 @@ mod member_expression_symbol;
 mod member_symbol;
 mod symbol_factory;
 mod time_dimension_symbol;
+pub mod transforms;
 
 pub use common::*;
 pub use cube_symbol::{

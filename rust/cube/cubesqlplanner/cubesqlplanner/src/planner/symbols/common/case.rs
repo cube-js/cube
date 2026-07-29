@@ -5,7 +5,7 @@ use crate::{
         case_switch_definition::CaseSwitchDefinition as NativeCaseSwitchDefinition,
         case_variant::CaseVariant, string_or_sql::StringOrSql,
     },
-    planner::{find_value_restriction, Compiler, MemberSymbol, SqlCall},
+    planner::{symbols::transforms::find_value_restriction, Compiler, MemberSymbol, SqlCall},
 };
 use cubenativeutils::CubeError;
 use itertools::Itertools;

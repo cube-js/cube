@@ -43,16 +43,16 @@ impl SymbolDeps for MemberExpressionExpression {
 /// full name lives in the `expr:` namespace.
 #[derive(Clone)]
 pub struct MemberExpressionSymbol {
-    compiled_path: CompiledMemberPath,
-    expression: MemberExpressionExpression,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) expression: MemberExpressionExpression,
     #[allow(dead_code)]
-    definition: Option<String>,
-    is_reference: bool,
-    parenthesized: bool,
+    pub(super) definition: Option<String>,
+    pub(super) is_reference: bool,
+    pub(super) parenthesized: bool,
     /// True when this expression materialises a `segments:` entry used as a
     /// selected dimension (in a pre-aggregation). Such a boolean must be
     /// wrapped per dialect when projected/grouped (e.g. MSSQL `BIT`).
-    is_segment: bool,
+    pub(super) is_segment: bool,
 }
 
 symbol_deps! {
@@ -122,12 +122,6 @@ impl MemberExpressionSymbol {
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
-    }
-
-    /// Trims the join-chain prefix from `compiled_path` in place so
-    /// the path points only at the owning cube.
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
     }
 
     /// Full unique identifier of the symbol; lives in the `expr:`

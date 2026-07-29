@@ -16,13 +16,13 @@ use std::rc::Rc;
 /// top of an existing time dimension.
 #[derive(Clone)]
 pub struct TimeDimensionSymbol {
-    base_symbol: Rc<MemberSymbol>,
-    compiled_path: CompiledMemberPath,
-    granularity: Option<String>,
-    granularity_obj: Option<Granularity>,
-    date_range: Option<(String, String)>,
-    alias_suffix: String,
-    alias_override: Option<String>,
+    pub(super) base_symbol: Rc<MemberSymbol>,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) granularity: Option<String>,
+    pub(super) granularity_obj: Option<Granularity>,
+    pub(super) date_range: Option<(String, String)>,
+    pub(super) alias_suffix: String,
+    pub(super) alias_override: Option<String>,
 }
 
 symbol_deps! {
@@ -148,12 +148,6 @@ impl TimeDimensionSymbol {
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
-    }
-
-    /// Trims the join-chain prefix from `compiled_path` in place so
-    /// the path points only at the owning cube.
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
     }
 
     /// Full unique identifier of the symbol: cube path, base

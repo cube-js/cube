@@ -233,33 +233,6 @@ impl MemberSymbol {
         false
     }
 
-    /// Returns a copy of this symbol with the path reduced to just the owning cube,
-    /// stripping any join chain prefix (e.g. from views or cross-cube references).
-    pub fn with_stripped_join_prefix(&self) -> Rc<Self> {
-        match self {
-            Self::Dimension(d) => {
-                let mut new = (**d).clone();
-                new.strip_join_prefix();
-                Rc::new(Self::Dimension(Rc::new(new)))
-            }
-            Self::TimeDimension(d) => {
-                let mut new = (**d).clone();
-                new.strip_join_prefix();
-                Rc::new(Self::TimeDimension(Rc::new(new)))
-            }
-            Self::Measure(m) => {
-                let mut new = (**m).clone();
-                new.strip_join_prefix();
-                Rc::new(Self::Measure(Rc::new(new)))
-            }
-            Self::MemberExpression(e) => {
-                let mut new = (**e).clone();
-                new.strip_join_prefix();
-                Rc::new(Self::MemberExpression(Rc::new(new)))
-            }
-        }
-    }
-
     /// `MemberExpression` symbols are never owned by a cube; for the other
     /// variants, the answer comes from the underlying member definition.
     pub fn owned_by_cube(&self) -> bool {

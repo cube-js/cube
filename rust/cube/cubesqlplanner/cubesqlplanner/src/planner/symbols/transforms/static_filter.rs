@@ -1,7 +1,8 @@
-use cubenativeutils::CubeError;
-
+use super::super::common::Case;
+use super::super::dimension_kinds::DimensionKind;
+use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
-use crate::planner::MemberSymbol;
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub fn find_value_restriction(
@@ -45,14 +46,18 @@ pub fn apply_static_filter_to_symbol(
             MemberSymbol::Dimension(dim) => {
                 if let Some(case) = dim.case() {
                     if let Some(new_case) = case.apply_static_filter(filters) {
-                        return Ok(MemberSymbol::new_dimension(dim.replace_case(new_case)));
+                        return Ok(MemberSymbol::new_dimension(replace_dimension_case(
+                            dim, new_case,
+                        )));
                     }
                 }
             }
             MemberSymbol::Measure(meas) => {
                 if let Some(case) = meas.case() {
                     if let Some(new_case) = case.apply_static_filter(filters) {
-                        return Ok(MemberSymbol::new_measure(meas.replace_case(new_case)));
+                        return Ok(MemberSymbol::new_measure(replace_measure_case(
+                            meas, new_case,
+                        )));
                     }
                 }
             }
@@ -89,4 +94,22 @@ pub fn apply_static_filter_to_filter_item(
         }
     }
     Ok(result)
+}
+
+fn replace_measure_case(measure: &MeasureSymbol, new_case: Case) -> Rc<MeasureSymbol> {
+    let mut new = measure.clone();
+    new.case = Some(new_case);
+    Rc::new(new)
+}
+
+fn replace_dimension_case(dimension: &DimensionSymbol, new_case: Case) -> Rc<DimensionSymbol> {
+    let mut new = dimension.clone();
+    if new_case.is_single_value() {
+        //FIXME - Hack: we don't treat a single-element case as a multi-stage dimension
+        new.multi_stage = None;
+    }
+    if let DimensionKind::Case(ref c) = new.kind {
+        new.kind = DimensionKind::Case(c.replace_case(new_case));
+    }
+    Rc::new(new)
 }

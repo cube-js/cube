@@ -6,7 +6,6 @@ use super::{
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
-use crate::planner::apply_static_filter_to_symbol;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::collectors::member_childs;
 use crate::planner::filter::base_filter::FilterType;
@@ -14,6 +13,7 @@ use crate::planner::filter::BaseFilter;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOperator;
 use crate::planner::state::State;
+use crate::planner::symbols::transforms;
 use crate::planner::symbols::AggregationType;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
@@ -465,7 +465,8 @@ impl MultiStageQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
-        let member = apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
+        let member =
+            transforms::apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
         let state = if member.is_dimension() {
             let mut new_state = state.as_ref().clone();
             new_state.remove_multistage_dimensions(resolved_multi_stage_dimensions)?;
@@ -701,7 +702,7 @@ impl MultiStageQueryPlanner {
                     }
                 }
 
-                let base_member = MemberSymbol::new_measure(measure.new_unrolling());
+                let base_member = MemberSymbol::new_measure(transforms::unroll_rolling(&measure));
 
                 if time_dimensions.is_empty() {
                     let base_state =

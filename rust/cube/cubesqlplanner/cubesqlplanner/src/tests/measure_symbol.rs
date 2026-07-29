@@ -1,5 +1,6 @@
-//! Tests for MeasureSymbol: kind classification, new_patched, and helper methods
+//! Tests for MeasureSymbol: kind classification, the patch_measure transform, and helper methods
 
+use crate::planner::symbols::transforms::patch_measure;
 use crate::planner::{AggregationType, CalculatedMeasureType, MeasureKind, SqlCall};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -177,10 +178,10 @@ fn measure_rolling_window_properties() {
     assert!(measure.is_cumulative());
 }
 
-// ─── new_patched: valid type replacements ───────────────────────────────────
+// ─── patch_measure: valid type replacements ───────────────────────────────────
 
 #[test]
-fn new_patched_sum_to_all_valid_targets() {
+fn patch_sum_to_all_valid_targets() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.total").unwrap();
     let measure = m.as_measure().unwrap();
@@ -197,8 +198,7 @@ fn new_patched_sum_to_all_valid_targets() {
         ),
     ];
     for (new_type, expected_agg) in cases {
-        let patched = measure
-            .new_patched(Some(new_type.to_string()), vec![])
+        let patched = patch_measure(&measure, Some(new_type.to_string()), vec![])
             .unwrap_or_else(|e| panic!("sum -> {} should succeed: {}", new_type, e));
         assert!(
             matches!(patched.kind(), MeasureKind::Aggregated(a) if a.agg_type() == expected_agg),
@@ -210,14 +210,10 @@ fn new_patched_sum_to_all_valid_targets() {
 }
 
 #[test]
-fn new_patched_avg_to_sum() {
+fn patch_avg_to_sum() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.average").unwrap();
-    let patched = m
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("sum".to_string()), vec![])
-        .unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), Some("sum".to_string()), vec![]).unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
@@ -225,45 +221,45 @@ fn new_patched_avg_to_sum() {
 }
 
 #[test]
-fn new_patched_count_distinct_family() {
+fn patch_count_distinct_family() {
     let ctx = ctx();
 
     let cd = ctx.create_measure("test_measures.distinct_count").unwrap();
-    let patched = cd
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("count_distinct_approx".to_string()), vec![])
-        .unwrap();
+    let patched = patch_measure(
+        &cd.as_measure().unwrap(),
+        Some("count_distinct_approx".to_string()),
+        vec![],
+    )
+    .unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinctApprox
     ));
 
     let cda = ctx.create_measure("test_measures.approx_count").unwrap();
-    let patched = cda
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("count_distinct".to_string()), vec![])
-        .unwrap();
+    let patched = patch_measure(
+        &cda.as_measure().unwrap(),
+        Some("count_distinct".to_string()),
+        vec![],
+    )
+    .unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
     ));
 }
 
-// ─── new_patched: invalid type replacements ─────────────────────────────────
+// ─── patch_measure: invalid type replacements ─────────────────────────────────
 
 #[test]
-fn new_patched_sum_invalid_targets() {
+fn patch_sum_invalid_targets() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.total").unwrap();
     let measure = m.as_measure().unwrap();
 
     for invalid in ["number", "count", "rank", "numberAgg"] {
         assert!(
-            measure
-                .new_patched(Some(invalid.to_string()), vec![])
-                .is_err(),
+            patch_measure(&measure, Some(invalid.to_string()), vec![]).is_err(),
             "sum -> {} should fail",
             invalid
         );
@@ -271,18 +267,14 @@ fn new_patched_sum_invalid_targets() {
 }
 
 #[test]
-fn new_patched_count_distinct_to_sum_error() {
+fn patch_count_distinct_to_sum_error() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.distinct_count").unwrap();
-    assert!(m
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("sum".to_string()), vec![])
-        .is_err());
+    assert!(patch_measure(&m.as_measure().unwrap(), Some("sum".to_string()), vec![]).is_err());
 }
 
 #[test]
-fn new_patched_non_patchable_types() {
+fn patch_non_patchable_types() {
     let ctx = ctx();
 
     let non_patchable = [
@@ -293,49 +285,46 @@ fn new_patched_non_patchable_types() {
     for path in non_patchable {
         let m = ctx.create_measure(path).unwrap();
         assert!(
-            m.as_measure()
-                .unwrap()
-                .new_patched(Some("sum".to_string()), vec![])
-                .is_err(),
+            patch_measure(&m.as_measure().unwrap(), Some("sum".to_string()), vec![]).is_err(),
             "{} -> sum should fail",
             path
         );
     }
 }
 
-// ─── new_patched: no type change (None) ─────────────────────────────────────
+// ─── patch_measure: no type change (None) ─────────────────────────────────────
 
 #[test]
-fn new_patched_none_preserves_kind() {
+fn patch_none_preserves_kind() {
     let ctx = ctx();
 
     let m = ctx.create_measure("test_measures.total").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::Sum
     ));
 
     let m = ctx.create_measure("test_measures.cnt").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(patched.kind(), MeasureKind::Count(_)));
 
     let m = ctx.create_measure("test_measures.calculated").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Calculated(c) if c.calc_type() == CalculatedMeasureType::Number
     ));
 
     let m = ctx.create_measure("test_measures.rank_measure").unwrap();
-    let patched = m.as_measure().unwrap().new_patched(None, vec![]).unwrap();
+    let patched = patch_measure(&m.as_measure().unwrap(), None, vec![]).unwrap();
     assert!(matches!(patched.kind(), MeasureKind::Rank));
 }
 
-// ─── new_patched: filter addition validation ────────────────────────────────
+// ─── patch_measure: filter addition validation ────────────────────────────────
 
 #[test]
-fn new_patched_filters_accepted_for_aggregatable_types() {
+fn patch_filters_accepted_for_aggregatable_types() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
@@ -348,10 +337,7 @@ fn new_patched_filters_accepted_for_aggregatable_types() {
     ];
     for path in accept_filters {
         let m = ctx.create_measure(path).unwrap();
-        let patched = m
-            .as_measure()
-            .unwrap()
-            .new_patched(None, filters.clone())
+        let patched = patch_measure(&m.as_measure().unwrap(), None, filters.clone())
             .unwrap_or_else(|e| panic!("{} + filters should succeed: {}", path, e));
         assert!(
             !patched.measure_filters().is_empty(),
@@ -364,17 +350,14 @@ fn new_patched_filters_accepted_for_aggregatable_types() {
 // Fixed: countDistinct/countDistinctApprox now correctly support filters
 // via MeasureKind::supports_additional_filters() pattern matching.
 #[test]
-fn new_patched_count_distinct_accepts_filters() {
+fn patch_count_distinct_accepts_filters() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
     for path in ["test_measures.distinct_count", "test_measures.approx_count"] {
         let m = ctx.create_measure(path).unwrap();
         assert!(
-            m.as_measure()
-                .unwrap()
-                .new_patched(None, filters.clone())
-                .is_ok(),
+            patch_measure(&m.as_measure().unwrap(), None, filters.clone()).is_ok(),
             "{} + filters should be Ok",
             path
         );
@@ -382,7 +365,7 @@ fn new_patched_count_distinct_accepts_filters() {
 }
 
 #[test]
-fn new_patched_filters_rejected_for_non_aggregatable_types() {
+fn patch_filters_rejected_for_non_aggregatable_types() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
@@ -394,29 +377,27 @@ fn new_patched_filters_rejected_for_non_aggregatable_types() {
     for path in reject_filters {
         let m = ctx.create_measure(path).unwrap();
         assert!(
-            m.as_measure()
-                .unwrap()
-                .new_patched(None, filters.clone())
-                .is_err(),
+            patch_measure(&m.as_measure().unwrap(), None, filters.clone()).is_err(),
             "{} + filters should fail",
             path
         );
     }
 }
 
-// ─── new_patched: combined type change + filters ────────────────────────────
+// ─── patch_measure: combined type change + filters ────────────────────────────
 
 #[test]
-fn new_patched_type_change_with_filters() {
+fn patch_type_change_with_filters() {
     let ctx = ctx();
     let filters = get_filter_calls(&ctx);
 
     let m = ctx.create_measure("test_measures.total").unwrap();
-    let patched = m
-        .as_measure()
-        .unwrap()
-        .new_patched(Some("count_distinct".to_string()), filters)
-        .unwrap();
+    let patched = patch_measure(
+        &m.as_measure().unwrap(),
+        Some("count_distinct".to_string()),
+        filters,
+    )
+    .unwrap();
     assert!(matches!(
         patched.kind(),
         MeasureKind::Aggregated(a) if a.agg_type() == AggregationType::CountDistinct
@@ -425,7 +406,7 @@ fn new_patched_type_change_with_filters() {
 }
 
 #[test]
-fn new_patched_appends_to_existing_filters() {
+fn patch_appends_to_existing_filters() {
     let ctx = ctx();
     let m = ctx.create_measure("test_measures.filtered_total").unwrap();
     let measure = m.as_measure().unwrap();
@@ -433,7 +414,7 @@ fn new_patched_appends_to_existing_filters() {
     assert!(original_count > 0);
 
     let new_filters = get_filter_calls(&ctx);
-    let patched = measure.new_patched(None, new_filters.clone()).unwrap();
+    let patched = patch_measure(&measure, None, new_filters.clone()).unwrap();
     assert_eq!(
         patched.measure_filters().len(),
         original_count + new_filters.len()
