@@ -184,7 +184,13 @@ impl ConfigObjImpl {
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
-            non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
+            // Cap on rows a non-streaming (one-shot) query may fetch, and the threshold
+            // above which CUBESQL_STREAM_MODE switches a query to streaming.
+            non_streaming_query_max_row_limit: env_optparse(
+                "CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT",
+            )
+            .or_else(|| env_optparse("CUBEJS_DB_QUERY_LIMIT"))
+            .unwrap_or(50000),
             cube_scan_max_batch_rows: env_parse("CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS", 65536),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
