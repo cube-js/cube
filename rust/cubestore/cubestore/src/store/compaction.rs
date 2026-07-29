@@ -23,9 +23,10 @@ use crate::CubeError;
 use async_trait::async_trait;
 use chrono::Utc;
 use datafusion::arrow::array::UInt64Array;
-use datafusion::arrow::compute::{concat_batches, SortOptions};
+use datafusion::arrow::compute::{concat_batches, CastOptions, SortOptions};
 use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::util::display::FormatOptions;
 use datafusion::config::TableParquetOptions;
 use datafusion::cube_ext;
 use datafusion::datasource::listing::PartitionedFile;
@@ -40,7 +41,8 @@ use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::expressions::{Column, Literal};
+use datafusion::physical_plan::expressions::{CastExpr, Column, Literal};
+use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, SendableRecordBatchStream};
@@ -310,7 +312,7 @@ impl CompactionServiceImpl {
             )
             .await?;
             let batches = collect(batches_stream).await?;
-            let batch = concat_batches(&schema, &batches).unwrap();
+            let batch = concat_batches(&schema, &batches)?;
 
             let oldest_insert_at = group_chunks
                 .iter()
@@ -413,7 +415,7 @@ impl CompactionServiceImpl {
             self.meta_store.deactivate_chunks(old_chunk_ids).await?;
             return Ok(());
         }
-        let batch = concat_batches(&schema, &batches).unwrap();
+        let batch = concat_batches(&schema, &batches)?;
 
         let (chunk, file_size) = self
             .chunk_store
@@ -1555,6 +1557,49 @@ pub(crate) async fn write_chunks_split_into_children(
         .unwrap())
 }
 
+/// Wraps `plan` into a projection that casts every column whose type diverged from `schema`
+/// back to the declared type. DataFusion widens some aggregate output types (e.g. a decimal
+/// SUM gains 10 digits of precision), while chunk data must keep the index schema.
+pub fn cast_plan_to_schema(
+    plan: Arc<dyn ExecutionPlan>,
+    schema: &Arc<Schema>,
+) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
+    let plan_schema = plan.schema();
+    if plan_schema.fields().len() != schema.fields().len() {
+        return Err(CubeError::internal(format!(
+            "Cannot cast plan schema {} to {}: different number of columns",
+            plan_schema, schema
+        )));
+    }
+    let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = Vec::with_capacity(schema.fields().len());
+    let mut needs_cast = false;
+    for (i, target) in schema.fields().iter().enumerate() {
+        let source = plan_schema.field(i);
+        let col: Arc<dyn PhysicalExpr> = Arc::new(Column::new(source.name().as_str(), i));
+        let expr: Arc<dyn PhysicalExpr> = if source.data_type() == target.data_type() {
+            col
+        } else {
+            needs_cast = true;
+            // safe: false so a value that doesn't fit the declared type (e.g. a sum
+            // overflowing the declared decimal precision) fails the job instead of
+            // silently becoming NULL.
+            Arc::new(CastExpr::new(
+                col,
+                target.data_type().clone(),
+                Some(CastOptions {
+                    safe: false,
+                    format_options: FormatOptions::default(),
+                }),
+            ))
+        };
+        exprs.push((expr, target.name().clone()));
+    }
+    if !needs_cast {
+        return Ok(plan);
+    }
+    Ok(Arc::new(ProjectionExec::try_new(exprs, plan)?))
+}
+
 /// Builds a `SendableRecordBatchStream` merging the persistent partition data `l` with the
 /// already-sorted chunk inputs `r` (one sorted ExecutionPlan per chunk). Inputs are merged with a
 /// k-way `SortPreservingMergeExec` instead of being concatenated and re-sorted.
@@ -1608,8 +1653,9 @@ pub async fn merge_chunks(
             aggregates,
             vec![None; aggregates_len],
             res.clone(),
-            schema,
+            schema.clone(),
         )?);
+        res = cast_plan_to_schema(res, &schema)?;
     } else if let Some(key_columns) = unique_key_columns {
         res = Arc::new(LastRowByUniqueKeyExec::try_new(
             res.clone(),
@@ -1675,7 +1721,7 @@ mod tests {
     use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use crate::table::{cmp_same_types, Row, TableValue};
     use cuberockstore::rocksdb::{Options, DB};
-    use datafusion::arrow::array::{ArrayRef, Int64Array, StringArray};
+    use datafusion::arrow::array::{ArrayRef, Decimal128Array, Int64Array, StringArray};
     use datafusion::arrow::datatypes::{Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::collect;
@@ -2309,6 +2355,14 @@ mod tests {
             Column::new("foo".to_string(), ColumnType::String, 0),
             Column::new("boo".to_string(), ColumnType::Int, 1),
             Column::new("sum_int".to_string(), ColumnType::Int, 2),
+            Column::new(
+                "sum_dec".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                3,
+            ),
         ];
         let table = metastore
             .create_table(
@@ -2325,7 +2379,10 @@ mod tests {
                 None,
                 None,
                 None,
-                Some(vec![("sum".to_string(), "sum_int".to_string())]),
+                Some(vec![
+                    ("sum".to_string(), "sum_int".to_string()),
+                    ("sum".to_string(), "sum_dec".to_string()),
+                ]),
                 None,
                 None,
                 false,
@@ -2356,6 +2413,11 @@ mod tests {
             ])),
             Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10])),
             Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
+            Arc::new(
+                Decimal128Array::from(vec![100000_i128, 200000, 300000, 400000, 500000])
+                    .with_precision_and_scale(18, 5)
+                    .unwrap(),
+            ),
         ];
         let data2: Vec<ArrayRef> = vec![
             Arc::new(StringArray::from(vec![
@@ -2368,6 +2430,18 @@ mod tests {
             ])),
             Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30])),
             Arc::new(Int64Array::from(vec![10, 20, 30, 40, 50, 60])),
+            Arc::new(
+                Decimal128Array::from(vec![
+                    1000000_i128,
+                    2000000,
+                    3000000,
+                    4000000,
+                    5000000,
+                    6000000,
+                ])
+                .with_precision_and_scale(18, 5)
+                .unwrap(),
+            ),
         ];
 
         let (chunk, _) = chunk_store
@@ -2458,7 +2532,21 @@ mod tests {
         let boos = Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30]));
 
         let sums = Arc::new(Int64Array::from(vec![11, 22, 33, 44, 55, 60]));
-        let expected: Vec<ArrayRef> = vec![foos, boos, sums];
+        // The decimal sum's DataFusion output is wider than the declared Decimal128(18, 5);
+        // compaction must cast it back to the index schema.
+        let dec_sums = Arc::new(
+            Decimal128Array::from(vec![
+                1100000_i128,
+                2200000,
+                3300000,
+                4400000,
+                5500000,
+                6000000,
+            ])
+            .with_precision_and_scale(18, 5)
+            .unwrap(),
+        );
+        let expected: Vec<ArrayRef> = vec![foos, boos, sums, dec_sums];
 
         assert_eq!(res_data.columns(), &expected);
 

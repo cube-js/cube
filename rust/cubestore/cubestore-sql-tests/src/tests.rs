@@ -293,6 +293,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             aggregate_index_with_hll_bytes,
         ),
         t("aggregate_index_errors", aggregate_index_errors),
+        t("aggregate_index_decimal", aggregate_index_decimal),
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
@@ -395,6 +396,8 @@ lazy_static::lazy_static! {
     static ref MIGRATION_TEST_EXCLUSION_SET: HashSet<String> = [
         // Tests that would fail and are useless as a migration test.
         "aggregate_index_errors",
+        // Old versions panic building an aggregating index over a decimal measure.
+        "aggregate_index_decimal",
         "create_table_with_location_invalid_digit",
         "create_table_with_url",
         "hyperloglog_inserts",
@@ -8824,6 +8827,90 @@ async fn aggregate_index_errors(service: Box<dyn SqlClient>) -> Result<(), CubeE
         )
         .await
         .expect_err("Aggregate function MERGE not allowed for column type integer");
+    Ok(())
+}
+
+async fn aggregate_index_decimal(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+
+    // Building an aggregating index runs sum() over the chunk data, and DataFusion widens a
+    // decimal sum's precision. The result must be cast back to the declared column type
+    // instead of failing the chunk build.
+    let file = write_tmp_file(indoc! {"
+        k,v,i
+        books,900.00000,10
+        books,100.50000,20
+        toys,90.00000,5
+        toys,9.50000,7
+    "})?;
+    let path = file.path().to_string_lossy();
+    service
+        .exec_query(
+            format!(
+                "CREATE TABLE s.Orders(k varchar, v decimal, i int)
+                     AGGREGATIONS(sum(v), sum(i))
+                     AGGREGATE INDEX k_agg (k)
+                     LOCATION '{}'",
+                path
+            )
+            .as_str(),
+        )
+        .await?;
+
+    let res = service
+        .exec_query("SELECT k, sum(v), sum(i) FROM s.Orders GROUP BY 1 ORDER BY 1")
+        .await?;
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::String("books".to_string()),
+                TableValue::Decimal(Decimal::new(100050000)),
+                TableValue::Int(30)
+            ],
+            [
+                TableValue::String("toys".to_string()),
+                TableValue::Decimal(Decimal::new(9950000)),
+                TableValue::Int(12)
+            ],
+        ]
+    );
+
+    // The same shape over INSERT-ed data exercises the in-memory ingestion path.
+    service
+        .exec_query(
+            "CREATE TABLE s.OrdersIns(k varchar, v decimal, i int)
+                     AGGREGATIONS(sum(v), sum(i))
+                     AGGREGATE INDEX k_agg (k)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.OrdersIns (k, v, i) VALUES ('books', 900.00000, 10), \
+                                                      ('books', 100.50000, 20), \
+                                                      ('toys', 90.00000, 5), \
+                                                      ('toys', 9.50000, 7)",
+        )
+        .await?;
+
+    let res = service
+        .exec_query("SELECT k, sum(v), sum(i) FROM s.OrdersIns GROUP BY 1 ORDER BY 1")
+        .await?;
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::String("books".to_string()),
+                TableValue::Decimal(Decimal::new(100050000)),
+                TableValue::Int(30)
+            ],
+            [
+                TableValue::String("toys".to_string()),
+                TableValue::Decimal(Decimal::new(9950000)),
+                TableValue::Int(12)
+            ],
+        ]
+    );
     Ok(())
 }
 
