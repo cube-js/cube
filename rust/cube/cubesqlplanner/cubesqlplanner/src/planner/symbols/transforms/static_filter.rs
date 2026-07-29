@@ -71,29 +71,9 @@ pub fn apply_static_filter_to_filter_item(
     filter_item: &FilterItem,
     filters: &Vec<FilterItem>,
 ) -> Result<FilterItem, CubeError> {
-    let mut result = filter_item.clone();
-    match &mut result {
-        FilterItem::Group(group) => {
-            let mut new_group = group.as_ref().clone();
-            for item in new_group.items.iter_mut() {
-                *item = apply_static_filter_to_filter_item(item, filters)?;
-            }
-            *group = Rc::new(new_group);
-        }
-        FilterItem::Item(item) => {
-            *item = item.with_member_evaluator(apply_static_filter_to_symbol(
-                &item.raw_member_evaluator(),
-                filters,
-            )?)?;
-        }
-        FilterItem::Segment(item) => {
-            *item = item.with_member_evaluator(apply_static_filter_to_symbol(
-                &item.member_evaluator(),
-                filters,
-            )?);
-        }
-    }
-    Ok(result)
+    super::map_filter_item_symbols(filter_item, &|symbol| {
+        apply_static_filter_to_symbol(symbol, filters)
+    })
 }
 
 fn replace_measure_case(measure: &MeasureSymbol, new_case: Case) -> Rc<MeasureSymbol> {

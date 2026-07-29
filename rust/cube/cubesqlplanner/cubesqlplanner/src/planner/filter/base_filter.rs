@@ -98,11 +98,11 @@ impl BaseFilter {
         &self,
         member_evaluator: Rc<MemberSymbol>,
     ) -> Result<Rc<Self>, CubeError> {
-        // No compiler here (called from static-filter symbol rewriting, which
-        // has none). A member swap keeps the same operator/values, so the only
-        // branch that would need a compiler is a to_date rolling window — not
-        // reachable from this path. FIXME: removed once granularities are
-        // resolved during early compilation rather than at filter-build time.
+        // No compiler here. A member swap keeps the same operator/values, so
+        // the only branch that would need a compiler is a to_date rolling
+        // window — not reachable from this path. FIXME: removed once
+        // granularities are resolved during early compilation rather than at
+        // filter-build time.
         let typed_filter = self
             .typed_filter
             .to_builder()

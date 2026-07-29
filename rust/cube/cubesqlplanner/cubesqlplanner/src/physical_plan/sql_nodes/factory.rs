@@ -34,7 +34,6 @@ pub struct SqlNodesFactory {
     multi_stage_rank: Option<Vec<String>>,   //partition_by
     multi_stage_window: Option<Vec<String>>, //partition_by
     rolling_window: bool,
-    dimensions_with_ignored_timezone: HashSet<String>,
     use_local_tz_in_date_range: bool,
     original_sql_pre_aggregations: HashMap<String, String>,
     // Full names of the members present in the query GROUP BY. Used by
@@ -114,10 +113,6 @@ impl SqlNodesFactory {
 
     pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<String, String>) {
         self.original_sql_pre_aggregations = value;
-    }
-
-    pub fn add_dimensions_with_ignored_timezone(&mut self, value: String) {
-        self.dimensions_with_ignored_timezone.insert(value);
     }
 
     pub fn set_multi_stage_rank(&mut self, partition_by: Vec<String>) {
@@ -346,8 +341,7 @@ impl SqlNodesFactory {
 
         let input: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(input);
 
-        let input: Rc<dyn SqlNode> =
-            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
+        let input: Rc<dyn SqlNode> = TimeDimensionNode::new(input);
 
         let input = if !self.calendar_time_shifts.is_empty() {
             CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
@@ -365,8 +359,7 @@ impl SqlNodesFactory {
     }
 
     fn time_dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        let input: Rc<dyn SqlNode> =
-            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
+        let input: Rc<dyn SqlNode> = TimeDimensionNode::new(input);
 
         input
     }

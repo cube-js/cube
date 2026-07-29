@@ -23,6 +23,10 @@ pub struct TimeDimensionSymbol {
     pub(super) date_range: Option<(String, String)>,
     pub(super) alias_suffix: String,
     pub(super) alias_override: Option<String>,
+    /// The rendered value comes from a source that stores it already
+    /// timezone-converted (a pre-aggregation rollup or an input CTE),
+    /// so rendering must not apply the timezone conversion again.
+    pub(super) ignore_timezone: bool,
 }
 
 symbol_deps! {
@@ -34,6 +38,7 @@ symbol_deps! {
         date_range: skip,
         alias_suffix: skip,
         alias_override: skip,
+        ignore_timezone: skip,
     }
 }
 
@@ -87,11 +92,16 @@ impl TimeDimensionSymbol {
             date_range,
             alias_suffix: name_suffix,
             alias_override,
+            ignore_timezone: false,
         })
     }
 
     pub fn base_symbol(&self) -> &Rc<MemberSymbol> {
         &self.base_symbol
+    }
+
+    pub fn ignore_timezone(&self) -> bool {
+        self.ignore_timezone
     }
 
     pub fn granularity(&self) -> &Option<String> {
