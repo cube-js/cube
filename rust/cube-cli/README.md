@@ -132,7 +132,7 @@ Every endpoint of the Console Server public API is covered:
 | `regions` | list available deployment regions |
 | `logs` | tail deployment pod logs (`--pod`, `-c/--container`; defaults to the Cube API container) |
 | `github` (`gh`) | status, installations, repos, branches, connect (import a repo into a deployment + first build) |
-| `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, dev-mode, exit-dev-mode, commit, pull. File writes only land on a **dev-mode branch**: `dev-mode <branch>` forks a personal `dev-…` branch and prints its name — pass that via `--branch` (or omit `--branch` to use your active dev-mode branch); puts to any other branch are rejected by the API |
+| `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, enable-branch, disable-branch, dev-mode, exit-dev-mode, commit, pull. File writes only land on a **dev-mode branch**: `dev-mode <branch>` forks a personal `dev-…` branch and prints its name — pass that via `--branch` (or omit `--branch` to use your active dev-mode branch); puts to any other branch are rejected by the API. `enable-branch` / `disable-branch` toggle whether a shared branch's staging environment stays always active (vs. only while viewed in the UI); `branches` reports it as `ENABLED` and `environments list --type staging` lists the enabled ones |
 | `environments` | list, tokens, create-token (incl. `--meta-sync`) |
 | `variables` | list, set (`KEY=VALUE` upserts) |
 | `folders` | list, create, update, delete, ancestors |
