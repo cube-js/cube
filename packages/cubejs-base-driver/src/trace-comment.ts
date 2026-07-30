@@ -22,6 +22,9 @@ const ALLOWED_CHARS = /[^A-Za-z0-9._:-]/g;
 
 const MAX_TRACE_ID_LENGTH = 128;
 
+/** Kept at module scope so the trailing-run scan doesn't re-evaluate a literal per character. */
+const WHITESPACE = /\s/;
+
 export function sanitizeTraceId(requestId: string | undefined | null): string {
   if (!requestId) {
     return '';
@@ -80,7 +83,7 @@ export function addTraceComment(sql: string, requestId: string | undefined | nul
     const ch = sql[end - 1];
     if (ch === ';') {
       sawSemicolon = true;
-    } else if (!/\s/.test(ch)) {
+    } else if (!WHITESPACE.test(ch)) {
       break;
     }
     end -= 1;
