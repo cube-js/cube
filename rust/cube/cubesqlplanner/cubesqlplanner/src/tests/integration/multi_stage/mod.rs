@@ -8,6 +8,7 @@ mod filter_directive;
 mod filters;
 mod granularities;
 mod group_by;
+mod include_switch;
 mod joins;
 mod multi_fact;
 mod multiple_measures;

@@ -144,11 +144,84 @@ automated — uses the same configuration:
 | **Title prefix** | `(dbt) ` | Prefix added to each generated cube's display title. |
 | **Model selector** | _(empty)_ | Optional dbt selector using `dbt ls --select` syntax to limit which models are pulled, e.g. `tag:cube` or `marts.*`. Leave empty to pull all models. |
 | **Only pull marts** | Off | When enabled, only pulls models whose path starts with the **Marts folder** value (e.g. `marts`). |
-| **Auto-detect primary keys** | On | Marks `id` / `*_id` columns (and columns with a dbt `primary_key` constraint) as the cube's primary key. |
+| **Auto-detect primary keys from column names** | On | Falls back to a column-name guess when dbt declares no key. See [Primary key detection](#primary-key-detection). |
+| **Primary key column suffixes** | `_id` | Comma-separated suffixes treated as key columns, e.g. `_sk, _key`. The default `_id` also matches a column named `id`. Only shown when **Auto-detect primary keys from column names** is on. |
+| **Detect primary keys from `unique` + `not_null` tests** | On | Treats a column carrying both dbt tests as the cube's primary key. Outranks the column-name guess. |
 | **Add default measures** | On | Adds a `count` measure to every cube, and `sum` measures for additive numeric columns. |
 | **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
 | **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
+| **Also generate reverse joins** | Off | Adds a `one_to_many` join back to the referencing cube, so a query can start from either side. Only shown when **Generate joins** is on. |
 | **Infer column types from dbt catalog** | Off | Reads real warehouse column types from dbt's `catalog.json` instead of guessing from column names. See [below](#infer-column-types-from-dbt-catalog). |
+
+### Primary key detection
+
+A cube's `primary_key` states the model's grain, and Cube relies on it to aggregate
+correctly across joins. The pull looks for it in three tiers and uses the first one that
+yields a key:
+
+1. **dbt `primary_key` constraints** — both column-level and model-level (composite)
+   constraint blocks. Always honored, even when both detection options are off.
+2. **Strict `unique` + `not_null` tests** on the same column. Only tests that actually
+   guarantee uniqueness count — a test with `where:`, `severity: warn`, or a relaxed
+   `error_if` is ignored.
+3. **Column-name suffixes**, `_id` by default.
+
+Only tier 1 can produce a **composite** key, because it's the only place where your dbt
+project states the grain. Tiers 2 and 3 mark exactly one column: two independently unique
+columns are two candidate keys, not a composite key. When several columns qualify, the
+pull prefers the one named after the model — `stg_customers` → `customer_id`, with layer
+prefixes (`stg_`, `dim_`, `fct_`, …) stripped and plurals reduced — and deprioritizes
+columns dbt declares as foreign keys, unless that would leave no candidate at all (on a
+1:1 satellite table, the foreign key *is* the table's own key).
+
+Separately from the tiers, a column that another cube joins to is marked as a key on the
+**referenced** cube — Cube can't resolve the join otherwise. This is additive: it applies
+whether or not the tiers already found a key, so a cube can end up with a declared key
+*plus* a joined-to column. The cube on the other side — the one that owns the foreign
+key — gets no key from this, which is the usual reason a cube in a join ends up without
+one.
+
+To key a cube on something the pull wouldn't guess — a composite key, or a column your
+suffixes don't cover — declare it in dbt. Constraints require an
+[enforced model contract](https://docs.getdbt.com/reference/resource-configs/contract),
+which in turn requires a `data_type` on every column of the model:
+
+```yaml
+models:
+  - name: dim_accounts
+    config:
+      contract:
+        enforced: true
+    constraints:
+      - type: primary_key
+        columns: [account_sk, valid_from]
+    columns:
+      - name: account_sk
+        data_type: varchar
+      - name: valid_from
+        data_type: timestamp
+      # …every other column of the model needs a data_type too
+```
+
+Your warehouse doesn't have to enforce primary keys for this to work — most don't. The
+pull only runs `dbt parse`, and reads the declaration out of `manifest.json`.
+
+If your project doesn't use contracts, tier 2 is the way to declare a single-column key:
+add `unique` and `not_null` tests to it.
+
+A declared key is never overridden or widened by the guessing tiers — only a joined-to
+column can add to it. If a cube that participates in a join ends up with no key at all,
+the pull still writes the file, and what happens next depends on the cube's measures:
+
+- **With a `count`, `sum`, `avg`, or `number` measure** — including the `count` that
+  **Add default measures** adds to every cube — the data model fails to compile with
+  `primary key for '<cube>' is required when join is defined in order to make aggregates
+  work properly`.
+- **Without one**, there's no compile error, but the join is dropped: a query that touches
+  both cubes then fails with `Can't find join path to join '<cube>', '<cube>'`.
+
+Either way, the generated `.yml` is where to check what the pull decided — every key it
+detected is a dimension with `primary_key: true`.
 
 ### Infer column types from dbt catalog
 
@@ -355,12 +428,15 @@ For each dbt model in your project:
 - **A `count` measure** is added to every cube.
 - **`total_<column>` sum measures** are added for numeric columns whose names suggest
   an additive metric (names containing `amount`, `price`, `cost`, `total`, or `value`).
-- **Primary keys** are detected from `id` / `*_id` columns and dbt `primary_key`
-  constraints, and the matching dimensions are marked `primary_key`.
+- **Primary keys** are detected from dbt `primary_key` constraints, then `unique` +
+  `not_null` tests, then column-name suffixes — see
+  [Primary key detection](#primary-key-detection).
 - **Joins between cubes** are generated from dbt `relationships` tests and
-  foreign-key constraints, with the relationship type (`many_to_one`,
-  `one_to_many`, or `one_to_one`) inferred from the models — so the generated data
-  model is queryable across cubes out of the box.
+  foreign-key constraints — so the generated data model is queryable across cubes out of
+  the box. The foreign-key column is on the "many" side, so every generated join is
+  `many_to_one` from the cube that owns it. A dbt relationship describes the reference
+  from the referencing side only, so nothing points back — enable **Also generate reverse
+  joins** to emit a `one_to_many` join back to the referencing cube too.
 
 Models named `metricflow_time_spine` and any non-model resources (sources, seeds,
 snapshots, etc.) are skipped.
@@ -538,7 +614,9 @@ Each push creates exactly two new files:
 - **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, Google
   BigQuery, Databricks, and Amazon Athena.
 - **Imports models, columns, and relationships only** — not dbt metrics, semantic
-  models, tests, or exposures.
+  models, or exposures. Data tests aren't converted into anything either; `unique`,
+  `not_null`, and `relationships` tests are only read as evidence for
+  [primary keys](#primary-key-detection) and joins.
 - **Pull is one-directional** — dbt pull never writes back to your dbt repository.
   Promoting cubes into dbt is the [dbt push](#push-cubes-to-dbt) direction (in preview).
 - **No warehouse connection** — a pull doesn't trigger a `dbt run`; it assumes your
@@ -632,6 +710,31 @@ Check that:
 dbt pull generates cube definitions that point at `schema.<model>`, but it doesn't
 build the tables. Make sure your production `dbt run` has materialized the models
 into the **dbt models schema** you configured, and that the schema matches.
+
+</Accordion>
+
+<Accordion title="A generated cube has no primary key, or the wrong one">
+
+- **No key at all** — the model has no `primary_key` constraint, no strict `unique` +
+  `not_null` pair, and no column matching the configured suffixes. Either declare the key
+  in dbt, or set **Primary key column suffixes** to your project's convention (e.g. `_sk`).
+- **A declared key was ignored** — a `primary_key` constraint is applied all-or-nothing.
+  If it names a column the model's `columns:` block doesn't document, the whole
+  declaration is skipped (rather than emitting a narrower, wrong grain) and the pull falls
+  back to the guessing tiers. Check that every column the constraint lists is also
+  documented under `columns:`.
+- **Wrong column** — declare the key in dbt and the pull will use it verbatim.
+
+Open the generated `.yml` to see what the pull decided: the key is whichever dimensions
+carry `primary_key: true`. See [Primary key detection](#primary-key-detection).
+
+</Accordion>
+
+<Accordion title="A query can't join two cubes in one direction">
+
+Joins generated from dbt follow the direction dbt declares them, and Cube's join graph is
+directed — so a query rooted at the referenced cube can't reach the cube that references
+it. Enable **Also generate reverse joins** in the pull settings and re-run the pull.
 
 </Accordion>
 

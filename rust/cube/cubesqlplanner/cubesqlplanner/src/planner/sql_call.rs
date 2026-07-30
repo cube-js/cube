@@ -1,3 +1,4 @@
+use super::symbols::deps::{DepVisitor, DepVisitorMut, SymbolDeps};
 use super::symbols::MemberSymbol;
 use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
 use crate::physical_plan::sql_nodes::{SqlNode, SqlNodesFactory};
@@ -281,9 +282,10 @@ impl SqlCall {
     }
 
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut result = vec![];
-        self.extract_cube_refs(&mut result);
-        result
+        self.deps
+            .iter()
+            .filter_map(|d| d.as_cube_ref().cloned())
+            .collect()
     }
 
     fn prepare_template_params(
@@ -528,37 +530,28 @@ impl SqlCall {
                     _ => false,
                 })
     }
+}
 
-    pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
+impl SymbolDeps for Rc<SqlCall> {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> std::ops::ControlFlow<()> {
         for dep in self.deps.iter() {
-            if let Some(s) = dep.as_symbol() {
-                result.push(s.clone())
+            match dep {
+                SqlDependency::Symbol(s) => visitor.symbol(s)?,
+                SqlDependency::CubeRef(cr) => visitor.cube_ref(cr)?,
             }
         }
+        std::ops::ControlFlow::Continue(())
     }
 
-    pub fn extract_cube_refs(&self, result: &mut Vec<CubeRef>) {
-        for dep in self.deps.iter() {
-            if let SqlDependency::CubeRef(cr) = dep {
-                result.push(cr.clone());
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        let mut call = (**self).clone();
+        for dep in call.deps.iter_mut() {
+            if let SqlDependency::Symbol(s) = dep {
+                visitor.symbol(s)?;
             }
         }
-    }
-
-    /// Returns a new `SqlCall` with `f` applied recursively to every
-    /// member-symbol dependency. Cube refs and other placeholders
-    /// pass through unchanged.
-    pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<Self>, CubeError> {
-        let mut result = self.clone();
-        for dep in result.deps.iter_mut() {
-            if let SqlDependency::Symbol(ref s) = dep {
-                *dep = SqlDependency::Symbol(s.apply_recursive(f)?);
-            }
-        }
-        Ok(Rc::new(result))
+        *self = Rc::new(call);
+        Ok(())
     }
 }
 
