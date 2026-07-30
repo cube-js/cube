@@ -202,7 +202,9 @@ ORDER BY 1;
 This works because `count` is additive, so monthly values can be re-aggregated
 with `SUM`. For non-additive measures, such as `count_distinct` or `avg`, group
 the inner query by the same granularity you need in the output — re-aggregating
-their partial results would produce incorrect values.
+their partial results would produce incorrect values. If no supported
+granularity matches that grouping, as is the case for a fiscal year, enable
+query pushdown or define the grouping as a dimension in your data model.
 
 ### Query pushdown
 
