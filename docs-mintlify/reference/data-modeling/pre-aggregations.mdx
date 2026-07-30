@@ -575,6 +575,17 @@ cube(`orders`, {
 
 </CodeGroup>
 
+<Note>
+
+[`switch`-type dimensions][ref-switch-dim] don't need to be listed here for a
+query to match this pre-aggregation. Since a `switch` dimension represents a
+predefined set of values rather than stored data, Cube can resolve it from the
+query filter (or the pre-aggregation's built-in dimension enumeration) even
+when it's omitted from the rollup — you no longer need to include it just to
+satisfy matching.
+
+</Note>
+
 ### `time_dimension`
 
 The `time_dimension` property can be any [`dimension`][ref-schema-dimensions] of
@@ -1840,3 +1851,4 @@ cube(`orders`, {
 [ref-ref-cubes]: /reference/data-modeling/cube
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-env-allow-non-strict]: /reference/configuration/environment-variables#cubejs-pre-aggregations-allow-non-strict-date-range-match
+[ref-switch-dim]: /reference/data-modeling/dimensions#type
