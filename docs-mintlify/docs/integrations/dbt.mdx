@@ -409,11 +409,11 @@ For each dbt model in your project:
   `not_null` tests, then column-name suffixes — see
   [Primary key detection](#primary-key-detection).
 - **Joins between cubes** are generated from dbt `relationships` tests and
-  foreign-key constraints, with the relationship type (`many_to_one`,
-  `one_to_many`, or `one_to_one`) inferred from the models — so the generated data
-  model is queryable across cubes out of the box. dbt can only declare a relationship in
-  one direction; enable **Also generate reverse joins** to emit a `one_to_many` join back
-  to the referencing cube too.
+  foreign-key constraints — so the generated data model is queryable across cubes out of
+  the box. The foreign-key column is on the "many" side, so every generated join is
+  `many_to_one` from the cube that owns it. dbt can only declare a relationship in one
+  direction; enable **Also generate reverse joins** to emit a `one_to_many` join back to
+  the referencing cube too.
 
 Models named `metricflow_time_spine` and any non-model resources (sources, seeds,
 snapshots, etc.) are skipped.
