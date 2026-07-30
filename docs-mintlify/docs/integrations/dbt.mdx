@@ -144,9 +144,9 @@ automated — uses the same configuration:
 | **Title prefix** | `(dbt) ` | Prefix added to each generated cube's display title. |
 | **Model selector** | _(empty)_ | Optional dbt selector using `dbt ls --select` syntax to limit which models are pulled, e.g. `tag:cube` or `marts.*`. Leave empty to pull all models. |
 | **Only pull marts** | Off | When enabled, only pulls models whose path starts with the **Marts folder** value (e.g. `marts`). |
-| **Detect primary keys from `unique` + `not_null` tests** | On | Treats a column carrying both dbt tests as the cube's primary key. See [Primary key detection](#primary-key-detection). |
-| **Auto-detect primary keys from column names** | On | Falls back to a column-name guess when dbt declares no key. |
+| **Auto-detect primary keys from column names** | On | Falls back to a column-name guess when dbt declares no key. See [Primary key detection](#primary-key-detection). |
 | **Primary key column suffixes** | `_id` | Comma-separated suffixes treated as key columns, e.g. `_sk, _key`. The default `_id` also matches a column named `id`. Only shown when **Auto-detect primary keys from column names** is on. |
+| **Detect primary keys from `unique` + `not_null` tests** | On | Treats a column carrying both dbt tests as the cube's primary key. Outranks the column-name guess. |
 | **Add default measures** | On | Adds a `count` measure to every cube, and `sum` measures for additive numeric columns. |
 | **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
 | **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
@@ -170,8 +170,12 @@ Only tier 1 can produce a **composite** key, because it's the only place where y
 project states the grain. Tiers 2 and 3 mark exactly one column: two independently unique
 columns are two candidate keys, not a composite key. When several columns qualify, the
 pull prefers the one named after the model — `stg_customers` → `customer_id`, with layer
-prefixes (`stg_`, `dim_`, `fct_`, …) stripped and plurals reduced — and avoids columns
-that dbt declares as foreign keys.
+prefixes (`stg_`, `dim_`, `fct_`, …) stripped and plurals reduced — and deprioritizes
+columns dbt declares as foreign keys, unless that would leave no candidate at all (on a
+1:1 satellite table, the foreign key *is* the table's own key).
+
+On top of the tiers, a column that another cube joins to is always marked as a key on the
+target cube — Cube can't resolve the join otherwise.
 
 To key a cube on something the pull wouldn't guess — a composite key, or a column your
 suffixes don't cover — declare it in dbt. Constraints require an
@@ -693,8 +697,13 @@ into the **dbt models schema** you configured, and that the schema matches.
 - **No key at all** — the model has no `primary_key` constraint, no strict `unique` +
   `not_null` pair, and no column matching the configured suffixes. Either declare the key
   in dbt, or set **Primary key column suffixes** to your project's convention (e.g. `_sk`).
-- **Wrong column, or a key that should be composite** — declare the key in dbt and the
-  pull will use it verbatim.
+- **A declared key was ignored** — a `primary_key` constraint is applied all-or-nothing.
+  If it names a column the model's `columns:` block doesn't document, the whole
+  declaration is skipped (rather than emitting a narrower, wrong grain) and the pull falls
+  back to the guessing tiers. The pull log names the missing column.
+- **Wrong column** — declare the key in dbt and the pull will use it verbatim. When
+  several columns were equally plausible, the pull logs which one it picked and what the
+  alternatives were.
 
 See [Primary key detection](#primary-key-detection).
 
