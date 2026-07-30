@@ -1087,11 +1087,21 @@ macro_rules! transform_response_body {
                                     // NULL for a column that holds no NULLs. Fail the
                                     // query instead, the way an unparseable value
                                     // already does just above.
-                                    return Err(CubeError::user(format!(
-                                        "Timestamp out of range: {}. Timestamps are \
-                                         represented with nanosecond precision and must be \
-                                         between {} and {}",
-                                        timestamp, MIN_NANOSECOND_TIMESTAMP, MAX_NANOSECOND_TIMESTAMP
+                                    //
+                                    // Name the column and quote the value as it
+                                    // arrived, not as re-rendered by chrono, so the
+                                    // message can be matched against the source data
+                                    // when a query selects several time dimensions.
+                                    return Err(CubeError::post_processing(format!(
+                                        "Timestamp out of range for column '{}': '{}'. \
+                                         Timestamps are represented with nanosecond \
+                                         precision and must be between '{}' and '{}'. \
+                                         Reading the column as a date rather than a \
+                                         timestamp avoids this limit.",
+                                        schema_field.name(),
+                                        s,
+                                        MIN_NANOSECOND_TIMESTAMP,
+                                        MAX_NANOSECOND_TIMESTAMP
                                     )));
                                 };
                                 builder.append_value(nanos)?;
@@ -1490,32 +1500,18 @@ mod tests {
         // A timestamp the source can represent but `Timestamp(Nanosecond)` can't
         // used to become NULL, so `MIN(t)` returned NULL over a column holding no
         // NULLs — a wrong answer with nothing downstream able to spot it.
-        for value in ["0202-01-01 00:00:00.000", "9999-12-31 00:00:00.000"] {
-            let raw = format!(
-                r#"
-                {{
-                    "results": [{{
-                        "annotation": {{
-                            "measures": [],
-                            "dimensions": [],
-                            "segments": [],
-                            "timeDimensions": []
-                        }},
-                        "data": {{"members": ["t"], "columns": [["2024-01-01 00:00:00.000", "{value}"]]}}
-                    }}]
-                }}
-            "#
-            );
-            let response: V1LoadResponse<V1LoadResultDataColumnar> =
-                serde_json::from_str(&raw).unwrap();
-            let schema = Arc::new(Schema::new(vec![Field::new(
-                "t",
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                true,
-            )]));
-            let member_fields = vec![MemberField::regular("t".to_string())];
-
-            let error = convert_transport_response(response, schema, member_fields)
+        //
+        // The last two are one nanosecond outside the range. Together with
+        // `convert_transport_response_accepts_boundary_timestamps` they pin both
+        // constants: move either bound by a nanosecond and one of the two tests
+        // fails.
+        for value in [
+            "0202-01-01 00:00:00.000",
+            "9999-12-31 00:00:00.000",
+            "1677-09-21 00:12:43.145224191",
+            "2262-04-11 23:47:16.854775808",
+        ] {
+            let error = timestamp_column_response(value)
                 .expect_err(&format!("{value} should not be silently nulled"));
 
             assert!(
@@ -1523,7 +1519,74 @@ mod tests {
                 "unexpected error for {value}: {}",
                 error.message
             );
+            // The column has to be named: a query can select several time
+            // dimensions and the message is the only thing pointing at the
+            // offending one.
+            assert!(
+                error.message.contains("column 't'"),
+                "error should name the column for {value}: {}",
+                error.message
+            );
+            // The value has to appear exactly as it arrived, so it can be matched
+            // against the source data rather than chrono's rendering of it.
+            assert!(
+                error.message.contains(value),
+                "error should quote the offending value for {value}: {}",
+                error.message
+            );
         }
+    }
+
+    /// The bounds are inclusive, and they are exactly `i64::MIN` / `i64::MAX`
+    /// nanoseconds. Both parse through chrono rather than the fast path, which
+    /// only accepts a 3-digit fraction.
+    #[test]
+    fn convert_transport_response_accepts_boundary_timestamps() {
+        for (value, expected) in [
+            (MIN_NANOSECOND_TIMESTAMP, i64::MIN),
+            (MAX_NANOSECOND_TIMESTAMP, i64::MAX),
+        ] {
+            let batches = timestamp_column_response(value)
+                .unwrap_or_else(|e| panic!("{value} is in range but failed: {}", e.message));
+
+            let column = batches[0]
+                .column(0)
+                .as_any()
+                .downcast_ref::<TimestampNanosecondArray>()
+                .expect("column should be TimestampNanosecond");
+
+            assert!(!column.is_null(1), "{} should not be null", value);
+            assert_eq!(column.value(1), expected, "wrong nanoseconds for {value}");
+        }
+    }
+
+    /// One `Timestamp(Nanosecond)` column holding an in-range value and `value`.
+    fn timestamp_column_response(value: &str) -> Result<Vec<RecordBatch>, CubeError> {
+        let raw = format!(
+            r#"
+            {{
+                "results": [{{
+                    "annotation": {{
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    }},
+                    "data": {{"members": ["t"], "columns": [["2024-01-01 00:00:00.000", "{value}"]]}}
+                }}]
+            }}
+        "#
+        );
+        let response: V1LoadResponse<V1LoadResultDataColumnar> =
+            serde_json::from_str(&raw).unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "t",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+        let member_fields = vec![MemberField::regular("t".to_string())];
+
+        convert_transport_response(response, schema, member_fields)
     }
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
