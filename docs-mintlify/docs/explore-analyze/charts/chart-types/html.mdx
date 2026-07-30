@@ -15,7 +15,7 @@ A free-form HTML document with Handlebars expressions. Write any markup and bind
 
 ## Template structure
 
-Query result rows are available as a flat `data` array. Each row is keyed by column name, e.g. `status` or `count`.
+Query result rows are available as a flat `data` array. Each row is keyed by the column name of the current query, which may be unqualified (`count`) or qualified with its cube or view (`order_items.count`) depending on how the query selects its members. Read the exact binding for each column from the **Handlebars reference** panel in the chart editor.
 
 **Access a row by index** with `data.<index>`:
 
@@ -39,11 +39,11 @@ Query result rows are available as a flat `data` array. Each row is keyed by col
 Templates are compiled in strict mode, so referencing a property that doesn't exist raises an error instead of rendering an empty string. If a chart fails to render, check that every path in the template matches a column of the current query.
 
 <Warning>
-Rows are keyed by literal strings, so a qualified name like `order_items.count` must be wrapped in square brackets: `{{data.0.[order_items.count]}}`. Without them, Handlebars reads the dot as a path and looks for a `count` property on a non-existent `order_items` object, which fails in strict mode. The unqualified column name never needs brackets.
+A qualified column name must be wrapped in square brackets: `{{data.0.[order_items.count]}}`, and `{{this.[order_items.count]}}` inside a loop. Rows are keyed by literal strings, so without brackets Handlebars reads the dot as a path and looks for a `count` property on a non-existent `order_items` object, which fails in strict mode. Unqualified names never need brackets.
 </Warning>
 
 <Tip>
-The chart editor includes a **Handlebars reference** panel listing the bindings for your current query. Add `{{json data}}` to a template to inspect the full context.
+The chart editor includes a **Handlebars reference** panel listing the bindings for your current query. Add `{{json data}}` to a template to inspect the full context — see the [`json` helper](#helpers).
 </Tip>
 
 ### Context
@@ -56,7 +56,7 @@ Alongside `data`, the following are available:
 | `columns` | Array of columns in the result, each with `name` and `title` |
 | `rowCount` | Number of rows in `data` |
 | `columnCount` | Number of columns |
-| `pivot` | Pivot table structure and totals, when the report is pivoted |
+| `pivot` | Pivot structure, when the report is pivoted, with `rows`, `columns`, `cellMap`, `grandTotals`, and `config`. Inspect it with `{{json pivot}}` |
 
 ## Helpers
 
@@ -65,7 +65,7 @@ In addition to the [built-in Handlebars helpers](https://handlebarsjs.com/guide/
 | Helper | Description |
 | --- | --- |
 | `formatNumber value "format"` | Format a number using a [d3-format](https://d3js.org/d3-format) string, e.g. `",.2f"` |
-| `formatDate value "format"` | Format a date, e.g. `"yyyy-LL-dd"` |
+| `formatDate value "format"` | Format a date using a [date-fns](https://date-fns.org/docs/format) pattern, e.g. `"yyyy-LL-dd"` |
 | `formatMonth value "format"` | Format a date as a month, e.g. `"LLL yyyy"` |
 | `json value` | Serialize a value as JSON — useful for inspecting the context |
 | `get object "path"` | Read a nested value by dotted path |
@@ -88,7 +88,7 @@ Supported:
 
 - HTML markup and inline `<style>` blocks
 - Images and fonts embedded as [`data:` URLs](https://developer.mozilla.org/docs/Web/URI/Reference/Schemes/data)
-- Handlebars expressions, which are evaluated before the iframe is rendered
+- Handlebars expressions
 
 Not supported:
 
