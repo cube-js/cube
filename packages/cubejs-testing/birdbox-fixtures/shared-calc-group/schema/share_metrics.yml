@@ -204,7 +204,12 @@ cubes:
           - product
           - sales.account
           - sales.product
-        time_dimension: date
+        # Keyed on the time dimension the view exposes (and dashboards group
+        # by), not on the cube's own `date`. The two are equal by the join
+        # condition, but pre-aggregation matching only knows stored members,
+        # so a rollup keyed on `share_metrics.date` cannot serve a query
+        # grouping by `sales.date`.
+        time_dimension: sales.date
         granularity: month
         allow_non_strict_date_range_match: true
         scheduled_refresh: false

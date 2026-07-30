@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.15](https://github.com/cube-js/cube/compare/v1.7.14...v1.7.15) (2026-07-30)
+
+### Features
+
+- **cubesql:** Separate env var for non-streaming query max row limit ([#11418](https://github.com/cube-js/cube/issues/11418)) ([236763a](https://github.com/cube-js/cube/commit/236763ad3936ac2a0df3bdd0bfc784d6df78c690))
+- **cubesql:** Split oversized CubeScan record batches ([#11384](https://github.com/cube-js/cube/issues/11384)) ([51db9c7](https://github.com/cube-js/cube/commit/51db9c7d4cc1cf4d50f7e48d4ec269982f01dff9))
+
 ## [1.7.14](https://github.com/cube-js/cube/compare/v1.7.13...v1.7.14) (2026-07-29)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

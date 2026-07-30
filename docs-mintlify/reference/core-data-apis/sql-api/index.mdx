@@ -214,6 +214,11 @@ explicit `LIMIT`, increase `CUBEJS_DB_QUERY_DEFAULT_LIMIT` as needed.
 
 </Info>
 
+Queries that are not streamed are capped by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](/reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit),
+which defaults to the value of `CUBEJS_DB_QUERY_LIMIT`. It also acts as the threshold
+above which a query is streamed rather than loaded in a single batch.
+
 ### Session limit
 
 Each concurrent connection to the SQL API consumes some resources and attempting

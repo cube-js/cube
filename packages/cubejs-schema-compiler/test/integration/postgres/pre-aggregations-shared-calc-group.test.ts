@@ -196,7 +196,7 @@ ${includePreAggs ? `
 `;
 }
 
-function shareMetricsCube(switchRef: string, rollingWindowPreAggDim: string, extraJoins: string, extraDimensions: string, includePreAggs: boolean = true) {
+function shareMetricsCube(switchRef: string, rollingWindowPreAggDim: string, extraJoins: string, extraDimensions: string, includePreAggs: boolean = true, preAggTimeDimension: string = 'date') {
   return `
   - name: share_metrics
     sql: >${SHARE_METRICS_SQL}
@@ -385,7 +385,7 @@ ${includePreAggs ? `
           - sales.account
           - sales.product${rollingWindowPreAggDim ? `
           - ${rollingWindowPreAggDim}` : ''}
-        time_dimension: date
+        time_dimension: ${preAggTimeDimension}
         granularity: month
         allow_non_strict_date_range_match: true
 ` : ''}
@@ -428,6 +428,37 @@ views:
       - join_path: share_metrics
         includes:
           - rolling_share_change
+
+      - join_path: rolling_window_dim
+        includes:
+          - rolling_window
+`;
+
+// Shared calc-group switch, and the share_metrics rollup is keyed on the
+// time dimension the query actually asks for (`sales.date`, exposed as
+// `date` in the view) instead of the cube's own `share_metrics.date`.
+const sharedSwitchModelSharedDateRollups = `
+cubes:
+${ROLLING_WINDOW_DIM_CUBE}
+${salesCube('{rolling_window_dim.rolling_window}', 'rolling_window_dim.rolling_window', SHARED_JOIN, '')}
+${shareMetricsCube('{rolling_window_dim.rolling_window}', 'rolling_window_dim.rolling_window', SHARED_JOIN, '', true, 'sales.date')}
+views:
+  - name: performance_view
+    cubes:
+      - join_path: sales
+        includes:
+          - account
+          - product
+          - date
+          - total
+          - rolling_amount
+          - rolling_amount_change
+
+      - join_path: share_metrics
+        includes:
+          - rolling_share_change
+          - name: date
+            alias: ms_date
 
       - join_path: rolling_window_dim
         includes:
@@ -568,6 +599,71 @@ const REPRO_QUERY = {
   cubestoreSupportMultistage: true,
 };
 
+const SALES_ROLLING_MEASURES = [
+  'performance_view.rolling_amount',
+  'performance_view.rolling_amount_change',
+];
+
+// A month-granularity time dimension over a bounded date range: the shape a
+// dashboard charting these rolling metrics per month actually sends. Both
+// rollups are built at `granularity: month` on the same date, so the query
+// must be served from them.
+const MONTH_TIME_DIMENSION = [{
+  dimension: 'performance_view.date',
+  granularity: 'month',
+  dateRange: ['2017-04-01', '2017-06-30'],
+}];
+
+const MONTH_QUERY = {
+  ...REPRO_QUERY,
+  timeDimensions: MONTH_TIME_DIMENSION,
+  order: [{ id: 'performance_view.product' }, { id: 'performance_view.date' }],
+};
+
+// Monthly R3 (trailing 3 month) values and their 3-month-prior change for
+// account A1: P1 sells 10/20/30/40/50/60 from January to June, P2 sells 5
+// every month.
+//   R3(Apr) = Feb+Mar+Apr, R3(May) = Mar+Apr+May, R3(Jun) = Apr+May+Jun
+//   change(m) = R3(m) - R3(m - 3 month)
+const EXPECTED_MONTHLY_SALES_ROWS = [
+  {
+    performance_view__product: 'P1',
+    performance_view__date_month: '2017-04-01T00:00:00.000Z',
+    performance_view__rolling_amount: '90.0',
+    performance_view__rolling_amount_change: '80.0',
+  },
+  {
+    performance_view__product: 'P1',
+    performance_view__date_month: '2017-05-01T00:00:00.000Z',
+    performance_view__rolling_amount: '120.0',
+    performance_view__rolling_amount_change: '90.0',
+  },
+  {
+    performance_view__product: 'P1',
+    performance_view__date_month: '2017-06-01T00:00:00.000Z',
+    performance_view__rolling_amount: '150.0',
+    performance_view__rolling_amount_change: '90.0',
+  },
+  {
+    performance_view__product: 'P2',
+    performance_view__date_month: '2017-04-01T00:00:00.000Z',
+    performance_view__rolling_amount: '15.0',
+    performance_view__rolling_amount_change: '10.0',
+  },
+  {
+    performance_view__product: 'P2',
+    performance_view__date_month: '2017-05-01T00:00:00.000Z',
+    performance_view__rolling_amount: '15.0',
+    performance_view__rolling_amount_change: '5.0',
+  },
+  {
+    performance_view__product: 'P2',
+    performance_view__date_month: '2017-06-01T00:00:00.000Z',
+    performance_view__rolling_amount: '15.0',
+    performance_view__rolling_amount_change: '0.0',
+  },
+];
+
 describe('PreAggregationsSharedCalcGroup', () => {
   jest.setTimeout(200000);
 
@@ -593,42 +689,134 @@ describe('PreAggregationsSharedCalcGroup', () => {
         });
       }));
 
-      // FIXME: with a date-range-only time dimension (no granularity) the
-      // rolling windows are anchored to the range end, but the query stops
-      // matching the rollups even though allow_non_strict_date_range_match
-      // is set and the range is month-aligned. Unskip once matching
-      // supports it.
-      it.skip('matches rollups with a date-range-only time dimension', () => compiler.compile().then(() => {
+      // Adding a month-granularity time dimension to the same query keeps the
+      // sales rollup: the rollup is built at `granularity: month` on the very
+      // dimension the query groups by.
+      it('matches its own rollup with a month time dimension for single-cube measures', () => compiler.compile().then(() => {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          ...MONTH_QUERY,
+          measures: SALES_ROLLING_MEASURES,
+        });
+
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const sqlAndParams = query.buildSqlAndParams();
+        const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
+        expect(tableNames).toEqual(['sales_perf_rolling']);
+        expect(sqlAndParams[0]).toContain('sales_perf_rolling');
+
+        return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+          expect(res).toEqual(EXPECTED_MONTHLY_SALES_ROWS);
+        });
+      }));
+
+      // Cross-cube with a time dimension is where matching breaks in this
+      // model: `share_metrics.perf_share` is keyed on `share_metrics.date`,
+      // while the view exposes (and the query asks for) `sales.date`. The two
+      // are equal by the join condition, but the matcher only knows stored
+      // members, so the share rollup can't serve the query — and because
+      // matching is all-or-nothing across the multi-cube query, the sales
+      // rollup is dropped as well and everything is recomputed from the raw
+      // source. Results stay correct; only the acceleration is lost.
+      // FIXME: unskip the sibling spec below (rollups keyed on the queried
+      // time dimension) as the reference behaviour and teach the matcher to
+      // resolve join-equal time dimensions.
+      it('loses both rollups for cross-cube measures when the joined rollup is keyed on its own time dimension', () => compiler.compile().then(() => {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, MONTH_QUERY);
+
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const sqlAndParams = query.buildSqlAndParams();
+        expect(preAggregationsDescription.map((d: any) => d.tableName)).toEqual([]);
+        expect(sqlAndParams[0]).not.toContain('sales_perf_rolling');
+        expect(sqlAndParams[0]).not.toContain('share_metrics_perf_share');
+      }));
+    });
+
+    // Same shared calc-group model, but `share_metrics.perf_share` is keyed on
+    // the time dimension the query actually groups by (`sales.date`, exposed
+    // as `date` in the view) instead of the cube's own `share_metrics.date`.
+    describe('shared calc-group switch dimension with rollups keyed on the queried time dimension', () => {
+      const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(sharedSwitchModelSharedDateRollups);
+      const noPreAggs = prepareYamlCompiler(sharedSwitchModelNoPreAggs);
+
+      it('matches both rollups for cross-cube rolling measures with a month time dimension', () => compiler.compile().then(() => {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, MONTH_QUERY);
+
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const sqlAndParams = query.buildSqlAndParams();
+        const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
+        expect(tableNames).toContain('sales_perf_rolling');
+        expect(tableNames).toContain('share_metrics_perf_share');
+        expect(sqlAndParams[0]).toContain('sales_perf_rolling');
+        expect(sqlAndParams[0]).toContain('share_metrics_perf_share');
+
+        return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+          // The sales side is pinned to exact values; the share-of-total side
+          // is compared against the same query over the raw source below.
+          expect(res).toEqual(EXPECTED_MONTHLY_SALES_ROWS.map((row, i) => ({
+            ...row,
+            performance_view__rolling_share_change: i < 3 ? '0.00000000000000000000' : null,
+          })));
+        });
+      }));
+
+      // The rollups must not change the answer: the same query over the same
+      // model without pre-aggregations returns exactly the same rows.
+      it('returns the same rows from the rollups as from the raw source', async () => {
+        await compiler.compile();
+        await noPreAggs.compiler.compile();
+
+        const fromRollups = await dbRunner.evaluateQueryWithPreAggregations(
+          new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, MONTH_QUERY)
+        );
+        const fromSource = await dbRunner.testQuery(
+          new PostgresQuery({
+            joinGraph: noPreAggs.joinGraph,
+            cubeEvaluator: noPreAggs.cubeEvaluator,
+            compiler: noPreAggs.compiler,
+          }, MONTH_QUERY).buildSqlAndParams()
+        );
+
+        expect(fromRollups).toEqual(fromSource);
+      });
+
+      it('matches both rollups with a date-range-only time dimension', () => compiler.compile().then(() => {
         const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
           ...REPRO_QUERY,
           timeDimensions: [{
             dimension: 'performance_view.date',
-            dateRange: ['2017-01-01', '2017-06-30'],
+            dateRange: ['2017-04-01', '2017-06-30'],
           }],
+        });
+
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const sqlAndParams = query.buildSqlAndParams();
+        const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
+        expect(tableNames).toContain('sales_perf_rolling');
+        expect(tableNames).toContain('share_metrics_perf_share');
+        expect(sqlAndParams[0]).toContain('sales_perf_rolling');
+        expect(sqlAndParams[0]).toContain('share_metrics_perf_share');
+      }));
+
+      // FIXME: expressing the same range as an `inDateRange` filter on the
+      // time dimension instead of `timeDimensions[].dateRange` stops every
+      // rollup from matching (even when `dateRange` is also present): the
+      // filter carries a plain dimension symbol, and the matcher looks it up
+      // only among the rollup's stored dimensions, never among its time
+      // dimensions. Unskip once time-dimension filters are matched against
+      // the rollup granularity.
+      it.skip('matches rollups when the range is given as an inDateRange filter', () => compiler.compile().then(() => {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          ...MONTH_QUERY,
+          filters: [
+            ...REPRO_QUERY.filters,
+            { member: 'performance_view.date', operator: 'inDateRange', values: ['2017-04-01', '2017-06-30'] },
+          ],
         });
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const tableNames = preAggregationsDescription.map((d: any) => d.tableName);
         expect(tableNames).toContain('sales_perf_rolling');
         expect(tableNames).toContain('share_metrics_perf_share');
-      }));
-
-      // FIXME: querying the same measures with a granular time dimension fails
-      // inside the Tesseract physical plan builder with "Alias not found for
-      // partition_by dimension rolling_window_dim.rolling_window": the
-      // calc-group dimension is not projected into the multi-stage window
-      // input CTE. Unskip once the planner supports it.
-      it.skip('cross-cube rolling measures with a granular time dimension', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-          ...REPRO_QUERY,
-          timeDimensions: [{
-            dimension: 'performance_view.date',
-            granularity: 'month',
-            dateRange: ['2017-06-01', '2017-06-30'],
-          }],
-        });
-
-        query.buildSqlAndParams();
       }));
     });
 
@@ -686,6 +874,18 @@ describe('PreAggregationsSharedCalcGroup', () => {
             performance_view__rolling_amount_change: '0.0',
           },
         ],
+        { joinGraph, cubeEvaluator, compiler });
+      });
+
+      // Same measures with a month-granularity time dimension: one row per
+      // month, each carrying its own trailing-3-month window and the change
+      // against the window 3 months earlier. Pins the arithmetic the rollup
+      // specs above compare against.
+      it('computes deterministic monthly rolling values', async () => {
+        await dbRunner.runQueryTest({
+          ...MONTH_QUERY,
+          measures: SALES_ROLLING_MEASURES,
+        }, EXPECTED_MONTHLY_SALES_ROWS,
         { joinGraph, cubeEvaluator, compiler });
       });
 

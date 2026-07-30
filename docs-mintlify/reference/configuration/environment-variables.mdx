@@ -1079,7 +1079,9 @@ specified in an API query.
 
 The maximum [row limit][ref-row-limit] in the result set. An explicit limit in a
 query cannot exceed this value, except for [SQL API][ref-sql-api] queries when
-[streaming mode][ref-sql-api-streaming] is enabled.
+[streaming mode][ref-sql-api-streaming] is enabled. SQL API queries that are not
+streamed can be capped separately, at a lower value, with
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit).
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1506,12 +1508,53 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][ref-sql-api].
 When enabled, SQL API queries with an explicit `LIMIT` clause can exceed the
 maximum row limit set by
-[`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit).
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit)
+and are streamed instead.
 Queries without an explicit `LIMIT` still use [`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](#cubejs_db_query_default_limit).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
+
+## `CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS`
+
+Specifies the maximum number of rows in a single record batch produced when the
+[SQL API][ref-sql-api] reads data from a cube. Larger result sets are split into
+several batches, which lets downstream consumers process them incrementally
+instead of materializing the whole result set at once. In particular, the
+[`/v1/cubesql`][ref-ref-cubesql] endpoint emits one newline-delimited JSON chunk
+per batch.
+
+Set to `0` to disable splitting.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| A non-negative integer number  | `65536`                | `65536`               |
+
+## `CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`
+
+The maximum [row limit][ref-row-limit] for [SQL API][ref-sql-api] queries that are
+not streamed. A larger `LIMIT` is reduced to this value, unless
+[streaming mode][ref-sql-api-streaming] is enabled, in which case the query is
+streamed instead.
+
+| Possible Values           | Default in Development                            | Default in Production                             |
+| ------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| A positive integer number | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) (`50000`) | [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit) (`50000`) |
+
+Set it below `CUBEJS_DB_QUERY_LIMIT` to let other APIs return large result sets
+while keeping SQL API responses small enough to fit in a single batch, or streamed
+if streaming mode is enabled. Buffering very large non-streamed responses can
+exhaust memory and break the client connection.
+
+<Warning>
+
+This value cannot exceed [`CUBEJS_DB_QUERY_LIMIT`](#cubejs_db_query_limit). If you
+set it higher, Cube logs a warning at startup and falls back to
+`CUBEJS_DB_QUERY_LIMIT`, because non-streamed queries above that limit are rejected
+before they reach the data source.
+
+</Warning>
 
 ## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
 
@@ -2149,6 +2192,7 @@ The port for a Cube deployment to listen to API connections on.
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
+[ref-ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
 [ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match

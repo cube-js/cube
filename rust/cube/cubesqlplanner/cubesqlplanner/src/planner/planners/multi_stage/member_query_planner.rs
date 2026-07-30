@@ -170,9 +170,15 @@ impl MultiStageMemberQueryPlanner {
             }
         };
 
+        // The CTE must project the dimensions of the state this rolling
+        // window is requested at, not the root query dimensions: a parent
+        // inode can widen the grain (`grain.include`, a `case` switch
+        // dimension) and consumers resolve those dimensions — e.g. as
+        // `partition_by` of the enclosing window function — against this
+        // CTE's schema.
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
-            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_dimensions(self.description.state().dimensions().clone())
+            .set_time_dimensions(self.description.state().time_dimensions().clone())
             .set_measures(vec![self.description.member().evaluation_node().clone()])
             .into_rc();
 

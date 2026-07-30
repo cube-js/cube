@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.15](https://github.com/cube-js/cube/compare/v1.7.14...v1.7.15) (2026-07-30)
+
+### Bug Fixes
+
+- **cubestore:** cast aggregating index aggregation results back to the declared column types ([#11413](https://github.com/cube-js/cube/issues/11413)) ([26c4801](https://github.com/cube-js/cube/commit/26c4801629ef4851e3474e5d0a4ed4cf76c3d4d0))
+- **cubestore:** keep the projection schema when rewriting a rolling window ([#11410](https://github.com/cube-js/cube/issues/11410)) ([1bf2dd8](https://github.com/cube-js/cube/commit/1bf2dd848e9147afa94c19235bd0026899740609))
+
 ## [1.7.14](https://github.com/cube-js/cube/compare/v1.7.13...v1.7.14) (2026-07-29)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

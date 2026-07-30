@@ -82,6 +82,15 @@ cubes:
                 else:
                     label: Other
 
+          # A calc-group (virtual enumeration) dimension used as the switch of
+          # `rolling_amount_switch`: it selects which rolling window the case
+          # measure dispatches to, and carries no stored data.
+          - name: window_kind
+            type: switch
+            values:
+                - R3
+                - YTD
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -454,6 +463,82 @@ cubes:
             rolling_window:
                 trailing: 7 day
                 offset: start
+
+          # Month-based rolling window: whole-month steps are what a rollup
+          # stored at `granularity: month` can serve, so the calc-group case
+          # entrypoints below dispatch between this and the year-to-date
+          # window rather than the 7-day one.
+          - name: rolling_sum_3m
+            type: sum
+            sql: amount
+            rolling_window:
+                trailing: 3 month
+
+          # An Aggregate parent that reduces by the time dimension: the child
+          # rolling-window state ends up NARROWER than the root query (no time
+          # dimension), while the leaf still groups per date.
+          - name: rolling_sum_7d_reduce_time
+            type: sum
+            sql: "{CUBE.rolling_sum_7d}"
+            multi_stage: true
+            reduce_by:
+                - orders.created_at
+
+          # Case entrypoint dispatching between two rolling windows on the
+          # `window_kind` calc group: the switch dimension is added to the
+          # grain of the rolling leaves, so every CTE feeding the case must
+          # project it.
+          - name: rolling_amount_switch
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.window_kind}"
+                when:
+                    - value: R3
+                      sql: "{CUBE.rolling_sum_3m}"
+                else:
+                    sql: "{CUBE.total_amount_ytd}"
+
+          # Change-over-prior-period on top of each rolling window: the
+          # arithmetic layer consumes two rolling-window CTEs and partitions
+          # by the grain it is requested at — which, under the case
+          # entrypoint below, includes the `window_kind` calc group.
+          - name: rolling_sum_3m_prev
+            type: number
+            multi_stage: true
+            sql: "{CUBE.rolling_sum_3m}"
+            time_shift:
+                - interval: 3 month
+                  type: prior
+
+          - name: rolling_sum_3m_change
+            type: number
+            multi_stage: true
+            sql: "({CUBE.rolling_sum_3m} - {CUBE.rolling_sum_3m_prev})"
+
+          - name: total_amount_ytd_prev_year
+            type: number
+            multi_stage: true
+            sql: "{CUBE.total_amount_ytd}"
+            time_shift:
+                - interval: 1 year
+                  type: prior
+
+          - name: total_amount_ytd_change
+            type: number
+            multi_stage: true
+            sql: "({CUBE.total_amount_ytd} - {CUBE.total_amount_ytd_prev_year})"
+
+          - name: rolling_change_switch
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.window_kind}"
+                when:
+                    - value: R3
+                      sql: "{CUBE.rolling_sum_3m_change}"
+                else:
+                    sql: "{CUBE.total_amount_ytd_change}"
 
           - name: total_amount_ytd
             type: sum
