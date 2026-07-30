@@ -91,6 +91,40 @@ cubes:
                 - R3
                 - YTD
 
+          # Case-switch dimension over a regular string dimension: a filter
+          # on `status` statically prunes the branches.
+          - name: status_case_label
+            type: string
+            case:
+                switch: "{CUBE.status}"
+                when:
+                    - value: completed
+                      sql: "'done'"
+                    - value: pending
+                      sql: "'waiting'"
+                else:
+                    sql: "'other'"
+
+          # Calc group: an abstract enumeration with no backing column.
+          - name: group_mode
+            type: switch
+            values:
+                - by_status
+                - by_category
+
+          # Case-switch dimension driven by the calc group.
+          - name: group_mode_label
+            type: string
+            case:
+                switch: "{CUBE.group_mode}"
+                when:
+                    - value: by_status
+                      sql: "{CUBE.status}"
+                    - value: by_category
+                      sql: "{CUBE.category}"
+                else:
+                    sql: "{CUBE.status}"
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -179,6 +213,44 @@ cubes:
             multi_stage: true
             add_group_by:
                 - orders.id
+
+          # `include` grain refs below carry case-switch / calc-group
+          # dimensions: the planner selects them inside the multi-stage CTE,
+          # so static filter pruning must reach them there.
+          - name: amount_by_status_case
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.status_case_label
+
+          - name: amount_by_group_mode_label
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.group_mode_label
+
+          - name: amount_by_group_mode
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.group_mode
+
+          # Case pruning must follow the leaf's own filters: the `exclude`
+          # directive drops the status filter inside this measure's CTEs, so
+          # the case dimension from `include` must stay unpruned there.
+          - name: amount_by_status_case_unfiltered
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.status_case_label
+            filter:
+                exclude:
+                    - orders.status
 
           - name: amount_by_category
             type: number

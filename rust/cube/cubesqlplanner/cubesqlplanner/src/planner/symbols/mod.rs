@@ -1,5 +1,6 @@
 mod common;
 mod cube_symbol;
+pub mod deps;
 pub mod dimension_kinds;
 mod dimension_symbol;
 pub mod measure_kinds;

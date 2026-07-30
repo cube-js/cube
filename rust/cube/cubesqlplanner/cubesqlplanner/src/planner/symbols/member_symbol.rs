@@ -4,8 +4,10 @@ use itertools::Itertools;
 use crate::planner::{Case, CubeRef, SqlCall};
 
 use super::common::CompiledMemberPath;
+use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::{DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, TimeDimensionSymbol};
 use std::fmt::Debug;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 
 /// First-class business object of the planner: the atomic unit of
@@ -23,6 +25,7 @@ use std::rc::Rc;
 /// Indivisible: renders as a single SQL expression. A symbol may depend
 /// on other symbols (`get_dependencies`); whether those deps are
 /// inlined or pushed into a CTE / subquery is a physical-plan decision.
+#[derive(Clone)]
 pub enum MemberSymbol {
     Dimension(Rc<DimensionSymbol>),
     TimeDimension(Rc<TimeDimensionSymbol>),
@@ -154,38 +157,15 @@ impl MemberSymbol {
         self: &Rc<Self>,
         f: &F,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let result = f(self)?;
-        result.apply_to_deps(f)
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        self: &Rc<Self>,
-        f: &F,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        match self.as_ref() {
-            Self::Dimension(d) => d.apply_to_deps(f),
-            Self::TimeDimension(d) => d.apply_to_deps(f),
-            Self::Measure(m) => m.apply_to_deps(f),
-            Self::MemberExpression(e) => e.apply_to_deps(f),
-        }
+        deps::apply_recursive(self, f)
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        match self {
-            Self::Dimension(d) => d.get_dependencies(),
-            Self::TimeDimension(d) => d.get_dependencies(),
-            Self::Measure(m) => m.get_dependencies(),
-            Self::MemberExpression(e) => e.get_dependencies(),
-        }
+        deps::collect_deps(self)
     }
 
     pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        match self {
-            Self::Dimension(d) => d.get_cube_refs(),
-            Self::TimeDimension(d) => d.get_cube_refs(),
-            Self::Measure(m) => m.get_cube_refs(),
-            Self::MemberExpression(e) => e.get_cube_refs(),
-        }
+        deps::collect_cube_refs(self)
     }
 
     /// True if the symbol is a transparent alias for another member, with
@@ -401,6 +381,43 @@ impl MemberSymbol {
         } else {
             Ok(())
         }
+    }
+}
+
+impl SymbolDeps for MemberSymbol {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
+        match self {
+            Self::Dimension(d) => d.as_ref().visit_deps(visitor),
+            Self::TimeDimension(d) => d.as_ref().visit_deps(visitor),
+            Self::Measure(m) => m.as_ref().visit_deps(visitor),
+            Self::MemberExpression(e) => e.as_ref().visit_deps(visitor),
+        }
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        match self {
+            Self::Dimension(d) => {
+                let mut body = (**d).clone();
+                body.visit_deps_mut(visitor)?;
+                *d = Rc::new(body);
+            }
+            Self::TimeDimension(d) => {
+                let mut body = (**d).clone();
+                body.visit_deps_mut(visitor)?;
+                *d = Rc::new(body);
+            }
+            Self::Measure(m) => {
+                let mut body = (**m).clone();
+                body.visit_deps_mut(visitor)?;
+                *m = Rc::new(body);
+            }
+            Self::MemberExpression(e) => {
+                let mut body = (**e).clone();
+                body.visit_deps_mut(visitor)?;
+                *e = Rc::new(body);
+            }
+        }
+        Ok(())
     }
 }
 

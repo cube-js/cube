@@ -1,6 +1,7 @@
 use super::common::Case;
 use super::common::CompiledMemberPath;
 use super::common::MultiStageProperties;
+use super::deps::{self, symbol_deps};
 use super::dimension_kinds::{
     CaseDimension, DimensionKind, GeoDimension, RegularDimension, SwitchDimension,
 };
@@ -13,7 +14,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
 use crate::planner::TimeDimensionSymbol;
-use crate::planner::{Compiler, CubeRef, SqlCall};
+use crate::planner::{Compiler, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -43,6 +44,22 @@ pub struct DimensionSymbol {
     is_sub_query: bool,
     propagate_filters_to_sub_query: bool,
     mask_sql: Option<Rc<SqlCall>>,
+}
+
+symbol_deps! {
+    DimensionSymbol {
+        kind: dep,
+        mask_sql: dep,
+        compiled_path: skip,
+        is_reference: skip,
+        is_view: skip,
+        multi_stage: skip,
+        time_shift: skip,
+        time_shift_pk_full_name: skip,
+        is_self_time_shift_pk: skip,
+        is_sub_query: skip,
+        propagate_filters_to_sub_query: skip,
+    }
 }
 
 impl DimensionSymbol {
@@ -220,26 +237,11 @@ impl DimensionSymbol {
         if !self.is_reference() {
             return None;
         }
-        let deps = self.get_dependencies();
-        if deps.is_empty() {
-            return None;
-        }
-        deps.first().cloned()
+        self.get_dependencies().first().cloned()
     }
 
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut result = self.clone();
-        result.kind = self.kind.apply_to_deps(f)?;
-        if let Some(mask) = &self.mask_sql {
-            result.mask_sql = Some(mask.apply_recursive(f)?);
-        }
-        if let Some(ms) = &self.multi_stage {
-            result.multi_stage = Some(ms.apply_to_deps(f)?);
-        }
-        Ok(MemberSymbol::new_dimension(Rc::new(result)))
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        deps::collect_deps(self)
     }
 
     /// SQL calls inside the kind body. `mask_sql` is intentionally
@@ -249,24 +251,6 @@ impl DimensionSymbol {
     /// cube-ref validation would produce false foreign-cube errors.
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         self.kind.iter_sql_calls()
-    }
-
-    /// All member dependencies of the dimension.
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = self.kind.get_dependencies();
-        if let Some(mask) = &self.mask_sql {
-            mask.extract_symbol_deps(&mut deps);
-        }
-        deps
-    }
-
-    /// All cube references of the dimension.
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = self.kind.get_cube_refs();
-        if let Some(mask) = &self.mask_sql {
-            mask.extract_cube_refs(&mut refs);
-        }
-        refs
     }
 
     pub fn cube_name(&self) -> String {

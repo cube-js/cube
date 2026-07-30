@@ -7,9 +7,10 @@ pub use calculated::*;
 pub use count::*;
 
 use super::common::AggregationType;
-use super::MemberSymbol;
-use crate::planner::{CubeRef, SqlCall};
+use super::deps::{DepVisitor, DepVisitorMut, SymbolDeps};
+use crate::planner::SqlCall;
 use cubenativeutils::CubeError;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 
 /// How a measure kind wraps its inner SQL when rendered: no wrapper
@@ -77,43 +78,12 @@ impl MeasureKind {
         }
     }
 
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        match self {
-            Self::Count(c) | Self::MultipliedCount(c) => c.get_dependencies(),
-            Self::Aggregated(a) => a.get_dependencies(),
-            Self::Calculated(c) => c.get_dependencies(),
-            Self::Rank => vec![],
-        }
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Self, CubeError> {
-        Ok(match self {
-            Self::Count(c) => Self::Count(c.apply_to_deps(f)?),
-            Self::MultipliedCount(c) => Self::MultipliedCount(c.apply_to_deps(f)?),
-            Self::Aggregated(a) => Self::Aggregated(a.apply_to_deps(f)?),
-            Self::Calculated(c) => Self::Calculated(c.apply_to_deps(f)?),
-            Self::Rank => Self::Rank,
-        })
-    }
-
     pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
         match self {
             Self::Count(c) | Self::MultipliedCount(c) => c.iter_sql_calls(),
             Self::Aggregated(a) => a.iter_sql_calls(),
             Self::Calculated(c) => c.iter_sql_calls(),
             Self::Rank => Box::new(std::iter::empty()),
-        }
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        match self {
-            Self::Count(c) | Self::MultipliedCount(c) => c.get_cube_refs(),
-            Self::Aggregated(a) => a.get_cube_refs(),
-            Self::Calculated(c) => c.get_cube_refs(),
-            Self::Rank => vec![],
         }
     }
 
@@ -278,6 +248,26 @@ impl MeasureKind {
             Self::Count(c) if c.convertible_to_distinct() => Some(Self::MultipliedCount(c.clone())),
             Self::Aggregated(a) if a.agg_type().is_distinct() => Some(self.clone()),
             _ => None,
+        }
+    }
+}
+
+impl SymbolDeps for MeasureKind {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
+        match self {
+            Self::Count(c) | Self::MultipliedCount(c) => c.visit_deps(visitor),
+            Self::Aggregated(a) => a.visit_deps(visitor),
+            Self::Calculated(c) => c.visit_deps(visitor),
+            Self::Rank => ControlFlow::Continue(()),
+        }
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        match self {
+            Self::Count(c) | Self::MultipliedCount(c) => c.visit_deps_mut(visitor),
+            Self::Aggregated(a) => a.visit_deps_mut(visitor),
+            Self::Calculated(c) => c.visit_deps_mut(visitor),
+            Self::Rank => Ok(()),
         }
     }
 }
