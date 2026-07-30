@@ -306,7 +306,7 @@ For the computed anchors (Minimum, Maximum, Midpoint, Average, Median), the drop
 
 Use **Reverse color scale** to swap the Start and End colors. **Treat nulls as zero** is on by default, coloring null/blank cells as zero; turn it off to leave them uncolored.
 
-The scale is normalized **per column** — each targeted column uses its own value range.
+The scale is normalized **per column** — each targeted column uses its own value range, taken from the column's data cells. Row totals and subtotal columns are colored by that scale but do not define it, so the gradient still spans the underlying values rather than the totals that aggregate them.
 
 {/* TODO screenshot: table with a color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
