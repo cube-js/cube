@@ -126,21 +126,23 @@ pub fn build_arrow_ipc(
     let mut fields = Vec::with_capacity(total_cols);
     let mut columns: Vec<ArrayRef> = Vec::with_capacity(total_cols);
 
+    // Every column is built with `from_iter_values`, which fills the Arrow buffer
+    // straight from the iterator. Collecting into a `Vec` first would hold a
+    // second copy of the whole column — and for the string case, `row_count` live
+    // `String` allocations — just to hand it over.
     for (j, (_, alias)) in dimensions.iter().enumerate() {
         fields.push(Field::new(alias.clone(), DataType::Utf8, false));
-        let values: Vec<String> = (0..row_count)
-            .map(|i| format!("dim_{}_{}", j, i % 1000))
-            .collect();
-        columns.push(Arc::new(StringArray::from(values)));
+        columns.push(Arc::new(StringArray::from_iter_values(
+            (0..row_count).map(|i| format!("dim_{}_{}", j, i % 1000)),
+        )));
     }
     for (j, (_, alias)) in measures.iter().enumerate() {
         match measure_kind {
             MeasureKind::Float64 => {
                 fields.push(Field::new(alias.clone(), DataType::Float64, false));
-                let values: Vec<f64> = (0..row_count)
-                    .map(|i| ((i * (j + 1)) as f64) * 0.5)
-                    .collect();
-                columns.push(Arc::new(Float64Array::from(values)));
+                columns.push(Arc::new(Float64Array::from_iter_values(
+                    (0..row_count).map(|i| ((i * (j + 1)) as f64) * 0.5),
+                )));
             }
             MeasureKind::Decimal128 => {
                 fields.push(Field::new(
@@ -149,13 +151,12 @@ pub fn build_arrow_ipc(
                     false,
                 ));
                 // Same magnitudes as the Float64 arm, as a scale-2 mantissa.
-                let values: Vec<i128> = (0..row_count)
-                    .map(|i| ((i * (j + 1)) as i128) * 50)
-                    .collect();
                 columns.push(Arc::new(
-                    Decimal128Array::from(values)
-                        .with_precision_and_scale(38, 2)
-                        .expect("decimal precision"),
+                    Decimal128Array::from_iter_values(
+                        (0..row_count).map(|i| ((i * (j + 1)) as i128) * 50),
+                    )
+                    .with_precision_and_scale(38, 2)
+                    .expect("decimal precision"),
                 ));
             }
         }
@@ -167,10 +168,9 @@ pub fn build_arrow_ipc(
             false,
         ));
         // One day apart, offset per column — arbitrary but realistic spread.
-        let values: Vec<i64> = (0..row_count)
-            .map(|i| ((i + j) as i64) * 86_400_000)
-            .collect();
-        columns.push(Arc::new(TimestampMillisecondArray::from(values)));
+        columns.push(Arc::new(TimestampMillisecondArray::from_iter_values(
+            (0..row_count).map(|i| ((i + j) as i64) * 86_400_000),
+        )));
     }
 
     let schema = Arc::new(Schema::new(fields));
