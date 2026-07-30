@@ -15,14 +15,14 @@ A free-form HTML document with Handlebars expressions. Write any markup and bind
 
 ## Template structure
 
-Query result rows are available as a flat `data` array. Each row is keyed by member name, e.g. `order_items.status`.
+Query result rows are available as a flat `data` array. Each row is keyed by column name, e.g. `status` or `count`.
 
 **Access a row by index** with `data.<index>`:
 
 ```html
 <div class="scorecard">
-  <h2>{{data.0.order_items.status}}</h2>
-  <p>{{data.0.order_items.count}} orders</p>
+  <h2>{{data.0.status}}</h2>
+  <p>{{data.0.count}} orders</p>
 </div>
 ```
 
@@ -31,12 +31,16 @@ Query result rows are available as a flat `data` array. Each row is keyed by mem
 ```html
 <ul>
   {{#each data}}
-    <li>{{this.order_items.status}}: {{this.order_items.count}}</li>
+    <li>{{this.status}}: {{this.count}}</li>
   {{/each}}
 </ul>
 ```
 
-Templates are compiled in strict mode, so referencing a property that doesn't exist raises an error instead of rendering an empty string. If a chart fails to render, check that every path in the template matches a member of the current query.
+Templates are compiled in strict mode, so referencing a property that doesn't exist raises an error instead of rendering an empty string. If a chart fails to render, check that every path in the template matches a column of the current query.
+
+<Warning>
+Rows are keyed by literal strings, so a qualified name like `order_items.count` must be wrapped in square brackets: `{{data.0.[order_items.count]}}`. Without them, Handlebars reads the dot as a path and looks for a `count` property on a non-existent `order_items` object, which fails in strict mode. The unqualified column name never needs brackets.
+</Warning>
 
 <Tip>
 The chart editor includes a **Handlebars reference** panel listing the bindings for your current query. Add `{{json data}}` to a template to inspect the full context.
@@ -48,7 +52,7 @@ Alongside `data`, the following are available:
 
 | Binding | Description |
 | --- | --- |
-| `data` | Array of result rows, each keyed by member name |
+| `data` | Array of result rows, each keyed by column name |
 | `columns` | Array of columns in the result, each with `name` and `title` |
 | `rowCount` | Number of rows in `data` |
 | `columnCount` | Number of columns |
@@ -72,7 +76,7 @@ In addition to the [built-in Handlebars helpers](https://handlebarsjs.com/guide/
 | `now` | The current date |
 
 ```html
-<p>{{formatNumber data.0.order_items.count ",.0f"}} orders</p>
+<p>{{formatNumber data.0.count ",.0f"}} orders</p>
 <p>as of {{formatDate now "yyyy-LL-dd"}}</p>
 ```
 
