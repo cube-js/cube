@@ -865,10 +865,17 @@ jobs:
           echo "cube-${{ matrix.target }}.tar.gz" > "expected/${{ matrix.target }}"
       - name: Upload expected asset marker
         if: ${{ !cancelled() }}
+        # A marker carries no release payload, so it must never be the thing
+        # that reddens a release: overwrite so re-running a failed leg isn't
+        # blocked by its own earlier marker (the recovery path that restored
+        # the v1.7.14 asset), and continue-on-error so an artifact-service blip
+        # leaves that target merely unverified rather than failing the release.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: cube-cli-expected-${{ matrix.target }}
           path: expected/
+          overwrite: true
           retention-days: 1
 
   # Guards against a release that is missing a platform: every target built by
@@ -911,7 +918,7 @@ jobs:
             --jq '.assets[] | select(.state == "uploaded" and .size > 0) | .name')
           missing=""
           while IFS= read -r asset; do
-            if ! printf '%s\n' "$assets" | grep -qx "$asset"; then
+            if ! printf '%s\n' "$assets" | grep -qxF "$asset"; then
               missing="${missing} ${asset}"
             fi
           done <<< "$expected"
