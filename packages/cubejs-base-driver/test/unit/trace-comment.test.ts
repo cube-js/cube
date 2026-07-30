@@ -1,4 +1,4 @@
-import { addTraceComment, buildTraceComment, sanitizeTraceId } from '../../src';
+import { addTraceComment, buildTraceComment, sanitizeTraceId, toTraceId } from '../../src';
 
 describe('sanitizeTraceId', () => {
   test('keeps every request id shape Cube produces or accepts', () => {
@@ -40,6 +40,28 @@ describe('sanitizeTraceId', () => {
 
   test('drops the space in the CLI request id', () => {
     expect(sanitizeTraceId('CLI REQUEST')).toBe('CLIREQUEST');
+  });
+});
+
+// Shared with the orchestrator, which re-exports this as extractRequestUUID.
+// Asserted here under its own name so a drift fails at the contract, not only
+// through buildTraceComment.
+describe('toTraceId', () => {
+  test('strips a numeric span suffix', () => {
+    expect(toTraceId('f47ac10b-58cc-4372-a567-0e02b2c3d479-span-1'))
+      .toBe('f47ac10b-58cc-4372-a567-0e02b2c3d479');
+  });
+
+  // WebSocket subscriptions build `-span-${uuidv4()}`, so the suffix is not
+  // always numeric — an anchored `-span-\d+$` would leave it in place.
+  test('strips a uuid span suffix', () => {
+    expect(toTraceId('conn1-msg2-span-f47ac10b-58cc-4372-a567-0e02b2c3d479'))
+      .toBe('conn1-msg2');
+  });
+
+  test('leaves an id without a span untouched', () => {
+    expect(toTraceId('scheduler-abc')).toBe('scheduler-abc');
+    expect(toTraceId('')).toBe('');
   });
 });
 
