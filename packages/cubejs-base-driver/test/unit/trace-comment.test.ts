@@ -133,10 +133,19 @@ describe('addTraceComment', () => {
   });
 
   test('never invents a semicolon the query did not have', () => {
-    // The trailing run must start at a `;` — matching trailing whitespace alone
+    // The trailing run has to contain a `;` — trimming trailing whitespace alone
     // would append a separator to a query that never had one.
     expect(addTraceComment('SELECT 1 ', 'abc-123')).toBe('SELECT 1 \n/* trace_id: abc-123 */');
     expect(addTraceComment('SELECT 1\n', 'abc-123')).toBe('SELECT 1\n\n/* trace_id: abc-123 */');
+  });
+
+  test('stays linear on a long run of separators', () => {
+    // Guards against going back to `;[\s;]*$`, which backtracks quadratically
+    // when the run never reaches the anchor — ~1.8s at 60k on uncontrolled input.
+    const runaway = `SELECT 1${';'.repeat(60_000)}x`;
+    const started = Date.now();
+    expect(addTraceComment(runaway, 'abc-123')).toBe(`${runaway}\n/* trace_id: abc-123 */`);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 
   test('leaves the query untouched when there is no usable id', () => {
