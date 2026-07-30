@@ -8,7 +8,6 @@ import {
   assertDataSource,
   getEnv,
   CancelablePromise,
-  MaybeCancelablePromise,
 } from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, DataType, RowStatement, StatementOption } from 'snowflake-sdk';
 import {
@@ -632,7 +631,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of queried fields meta info.
    */
-  public async queryColumnTypes(sql: string, params: unknown[]): Promise<TableStructure> {
+  public queryColumnTypes(sql: string, params: unknown[]): CancelablePromise<TableStructure> {
     return this.executeCancelable<TableStructure>(
       this.getConnection(),
       {
@@ -824,7 +823,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     query: string,
     values: unknown[],
     options: DownloadQueryResultsOptions,
-  ): MaybeCancelablePromise<DownloadQueryResultsResult> {
+  ): CancelablePromise<DownloadQueryResultsResult> {
     if (!options.streamImport) {
       return this.memory(query, values);
     } else {
@@ -836,10 +835,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Executes query and returns table memory data that includes rows
    * and queried fields types.
    */
-  public async memory(
+  public memory(
     query: string,
     values: unknown[],
-  ): Promise<DownloadTableMemoryData & { types: TableStructure }> {
+  ): CancelablePromise<DownloadTableMemoryData & { types: TableStructure }> {
     return this.executeCancelable<DownloadTableMemoryData & { types: TableStructure }>(
       this.getConnection(),
       {
@@ -884,6 +883,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       },
       (stmt) => stmt,
     );
+
     // Reused by release() below. It is idempotent and a no-op once the
     // statement settled, so a stream that finished normally is never
     // needlessly aborted, and release() + cancel() cannot double-abort.
@@ -914,6 +914,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           if (!sourceStream.readableEnded) {
             sourceStream.destroy();
           }
+
           if (rowStream !== sourceStream && !rowStream.readableEnded) {
             rowStream.destroy();
           }

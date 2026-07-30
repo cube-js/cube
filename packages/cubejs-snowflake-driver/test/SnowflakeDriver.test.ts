@@ -132,6 +132,54 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
+  test('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const promise = driver.downloadQueryResults(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
+      expect(typeof promise.cancel).toBe('function');
+
+      await pause(5000);
+      await promise.cancel();
+
+      await expect(promise).rejects.toThrow(/cancelled/i);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const promise = driver.downloadQueryResults(
+        LONG_RUNNING_QUERY,
+        [],
+        { highWaterMark: 100, streamImport: true },
+      );
+      expect(typeof promise.cancel).toBe('function');
+
+      await pause(5000);
+      await promise.cancel();
+
+      await expect(promise).rejects.toThrow(/cancelled/i);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('downloadQueryResults() returns memory data when not streaming', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const tableData = <any> await driver.downloadQueryResults(
+        QUERY_TO_TEST_HYDRATION,
+        [],
+        { highWaterMark: 100 },
+      );
+      assertHydrationResults(tableData.rows);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
   test('stream() release() after normal completion does not abort', async () => {
     const driver = new SnowflakeDriver({});
     try {
