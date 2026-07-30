@@ -154,6 +154,22 @@ cubes:
           - name: rate_vs_commission
             type: number
             sql: "100.0 * {converted_value} / NULLIF({commissioned_value}, 0)"
+          # Every dependency is a measure, but the expression also reads the
+          # cube's own table directly - that read has nowhere to go if the
+          # component leaves.
+          - name: converted_per_max_amount
+            type: number
+            sql: "{converted_value} / NULLIF(MAX({CUBE}.amount), 0)"
+          # Reaches `rates` past its component measure, so the component cannot
+          # be computed on its own: the leftover expression would have nothing
+          # to read `fx_rate` from.
+          - name: amount_over_fx
+            type: number
+            sql: "{total_amount} / NULLIF(MAX({rates.fx_rate}), 0)"
+          # Reaches `rates` with no component measure at all.
+          - name: max_fx_rate
+            type: number
+            sql: "MAX({rates.fx_rate})"
           # Reaches a cube that owns the join towards `payments`, so this
           # measure's tree roots away from the key cube.
           - name: gold_amount

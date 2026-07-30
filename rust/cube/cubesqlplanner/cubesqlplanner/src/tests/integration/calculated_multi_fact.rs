@@ -204,11 +204,10 @@ async fn test_two_sibling_lookup_join_trees_of_one_cube() {
     }
 }
 
-/// A calculated measure that reaches other cubes, on its own. The measure-join
-/// subquery drops the aggregation around its components, so the outer select
-/// projects the expression neither aggregated nor grouped.
+/// A calculated measure that reaches other cubes, on its own. Reaching them
+/// forces a measure-join subquery, which renders measures without their
+/// aggregate - so the components travel down and the ratio is formed above them.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "calculated measure loses its component aggregation in the measure-join subquery"]
 async fn test_calculated_measure_reaching_other_cubes_alone() {
     let ctx = create_context();
 
@@ -229,12 +228,9 @@ async fn test_calculated_measure_reaching_other_cubes_alone() {
 }
 
 /// A calculated measure whose two components need different extra cubes, so its
-/// own footprint is their union - next to a measure that needs neither. The two
-/// join trees are separated correctly; the calculated leg itself hits the same
-/// lost-aggregation problem as
-/// [`test_calculated_measure_reaching_other_cubes_alone`].
+/// own footprint is their union - next to a measure that needs neither, which
+/// puts the two on separate join trees.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "calculated measure loses its component aggregation in the measure-join subquery"]
 async fn test_calculated_measure_over_components_with_different_joins() {
     let ctx = create_context();
 
@@ -325,6 +321,83 @@ async fn test_several_join_tree_shapes_in_one_query() {
           - payments.total_amount
           - payments.net_value
           - payments.success_rate
+        dimensions:
+          - payment_meta.value
+        order:
+          - id: payment_meta.value
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A calculated measure whose dependencies are all measures, but whose sql also
+/// reads its own cube's table. Letting the component leave would strand that
+/// read in a select the cube is not joined into. Paired with a measure of
+/// another cube so the query is planned through classification, and grouped by a
+/// dimension that multiplies nothing, so the measure renders whole and the
+/// result is checkable.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calculated_measure_reading_its_own_cube_directly() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - payments.converted_per_max_amount
+          - payment_meta.count
+        dimensions:
+          - payments.status
+        order:
+          - id: payments.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A calculated measure that reaches another cube past its component measure.
+/// The component cannot travel on its own - `MAX({rates.fx_rate})` would be left
+/// with no `rates` to read from - so the measure stays whole, and whole is where
+/// the measure-join subquery drops its aggregation.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "calculated measure that cannot be decomposed loses its aggregation in the measure-join subquery"]
+async fn test_calculated_measure_reaching_past_its_components() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - payments.amount_over_fx
+        dimensions:
+          - payment_meta.value
+        order:
+          - id: payment_meta.value
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// A calculated measure that reaches another cube and has no component measure
+/// to travel in its place. It must keep going through the keys subquery, or the
+/// fan-out on `p1` would be counted twice.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "calculated measure that cannot be decomposed loses its aggregation in the measure-join subquery"]
+async fn test_calculated_measure_without_component_measures() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - payments.max_fx_rate
+          - payments.total_amount
         dimensions:
           - payment_meta.value
         order:

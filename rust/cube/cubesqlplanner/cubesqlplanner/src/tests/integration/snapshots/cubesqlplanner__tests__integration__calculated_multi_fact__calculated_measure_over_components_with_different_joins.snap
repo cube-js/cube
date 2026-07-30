@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payment_meta__value | payments__rate_vs_commission | payments__total_amount
+--------------------+------------------------------+-----------------------
+A                   | 333.33333333333333333        | 600.00                
+B                   | 100.00000000000000000        | 400.00                
+C                   | 1000.00000000000000000       | 500.00
