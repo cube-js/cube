@@ -33,7 +33,7 @@ In addition to that, you'll need to make sure you have sufficient access to crea
 the `CubeCloudBYOC` IAM role that would allow Cube to:
 - Create and manage a VPC
 - Create one or more EKS clusters
-- Create necessary IAM roles and policies
+- Create and maintain necessary IAM roles and policies
 - Configure VPC networking
 - Run ec2 instances
 - Manage ec2 autoscaling
@@ -144,11 +144,13 @@ actual account ID.
                 "iam:CreateInstanceProfile",
                 "iam:CreateOpenIDConnectProvider",
                 "iam:CreatePolicy",
+                "iam:CreatePolicyVersion",
                 "iam:CreateRole",
                 "iam:CreateServiceLinkedRole",
                 "iam:DeleteInstanceProfile",
                 "iam:DeleteOpenIDConnectProvider",
                 "iam:DeletePolicy",
+                "iam:DeletePolicyVersion",
                 "iam:DeleteRole",
                 "iam:DeleteRolePolicy",
                 "iam:DeleteServiceLinkedRole",
