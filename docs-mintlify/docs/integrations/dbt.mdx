@@ -155,8 +155,8 @@ automated — uses the same configuration:
 
 ### Primary key detection
 
-Every cube needs a `primary_key` — it states the model's grain, and Cube requires one on
-both ends of every join. The pull looks for it in three tiers and uses the first one that
+A cube's `primary_key` states the model's grain, and Cube relies on it to aggregate
+correctly across joins. The pull looks for it in three tiers and uses the first one that
 yields a key:
 
 1. **dbt `primary_key` constraints** — both column-level and model-level (composite)
@@ -200,7 +200,11 @@ models:
         data_type: varchar
       - name: valid_from
         data_type: timestamp
+      # …every other column of the model needs a data_type too
 ```
+
+Your warehouse doesn't have to enforce primary keys for this to work — most don't. The
+pull only runs `dbt parse`, and reads the declaration out of `manifest.json`.
 
 If your project doesn't use contracts, tier 2 is the way to declare a single-column key:
 add `unique` and `not_null` tests to it.
@@ -209,11 +213,12 @@ A declared key is never overridden or widened by the guessing tiers — only a j
 column can add to it. If a cube that participates in a join ends up with no key at all,
 the pull still writes the file, and what happens next depends on the cube's measures:
 
-- **With aggregatable measures** — including the `count` that **Add default measures**
-  adds to every cube — the data model fails to compile with `primary key for '<cube>' is
-  required when join is defined in order to make aggregates work properly`.
-- **Without them**, there's no error: the join is dropped, and the two cubes are simply
-  not queryable together.
+- **With a `count`, `sum`, `avg`, or `number` measure** — including the `count` that
+  **Add default measures** adds to every cube — the data model fails to compile with
+  `primary key for '<cube>' is required when join is defined in order to make aggregates
+  work properly`.
+- **Without one**, there's no compile error, but the join is dropped: a query that touches
+  both cubes then fails with `Can't find join path to join '<cube>', '<cube>'`.
 
 Either way, the generated `.yml` is where to check what the pull decided — every key it
 detected is a dimension with `primary_key: true`.
@@ -429,9 +434,9 @@ For each dbt model in your project:
 - **Joins between cubes** are generated from dbt `relationships` tests and
   foreign-key constraints — so the generated data model is queryable across cubes out of
   the box. The foreign-key column is on the "many" side, so every generated join is
-  `many_to_one` from the cube that owns it. dbt can only declare a relationship in one
-  direction; enable **Also generate reverse joins** to emit a `one_to_many` join back to
-  the referencing cube too.
+  `many_to_one` from the cube that owns it. A dbt relationship describes the reference
+  from the referencing side only, so nothing points back — enable **Also generate reverse
+  joins** to emit a `one_to_many` join back to the referencing cube too.
 
 Models named `metricflow_time_spine` and any non-model resources (sources, seeds,
 snapshots, etc.) are skipped.
@@ -609,7 +614,9 @@ Each push creates exactly two new files:
 - **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, Google
   BigQuery, Databricks, and Amazon Athena.
 - **Imports models, columns, and relationships only** — not dbt metrics, semantic
-  models, tests, or exposures.
+  models, or exposures. Data tests aren't converted into anything either; `unique`,
+  `not_null`, and `relationships` tests are only read as evidence for
+  [primary keys](#primary-key-detection) and joins.
 - **Pull is one-directional** — dbt pull never writes back to your dbt repository.
   Promoting cubes into dbt is the [dbt push](#push-cubes-to-dbt) direction (in preview).
 - **No warehouse connection** — a pull doesn't trigger a `dbt run`; it assumes your
