@@ -71,10 +71,24 @@ export function addTraceComment(sql: string, requestId: string | undefined | nul
     return sql;
   }
 
-  // Collapse a run of trailing semicolons, not just one: leaving `;` behind would
-  // put the comment between two statements, the second of them empty.
-  const withoutSemicolon = sql.replace(/;[\s;]*$/, '');
-  const semicolon = withoutSemicolon.length === sql.length ? '' : ';';
+  // Take the whole trailing run, not one semicolon: a leftover `;` would leave the
+  // comment between two statements, the second empty. Scanned, not matched — `sql`
+  // is uncontrolled and `;[\s;]*$` backtracks quadratically on a long run.
+  let end = sql.length;
+  let sawSemicolon = false;
+  while (end > 0) {
+    const ch = sql[end - 1];
+    if (ch === ';') {
+      sawSemicolon = true;
+    } else if (!/\s/.test(ch)) {
+      break;
+    }
+    end -= 1;
+  }
+
+  // Trailing whitespace on its own must not gain the query a semicolon it never had.
+  const withoutSemicolon = sawSemicolon ? sql.slice(0, end) : sql;
+  const semicolon = sawSemicolon ? ';' : '';
 
   return `${withoutSemicolon}\n${comment}${semicolon}`;
 }
