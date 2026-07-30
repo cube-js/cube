@@ -161,7 +161,7 @@ impl Serialize for CompactRow<'_> {
                     column,
                     member_type,
                 } => column.with_transformed(self.row_idx, member_type, |value| {
-                    seq.serialize_element(value)
+                    seq.serialize_element(&value)
                 })?,
                 CompactPlanEntry::Constant(value) => seq.serialize_element(value)?,
             }
@@ -206,7 +206,7 @@ impl Serialize for ColumnarColumn<'_> {
                 // row loop — the same tight fill the materializing path uses.
                 let reader = self.source.reader(*index).map_err(S::Error::custom)?;
                 reader.for_each_transformed(self.entry.member_type, |value| {
-                    seq.serialize_element(value.as_ref())
+                    seq.serialize_element(&value)
                 })?;
             }
             ColumnarColumnSource::Constant(value) => {

@@ -20,6 +20,7 @@ use arrow::array::{
     UInt32Array, UInt64Array, UInt8Array,
 };
 use arrow::datatypes::{ArrowTemporalType, DataType, TimeUnit};
+use serde::{Serialize, Serializer};
 use std::{borrow::Cow, convert::Infallible};
 
 /// One logical column of a query result.
@@ -178,6 +179,58 @@ impl ArrowArray {
     }
 }
 
+/// A cell on its way out of a column.
+///
+/// [`DBResponsePrimitive`] owns its `String`, so building one from an Arrow `Utf8`
+/// column costs an allocation per cell. Callers that only render a cell and drop
+/// it — the response serializers — take this instead and borrow the text where it
+/// already lives.
+pub enum CellRef<'a> {
+    /// A cell already materialized in the column.
+    Primitive(&'a DBResponsePrimitive),
+    /// Text borrowed straight from the column's buffer.
+    Str(&'a str),
+    /// Decoded on read: booleans, numbers, timestamps, decimals.
+    Owned(DBResponsePrimitive),
+}
+
+impl CellRef<'_> {
+    /// The same cell as an owned primitive, for callers that keep it.
+    #[inline]
+    pub fn into_owned(self) -> DBResponsePrimitive {
+        match self {
+            CellRef::Primitive(value) => value.clone(),
+            CellRef::Str(text) => DBResponsePrimitive::String(text.to_owned()),
+            CellRef::Owned(value) => value,
+        }
+    }
+}
+
+/// Mirrors `Serialize for DBResponsePrimitive`: `Str` renders exactly as that
+/// impl's `String` arm, and every other cell delegates to it outright.
+impl Serialize for CellRef<'_> {
+    #[inline]
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            CellRef::Primitive(value) => value.serialize(serializer),
+            CellRef::Str(text) => serializer.serialize_str(text),
+            CellRef::Owned(value) => value.serialize(serializer),
+        }
+    }
+}
+
+/// Read `$array[$row]` as borrowed text, or a null cell.
+macro_rules! borrowed_str_cell {
+    ($array:expr, $row:expr) => {{
+        let a = $array;
+        if a.is_null($row) {
+            CellRef::Owned(DBResponsePrimitive::Null)
+        } else {
+            CellRef::Str(a.value($row))
+        }
+    }};
+}
+
 /// Per-cell accessor for one column, resolved once per column so the per-cell path
 /// is a jump table plus an index — never a `DataType` match and a downcast.
 pub enum ColumnReader<'a> {
@@ -224,21 +277,32 @@ impl ColumnReader<'_> {
         }
     }
 
-    /// The cell at `row`, transformed for `member_type`, passed to `f` by
-    /// reference. A materialized column whose member type needs no transform is
-    /// handed over borrowed, so a reader that only forwards the value — the
-    /// row-major serializers — never clones it.
+    /// The cell at `row`, transformed for `member_type`, handed to `f`. Cells that
+    /// need no transform are passed borrowed — from the column's own storage or
+    /// straight out of the Arrow buffer — so a caller that only renders the value
+    /// never allocates for it.
     #[inline]
     pub fn with_transformed<R>(
         &self,
         row: usize,
         member_type: &str,
-        f: impl FnOnce(&DBResponsePrimitive) -> R,
+        f: impl FnOnce(CellRef<'_>) -> R,
     ) -> R {
-        match self {
-            ColumnReader::Primitives(cells) if is_identity_transform(member_type) => f(&cells[row]),
-            _ => f(&transform_value(self.value(row), member_type)),
+        if is_identity_transform(member_type) {
+            match self {
+                ColumnReader::Primitives(cells) => return f(CellRef::Primitive(&cells[row])),
+                ColumnReader::Arrow(a) => {
+                    if let Some(cell) = a.borrowed_cell(row) {
+                        return f(cell);
+                    }
+                }
+            }
         }
+
+        f(CellRef::Owned(transform_value(
+            self.value(row),
+            member_type,
+        )))
     }
 
     /// Hand every cell, transformed for `member_type`, to `visit` in row order.
@@ -248,17 +312,17 @@ impl ColumnReader<'_> {
     pub fn for_each_transformed<E>(
         &self,
         member_type: &str,
-        mut visit: impl FnMut(Cow<'_, DBResponsePrimitive>) -> Result<(), E>,
+        mut visit: impl FnMut(CellRef<'_>) -> Result<(), E>,
     ) -> Result<(), E> {
         match self {
             ColumnReader::Primitives(cells) => {
                 if is_identity_transform(member_type) {
                     for cell in cells.iter() {
-                        visit(Cow::Borrowed(cell))?;
+                        visit(CellRef::Primitive(cell))?;
                     }
                 } else {
                     for cell in cells.iter() {
-                        visit(Cow::Owned(transform_value(cell.clone(), member_type)))?;
+                        visit(CellRef::Owned(transform_value(cell.clone(), member_type)))?;
                     }
                 }
                 Ok(())
@@ -427,6 +491,19 @@ impl ArrowCellReader<'_> {
         }
     }
 
+    /// The cell at `row` borrowed from the Arrow buffer, for the types that store
+    /// their values as text. `None` for every other type, so the caller falls back
+    /// to decoding an owned value.
+    #[inline]
+    fn borrowed_cell(&self, row: usize) -> Option<CellRef<'_>> {
+        match self {
+            ArrowCellReader::Utf8(a) => Some(borrowed_str_cell!(a, row)),
+            ArrowCellReader::LargeUtf8(a) => Some(borrowed_str_cell!(a, row)),
+            ArrowCellReader::Utf8View(a) => Some(borrowed_str_cell!(a, row)),
+            _ => None,
+        }
+    }
+
     /// Text rendering of `row`, borrowing from the Arrow buffer for string types.
     fn value_as_str(&self, row: usize) -> Option<Cow<'_, str>> {
         macro_rules! borrowed_str {
@@ -458,14 +535,14 @@ impl ArrowCellReader<'_> {
     fn for_each_transformed<E>(
         &self,
         member_type: &str,
-        mut visit: impl FnMut(Cow<'_, DBResponsePrimitive>) -> Result<(), E>,
+        mut visit: impl FnMut(CellRef<'_>) -> Result<(), E>,
     ) -> Result<(), E> {
         let len = self.len();
 
         macro_rules! fill {
             ($read:expr) => {{
                 for row in 0..len {
-                    visit(Cow::Owned(transform_value($read(row), member_type)))?;
+                    visit(CellRef::Owned(transform_value($read(row), member_type)))?;
                 }
             }};
         }
@@ -477,11 +554,30 @@ impl ArrowCellReader<'_> {
             }};
         }
 
+        /// Text columns are handed over borrowed unless the member type asks for
+        /// a transform, which needs an owned `String` to rewrite.
+        macro_rules! fill_str {
+            ($array:expr) => {{
+                let a = $array;
+                if is_identity_transform(member_type) {
+                    for row in 0..len {
+                        visit(borrowed_str_cell!(a, row))?;
+                    }
+                } else {
+                    fill!(
+                        |row| read_cell!(a, row, |v: &str| DBResponsePrimitive::String(
+                            v.to_owned()
+                        ))
+                    )
+                }
+            }};
+        }
+
         match self {
             ArrowCellReader::Empty => {}
             ArrowCellReader::Null(_) => {
                 for _ in 0..len {
-                    visit(Cow::Owned(DBResponsePrimitive::Null))?;
+                    visit(CellRef::Owned(DBResponsePrimitive::Null))?;
                 }
             }
             ArrowCellReader::Boolean(a) => fill_with!(a, DBResponsePrimitive::Boolean),
@@ -502,15 +598,9 @@ impl ArrowCellReader<'_> {
                 fill_with!(a, |v| DBResponsePrimitive::Float64(v as f64))
             }
             ArrowCellReader::Float64(a) => fill_with!(a, DBResponsePrimitive::Float64),
-            ArrowCellReader::Utf8(a) => {
-                fill_with!(a, |v: &str| DBResponsePrimitive::String(v.to_owned()))
-            }
-            ArrowCellReader::LargeUtf8(a) => {
-                fill_with!(a, |v: &str| DBResponsePrimitive::String(v.to_owned()))
-            }
-            ArrowCellReader::Utf8View(a) => {
-                fill_with!(a, |v: &str| DBResponsePrimitive::String(v.to_owned()))
-            }
+            ArrowCellReader::Utf8(a) => fill_str!(a),
+            ArrowCellReader::LargeUtf8(a) => fill_str!(a),
+            ArrowCellReader::Utf8View(a) => fill_str!(a),
             ArrowCellReader::Date32(a) => fill!(|row| datetime_cell(*a, row)),
             ArrowCellReader::Date64(a) => fill!(|row| datetime_cell(*a, row)),
             ArrowCellReader::TimestampSecond(a) => fill!(|row| datetime_cell(*a, row)),

@@ -3812,6 +3812,10 @@ pub(crate) mod tests {
                     DataType::Timestamp(TimeUnit::Millisecond, None),
                     true,
                 ),
+                // A text column annotated as `time`: the one shape where a cell
+                // cannot be handed over borrowed, because `transform_value`
+                // rewrites it.
+                Field::new("cube__shipped_at_day", DataType::Utf8, true),
             ]));
 
             let batch = RecordBatch::try_new(
@@ -3833,6 +3837,11 @@ pub(crate) mod tests {
                         Some(1_000),
                         None,
                     ])),
+                    Arc::new(StringArray::from(vec![
+                        Some("2024-06-15 00:00:00.000"),
+                        None,
+                        Some("2024-06-16T00:00:00"),
+                    ])),
                 ],
             )
             .unwrap();
@@ -3853,6 +3862,7 @@ pub(crate) mod tests {
                 ("cube__amount", "Cube.amount", "number"),
                 ("cube__total", "Cube.total", "number"),
                 ("cube__created_at_day", "Cube.createdAt.day", "time"),
+                ("cube__shipped_at_day", "Cube.shippedAt.day", "time"),
             ];
 
             let mut alias_to_member_name_map: HashMap<String, String> = HashMap::new();
@@ -3866,6 +3876,15 @@ pub(crate) mod tests {
                 members
                     .iter()
                     .map(|(_, member, _)| MemberOrMemberExpression::Member(member.to_string()))
+                    // `Cube.createdAt` is requested without a granularity, so
+                    // `get_members` appends a deprecated-style member only for
+                    // `Cube.shippedAt`. That keeps the appended-member order
+                    // deterministic across calls: `get_members` walks a `HashMap`
+                    // there, so two of them would come out in either order and the
+                    // byte-equality assertions below would flake.
+                    .chain([MemberOrMemberExpression::Member(
+                        "Cube.createdAt".to_string(),
+                    )])
                     .collect(),
             ));
 
@@ -3927,11 +3946,27 @@ pub(crate) mod tests {
             .iter()
             .position(|m| m == "Cube.createdAt.day")
             .unwrap();
+        let shipped_idx = members
+            .iter()
+            .position(|m| m == "Cube.shippedAt.day")
+            .unwrap();
         assert_eq!(
             dataset[0][total_idx],
             DBResponsePrimitive::String("2399.96".to_string()),
             "decimals render from mantissa and scale"
         );
+        // A `time` member's text is reformatted, so it must not be passed through
+        // as the raw Arrow value.
+        assert_eq!(
+            dataset[0][shipped_idx],
+            DBResponsePrimitive::String("2024-06-15T00:00:00.000".to_string()),
+            "text of a time member is reformatted, not borrowed as-is"
+        );
+        assert_eq!(
+            dataset[2][shipped_idx],
+            DBResponsePrimitive::String("2024-06-16T00:00:00.000".to_string()),
+        );
+        assert_eq!(dataset[1][shipped_idx], DBResponsePrimitive::Null);
         assert_eq!(
             serde_json::to_value(&dataset[1][created_idx])?,
             serde_json::json!("1970-01-01T00:00:01.000"),
