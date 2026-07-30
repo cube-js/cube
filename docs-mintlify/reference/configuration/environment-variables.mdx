@@ -1330,10 +1330,9 @@ This allows reusing pre-aggregations across environments, saving both time and c
 
 Connection variables for a dedicated data source used to build and store the default
 data source's pre-aggregations, instead of its own connection. They mirror the regular
-`CUBEJS_DB_*` connection variables — for example `CUBEJS_PRE_AGGREGATIONS_DB_TYPE`,
-`CUBEJS_PRE_AGGREGATIONS_DB_HOST`, `CUBEJS_PRE_AGGREGATIONS_DB_PORT`,
-`CUBEJS_PRE_AGGREGATIONS_DB_USER`, `CUBEJS_PRE_AGGREGATIONS_DB_PASS`, and
-`CUBEJS_PRE_AGGREGATIONS_DB_SSL`. For a [named data source][ref-config-multiple-ds-decorating-env],
+`CUBEJS_DB_*` connection variables — for example `CUBEJS_PRE_AGGREGATIONS_DB_HOST`,
+`CUBEJS_PRE_AGGREGATIONS_DB_PORT`, `CUBEJS_PRE_AGGREGATIONS_DB_USER`,
+`CUBEJS_PRE_AGGREGATIONS_DB_PASS`, and `CUBEJS_PRE_AGGREGATIONS_DB_SSL`. For a [named data source][ref-config-multiple-ds-decorating-env],
 use the decorated form `CUBEJS_DS_<NAME>_PRE_AGGREGATIONS_DB_*`.
 
 Driver-specific connection variables take the same segment, so the dedicated connection
@@ -1347,7 +1346,9 @@ and `FIREBOLT_` variable families are supported.
 | Same as the corresponding `CUBEJS_DB_*` variable | Not set                | Not set               |
 
 Setting any one of these variables switches the data source's pre-aggregations onto the
-dedicated connection.
+dedicated connection. Configure it in full: an unset variable falls back to the driver's
+default rather than to its `CUBEJS_DB_*` counterpart. `CUBEJS_PRE_AGGREGATIONS_DB_TYPE` is
+ignored — the dedicated connection always uses the data source's driver.
 
 See [pre-aggregation data source][ref-preagg-data-source] for details and examples.
 

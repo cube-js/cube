@@ -39,20 +39,22 @@ CUBEJS_DB_TYPE=postgres
 CUBEJS_DB_HOST=localhost
 
 # Dedicated pre-aggregation data source for the default data source
-CUBEJS_PRE_AGGREGATIONS_DB_TYPE=postgres
 CUBEJS_PRE_AGGREGATIONS_DB_HOST=preagg-host
+CUBEJS_PRE_AGGREGATIONS_DB_USER=preagg-user
+CUBEJS_PRE_AGGREGATIONS_DB_PASS=preagg-pass
 
 # A named data source and its dedicated pre-aggregation data source
 CUBEJS_DATASOURCES=default,analytics
 CUBEJS_DS_ANALYTICS_DB_TYPE=postgres
 CUBEJS_DS_ANALYTICS_DB_HOST=remotehost
-CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_TYPE=postgres
 CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST=analytics-preagg-host
+CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_USER=analytics-preagg-user
+CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_PASS=analytics-preagg-pass
 ```
 
 The `PRE_AGGREGATIONS` variant supports the same connection variables as the regular
-`CUBEJS_DB_*` / `CUBEJS_DS_<NAME>_DB_*` data source variables (for example `_DB_TYPE`,
-`_DB_HOST`, `_DB_PORT`, `_DB_USER`, `_DB_PASS`, and `_DB_SSL`).
+`CUBEJS_DB_*` / `CUBEJS_DS_<NAME>_DB_*` data source variables (for example `_DB_HOST`,
+`_DB_PORT`, `_DB_USER`, `_DB_PASS`, and `_DB_SSL`).
 
 Driver-specific variables take the same segment, so the dedicated connection is not
 limited to the `_DB_*` family — for example `CUBEJS_PRE_AGGREGATIONS_JDBC_URL` or
@@ -61,6 +63,19 @@ limited to the `_DB_*` family — for example `CUBEJS_PRE_AGGREGATIONS_JDBC_URL`
 
 Setting any one of these variables switches the data source onto the dedicated
 connection; there is no separate flag to enable it.
+
+<Warning>
+
+Each variable is read independently, and an unset one does **not** fall back to its
+`CUBEJS_DB_*` counterpart — it falls back to the driver's own default. Configure the
+dedicated connection in full: if you set only `CUBEJS_PRE_AGGREGATIONS_DB_HOST`, the build
+connects to that host with the driver's default user and password rather than the ones
+from `CUBEJS_DB_USER` and `CUBEJS_DB_PASS`.
+
+The one exception is the driver type: `CUBEJS_PRE_AGGREGATIONS_DB_TYPE` is ignored, since
+the dedicated connection always uses the same driver as the data source it belongs to.
+
+</Warning>
 
 <Info>
 
