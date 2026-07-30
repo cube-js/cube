@@ -14,7 +14,7 @@ use crate::{
     CubeError,
 };
 use futures::future::join_all;
-use log::error;
+use log::{error, warn};
 
 use std::{
     env,
@@ -153,6 +153,22 @@ impl ConfigObjImpl {
             .map(|v| v.parse::<u64>().unwrap())
             .unwrap_or(120);
         let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", true);
+
+        let db_query_limit: i32 = env_parse("CUBEJS_DB_QUERY_LIMIT", 50000);
+        let non_streaming_query_max_row_limit =
+            match env_optparse("CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT") {
+                Some(limit) if limit > db_query_limit => {
+                    warn!(
+                        "CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT ({}) exceeds \
+                        CUBEJS_DB_QUERY_LIMIT ({}), falling back to the latter",
+                        limit, db_query_limit
+                    );
+                    db_query_limit
+                }
+                Some(limit) => limit,
+                None => db_query_limit,
+            };
+
         Self {
             bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
                 env::var("CUBESQL_PORT")
@@ -184,7 +200,7 @@ impl ConfigObjImpl {
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
-            non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
+            non_streaming_query_max_row_limit,
             cube_scan_max_batch_rows: env_parse("CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS", 65536),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
