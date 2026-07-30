@@ -32,6 +32,7 @@ import { HydrationMap, HydrationStream } from './HydrationStream';
 import { hydrators } from './type-parsers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
+export const CANCEL_ACK_TIMEOUT = 30 * 1000;
 
 const FETCH_AS_STRING: DataType[] = [
   // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
@@ -95,7 +96,7 @@ interface SnowflakeDriverExportAzure {
 export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS
   | SnowflakeDriverExportAzure;
 
-interface SnowflakeDriverOptions {
+export interface SnowflakeDriverOptions {
   host?: string,
   account: string,
   username: string,
@@ -128,17 +129,7 @@ interface SnowflakeDriverOptions {
 
 type SessionParameterValue = string | number | boolean | undefined;
 
-/**
- * Snowflake driver class.
- *
- * Attention:
- * Snowflake is using UPPER_CASE for table, schema and column names
- * Similar to data in response, column_name will be COLUMN_NAME
- */
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
-  /**
-   * Returns default concurrency value.
-   */
   public static getDefaultConcurrency(): number {
     return 8;
   }
@@ -173,9 +164,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: SnowflakeDriverOptions;
 
-  /**
-   * Class constructor.
-   */
   public constructor(
     config: Partial<SnowflakeDriverOptions> & {
       /**
@@ -969,24 +957,43 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected cancelStatement(stmt: RowStatement): Promise<void> {
     return new Promise<void>((resolve) => {
-      const onError = (e: any) => {
-        if (this.logger) {
-          this.logger('Snowflake statement cancel error', {
-            error: (e?.stack || e?.message || e)?.toString(),
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let settled = false;
+
+      const finish = (warning?: string, error?: any) => {
+        // The SDK is free to call back after the timeout has already given up,
+        // and a synchronous throw can land after the callback fired.
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+
+        if (timer) {
+          clearTimeout(timer);
+        }
+
+        if (warning && this.logger) {
+          this.logger(warning, {
+            queryId: stmt.getQueryId(),
+            ...(error !== undefined && {
+              error: (error?.stack || error?.message || error)?.toString(),
+            }),
           });
         }
+
+        resolve();
       };
 
+      timer = setTimeout(
+        () => finish('Snowflake statement cancel timeout'),
+        CANCEL_ACK_TIMEOUT,
+      );
+
       try {
-        stmt.cancel((err) => {
-          if (err) {
-            onError(err);
-          }
-          resolve();
-        });
+        stmt.cancel((err) => finish(err ? 'Snowflake statement cancel error' : undefined, err));
       } catch (e) {
-        onError(e);
-        resolve();
+        finish('Snowflake statement cancel error', e);
       }
     });
   }

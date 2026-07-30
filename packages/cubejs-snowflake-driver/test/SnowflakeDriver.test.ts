@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { streamToArray } from '@cubejs-backend/shared';
+import type { RowStatement } from 'snowflake-sdk';
 
-import { SnowflakeDriver } from '../src';
+import { CANCEL_ACK_TIMEOUT, SnowflakeDriver } from '../src/SnowflakeDriver';
 
-// Long enough that a run to completion is unmistakably distinguishable from a
-// successful cancel. SYSTEM$WAIT holds the warehouse without producing data.
 const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(120)';
 
 const pause = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -179,6 +178,83 @@ describe('SnowflakeDriver', () => {
       await driver.release();
     }
   }, 2 * 60 * 1000);
+
+  // These need no Snowflake connection: the point is what the driver does when the
+  // SDK never answers, which no live server reproduces on demand.
+  describe('cancelStatement()', () => {
+    class TestSnowflakeDriver extends SnowflakeDriver {
+      public logged: [string, any][] = [];
+
+      public constructor() {
+        super({});
+        this.setLogger((msg, params) => this.logged.push([msg, params]));
+      }
+
+      public cancelStatementForTest(stmt: RowStatement): Promise<void> {
+        return this.cancelStatement(stmt);
+      }
+    }
+
+    // A statement wedged the way a black-holed socket wedges one: `cancel()` takes
+    // the callback and only calls it if the test says so.
+    const wedgedStatement = (onCancel?: (cb: (err: any) => void) => void) => <RowStatement>(<unknown>{
+      cancel: (cb: (err: any) => void) => onCancel?.(cb),
+      getQueryId: () => 'query-id',
+    });
+
+    // Waits out the real bound, so it costs CANCEL_ACK_TIMEOUT. Both assertions
+    // live here rather than in two tests to pay that once.
+    test('gives up waiting when the SDK never acknowledges, and ignores a late one', async () => {
+      const driver = new TestSnowflakeDriver();
+
+      let acknowledge: (() => void) | undefined;
+      let settled = false;
+      const cancelling = driver
+        .cancelStatementForTest(
+          wedgedStatement((cb) => { acknowledge = () => cb(new Error('too late')); }),
+        )
+        .then(() => { settled = true; });
+
+      await pause(CANCEL_ACK_TIMEOUT / 2);
+      expect(settled).toBe(false);
+
+      await cancelling;
+      expect(settled).toBe(true);
+
+      // The wait has expired; a late callback must neither resolve a second time
+      // nor report an error nobody can act on any more.
+      acknowledge?.();
+
+      expect(driver.logged).toEqual([
+        ['Snowflake statement cancel timeout', { queryId: 'query-id' }],
+      ]);
+    }, CANCEL_ACK_TIMEOUT + 10 * 1000);
+
+    test('reports an acknowledged failure without waiting out the bound', async () => {
+      const driver = new TestSnowflakeDriver();
+
+      const startedAt = Date.now();
+      await driver.cancelStatementForTest(
+        wedgedStatement((cb) => cb(new Error('cancel refused'))),
+      );
+
+      expect(Date.now() - startedAt).toBeLessThan(CANCEL_ACK_TIMEOUT);
+      expect(driver.logged).toEqual([
+        [
+          'Snowflake statement cancel error',
+          { queryId: 'query-id', error: expect.stringContaining('cancel refused') },
+        ],
+      ]);
+    });
+
+    test('resolves when the SDK acknowledges a successful cancel', async () => {
+      const driver = new TestSnowflakeDriver();
+
+      await driver.cancelStatementForTest(wedgedStatement((cb) => cb(undefined)));
+
+      expect(driver.logged).toEqual([]);
+    });
+  });
 
   test('stream() release() after normal completion does not abort', async () => {
     const driver = new SnowflakeDriver({});

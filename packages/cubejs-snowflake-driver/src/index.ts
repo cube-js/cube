@@ -1,5 +1,5 @@
 import { SnowflakeDriver } from './SnowflakeDriver';
 
-export * from './SnowflakeDriver';
+export { SnowflakeDriver } from './SnowflakeDriver';
 
 export default SnowflakeDriver;
