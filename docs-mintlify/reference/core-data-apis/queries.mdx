@@ -44,7 +44,9 @@ environment variable to override it. You can also implement
 If you're using the [SQL API][ref-sql-api], you can enable
 [streaming mode][ref-sql-api-streaming] to bypass the maximum row limit for
 queries with an explicit `LIMIT` clause. Without an explicit `LIMIT`,
-`CUBEJS_DB_QUERY_DEFAULT_LIMIT` still applies even in streaming mode.
+`CUBEJS_DB_QUERY_DEFAULT_LIMIT` still applies even in streaming mode. SQL API
+queries that are not streamed can also be capped separately with
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](/reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit).
 
 ### Time zone
 
