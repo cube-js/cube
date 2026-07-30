@@ -83,7 +83,7 @@ pub enum MeasureTimeShifts {
 
 /// Render-time modifier of how the measure's value is emitted in its
 /// select. `None` on the symbol means the usual final aggregation.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug)]
 pub enum MeasureRenderModifier {
     /// Raw row-level value without the aggregation wrap (measure
     /// subqueries, ungrouped multi-stage leaves).
@@ -92,6 +92,18 @@ pub enum MeasureRenderModifier {
     /// render a not-null indicator so an outer count can sum each
     /// row's contribution.
     UngroupedQueryValue,
+    /// Merge of the window's partial values in a rolling-window
+    /// select: mergeable aggregations combine the input column
+    /// (`sum` for sums and counts, `min`/`max`, an HLL merge for
+    /// `count_distinct_approx`); the rest re-aggregate the raw rows.
+    RollingMerge,
+    /// `rank() OVER (PARTITION BY ...)` in the multi-stage select
+    /// that computes a rank measure.
+    MultiStageRank { partition: Vec<Rc<MemberSymbol>> },
+    /// A window aggregation `agg(agg(x)) OVER (PARTITION BY ...)` in
+    /// the multi-stage select whose partition is narrower than the
+    /// full dimension set.
+    MultiStageWindow { partition: Vec<Rc<MemberSymbol>> },
 }
 
 /// `MemberSymbol::Measure` body: Tesseract representation of a
@@ -164,8 +176,8 @@ impl MeasureSymbol {
         &self.compiled_path
     }
 
-    pub fn render_modifier(&self) -> Option<MeasureRenderModifier> {
-        self.render_modifier
+    pub fn render_modifier(&self) -> Option<&MeasureRenderModifier> {
+        self.render_modifier.as_ref()
     }
 
     /// Full unique identifier of the symbol: cube path, member name

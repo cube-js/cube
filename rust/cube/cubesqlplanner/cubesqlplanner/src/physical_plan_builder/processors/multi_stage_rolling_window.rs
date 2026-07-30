@@ -84,7 +84,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         );
 
         let mut context_factory = context.make_sql_nodes_factory()?;
-        context_factory.set_rolling_window(true);
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from.clone());
@@ -109,14 +108,18 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         // without the conversion.
         let schema = transforms::ignore_timezone_in_schema(&rolling_window.schema)?;
         // An ungrouped rolling select emits row-level values: count-like
-        // measures render a not-null indicator over the input column.
+        // measures render a not-null indicator over the input column;
+        // otherwise the select merges the window's partial values.
         let schema = if rolling_window.is_ungrouped {
             transforms::measures_render_modifier_in_schema(
                 &schema,
-                MeasureRenderModifier::UngroupedQueryValue,
+                &MeasureRenderModifier::UngroupedQueryValue,
             )?
         } else {
-            schema
+            transforms::measures_render_modifier_in_schema(
+                &schema,
+                &MeasureRenderModifier::RollingMerge,
+            )?
         };
 
         for dim in schema.time_dimensions.iter() {

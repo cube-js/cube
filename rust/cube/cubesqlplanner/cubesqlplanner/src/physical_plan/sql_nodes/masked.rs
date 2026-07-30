@@ -4,7 +4,7 @@ use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
-use crate::planner::MemberSymbol;
+use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashSet;
@@ -70,11 +70,17 @@ impl MaskedSqlNode {
 
         let mask_filter = query_tools.member_mask_filter(&full_name);
 
-        // A measure with a render modifier is emitted at row grain, which
-        // changes both mask decisions below.
+        // A measure with an ungrouped render modifier is emitted at row
+        // grain, which changes both mask decisions below.
         let ungrouped = self.row_level_semantics
             && match node.as_ref() {
-                MemberSymbol::Measure(m) => m.render_modifier().is_some(),
+                MemberSymbol::Measure(m) => matches!(
+                    m.render_modifier(),
+                    Some(
+                        MeasureRenderModifier::Ungrouped
+                            | MeasureRenderModifier::UngroupedQueryValue
+                    )
+                ),
                 _ => false,
             };
 

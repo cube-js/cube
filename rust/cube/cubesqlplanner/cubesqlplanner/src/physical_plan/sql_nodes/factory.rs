@@ -15,10 +15,10 @@ use crate::planner::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-/// Builds the SQL-node chain for a query. Carries all the flags and
-/// reference maps the query needs (time shifts, render references,
-/// pre-aggregation refs, multi-stage partitions, etc.) and assembles
-/// them into a layered `SqlNode` via `default_node_processor`.
+/// Builds the SQL-node chain for a query. Carries the reference maps
+/// the query needs (time shifts, render references, pre-aggregation
+/// refs, cube aliases) and assembles them into a layered `SqlNode`
+/// via `default_node_processor`.
 #[derive(Clone, Default)]
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
@@ -28,9 +28,6 @@ pub struct SqlNodesFactory {
     pre_aggregation_measures_references: RenderReferences,
     ungrouped_measure_references: RenderReferences,
     cube_name_references: HashMap<String, String>,
-    multi_stage_rank: Option<Vec<String>>,   //partition_by
-    multi_stage_window: Option<Vec<String>>, //partition_by
-    rolling_window: bool,
     use_local_tz_in_date_range: bool,
     original_sql_pre_aggregations: HashMap<String, String>,
     // Full names of the members present in the query GROUP BY. Used by
@@ -104,24 +101,12 @@ impl SqlNodesFactory {
         self.original_sql_pre_aggregations = value;
     }
 
-    pub fn set_multi_stage_rank(&mut self, partition_by: Vec<String>) {
-        self.multi_stage_rank = Some(partition_by);
-    }
-
-    pub fn set_multi_stage_window(&mut self, partition_by: Vec<String>) {
-        self.multi_stage_window = Some(partition_by);
-    }
-
     pub fn add_pre_aggregation_measure_reference<T: Into<RenderReferencesType>>(
         &mut self,
         name: String,
         value: T,
     ) {
         self.pre_aggregation_measures_references.insert(name, value);
-    }
-
-    pub fn set_rolling_window(&mut self, value: bool) {
-        self.rolling_window = value;
     }
 
     pub fn add_ungrouped_measure_reference<T: Into<RenderReferencesType>>(
@@ -151,10 +136,11 @@ impl SqlNodesFactory {
     /// Three sub-chains hang off a `RootSqlNode` keyed by member
     /// kind: a dimension chain (geo / case / time-shift / calendar
     /// time-shift wraps), a time-dimension chain, and a measure
-    /// chain (case → measure filter → final-measure / ungrouped /
-    /// multi-stage wraps → mask). The whole tree is then wrapped in
-    /// a top-level `RenderReferencesSqlNode` for query-wide reference
-    /// substitution.
+    /// chain (case → measure filter → render-modifier dispatch over
+    /// the final-measure / rolling-merge / ungrouped chains → mask →
+    /// multi-stage window and rank wraps). The whole tree is then
+    /// wrapped in a top-level `RenderReferencesSqlNode` for
+    /// query-wide reference substitution.
     pub fn default_node_processor(&self, query_tools: &QueryTools) -> Rc<dyn SqlNode> {
         // Build an "unmasked" copy of the tree (masking disabled, but still
         // dispatching by member kind) only when the query has masked members. It
@@ -205,9 +191,9 @@ impl SqlNodesFactory {
             skip_masking,
             unmasked_root.clone(),
         );
-        let measure_processor = self
-            .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
-        let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
+        let measure_processor: Rc<dyn SqlNode> =
+            MultiStageWindowNode::new(measure_filter_processor.clone(), measure_processor);
+        let measure_processor: Rc<dyn SqlNode> = MultiStageRankNode::new(measure_processor);
 
         let default_processor: Rc<dyn SqlNode> =
             if !self.pre_aggregation_dimensions_references.is_empty() {
@@ -258,48 +244,24 @@ impl SqlNodesFactory {
         }
     }
 
-    fn add_multi_stage_rank_if_needed(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        if let Some(partition_by) = &self.multi_stage_rank {
-            MultiStageRankNode::new(default, partition_by.clone())
-        } else {
-            default
-        }
-    }
-
-    fn add_multi_stage_window_if_needed(
-        &self,
-        default: Rc<dyn SqlNode>,
-        multi_stage_input: Rc<dyn SqlNode>,
-    ) -> Rc<dyn SqlNode> {
-        if let Some(partition_by) = &self.multi_stage_window {
-            MultiStageWindowNode::new(multi_stage_input, default, partition_by.clone())
-        } else {
-            default
-        }
-    }
-
     fn final_measure_node_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        let aggregated = {
+        let aggregated: Rc<dyn SqlNode> = {
             let final_processor: Rc<dyn SqlNode> = FinalMeasureSqlNode::new(input.clone());
-            let final_processor = if !self.pre_aggregation_measures_references.is_empty() {
+            if !self.pre_aggregation_measures_references.is_empty() {
                 FinalPreAggregationMeasureSqlNode::new(
                     final_processor,
                     self.pre_aggregation_measures_references.clone(),
                 )
             } else {
                 final_processor
-            };
-            if self.rolling_window {
-                RollingWindowNode::new(input.clone(), final_processor)
-            } else {
-                final_processor
             }
         };
+        let rolling_merge = RollingWindowNode::new(input.clone(), aggregated.clone());
         let ungrouped = self
             .wrap_ungrouped_pre_aggregation_measure(UngroupedMeasureSqlNode::new(input.clone()));
         let ungrouped_query = self
             .wrap_ungrouped_pre_aggregation_measure(UngroupedQueryFinalMeasureSqlNode::new(input));
-        MeasureRenderModifierSqlNode::new(aggregated, ungrouped, ungrouped_query)
+        MeasureRenderModifierSqlNode::new(aggregated, rolling_merge, ungrouped, ungrouped_query)
     }
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {

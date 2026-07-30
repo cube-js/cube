@@ -169,7 +169,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         } else {
             None
         };
-        if let Some(modifier) = measure_modifier {
+        if let Some(modifier) = &measure_modifier {
             schema = logical_transforms::measures_render_modifier_in_schema(&schema, modifier)?;
             having = transforms::map_filter_symbols(having, &|symbol| {
                 transforms::measures_render_modifier(symbol, modifier)
@@ -261,7 +261,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         } else {
             logical_plan.modifers().order_by.clone()
         };
-        let order_by = if let Some(modifier) = measure_modifier {
+        let order_by = if let Some(modifier) = &measure_modifier {
             order_by
                 .iter()
                 .map(|o| -> Result<_, CubeError> {

@@ -8,13 +8,13 @@ use std::rc::Rc;
 /// takes precedence.
 pub fn measures_render_modifier(
     symbol: &Rc<MemberSymbol>,
-    modifier: MeasureRenderModifier,
+    modifier: &MeasureRenderModifier,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
     symbol.apply_recursive(&|node| {
         if let MemberSymbol::Measure(measure) = node.as_ref() {
             if measure.render_modifier().is_none() {
                 let mut new = (**measure).clone();
-                new.render_modifier = Some(modifier);
+                new.render_modifier = Some(modifier.clone());
                 return Ok(Rc::new(MemberSymbol::Measure(Rc::new(new))));
             }
         }

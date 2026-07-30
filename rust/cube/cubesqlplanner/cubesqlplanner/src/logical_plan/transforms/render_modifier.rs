@@ -8,7 +8,7 @@ use std::rc::Rc;
 /// no render modifier yet.
 pub fn measures_render_modifier_in_schema(
     schema: &LogicalSchema,
-    modifier: MeasureRenderModifier,
+    modifier: &MeasureRenderModifier,
 ) -> Result<Rc<LogicalSchema>, CubeError> {
     let mut new = schema.clone();
     new.measures = new

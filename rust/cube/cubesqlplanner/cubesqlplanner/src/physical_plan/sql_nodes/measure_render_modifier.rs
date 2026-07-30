@@ -8,9 +8,13 @@ use std::any::Any;
 use std::rc::Rc;
 
 /// Routes a measure to the chain matching its render modifier: the
-/// final aggregation by default, or one of the row-level forms.
+/// final aggregation by default, the window-partial merge for
+/// `RollingMerge`, or one of the row-level forms. Rank and window
+/// modifiers route to the aggregation chain — their measures are
+/// intercepted by the dedicated nodes higher in the chain.
 pub struct MeasureRenderModifierSqlNode {
     aggregated: Rc<dyn SqlNode>,
+    rolling_merge: Rc<dyn SqlNode>,
     ungrouped: Rc<dyn SqlNode>,
     ungrouped_query: Rc<dyn SqlNode>,
 }
@@ -18,11 +22,13 @@ pub struct MeasureRenderModifierSqlNode {
 impl MeasureRenderModifierSqlNode {
     pub fn new(
         aggregated: Rc<dyn SqlNode>,
+        rolling_merge: Rc<dyn SqlNode>,
         ungrouped: Rc<dyn SqlNode>,
         ungrouped_query: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {
             aggregated,
+            rolling_merge,
             ungrouped,
             ungrouped_query,
         })
@@ -40,7 +46,10 @@ impl SqlNode for MeasureRenderModifierSqlNode {
     ) -> Result<String, CubeError> {
         let chain = match node.as_ref() {
             MemberSymbol::Measure(m) => match m.render_modifier() {
-                None => &self.aggregated,
+                None
+                | Some(MeasureRenderModifier::MultiStageRank { .. })
+                | Some(MeasureRenderModifier::MultiStageWindow { .. }) => &self.aggregated,
+                Some(MeasureRenderModifier::RollingMerge) => &self.rolling_merge,
                 Some(MeasureRenderModifier::Ungrouped) => &self.ungrouped,
                 Some(MeasureRenderModifier::UngroupedQueryValue) => &self.ungrouped_query,
             },
@@ -60,6 +69,7 @@ impl SqlNode for MeasureRenderModifierSqlNode {
     fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
         vec![
             self.aggregated.clone(),
+            self.rolling_merge.clone(),
             self.ungrouped.clone(),
             self.ungrouped_query.clone(),
         ]
