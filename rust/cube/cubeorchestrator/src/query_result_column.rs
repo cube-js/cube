@@ -19,9 +19,13 @@ use arrow::array::{
     TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt16Array,
     UInt32Array, UInt64Array, UInt8Array,
 };
-use arrow::datatypes::{ArrowTemporalType, DataType, TimeUnit};
+use arrow::datatypes::{i256, ArrowTemporalType, DataType, TimeUnit};
 use serde::{Serialize, Serializer};
-use std::{borrow::Cow, convert::Infallible};
+use std::{
+    borrow::Cow,
+    convert::Infallible,
+    fmt::{self, Write as _},
+};
 
 /// One logical column of a query result.
 #[derive(Debug, Clone)]
@@ -182,15 +186,24 @@ impl ArrowArray {
 /// A cell on its way out of a column.
 ///
 /// [`DBResponsePrimitive`] owns its `String`, so building one from an Arrow `Utf8`
-/// column costs an allocation per cell. Callers that only render a cell and drop
-/// it — the response serializers — take this instead and borrow the text where it
-/// already lives.
+/// or decimal column costs an allocation per cell. Callers that only render a cell
+/// and drop it — the response serializers — take this instead, which borrows text
+/// where it already lives and renders a decimal straight into the output.
 pub enum CellRef<'a> {
     /// A cell already materialized in the column.
     Primitive(&'a DBResponsePrimitive),
     /// Text borrowed straight from the column's buffer.
     Str(&'a str),
-    /// Decoded on read: booleans, numbers, timestamps, decimals.
+    /// A decimal still in its Arrow form, rendered on the way out.
+    Decimal128 {
+        mantissa: i128,
+        scale: u32,
+    },
+    Decimal256 {
+        mantissa: i256,
+        scale: u32,
+    },
+    /// Decoded on read: booleans, numbers, timestamps.
     Owned(DBResponsePrimitive),
 }
 
@@ -201,19 +214,35 @@ impl CellRef<'_> {
         match self {
             CellRef::Primitive(value) => value.clone(),
             CellRef::Str(text) => DBResponsePrimitive::String(text.to_owned()),
+            CellRef::Decimal128 { mantissa, scale } => {
+                DBResponsePrimitive::String(decimal_to_string(mantissa, scale))
+            }
+            CellRef::Decimal256 { mantissa, scale } => {
+                DBResponsePrimitive::String(decimal_to_string(mantissa, scale))
+            }
             CellRef::Owned(value) => value,
         }
     }
 }
 
-/// Mirrors `Serialize for DBResponsePrimitive`: `Str` renders exactly as that
-/// impl's `String` arm, and every other cell delegates to it outright.
+/// Mirrors `Serialize for DBResponsePrimitive`: `Str` and the decimals render
+/// exactly as that impl's `String` arm would — a JSON string, from the same
+/// [`DecimalText`] the owned path formats with — and every other cell delegates to
+/// it outright.
 impl Serialize for CellRef<'_> {
     #[inline]
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             CellRef::Primitive(value) => value.serialize(serializer),
             CellRef::Str(text) => serializer.serialize_str(text),
+            CellRef::Decimal128 { mantissa, scale } => serializer.collect_str(&DecimalText {
+                mantissa: *mantissa,
+                scale: *scale,
+            }),
+            CellRef::Decimal256 { mantissa, scale } => serializer.collect_str(&DecimalText {
+                mantissa: *mantissa,
+                scale: *scale,
+            }),
             CellRef::Owned(value) => value.serialize(serializer),
         }
     }
@@ -227,6 +256,21 @@ macro_rules! borrowed_str_cell {
             CellRef::Owned(DBResponsePrimitive::Null)
         } else {
             CellRef::Str(a.value($row))
+        }
+    }};
+}
+
+/// Read `$array[$row]` as an unrendered decimal, or a null cell.
+macro_rules! decimal_cell {
+    ($array:expr, $row:expr, $variant:ident, $scale:expr) => {{
+        let a = $array;
+        if a.is_null($row) {
+            CellRef::Owned(DBResponsePrimitive::Null)
+        } else {
+            CellRef::$variant {
+                mantissa: a.value($row),
+                scale: $scale,
+            }
         }
     }};
 }
@@ -292,7 +336,7 @@ impl ColumnReader<'_> {
             match self {
                 ColumnReader::Primitives(cells) => return f(CellRef::Primitive(&cells[row])),
                 ColumnReader::Arrow(a) => {
-                    if let Some(cell) = a.borrowed_cell(row) {
+                    if let Some(cell) = a.cell_without_alloc(row) {
                         return f(cell);
                     }
                 }
@@ -491,15 +535,22 @@ impl ArrowCellReader<'_> {
         }
     }
 
-    /// The cell at `row` borrowed from the Arrow buffer, for the types that store
-    /// their values as text. `None` for every other type, so the caller falls back
-    /// to decoding an owned value.
+    /// The cell at `row` for the types whose [`ArrowCellReader::value`] would
+    /// allocate — text, which is borrowed instead, and decimals, which are left
+    /// unrendered. `None` for every other type, whose owned form allocates nothing
+    /// anyway, so the caller just decodes it.
     #[inline]
-    fn borrowed_cell(&self, row: usize) -> Option<CellRef<'_>> {
+    fn cell_without_alloc(&self, row: usize) -> Option<CellRef<'_>> {
         match self {
             ArrowCellReader::Utf8(a) => Some(borrowed_str_cell!(a, row)),
             ArrowCellReader::LargeUtf8(a) => Some(borrowed_str_cell!(a, row)),
             ArrowCellReader::Utf8View(a) => Some(borrowed_str_cell!(a, row)),
+            ArrowCellReader::Decimal128(a, scale) => {
+                Some(decimal_cell!(a, row, Decimal128, *scale))
+            }
+            ArrowCellReader::Decimal256(a, scale) => {
+                Some(decimal_cell!(a, row, Decimal256, *scale))
+            }
             _ => None,
         }
     }
@@ -573,6 +624,21 @@ impl ArrowCellReader<'_> {
             }};
         }
 
+        /// Decimals likewise: handed over unrendered when nothing has to rewrite
+        /// them, so their digits go straight into the output.
+        macro_rules! fill_decimal {
+            ($array:expr, $variant:ident, $scale:expr, $make:expr) => {{
+                let a = $array;
+                if is_identity_transform(member_type) {
+                    for row in 0..len {
+                        visit(decimal_cell!(a, row, $variant, $scale))?;
+                    }
+                } else {
+                    fill!(|row| read_cell!(a, row, $make))
+                }
+            }};
+        }
+
         match self {
             ArrowCellReader::Empty => {}
             ArrowCellReader::Null(_) => {
@@ -608,14 +674,14 @@ impl ArrowCellReader<'_> {
             ArrowCellReader::TimestampMicrosecond(a) => fill!(|row| datetime_cell(*a, row)),
             ArrowCellReader::TimestampNanosecond(a) => fill!(|row| datetime_cell(*a, row)),
             ArrowCellReader::Decimal128(a, scale) => {
-                fill_with!(a, |v| DBResponsePrimitive::String(decimal_to_string(
-                    v, *scale
-                )))
+                fill_decimal!(a, Decimal128, *scale, |v| DBResponsePrimitive::String(
+                    decimal_to_string(v, *scale)
+                ))
             }
             ArrowCellReader::Decimal256(a, scale) => {
-                fill_with!(a, |v| DBResponsePrimitive::String(decimal_to_string(
-                    v, *scale
-                )))
+                fill_decimal!(a, Decimal256, *scale, |v| DBResponsePrimitive::String(
+                    decimal_to_string(v, *scale)
+                ))
             }
         }
 
@@ -641,39 +707,107 @@ where
     }
 }
 
-/// Format a decimal `mantissa` with `scale` fractional digits, stripping trailing
-/// fractional zeros. Generic over the mantissa's `Display`, so it renders any Arrow
-/// decimal width (`i32`/`i64`/`i128`/`i256`) directly — Decimal256 needs no fallback
-/// to Arrow's own string conversion.
+/// Renders a decimal from its `mantissa` and `scale`: the mantissa's digits with a
+/// point inserted `scale` places from the right and trailing fractional zeros
+/// stripped. Generic over the mantissa's `Display`, so it covers every Arrow
+/// decimal width (`i32`/`i64`/`i128`/`i256`) — Decimal256 needs no fallback to
+/// Arrow's own string conversion.
+///
+/// Rendering through `fmt::Write` and a stack buffer means no allocation at all:
+/// `collect_str` streams this straight into the response, and
+/// [`decimal_to_string`] is the same text collected into a `String`.
 ///
 /// e.g. `(25987600, 5) -> "259.876"`, `(6199200000, 5) -> "61992"`,
 /// `(-250, 3) -> "-0.25"`, `(25, 5) -> "0.00025"`.
-pub(crate) fn decimal_to_string<T: std::fmt::Display>(mantissa: T, scale: u32) -> String {
-    let raw = mantissa.to_string();
-    if scale == 0 {
-        return raw;
+pub(crate) struct DecimalText<T> {
+    pub mantissa: T,
+    pub scale: u32,
+}
+
+impl<T: fmt::Display> fmt::Display for DecimalText<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.scale == 0 {
+            return write!(f, "{}", self.mantissa);
+        }
+
+        let mut rendered = DigitBuf::default();
+        write!(&mut rendered, "{}", self.mantissa)?;
+        let raw = rendered.as_str()?;
+
+        let scale = self.scale as usize;
+        let (sign, digits) = match raw.strip_prefix('-') {
+            Some(rest) => ("-", rest),
+            None => ("", raw),
+        };
+
+        if digits.len() > scale {
+            let (int_part, frac) = digits.split_at(digits.len() - scale);
+            let frac = frac.trim_end_matches('0');
+            f.write_str(sign)?;
+            f.write_str(int_part)?;
+            if !frac.is_empty() {
+                f.write_char('.')?;
+                f.write_str(frac)?;
+            }
+            return Ok(());
+        }
+
+        // Fewer digits than the scale, so the value is `0.` followed by the digits
+        // padded out to `scale`. Trailing zeros are stripped from the digits, which
+        // is where any of them can be.
+        let frac = digits.trim_end_matches('0');
+        f.write_str(sign)?;
+        if frac.is_empty() {
+            return f.write_str("0");
+        }
+
+        f.write_str("0.")?;
+        for _ in 0..scale - digits.len() {
+            f.write_char('0')?;
+        }
+        f.write_str(frac)
     }
+}
 
-    let scale = scale as usize;
-    let (sign, digits) = match raw.strip_prefix('-') {
-        Some(rest) => ("-", rest),
-        None => ("", raw.as_str()),
-    };
+/// Fixed-size sink for a mantissa's digits. `i256::MIN` is 78 digits plus a sign,
+/// so this covers every Arrow decimal width with room to spare; a mantissa that
+/// somehow overflowed it would surface as a formatting error rather than bad text.
+struct DigitBuf {
+    bytes: [u8; 96],
+    len: usize,
+}
 
-    let (int_part, frac) = if digits.len() > scale {
-        let (int_part, frac) = digits.split_at(digits.len() - scale);
-        (int_part, frac.to_string())
-    } else {
-        let pad = "0".repeat(scale - digits.len());
-        ("0", format!("{pad}{digits}"))
-    };
-
-    let frac = frac.trim_end_matches('0');
-    if frac.is_empty() {
-        format!("{sign}{int_part}")
-    } else {
-        format!("{sign}{int_part}.{frac}")
+impl Default for DigitBuf {
+    fn default() -> Self {
+        Self {
+            bytes: [0; 96],
+            len: 0,
+        }
     }
+}
+
+impl DigitBuf {
+    fn as_str(&self) -> Result<&str, fmt::Error> {
+        std::str::from_utf8(&self.bytes[..self.len]).map_err(|_| fmt::Error)
+    }
+}
+
+impl fmt::Write for DigitBuf {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let end = self.len + s.len();
+        if end > self.bytes.len() {
+            return Err(fmt::Error);
+        }
+
+        self.bytes[self.len..end].copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
+
+/// [`DecimalText`] collected into a `String`, for the paths that keep the value.
+pub(crate) fn decimal_to_string<T: fmt::Display>(mantissa: T, scale: u32) -> String {
+    DecimalText { mantissa, scale }.to_string()
 }
 
 #[cfg(test)]
@@ -702,5 +836,119 @@ mod tests {
                 "mantissa={mantissa} scale={scale}"
             );
         }
+    }
+
+    /// The allocation-free renderer must agree with the straightforward
+    /// String-building version everywhere, not just on the cases above. This is
+    /// that version, kept only as the oracle below.
+    fn decimal_to_string_reference(raw: String, scale: u32) -> String {
+        if scale == 0 {
+            return raw;
+        }
+
+        let scale = scale as usize;
+        let (sign, digits) = match raw.strip_prefix('-') {
+            Some(rest) => ("-", rest),
+            None => ("", raw.as_str()),
+        };
+
+        let (int_part, frac) = if digits.len() > scale {
+            let (int_part, frac) = digits.split_at(digits.len() - scale);
+            (int_part, frac.to_string())
+        } else {
+            let pad = "0".repeat(scale - digits.len());
+            ("0", format!("{pad}{digits}"))
+        };
+
+        let frac = frac.trim_end_matches('0');
+        if frac.is_empty() {
+            format!("{sign}{int_part}")
+        } else {
+            format!("{sign}{int_part}.{frac}")
+        }
+    }
+
+    #[test]
+    fn test_decimal_to_string_matches_reference() {
+        let mantissas: Vec<i128> = [
+            0i128,
+            1,
+            5,
+            9,
+            10,
+            99,
+            100,
+            101,
+            1_000,
+            1_005,
+            10_000_000,
+            123_456_789,
+            999_999_999_999,
+            1_000_000_000_000,
+            i128::MAX,
+            i128::MIN,
+        ]
+        .into_iter()
+        // `-i128::MIN` overflows, so only negate what can be negated.
+        .flat_map(|m| [Some(m), m.checked_neg()])
+        .flatten()
+        .collect();
+
+        for mantissa in mantissas {
+            for scale in [0u32, 1, 2, 3, 5, 9, 12, 20, 38, 39, 40] {
+                assert_eq!(
+                    decimal_to_string(mantissa, scale),
+                    decimal_to_string_reference(mantissa.to_string(), scale),
+                    "mantissa={mantissa} scale={scale}"
+                );
+            }
+        }
+    }
+
+    /// The widest mantissa Arrow can hand over must still render, i.e. the stack
+    /// buffer has to be large enough for it.
+    #[test]
+    fn test_decimal_to_string_i256_extremes() {
+        for mantissa in [i256::MAX, i256::MIN, i256::from_i128(-1), i256::ZERO] {
+            for scale in [0u32, 2, 38, 76] {
+                assert_eq!(
+                    decimal_to_string(mantissa, scale),
+                    decimal_to_string_reference(mantissa.to_string(), scale),
+                    "mantissa={mantissa} scale={scale}"
+                );
+            }
+        }
+    }
+
+    /// Serializing an unrendered decimal must produce exactly the JSON the owned
+    /// `String` cell produces.
+    #[test]
+    fn test_decimal_cell_serializes_like_owned_string() {
+        for (mantissa, scale) in [
+            (239996i128, 2u32),
+            (-250, 3),
+            (0, 5),
+            (i128::MIN, 38),
+            (6199200000, 5),
+        ] {
+            let unrendered = CellRef::Decimal128 { mantissa, scale };
+            let owned = DBResponsePrimitive::String(decimal_to_string(mantissa, scale));
+
+            assert_eq!(
+                serde_json::to_string(&unrendered).unwrap(),
+                serde_json::to_string(&owned).unwrap(),
+                "mantissa={mantissa} scale={scale}"
+            );
+        }
+
+        let big = i256::MAX;
+        assert_eq!(
+            serde_json::to_string(&CellRef::Decimal256 {
+                mantissa: big,
+                scale: 4
+            })
+            .unwrap(),
+            serde_json::to_string(&DBResponsePrimitive::String(decimal_to_string(big, 4))).unwrap(),
+        );
     }
 }

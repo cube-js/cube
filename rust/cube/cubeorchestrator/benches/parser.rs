@@ -13,7 +13,7 @@ use cubeshared::flatbuffers::FlatBufferBuilder;
 mod common;
 use common::{
     build_arrow_ipc, build_cubestore_fb_arrow_message, build_dataset, make_member_aliases,
-    split_dim_measure, COLUMN_COUNTS, ROW_COUNTS,
+    split_dim_measure, MeasureKind, COLUMN_COUNTS, ROW_COUNTS,
 };
 
 /// Build a FlatBuffer `HttpMessage` payload mirroring CubeStore's wire format
@@ -169,7 +169,8 @@ fn bench_from_cubestore_fb_arrow(c: &mut Criterion) {
         let dimensions = make_member_aliases("dim", dim_count);
         let measures = make_member_aliases("measure", measure_count);
 
-        let arrow_ipc = build_arrow_ipc(row_count, &dimensions, &measures, &[]);
+        let arrow_ipc =
+            build_arrow_ipc(row_count, &dimensions, &measures, &[], MeasureKind::Float64);
         let payload = build_cubestore_fb_arrow_message(&arrow_ipc);
         let payload_len = payload.len();
 

@@ -13,8 +13,8 @@ use cubeorchestrator::transport::{
 #[path = "common/mod.rs"]
 mod common;
 use common::{
-    build_arrow_query_result, build_dataset, make_member_aliases, split_dim_measure, TimeColumn,
-    COLUMN_COUNTS, ROW_COUNTS,
+    build_arrow_query_result, build_dataset, make_member_aliases, split_dim_measure, MeasureKind,
+    TimeColumn, COLUMN_COUNTS, ROW_COUNTS,
 };
 
 /// Total columns and row count used by `bench_transform_time_scenarios`.
@@ -167,7 +167,13 @@ fn bench_transform(c: &mut Criterion) {
                 ),
                 (
                     "arrow",
-                    build_arrow_query_result(row_count, &dimensions, &measures, &[]),
+                    build_arrow_query_result(
+                        row_count,
+                        &dimensions,
+                        &measures,
+                        &[],
+                        MeasureKind::Float64,
+                    ),
                 ),
             ];
 
@@ -228,7 +234,13 @@ fn bench_transform_time_scenarios(c: &mut Criterion) {
             ),
             (
                 "arrow",
-                build_arrow_query_result(SCENARIO_ROW_COUNT, &dimensions, &measures, &time_dims),
+                build_arrow_query_result(
+                    SCENARIO_ROW_COUNT,
+                    &dimensions,
+                    &measures,
+                    &time_dims,
+                    MeasureKind::Float64,
+                ),
             ),
         ];
 
@@ -291,8 +303,24 @@ fn bench_final_json(c: &mut Criterion) {
                 .expect("from_js_raw_data"),
             ),
             (
-                "arrow",
-                build_arrow_query_result(row_count, &dimensions, &measures, &[]),
+                MeasureKind::Float64.label(),
+                build_arrow_query_result(
+                    row_count,
+                    &dimensions,
+                    &measures,
+                    &[],
+                    MeasureKind::Float64,
+                ),
+            ),
+            (
+                MeasureKind::Decimal128.label(),
+                build_arrow_query_result(
+                    row_count,
+                    &dimensions,
+                    &measures,
+                    &[],
+                    MeasureKind::Decimal128,
+                ),
             ),
         ];
 

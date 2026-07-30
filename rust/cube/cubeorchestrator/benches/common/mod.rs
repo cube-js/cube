@@ -85,17 +85,38 @@ pub fn build_dataset(
     JsRawColumnarData { members, columns }
 }
 
+/// How measure columns are typed in an Arrow fixture. CubeStore answers `SUM`
+/// with `Decimal128`, so that is the shape most measure cells really have; the
+/// `Float64` variant is kept because it is the cheaper baseline to compare against.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum MeasureKind {
+    Float64,
+    Decimal128,
+}
+
+impl MeasureKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            MeasureKind::Float64 => "arrow",
+            MeasureKind::Decimal128 => "arrow_dec",
+        }
+    }
+}
+
 /// Build an Arrow IPC **stream** payload with the same logical data shape as
-/// [`build_dataset`]: dimensions as Utf8, measures as Float64, time dimensions
-/// as Timestamp(Millisecond). Used to compare Arrow parse throughput against the
-/// JSON path.
+/// [`build_dataset`]: dimensions as Utf8, measures per `measure_kind`, time
+/// dimensions as Timestamp(Millisecond). Used to compare Arrow parse throughput
+/// against the JSON path.
 pub fn build_arrow_ipc(
     row_count: usize,
     dimensions: &[(String, String)],
     measures: &[(String, String)],
     time_dims: &[TimeColumn],
+    measure_kind: MeasureKind,
 ) -> Vec<u8> {
-    use arrow::array::{ArrayRef, Float64Array, StringArray, TimestampMillisecondArray};
+    use arrow::array::{
+        ArrayRef, Decimal128Array, Float64Array, StringArray, TimestampMillisecondArray,
+    };
     use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
     use arrow::ipc::writer::StreamWriter;
     use arrow::record_batch::RecordBatch;
@@ -113,11 +134,31 @@ pub fn build_arrow_ipc(
         columns.push(Arc::new(StringArray::from(values)));
     }
     for (j, (_, alias)) in measures.iter().enumerate() {
-        fields.push(Field::new(alias.clone(), DataType::Float64, false));
-        let values: Vec<f64> = (0..row_count)
-            .map(|i| ((i * (j + 1)) as f64) * 0.5)
-            .collect();
-        columns.push(Arc::new(Float64Array::from(values)));
+        match measure_kind {
+            MeasureKind::Float64 => {
+                fields.push(Field::new(alias.clone(), DataType::Float64, false));
+                let values: Vec<f64> = (0..row_count)
+                    .map(|i| ((i * (j + 1)) as f64) * 0.5)
+                    .collect();
+                columns.push(Arc::new(Float64Array::from(values)));
+            }
+            MeasureKind::Decimal128 => {
+                fields.push(Field::new(
+                    alias.clone(),
+                    DataType::Decimal128(38, 2),
+                    false,
+                ));
+                // Same magnitudes as the Float64 arm, as a scale-2 mantissa.
+                let values: Vec<i128> = (0..row_count)
+                    .map(|i| ((i * (j + 1)) as i128) * 50)
+                    .collect();
+                columns.push(Arc::new(
+                    Decimal128Array::from(values)
+                        .with_precision_and_scale(38, 2)
+                        .expect("decimal precision"),
+                ));
+            }
+        }
     }
     for (j, td) in time_dims.iter().enumerate() {
         fields.push(Field::new(
@@ -190,8 +231,9 @@ pub fn build_arrow_query_result(
     dimensions: &[(String, String)],
     measures: &[(String, String)],
     time_dims: &[TimeColumn],
+    measure_kind: MeasureKind,
 ) -> QueryResult {
-    let ipc = build_arrow_ipc(row_count, dimensions, measures, time_dims);
+    let ipc = build_arrow_ipc(row_count, dimensions, measures, time_dims, measure_kind);
     let payload = build_cubestore_fb_arrow_message(&ipc);
     QueryResult::from_cubestore_fb(&payload).expect("arrow query result")
 }

@@ -3881,7 +3881,7 @@ pub(crate) mod tests {
                     // `Cube.shippedAt`. That keeps the appended-member order
                     // deterministic across calls: `get_members` walks a `HashMap`
                     // there, so two of them would come out in either order and the
-                    // byte-equality assertions below would flake.
+                    // byte-equality assertions would flake.
                     .chain([MemberOrMemberExpression::Member(
                         "Cube.createdAt".to_string(),
                     )])
