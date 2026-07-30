@@ -151,3 +151,82 @@ async fn test_rolling_and_calculated() {
         insta::assert_snapshot!(result);
     }
 }
+
+/// A `case` entrypoint dispatching between two month-based rolling windows
+/// (trailing 3 month / year-to-date, the grain a monthly rollup can serve)
+/// on a `type: switch` calc-group dimension, queried with a month time
+/// dimension. The switch dimension is added to the grain of the rolling
+/// leaves, so the rolling-window CTE must project it — building the CTE
+/// from the root query dimensions instead of the requested state made
+/// this fail with `Alias not found for partition_by dimension
+/// orders.window_kind`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_switch_with_granular_time_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_amount_switch
+          - orders.rolling_change_switch
+        dimensions:
+          - orders.status
+        filters:
+          - member: orders.window_kind
+            operator: equals
+            values:
+              - R3
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.status
+          - id: orders.created_at
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    // The pinned switch value renders as a literal, and the calc-group
+    // dimension is projected by the CTEs feeding the case measure.
+    assert!(
+        sql.contains("'R3'"),
+        "Expected the pinned calc-group value in the generated SQL:\n{}",
+        sql
+    );
+    assert!(
+        sql.contains("orders__window_kind"),
+        "Expected the calc-group dimension to be projected:\n{}",
+        sql
+    );
+}
+
+/// An Aggregate parent reducing by the time dimension narrows the child
+/// rolling-window state: the CTE must still project and group by the rolling
+/// time dimension, otherwise the `time_series` LEFT JOIN fans out and the
+/// rolling sum is multiplied.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_under_reduce_by_time() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_7d_reduce_time
+        dimensions:
+          - orders.category
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-10"
+        order:
+          - id: orders.category
+          - id: orders.created_at
+    "#};
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
