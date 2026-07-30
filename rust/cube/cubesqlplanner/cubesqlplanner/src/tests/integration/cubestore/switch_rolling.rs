@@ -6,10 +6,11 @@
 //! Requires `--features integration-cubestore` and a `cubestored` binary;
 //! without them both paths return `None` and only matching is asserted.
 //!
-//! Two shapes are `#[ignore]`d for CubeStore limitations unrelated to the
-//! calc-group grain — see the note on each; run them with `--ignored` to
-//! reproduce. The rolling-rewrite defect these tests were originally written
-//! against was fixed in #11410.
+//! One shape is `#[ignore]`d for a CubeStore limitation unrelated to the
+//! calc-group grain — see the note on it; run it with `--ignored` to reproduce.
+//! Two defects these tests were originally written against are fixed: the
+//! rolling-rewrite schema widening in #11410 and the aggregating-index decimal
+//! cast in #11413.
 //! Note that a debug-built `cubestored` overflows its stack on rolling-window
 //! queries, so `CUBESTORED_BIN_PATH` must point at a release build.
 
@@ -329,10 +330,11 @@ async fn test_case_entrypoint_rollup_stores_switch() {
     .await;
 }
 
-/// Same grain, but the rollup carries an aggregating index. Creating the table
-/// fails before any query runs: `Create table failed: Internal: task panicked
-/// ... InvalidArgumentError("column types must match schema types")`.
-#[ignore = "CubeStore fails to create the aggregating-index table for this rollup"]
+/// Same grain, but the rollup carries an aggregating index. Building that index
+/// used to fail before any query ran — the decimal sum widened to
+/// `Decimal128(28, 5)` against a column declared `Decimal128(18, 5)` and
+/// CubeStore panicked with `column types must match schema types`. Fixed in
+/// #11413; this test guards it.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_case_entrypoint_aggregating_index() {
     run_both(
