@@ -1,4 +1,5 @@
 use super::common::{Case, CompiledMemberPath, MultiStageProperties};
+use super::deps::{self, symbol_deps};
 use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
@@ -8,7 +9,7 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::collectors::find_owned_by_cube_child;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
-use crate::planner::{Compiler, CubeRef, SqlCall};
+use crate::planner::{Compiler, SqlCall};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::{Eq, PartialEq};
@@ -34,12 +35,15 @@ impl MeasureOrderBy {
         &self.sql_call
     }
 
-    pub fn set_sql_call(&mut self, sql_call: Rc<SqlCall>) {
-        self.sql_call = sql_call;
-    }
-
     pub fn direction(&self) -> &String {
         &self.direction
+    }
+}
+
+symbol_deps! {
+    MeasureOrderBy {
+        sql_call: dep,
+        direction: skip,
     }
 }
 
@@ -94,6 +98,23 @@ pub struct MeasureSymbol {
     measure_order_by: Vec<MeasureOrderBy>,
     is_splitted_source: bool,
     mask_sql: Option<Rc<SqlCall>>,
+}
+
+symbol_deps! {
+    MeasureSymbol {
+        kind: dep,
+        measure_filters: dep,
+        measure_drill_filters: dep,
+        measure_order_by: dep,
+        case: dep,
+        mask_sql: dep,
+        compiled_path: skip,
+        rolling_window: skip,
+        multi_stage: skip,
+        is_reference: skip,
+        is_view: skip,
+        is_splitted_source: skip,
+    }
 }
 
 impl MeasureSymbol {
@@ -279,40 +300,6 @@ impl MeasureSymbol {
         }
     }
 
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut result = self.clone();
-        result.kind = result.kind.apply_to_deps(f)?;
-
-        for sql in result.measure_filters.iter_mut() {
-            *sql = sql.apply_recursive(f)?
-        }
-
-        for sql in result.measure_drill_filters.iter_mut() {
-            *sql = sql.apply_recursive(f)?
-        }
-
-        for order in result.measure_order_by.iter_mut() {
-            order.set_sql_call(order.sql_call().apply_recursive(f)?);
-        }
-
-        if let Some(case) = &self.case {
-            result.case = Some(case.apply_to_deps(f)?)
-        }
-
-        if let Some(mask) = &self.mask_sql {
-            result.mask_sql = Some(mask.apply_recursive(f)?);
-        }
-
-        if let Some(ms) = &self.multi_stage {
-            result.multi_stage = Some(ms.apply_to_deps(f)?);
-        }
-
-        Ok(MemberSymbol::new_measure(Rc::new(result)))
-    }
-
     /// SQL calls inside the measure's kind and `case` body.
     /// `mask_sql` is intentionally excluded: it is compiled against
     /// the cube that owns the measure, which differs from the symbol's
@@ -326,46 +313,6 @@ impl MeasureSymbol {
             .iter_sql_calls()
             .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
         Box::new(result)
-    }
-
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = self.kind.get_dependencies();
-        for filter in self.measure_filters.iter() {
-            filter.extract_symbol_deps(&mut deps);
-        }
-        for filter in self.measure_drill_filters.iter() {
-            filter.extract_symbol_deps(&mut deps);
-        }
-        for order in self.measure_order_by.iter() {
-            order.sql_call().extract_symbol_deps(&mut deps);
-        }
-        if let Some(case) = &self.case {
-            case.extract_symbol_deps(&mut deps);
-        }
-        if let Some(mask) = &self.mask_sql {
-            mask.extract_symbol_deps(&mut deps);
-        }
-        deps
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = self.kind.get_cube_refs();
-        for filter in self.measure_filters.iter() {
-            filter.extract_cube_refs(&mut refs);
-        }
-        for filter in self.measure_drill_filters.iter() {
-            filter.extract_cube_refs(&mut refs);
-        }
-        for order in self.measure_order_by.iter() {
-            order.sql_call().extract_cube_refs(&mut refs);
-        }
-        if let Some(case) = &self.case {
-            case.extract_cube_refs(&mut refs);
-        }
-        if let Some(mask) = &self.mask_sql {
-            mask.extract_cube_refs(&mut refs);
-        }
-        refs
     }
 
     /// Render form of this measure when it sits under a row-multiplying
@@ -427,11 +374,11 @@ impl MeasureSymbol {
         if !self.is_reference() {
             return None;
         }
-        let deps = self.get_dependencies();
-        if deps.is_empty() {
-            return None;
-        }
-        deps.first().cloned()
+        self.get_dependencies().first().cloned()
+    }
+
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        deps::collect_deps(self)
     }
 
     pub fn measure_type(&self) -> &str {

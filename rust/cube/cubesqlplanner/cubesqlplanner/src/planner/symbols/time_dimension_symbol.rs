@@ -1,9 +1,9 @@
 use super::common::CompiledMemberPath;
+use super::deps::{self, symbol_deps};
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::state::State;
 use crate::planner::time_dimension::Granularity;
-use crate::planner::CubeRef;
 use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
 use chrono::Duration;
 use chrono_tz::Tz;
@@ -23,6 +23,18 @@ pub struct TimeDimensionSymbol {
     date_range: Option<(String, String)>,
     alias_suffix: String,
     alias_override: Option<String>,
+}
+
+symbol_deps! {
+    TimeDimensionSymbol {
+        granularity_obj: dep,
+        base_symbol: dep_transparent,
+        compiled_path: skip,
+        granularity: skip,
+        date_range: skip,
+        alias_suffix: skip,
+        alias_override: skip,
+    }
 }
 
 impl TimeDimensionSymbol {
@@ -165,13 +177,18 @@ impl TimeDimensionSymbol {
         self.base_symbol.owned_by_cube()
     }
 
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        deps::collect_deps(self)
+    }
+
     pub fn date_range_vec(&self) -> Option<Vec<String>> {
         self.date_range.clone().map(|(from, to)| vec![from, to])
     }
 
-    /// Like `get_dependencies`, but wraps any time-dimension dep in
-    /// a `TimeDimensionSymbol` carrying this symbol's granularity and
-    /// date range. Non-time-dimension deps pass through unchanged.
+    /// Dependencies of this symbol, with any time-dimension dep
+    /// wrapped in a `TimeDimensionSymbol` carrying this symbol's
+    /// granularity and date range. Non-time-dimension deps pass
+    /// through unchanged.
     pub fn get_dependencies_as_time_dimensions(&self) -> Vec<Rc<MemberSymbol>> {
         self.get_dependencies()
             .into_iter()
@@ -193,41 +210,6 @@ impl TimeDimensionSymbol {
                 _ => s.clone(),
             })
             .collect()
-    }
-
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
-        &self,
-        f: &F,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut result = self.clone();
-        if let Some(granularity_obj) = &self.granularity_obj {
-            result.granularity_obj = Some(granularity_obj.apply_to_deps(f)?);
-        }
-        result.base_symbol = f(&self.base_symbol)?;
-        Ok(MemberSymbol::new_time_dimension(Rc::new(result)))
-    }
-
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = vec![];
-        if let Some(granularity_obj) = &self.granularity_obj {
-            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
-                calendar_sql.extract_symbol_deps(&mut deps);
-            }
-        }
-
-        deps.append(&mut self.base_symbol.get_dependencies());
-        deps
-    }
-
-    pub fn get_cube_refs(&self) -> Vec<CubeRef> {
-        let mut refs = vec![];
-        if let Some(granularity_obj) = &self.granularity_obj {
-            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
-                calendar_sql.extract_cube_refs(&mut refs);
-            }
-        }
-        refs.append(&mut self.base_symbol.get_cube_refs());
-        refs
     }
 
     pub fn cube_name(&self) -> String {
