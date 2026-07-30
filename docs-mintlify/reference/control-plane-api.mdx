@@ -212,6 +212,67 @@ Example response:
 ```
 
 
+### `/build/api/v1/deployments/{deployment_id}/branches/staging-environment`
+
+Send a `PUT` request to enable or disable a branch, i.e. to control whether its
+[staging environment][ref-environments-staging] stays always active. Disabled
+(the default), a staging environment is only active while the branch is viewed
+in the Cube UI; enabled, it remains active and accessible regardless of user
+activity, and it is reported by
+[`/api/v1/deployments/{deployment_id}/environments`](#apiv1deploymentsdeployment_idenvironments)
+as a `staging` environment.
+
+Only shared branches can be enabled — personal development branches and the
+production branch are rejected.
+
+<Info>
+
+Note the `/build` prefix: data model and branch endpoints are served by the
+build API.
+
+</Info>
+
+Path parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `deployment_id` | The deployment ID |
+
+Body parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `enabled` | `true` enables the branch, `false` disables it | Yes |
+| `branchName` | Name of the branch to update | One of `branchName` or `branchId` |
+| `branchId` | ID of the branch to update, as returned by `GET /build/api/v1/deployments/{deployment_id}/branches` | One of `branchName` or `branchId` |
+
+Example request:
+
+```bash
+curl -X PUT \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"branchName": "staging", "enabled": true}' \
+  "https://YOUR_CUBE_CLOUD_HOST/build/api/v1/deployments/123/branches/staging-environment"
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "id": 456,
+    "name": "staging",
+    "parentBranch": "main",
+    "lastHash": "9f2c1ab",
+    "isStagingEnvironmentEnabled": true
+  }
+}
+```
+
+The same operation is available in the [CLI][ref-cli] as
+`cube data-model enable-branch` / `cube data-model disable-branch`.
+
 ### `/api/v1/audit-logs/export`
 
 Send a `GET` request to export [audit log][ref-audit-log] events as a CSV
@@ -262,6 +323,8 @@ curl \
 [ref-metadata-api]: /reference/core-data-apis/rest-api/reference#metadata-api
 [ref-deployments]: /admin/deployment
 [ref-environments]: /admin/deployment/environments
+[ref-environments-staging]: /admin/deployment/environments#staging-environments
+[ref-cli]: /reference/cli
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-audit-log]: /admin/monitoring/audit-log

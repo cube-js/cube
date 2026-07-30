@@ -52,6 +52,14 @@ regardless of user activity.
   <img src="https://ucarecdn.com/e0dcce34-a53a-4087-b021-25dbaf730a92/" />
 </Frame>
 
+The same toggle is available in the [CLI][ref-cli] and the [Control Plane
+API][ref-control-plane-api-staging], so it can be scripted, e.g. from CI:
+
+```bash
+cube data-model enable-branch DEPLOYMENT_ID BRANCH_NAME
+cube data-model disable-branch DEPLOYMENT_ID BRANCH_NAME
+```
+
 ### Resources and costs
 
 Staging environments run on Shared deployments, incurring [relevant
@@ -116,3 +124,5 @@ credentials**][ref-credentials].
 [ref-credentials]: /admin/connect-to-data/visualization-tools
 [ref-version]: /admin/deployment#cube-version
 [ref-version-channel]: /admin/deployment#update-channels
+[ref-cli]: /reference/cli
+[ref-control-plane-api-staging]: /reference/control-plane-api#buildapiv1deploymentsdeployment_idbranchesstaging-environment

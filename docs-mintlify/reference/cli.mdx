@@ -151,7 +151,7 @@ Run `cube <command> --help` for the full options of any command.
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
-| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
+| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
 | `environments` | Deployment environments and environment tokens |
 | `variables` | Deployment environment variables |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
@@ -188,6 +188,19 @@ targeting any other branch are rejected by the API.
 
 </Info>
 
+`enable-branch` keeps a shared branch's [staging environment][ref-staging-env]
+always active, so it stays queryable without anyone viewing the branch in the
+UI — useful for running tests against a branch from CI. `disable-branch` reverts
+to the default, where the environment is only active while viewed.
+`cube data-model branches DEPLOYMENT_ID` shows the current state per branch, and
+`cube environments list DEPLOYMENT_ID --type staging` lists the enabled ones with
+their API credentials.
+
+```bash
+cube data-model enable-branch DEPLOYMENT_ID my-branch
+cube data-model disable-branch DEPLOYMENT_ID my-branch
+```
+
 ## Environment variables
 
 | Variable | Description |
@@ -210,3 +223,4 @@ or explicitly with `CUBE_NO_TELEMETRY=1` (or the legacy `CUBEJS_TELEMETRY=false`
 
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-rest-api]: /reference/core-data-apis/rest-api/index
+[ref-staging-env]: /admin/deployment/environments#staging-environments

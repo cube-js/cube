@@ -4,7 +4,7 @@ use anyhow::{Context as _, Result};
 use clap::Subcommand;
 use serde_json::json;
 
-use crate::client::Query;
+use crate::client::{Client, Query};
 use crate::{output, util, Ctx};
 
 /// Manage a deployment's data model files (schema).
@@ -95,6 +95,21 @@ enum Cmd {
         /// Enter dev mode on the new branch
         #[arg(long)]
         dev_mode: bool,
+    },
+    /// Enable a branch: keep its staging environment always active
+    EnableBranch {
+        /// Deployment id
+        deployment: i64,
+        /// Branch to enable (a shared branch — not a personal dev branch)
+        branch: String,
+    },
+    /// Disable a branch: its staging environment is active only while the
+    /// branch is viewed in Cube Cloud
+    DisableBranch {
+        /// Deployment id
+        deployment: i64,
+        /// Branch to disable
+        branch: String,
     },
     /// Enter dev mode on a branch (prints the personal dev-mode branch that
     /// file writes must target)
@@ -219,6 +234,41 @@ fn write_body(
         body.insert("branchName".into(), json!(b));
     }
     util::body(body)
+}
+
+/// Enabling a branch keeps its staging environment always active and accessible
+/// at `<deploymentUrl>/dev-mode/<branch>/cubejs-api/v1`; disabled (the default)
+/// it is only active while someone views the branch in Cube Cloud. Enabled
+/// branches are the ones `cube environments list --type staging` reports. Only
+/// shared branches qualify — personal dev branches are served as your own
+/// development environment, and the deploy branch is production.
+async fn set_branch_enabled(
+    api: &Client,
+    ctx: &Ctx,
+    deployment: i64,
+    branch: &str,
+    enabled: bool,
+) -> Result<()> {
+    let body = json!({ "branchName": branch, "enabled": enabled });
+    let res = api
+        .put(
+            &format!("/build/api/v1/deployments/{deployment}/branches/staging-environment"),
+            Some(&body),
+        )
+        .await?;
+    if ctx.json {
+        output::print_json(&res);
+    } else if enabled {
+        output::success(&format!(
+            "Enabled branch {branch}; its staging environment stays active \
+             (see `cube environments list {deployment} --type staging`)"
+        ));
+    } else {
+        output::success(&format!(
+            "Disabled branch {branch}; its staging environment is active only while viewed"
+        ));
+    }
+    Ok(())
 }
 
 fn read_content(file: Option<String>, content: Option<String>) -> Result<String> {
@@ -351,8 +401,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 &res,
                 &[
                     ("NAME", "name"),
-                    ("DEFAULT", "isDefault"),
-                    ("CURRENT", "isCurrent"),
+                    ("PARENT", "parentBranch"),
+                    ("ENABLED", "isStagingEnvironmentEnabled"),
                 ],
             );
         }
@@ -383,6 +433,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     output::success(&format!("Created branch {name}"));
                 }
             }
+        }
+        Cmd::EnableBranch { deployment, branch } => {
+            set_branch_enabled(&api, ctx, deployment, &branch, true).await?;
+        }
+        Cmd::DisableBranch { deployment, branch } => {
+            set_branch_enabled(&api, ctx, deployment, &branch, false).await?;
         }
         Cmd::DevMode { deployment, branch } => {
             let body = json!({ "branchName": branch });
