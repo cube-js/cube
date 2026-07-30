@@ -832,67 +832,15 @@ SELECT * FROM information_schema.tables;
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
 folder in the project root during development.
 
-### `EXPLAIN` queries
+### `EXPLAIN` queries {#explain-queries}
 
-Cube Store's MySQL protocol also supports `EXPLAIN` and `EXPLAIN ANALYZE`
-queries both of which are useful for determining how much processing a query
-will require.
+Cube Store's MySQL protocol also supports `EXPLAIN`, `EXPLAIN ANALYZE`, and
+`EXPLAIN ANALYZE DETAILED`, all of which are useful for determining how much
+processing a query will require, and for seeing where time is spent within it.
 
-`EXPLAIN` queries show the logical plan for a query:
-
-```sql
- EXPLAIN SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
- GROUP BY orders__gender, orders__platform;
-+-------------------------------------------------------------------------------------------------------------------------------------+
-| logical plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-+--------------------------------------------------------------------------------------------------------------------------------------+
-| Projection, [dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__platform, dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)]
-  Aggregate
-    ClusterSend, indices: [[96]]
-      Scan dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r, source: CubeTable(index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126]), fields: [orders__gender, orders__platform, orders__count] |
-+-------------------------------------------------------------------------------------------------------------------------------------+
-```
-
-`EXPLAIN ANALYZE` queries show the physical plan for the router and all workers
-used for query processing:
-
-```sql
- EXPLAIN ANALYZE SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
- GROUP BY orders__gender, orders__platform
-
-+-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
-| node type | node name       | physical plan                                                                                                                                                                                                                                                                                                                                                   |
-+-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
-| router    |                 | Projection, [orders__platform, orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)@2:SUM(orders__count)]
-  FinalInplaceAggregate
-    ClusterSend, partitions: [[123, 126]]                                                                                                                                         |
-| worker    | 127.0.0.1:10001 | PartialInplaceAggregate
-  Merge
-    Scan, index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126], fields: [orders__gender, orders__platform, orders__count]
-      Projection, [orders__gender, orders__platform, orders__count]
-        ParquetScan, files: /.cubestore/data/126-0qtyakym.parquet |
-+-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
-```
-
-Unlike `EXPLAIN` and `EXPLAIN ANALYZE`, which only show the plan, `EXPLAIN ANALYZE
-DETAILED` actually executes the query under per-query tracing and renders a
-detailed execution trace as a tree with a per-category timing summary. Use it to
-diagnose where time is spent within a query:
-
-```sql
-EXPLAIN ANALYZE DETAILED SELECT orders__platform, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
-GROUP BY orders__platform;
-```
-
-When you're debugging performance, one thing to keep in mind is that Cube Store, due to its design, will always use some index to query data, and usage of the index itself doesn't necessarily tell if the particular query is performing optimally or not.
-What's important to look at is aggregation and partition merge strategies.
-In most of the cases for aggregation, Cube Store will use `HashAggregate` or `InplaceAggregate` strategy as well as `Merge` and `MergeSort` operators to merge different partitions.
-Even for larger datasets, scan operations on sorted data will almost always be much more efficient and faster than hash aggregate as the Cube Store optimizer decides to use those only if there's an index with appropriate sorting.
-So, as a rule of thumb, if you see in your plan `PartialHashAggregate` and `FinalHashAggregate` nodes together with `Merge` operators, those queries most likely perform sub-optimally.
-On the other hand, if you see `PartialInplaceAggregate`, `FinalInplaceAggregate`, and `FullInplaceAggregate` together with `MergeSort` operators in your plan, then there's a high chance the query performs optimally.
-Sometimes, there can be exceptions to this rule. 
-For example, a total count query run on top of the index will perform `HashAggregate` strategy on top of `MergeSort` nodes even if all required indexes are in place.
-This query would be optimal as well.
+See [Cube Store SQL commands][ref-cubestore-sql-commands] for their syntax and
+output, guidance on reading a query plan, and the rest of Cube Store's command
+surface.
 
 ## Pre-aggregations storage
 
@@ -1244,6 +1192,7 @@ or a decimal type, depending on the nature of your data.
 [ref-build-history]: /admin/monitoring/pre-aggregations#build-history
 [ref-matching-preaggs]: /docs/pre-aggregations/matching-pre-aggregations
 [ref-cube-store]: /docs/pre-aggregations/running-in-production#architecture
+[ref-cubestore-sql-commands]: /reference/cubestore/sql-commands
 [ref-cube-store-storage]: /docs/pre-aggregations/running-in-production#storage
 [ref-member-sql]: /reference/data-modeling/dimensions#sql
 [ref-incremental-refresh-recipe]: /recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range
