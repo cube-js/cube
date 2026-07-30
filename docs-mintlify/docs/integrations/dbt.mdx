@@ -174,8 +174,12 @@ prefixes (`stg_`, `dim_`, `fct_`, …) stripped and plurals reduced — and depr
 columns dbt declares as foreign keys, unless that would leave no candidate at all (on a
 1:1 satellite table, the foreign key *is* the table's own key).
 
-On top of the tiers, a column that another cube joins to is always marked as a key on the
-target cube — Cube can't resolve the join otherwise.
+Separately from the tiers, a column that another cube joins to is marked as a key on the
+**referenced** cube — Cube can't resolve the join otherwise. This is additive: it applies
+whether or not the tiers already found a key, so a cube can end up with a declared key
+*plus* a joined-to column. The cube on the other side — the one that owns the foreign
+key — gets no key from this, which is the usual reason a cube in a join ends up without
+one.
 
 To key a cube on something the pull wouldn't guess — a composite key, or a column your
 suffixes don't cover — declare it in dbt. Constraints require an
@@ -201,8 +205,11 @@ models:
 If your project doesn't use contracts, tier 2 is the way to declare a single-column key:
 add `unique` and `not_null` tests to it.
 
-A declared key is never widened or overridden by a guess. If a cube involved in a join
-ends up with no detectable key, the pull logs a warning naming the cube.
+A declared key is never overridden or widened by the guessing tiers — only a joined-to
+column can add to it. If a cube that participates in a join ends up with no key at all,
+the pull still writes the file, but the data model won't compile: Cube reports `primary
+key for '<cube>' is required when join is defined`. The generated `.yml` is the place to
+check what the pull decided — every key it detected is a dimension with `primary_key: true`.
 
 ### Infer column types from dbt catalog
 
@@ -700,12 +707,12 @@ into the **dbt models schema** you configured, and that the schema matches.
 - **A declared key was ignored** — a `primary_key` constraint is applied all-or-nothing.
   If it names a column the model's `columns:` block doesn't document, the whole
   declaration is skipped (rather than emitting a narrower, wrong grain) and the pull falls
-  back to the guessing tiers. The pull log names the missing column.
-- **Wrong column** — declare the key in dbt and the pull will use it verbatim. When
-  several columns were equally plausible, the pull logs which one it picked and what the
-  alternatives were.
+  back to the guessing tiers. Check that every column the constraint lists is also
+  documented under `columns:`.
+- **Wrong column** — declare the key in dbt and the pull will use it verbatim.
 
-See [Primary key detection](#primary-key-detection).
+Open the generated `.yml` to see what the pull decided: the key is whichever dimensions
+carry `primary_key: true`. See [Primary key detection](#primary-key-detection).
 
 </Accordion>
 
