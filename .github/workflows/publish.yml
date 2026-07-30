@@ -831,14 +831,57 @@ jobs:
           bin=cube
           [ "${{ runner.os }}" = "Windows" ] && bin=cube.exe
           tar -C "$bindir" -czf "cube-${{ matrix.target }}.tar.gz" "$bin"
+      # A single API timeout here used to drop one platform's binary from the
+      # release while the job's build steps still passed, so the release
+      # shipped incomplete and `install-cli.sh` 404'd for that platform.
       - name: Upload Binary to Release
-        uses: svenstaro/upload-release-action@v2
+        uses: nick-fields/retry@v3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cube-${{ matrix.target }}.tar.gz
-          asset_name: cube-${{ matrix.target }}.tar.gz
-          tag: ${{ github.ref }}
-          overwrite: true
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 10
+          # Defaults to powershell on Windows, where ${VAR} does not expand.
+          shell: bash
+          command: gh release upload "${GITHUB_REF_NAME}" "cube-${{ matrix.target }}.tar.gz" --clobber --repo "${GITHUB_REPOSITORY}"
+
+  # Guards against a release that is missing a platform: every target built by
+  # the cube-cli matrix must be attached before the release is considered good.
+  cube-cli-assets-complete:
+    name: Cube CLI release assets complete
+    runs-on: ubuntu-24.04
+    needs: [cube-cli]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Verify every CLI target is attached to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          targets="
+          x86_64-unknown-linux-musl
+          aarch64-unknown-linux-musl
+          x86_64-apple-darwin
+          aarch64-apple-darwin
+          x86_64-pc-windows-msvc
+          "
+          assets=$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name')
+          missing=""
+          for t in $targets; do
+            if ! printf '%s\n' "$assets" | grep -qx "cube-${t}.tar.gz"; then
+              missing="${missing} cube-${t}.tar.gz"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "release ${GITHUB_REF_NAME} is missing CLI assets:${missing}" >&2
+            exit 1
+          fi
+          echo "all CLI assets present on ${GITHUB_REF_NAME}"
 
   trigger-test-suites:
     name: Trigger test suites run
