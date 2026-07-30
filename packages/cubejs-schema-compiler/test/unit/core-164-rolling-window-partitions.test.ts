@@ -112,9 +112,15 @@ describe('CORE-164 rolling-window pre-aggregation partition scope', () => {
     expect(desc[0].matchedTimeDimensionDateRange).toBeUndefined();
   });
 
-  it('shifts the start back by the largest trailing window when measures disagree', async () => {
+  // Both measure orders, so the assertion pins the `seconds > maxTrailingSeconds`
+  // comparison rather than a positional accident: with only one order, taking the
+  // first window or taking the last would each pass for one of them.
+  it.each([
+    ['7d first', ['rent.rolling_7d', 'rent.rolling_1m']],
+    ['1m first', ['rent.rolling_1m', 'rent.rolling_7d']],
+  ])('shifts the start back by the largest trailing window when measures disagree (%s)', async (_label, measures) => {
     const desc: any = await preAggDescription({
-      measures: ['rent.rolling_7d', 'rent.rolling_1m'],
+      measures,
       timeDimensions: [{
         dimension: 'rent.date',
         granularity: 'day',
@@ -123,10 +129,13 @@ describe('CORE-164 rolling-window pre-aggregation partition scope', () => {
       timezone: 'UTC',
     });
 
-    const mixed = desc.find(d => d.preAggregationId === 'rent.rolling_mixed_pa');
+    // Assert the id list first: a missing mixed rollup then reads as a match failure
+    // rather than a TypeError on the range lookup below.
+    const ids = desc.map(d => d.preAggregationId);
+    expect(ids).toContain('rent.rolling_mixed_pa');
     // 1 month is the wider of the two windows, so the lookback must reach back a
     // month — shifting by the 7-day window would leave the 1-month measure short.
-    expect(mixed.matchedTimeDimensionDateRange).toEqual([
+    expect(desc[ids.indexOf('rent.rolling_mixed_pa')].matchedTimeDimensionDateRange).toEqual([
       '2024-05-10T00:00:00.000',
       '2024-06-10T23:59:59.999',
     ]);
