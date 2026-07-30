@@ -114,6 +114,8 @@ pub trait ConfigObj: DIService + Debug {
 
     fn non_streaming_query_max_row_limit(&self) -> i32;
 
+    fn cube_scan_max_batch_rows(&self) -> usize;
+
     fn max_sessions(&self) -> usize;
 
     fn no_implicit_order(&self) -> bool;
@@ -138,6 +140,7 @@ pub struct ConfigObjImpl {
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
+    pub cube_scan_max_batch_rows: usize,
     pub max_sessions: usize,
     pub no_implicit_order: bool,
     pub tesseract_sql_planner: bool,
@@ -182,6 +185,7 @@ impl ConfigObjImpl {
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
+            cube_scan_max_batch_rows: env_parse("CUBESQL_CUBE_SCAN_MAX_BATCH_ROWS", 65536),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
             tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", true),
@@ -248,6 +252,10 @@ impl ConfigObj for ConfigObjImpl {
         self.non_streaming_query_max_row_limit
     }
 
+    fn cube_scan_max_batch_rows(&self) -> usize {
+        self.cube_scan_max_batch_rows
+    }
+
     fn no_implicit_order(&self) -> bool {
         self.no_implicit_order
     }
@@ -290,6 +298,7 @@ impl Config {
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
+                cube_scan_max_batch_rows: 65536,
                 max_sessions: 1024,
                 no_implicit_order: true,
                 tesseract_sql_planner: false,
