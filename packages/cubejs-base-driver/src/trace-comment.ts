@@ -71,7 +71,9 @@ export function addTraceComment(sql: string, requestId: string | undefined | nul
     return sql;
   }
 
-  const withoutSemicolon = sql.replace(/;\s*$/, '');
+  // Collapse a run of trailing semicolons, not just one: leaving `;` behind would
+  // put the comment between two statements, the second of them empty.
+  const withoutSemicolon = sql.replace(/;[\s;]*$/, '');
   const semicolon = withoutSemicolon.length === sql.length ? '' : ';';
 
   return `${withoutSemicolon}\n${comment}${semicolon}`;
