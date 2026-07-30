@@ -106,14 +106,14 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         // Time dimensions are read from the rolling source input, where they
         // are already timezone-converted and truncated, so they must render
         // without the conversion.
-        let schema = transforms::ignore_timezone_in_schema(&rolling_window.schema)?;
+        let schema = transforms::mark_tz_converted_at_source_in_schema(&rolling_window.schema)?;
         // An ungrouped rolling select emits row-level values: count-like
         // measures render a not-null indicator over the input column;
         // otherwise the select merges the window's partial values.
         let schema = if rolling_window.is_ungrouped {
             transforms::measures_render_modifier_in_schema(
                 &schema,
-                &MeasureRenderModifier::UngroupedQueryValue,
+                &MeasureRenderModifier::UngroupedFinal,
             )?
         } else {
             transforms::measures_render_modifier_in_schema(

@@ -185,7 +185,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 .schema
                 .measures
                 .iter()
-                .map(|m| transforms::measures_render_modifier(m, &MeasureRenderModifier::Ungrouped))
+                .map(|m| transforms::measures_render_modifier(m, &MeasureRenderModifier::RawValue))
                 .collect::<Result<Vec<_>, _>>()?
         } else {
             aggregate_multiplied_subquery.schema.measures.clone()

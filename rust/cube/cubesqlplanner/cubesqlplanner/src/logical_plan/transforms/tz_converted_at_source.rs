@@ -4,11 +4,13 @@ use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-/// Copy of the schema with every time dimension marked as already
-/// timezone-converted (its value comes from a source that stores it
-/// converted, e.g. a pre-aggregation rollup or an input CTE). The
-/// mark is applied recursively inside each time dimension's tree.
-pub fn ignore_timezone_in_schema(schema: &LogicalSchema) -> Result<Rc<LogicalSchema>, CubeError> {
+/// Copy of the schema with every time dimension marked as
+/// timezone-converted at the source (a pre-aggregation rollup or an
+/// input CTE). The mark is applied recursively inside each time
+/// dimension's tree.
+pub fn mark_tz_converted_at_source_in_schema(
+    schema: &LogicalSchema,
+) -> Result<Rc<LogicalSchema>, CubeError> {
     let names = schema
         .time_dimensions
         .iter()
@@ -18,7 +20,7 @@ pub fn ignore_timezone_in_schema(schema: &LogicalSchema) -> Result<Rc<LogicalSch
     new.time_dimensions = new
         .time_dimensions
         .iter()
-        .map(|d| transforms::ignore_timezone_for(d, &names))
+        .map(|d| transforms::mark_tz_converted_at_source(d, &names))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Rc::new(new))
 }

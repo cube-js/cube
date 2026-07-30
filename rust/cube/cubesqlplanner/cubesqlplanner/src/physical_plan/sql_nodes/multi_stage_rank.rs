@@ -2,7 +2,6 @@ use super::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::symbols::MeasureKind;
 use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -36,10 +35,15 @@ impl SqlNode for MultiStageRankNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                if let (Some(MeasureRenderModifier::MultiStageRank { partition }), true) = (
-                    m.render_modifier(),
-                    m.is_multi_stage() && matches!(m.kind(), MeasureKind::Rank),
-                ) {
+                if let Some(modifier @ MeasureRenderModifier::MultiStageRank { partition }) =
+                    m.render_modifier()
+                {
+                    if !modifier.applies_to(m) {
+                        return Err(CubeError::internal(format!(
+                            "MultiStageRank render modifier on incompatible measure {}",
+                            m.full_name()
+                        )));
+                    }
                     let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let order_by = if !m.measure_order_by().is_empty() {
                         let sql = m

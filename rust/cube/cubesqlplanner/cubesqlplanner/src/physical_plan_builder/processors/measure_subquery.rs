@@ -44,7 +44,7 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         // aggregate select applies the actual aggregation.
         for meas in measure_subquery.schema.measures.iter() {
             let meas =
-                transforms::measures_render_modifier(meas, &MeasureRenderModifier::Ungrouped)?;
+                transforms::measures_render_modifier(meas, &MeasureRenderModifier::RawValue)?;
             select_builder.add_projection_member(&meas, None);
         }
 

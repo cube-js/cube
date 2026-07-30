@@ -76,10 +76,7 @@ impl MaskedSqlNode {
             && match node.as_ref() {
                 MemberSymbol::Measure(m) => matches!(
                     m.render_modifier(),
-                    Some(
-                        MeasureRenderModifier::Ungrouped
-                            | MeasureRenderModifier::UngroupedQueryValue
-                    )
+                    Some(MeasureRenderModifier::RawValue | MeasureRenderModifier::UngroupedFinal)
                 ),
                 _ => false,
             };

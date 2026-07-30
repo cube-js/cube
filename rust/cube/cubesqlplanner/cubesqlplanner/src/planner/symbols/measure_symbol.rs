@@ -82,16 +82,23 @@ pub enum MeasureTimeShifts {
 }
 
 /// Render-time modifier of how the measure's value is emitted in its
-/// select. `None` on the symbol means the usual final aggregation.
+/// select.
+///
+/// `None` on the symbol means both "no stamping pass has decided yet"
+/// and "the usual final aggregation" — the two coincide because no
+/// pass ever needs to force the default form over an earlier stamp
+/// (stamping only fills `None`). A variant meaning "explicitly the
+/// default" would break that precedence scheme.
 #[derive(Clone, Debug)]
 pub enum MeasureRenderModifier {
-    /// Raw row-level value without the aggregation wrap (measure
-    /// subqueries, ungrouped multi-stage leaves).
-    Ungrouped,
-    /// Row-level value in an ungrouped query: count-like measures
-    /// render a not-null indicator so an outer count can sum each
-    /// row's contribution.
-    UngroupedQueryValue,
+    /// Raw row-level value without the aggregation wrap, re-aggregated
+    /// by an enclosing select (measure subqueries, ungrouped
+    /// multi-stage leaves).
+    RawValue,
+    /// Final row-level output of an ungrouped query: count-like
+    /// measures render a not-null indicator so an outer count can sum
+    /// each row's contribution.
+    UngroupedFinal,
     /// Merge of the window's partial values in a rolling-window
     /// select: mergeable aggregations combine the input column
     /// (`sum` for sums and counts, `min`/`max`, an HLL merge for
@@ -104,6 +111,21 @@ pub enum MeasureRenderModifier {
     /// the multi-stage select whose partition is narrower than the
     /// full dimension set.
     MultiStageWindow { partition: Vec<Rc<MemberSymbol>> },
+}
+
+impl MeasureRenderModifier {
+    /// True when the measure can take this form. The single authority
+    /// for the decision: stamping consults it, render nodes assert it.
+    pub fn applies_to(&self, measure: &MeasureSymbol) -> bool {
+        match self {
+            Self::RawValue | Self::UngroupedFinal => true,
+            Self::RollingMerge => measure.is_cumulative(),
+            Self::MultiStageRank { .. } => {
+                measure.is_multi_stage() && matches!(measure.kind(), MeasureKind::Rank)
+            }
+            Self::MultiStageWindow { .. } => measure.is_multi_stage() && !measure.is_calculated(),
+        }
+    }
 }
 
 /// `MemberSymbol::Measure` body: Tesseract representation of a

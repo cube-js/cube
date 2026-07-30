@@ -141,12 +141,13 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     .iter()
                     .map(|d| d.full_name())
                     .collect::<HashSet<_>>();
-                let ignore_tz = |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
-                    transforms::ignore_timezone_for(symbol, &time_dimension_names)
-                };
-                schema = logical_transforms::ignore_timezone_in_schema(&schema)?;
-                filter = transforms::map_filter_symbols(filter, &ignore_tz)?;
-                having = transforms::map_filter_symbols(having, &ignore_tz)?;
+                let mark_tz_converted =
+                    |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
+                        transforms::mark_tz_converted_at_source(symbol, &time_dimension_names)
+                    };
+                schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
+                filter = transforms::map_filter_symbols(filter, &mark_tz_converted)?;
+                having = transforms::map_filter_symbols(having, &mark_tz_converted)?;
                 context_factory.set_use_local_tz_in_date_range(true);
 
                 for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
@@ -163,9 +164,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         // under a measure-rendering context (multi-stage leaves), a
         // not-null indicator form for count-likes otherwise.
         let measure_modifier = if context.render_measure_for_ungrouped {
-            Some(MeasureRenderModifier::Ungrouped)
+            Some(MeasureRenderModifier::RawValue)
         } else if logical_plan.modifers().ungrouped {
-            Some(MeasureRenderModifier::UngroupedQueryValue)
+            Some(MeasureRenderModifier::UngroupedFinal)
         } else {
             None
         };

@@ -257,11 +257,11 @@ impl SqlNodesFactory {
             }
         };
         let rolling_merge = RollingWindowNode::new(input.clone(), aggregated.clone());
-        let ungrouped = self
+        let raw_value = self
             .wrap_ungrouped_pre_aggregation_measure(UngroupedMeasureSqlNode::new(input.clone()));
-        let ungrouped_query = self
+        let ungrouped_final = self
             .wrap_ungrouped_pre_aggregation_measure(UngroupedQueryFinalMeasureSqlNode::new(input));
-        MeasureRenderModifierSqlNode::new(aggregated, rolling_merge, ungrouped, ungrouped_query)
+        MeasureRenderModifierSqlNode::new(aggregated, rolling_merge, raw_value, ungrouped_final)
     }
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {

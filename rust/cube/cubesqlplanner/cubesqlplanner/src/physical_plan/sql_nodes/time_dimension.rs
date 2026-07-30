@@ -53,7 +53,7 @@ impl SqlNode for TimeDimensionNode {
                         node_processor.clone(),
                         templates,
                     )?;
-                    let converted_tz = if ev.ignore_timezone() {
+                    let converted_tz = if ev.tz_converted_at_source() {
                         input_sql
                     } else {
                         templates.convert_tz(input_sql)?
