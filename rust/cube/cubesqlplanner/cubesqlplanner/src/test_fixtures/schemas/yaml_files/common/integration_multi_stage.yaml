@@ -462,6 +462,59 @@ cubes:
                 type: to_date
                 granularity: year
 
+          # rolling-window leaf declaring `add_group_by`, with the parent calc
+          # re-declaring it. The leaf's own `add_group_by` is inert on the
+          # rolling path — `try_plan_rolling_window` builds the leaf before the
+          # inode `grain.include` is applied — so it is the parent's pushed-down
+          # grain that reaches the rollup CTE.
+          - name: rolling_leaf_own_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            rolling_window:
+                trailing: unbounded
+                offset: end
+            add_group_by:
+                - orders.category
+
+          - name: rolling_leaf_own_calc
+            type: number
+            sql: "{CUBE.rolling_leaf_own_category}"
+            multi_stage: true
+            add_group_by:
+                - orders.category
+
+          - name: rolling_leaf_own_reduce
+            type: sum
+            sql: "{CUBE.rolling_leaf_own_calc}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          # Same shape with no grain declared on the leaf, so only the parent's
+          # pushed-down `add_group_by` reaches the rollup CTE.
+          - name: rolling_leaf_plain
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            rolling_window:
+                trailing: unbounded
+                offset: end
+
+          - name: rolling_parent_pushes_category
+            type: number
+            sql: "{CUBE.rolling_leaf_plain}"
+            multi_stage: true
+            add_group_by:
+                - orders.category
+
+          - name: rolling_parent_pushed_reduce
+            type: sum
+            sql: "{CUBE.rolling_parent_pushes_category}"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
           # ── filter: directive variants ────────────────────────────────────
           - name: amount_exclude_status
             type: sum
