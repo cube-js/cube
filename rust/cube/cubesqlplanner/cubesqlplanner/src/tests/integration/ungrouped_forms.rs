@@ -63,6 +63,40 @@ async fn test_ungrouped_masked_measures() {
     }
 }
 
+// A conditional mask (mask filter) on a measure whose mask SQL has
+// row-level dependencies, in an ungrouped query. The dependency-
+// carrying mask is applied with grouped semantics at the evaluate
+// position, where the filter cannot be turned into a CASE WHEN — so
+// every row must render the mask value; the original value must not
+// leak through rows matching the filter.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_conditional_dep_mask() {
+    let ctx = create_masking_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.masked_total
+        dimensions:
+          - orders.id
+          - orders.status
+        order:
+          - id: orders.id
+        ungrouped: true
+        maskedMembers:
+          - member: orders.masked_total
+            filter:
+              member: orders.status
+              operator: equals
+              values: ['completed']
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, BASIC_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // Control: a constant-masked measure in a grouped query. The mask
 // whose SQL has row-level dependencies is not representable in a
 // grouped select and is exercised by the ungrouped test only.

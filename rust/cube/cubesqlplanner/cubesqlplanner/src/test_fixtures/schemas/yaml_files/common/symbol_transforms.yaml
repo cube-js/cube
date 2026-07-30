@@ -1,0 +1,18 @@
+cubes:
+    - name: events
+      sql: "SELECT * FROM events"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+          - name: created_at
+            type: time
+            sql: created_at
+          # A granularity reference compiles into an embedded
+          # TimeDimension symbol inside this dimension's tree.
+          - name: created_day
+            type: time
+            sql: "{CUBE.created_at.day}"
+      measures:
+          - name: count
+            type: count

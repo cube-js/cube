@@ -13,6 +13,7 @@ mod no_query_tools_leak;
 mod positional_params;
 mod string_measures;
 mod subquery_dimensions;
+mod symbol_transforms;
 mod time_dimension_symbol;
 mod utils;
 mod view_default_filters;

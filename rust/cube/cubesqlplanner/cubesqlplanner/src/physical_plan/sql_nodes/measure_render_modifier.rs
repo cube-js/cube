@@ -47,7 +47,15 @@ impl SqlNode for MeasureRenderModifierSqlNode {
         let chain = match node.as_ref() {
             MemberSymbol::Measure(m) => match m.render_modifier() {
                 None => &self.aggregated,
-                Some(MeasureRenderModifier::RollingMerge) => &self.rolling_merge,
+                Some(modifier @ MeasureRenderModifier::RollingMerge) => {
+                    if !modifier.applies_to(m) {
+                        return Err(CubeError::internal(format!(
+                            "RollingMerge render modifier on incompatible measure {}",
+                            m.full_name()
+                        )));
+                    }
+                    &self.rolling_merge
+                }
                 Some(MeasureRenderModifier::RawValue) => &self.raw_value,
                 Some(MeasureRenderModifier::UngroupedFinal) => &self.ungrouped_final,
                 Some(MeasureRenderModifier::MultiStageRank { .. })

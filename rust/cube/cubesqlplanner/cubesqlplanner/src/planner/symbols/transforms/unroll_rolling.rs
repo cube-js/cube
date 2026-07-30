@@ -38,6 +38,9 @@ pub fn unroll_rolling(measure: &MeasureSymbol) -> Rc<MeasureSymbol> {
         measure_drill_filters: measure.measure_drill_filters.clone(),
         measure_order_by: measure.measure_order_by.clone(),
         mask_sql: measure.mask_sql.clone(),
-        render_modifier: measure.render_modifier.clone(),
+        // Unrolling erases the properties (cumulativeness, multi-stage)
+        // a render modifier is stamped against, so a carried-over
+        // modifier would contradict the resulting symbol.
+        render_modifier: None,
     })
 }
