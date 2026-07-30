@@ -44,7 +44,9 @@ use crate::metastore::chunks::chunk_file_name;
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
-use compaction::{merge_chunks, merge_replay_handles, write_chunks_split_into_children};
+use compaction::{
+    cast_plan_to_schema, merge_chunks, merge_replay_handles, write_chunks_split_into_children,
+};
 use datafusion::arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -2875,7 +2877,11 @@ impl ChunkStore {
                     schema.clone(),
                 )?);
 
-                assert!(aggregate
+                // DataFusion may widen aggregate output types (e.g. a decimal sum gains
+                // precision); cast them back so chunk data keeps the index schema.
+                let plan = cast_plan_to_schema(aggregate, &schema)?;
+
+                assert!(plan
                     .properties()
                     .output_ordering()
                     .is_some_and(|ordering| ordering.len() == key_size));
@@ -2887,13 +2893,20 @@ impl ChunkStore {
                 )
                 .task_ctx();
 
-                let batches = collect(aggregate, task_context).await?;
+                let batches = collect(plan, task_context).await.map_err(|e| {
+                    CubeError::internal(format!(
+                        "Failed to build aggregating index {} of table {}: {}",
+                        index.get_row().get_name(),
+                        table.get_row().get_table_name(),
+                        e
+                    ))
+                })?;
                 if batches.is_empty() {
                     Ok(vec![])
                 } else if batches.len() == 1 {
                     Ok(batches[0].columns().to_vec())
                 } else {
-                    let res = concat_batches(&schema, &batches).unwrap();
+                    let res = concat_batches(&schema, &batches)?;
                     Ok(res.columns().to_vec())
                 }
             }
