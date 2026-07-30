@@ -122,6 +122,23 @@ describe('addTraceComment', () => {
     expect(addTraceComment('SELECT 1;  ', 'abc-123')).toBe('SELECT 1\n/* trace_id: abc-123 */;');
   });
 
+  test('never leaves an empty statement after the comment', () => {
+    // Cube does not emit repeated separators, but the function has to stay total:
+    // a leftover `;` after the comment is a second, empty statement that some
+    // engines reject.
+    for (const trailing of [';;', '; ;', ';;;', ';\n;  ']) {
+      expect(addTraceComment(`SELECT 1${trailing}`, 'abc-123'))
+        .toBe('SELECT 1\n/* trace_id: abc-123 */;');
+    }
+  });
+
+  test('never invents a semicolon the query did not have', () => {
+    // The trailing run must start at a `;` — matching trailing whitespace alone
+    // would append a separator to a query that never had one.
+    expect(addTraceComment('SELECT 1 ', 'abc-123')).toBe('SELECT 1 \n/* trace_id: abc-123 */');
+    expect(addTraceComment('SELECT 1\n', 'abc-123')).toBe('SELECT 1\n\n/* trace_id: abc-123 */');
+  });
+
   test('leaves the query untouched when there is no usable id', () => {
     expect(addTraceComment(sql, undefined)).toBe(sql);
     expect(addTraceComment(sql, '')).toBe(sql);
