@@ -834,6 +834,11 @@ jobs:
       # A single API timeout here used to drop one platform's binary from the
       # release while the job's build steps still passed, so the release
       # shipped incomplete and `install-cli.sh` 404'd for that platform.
+      #
+      # Unlike upload-release-action, `gh release upload` does not create the
+      # release. That is fine here: the release is always published before the
+      # tag push that starts this workflow, so it exists by the time any job
+      # runs.
       - name: Upload Binary to Release
         uses: nick-fields/retry@v3
         env:
@@ -846,6 +851,25 @@ jobs:
           # Defaults to powershell on Windows, where ${VAR} does not expand.
           shell: bash
           command: gh release upload "${GITHUB_REF_NAME}" "cube-${{ matrix.target }}.tar.gz" --clobber --repo "${GITHUB_REPOSITORY}"
+      # Each leg records the target it is responsible for, so the completeness
+      # guard below checks the matrix as it actually ran instead of a copy of
+      # the target list that could drift out of sync with it. This runs even
+      # when the upload failed — a leg that dropped its asset is precisely what
+      # the guard must still hear about.
+      - name: Record expected asset
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p expected
+          echo "cube-${{ matrix.target }}.tar.gz" > "expected/${{ matrix.target }}"
+      - name: Upload expected asset marker
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cube-cli-expected-${{ matrix.target }}
+          path: expected/
+          retention-days: 1
 
   # Guards against a release that is missing a platform: every target built by
   # the cube-cli matrix must be attached before the release is considered good.
@@ -853,35 +877,47 @@ jobs:
     name: Cube CLI release assets complete
     runs-on: ubuntu-24.04
     needs: [cube-cli]
+    # A failed matrix leg is the exact case this guard exists for, and a plain
+    # `needs:` would skip it there — so it runs whenever the matrix did.
+    if: ${{ !cancelled() }}
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
+      - name: Collect expected assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cube-cli-expected-*
+          merge-multiple: true
+          path: expected/
       - name: Verify every CLI target is attached to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          targets="
-          x86_64-unknown-linux-musl
-          aarch64-unknown-linux-musl
-          x86_64-apple-darwin
-          aarch64-apple-darwin
-          x86_64-pc-windows-msvc
-          "
-          assets=$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name')
+          expected=$(cat expected/* | sort -u)
+          if [ -z "$expected" ]; then
+            echo "no cube-cli leg reported an expected asset — the matrix did not run" >&2
+            exit 1
+          fi
+          # `state` is starting/new until an upload completes, so an interrupted
+          # upload can leave a name-only match behind; require it uploaded and
+          # non-empty.
+          assets=$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json assets \
+            --jq '.assets[] | select(.state == "uploaded" and .size > 0) | .name')
           missing=""
-          for t in $targets; do
-            if ! printf '%s\n' "$assets" | grep -qx "cube-${t}.tar.gz"; then
-              missing="${missing} cube-${t}.tar.gz"
+          while IFS= read -r asset; do
+            if ! printf '%s\n' "$assets" | grep -qx "$asset"; then
+              missing="${missing} ${asset}"
             fi
-          done
+          done <<< "$expected"
           if [ -n "$missing" ]; then
             echo "release ${GITHUB_REF_NAME} is missing CLI assets:${missing}" >&2
             exit 1
           fi
-          echo "all CLI assets present on ${GITHUB_REF_NAME}"
+          echo "all CLI assets present on ${GITHUB_REF_NAME}:"
+          printf '%s\n' "$expected"
 
   trigger-test-suites:
     name: Trigger test suites run
