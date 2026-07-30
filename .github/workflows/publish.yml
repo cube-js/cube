@@ -896,7 +896,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          expected=$(cat expected/* | sort -u)
+          # download-artifact succeeds without creating anything when its
+          # pattern matches nothing, so treat "no markers" as a failure of its
+          # own rather than letting an unmatched glob report it.
+          expected=$(find expected -type f -exec cat {} + 2>/dev/null | sort -u || true)
           if [ -z "$expected" ]; then
             echo "no cube-cli leg reported an expected asset — the matrix did not run" >&2
             exit 1
