@@ -178,6 +178,17 @@ cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders
 
 `merge-to-default` merges into the deploy branch and rebuilds production.
 
+<Info>
+
+`--dev-mode` (on `create-branch` and `dev-mode`) forks a personal `dev-*`
+branch for you rather than writing directly to the named branch, and prints
+the actual forked branch name (e.g. `dev-pavel-ab12cd34`) to pass via
+`--branch` on subsequent commands — or omit `--branch` to use your currently
+active dev-mode session. `put`, `delete`, and `rename` only accept writes to
+the active dev-mode branch; targeting any other branch is rejected.
+
+</Info>
+
 ## Environment variables
 
 | Variable | Description |
