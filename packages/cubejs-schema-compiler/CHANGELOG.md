@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.15](https://github.com/cube-js/cube/compare/v1.7.14...v1.7.15) (2026-07-30)
+
+### Bug Fixes
+
+- **tesseract:** project the requested grain into rolling-window CTEs ([#11400](https://github.com/cube-js/cube/issues/11400)) ([80d1159](https://github.com/cube-js/cube/commit/80d1159fd0d255f8b3b8799275bc921fabeaad5a)), closes [#11410](https://github.com/cube-js/cube/issues/11410) [#11413](https://github.com/cube-js/cube/issues/11413)
+
 ## [1.7.14](https://github.com/cube-js/cube/compare/v1.7.13...v1.7.14) (2026-07-29)
 
 ### Bug Fixes

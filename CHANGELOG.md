@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.15](https://github.com/cube-js/cube/compare/v1.7.14...v1.7.15) (2026-07-30)
+
+### Bug Fixes
+
+- **cubestore:** cast aggregating index aggregation results back to the declared column types ([#11413](https://github.com/cube-js/cube/issues/11413)) ([26c4801](https://github.com/cube-js/cube/commit/26c4801629ef4851e3474e5d0a4ed4cf76c3d4d0))
+- **cubestore:** keep the projection schema when rewriting a rolling window ([#11410](https://github.com/cube-js/cube/issues/11410)) ([1bf2dd8](https://github.com/cube-js/cube/commit/1bf2dd848e9147afa94c19235bd0026899740609))
+- **tesseract:** project the requested grain into rolling-window CTEs ([#11400](https://github.com/cube-js/cube/issues/11400)) ([80d1159](https://github.com/cube-js/cube/commit/80d1159fd0d255f8b3b8799275bc921fabeaad5a)), closes [#11410](https://github.com/cube-js/cube/issues/11410) [#11413](https://github.com/cube-js/cube/issues/11413)
+
+### Features
+
+- **cubesql:** Separate env var for non-streaming query max row limit ([#11418](https://github.com/cube-js/cube/issues/11418)) ([236763a](https://github.com/cube-js/cube/commit/236763ad3936ac2a0df3bdd0bfc784d6df78c690))
+- **cubesql:** Split oversized CubeScan record batches ([#11384](https://github.com/cube-js/cube/issues/11384)) ([51db9c7](https://github.com/cube-js/cube/commit/51db9c7d4cc1cf4d50f7e48d4ec269982f01dff9))
+
 ## [1.7.14](https://github.com/cube-js/cube/compare/v1.7.13...v1.7.14) (2026-07-29)
 
 ### Bug Fixes
