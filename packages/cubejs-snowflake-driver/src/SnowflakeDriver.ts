@@ -4,8 +4,13 @@
  * @fileoverview The `SnowflakeDriver` and related types declaration.
  */
 
-import { assertDataSource, getEnv } from '@cubejs-backend/shared';
-import snowflake, { Column, Connection, RowStatement } from 'snowflake-sdk';
+import {
+  assertDataSource,
+  getEnv,
+  CancelablePromise,
+  MaybeCancelablePromise,
+} from '@cubejs-backend/shared';
+import snowflake, { Column, Connection, DataType, RowStatement, StatementOption } from 'snowflake-sdk';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,
@@ -22,11 +27,19 @@ import {
 } from '@cubejs-backend/base-driver';
 import fs from 'fs/promises';
 import crypto from 'crypto';
+import { Readable } from 'stream';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 import { hydrators } from './type-parsers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
+
+const FETCH_AS_STRING: DataType[] = [
+  // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
+  'Number',
+  // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
+  'JSON',
+];
 
 type UnloadResponse = {
   // eslint-disable-next-line camelcase
@@ -519,9 +532,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   /**
    * Executes query and returns queried rows.
+   * Returns a cancelable promise that will abort the Snowflake statement on cancel.
    */
-  public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
-    return this.getConnection().then((connection) => this.execute<R>(connection, query, values));
+  public query<R = unknown>(query: string, values?: unknown[]): CancelablePromise<R> {
+    return this.execute<R>(this.getConnection(), query, values);
   }
 
   /**
@@ -619,26 +633,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns an array of queried fields meta info.
    */
   public async queryColumnTypes(sql: string, params: unknown[]): Promise<TableStructure> {
-    const connection = await this.getConnection();
-    return new Promise((resolve, reject) => connection.execute({
-      sqlText: `${sql} LIMIT 0`,
-      binds: <string[] | undefined>params,
-      fetchAsString: [
-        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
-        'Number',
-        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
-        'JSON'
-      ],
-      complete: (err, stmt) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        const types: {name: string, type: string}[] =
-          this.getTypes(stmt);
-        resolve(types);
+    return this.executeCancelable<TableStructure>(
+      this.getConnection(),
+      {
+        sqlText: `${sql} LIMIT 0`,
+        binds: <string[] | undefined>params,
+        fetchAsString: FETCH_AS_STRING,
       },
-    }));
+      (stmt) => this.getTypes(stmt),
+    );
   }
 
   /**
@@ -817,11 +820,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Executes a query and returns either query result memory data or
    * query result stream, depending on options.
    */
-  public async downloadQueryResults(
+  public downloadQueryResults(
     query: string,
     values: unknown[],
     options: DownloadQueryResultsOptions,
-  ): Promise<DownloadQueryResultsResult> {
+  ): MaybeCancelablePromise<DownloadQueryResultsResult> {
     if (!options.streamImport) {
       return this.memory(query, values);
     } else {
@@ -837,22 +840,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     query: string,
     values: unknown[],
   ): Promise<DownloadTableMemoryData & { types: TableStructure }> {
-    const connection = await this.getConnection();
-    return new Promise((resolve, reject) => connection.execute({
-      sqlText: query,
-      binds: <string[] | undefined>values,
-      fetchAsString: [
-        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
-        'Number',
-        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
-        'JSON'
-      ],
-      complete: (err, stmt, rows) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
+    return this.executeCancelable<DownloadTableMemoryData & { types: TableStructure }>(
+      this.getConnection(),
+      {
+        sqlText: query,
+        binds: <string[] | undefined>values,
+        fetchAsString: FETCH_AS_STRING,
+      },
+      (stmt, rows) => {
         const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
         const types: {name: string, type: string}[] =
           this.getTypes(stmt);
@@ -865,61 +860,69 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
             }
           }
         }
-        resolve({ types, rows: rows || [] });
-      }
-    }));
+        return { types, rows: rows || [] };
+      },
+    );
   }
 
   /**
    * Returns stream table object that includes query result stream and
    * queried fields types.
    */
-  public async stream(
+  public stream(
     query: string,
     values: unknown[],
     _options: StreamOptions,
-  ): Promise<StreamTableDataWithTypes> {
-    const connection = await this.getConnection();
-    const stmt = await new Promise<RowStatement>((resolve, reject) => connection.execute({
-      sqlText: query,
-      binds: <string[] | undefined>values,
-      fetchAsString: [
-        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
-        'Number',
-        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
-        'JSON'
-      ],
-      streamResult: true,
-      complete: (err, statement) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+  ): CancelablePromise<StreamTableDataWithTypes> {
+    const stmtPromise = this.executeCancelable<RowStatement>(
+      this.getConnection(),
+      {
+        sqlText: query,
+        binds: <string[] | undefined>values,
+        fetchAsString: FETCH_AS_STRING,
+        streamResult: true,
+      },
+      (stmt) => stmt,
+    );
+    // Reused by release() below. It is idempotent and a no-op once the
+    // statement settled, so a stream that finished normally is never
+    // needlessly aborted, and release() + cancel() cannot double-abort.
+    const abort = stmtPromise.cancel;
 
-        resolve(statement);
-      }
-    }));
-    const types: {name: string, type: string}[] =
-      this.getTypes(stmt);
-    const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
-    if (Object.keys(hydrationMap).length) {
-      const rowStream = new HydrationStream(hydrationMap);
-      stmt.streamRows().pipe(rowStream);
+    const promise = <CancelablePromise<StreamTableDataWithTypes>>stmtPromise.then((stmt) => {
+      const types: {name: string, type: string}[] =
+        this.getTypes(stmt);
+      const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
+
+      const sourceStream = stmt.streamRows();
+      const rowStream: Readable = Object.keys(hydrationMap).length
+        ? sourceStream.pipe(new HydrationStream(hydrationMap))
+        : sourceStream;
+
       return {
         rowStream,
         types,
         release: async () => {
-          //
-        }
+          // No-op when the statement already completed, which is the normal
+          // path: QueryCache's streamHandler calls release() from
+          // rowStream.once('end'). Only reaches Snowflake when the consumer
+          // bailed out before the statement finished.
+          await abort();
+
+          // .pipe() does not propagate destroy() upstream, so stop the SDK's
+          // pull-based chunk downloader explicitly.
+          if (!sourceStream.readableEnded) {
+            sourceStream.destroy();
+          }
+          if (rowStream !== sourceStream && !rowStream.readableEnded) {
+            rowStream.destroy();
+          }
+        },
       };
-    }
-    return {
-      rowStream: stmt.streamRows(),
-      types,
-      release: async () => {
-        //
-      }
-    };
+    });
+    promise.cancel = abort;
+
+    return promise;
   }
 
   private getTypes(stmt: RowStatement) {
@@ -963,27 +966,102 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return hydrationMap;
   }
 
-  protected async execute<R = unknown>(
-    connection: Connection,
+  protected cancelStatement(stmt: RowStatement): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const onError = (e: any) => {
+        if (this.logger) {
+          this.logger('Snowflake statement cancel error', {
+            error: (e?.stack || e?.message || e)?.toString(),
+          });
+        }
+      };
+
+      try {
+        stmt.cancel((err) => {
+          if (err) {
+            onError(err);
+          }
+          resolve();
+        });
+      } catch (e) {
+        onError(e);
+        resolve();
+      }
+    });
+  }
+
+  protected executeCancelable<R>(
+    connectionPromise: Promise<Connection>,
+    options: Omit<StatementOption, 'complete'>,
+    onComplete: (stmt: RowStatement, rows: any[] | undefined) => R | PromiseLike<R>,
+  ): CancelablePromise<R> {
+    let stmt: RowStatement | undefined;
+    let cancelled = false;
+    let settled = false;
+
+    const promise = <CancelablePromise<R>>(async () => {
+      const connection = await connectionPromise;
+
+      if (cancelled) {
+        // Cancelled while we were still connecting - never issue the statement.
+        throw new Error('Query was cancelled');
+      }
+
+      return new Promise<R>((resolve, reject) => {
+        stmt = connection.execute({
+          ...options,
+          complete: (err, statement, rows) => {
+            settled = true;
+
+            if (cancelled) {
+              // Snowflake reports its own `SQL execution canceled.` here.
+              // Normalize it so callers see one consistent message, and so a
+              // query that happened to succeed microseconds before the abort
+              // landed does not return a result nobody is waiting for anymore.
+              reject(new Error('Query was cancelled'));
+              return;
+            }
+
+            if (err) {
+              reject(err);
+              return;
+            }
+
+            resolve(onComplete(<RowStatement>statement, rows));
+          },
+        });
+      });
+    })();
+
+    promise.cancel = async () => {
+      if (cancelled || settled) {
+        return;
+      }
+
+      cancelled = true;
+
+      if (stmt) {
+        await this.cancelStatement(stmt);
+      }
+    };
+
+    return promise;
+  }
+
+  protected execute<R = unknown>(
+    connection: Connection | Promise<Connection>,
     query: string,
     values?: unknown[],
     rehydrate: boolean = true
-  ): Promise<R> {
-    return new Promise((resolve, reject) => connection.execute({
-      sqlText: query,
-      binds: <string[] | undefined>values,
-      fetchAsString: [
-        // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
-        'Number',
-        // VARIANT, OBJECT, ARRAY are mapped to JSON type in Snowflake SDK
-        'JSON'
-      ],
-      complete: (err, stmt, rows) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
+  ): CancelablePromise<R> {
+    return this.executeCancelable<R>(
+      Promise.resolve(connection),
+      {
+        sqlText: query,
+        binds: <string[] | undefined>values,
+        fetchAsString: FETCH_AS_STRING,
+      },
+      (stmt, rows) => {
         if (rehydrate && rows?.length) {
           const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
           if (Object.keys(hydrationMap).length) {
@@ -997,9 +1075,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           }
         }
 
-        resolve(<any>rows);
-      }
-    }));
+        return <any>rows;
+      },
+    );
   }
 
   public informationSchemaQuery() {
