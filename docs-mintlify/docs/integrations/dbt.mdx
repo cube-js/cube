@@ -207,9 +207,16 @@ add `unique` and `not_null` tests to it.
 
 A declared key is never overridden or widened by the guessing tiers — only a joined-to
 column can add to it. If a cube that participates in a join ends up with no key at all,
-the pull still writes the file, but the data model won't compile: Cube reports `primary
-key for '<cube>' is required when join is defined`. The generated `.yml` is the place to
-check what the pull decided — every key it detected is a dimension with `primary_key: true`.
+the pull still writes the file, and what happens next depends on the cube's measures:
+
+- **With aggregatable measures** — including the `count` that **Add default measures**
+  adds to every cube — the data model fails to compile with `primary key for '<cube>' is
+  required when join is defined in order to make aggregates work properly`.
+- **Without them**, there's no error: the join is dropped, and the two cubes are simply
+  not queryable together.
+
+Either way, the generated `.yml` is where to check what the pull decided — every key it
+detected is a dimension with `primary_key: true`.
 
 ### Infer column types from dbt catalog
 
