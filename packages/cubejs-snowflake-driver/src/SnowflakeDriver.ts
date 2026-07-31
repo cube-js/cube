@@ -57,7 +57,7 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
 };
 
 // User can create own stage to pass permission restrictions.
-interface SnowflakeDriverExportAWS {
+export interface SnowflakeDriverExportAWS {
   bucketType: 's3',
   bucketName: string,
   keyId?: string,
@@ -66,14 +66,14 @@ interface SnowflakeDriverExportAWS {
   integrationName?: string,
 }
 
-interface SnowflakeDriverExportGCS {
+export interface SnowflakeDriverExportGCS {
   bucketType: 'gcs',
   integrationName: string,
   bucketName: string,
   credentials: any,
 }
 
-interface SnowflakeDriverExportAzure {
+export interface SnowflakeDriverExportAzure {
   bucketType: 'azure',
   bucketName: string,
   azureKey?: string,
