@@ -883,9 +883,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
 
       const sourceStream = stmt.streamRows();
-      const rowStream: Readable = Object.keys(hydrationMap).length
-        ? sourceStream.pipe(new HydrationStream(hydrationMap))
-        : sourceStream;
+      const rowStream = this.buildRowStream(sourceStream, hydrationMap);
 
       return {
         rowStream,
@@ -912,6 +910,22 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     promise.cancel = abort;
 
     return promise;
+  }
+
+  protected buildRowStream(source: Readable, hydrationMap: HydrationMap): Readable {
+    if (!Object.keys(hydrationMap).length) {
+      return source;
+    }
+
+    const rowStream = new HydrationStream(hydrationMap);
+
+    // Attached before pipe() resumes the source, so no failure can land before
+    // anyone is listening. destroy() on an already destroyed stream is a no-op,
+    // which is what keeps a failure arriving after release() silent instead of
+    // surfacing on a stream the consumer has already finished with.
+    source.on('error', (err) => rowStream.destroy(err));
+
+    return source.pipe(rowStream);
   }
 
   private getTypes(stmt: RowStatement) {
