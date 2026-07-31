@@ -407,6 +407,64 @@ ORDER BY 1;
 | 9m            |                2610 |                810 |
 | 12m           |                3300 |               1440 |
 
+## Pre-aggregations
+
+Add a [`rollup`][ref-rollup] over the per-window measures to accelerate these
+queries. `growth_window` is a [`switch` dimension][ref-switch], so it does not
+have to be included: [pre-aggregation matching][ref-matching-switch-dimensions]
+applies the selected value over the rollup scan. Leaving it out also keeps the
+rollup small — including it would multiply the rows by every window in the set.
+
+Include the per-window measures rather than the four `case` measures: the `case`
+measures are [multi-stage][ref-multi-stage] and dispatch to the per-window ones,
+which is what actually gets aggregated.
+
+<CodeGroup>
+
+```yaml title="YAML"
+{%- set windows = [3, 6, 9, 12] -%}
+
+cubes:
+  - name: gross_sales
+    # ...
+
+    pre_aggregations:
+      - name: rolling
+        measures:
+          - gross_sales
+          {%- for months in windows %}
+          - r{{ months }}_gross_sales
+          {%- endfor %}
+        time_dimension: month
+        granularity: month
+```
+
+```javascript title="JavaScript"
+const windows = [3, 6, 9, 12];
+
+cube(`gross_sales`, {
+  // ...
+
+  pre_aggregations: {
+    rolling: {
+      measures: [
+        `gross_sales`,
+        ...windows.map(months => `r${months}_gross_sales`)
+      ],
+      time_dimension: month,
+      granularity: `month`
+    }
+  }
+});
+```
+
+</CodeGroup>
+
+Query the view exactly as above; provide the date range through
+[`timeDimensions`][ref-time-dimensions-format] (a `WHERE` clause on the time
+dimension in the SQL API) rather than an [`inDateRange` filter][ref-in-date-range],
+which prevents matching.
+
 ## Related recipes
 
 - If you need a single fixed window rather than a consumer-selectable one, see
@@ -423,6 +481,11 @@ ORDER BY 1;
 
 [ref-switch]: /reference/data-modeling/dimensions#type
 [ref-case]: /reference/data-modeling/measures#case
+[ref-rollup]: /reference/data-modeling/pre-aggregations#rollup
+[ref-multi-stage]: /reference/data-modeling/measures#multi_stage
+[ref-matching-switch-dimensions]: /docs/pre-aggregations/matching-pre-aggregations#matching-switch-dimensions
+[ref-time-dimensions-format]: /reference/core-data-apis/rest-api/query-format#time-dimensions-format
+[ref-in-date-range]: /reference/core-data-apis/rest-api/query-format#indaterange
 [ref-rolling-window]: /reference/data-modeling/measures#rolling_window
 [ref-time-shift]: /reference/data-modeling/measures#time_shift
 [ref-view]: /reference/data-modeling/view

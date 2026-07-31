@@ -52,7 +52,8 @@ measures defined as `{sum} / {count}`), then referenced leaf measures will be
 checked for additivity.
 - **Does every member of the query exist in the pre-aggregation?** Cube checks
 that the pre-aggregation contains all dimensions, filter dimensions, and leaf
-measures from the query.
+measures from the query. [`switch` dimensions](#matching-switch-dimensions) are
+an exception: they don't have to be included in the pre-aggregation.
 - **Are any query measures multiplied in the cube's data model?** Cube checks
 if any measures are multiplied via a [`one_to_many`
 relationship][ref-schema-joins-rel] between cubes in the query.
@@ -60,8 +61,6 @@ relationship][ref-schema-joins-rel] between cubes in the query.
 that the time dimension granularity is set in the query.
 - **Are query filter dimensions included in its own dimensions?** Cube checks
 that all filter dimensions are also included as dimensions in the query.
-- **Does every member in the query exist in the pre-aggregation?** Cube checks
-that the pre-aggregation contains all dimensions and measures used in the query.
 
 ### Matching time dimensions
 
@@ -102,6 +101,89 @@ queries][ref-ungrouped-queries]:
 cubes involved in the query.
 - If multiple cubes are referenced in the query, the pre-aggregation should
 include only members of these cubes.
+
+### Matching switch dimensions
+
+A [`switch` dimension][ref-switch] holds a predefined set of values rather than
+data from the upstream data source, and [`case` measures][ref-case] dispatch on
+the selected value. Because its values are known from the data model, a
+pre-aggregation **does not need to include a `switch` dimension** to match a
+query that uses one: the selected value is applied over the pre-aggregation scan.
+
+Leaving the `switch` dimension out keeps the pre-aggregation small — including
+it multiplies the rows by every value in the set:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: sales
+    # ...
+
+    pre_aggregations:
+      - name: rolling
+        measures:
+          - total
+          - r3_amount
+          - ytd_amount
+        dimensions:
+          - account
+          - product
+        time_dimension: date
+        granularity: month
+```
+
+```javascript title="JavaScript"
+cube(`sales`, {
+  // ...
+
+  pre_aggregations: {
+    rolling: {
+      measures: [total, r3_amount, ytd_amount],
+      dimensions: [account, product],
+      time_dimension: date,
+      granularity: `month`
+    }
+  }
+});
+```
+
+</CodeGroup>
+
+Pre-aggregations that *do* include the `switch` dimension keep matching as well,
+so existing definitions are unaffected.
+
+<Warning>
+
+`switch` dimensions and `case` measures are powered by Tesseract, the
+[next-generation data modeling engine][link-tesseract]. In versions before
+v1.7.0, it was not enabled by default.
+
+</Warning>
+
+Two modeling considerations apply when `case` measures span multiple cubes:
+
+- **Define the `switch` dimension on a single shared cube joined into every fact
+cube**, rather than defining a separate one on each cube. All `case` measures
+then dispatch on the same dimension, so one filter resolves every measure. With
+a `switch` dimension per cube, a single filter pins only one of them; the others
+fall back to their full set of values, and each value emits its own row — so the
+query returns extra rows. Pre-aggregations match either way, so they accelerate
+that result rather than preventing it.
+- **Key every pre-aggregation on the time dimension the query groups by.** If a
+query joins two cubes and one pre-aggregation is keyed on its own cube's time
+dimension while the query groups by the other's, that pre-aggregation can't
+serve the query — and since matching is all-or-nothing across the query, the
+other pre-aggregation is dropped too and the query runs against the upstream
+data source. Results stay correct; only the acceleration is lost.
+
+<Note>
+
+Provide the date range via [`timeDimensions`][ref-time-dimensions-format]
+rather than an [`inDateRange` filter][ref-in-date-range]. A date range expressed
+as a filter prevents matching, even when `timeDimensions` is also present.
+
+</Note>
 
 ## Matching multi-fact and multi-stage queries
 
@@ -159,4 +241,8 @@ configuration option.
 [ref-views]: /docs/data-modeling/views
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
 [ref-multi-stage]: /docs/data-modeling/measures#multi_stage
+[ref-switch]: /reference/data-modeling/dimensions#type
+[ref-case]: /reference/data-modeling/measures#case
+[ref-time-dimensions-format]: /reference/core-data-apis/rest-api/query-format#time-dimensions-format
+[ref-in-date-range]: /reference/core-data-apis/rest-api/query-format#indaterange
 [link-tesseract]: https://cube.dev/blog/introducing-tesseract
