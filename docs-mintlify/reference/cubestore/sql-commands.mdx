@@ -144,6 +144,10 @@ query processing:
 +-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
 ```
 
+System-table selects don't produce a distributable plan, so neither `EXPLAIN
+ANALYZE` nor `EXPLAIN ANALYZE DETAILED` accepts one. Plain `EXPLAIN` is the only
+one of the three that works on `information_schema.tables`.
+
 ### `EXPLAIN ANALYZE DETAILED`
 
 Synopsis:
