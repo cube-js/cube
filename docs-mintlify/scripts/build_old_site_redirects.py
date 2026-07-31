@@ -248,15 +248,22 @@ def resolve_destination(old_dest: str, page_map: dict) -> str:
 
 
 def build_redirects(old_redirects: list, page_map: dict) -> list:
-    out, seen = [], set()
+    out, seen = [], {}
 
     def add(source: str, dest: str):
         # Next strips a trailing slash before matching redirects, so a slash-terminated
         # source can never fire — the normalized path matches no rule and 404s.
         source = source.rstrip("/") or "/"
         if source in seen:
+            # First writer wins: a legacy alias deliberately outranks the canonical
+            # page_map entry for the same path. Only report the cases that actually
+            # lose a distinct destination, so a dropped redirect is visible rather
+            # than silent. Not fatal — the precedence itself is intended.
+            if seen[source] != dest:
+                print(f"  note: {source} already redirects to {seen[source]}, "
+                      f"dropping {dest}", file=sys.stderr)
             return
-        seen.add(source)
+        seen[source] = dest
         out.append({"source": source, "destination": dest, "permanent": True})
 
     # 1. Legacy aliases from the old redirects.json.
