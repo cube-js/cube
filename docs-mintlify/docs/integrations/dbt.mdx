@@ -405,9 +405,10 @@ For each dbt model in your project:
   `database.schema.model` (empty parts are dropped, so e.g. Postgres and Athena
   yield `schema.model`). On Databricks, the first segment is the catalog: the
   value of the deployment's `CUBEJS_DB_DATABRICKS_CATALOG` environment variable,
-  or `hive_metastore` if it isn't set. On ClickHouse, whose namespace is two-level,
-  cubes always point at `schema.model` — the **dbt models schema** you configure
-  *is* the ClickHouse database, and `CUBEJS_DB_NAME` isn't used.
+  or `hive_metastore` if it isn't set. On ClickHouse, cubes also yield
+  `schema.model`: the **dbt models schema** you configure *is* the ClickHouse
+  database, so `CUBEJS_DB_NAME` doesn't affect the generated `sql_table` (it still
+  sets the connection's default database).
 - **Each column becomes a dimension.** The dimension type is inferred from the
   column's `data_type` where available, then — if
   [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) is
