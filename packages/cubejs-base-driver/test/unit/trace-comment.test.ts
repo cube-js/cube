@@ -25,9 +25,10 @@ describe('sanitizeTraceId', () => {
     expect(sanitizeTraceId('трейс-id')).toBe('-id');
   });
 
-  test('strips a leading plus, which reads as an optimizer hint on Hive and Spark', () => {
+  test('strips every plus, which reads as an optimizer hint on Hive and Spark', () => {
     expect(sanitizeTraceId('+MAPJOIN(a)')).toBe('MAPJOINa');
     expect(sanitizeTraceId('++abc')).toBe('abc');
+    expect(sanitizeTraceId('abc+def')).toBe('abcdef');
   });
 
   test('returns empty for ids with nothing usable left', () => {
