@@ -927,7 +927,7 @@ a dimension. A dimension can only have one type.
 | `string` | Text fields containing letters or special characters. |
 | `number` | Numeric or integer fields. |
 | `boolean` | Boolean fields or data coercible to boolean. |
-| `switch` | Predefined set of allowed values (enum-like), listed in the `values` sub-parameter instead of `sql`. Useful for [`case` measures][ref-case-measures]. [Pre-aggregations][ref-matching-switch-dimensions] don't need to include it. Tesseract only. |
+| `switch` | Predefined set of allowed values (enum-like). Requires a `values` sub-parameter and doesn't accept `sql`. Useful for [`case` measures][ref-case-measures]. [Pre-aggregations][ref-matching-switch-dimensions] don't need to include it. Tesseract only. |
 | `geo` | Geographic coordinates. Requires `latitude` and `longitude` sub-parameters instead of `sql`. |
 
 <Warning>
@@ -961,7 +961,7 @@ cubes:
         sql: is_enabled
         type: boolean
 
-      - name: rolling_window
+      - name: growth_window
         type: switch
         values:
           - 3m
@@ -1001,7 +1001,7 @@ cube(`orders`, {
       type: `boolean`
     },
 
-    rolling_window: {
+    growth_window: {
       type: `switch`,
       values: [`3m`, `6m`, `12m`]
     },

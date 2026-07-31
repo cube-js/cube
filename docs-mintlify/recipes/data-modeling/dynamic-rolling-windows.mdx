@@ -460,10 +460,11 @@ cube(`gross_sales`, {
 
 </CodeGroup>
 
-Query the view exactly as above; provide the date range through
-[`timeDimensions`][ref-time-dimensions-format] (a `WHERE` clause on the time
-dimension in the SQL API) rather than an [`inDateRange` filter][ref-in-date-range],
-which prevents matching.
+Query the view exactly as above. When querying through the REST (JSON) API,
+provide the date range via [`timeDimensions`][ref-time-dimensions-format] rather
+than an [`inDateRange` filter][ref-in-date-range] — a filter is matched as a
+generic dimension filter, which requires the time dimension to be listed in the
+rollup's `dimensions`.
 
 ## Related recipes
 
