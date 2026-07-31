@@ -11,14 +11,28 @@ The Chat API is available on [Premium and Enterprise plans](https://cube.dev/pri
 
 ## Endpoint
 
+The endpoint can be addressed either by agent or by deployment.
 
-The endpoint has the following structure:
+Addressed by agent, it talks to that specific agent:
 
 ```text
 https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state
 ```
 
-Copy the exact Chat API URL from your agent settings (**Chat API URL** field) in **Admin → Agents**.
+Copy the exact URL from your agent settings (**Chat API URL** field) in **Admin → Agents**.
+
+Addressed by deployment, it talks to the deployment's Auto agent — the agent
+used when no specific one is selected:
+
+```text
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{deploymentId}/chat/stream-chat-state
+```
+
+Copy the exact URL from the deployment's **Settings → API credentials → Chat API**
+tab, also reachable from the **Chat** entry on the deployment's **Status** page.
+
+Both forms take the same authentication, request body, and streaming response;
+only the agent they resolve to differs.
 
 
 ## Overview
@@ -246,11 +260,14 @@ The attributes passed during session generation become available as `userAttribu
 
 ```text
 https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{deploymentId}/chat/stream-chat-state
 ```
 
 <Info>
 
-Copy the complete Chat API URL from your agent settings (**Chat API URL** field) in **Admin → Agents**.
+Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
+in **Admin → Agents**, or — for the deployment's Auto agent — from
+**Settings → API credentials → Chat API**.
 
 </Info>
 
@@ -258,7 +275,8 @@ Copy the complete Chat API URL from your agent settings (**Chat API URL** field)
 
 - **`cloudRegion`** (string): The cloud region identifier (e.g., "gcp-us-central1")
 - **`accountName`** (string, required): The account identifier (e.g., "acme"). It is in your account URL, e.g. https://acme.cubecloud.dev
-- **`agentId`** (string, required): The AI agent identifier (e.g., "1"). You can find it in **Admin → Agents → Click on Agent row in the table**.
+- **`agentId`** (string, required for the agent form): The AI agent identifier (e.g., "1"). You can find it in **Admin → Agents → Click on Agent row in the table**.
+- **`deploymentId`** (string, required for the deployment form): The deployment identifier (e.g., "9"). It is in the deployment URL, e.g. https://acme.cubecloud.dev/d/9. Resolves to the deployment's Auto agent.
 
 ### Request Body
 
@@ -931,10 +949,12 @@ response.
 
 ```text
 https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/abort
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{deploymentId}/chat/abort
 ```
 
 The abort URL is derived from the Chat API URL by replacing `/stream-chat-state`
-with `/abort`.
+with `/abort` — for whichever form, agent or deployment, you used to start the
+stream.
 
 ### Authentication
 
