@@ -340,8 +340,9 @@ scans on sorted data, and if `GROUP BY` matches index ordering, merge
 sort-based algorithms are used for querying, which are usually much faster
 than hash-based `GROUP BY` in case index ordering doesn't match the query.
 
-If in doubt, always [use `EXPLAIN` and `EXPLAIN
-ANALYZE`][ref-cubestore-sql-commands] to figure out the final query plan.
+If in doubt, always
+[use `EXPLAIN` and `EXPLAIN ANALYZE`][ref-cubestore-sql-commands] to figure out
+the final query plan.
 
 #### Example
 

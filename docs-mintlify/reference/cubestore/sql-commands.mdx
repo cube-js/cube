@@ -59,8 +59,8 @@ accepts read-only statements, so the [cache and queue](#cache-and-queue) and
 are rejected before they reach Cube Store. If you need one of those, contact
 support.
 
-Avoid `DUMP` there — it isn't blocked, but it writes to the router's local disk
-and nothing cleans it up.
+Avoid `DUMP` there. It wraps a `SELECT`, so it reads as a query and gets through,
+but it writes to the router's local disk and nothing cleans it up.
 
 </Note>
 
