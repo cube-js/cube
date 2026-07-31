@@ -3,6 +3,10 @@ import { streamToArray } from '@cubejs-backend/shared';
 
 import { SnowflakeDriver } from '../src';
 
+const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(120)';
+
+const pause = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
 const QUERY_TO_TEST_HYDRATION = `
   SELECT
     CAST(1265.88 AS NUMBER(10,2))                  AS "n",
@@ -55,6 +59,138 @@ describe('SnowflakeDriver', () => {
       } finally {
         await tableData.release?.();
       }
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('query() exposes cancel synchronously', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      // QueryCache reads `resultPromise.cancel` on the very next line after
+      // calling the driver, so it must be there without awaiting anything.
+      // Declaring the method `async` would silently drop it.
+      const promise = driver.query(LONG_RUNNING_QUERY, []);
+      expect(typeof promise.cancel).toBe('function');
+
+      await promise.cancel();
+      await expect(promise).rejects.toThrow(/cancelled/i);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('query() cancel aborts a running statement', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const promise = driver.query(LONG_RUNNING_QUERY, []);
+      // Let the statement actually reach Snowflake before aborting it.
+      await pause(5000);
+
+      const startedAt = Date.now();
+      await promise.cancel();
+      await expect(promise).rejects.toThrow(/cancelled/i);
+
+      // The query would otherwise hold the warehouse for 120s.
+      expect(Date.now() - startedAt).toBeLessThan(30 * 1000);
+
+      // Cancelling one statement must not poison the shared connection.
+      expect(await driver.query('SELECT 1 AS "one"', [])).toHaveLength(1);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('query() cancel before the connection is established', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      // No await in between: the driver is still connecting, so no statement
+      // exists yet and there is nothing to abort - it must simply never issue one.
+      const promise = driver.query(LONG_RUNNING_QUERY, []);
+      await promise.cancel();
+
+      await expect(promise).rejects.toThrow(/cancelled/i);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('stream() cancel aborts a running statement', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const promise = driver.stream(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
+      expect(typeof promise.cancel).toBe('function');
+
+      await pause(5000);
+      await promise.cancel();
+
+      await expect(promise).rejects.toThrow(/cancelled/i);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const promise = driver.downloadQueryResults(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
+      expect(typeof promise.cancel).toBe('function');
+
+      await pause(5000);
+      await promise.cancel();
+
+      await expect(promise).rejects.toThrow(/cancelled/i);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const promise = driver.downloadQueryResults(
+        LONG_RUNNING_QUERY,
+        [],
+        { highWaterMark: 100, streamImport: true },
+      );
+      expect(typeof promise.cancel).toBe('function');
+
+      await pause(5000);
+      await promise.cancel();
+
+      await expect(promise).rejects.toThrow(/cancelled/i);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('downloadQueryResults() returns memory data when not streaming', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const tableData = <any> await driver.downloadQueryResults(
+        QUERY_TO_TEST_HYDRATION,
+        [],
+        { highWaterMark: 100 },
+      );
+      assertHydrationResults(tableData.rows);
+    } finally {
+      await driver.release();
+    }
+  }, 2 * 60 * 1000);
+
+  test('stream() release() after normal completion does not abort', async () => {
+    const driver = new SnowflakeDriver({});
+    try {
+      const tableData = await driver.stream(QUERY_TO_TEST_HYDRATION, [], { highWaterMark: 100 });
+      const rows = await streamToArray(tableData.rowStream as any);
+      assertHydrationResults(rows as any[]);
+
+      // release() also fires on the normal-completion path (QueryCache calls it
+      // from rowStream 'end'), so it must be a no-op rather than a stray abort.
+      await tableData.release?.();
+      await tableData.release?.();
+
+      expect(await driver.query('SELECT 1 AS "one"', [])).toHaveLength(1);
     } finally {
       await driver.release();
     }
