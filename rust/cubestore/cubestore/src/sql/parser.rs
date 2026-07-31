@@ -508,7 +508,7 @@ impl<'a> CubeStoreParser<'a> {
             "clear" => CacheCommand::Clear {},
             other => {
                 return Err(ParserError::ParserError(format!(
-                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|CLEAR",
+                    "Unknown cache command: {}, available: SET|GET|KEYS|INCR|REMOVE|CLEAR",
                     other
                 )))
             }
