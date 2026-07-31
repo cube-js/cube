@@ -7,13 +7,109 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.js against the platform client CHANGELOG.md. */}
 
+<Update label="2026-07-30" description="v0.3.0" tags={["Added","Changed","Removed"]}>
+  > Supersedes `0.2.1`, which never reached npm because its publish job failed.
+  > Upgrading from `0.2.0` picks up both releases, so the `0.2.1` entries are
+  > repeated below under _Also included from the unpublished 0.2.1_.
+
+  ### Added
+
+  #### Build API — a new `/build/api/v1` surface
+
+  - `POST /build/api/v1/deployments/` (`DeploymentsBuildPublicController.createDeployment`) — creates a deployment. New schemas: `CreateDeploymentInput`, `CreateDeploymentInputCloudProvider` (`cubecloud` | `aws` | `gcp`), `CreateDeploymentInputCreationMethod` (`upload` | `cubecloud` | `github` | `ssh`), `CreateDeploymentInputDeployMode` (`git` | `cli`), `CspsConfigInput`.
+  - Data-model file authoring: `GET` / `PUT` / `DELETE /build/api/v1/deployments/{deploymentId}/data-model/files` (`DataModelPublicController.listFiles` / `updateFiles` / `removeFiles`) and `POST .../data-model/files/rename` (`renameFiles`). Writes are restricted to dev-mode branches. New schemas: `DataModelFileContent`, `DataModelFilePath`, `DataModelFileRename`, `UpdateDataModelFilesInput`, `RemoveDataModelFilesInput`, `RenameDataModelFilesInput`, `DataModelWriteResponse`.
+  - Chunked data-model uploads: `POST .../data-model/upload/start`, `POST .../data-model/upload/file`, `POST .../data-model/upload/finish`, and `GET .../data-model/file-hashes` (`UploadsPublicController.*`). New schemas: `StartUploadResponse`, `UploadFileBody`, `FinishUploadBody`, `FinishUploadResponse`, `UploadTransaction`, `FileHash`, `SourceTreeResponse`.
+  - Dev mode and branch operations: `POST` / `DELETE .../dev-mode` (`startDevMode` / `stopDevMode`), `GET` / `POST .../branches` (`listBranches` / `createBranch`), `POST .../commit`, `POST .../pull`, `POST .../merge`, `POST .../merge-to-default`. The dev-mode endpoints return the real dev branch. New schemas: `StartDevModeRequest`, `DevBranchResponse`, `BranchResponse`, `BranchesListResponse`, `CommitChangesRequest`, `PullRequest`, `PullResponse`, `MergeIntoParentBranchRequest`, `MergeToDefaultBranchRequest`, `MergeResponse`.
+  - `POST /build/api/v1/deployments/{deploymentId}/github/connect` (`GitHubDeploymentPublicController.connect`) — connects a deployment to a GitHub repository. New schema: `ConnectGitHubRequest`.
+
+  #### Deployment management
+
+  - `PUT /api/v1/deployments/{deploymentId}` (`DeploymentsPublicController.updateDeployment`) and `DELETE /api/v1/deployments/{deploymentId}` (`deleteDeployment`). New schemas: `UpdateDeploymentInput`, `UpdateDeploymentInputCreationMethod`, `UpdateDeploymentInputDeployMode`, `DeploymentDeleteResponse`.
+  - `GET /api/v1/deployments/{deploymentId}/build-status` (`buildStatus`) — current build/deploy state for a branch. New schema: `BuildStatusResponse`.
+  - `GET /api/v1/deployments/{deploymentId}/logs` (`logs`) — container logs, filterable by source and container. New schemas: `DeploymentLogsResponse`, `DeploymentLogLine`, `DeploymentLogsQuerySource` (`production` | `dev`), `DeploymentLogsQueryContainer` (`INIT` | `MAIN` | `cubejs-server` | `vector` | `api-proxy`).
+  - `GET /api/v1/deployments/{deploymentId}/pods` (`pods`). New schemas: `DeploymentPodsResponse`, `DeploymentPod`.
+  - `GET` / `PUT /api/v1/deployments/{deploymentId}/env-vars` (`EnvVariablesPublicController.getEnvVariables` / `setEnvVariables`). New schemas: `EnvVariablesListResponse`, `EnvVariableItem`, `SetEnvVariablesInput`.
+  - `POST /api/v1/deployments/{deploymentId}/creation-step/advance` and `.../creation-step/reset` (`advanceCreationStep` / `resetCreationStep`) for driving the deployment setup wizard. New schema: `AdvanceCreationStepInput`.
+  - `GET /api/v1/regions/` (`RegionsPublicController.listRegions`) — regions available to the tenant. New schemas: `RegionsListResponse`, `RegionResponse`.
+
+  #### Users, attributes and tenant settings
+
+  - Console user administration: `POST` / `PUT` / `DELETE /api/v1/users/{id}` and `POST /api/v1/users/` (`UsersAdminPublicController.createUser` / `updateUser` / `deleteUser`). New schemas: `UserCreateInput`, `UserUpdateInput`.
+  - `POST /api/v1/users/bulk` (`bulkUserAction`) — activate, deactivate or delete many users in one call, with per-user failure reporting. New schemas: `BulkUserActionInput`, `BulkUserActionInputAction` (`DEACTIVATE` | `ACTIVATE` | `DELETE`), `BulkUserActionPayload`, `BulkUserActionResponseAction`, `BulkUserActionFailure`.
+  - Tenant-level user attributes: `GET` / `POST /api/v1/user-attributes/` and `PUT /api/v1/user-attributes/{id}` (`UserAttributesPublicController.*`). New schemas: `UserAttribute`, `UserAttributesListResponse`, `UserAttributeCreateInput`, `UserAttributeUpdateInput`, `UserAttributeType` / `UserAttributeCreateInputType` / `GetUserAttributesQueryType` (`string` | `number` | `boolean` | `string_array` | `number_array`).
+  - Per-user attribute values: `GET /api/v1/user-attribute-values/{userId}` and `POST /api/v1/user-attribute-values/` (`UserAttributeValuesPublicController.getUserAttributeValues` / `upsertUserAttributeValue`). New schemas: `UserAttributeValue`, `UserAttributeValueType`, `UserAttributeValueCreateInput`.
+  - `GET` / `PUT /api/v1/tenant/settings` (`TenantSettingsPublicController.getTenantSettings` / `updateTenantSettings`) — audit log, maintenance window, support access, OIDC and AI/BI interface toggles. New schemas: `TenantSettings`, `TenantSettingsInput`.
+
+  #### OAuth, OIDC and GitHub integrations
+
+  - OAuth integration management: `GET` / `POST /api/v1/oauth-integrations/` and `GET` / `PUT` / `DELETE /api/v1/oauth-integrations/{id}` (`OAuthIntegrationsPublicController.*`). New schemas: `OAuthIntegration`, `CreateOAuthIntegrationInput`, `UpdateOAuthIntegrationInput`.
+  - Per-user OAuth tokens: `GET /api/v1/user-oauth-tokens/`, `GET` / `DELETE /api/v1/user-oauth-tokens/{integrationId}`, and `POST /api/v1/user-oauth-tokens/{integrationId}/initiate` (`UserOAuthTokensPublicController.*`). New schema: `UserOAuthToken`.
+  - OIDC token configuration: `GET` / `POST /api/v1/oidc-token-configs/` and `GET` / `PUT` / `DELETE /api/v1/oidc-token-configs/{id}` (`OidcTokenConfigsPublicController.*`). New schemas: `OidcTokenConfig`, `CreateOidcTokenConfigInput`, `UpdateOidcTokenConfigInput`.
+  - GitHub app discovery: `GET /api/v1/github/status`, `GET /api/v1/github/installations`, `GET /api/v1/github/installations/{installationId}/repositories`, and `GET /api/v1/github/repositories/{owner}/{repo}/branches` (`GitHubPublicController.*`). New schemas: `GitHubConnectStatusResponse`, `GitHubInstallationsListResponse`, `GitHubInstallationResponse`, `GitHubReposListResponse`, `GitHubRepoResponse`, `GitHubBranchesListResponse`, `GitHubBranchResponse`.
+
+  #### Embed tenants, groups and dashboard embedding
+
+  - `GET /api/v1/embed-tenants/` (`EmbedTenantAdminPublicController.listEmbedTenants`) and `GET /api/v1/embed-tenants/{embedTenantName}/users` (`listEmbedUsers`). New schemas: `EmbedTenantsPublicResponse`, `EmbedTenant`, `EmbedUsersPublicResponse`, `EmbedUser`.
+  - Embed group management: `POST /api/v1/embed-tenants/{embedTenantName}/groups` (`createGroup`), `GET` / `PATCH /api/v1/embed-tenants/{embedTenantName}/groups/{id}` (`getGroup` / `updateGroup`), and membership via `GET` / `POST` / `DELETE .../groups/{id}/users` (`getGroupMembers` / `addGroupMembers` / `removeGroupMembers`). New schemas: `CreateEmbedGroupInput`, `UpdateEmbedGroupInput`, `EmbedGroupMemberInput`, `EmbedGroupMembersInput`, `EmbedGroupMembersMutationResponse`.
+  - `GET` / `PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access` (`DashboardEmbedAccessPublicController.getEmbedAccess` / `updateEmbedAccess`) — grant or revoke dashboard access per embed tenant, or for all embed users. New schemas: `EmbedAccessResponse`, `EmbedAccessTenantEntry`, `EmbedAccessAllEmbedUsers`, `UpdateEmbedAccessInput`, and the `read` | `none` action enums `EmbedAccessTenantEntryAction`, `EmbedAccessAllEmbedUsersAction`, `UpdateEmbedAccessInputAction`.
+  - `PATCH /api/v1/embed/dashboard/{publicId}` (`EmbedPublicController.updateDashboardEmbedding`) — enable or disable signed embedding for a dashboard. New schemas: `UpdateDashboardEmbeddingInput`, `DashboardEmbeddingResponse`.
+  - `POST /api/v1/embed/dashboard/{publicId}/python-run` (`EmbedPublicController.postDashboardPythonRun`) — runs a Python report on an embed surface with dashboard filters applied. New schemas: `EmbedPythonFilteredRunInput`, `PythonAnalysisFilteredRun`.
+  - The embed session request (`GenerateSession`) accepts a `settings` object. New schema: `EmbedSessionSettings` (`showDashboardChat`).
+
+  #### Workspace, workbooks and reports
+
+  - `POST /api/v1/deployments/{deploymentId}/workspace/bulk-delete` and `.../workspace/bulk-move` (`WorkspacePublicController.bulkDeleteWorkspaceObjects` / `bulkMoveWorkspaceObjects`) — delete or move folders, workbooks and reports in one call, with per-item failure reporting. New schemas: `BulkDeleteWorkspaceObjectsInput`, `BulkDeleteWorkspaceObjectsPayload`, `BulkMoveWorkspaceObjectsInput`, `BulkMoveWorkspaceObjectsResponse`, `WorkspaceItemRef`, `WorkspaceItemRefInput`, `WorkspaceBulkFailure`, `BulkActionError`, and the `FOLDER` | `WORKBOOK` | `REPORT` enums `WorkspaceItemRefType`, `WorkspaceItemRefInputType`, `WorkspaceBulkFailureType`.
+  - `PUT /api/v1/deployments/{deploymentId}/workbooks/by-slug/{slug}` (`WorkbooksPublicController.upsertWorkbookBySlug`) and `PUT /api/v1/deployments/{deploymentId}/reports/by-public-id/{publicId}` (`ReportsPublicController.upsertReportByPublicId`) — create-or-update by stable external identifier.
+  - `Folder`, `Workbook` and `Report` responses now include `folderPath`, the ancestor chain of the containing folder. New schema: `WorkspaceFolderPathEntry`.
+  - `ReportSnapshot` now includes `periodComparisons` for period-over-period measures. New schemas: `PeriodComparison` (`measure`, `timeDimension`, `offset`, `outputs`), `PeriodComparisonOffset` (`amount`, `unit`).
+  - `UpdateReportInput` now accepts `publicId`.
+  - `PublishDashboardInput` now accepts `allowEmbed`.
+
+  #### Dashboard apps
+
+  - `DashboardConfig` and `DashboardConfigInput` now carry `kind` and `app`, so a dashboard can be an app of authored files rather than a widget document. New schemas: `DashboardAppSource`, `DashboardAppSourceInput`, `DashboardAppManifest`, `DashboardAppManifestInput`, and the `CLASSIC` | `APP` enums `DashboardConfigKind`, `DashboardConfigInputKind`.
+
+  #### App configuration
+
+  - `AppConfigResponse` now includes `sheetsUi`. New schema: `SheetsUiSettings` (`showAppliedFilters`).
+  - `EmbedSettings` now includes `showDashboardChat`.
+  - `AIEngineerSettings` now includes `agentsConfigCredentials`.
+
+  #### Also included from the unpublished 0.2.1
+
+  - `POST /api/v1/deployments/{deploymentId}/dbt-sync` operation (`DbtSyncPublicController.startDbtSync`) — starts a dbt sync for a deployment, optionally on a specific branch. New schemas: `StartDbtSyncInput` (`branchName`), `DbtSyncResponse` (`branchName`, `syncJobId`, `workflowId`).
+  - `PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` operation (`ReportsPublicController.connectReportToWorkbook`) — links a report to the caller's own spreadsheet by recording its placement, and returns the updated `Report`. Requires only read access to the report. New schema: `ConnectReportToWorkbookInput` (`externalWorkbookId`, `resultLocation`, `endResultCell`).
+  - New `SecretsManage` and `DownloadData` RBAC actions, available across all policy action enums (`RoleWithAccess.actions`, the inherited/resource user & group policy actions, and the update-policy request bodies).
+  - `AIEngineerSettings` now includes `chatThreadPolicies`. New schemas: `ChatThreadPolicy` (`actions`, `effect`, `resourceType`, `resources`), `ChatThreadPolicyEffect` (`allow` | `deny`), `ChatThreadPolicyResourceType`.
+  - `GET /api/v1/deployments/{deploymentId}/reports` accepts a new `search` query filter.
+  - `Report` now includes `canEdit`, `canManage`, and `externalWorkbookPlacements` — a report can be placed in multiple spreadsheets. New schema: `ReportPlacement` (`workbookId`, `resultLocation`, `endResultCell`).
+  - `ReportSnapshot` now includes `fillMissingRows`. New schema: `FillMissingRows` (`member`, `excludedDimensions`).
+  - `CreatorMode` now includes `showGeneratedSql` and `showSemanticSql` toggles.
+  - `Dashboard` now includes `restrictDataDownload` and `useBoardDashboards`.
+  - `UpdatePublishedAiWidgetThreadInput` accepts an optional `checksum`.
+
+  ### Changed
+
+  - **BREAKING:** the `deleteEmbedTenant` operation moved from `DELETE /api/v1/embed-tenants/{embedTenantName}/` to `DELETE /api/v1/embed-tenants/{embedTenantName}` — the trailing slash is gone, so the typed path key changed.
+  - `deleteEmbedTenant` and `deleteGroup` now document their `204` responses, and the embed-tenant path parameters carry descriptions.
+  - `DashboardConfigInput.widgets` is now optional. (from the unpublished `0.2.1`)
+
+  ### Removed
+
+  - **BREAKING:** removed the `GET /api/v1/ai-engineer/active-region` operation (`AIEngineerPublicController.getMyActiveAgentRegion`) and the `ActiveAgentRegion` schema. Use `GET /api/v1/regions/` to discover regions.
+</Update>
+
 <Update label="2026-07-20" description="v0.2.1" tags={["Added","Changed"]}>
+  > **Never published to npm.** The publish job for this version failed, so `0.2.1`
+  > does not exist on the registry. Everything below shipped in `0.3.0`, which
+  > repeats these entries in its own section.
+
   ### Added
 
   - `POST /api/v1/deployments/{deploymentId}/dbt-sync` operation (`DbtSyncPublicController.startDbtSync`) — starts a dbt sync for a deployment, optionally on a specific branch. New schemas: `StartDbtSyncInput` (`branchName`), `DbtSyncResponse` (`branchName`, `syncJobId`, `workflowId`).
   - `PUT /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` operation (`ReportsPublicController.connectReportToWorkbook`) — links a report to the caller's own spreadsheet by recording its placement, and returns the updated `Report`. Requires only read access to the report. New schema: `ConnectReportToWorkbookInput` (`externalWorkbookId`, `resultLocation`, `endResultCell`).
   - New `SecretsManage` and `DownloadData` RBAC actions, available across all policy action enums (`RoleWithAccess.actions`, the inherited/resource user & group policy actions, and the update-policy request bodies).
-  - `AIEngineerSettings` now includes `chatThreadPolicies`. New schemas: `ChatThreadPolicyDTO` (`actions`, `effect`, `resourceType`, `resources`), `ChatThreadPolicyDTOEffect` (`allow` | `deny`), `ChatThreadPolicyDTOResourceType`.
+  - `AIEngineerSettings` now includes `chatThreadPolicies`. New schemas: `ChatThreadPolicy` (`actions`, `effect`, `resourceType`, `resources`), `ChatThreadPolicyEffect` (`allow` | `deny`), `ChatThreadPolicyResourceType`.
   - `GET /api/v1/deployments/{deploymentId}/reports` accepts a new `search` query filter.
   - `Report` now includes `canEdit`, `canManage`, and `externalWorkbookPlacements` — a report can be placed in multiple spreadsheets. New schema: `ReportPlacement` (`workbookId`, `resultLocation`, `endResultCell`).
   - `ReportSnapshot` now includes `fillMissingRows`. New schema: `FillMissingRows` (`member`, `excludedDimensions`).

@@ -5,10 +5,12 @@ info:
   description: |-
     Programmatically manage Cube Cloud: deployments and everything scoped to them
     (environments, folders, reports, workbooks, notifications, workspace, and agents),
-    plus account-level users, groups, policies, embedding, and AI settings.
+    plus account-level users, groups, policies, embedding, and AI settings. Data-model
+    authoring, dev mode, branches, and uploads live under /build/api/v1 — same host and
+    token, routed to the build pods.
 servers:
-  - url: https://{tenant}.cubecloud.dev/api
-    description: Cube Cloud API base URL. Replace the whole host if you use a custom domain.
+  - url: https://{tenant}.cubecloud.dev
+    description: Your tenant host. Replace the whole host if you use a custom domain.
     variables:
       tenant:
         default: your-tenant
@@ -17,27 +19,33 @@ security:
   - bearerAuth: []
 tags:
   - name: Deployments
+  - name: Deployment Creation
   - name: Environments
+  - name: Env Variables
+  - name: Regions
+  - name: Data Model
+  - name: Data Model Uploads
+  - name: GitHub
+  - name: GitHub Connection
+  - name: dbt Sync
   - name: Folders
   - name: Reports
   - name: Workbooks
   - name: Notifications
   - name: Workspace
+  - name: Users Admin
   - name: User Attributes
+  - name: User Attribute Values
+  - name: Tenant Settings
+  - name: OAuth Integrations
+  - name: User OAuth Tokens
+  - name: OIDC Token Configs
   - name: App Theme
   - name: Embed
   - name: Embed Tenants
-  - name: Dbt Sync
-  - name: Env Variables
-  - name: OAuth Integrations
-  - name: OIDC Token Configs
-  - name: Regions
-  - name: Tenant Settings
-  - name: User Attribute Values
-  - name: User OAuth Tokens
-  - name: Users Admin
+  - name: Dashboard Embed Access
 paths:
-  /v1/app-config:
+  /api/v1/app-config:
     get:
       operationId: getAppConfig
       responses:
@@ -50,7 +58,7 @@ paths:
       summary: Get app config
       tags:
         - App Theme
-  /v1/deployments:
+  /api/v1/deployments:
     get:
       operationId: getDeployments
       parameters:
@@ -119,7 +127,7 @@ paths:
       summary: Get deployments
       tags:
         - Deployments
-  /v1/deployments/{deploymentId}:
+  /api/v1/deployments/{deploymentId}:
     delete:
       operationId: deleteDeployment
       parameters:
@@ -181,7 +189,77 @@ paths:
       summary: Update deployment
       tags:
         - Deployments
-  /v1/deployments/{deploymentId}/dbt-sync:
+  /api/v1/deployments/{deploymentId}/build-status:
+    get:
+      operationId: buildStatus
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildStatusResponse'
+          description: ''
+      summary: Latest build/compile status for a branch (production build or dev-mode)
+      tags:
+        - Deployments
+  /api/v1/deployments/{deploymentId}/creation-step/advance:
+    post:
+      operationId: advanceCreationStep
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdvanceCreationStepInput'
+        description: AdvanceCreationStepInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+          description: ''
+      summary: Advance a deployment to a given onboarding step (e.g. after connecting a source)
+      tags:
+        - Deployments
+  /api/v1/deployments/{deploymentId}/creation-step/reset:
+    post:
+      operationId: resetCreationStep
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+          description: ''
+      summary: Reset a deployment to the first onboarding step (project)
+      tags:
+        - Deployments
+  /api/v1/deployments/{deploymentId}/dbt-sync:
     post:
       operationId: startDbtSync
       parameters:
@@ -206,8 +284,8 @@ paths:
           description: ''
       summary: Start a dbt sync for a deployment
       tags:
-        - Dbt Sync
-  /v1/deployments/{deploymentId}/env-vars:
+        - dbt Sync
+  /api/v1/deployments/{deploymentId}/env-vars:
     get:
       operationId: getEnvVariables
       parameters:
@@ -260,7 +338,7 @@ paths:
           Upserts deployment environment variables by name; variables not included keep their
           existing values. Passing the `[ENCRYPTED]` placeholder (the masked read value) is rejected
           — omit variables you do not intend to change.
-  /v1/deployments/{deploymentId}/environments:
+  /api/v1/deployments/{deploymentId}/environments:
     get:
       operationId: getDeploymentEnvironments
       parameters:
@@ -311,7 +389,7 @@ paths:
       summary: Get deployment environments
       tags:
         - Environments
-  /v1/deployments/{deploymentId}/environments/{environmentId}/tokens:
+  /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens:
     get:
       operationId: getDeploymentEnvironmentTokens
       parameters:
@@ -385,7 +463,7 @@ paths:
       summary: Create deployment environment token
       tags:
         - Environments
-  /v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync:
+  /api/v1/deployments/{deploymentId}/environments/{environmentId}/tokens-for-meta-sync:
     post:
       operationId: createDeploymentEnvironmentTokenForMetaSync
       parameters:
@@ -416,7 +494,7 @@ paths:
       summary: Create deployment environment token for meta sync
       tags:
         - Environments
-  /v1/deployments/{deploymentId}/folders:
+  /api/v1/deployments/{deploymentId}/folders:
     get:
       operationId: getFolders
       parameters:
@@ -515,7 +593,7 @@ paths:
 
 
           Folders can be nested up to a fixed maximum depth; exceeding it returns `400`.
-  /v1/deployments/{deploymentId}/folders/{folderId}:
+  /api/v1/deployments/{deploymentId}/folders/{folderId}:
     delete:
       operationId: deleteFolder
       parameters:
@@ -594,7 +672,7 @@ paths:
 
           Requires **edit** access to the folder. Returns `404` if the folder does not exist or
           belongs to a different deployment.
-  /v1/deployments/{deploymentId}/folders/{folderId}/ancestors:
+  /api/v1/deployments/{deploymentId}/folders/{folderId}/ancestors:
     get:
       operationId: getFolderAncestors
       parameters:
@@ -632,7 +710,47 @@ paths:
 
           Requires visibility access to the target folder. Returns `404` if the folder does not
           exist or belongs to a different deployment.
-  /v1/deployments/{deploymentId}/notifications:
+  /api/v1/deployments/{deploymentId}/logs:
+    get:
+      operationId: logs
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: source
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/DeploymentLogsQuerySource'
+              - type: 'null'
+        - in: query
+          name: pod
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: container
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/DeploymentLogsQueryContainer'
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentLogsResponse'
+          description: ''
+      summary: >-
+        Recent runtime logs (tail) for a deployment. With no `source`, reads both the production API
+        / worker pods and the dev-mode worker, merged chronologically; scope with
+        `?source=production` or `?source=dev`.
+      tags:
+        - Deployments
+  /api/v1/deployments/{deploymentId}/notifications:
     get:
       operationId: getNotifications
       parameters:
@@ -807,7 +925,7 @@ paths:
           either `dashboardId` (numeric) or `dashboardPublicId` (string) — supply exactly one; it
           must belong to this deployment, otherwise `404` is returned. The created notification has
           no recipients — add them via `POST /notifications/{id}/recipients`.
-  /v1/deployments/{deploymentId}/notifications/{id}:
+  /api/v1/deployments/{deploymentId}/notifications/{id}:
     delete:
       operationId: deleteNotification
       parameters:
@@ -920,7 +1038,7 @@ paths:
           unchanged. This endpoint never modifies recipients — manage those through the
           `/recipients` sub-resource. Returns `404` if the notification is not part of this
           deployment.
-  /v1/deployments/{deploymentId}/notifications/{id}/recipients:
+  /api/v1/deployments/{deploymentId}/notifications/{id}/recipients:
     delete:
       operationId: removeRecipients
       parameters:
@@ -1071,7 +1189,26 @@ paths:
           `400` before anything is written. The operation is idempotent: the response buckets each
           recipient into `createdRecipients`, `updatedRecipients` (an existing recipient whose embed
           properties changed), or `unchangedRecipients`.
-  /v1/deployments/{deploymentId}/reports:
+  /api/v1/deployments/{deploymentId}/pods:
+    get:
+      operationId: pods
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentPodsResponse'
+          description: ''
+      summary: List the pods currently scheduled for a deployment
+      tags:
+        - Deployments
+  /api/v1/deployments/{deploymentId}/reports:
     get:
       operationId: getReports
       parameters:
@@ -1180,10 +1317,108 @@ paths:
               schema:
                 $ref: '#/components/schemas/Report'
           description: ''
-      summary: Create report
+      summary: Create a report
       tags:
         - Reports
-  /v1/deployments/{deploymentId}/reports/{reportId}:
+      x-mint:
+        content: >-
+          Create a report in a deployment.
+
+
+          You may supply your own `publicId` (a 12-character `[0-9A-Za-z]` id) to key the report for
+          as-code management; omit it to have one generated. It must be an id you chose — the
+          auto-generated placeholder ids shown for reports that have no stable id yet are a
+          reserved, non-unique shape and are rejected with `400`.
+  /api/v1/deployments/{deploymentId}/reports/by-public-id/{publicId}:
+    put:
+      operationId: upsertReportByPublicId
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportInput'
+        description: CreateReportInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
+      summary: Create or update a report by publicId
+      tags:
+        - Reports
+      x-mint:
+        content: >-
+          Idempotent create-or-update ("upsert") of a report keyed by its portable `publicId` — the
+          stable identity for managing dashboards as code (CI/CD pipelines re-applying the same
+          definition against any environment).
+
+
+          If a report with this `publicId` exists in the deployment, it is updated with the fields
+          you send (same semantics as `PUT /reports/:reportId`); otherwise a new report is created
+          with this `publicId`. Re-applying the same request is a no-op. The `publicId` must be a
+          12-character alphanumeric id (`[0-9A-Za-z]`); mint one client-side when authoring the
+          definition.
+
+
+          This endpoint returns `409` for three different reasons, distinguished by the response
+          body's `code` — handle them differently:
+
+
+          - **No `code`** — the `publicId` already belongs to a report in a **different**
+          deployment. Because `publicId` is unique across the account, it is rejected rather than
+          silently updating across deployments (reported regardless of whether you have access to
+          that report). This is **permanent**: retrying will not help; use a different `publicId`.
+
+          - **`code: "upsert_branch_changed"`** — whether this request creates or updates is
+          decided, and access-checked, before it is applied; another writer changed that in between
+          (created or deleted the report with this `publicId`). The request was rejected rather than
+          applied under the wrong permission check. This is **transient: retry the request**. It
+          only happens when two writers target the same `publicId` concurrently, e.g. two pipeline
+          runs applying the same bundle at once.
+
+          - **`code: "ambiguous_legacy_id"`** — the id given is one of the ids synthesized for
+          reports that predate stable ids (see below), and it matches more than one of them, so it
+          cannot identify a single report. Nothing was changed. This is **permanent**, and the fix
+          is different from the case above: assign the report you mean a `publicId` of your own with
+          `PUT /deployments/{deploymentId}/reports/{reportId}`, then key on that.
+
+
+          **Reports created before stable ids** do not store a `publicId`; the API synthesizes one
+          for them from the report's internal id. Those synthesized ids are **not unique** — several
+          reports can share one, and in practice most do. This endpoint resolves such an id only
+          when it is unambiguous, adopting it as the report's real `publicId` at that point;
+          otherwise it returns the `ambiguous_legacy_id` conflict above.
+
+
+          For anything you intend to manage as code, do not rely on a synthesized id: give the
+          report a `publicId` you chose. `PUT /deployments/{deploymentId}/reports/{reportId}`
+          accepts `publicId` for exactly this, on any report that does not have one yet (it is
+          write-once — a report's existing `publicId` cannot be changed, since clients may already
+          have stored it).
+
+
+          `source` is **create-only**: it is recorded when the report is first created and ignored
+          on subsequent updates (it describes where the report originated, not its current
+          definition).
+
+
+          Access: updating requires **edit** access to the existing report; creating requires the
+          same access as `POST /reports`.
+  /api/v1/deployments/{deploymentId}/reports/{reportId}:
     delete:
       operationId: deleteReport
       parameters:
@@ -1255,10 +1490,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/Report'
           description: ''
-      summary: Update report
+      summary: Update a report
       tags:
         - Reports
-  /v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook:
+      x-mint:
+        content: >-
+          Update a report. All fields are optional; only the fields you send are changed.
+
+
+          `publicId` is **write-once**: you may assign one to a report that does not have one yet —
+          which is how a report created before stable ids is adopted into as-code management, so
+          `PUT /reports/by-public-id/{publicId}` can key on it — but a report's existing `publicId`
+          cannot be changed, since clients may already have stored it. Attempting to change it
+          returns `400`; a `publicId` already used by another report returns `409`.
+
+
+          The id you assign must be one you chose (any distinct 12-character `[0-9A-Za-z]` id). The
+          auto-generated placeholder id shown for a report that has no stable id yet cannot be
+          assigned — it is not unique — and is rejected with `400`.
+
+
+          Requires **edit** access to the report.
+  /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook:
     put:
       operationId: connectReportToWorkbook
       parameters:
@@ -1298,7 +1551,7 @@ paths:
           report's query, name, or other definition — so, like refresh, it requires only
           read access to the report. A user who can view a report can place its data into
           their own sheet without being its creator or having edit rights.
-  /v1/deployments/{deploymentId}/reports/{reportId}/refresh:
+  /api/v1/deployments/{deploymentId}/reports/{reportId}/refresh:
     put:
       operationId: refreshReport
       parameters:
@@ -1322,7 +1575,7 @@ paths:
       summary: Refresh report
       tags:
         - Reports
-  /v1/deployments/{deploymentId}/shared-workspace:
+  /api/v1/deployments/{deploymentId}/shared-workspace:
     get:
       operationId: sharedWorkspaceObjects
       parameters:
@@ -1401,7 +1654,7 @@ paths:
           Accepts the same `folderId`, `types`, `search`, sorting, and cursor-pagination parameters
           as `GET /workspace`. Folders reachable only because a nested item inside them was shared
           are surfaced as navigation, but their unshared siblings stay hidden.
-  /v1/deployments/{deploymentId}/token:
+  /api/v1/deployments/{deploymentId}/token:
     post:
       operationId: deploymentToken
       parameters:
@@ -1420,7 +1673,7 @@ paths:
       summary: Deployment token
       tags:
         - Deployments
-  /v1/deployments/{deploymentId}/workbooks:
+  /api/v1/deployments/{deploymentId}/workbooks:
     get:
       operationId: getWorkbooks
       parameters:
@@ -1480,7 +1733,68 @@ paths:
       summary: Create workbook
       tags:
         - Workbooks
-  /v1/deployments/{deploymentId}/workbooks/{workbookId}:
+  /api/v1/deployments/{deploymentId}/workbooks/by-slug/{slug}:
+    put:
+      operationId: upsertWorkbookBySlug
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkbookInput'
+        description: CreateWorkbookInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Create or update a workbook by slug
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Idempotent create-or-update ("upsert") of a workbook keyed by its deployment-scoped slug —
+          the portable identity for managing dashboards as code (CI/CD pipelines re-applying the
+          same definition against any environment).
+
+
+          If a workbook with this slug exists in the deployment, it is updated: only the fields you
+          send are changed, and `meta` is merged into the existing metadata (a `meta.dashboardDraft`
+          is validated like everywhere else). Otherwise a new workbook is created with this slug.
+          The slug is normalized (trimmed, lowercased) before matching. Re-applying the same request
+          is a no-op.
+
+
+          Access: updating requires **edit** access to the workbook holding the slug (requests that
+          include `folderId` require **manage** access, plus **edit** access to the destination
+          folder); creating requires the same access as `POST /workbooks` (AI BI User role or
+          higher).
+
+
+          Whether this request creates or updates is decided — and access-checked — before it is
+          applied. If another writer changes that in between (creates or deletes the workbook
+          holding this slug), the request is rejected with `409` and `code: "upsert_branch_changed"`
+          rather than applied under the wrong permission check. This is **transient: retry the
+          request**. It only happens when two writers target the same slug concurrently — for
+          example two pipeline runs applying the same bundle at once, where one creates the workbook
+          and the other must then retry into the update path.
+
+
+          Returns `404` if the deployment does not exist.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}:
     delete:
       operationId: deleteWorkbook
       parameters:
@@ -1575,7 +1889,7 @@ paths:
 
           To move a workbook you can use either this endpoint or the unified `POST /workspace/move`.
           Returns `404` if the workbook does not exist or belongs to a different deployment.
-  /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard:
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard:
     put:
       operationId: updateWorkbookDashboard
       parameters:
@@ -1606,7 +1920,7 @@ paths:
       summary: Update workbook dashboard
       tags:
         - Workbooks
-  /v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread:
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread:
     post:
       operationId: updatePublishedDashboardAiWidgetThread
       parameters:
@@ -1637,7 +1951,7 @@ paths:
       summary: Update published dashboard AI widget thread
       tags:
         - Workbooks
-  /v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate:
     post:
       operationId: duplicateWorkbook
       parameters:
@@ -1674,10 +1988,22 @@ paths:
           return the new workbook.
 
 
-          The clone is created in the same folder as the source and named "Copy of \{original
-          name\}". All report references inside the dashboard (and the dashboard draft) are
-          re-pointed at the copied reports, so the duplicate is fully self-contained and independent
-          of the original. Per-user view history (last-viewed timestamps) is **not** carried over.
+          The clone is named "Copy of \{original name\}". All report references inside the dashboard
+          (and the dashboard draft) are re-pointed at the copied reports, so the duplicate is fully
+          self-contained and independent of the original. Per-user view history (last-viewed
+          timestamps) is **not** carried over.
+
+
+          The clone does **not** inherit the source's sharing: no user or group policies are copied,
+          and signed embedding (`allowEmbed`) starts disabled on the cloned dashboard even when it
+          is enabled on the source.
+
+
+          Placement follows the caller's access to the source's folder. With **edit** access to that
+          folder the clone (and its reports) is created alongside the original, and therefore
+          inherits the access that folder grants. With only **read** access — or when the source is
+          at the root — the clone is created at the workspace root instead, so a viewer never writes
+          into a folder they don't control.
 
 
           Requires **read** access to the source workbook and the **AI BI User** role (or higher).
@@ -1697,7 +2023,86 @@ paths:
           If the deployment's plan enforces a workbook limit and it has been reached, the request is
           rejected with `400`. Returns `404` if the workbook does not exist or belongs to a
           different deployment.
-  /v1/deployments/{deploymentId}/workbooks/{workbookId}/publish:
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/embed-access:
+    get:
+      operationId: getEmbedAccess
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedAccessResponse'
+          description: ''
+      summary: List a dashboard's embed access
+      tags:
+        - Dashboard Embed Access
+      x-mint:
+        content: >-
+          Return the embed audience of a workbook's published dashboard: the global `allowEmbed`
+          (signed-embedding) flag, whether it is shared with **all embed users**, and the list of
+          individual embed **tenants** it is shared with.
+
+
+          Embed access is a read-only share of the workbook with a system sharing group, so this is
+          scoped to the workbook that owns the dashboard. Requires **read** access to the workbook.
+          Returns `404` if the workbook does not exist or belongs to a different deployment.
+    put:
+      operationId: updateEmbedAccess
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmbedAccessInput'
+        description: UpdateEmbedAccessInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedAccessResponse'
+          description: ''
+      summary: Update a dashboard's embed access
+      tags:
+        - Dashboard Embed Access
+      x-mint:
+        content: >-
+          Add, update, or remove one embed audience from a workbook's published dashboard, and/or
+          toggle signed embedding. Returns the updated embed-access view.
+
+
+          Provide exactly one target — `embedTenantName` (a single embed tenant) or `allEmbedUsers:
+          true` (every embed tenant) — together with `action`: `"read"` grants access, `"none"`
+          removes it. Include `allowEmbed` to also flip "Allow signed embedding" in the same
+          request; omit both targets to change only `allowEmbed`.
+
+
+          Requires **manage** access to the workbook. Returns `404` if the workbook or the named
+          embed tenant does not exist, and `400` if the request specifies no change or sets
+          `allowEmbed` on a workbook that has no published dashboard.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish:
     post:
       operationId: publishDashboard
       parameters:
@@ -1728,7 +2133,7 @@ paths:
       summary: Publish dashboard
       tags:
         - Workbooks
-  /v1/deployments/{deploymentId}/workspace:
+  /api/v1/deployments/{deploymentId}/workspace:
     get:
       operationId: workspaceObjects
       parameters:
@@ -1820,7 +2225,128 @@ paths:
 
 
           Results are scoped to the calling user: only items the user can access are returned.
-  /v1/deployments/{deploymentId}/workspace/move:
+  /api/v1/deployments/{deploymentId}/workspace/bulk-delete:
+    post:
+      operationId: bulkDeleteWorkspaceObjects
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkDeleteWorkspaceObjectsInput'
+        description: BulkDeleteWorkspaceObjectsInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkDeleteWorkspaceObjectsPayload'
+          description: ''
+      summary: Delete workspace items in bulk
+      tags:
+        - Workspace
+      x-mint:
+        content: >-
+          Delete up to 100 workspace items — workbooks, reports, and folders, mixed freely — in a
+          single request.
+
+
+          Request body:
+
+          - `items` — the items to delete, each `{ type, id }` with `type` one of `WORKBOOK`,
+          `REPORT`, `FOLDER`. Repeated references to the same item are collapsed, so the response
+          holds exactly one entry per distinct item requested.
+
+
+          **This endpoint is partially successful.** It returns `200` whenever the request itself is
+          well formed, and reports each item's outcome separately:
+
+          - `deleted` — the `(type, id)` of each item that was deleted.
+
+          - `failed` — the items that were not deleted, each with the `(type, id)` requested and an
+          `error` carrying the `status` and `message` the per-type delete endpoint would have
+          returned for it (`403` when the caller lacks access, `404` when the item does not exist or
+          belongs to another deployment, `400` when a folder still has sub-folders).
+
+
+          An empty `failed` array means the whole batch applied. Items are deleted one at a time in
+          the order given, each in its own transaction, so **deletions are not rolled back** when a
+          later item fails — the response is the record of what was applied. Deleting a folder does
+          not delete the workbooks, dashboards, and reports directly inside it: they are detached
+          and returned to the workspace root, matching `DELETE /folders/:folderId`.
+
+
+          Access is checked per item with the same rules as the per-type delete endpoints:
+          **manage** access for a workbook or folder, and **edit** access plus the report-manage
+          permission for a report.
+  /api/v1/deployments/{deploymentId}/workspace/bulk-move:
+    post:
+      operationId: bulkMoveWorkspaceObjects
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkMoveWorkspaceObjectsInput'
+        description: BulkMoveWorkspaceObjectsInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkMoveWorkspaceObjectsResponse'
+          description: ''
+      summary: Move workspace items in bulk
+      tags:
+        - Workspace
+      x-mint:
+        content: >-
+          Move up to 100 workspace items — workbooks, reports, and folders, mixed freely — into one
+          destination folder in a single request.
+
+
+          Request body:
+
+          - `items` — the items to move, each `{ type, id }` with `type` one of `WORKBOOK`,
+          `REPORT`, `FOLDER`. Repeated references to the same item are collapsed, so the response
+          holds exactly one entry per distinct item requested.
+
+          - `folderId` — the destination folder id for the whole batch, or `null` to move the items
+          to the workspace root. For a folder item this becomes its new parent.
+
+
+          **This endpoint is partially successful.** It returns `200` whenever the request itself is
+          well formed, and reports each item's outcome separately:
+
+          - `moved` — the items that were moved, serialized exactly as `POST /workspace/move`
+          returns them.
+
+          - `failed` — the items that were not moved, each with the `(type, id)` requested and an
+          `error` carrying the `status` and `message` the single-item move would have returned for
+          it (`403` when the caller lacks access, `404` when the item does not exist or belongs to
+          another deployment, `400` for an invalid move such as a folder into its own descendant).
+
+
+          An empty `failed` array means the whole batch applied. Items are applied one at a time in
+          the order given, each in its own transaction, so earlier moves are **not** rolled back
+          when a later item fails — the response is the record of what was applied.
+
+
+          Access is checked per item with the same rules as the single-item move, so a batch mixing
+          items the caller may and may not move applies the permitted ones and reports the rest.
+  /api/v1/deployments/{deploymentId}/workspace/move:
     post:
       operationId: moveWorkspaceObject
       parameters:
@@ -1876,7 +2402,41 @@ paths:
           Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
           rejected with `400`. Returns `404` if the item does not exist or belongs to a different
           deployment.
-  /v1/embed-tenants/{embedTenantName}:
+  /api/v1/embed-tenants:
+    get:
+      operationId: listEmbedTenants
+      parameters:
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedTenantsPublicResponse'
+          description: ''
+      summary: List embed tenants
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          List the account's embed tenants, cursor-paginated. Supports `first`/`after` pagination
+          and a case-insensitive `search` substring match on the tenant name. Requires an admin API
+          key.
+  /api/v1/embed-tenants/{embedTenantName}:
     delete:
       operationId: deleteEmbedTenant
       parameters:
@@ -1885,15 +2445,30 @@ paths:
           required: true
           schema:
             type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
       responses:
         '200':
           content:
             application/json: {}
           description: Successful response
+        '204':
+          description: Embed tenant deleted, or did not exist.
       summary: Delete embed tenant
       tags:
         - Embed Tenants
-  /v1/embed-tenants/{embedTenantName}/groups:
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Deletes an embed tenant and everything inside it — users, groups, memberships, attributes,
+          policies, and content — plus the tenant's `system:tenant:*` sharing group. Idempotent:
+          deleting a tenant that does not exist succeeds. The name must already be in canonical form
+          (lowercase, per the `embedTenantName` rule); unlike the routes below, a name that differs
+          only in case is rejected with `400` rather than being lowercased, so a typo can never
+          cascade-delete a tenant the caller did not name exactly.
+  /api/v1/embed-tenants/{embedTenantName}/groups:
     get:
       operationId: getGroups
       parameters:
@@ -1902,6 +2477,7 @@ paths:
           required: true
           schema:
             type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
         - in: query
           name: after
           schema:
@@ -1922,10 +2498,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserGroupsConnectionResponse'
           description: ''
-      summary: Get groups
+      summary: List embed groups
       tags:
         - Embed Tenants
-  /v1/embed-tenants/{embedTenantName}/groups/{id}:
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Lists the embed tenant's own groups (`embed_user_groups`), cursor-paginated, newest first,
+          each with its member count. These are the groups an embed session references through
+          `tenantGroups`; the implicit `system:tenant:*` sharing group is not included.
+    post:
+      operationId: createGroup
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmbedGroupInput'
+        description: CreateEmbedGroupInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDTO'
+          description: ''
+      summary: Create an embed group
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Creates a group inside the embed tenant. The name must be unique within the tenant and may
+          not start with `system:` (that prefix is reserved for platform-managed groups). The group
+          is immediately usable as a `tenantGroups` entry when generating a creator-mode embed
+          session, and reaches the data model as `system:tenant:{embedTenantName}:{name}`. Returns
+          `400` if the name is taken or reserved.
+  /api/v1/embed-tenants/{embedTenantName}/groups/{id}:
     delete:
       operationId: deleteGroup
       parameters:
@@ -1934,20 +2556,294 @@ paths:
           required: true
           schema:
             type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
         - in: path
           name: id
           required: true
           schema:
-            type: number
+            type: integer
+          description: Numeric id of the group, as returned by the groups endpoints.
       responses:
         '200':
           content:
             application/json: {}
           description: Successful response
-      summary: Delete group
+        '204':
+          description: Group deleted.
+      summary: Delete an embed group
       tags:
         - Embed Tenants
-  /v1/embed/dashboard/{publicId}:
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Deletes one of the embed tenant’s groups. Returns `400` while the group still has members
+          — remove them first — and `404` if the group does not exist in this tenant.
+    get:
+      operationId: getGroup
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the group, as returned by the groups endpoints.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDTO'
+          description: ''
+      summary: Get an embed group
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Returns one of the embed tenant’s groups with its member count, or `404` if no such group
+          exists in this tenant.
+    patch:
+      operationId: updateGroup
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the group, as returned by the groups endpoints.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmbedGroupInput'
+        description: UpdateEmbedGroupInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDTO'
+          description: ''
+      summary: Update an embed group
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Updates a group’s description. The name is deliberately immutable: it is part of the
+          security context an embed session carries (`system:tenant:{embedTenantName}:{name}`), so
+          renaming would silently detach the data-model access policies written against it — create
+          a new group instead. Pass an empty `description` to clear it.
+  /api/v1/embed-tenants/{embedTenantName}/groups/{id}/users:
+    delete:
+      operationId: removeGroupMembers
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the group, as returned by the groups endpoints.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbedGroupMembersInput'
+        description: EmbedGroupMembersInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+        '204':
+          description: Members removed.
+      summary: Remove embed group members
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Removes one or more embed users (1–1000 per request) from a group, identified the same way
+          as when adding them — exactly one of `externalId` or `embedUserId` each. Only this group’s
+          membership is dropped; the users themselves and their other groups are left alone, and
+          unlike adding, an unknown `externalId` is never provisioned. Idempotent: removing a user
+          who is not a member is a no-op. Returns `204 No Content`, or `404` if the group does not
+          exist in this tenant.
+    get:
+      operationId: getGroupMembers
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the group, as returned by the groups endpoints.
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedUsersPublicResponse'
+          description: ''
+      summary: List embed group members
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Lists the embed users that belong to a group, cursor-paginated, most recently added first.
+          Each member carries both its numeric `id` and its `externalId`. Returns `404` if the group
+          does not exist in this tenant.
+    post:
+      operationId: addGroupMembers
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Numeric id of the group, as returned by the groups endpoints.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbedGroupMembersInput'
+        description: EmbedGroupMembersInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedGroupMembersMutationResponse'
+          description: ''
+      summary: Add embed group members
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Adds one or more embed users (1–1000 per request) to a group. Each member is identified by
+          exactly one of `externalId` (the id passed to `generate-session`) or `embedUserId` (the
+          numeric id this API returns). An `externalId` that has never signed in is provisioned as
+          an embed user, so groups can be populated ahead of a user’s first session; an unknown
+          `embedUserId` is a `404` instead. Memberships are added, never replaced: the user’s other
+          groups — including the account-wide `groups` that drive data-model access — are left
+          untouched. Idempotent: the response buckets every requested member into `addedMembers` or
+          `unchangedMembers`.
+  /api/v1/embed-tenants/{embedTenantName}/users:
+    get:
+      operationId: listEmbedUsers
+      parameters:
+        - in: path
+          name: embedTenantName
+          required: true
+          schema:
+            type: string
+          description: Name of the embed tenant (the `embedTenantName` used to generate embed sessions).
+        - in: query
+          name: search
+          schema:
+            oneOf:
+              - type: string
+                description: Case-insensitive substring match against the embed user’s email or external id.
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedUsersPublicResponse'
+          description: ''
+      summary: List embed users
+      tags:
+        - Embed Tenants
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Lists the embed users belonging to one embed tenant, cursor-paginated and ordered by
+          email. Alongside the numeric `id` this API uses, a user carries the `externalId` your
+          integration knows it by (the id passed to `generate-session`) whenever it was recorded on
+          the account — users provisioned before it was recorded come back without an `externalId`,
+          though they stay addressable by it everywhere it is accepted as input. Use `search` to
+          match a substring of the email or external id, or a complete external id, which resolves a
+          user even when the response cannot echo it back.
+  /api/v1/embed/dashboard/{publicId}:
     get:
       operationId: getDashboard
       parameters:
@@ -1982,7 +2878,90 @@ paths:
           Signed embedding additionally requires the dashboard to have "Allow signed embedding"
           enabled; the trusted screenshoter and creator-mode session flows are exempt. Returns `403`
           when embedding is not permitted for the dashboard.
-  /v1/embed/generate-session:
+    patch:
+      operationId: updateDashboardEmbedding
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDashboardEmbeddingInput'
+        description: UpdateDashboardEmbeddingInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardEmbeddingResponse'
+          description: ''
+      summary: Enable or disable signed embedding for a dashboard
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Sets the dashboard's "Allow signed embedding" flag (`allowEmbed`), which gates the
+          customer-signed embedding path: with the flag off, embed sessions fetching `GET
+          /api/v1/embed/dashboard/{publicId}` receive `403`. Trusted cube-cloud session flows
+          (screenshoter, creator mode) and dashboards shared with all embed users are not affected
+          by this flag.
+
+
+          Note that the flag alone does not make a dashboard embeddable — it must also be published
+          and shared with the embed tenant. Returns `404` if the dashboard does not exist.
+  /api/v1/embed/dashboard/{publicId}/python-run:
+    post:
+      operationId: postDashboardPythonRun
+      parameters:
+        - in: path
+          name: publicId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbedPythonFilteredRunInput'
+        description: EmbedPythonFilteredRunInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PythonAnalysisFilteredRun'
+          description: ''
+      summary: Run a python report over dashboard-filtered SQL
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Re-runs the Python analysis attached to one of this dashboard's reports over `sqlQuery` —
+          the report's own query with the dashboard's filters and time grains already applied — and
+          returns the result **without persisting it**.
+
+
+          Authorized against the dashboard, exactly as `GET /api/v1/embed/dashboard/{publicId}` is.
+          The `reportVersionId` must be one of that dashboard's published report snapshots and must
+          belong to `reportId`; anything else returns `403`. The Python itself is read server-side
+          from that snapshot — it is never supplied by the caller.
+
+
+          The analysis runs under the calling embed user's own security context, so row-level
+          security applies to the viewer, and the stored result other viewers see is left untouched.
+          Results are cached briefly per (report, code, SQL, user); failures are not cached. Returns
+          `403` when Python analysis is not enabled for the account.
+  /api/v1/embed/generate-session:
     post:
       operationId: generateSession
       requestBody:
@@ -2040,7 +3019,7 @@ paths:
 
           `deploymentId` is required and the caller must have read access to it. Embedding must be
           enabled for the tenant, otherwise `403` is returned.
-  /v1/embed/session/token:
+  /api/v1/embed/session/token:
     post:
       operationId: postTokenBySessionId
       requestBody:
@@ -2075,7 +3054,81 @@ paths:
           This endpoint is unauthenticated — it is called from the embedding client and the session
           id itself is the credential. Returns `401` if the session id is unknown or has already
           been redeemed.
-  /v1/oauth-integrations:
+  /api/v1/github/installations:
+    get:
+      operationId: installations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubInstallationsListResponse'
+          description: ''
+      summary: List the user's GitHub App installations (orgs/accounts)
+      tags:
+        - GitHub
+  /api/v1/github/installations/{installationId}/repositories:
+    get:
+      operationId: repositories
+      parameters:
+        - in: path
+          name: installationId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubReposListResponse'
+          description: ''
+      summary: List repositories accessible to a GitHub App installation
+      tags:
+        - GitHub
+  /api/v1/github/repositories/{owner}/{repo}/branches:
+    get:
+      operationId: branches
+      parameters:
+        - in: query
+          name: installationId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: repo
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: installationId
+          required: false
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubBranchesListResponse'
+          description: ''
+      summary: List branches of a repository
+      tags:
+        - GitHub
+  /api/v1/github/status:
+    get:
+      operationId: status
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubConnectStatusResponse'
+          description: ''
+      summary: Whether GitHub is linked, plus the link/install URLs
+      tags:
+        - GitHub
+  /api/v1/oauth-integrations:
     get:
       operationId: listOAuthIntegrations
       responses:
@@ -2109,7 +3162,7 @@ paths:
       summary: Create OAuth integration
       tags:
         - OAuth Integrations
-  /v1/oauth-integrations/{id}:
+  /api/v1/oauth-integrations/{id}:
     delete:
       operationId: deleteOAuthIntegration
       parameters:
@@ -2169,7 +3222,7 @@ paths:
       summary: Update OAuth integration
       tags:
         - OAuth Integrations
-  /v1/oidc-token-configs:
+  /api/v1/oidc-token-configs:
     get:
       operationId: listOidcTokenConfigs
       responses:
@@ -2203,7 +3256,7 @@ paths:
       summary: Create OIDC token config
       tags:
         - OIDC Token Configs
-  /v1/oidc-token-configs/{id}:
+  /api/v1/oidc-token-configs/{id}:
     delete:
       operationId: deleteOidcTokenConfig
       parameters:
@@ -2263,7 +3316,7 @@ paths:
       summary: Update OIDC token config
       tags:
         - OIDC Token Configs
-  /v1/regions:
+  /api/v1/regions:
     get:
       operationId: listRegions
       responses:
@@ -2276,7 +3329,7 @@ paths:
       summary: List regions
       tags:
         - Regions
-  /v1/tenant/settings:
+  /api/v1/tenant/settings:
     get:
       operationId: getTenantSettings
       responses:
@@ -2308,7 +3361,7 @@ paths:
       summary: Update tenant settings
       tags:
         - Tenant Settings
-  /v1/user-attribute-values:
+  /api/v1/user-attribute-values:
     post:
       operationId: upsertUserAttributeValue
       requestBody:
@@ -2323,12 +3376,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAttributeValueDTO'
+                $ref: '#/components/schemas/UserAttributeValue'
           description: ''
       summary: Upsert user attribute value
       tags:
         - User Attribute Values
-  /v1/user-attribute-values/{userId}:
+  /api/v1/user-attribute-values/{userId}:
     get:
       operationId: getUserAttributeValues
       parameters:
@@ -2343,13 +3396,13 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/UserAttributeValueDTO'
+                  $ref: '#/components/schemas/UserAttributeValue'
                 type: array
           description: ''
       summary: Get user attribute values
       tags:
         - User Attribute Values
-  /v1/user-attributes:
+  /api/v1/user-attributes:
     get:
       operationId: getUserAttributes
       parameters:
@@ -2406,7 +3459,7 @@ paths:
       summary: Create user attribute
       tags:
         - User Attributes
-  /v1/user-attributes/{id}:
+  /api/v1/user-attributes/{id}:
     put:
       operationId: updateUserAttribute
       parameters:
@@ -2432,7 +3485,7 @@ paths:
       summary: Update user attribute
       tags:
         - User Attributes
-  /v1/user-oauth-tokens:
+  /api/v1/user-oauth-tokens:
     get:
       operationId: listUserOAuthTokens
       responses:
@@ -2447,7 +3500,7 @@ paths:
       summary: List user OAuth tokens
       tags:
         - User OAuth Tokens
-  /v1/user-oauth-tokens/{integrationId}:
+  /api/v1/user-oauth-tokens/{integrationId}:
     delete:
       operationId: revokeUserOAuthToken
       parameters:
@@ -2482,7 +3535,7 @@ paths:
       summary: Get user OAuth token
       tags:
         - User OAuth Tokens
-  /v1/user-oauth-tokens/{integrationId}/initiate:
+  /api/v1/user-oauth-tokens/{integrationId}/initiate:
     post:
       operationId: initiateOAuthFlow
       parameters:
@@ -2499,7 +3552,7 @@ paths:
       summary: Initiate OAuth flow
       tags:
         - User OAuth Tokens
-  /v1/users:
+  /api/v1/users:
     post:
       operationId: createUser
       requestBody:
@@ -2519,7 +3572,71 @@ paths:
       summary: Create user
       tags:
         - Users Admin
-  /v1/users/{id}:
+  /api/v1/users/bulk:
+    post:
+      operationId: bulkUserAction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUserActionInput'
+        description: BulkUserActionInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkUserActionPayload'
+          description: ''
+      summary: Apply an action to many users
+      tags:
+        - Users Admin
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Apply one action to up to 100 users in a single request.
+
+
+          Request body:
+
+          - `action` — `DEACTIVATE` (revoke access and end the users' sessions), `ACTIVATE` (restore
+          access to deactivated users), or `DELETE` (remove the users outright).
+
+          - `userIds` — the users to act on. Repeated ids are collapsed, so the response holds
+          exactly one entry per distinct user requested.
+
+
+          **This endpoint is partially successful.** It returns `200` whenever the request itself is
+          well formed, and reports each user's outcome separately:
+
+          - `succeeded` — ids of the users the action was applied to.
+
+          - `failed` — the users it was not applied to, each with an `error` carrying the `status`
+          and `message` the single-user endpoint would have returned (`404` for an unknown id, `403`
+          when a guard refuses the change).
+
+
+          An empty `failed` array means the whole batch applied. Users are processed one at a time
+          in the order given, each in its own transaction, so earlier changes are **not** rolled
+          back when a later user fails — the response is the record of what was applied.
+
+
+          Every guard of the single-user endpoints still applies, per user:
+
+          - The caller's own id fails rather than the request: `DEACTIVATE` on self is `403`,
+          `DELETE` on self is `400`.
+
+          - A tenant must always keep at least one active, direct admin, so the action that would
+          remove the last one fails with `403` while the rest of the batch still applies.
+
+
+          Reapplying an action a user is already in (deactivating a deactivated user) succeeds as a
+          no-op.
+  /api/v1/users/{id}:
     delete:
       operationId: deleteUser
       parameters:
@@ -2561,6 +3678,525 @@ paths:
       summary: Update user
       tags:
         - Users Admin
+  /build/api/v1/deployments:
+    post:
+      operationId: createDeployment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentInput'
+        description: CreateDeploymentInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+          description: ''
+      summary: Create a deployment with an empty starter project and trigger its first build
+      tags:
+        - Deployment Creation
+      x-mint:
+        content: >-
+          Scaffolds an empty starter project and triggers the first build. When `creationMethod` is
+          `github`, no starter project is scaffolded — connect a repository afterwards via POST
+          /build/api/v1/deployments/:deploymentId/github/connect.
+  /build/api/v1/deployments/{deploymentId}/branches:
+    get:
+      operationId: listBranches
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchesListResponse'
+          description: ''
+      summary: List a deployment's branches
+      tags:
+        - Data Model
+    post:
+      operationId: createBranch
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBranchRequest'
+        description: CreateBranchRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevBranchResponse'
+          description: ''
+      summary: Create a branch (optionally entering dev mode on it)
+      tags:
+        - Data Model
+  /build/api/v1/deployments/{deploymentId}/commit:
+    post:
+      operationId: commitChanges
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitChangesRequest'
+        description: CommitChangesRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelWriteResponse'
+          description: ''
+      summary: Commit (and push) the active branch's pending changes
+      tags:
+        - Data Model
+  /build/api/v1/deployments/{deploymentId}/data-model/file-hashes:
+    get:
+      operationId: fileHashes
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: live
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: branchName
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: useDeployProjectRoot
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  $ref: '#/components/schemas/FileHash'
+                type: object
+          description: Map of project-relative file path to its content hash
+      summary: Content hashes of the current data-model files (for upload diffing)
+      tags:
+        - Data Model Uploads
+  /build/api/v1/deployments/{deploymentId}/data-model/files:
+    delete:
+      operationId: removeFiles
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoveDataModelFilesInput'
+        description: RemoveDataModelFilesInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelWriteResponse'
+          description: ''
+      summary: Delete data-model source files
+      tags:
+        - Data Model
+    get:
+      operationId: listFiles
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: withContent
+          required: false
+          schema:
+            type: boolean
+        - in: query
+          name: branchName
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: showLastCLIUpload
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceTreeResponse'
+          description: ''
+      summary: List the data-model source files for a deployment
+      tags:
+        - Data Model
+    put:
+      operationId: updateFiles
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDataModelFilesInput'
+        description: UpdateDataModelFilesInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelWriteResponse'
+          description: ''
+      summary: Create or overwrite data-model source files
+      tags:
+        - Data Model
+  /build/api/v1/deployments/{deploymentId}/data-model/files/rename:
+    post:
+      operationId: renameFiles
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameDataModelFilesInput'
+        description: RenameDataModelFilesInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelWriteResponse'
+          description: ''
+      summary: Rename data-model source files
+      tags:
+        - Data Model
+  /build/api/v1/deployments/{deploymentId}/data-model/upload/file:
+    post:
+      operationId: uploadFile
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: live
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: branchName
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: useDeployProjectRoot
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/UploadFileBody'
+                - type: object
+                  properties:
+                    file:
+                      type: string
+                      format: binary
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Upload a single file into an open transaction
+      tags:
+        - Data Model Uploads
+  /build/api/v1/deployments/{deploymentId}/data-model/upload/finish:
+    post:
+      operationId: finishUpload
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: live
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: branchName
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: useDeployProjectRoot
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinishUploadBody'
+        description: FinishUploadBody
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinishUploadResponse'
+          description: ''
+      summary: Finish the upload transaction (prune removed files) and trigger a build
+      tags:
+        - Data Model Uploads
+  /build/api/v1/deployments/{deploymentId}/data-model/upload/start:
+    post:
+      operationId: startUpload
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: live
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+        - in: query
+          name: branchName
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: useDeployProjectRoot
+          schema:
+            oneOf:
+              - type: boolean
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartUploadResponse'
+          description: ''
+      summary: Start a data-model upload transaction
+      tags:
+        - Data Model Uploads
+  /build/api/v1/deployments/{deploymentId}/dev-mode:
+    delete:
+      operationId: stopDevMode
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataModelWriteResponse'
+          description: ''
+      summary: Exit dev mode
+      tags:
+        - Data Model
+    post:
+      operationId: startDevMode
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDevModeRequest'
+        description: StartDevModeRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevBranchResponse'
+          description: ''
+      summary: Enter dev mode (switch to a branch)
+      tags:
+        - Data Model
+  /build/api/v1/deployments/{deploymentId}/github/connect:
+    post:
+      operationId: connect
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectGitHubRequest'
+        description: ConnectGitHubRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+          description: ''
+      summary: Connect a deployment to a GitHub repository and trigger a build
+      tags:
+        - GitHub Connection
+  /build/api/v1/deployments/{deploymentId}/merge:
+    post:
+      operationId: mergeIntoParentBranch
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeIntoParentBranchRequest'
+        description: MergeIntoParentBranchRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeResponse'
+          description: ''
+      summary: Merge a branch into its parent branch (git-flow merge)
+      tags:
+        - Data Model
+  /build/api/v1/deployments/{deploymentId}/merge-to-default:
+    post:
+      operationId: mergeToDefaultBranch
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeToDefaultBranchRequest'
+        description: MergeToDefaultBranchRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeResponse'
+          description: ''
+      summary: Merge a branch straight into the deploy (default) branch
+      tags:
+        - Data Model
+  /build/api/v1/deployments/{deploymentId}/pull:
+    post:
+      operationId: pull
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PullRequest'
+        description: PullRequest
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullResponse'
+          description: ''
+      summary: Pull the latest for a branch from its remote and rebuild if changed
+      tags:
+        - Data Model
 components:
   securitySchemes:
     bearerAuth:
@@ -2580,6 +4216,13 @@ components:
       required:
         - recipients
       type: object
+    AdvanceCreationStepInput:
+      properties:
+        creationStep:
+          $ref: '#/components/schemas/CreationStep'
+      required:
+        - creationStep
+      type: object
     AppConfigResponse:
       properties:
         appTheme:
@@ -2595,6 +4238,10 @@ components:
         embedding:
           oneOf:
             - $ref: '#/components/schemas/EmbedSettings'
+            - type: 'null'
+        sheetsUi:
+          oneOf:
+            - $ref: '#/components/schemas/SheetsUiSettings'
             - type: 'null'
       required:
         - applyThemeGlobally
@@ -2657,6 +4304,190 @@ components:
         - body
         - heading
       type: object
+    BranchResponse:
+      properties:
+        id:
+          type: integer
+        lastHash:
+          oneOf:
+            - type: string
+            - type: 'null'
+        name:
+          type: string
+        parentBranch:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - id
+        - name
+      type: object
+    BranchesListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/BranchResponse'
+          type: array
+      required:
+        - data
+      type: object
+    BuildStatusResponse:
+      properties:
+        branchName:
+          type: string
+        buildJobId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        deploymentId:
+          type: integer
+        deploymentStatus:
+          oneOf:
+            - type: string
+            - type: 'null'
+        errorText:
+          oneOf:
+            - type: string
+            - type: 'null'
+        filesHash:
+          oneOf:
+            - type: string
+            - type: 'null'
+        lastHash:
+          oneOf:
+            - type: string
+            - type: 'null'
+        mode:
+          type: string
+        status:
+          type: string
+        updatedAt:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - deploymentId
+        - branchName
+        - mode
+        - status
+      type: object
+    BulkActionError:
+      properties:
+        message:
+          type: string
+        status:
+          type: integer
+      required:
+        - status
+        - message
+      type: object
+    BulkDeleteWorkspaceObjectsInput:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/WorkspaceItemRefInput'
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - items
+      type: object
+    BulkDeleteWorkspaceObjectsPayload:
+      properties:
+        deleted:
+          items:
+            $ref: '#/components/schemas/WorkspaceItemRef'
+          type: array
+        failed:
+          items:
+            $ref: '#/components/schemas/WorkspaceBulkFailure'
+          type: array
+      required:
+        - deleted
+        - failed
+      type: object
+    BulkMoveWorkspaceObjectsInput:
+      properties:
+        folderId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        items:
+          items:
+            $ref: '#/components/schemas/WorkspaceItemRefInput'
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - items
+      type: object
+    BulkMoveWorkspaceObjectsResponse:
+      properties:
+        failed:
+          items:
+            $ref: '#/components/schemas/WorkspaceBulkFailure'
+          type: array
+        moved:
+          items:
+            $ref: '#/components/schemas/Workbook'
+          type: array
+      required:
+        - moved
+        - failed
+      type: object
+    BulkUserActionFailure:
+      properties:
+        error:
+          $ref: '#/components/schemas/BulkActionError'
+        userId:
+          type: integer
+      required:
+        - userId
+        - error
+      type: object
+    BulkUserActionInput:
+      properties:
+        action:
+          $ref: '#/components/schemas/BulkUserActionInputAction'
+        userIds:
+          items:
+            type: integer
+          maxItems: 100
+          minItems: 1
+          type: array
+      required:
+        - action
+        - userIds
+      type: object
+    BulkUserActionInputAction:
+      enum:
+        - DEACTIVATE
+        - ACTIVATE
+        - DELETE
+      type: string
+    BulkUserActionPayload:
+      properties:
+        action:
+          $ref: '#/components/schemas/BulkUserActionResponseAction'
+        failed:
+          items:
+            $ref: '#/components/schemas/BulkUserActionFailure'
+          type: array
+        succeeded:
+          items:
+            type: integer
+          type: array
+      required:
+        - action
+        - succeeded
+        - failed
+      type: object
+    BulkUserActionResponseAction:
+      enum:
+        - DEACTIVATE
+        - ACTIVATE
+        - DELETE
+      type: string
     ColumnFormatOverride:
       properties:
         decimalPlaces:
@@ -2674,6 +4505,48 @@ components:
         - percent
         - number
       type: string
+    CommitChangesRequest:
+      properties:
+        exitDevMode:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        message:
+          oneOf:
+            - type: string
+            - type: 'null'
+        resolveMergeConflict:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
+    ConnectGitHubRequest:
+      properties:
+        deployBranchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        deployProjectRoot:
+          oneOf:
+            - type: string
+            - type: 'null'
+        installationId:
+          type: integer
+        isNewRepo:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        name:
+          minLength: 1
+          type: string
+        private:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      required:
+        - installationId
+        - name
+      type: object
     ConnectReportToWorkbookInput:
       properties:
         endResultCell:
@@ -2745,6 +4618,21 @@ components:
             - type: string
             - type: 'null'
       type: object
+    CreateBranchRequest:
+      properties:
+        activate:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        from:
+          oneOf:
+            - type: string
+            - type: 'null'
+        name:
+          type: string
+      required:
+        - name
+      type: object
     CreateDeploymentEnvironmentTokenInput:
       properties:
         expires_in:
@@ -2766,6 +4654,72 @@ components:
           type: object
       required:
         - security_context
+      type: object
+    CreateDeploymentInput:
+      properties:
+        cloudProvider:
+          $ref: '#/components/schemas/CreateDeploymentInputCloudProvider'
+        creationMethod:
+          oneOf:
+            - $ref: '#/components/schemas/CreateDeploymentInputCreationMethod'
+            - type: 'null'
+        creationStep:
+          $ref: '#/components/schemas/CreationStep'
+        deployMode:
+          oneOf:
+            - $ref: '#/components/schemas/CreateDeploymentInputDeployMode'
+            - type: 'null'
+        isManaged:
+          type: boolean
+        name:
+          type: string
+        region:
+          type: string
+        targetPlatform:
+          type: string
+      required:
+        - name
+        - cloudProvider
+        - isManaged
+        - region
+        - targetPlatform
+        - creationStep
+      type: object
+    CreateDeploymentInputCloudProvider:
+      enum:
+        - cubecloud
+        - aws
+        - gcp
+      type: string
+    CreateDeploymentInputCreationMethod:
+      enum:
+        - upload
+        - cubecloud
+        - github
+        - ssh
+      type: string
+    CreateDeploymentInputDeployMode:
+      enum:
+        - git
+        - cli
+      type: string
+    CreateEmbedGroupInput:
+      properties:
+        description:
+          oneOf:
+            - maxLength: 500
+              type: string
+              description: Optional human-readable description.
+            - type: 'null'
+        name:
+          description: >-
+            Group name, unique within the embed tenant. The `system:` prefix is reserved and
+            rejected.
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - name
       type: object
     CreateFolderInput:
       properties:
@@ -3061,6 +5015,60 @@ components:
             - type: string
             - type: 'null'
       type: object
+    CspsConfigInput:
+      properties:
+        awsRoleArn:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureClientId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureContainer:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureStorageAccount:
+          oneOf:
+            - type: string
+            - type: 'null'
+        azureTenantId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        enabled:
+          type: boolean
+        gcpServiceAccountEmail:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gcpWorkloadIdentityProvider:
+          oneOf:
+            - type: string
+            - type: 'null'
+        gcsBucket:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Bucket:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Region:
+          oneOf:
+            - type: string
+            - type: 'null'
+        s3Sse:
+          oneOf:
+            - type: string
+            - type: 'null'
+        storageProvider:
+          type: string
+      required:
+        - enabled
+        - storageProvider
+      type: object
     Dashboard:
       properties:
         allowEmbed:
@@ -3120,6 +5128,76 @@ components:
         - versionNumber
         - versionId
         - reportSnapshots
+      type: object
+    DashboardAppManifest:
+      properties:
+        dependencies:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        version:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      type: object
+    DashboardAppManifestInput:
+      properties:
+        dependencies:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        version:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      type: object
+    DashboardAppSource:
+      properties:
+        entry:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        files:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        html:
+          oneOf:
+            - type: string
+            - type: 'null'
+        manifest:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardAppManifest'
+            - type: 'null'
+      type: object
+    DashboardAppSourceInput:
+      properties:
+        entry:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        files:
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+        html:
+          oneOf:
+            - type: string
+            - type: 'null'
+        manifest:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardAppManifestInput'
+            - type: 'null'
       type: object
     DashboardBreakpointCols:
       properties:
@@ -3219,9 +5297,17 @@ components:
       type: object
     DashboardConfig:
       properties:
+        app:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardAppSource'
+            - type: 'null'
         description:
           oneOf:
             - type: string
+            - type: 'null'
+        kind:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfigKind'
             - type: 'null'
         layout:
           oneOf:
@@ -3250,9 +5336,17 @@ components:
       type: object
     DashboardConfigInput:
       properties:
+        app:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardAppSourceInput'
+            - type: 'null'
         description:
           oneOf:
             - type: string
+            - type: 'null'
+        kind:
+          oneOf:
+            - $ref: '#/components/schemas/DashboardConfigInputKind'
             - type: 'null'
         layout:
           oneOf:
@@ -3278,12 +5372,32 @@ components:
               type: array
             - type: 'null'
       type: object
+    DashboardConfigInputKind:
+      enum:
+        - CLASSIC
+        - APP
+      type: string
+    DashboardConfigKind:
+      enum:
+        - CLASSIC
+        - APP
+      type: string
     DashboardDtoStatus:
       enum:
         - draft
         - published
         - archived
       type: string
+    DashboardEmbeddingResponse:
+      properties:
+        allowEmbed:
+          type: boolean
+        publicId:
+          type: string
+      required:
+        - publicId
+        - allowEmbed
+      type: object
     DashboardFilter:
       properties:
         caseSensitive:
@@ -3341,8 +5455,8 @@ components:
         value:
           oneOf:
             - description: >-
-                Filter value. Omit for is_null / is_not_null; provide a 2-element [start, end] array
-                for between.
+                Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
+                2-element [start, end] array for between.
               oneOf:
                 - type: string
                 - type: number
@@ -3369,6 +5483,8 @@ components:
         - not_ends_with
         - is_null
         - is_not_null
+        - is_empty
+        - is_not_empty
         - between
         - custom
       type: string
@@ -3388,6 +5504,8 @@ components:
         - not_ends_with
         - is_null
         - is_not_null
+        - is_empty
+        - is_not_empty
         - between
         - custom
       type: string
@@ -3660,6 +5778,40 @@ components:
         - w
         - h
       type: object
+    DataModelFileContent:
+      properties:
+        content:
+          type: string
+        path:
+          type: string
+      required:
+        - path
+        - content
+      type: object
+    DataModelFilePath:
+      properties:
+        path:
+          type: string
+      required:
+        - path
+      type: object
+    DataModelFileRename:
+      properties:
+        newPath:
+          type: string
+        path:
+          type: string
+      required:
+        - path
+        - newPath
+      type: object
+    DataModelWriteResponse:
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+      type: object
     DbtSyncResponse:
       properties:
         branchName:
@@ -3806,6 +5958,79 @@ components:
         - data
         - pagination
       type: object
+    DeploymentLogLine:
+      properties:
+        date:
+          type: string
+        message:
+          type: string
+        pod:
+          type: string
+      required:
+        - pod
+        - date
+        - message
+      type: object
+    DeploymentLogsQueryContainer:
+      enum:
+        - INIT
+        - MAIN
+        - cubejs-server
+        - vector
+        - api-proxy
+      type: string
+    DeploymentLogsQuerySource:
+      enum:
+        - production
+        - dev
+      type: string
+    DeploymentLogsResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DeploymentLogLine'
+          type: array
+      required:
+        - items
+      type: object
+    DeploymentPod:
+      properties:
+        containers:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        name:
+          type: string
+        ready:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        restartCount:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        status:
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - name
+      type: object
+    DeploymentPodsResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DeploymentPod'
+          type: array
+      required:
+        - items
+      type: object
     DeploymentTokenResponse:
       properties:
         cubeApiToken:
@@ -3860,12 +6085,135 @@ components:
         - offset
         - limit
       type: object
+    DevBranchResponse:
+      properties:
+        active:
+          type: boolean
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        parentBranch:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - active
+      type: object
     DuplicateWorkbookInput:
       properties:
         shared:
           oneOf:
             - type: boolean
             - type: 'null'
+      type: object
+    EmbedAccessAllEmbedUsers:
+      properties:
+        action:
+          $ref: '#/components/schemas/EmbedAccessAllEmbedUsersAction'
+        enabled:
+          type: boolean
+        groupId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - enabled
+        - action
+      type: object
+    EmbedAccessAllEmbedUsersAction:
+      enum:
+        - read
+        - none
+      type: string
+    EmbedAccessResponse:
+      properties:
+        allEmbedUsers:
+          $ref: '#/components/schemas/EmbedAccessAllEmbedUsers'
+        allowEmbed:
+          type: boolean
+        tenants:
+          items:
+            $ref: '#/components/schemas/EmbedAccessTenantEntry'
+          type: array
+      required:
+        - allowEmbed
+        - allEmbedUsers
+        - tenants
+      type: object
+    EmbedAccessTenantEntry:
+      properties:
+        action:
+          $ref: '#/components/schemas/EmbedAccessTenantEntryAction'
+        embedTenantName:
+          type: string
+        groupId:
+          type: integer
+      required:
+        - embedTenantName
+        - groupId
+        - action
+      type: object
+    EmbedAccessTenantEntryAction:
+      enum:
+        - read
+        - none
+      type: string
+    EmbedGroupMemberInput:
+      properties:
+        embedUserId:
+          oneOf:
+            - minimum: 1
+              type: integer
+              description: Numeric id of an existing embed user. Provide this OR `externalId`.
+            - type: 'null'
+        externalId:
+          oneOf:
+            - minLength: 1
+              type: string
+              description: >-
+                External id of the embed user (the `externalId` passed to `generate-session`).
+                Provide this OR `embedUserId`.
+            - type: 'null'
+      type: object
+    EmbedGroupMembersInput:
+      properties:
+        members:
+          description: Embed users to add or remove (1–1000 per request).
+          items:
+            $ref: '#/components/schemas/EmbedGroupMemberInput'
+          maxItems: 1000
+          minItems: 1
+          type: array
+      required:
+        - members
+      type: object
+    EmbedGroupMembersMutationResponse:
+      properties:
+        addedMembers:
+          items:
+            $ref: '#/components/schemas/EmbedUser'
+          type: array
+        unchangedMembers:
+          items:
+            $ref: '#/components/schemas/EmbedUser'
+          type: array
+      required:
+        - addedMembers
+        - unchangedMembers
+      type: object
+    EmbedPythonFilteredRunInput:
+      properties:
+        reportId:
+          type: integer
+        reportVersionId:
+          type: integer
+        sqlQuery:
+          type: string
+      required:
+        - reportId
+        - sqlQuery
+        - reportVersionId
       type: object
     EmbedSessionSettings:
       properties:
@@ -3891,12 +6239,49 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    EmbedTenant:
+      properties:
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        displayName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        name:
+          type: string
+        userCount:
+          type: integer
+      required:
+        - id
+        - name
+        - userCount
+      type: object
     EmbedTenantProfile:
       properties:
         displayName:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    EmbedTenantsPublicResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedTenant'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
       type: object
     EmbedTheme:
       properties:
@@ -3949,6 +6334,44 @@ components:
             - type: string
             - type: 'null'
       type: object
+    EmbedUser:
+      properties:
+        createdAt:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        email:
+          oneOf:
+            - type: string
+            - type: 'null'
+        externalId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        lastLogin:
+          oneOf:
+            - oneOf:
+                - format: date
+                  type: string
+                - format: date-time
+                  type: string
+            - type: 'null'
+        username:
+          type: string
+      required:
+        - id
+        - username
+      type: object
     EmbedUserProfile:
       properties:
         displayName:
@@ -3961,7 +6384,19 @@ components:
               type: string
             - type: 'null'
       type: object
-    EnvVariableDto:
+    EmbedUsersPublicResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/EmbedUser'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    EnvVariableItem:
       properties:
         name:
           type: string
@@ -3975,10 +6410,17 @@ components:
       properties:
         data:
           items:
-            $ref: '#/components/schemas/EnvVariableDto'
+            $ref: '#/components/schemas/EnvVariableItem'
           type: array
       required:
         - data
+      type: object
+    FileHash:
+      properties:
+        hash:
+          type: string
+      required:
+        - hash
       type: object
     FillMissingRows:
       properties:
@@ -3993,6 +6435,37 @@ components:
       required:
         - member
       type: object
+    FinishUploadBody:
+      properties:
+        autoRemoveFiles:
+          oneOf:
+            - type: boolean
+              default: true
+            - type: 'null'
+        awaitGitOperations:
+          oneOf:
+            - type: boolean
+              default: true
+            - type: 'null'
+        commitMessage:
+          oneOf:
+            - type: string
+            - type: 'null'
+        files:
+          type: object
+        transaction:
+          $ref: '#/components/schemas/UploadTransaction'
+      required:
+        - transaction
+        - files
+      type: object
+    FinishUploadResponse:
+      properties:
+        lastHash:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
     Folder:
       properties:
         createdAt:
@@ -4005,6 +6478,10 @@ components:
           type: integer
         deploymentId:
           type: integer
+        folderPath:
+          items:
+            $ref: '#/components/schemas/WorkspaceFolderPathEntry'
+          type: array
         id:
           type: integer
         name:
@@ -4117,9 +6594,9 @@ components:
               deprecated: true
               description: >-
                 Deprecated and ignored. Global groups can no longer be created through this endpoint
-                — define them beforehand via the Cube Cloud UI or admin API. Still accepted for
-                backward compatibility (no error), but it has no effect. To create per-embed-tenant
-                groups, use `tenantGroupDefinitions`.
+                — define them beforehand via the Cube UI or admin API. Still accepted for backward
+                compatibility (no error), but it has no effect. To create per-embed-tenant groups,
+                use `tenantGroupDefinitions`.
             - type: 'null'
         groups:
           oneOf:
@@ -4132,11 +6609,11 @@ components:
                 control**: each name is placed verbatim into the Cube security context as
                 `cubeCloud.groups`, where your data model's `access_policy` rules reference it to
                 gate cubes, views, members, and row-/column-level filters. The groups must already
-                exist in the tenant (create them via the Cube Cloud UI or admin API beforehand) —
-                this endpoint never creates global groups, and names that do not resolve to an
-                existing group are rejected. Global groups are NOT shown in an embed tenant’s
-                Creator Mode UI. To share or organize content inside a single embed tenant, use
-                `tenantGroups` instead.
+                exist in the tenant (create them via the Cube UI or admin API beforehand) — this
+                endpoint never creates global groups, and names that do not resolve to an existing
+                group are rejected. Global groups are NOT shown in an embed tenant’s Creator Mode
+                UI. To share or organize content inside a single embed tenant, use `tenantGroups`
+                instead.
             - type: 'null'
         internalId:
           oneOf:
@@ -4264,6 +6741,85 @@ components:
         - name
         - viewer_last_viewed_at
       type: string
+    GitHubBranchResponse:
+      properties:
+        isDefault:
+          type: boolean
+        name:
+          type: string
+      required:
+        - name
+        - isDefault
+      type: object
+    GitHubBranchesListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/GitHubBranchResponse'
+          type: array
+      required:
+        - data
+      type: object
+    GitHubConnectStatusResponse:
+      properties:
+        connected:
+          type: boolean
+        linkUrl:
+          type: string
+        settingsUrl:
+          type: string
+      required:
+        - connected
+        - linkUrl
+        - settingsUrl
+      type: object
+    GitHubInstallationResponse:
+      properties:
+        avatarUrl:
+          type: string
+        id:
+          type: string
+        installationId:
+          type: string
+        login:
+          type: string
+      required:
+        - installationId
+        - id
+        - login
+        - avatarUrl
+      type: object
+    GitHubInstallationsListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/GitHubInstallationResponse'
+          type: array
+      required:
+        - data
+      type: object
+    GitHubRepoResponse:
+      properties:
+        htmlUrl:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - htmlUrl
+      type: object
+    GitHubReposListResponse:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/GitHubRepoResponse'
+          type: array
+      required:
+        - data
+      type: object
     GroupDefinition:
       properties:
         description:
@@ -4286,6 +6842,54 @@ components:
       required:
         - locale
         - value
+      type: object
+    MergeIntoParentBranchRequest:
+      properties:
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        deleteBranch:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        message:
+          oneOf:
+            - type: string
+            - type: 'null'
+        squashCommits:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        switchToParentBranch:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
+    MergeResponse:
+      properties:
+        branchDeleted:
+          type: boolean
+        merged:
+          type: boolean
+      required:
+        - merged
+        - branchDeleted
+      type: object
+    MergeToDefaultBranchRequest:
+      properties:
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        message:
+          type: string
+        removeBranchAfterMerge:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      required:
+        - message
       type: object
     MoveWorkspaceObjectInput:
       properties:
@@ -4632,6 +7236,35 @@ components:
         - hasNextPage
         - hasPreviousPage
       type: object
+    PeriodComparison:
+      properties:
+        measure:
+          type: string
+        offset:
+          $ref: '#/components/schemas/PeriodComparisonOffset'
+        outputs:
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+        timeDimension:
+          type: string
+      required:
+        - measure
+        - timeDimension
+        - offset
+      type: object
+    PeriodComparisonOffset:
+      properties:
+        amount:
+          type: integer
+        unit:
+          type: string
+      required:
+        - amount
+        - unit
+      type: object
     PivotItems:
       properties:
         columns:
@@ -4689,6 +7322,10 @@ components:
       type: object
     PublishDashboardInput:
       properties:
+        allowEmbed:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         config:
           oneOf:
             - $ref: '#/components/schemas/DashboardConfigInput'
@@ -4710,7 +7347,45 @@ components:
       required:
         - workbookId
       type: object
-    RegionDto:
+    PullRequest:
+      properties:
+        branchName:
+          type: string
+      required:
+        - branchName
+      type: object
+    PullResponse:
+      properties:
+        buildTriggered:
+          type: boolean
+      required:
+        - buildTriggered
+      type: object
+    PythonAnalysisFilteredRun:
+      properties:
+        at:
+          type: string
+        executionError:
+          oneOf:
+            - type: string
+            - type: 'null'
+        inputRowCount:
+          type: integer
+        outputData:
+          oneOf:
+            - {}
+            - type: 'null'
+        stderr:
+          type: string
+        stdout:
+          type: string
+      required:
+        - at
+        - stdout
+        - stderr
+        - inputRowCount
+      type: object
+    RegionResponse:
       properties:
         id:
           type: integer
@@ -4748,10 +7423,23 @@ components:
       properties:
         data:
           items:
-            $ref: '#/components/schemas/RegionDto'
+            $ref: '#/components/schemas/RegionResponse'
           type: array
       required:
         - data
+      type: object
+    RemoveDataModelFilesInput:
+      properties:
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        files:
+          items:
+            $ref: '#/components/schemas/DataModelFilePath'
+          type: array
+      required:
+        - files
       type: object
     RemoveNotificationRecipientInput:
       properties:
@@ -4792,6 +7480,19 @@ components:
           type: array
       required:
         - recipients
+      type: object
+    RenameDataModelFilesInput:
+      properties:
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        files:
+          items:
+            $ref: '#/components/schemas/DataModelFileRename'
+          type: array
+      required:
+        - files
       type: object
     Report:
       properties:
@@ -4835,6 +7536,10 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        folderPath:
+          items:
+            $ref: '#/components/schemas/WorkspaceFolderPathEntry'
+          type: array
         id:
           type: integer
         jsonQuery:
@@ -4968,6 +7673,12 @@ components:
         name:
           oneOf:
             - type: string
+            - type: 'null'
+        periodComparisons:
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/PeriodComparison'
+              type: array
             - type: 'null'
         preferences:
           oneOf:
@@ -5132,10 +7843,27 @@ components:
       properties:
         env_variables:
           items:
-            $ref: '#/components/schemas/EnvVariableDto'
+            $ref: '#/components/schemas/EnvVariableItem'
           type: array
       required:
         - env_variables
+      type: object
+    SheetsUiSettings:
+      properties:
+        showAppliedFilters:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
+    SourceTreeResponse:
+      properties:
+        data:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+      required:
+        - data
       type: object
     StartDbtSyncInput:
       properties:
@@ -5143,6 +7871,23 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+      type: object
+    StartDevModeRequest:
+      properties:
+        branchName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    StartUploadResponse:
+      properties:
+        deploymentName:
+          type: string
+        transaction:
+          $ref: '#/components/schemas/UploadTransaction'
+      required:
+        - transaction
+        - deploymentName
       type: object
     TenantSettings:
       properties:
@@ -5227,19 +7972,40 @@ components:
         - url
         - format
       type: object
+    UpdateDashboardEmbeddingInput:
+      properties:
+        allowEmbed:
+          description: >-
+            Whether customer-signed embedding is allowed for this dashboard ("Allow signed
+            embedding" in the UI). `true` lets embed sessions fetch the dashboard via `GET
+            /api/v1/embed/dashboard/{publicId}`; `false` makes that fetch return `403`. Does not
+            affect creator-mode sessions or dashboards shared with all embed users.
+          type: boolean
+      required:
+        - allowEmbed
+      type: object
+    UpdateDataModelFilesInput:
+      properties:
+        branchId:
+          type: integer
+        branchName:
+          type: string
+        files:
+          items:
+            $ref: '#/components/schemas/DataModelFileContent'
+          type: array
+      required:
+        - files
+      type: object
     UpdateDeploymentInput:
       properties:
-        cloudProvider:
-          oneOf:
-            - type: string
-            - type: 'null'
         creationMethod:
           oneOf:
             - $ref: '#/components/schemas/UpdateDeploymentInputCreationMethod'
             - type: 'null'
-        creationStep:
+        cspsConfig:
           oneOf:
-            - $ref: '#/components/schemas/CreationStep'
+            - $ref: '#/components/schemas/CspsConfigInput'
             - type: 'null'
         customDomain:
           oneOf:
@@ -5269,10 +8035,6 @@ components:
           oneOf:
             - type: string
             - type: 'null'
-        region:
-          oneOf:
-            - type: string
-            - type: 'null'
       type: object
     UpdateDeploymentInputCreationMethod:
       enum:
@@ -5286,6 +8048,39 @@ components:
         - git
         - cli
       type: string
+    UpdateEmbedAccessInput:
+      properties:
+        action:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateEmbedAccessInputAction'
+            - type: 'null'
+        allEmbedUsers:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        allowEmbed:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        embedTenantName:
+          oneOf:
+            - type: string
+            - type: 'null'
+      type: object
+    UpdateEmbedAccessInputAction:
+      enum:
+        - read
+        - none
+      type: string
+    UpdateEmbedGroupInput:
+      properties:
+        description:
+          oneOf:
+            - maxLength: 500
+              type: string
+              description: New description. Pass an empty string to clear it. Omit to leave it unchanged.
+            - type: 'null'
+      type: object
     UpdateFolderInput:
       properties:
         name:
@@ -5486,6 +8281,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/PivotItems'
             - type: 'null'
+        publicId:
+          oneOf:
+            - pattern: ^[0-9A-Za-z]+$
+              type: string
+              minLength: 12
+              maxLength: 12
+            - type: 'null'
         resultLocation:
           oneOf:
             - type: string
@@ -5526,6 +8328,23 @@ components:
           oneOf:
             - type: boolean
             - type: 'null'
+      type: object
+    UploadFileBody:
+      properties:
+        fileName:
+          type: string
+        transaction:
+          type: string
+      required:
+        - transaction
+        - fileName
+      type: object
+    UploadTransaction:
+      properties:
+        id:
+          type: string
+      required:
+        - id
       type: object
     User:
       properties:
@@ -5677,7 +8496,7 @@ components:
         name:
           type: string
         type:
-          $ref: '#/components/schemas/UserAttributeDTOType'
+          $ref: '#/components/schemas/UserAttributeType'
       required:
         - id
         - name
@@ -5707,14 +8526,6 @@ components:
         - type
       type: object
     UserAttributeCreateInputType:
-      enum:
-        - string
-        - number
-        - boolean
-        - string_array
-        - number_array
-      type: string
-    UserAttributeDTOType:
       enum:
         - string
         - number
@@ -5772,6 +8583,14 @@ components:
       required:
         - name
       type: object
+    UserAttributeType:
+      enum:
+        - string
+        - number
+        - boolean
+        - string_array
+        - number_array
+      type: string
     UserAttributeUpdateInput:
       properties:
         defaultValue:
@@ -5787,19 +8606,7 @@ components:
             - type: string
             - type: 'null'
       type: object
-    UserAttributeValueCreateInput:
-      properties:
-        userAttributeId:
-          minLength: 1
-          type: string
-        userId:
-          minLength: 1
-          type: string
-      required:
-        - userId
-        - userAttributeId
-      type: object
-    UserAttributeValueDTO:
+    UserAttributeValue:
       properties:
         description:
           oneOf:
@@ -5816,7 +8623,7 @@ components:
         name:
           type: string
         type:
-          $ref: '#/components/schemas/UserAttributeValueDTOType'
+          $ref: '#/components/schemas/UserAttributeValueType'
         userAttributeId:
           type: integer
         userId:
@@ -5831,7 +8638,23 @@ components:
         - name
         - type
       type: object
-    UserAttributeValueDTOType:
+    UserAttributeValueCreateInput:
+      properties:
+        userAttributeId:
+          minLength: 1
+          type: string
+        userId:
+          minLength: 1
+          type: string
+        value:
+          oneOf:
+            - {}
+            - type: 'null'
+      required:
+        - userId
+        - userAttributeId
+      type: object
+    UserAttributeValueType:
       enum:
         - string
         - number
@@ -5873,9 +8696,17 @@ components:
           oneOf:
             - type: boolean
             - type: 'null'
+        isExternal:
+          oneOf:
+            - {}
+            - type: 'null'
         password:
           oneOf:
             - type: string
+            - type: 'null'
+        picture:
+          oneOf:
+            - {}
             - type: 'null'
         username:
           type: string
@@ -6011,6 +8842,10 @@ components:
       type: object
     UserUpdateInput:
       properties:
+        embedTheme:
+          oneOf:
+            - {}
+            - type: 'null'
         firstName:
           oneOf:
             - type: string
@@ -6023,6 +8858,10 @@ components:
           oneOf:
             - type: boolean
             - type: 'null'
+        lastLogin:
+          oneOf:
+            - {}
+            - type: 'null'
         notifications:
           oneOf:
             - items:
@@ -6032,6 +8871,14 @@ components:
         password:
           oneOf:
             - type: string
+            - type: 'null'
+        picture:
+          oneOf:
+            - {}
+            - type: 'null'
+        securityContext:
+          oneOf:
+            - {}
             - type: 'null'
         settings:
           oneOf:
@@ -6158,6 +9005,10 @@ components:
           oneOf:
             - type: number
             - type: 'null'
+        folderPath:
+          items:
+            $ref: '#/components/schemas/WorkspaceFolderPathEntry'
+          type: array
         id:
           type: integer
         isFavorite:
@@ -6250,6 +9101,25 @@ components:
         - items
         - data
       type: object
+    WorkspaceBulkFailure:
+      properties:
+        error:
+          $ref: '#/components/schemas/BulkActionError'
+        id:
+          type: integer
+        type:
+          $ref: '#/components/schemas/WorkspaceBulkFailureType'
+      required:
+        - error
+        - type
+        - id
+      type: object
+    WorkspaceBulkFailureType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
     WorkspaceConnectionResponse:
       properties:
         items:
@@ -6262,3 +9132,45 @@ components:
         - items
         - pageInfo
       type: object
+    WorkspaceFolderPathEntry:
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+      type: object
+    WorkspaceItemRef:
+      properties:
+        id:
+          type: integer
+        type:
+          $ref: '#/components/schemas/WorkspaceItemRefType'
+      required:
+        - type
+        - id
+      type: object
+    WorkspaceItemRefInput:
+      properties:
+        id:
+          type: integer
+        type:
+          $ref: '#/components/schemas/WorkspaceItemRefInputType'
+      required:
+        - type
+        - id
+      type: object
+    WorkspaceItemRefInputType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
+    WorkspaceItemRefType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string

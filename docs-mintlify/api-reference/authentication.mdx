@@ -3,9 +3,10 @@ title: Authentication
 description: Authenticate REST and SCIM requests with a token sent using the Bearer prefix.
 ---
 
-How you authenticate depends on which API you call. Both the REST management API
-(`/api/v1/…`) and the SCIM API (`/api/scim/v2/…`) take a token in the
-`Authorization` header with the `Bearer` prefix, and only HTTPS is accepted.
+How you authenticate depends on which API you call. The REST management API
+(`/api/v1/…` and `/build/api/v1/…`) and the SCIM API (`/api/scim/v2/…`) all take
+a token in the `Authorization` header with the `Bearer` prefix, and only HTTPS is
+accepted.
 
 ## REST API (`/api/v1`)
 
@@ -29,6 +30,9 @@ curl --request GET \
   --url 'https://<tenant>.cubecloud.dev/api/v1/deployments' \
   --header 'Authorization: Bearer <YOUR_TOKEN>'
 ```
+
+The [data model endpoints](/api-reference/introduction#platform-api) under
+`/build/api/v1/…` take the same token — only the path prefix differs.
 
 ## SCIM API (`/api/scim/v2`)
 
