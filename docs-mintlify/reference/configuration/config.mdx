@@ -422,6 +422,21 @@ It should contain the `type` element corresponding to data source type and other
 options that will be passed to a data source driver. You can lookup supported options
 in the drivers' [source code][link-github-cube-drivers]. 
 
+<Info>
+
+A custom `driver_factory` takes precedence over the [`CUBEJS_PRE_AGGREGATIONS_*`
+environment variables][ref-preagg-data-source], for every data source rather than only the
+ones it handles. If both are configured, the `driver_factory` connection is used for
+pre-aggregations as well and a `Pre-aggregation driver conflict` warning is logged.
+
+The factory can't return a different connection for pre-aggregations either, since it
+receives no signal distinguishing a pre-aggregation connection request from a regular one.
+To use a dedicated connection for pre-aggregation builds, define it entirely through the
+`CUBEJS_PRE_AGGREGATIONS_*` environment variables and don't configure a custom
+`driver_factory`.
+
+</Info>
+
 <CodeGroup>
 
 ```python title="Python"
@@ -1496,6 +1511,7 @@ module.exports = {
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
 [ref-development-mode]: /docs/data-modeling/dev-mode
 [ref-multitenancy]: /embedding/multitenancy
+[ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-pre-aggregations-refresh-key]: /reference/data-modeling/pre-aggregations#refresh_key
