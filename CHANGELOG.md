@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
+
+### Features
+
+- **snowflake-driver:** Support query cancellation ([#11428](https://github.com/cube-js/cube/issues/11428)) ([7c75eda](https://github.com/cube-js/cube/commit/7c75edac4fcd13c2b0845e503d8a9df6f10e989d))
+
 ## [1.7.15](https://github.com/cube-js/cube/compare/v1.7.14...v1.7.15) (2026-07-30)
 
 ### Bug Fixes
