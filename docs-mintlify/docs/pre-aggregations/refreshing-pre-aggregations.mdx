@@ -61,8 +61,11 @@ limited to the `_DB_*` family — for example `CUBEJS_PRE_AGGREGATIONS_JDBC_URL`
 `CUBEJS_PRE_AGGREGATIONS_AWS_REGION`. In the decorated form for a named data source, the
 `DB_`, `JDBC_`, `AWS_`, `DATABASE`, and `FIREBOLT_` families are supported.
 
-Setting any one of these variables switches the data source onto the dedicated
-connection; there is no separate flag to enable it.
+Setting any one of these variables switches the data source's pre-aggregations onto the
+dedicated connection; there is no separate flag to enable it. Activation is prefix-based
+rather than name-based, so a misspelled variable such as
+`CUBEJS_PRE_AGGREGATIONS_DB_HSOT` still switches it on — combined with the rule below,
+that leaves every setting at its driver default.
 
 <Warning>
 

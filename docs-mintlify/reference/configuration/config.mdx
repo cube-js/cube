@@ -425,13 +425,15 @@ in the drivers' [source code][link-github-cube-drivers].
 <Info>
 
 A custom `driver_factory` takes precedence over the [`CUBEJS_PRE_AGGREGATIONS_*`
-environment variables][ref-preagg-data-source]. If both are configured, the
-`driver_factory` is used for pre-aggregations as well and a `Pre-aggregation driver
-conflict` warning is logged.
+environment variables][ref-preagg-data-source], for every data source rather than only the
+ones it handles. If both are configured, the `driver_factory` connection is used for
+pre-aggregations as well and a `Pre-aggregation driver conflict` warning is logged.
 
-To use a dedicated connection for pre-aggregation builds, either define it entirely
-through the `CUBEJS_PRE_AGGREGATIONS_*` environment variables without a custom
-`driver_factory`, or return the appropriate connection from the `driver_factory` itself.
+The factory can't return a different connection for pre-aggregations either, since it
+receives no signal distinguishing a pre-aggregation connection request from a regular one.
+To use a dedicated connection for pre-aggregation builds, define it entirely through the
+`CUBEJS_PRE_AGGREGATIONS_*` environment variables and don't configure a custom
+`driver_factory`.
 
 </Info>
 
