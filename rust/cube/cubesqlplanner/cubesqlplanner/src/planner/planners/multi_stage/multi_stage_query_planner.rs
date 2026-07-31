@@ -174,12 +174,16 @@ impl MultiStageQueryPlanner {
                 .multi_stage()
                 .map(|ms| ms.grain.clone())
                 .unwrap_or_default();
-            // Window-path eligibility intentionally checks only `include`:
-            // `exclude` and `keep_only` are realised through the window's
-            // PARTITION BY at render time, so they don't disqualify the
-            // path. `include` extends the leaf grain, which the JOIN-model
-            // is required for. Revisit if window-path expands to cases
-            // where exclude/keep_only affect render correctness.
+            // Of the `grain` lists only `include` disqualifies the window path
+            // here: `exclude` and `keep_only` are realised through the window's
+            // PARTITION BY at render time, while `include` extends the leaf
+            // grain, which the JOIN-model is required for.
+            //
+            // Grain is not the only disqualifier. A `filter` directive that
+            // drops a filter the query restricts the grid by also rules the
+            // window path out. Detecting that needs the inherited state, which
+            // only exists further down in `make_queries_descriptions` — the
+            // flag is revoked there.
             let has_include = grain.include.as_ref().is_some_and(|v| !v.is_empty());
             let use_window_path = matches!(member_type, MultiStageInodeMemberType::Aggregate)
                 && !has_include
@@ -512,7 +516,7 @@ impl MultiStageQueryPlanner {
                 alias.clone(),
             )
         } else {
-            let (multi_stage_member, is_ungrupped) = self
+            let (mut multi_stage_member, is_ungrupped) = self
                 .create_multi_stage_inode_member(member.clone(), resolved_multi_stage_dimensions)?;
 
             let mut dimensions_to_add = multi_stage_member
@@ -544,16 +548,39 @@ impl MultiStageQueryPlanner {
             // The window-path Aggregate inode skips step 2: the leaf stays
             // at the parent state plus any `include` extension, and the
             // window function does the `exclude` collapse at outer level.
-            let use_window_path = multi_stage_member.use_window_path();
-            let new_state = {
-                let mut new_state = match directive_filter.as_ref().map(|f| &f.mode) {
+            let filtered_state = {
+                let mut filtered_state = match directive_filter.as_ref().map(|f| &f.mode) {
                     Some(MultiStageFilterMode::Fixed) => self.root_state().as_ref().clone(),
                     Some(MultiStageFilterMode::Relative) | None => state.as_ref().clone(),
                 };
 
                 if let Some(filter) = &directive_filter {
-                    apply_filter_directive_to_state(filter, &mut new_state);
+                    apply_filter_directive_to_state(filter, &mut filtered_state);
                 }
+                filtered_state
+            };
+
+            // Step 1 can drop a filter the query restricts the grid by, and the
+            // window path cannot honour that. A window has a single row set
+            // serving both roles: the rows it reports and the rows it
+            // aggregates over. Dropping the filter widens the aggregation
+            // input, which is the point of the directive — but on the window
+            // path it widens the reported rows with it, so values the query
+            // filtered out come back as result rows. The JOIN-model can hold
+            // the two apart, so hand the inode to it.
+            //
+            // Handing it over restores the row set only for inodes that also
+            // reshape the grain: the keys side below is gated on the grain
+            // losing a dimension, and it is the keys side that carries the
+            // query's rows. An inode that drops a filter while keeping the
+            // parent grain gets no keys side and still reports the wider set.
+            if query_filters_dropped(self.root_state(), &state, &filtered_state) {
+                multi_stage_member = multi_stage_member.with_use_window_path(false);
+            }
+
+            let use_window_path = multi_stage_member.use_window_path();
+            let new_state = {
+                let mut new_state = filtered_state;
 
                 if !use_window_path
                     && matches!(
@@ -1082,6 +1109,67 @@ fn filter_directive_match_names(symbol: &Rc<MemberSymbol>) -> Vec<String> {
     } else {
         vec![full]
     }
+}
+
+// True when `narrowed` lost a *query-level* filter that `base` restricts the
+// grid by. Three conditions per filter: `base` has it, the query asked for it,
+// and `narrowed` doesn't have it.
+//
+// The query membership check is what keeps the notion anchored to the result
+// grid. A filter a parent multi-stage member introduced through its own
+// `filter: include` narrows that parent's view, not the grid the query asked
+// for; a child dropping it (`mode: fixed`) therefore cannot widen the grid
+// past the query, and needs no keys side.
+//
+// Measure filters are absent from the comparison because they never reach a
+// CTE state to begin with — `build_root_state` drops them — so there is no
+// query-level measure filter for a directive to lose. Filters added on top of
+// `base` don't count either: they shrink the grid, which is safe.
+fn query_filters_dropped(
+    root: &QueryProperties,
+    base: &QueryProperties,
+    narrowed: &QueryProperties,
+) -> bool {
+    // `FilterItem`'s own equality compares a filter's type, operator and
+    // values but not the member it targets, so two filters differing only in
+    // their member count as equal. Left alone, a dropped filter would be
+    // cancelled out by an unrelated look-alike that survived, hiding the
+    // widening. Segments carry their member in `full_name` and compare as-is.
+    fn same_filter(a: &FilterItem, b: &FilterItem) -> bool {
+        match (a, b) {
+            (FilterItem::Item(a), FilterItem::Item(b)) => {
+                a.member_name() == b.member_name() && a == b
+            }
+            (FilterItem::Group(a), FilterItem::Group(b)) => {
+                a.operator == b.operator
+                    && a.items.len() == b.items.len()
+                    && a.items
+                        .iter()
+                        .zip(b.items.iter())
+                        .all(|(a, b)| same_filter(a, b))
+            }
+            _ => a == b,
+        }
+    }
+
+    fn has(items: &[FilterItem], item: &FilterItem) -> bool {
+        items.iter().any(|candidate| same_filter(item, candidate))
+    }
+
+    fn any_dropped(root: &[FilterItem], base: &[FilterItem], narrowed: &[FilterItem]) -> bool {
+        base.iter()
+            .any(|item| has(root, item) && !has(narrowed, item))
+    }
+
+    any_dropped(
+        root.dimensions_filters(),
+        base.dimensions_filters(),
+        narrowed.dimensions_filters(),
+    ) || any_dropped(
+        root.time_dimensions_filters(),
+        base.time_dimensions_filters(),
+        narrowed.time_dimensions_filters(),
+    ) || any_dropped(root.segments(), base.segments(), narrowed.segments())
 }
 
 fn apply_filter_directive_to_state(filter: &MultiStageFilter, state: &mut QueryProperties) {

@@ -175,14 +175,17 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // Null-safe dimension join when keys are derived from the
-            // measure refs (FULL JOIN-equivalent shape). For the JOIN-model
-            // path (explicit keys) it's a one-to-one match — null-safety is
-            // unnecessary but stays correct.
+            // Dimension values include NULL, and a plain `=` never matches
+            // NULL to NULL — the key row would keep its place in the grid but
+            // lose the measure. Both shapes need the null-safe comparison; it
+            // costs the planner's ability to hash- or merge-join these keys on
+            // engines that treat the null-safe operator as unhashable, which is
+            // the same cost the keys-derived-from-measure-refs shape has always
+            // paid.
             join_builder.left_join_subselect(
                 query,
                 query_alias,
-                JoinCondition::new_dimension_join(conditions, !has_explicit_keys),
+                JoinCondition::new_dimension_join(conditions, true),
             );
         }
 

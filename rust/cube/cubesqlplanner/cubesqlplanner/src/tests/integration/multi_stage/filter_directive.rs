@@ -245,3 +245,104 @@ async fn test_mode_fixed_in_chain_diverges_from_relative() {
         insta::assert_snapshot!(result);
     }
 }
+
+// `grain.exclude` and `filter.exclude` naming the same dimension, which the
+// query both groups by and filters on. The value ignores the filter and the
+// partition; the row set stays the query's — the statuses the query filtered
+// out may not reappear.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_and_filter_exclude_keeps_query_row_set() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_grain_and_filter_exclude_status
+        dimensions:
+          - orders.status
+          - orders.category
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Share-of-total over a grand-total denominator that ignores the query filter.
+// The denominator's own aggregation must span every status while the ratio is
+// reported only for the rows the query asked for; a widened row set would show
+// up as extra rows whose share coalesces to 0.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_share_of_grand_total_keeps_query_row_set() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_share_percent
+        dimensions:
+          - orders.status
+          - orders.category
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    // Whitespace-stripped so the check survives a dialect rendering `OVER(`
+    // or breaking the window expression across lines.
+    let dense: String = sql.chars().filter(|c| !c.is_whitespace()).collect();
+    assert!(
+        !dense.contains("OVER("),
+        "the denominator has to hold the query's rows through a keys side, \
+         which a window expression cannot do:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A NULL dimension value is a grid key like any other: the keys side and the
+// measure side must still meet on it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_exclude_keeps_null_dimension_key() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_grain_and_filter_exclude_status
+        dimensions:
+          - orders.status
+          - orders.category_nullable
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

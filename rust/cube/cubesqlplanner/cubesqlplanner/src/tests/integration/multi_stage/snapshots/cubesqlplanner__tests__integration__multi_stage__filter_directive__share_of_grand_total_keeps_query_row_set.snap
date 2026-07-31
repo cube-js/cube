@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+assertion_line: 314
+expression: result
+---
+orders__status | orders__category | orders__amount_share_percent
+---------------+------------------+-----------------------------
+completed      | books            | 26.6666666666666667         
+completed      | clothing         | 13.3333333333333333         
+completed      | electronics      | 22.2222222222222222

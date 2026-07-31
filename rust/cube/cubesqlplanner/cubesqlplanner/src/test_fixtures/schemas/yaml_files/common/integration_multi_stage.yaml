@@ -125,6 +125,12 @@ cubes:
                 else:
                     sql: "{CUBE.status}"
 
+          # Every books row is NULL here, so a query grouping by it carries a
+          # NULL dimension key through the multi-stage assembly.
+          - name: category_nullable
+            type: string
+            sql: "NULLIF(category, 'books')"
+
           - name: customer_name
             type: string
             sql: "{customers.name}"
@@ -635,6 +641,41 @@ cubes:
             filter:
                 keep_only:
                     - orders.status
+
+          # Both directives name `status`: the value ignores the query filter
+          # on it (`filter`) and collapses its partition (`grain`). The result
+          # row set must still be the query's.
+          - name: amount_grain_and_filter_exclude_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.status
+            filter:
+                exclude:
+                    - orders.status
+
+          # Share-of-total shape: a grand-total denominator (grain drops every
+          # dimension) that also ignores the query filter on `status`, consumed
+          # by a ratio that coalesces a missing denominator to 0 — so a widened
+          # row set surfaces as extra rows reading 0 rather than NULL.
+          - name: amount_grand_total_unfiltered
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.status
+                    - orders.category
+            filter:
+                exclude:
+                    - orders.status
+
+          - name: amount_share_percent
+            type: number
+            multi_stage: true
+            sql: "coalesce(100 * {CUBE.total_amount} / nullif({CUBE.amount_grand_total_unfiltered}, 0), 0)"
 
           - name: amount_only_completed
             type: sum
