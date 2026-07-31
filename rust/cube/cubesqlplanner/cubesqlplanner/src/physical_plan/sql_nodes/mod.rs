@@ -29,6 +29,7 @@ pub mod time_dimension;
 pub mod time_shift;
 pub mod ungroupped_measure;
 pub mod ungroupped_query_final_measure;
+pub mod window_partition;
 
 pub use auto_prefix::AutoPrefixSqlNode;
 pub use case::CaseSqlNode;

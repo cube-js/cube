@@ -1,7 +1,9 @@
 //! Tests for MeasureSymbol: kind classification, the patch_measure transform, and helper methods
 
-use crate::planner::symbols::transforms::patch_measure;
-use crate::planner::{AggregationType, CalculatedMeasureType, MeasureKind, SqlCall};
+use crate::planner::symbols::transforms::{measures_as_state, patch_measure};
+use crate::planner::{
+    AggregationType, CalculatedMeasureType, MeasureKind, MeasureRenderModifier, SqlCall,
+};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;
@@ -419,6 +421,141 @@ fn patch_appends_to_existing_filters() {
         patched.measure_filters().len(),
         original_count + new_filters.len()
     );
+}
+
+// ─── State form ─────────────────────────────────────────────────────────────
+
+// Only an aggregation with a mergeable partial value has a state form,
+// and taking it twice is not possible.
+#[test]
+fn state_form_exists_only_for_count_distinct_approx() {
+    let ctx = ctx();
+    let stateful = ctx.create_measure("test_measures.approx_count").unwrap();
+    let state = stateful.as_measure().unwrap().kind().as_state();
+    assert!(matches!(
+        state,
+        Some(MeasureKind::AggregatedState(ref a)) if a.agg_type() == AggregationType::CountDistinctApprox
+    ));
+    assert!(
+        state.unwrap().as_state().is_none(),
+        "a state form has no state form of its own"
+    );
+
+    for path in [
+        "test_measures.total",
+        "test_measures.cnt",
+        "test_measures.distinct_count",
+        "test_measures.calculated",
+        "test_measures.rank_measure",
+    ] {
+        let m = ctx.create_measure(path).unwrap();
+        assert!(
+            m.as_measure().unwrap().kind().as_state().is_none(),
+            "{path} must have no state form"
+        );
+    }
+}
+
+// A stored state is not a value the query can filter or re-type: it is
+// consumed by a merge, not by an aggregation over rows.
+#[test]
+fn state_form_classification() {
+    let ctx = ctx();
+    let m = ctx.create_measure("test_measures.approx_count").unwrap();
+    let state = measures_as_state(&m).unwrap();
+    let state = state.as_measure().unwrap();
+
+    assert!(matches!(state.kind(), MeasureKind::AggregatedState(_)));
+    assert!(!state.kind().supports_additional_filters());
+    assert!(!state.kind().can_replace_type_with("count_distinct"));
+    assert_eq!(
+        state.measure_type(),
+        m.as_measure().unwrap().measure_type(),
+        "the state form keeps the aggregation it stores"
+    );
+}
+
+// ─── Render modifiers ───────────────────────────────────────────────────────
+
+// `applies_to` is the single authority for which measures may take a
+// form: stamping consults it and the render nodes assert it, so both
+// sides move together and only a test can pin the answers.
+#[test]
+fn render_modifier_row_level_forms_apply_to_every_measure() {
+    let ctx = ctx();
+    for path in [
+        "test_measures.total",
+        "test_measures.cnt",
+        "test_measures.calculated",
+        "test_measures.rank_measure",
+        "test_measures.rolling_sum",
+    ] {
+        let m = ctx.create_measure(path).unwrap();
+        let measure = m.as_measure().unwrap();
+        assert!(MeasureRenderModifier::RawValue.applies_to(&measure));
+        assert!(MeasureRenderModifier::UngroupedFinal.applies_to(&measure));
+    }
+}
+
+#[test]
+fn render_modifier_rolling_merge_requires_a_cumulative_measure() {
+    let ctx = ctx();
+    let rolling = ctx.create_measure("test_measures.rolling_sum").unwrap();
+    let plain = ctx.create_measure("test_measures.total").unwrap();
+
+    assert!(MeasureRenderModifier::RollingMerge.applies_to(&rolling.as_measure().unwrap()));
+    assert!(!MeasureRenderModifier::RollingMerge.applies_to(&plain.as_measure().unwrap()));
+}
+
+#[test]
+fn render_modifier_multi_stage_forms_require_multi_stage_measures() {
+    let ctx = ctx();
+    let rank = MeasureRenderModifier::MultiStageRank { partition: vec![] };
+    let window = MeasureRenderModifier::MultiStageWindow { partition: vec![] };
+
+    let ms_rank = ctx
+        .create_measure("test_measures.multi_stage_rank")
+        .unwrap();
+    let ms_total = ctx
+        .create_measure("test_measures.multi_stage_total")
+        .unwrap();
+    let ms_calculated = ctx
+        .create_measure("test_measures.multi_stage_calculated")
+        .unwrap();
+    let plain_rank = ctx.create_measure("test_measures.rank_measure").unwrap();
+
+    // A rank window ranks a multi-stage rank measure and nothing else.
+    assert!(rank.applies_to(&ms_rank.as_measure().unwrap()));
+    assert!(!rank.applies_to(&ms_total.as_measure().unwrap()));
+    assert!(!rank.applies_to(&plain_rank.as_measure().unwrap()));
+
+    // A value window aggregates over a partition, which a calculated
+    // measure has no aggregation for.
+    assert!(window.applies_to(&ms_total.as_measure().unwrap()));
+    assert!(!window.applies_to(&ms_calculated.as_measure().unwrap()));
+    assert!(!window.applies_to(&plain_rank.as_measure().unwrap()));
+}
+
+#[test]
+fn ensure_applies_to_names_the_rejected_form() {
+    let ctx = ctx();
+    let plain = ctx.create_measure("test_measures.total").unwrap();
+    let measure = plain.as_measure().unwrap();
+
+    assert!(MeasureRenderModifier::RollingMerge
+        .ensure_applies_to(&measure)
+        .is_err());
+    let err = MeasureRenderModifier::RollingMerge
+        .ensure_applies_to(&measure)
+        .unwrap_err();
+    assert!(
+        err.message.contains("RollingMerge") && err.message.contains("test_measures.total"),
+        "unexpected error message: {}",
+        err.message
+    );
+    assert!(MeasureRenderModifier::RawValue
+        .ensure_applies_to(&measure)
+        .is_ok());
 }
 
 // ─── Multi-stage properties + filter directive ──────────────────────────────

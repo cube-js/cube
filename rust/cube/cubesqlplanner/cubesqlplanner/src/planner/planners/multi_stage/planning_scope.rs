@@ -34,9 +34,9 @@ impl CteState {
     }
 }
 
-/// How values are evaluated within a multi-stage leaf scope: the
-/// time basis of its dimensions and the measure evaluation shape
-/// (mergeable state for aggregates-on-top, ungrouped evaluation).
+/// How values are evaluated within a multi-stage leaf scope: the time
+/// basis of its dimensions and whether measures are evaluated at row
+/// grain for an enclosing aggregation.
 #[derive(Clone, Default)]
 pub struct EvaluationContext {
     pub time_shifts: TimeShiftState,

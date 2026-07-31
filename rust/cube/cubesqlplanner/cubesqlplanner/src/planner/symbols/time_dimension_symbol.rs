@@ -148,13 +148,37 @@ impl TimeDimensionSymbol {
             new_granularity.clone(),
         )?;
         let date_range_tuple = self.date_range.clone();
-        let result = TimeDimensionSymbol::new(
+        Ok(self.derive(
             self.base_symbol.clone(),
             new_granularity.clone(),
             new_granularity_obj.clone(),
             date_range_tuple,
-        );
-        Ok(result)
+            None,
+        ))
+    }
+
+    /// Another form of the same time dimension — a different
+    /// granularity of it, or the member it references. Render marks
+    /// describe where the value comes from, which such a re-wrap does
+    /// not change, so they are carried over.
+    fn derive(
+        &self,
+        base_symbol: Rc<MemberSymbol>,
+        granularity: Option<String>,
+        granularity_obj: Option<Granularity>,
+        date_range: Option<(String, String)>,
+        alias_override: Option<String>,
+    ) -> Rc<Self> {
+        let mut new = (*Self::new_with_alias(
+            base_symbol,
+            granularity,
+            granularity_obj,
+            date_range,
+            alias_override,
+        ))
+        .clone();
+        new.tz_converted_at_source = self.tz_converted_at_source;
+        Rc::new(new)
     }
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
@@ -251,7 +275,7 @@ impl TimeDimensionSymbol {
     /// range. `None` if the base is not a reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         if let Some(base_symbol) = self.base_symbol.clone().reference_member() {
-            let new_time_dim = Self::new_with_alias(
+            let new_time_dim = self.derive(
                 base_symbol,
                 self.granularity.clone(),
                 self.granularity_obj.clone(),

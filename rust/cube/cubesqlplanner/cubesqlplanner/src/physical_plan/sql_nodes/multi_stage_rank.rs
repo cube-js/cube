@@ -1,3 +1,4 @@
+use super::window_partition::render_partition_by;
 use super::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
@@ -38,12 +39,7 @@ impl SqlNode for MultiStageRankNode {
                 if let Some(modifier @ MeasureRenderModifier::MultiStageRank { partition }) =
                     m.render_modifier()
                 {
-                    if !modifier.applies_to(m) {
-                        return Err(CubeError::internal(format!(
-                            "MultiStageRank render modifier on incompatible measure {}",
-                            m.full_name()
-                        )));
-                    }
+                    modifier.ensure_applies_to(m)?;
                     let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let order_by = if !m.measure_order_by().is_empty() {
                         let sql = m
@@ -64,16 +60,12 @@ impl SqlNode for MultiStageRankNode {
                     } else {
                         "".to_string()
                     };
-                    let partition_by = if partition.is_empty() {
-                        "".to_string()
-                    } else {
-                        let columns = partition
-                            .iter()
-                            .map(|dim| inner_visitor.apply(dim, node_processor.clone(), templates))
-                            .collect::<Result<Vec<_>, _>>()?
-                            .join(", ");
-                        format!("PARTITION BY {} ", columns)
-                    };
+                    let partition_by = render_partition_by(
+                        partition,
+                        &inner_visitor,
+                        node_processor.clone(),
+                        templates,
+                    )?;
                     format!("rank() OVER ({partition_by}{order_by})")
                 } else {
                     self.else_processor.to_sql(

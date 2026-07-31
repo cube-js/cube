@@ -11,6 +11,9 @@ pub fn mark_tz_converted_at_source(
     symbol: &Rc<MemberSymbol>,
     names: &HashSet<String>,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
+    if names.is_empty() {
+        return Ok(symbol.clone());
+    }
     symbol.apply_recursive(&|node| {
         if let MemberSymbol::TimeDimension(td) = node.as_ref() {
             if !td.tz_converted_at_source() && names.contains(&node.full_name()) {

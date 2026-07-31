@@ -5,8 +5,9 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 /// Leaf CTE of a multi-stage chain — a base query that produces the
-/// raw aggregated values feeding the rest of the chain. Optional
-/// state rendering and time shifts come from `evaluation_context`.
+/// raw aggregated values feeding the rest of the chain. The measures
+/// carry their own render form; time shifts and row-grain evaluation
+/// come from `evaluation_context`.
 pub struct MultiStageLeafMeasure {
     pub measures: Vec<Rc<MemberSymbol>>,
     pub evaluation_context: EvaluationContext,

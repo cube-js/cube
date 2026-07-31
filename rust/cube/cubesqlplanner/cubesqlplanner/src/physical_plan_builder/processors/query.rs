@@ -171,10 +171,12 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             None
         };
         if let Some(modifier) = &measure_modifier {
-            schema = logical_transforms::measures_render_modifier_in_schema(&schema, modifier)?;
-            having = transforms::map_filter_symbols(having, &|symbol| {
+            let stamp = |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
                 transforms::measures_render_modifier(symbol, modifier)
-            })?;
+            };
+            schema = logical_transforms::measures_render_modifier_in_schema(&schema, modifier)?;
+            filter = transforms::map_filter_symbols(filter, &stamp)?;
+            having = transforms::map_filter_symbols(having, &stamp)?;
         }
 
         let is_pre_aggregation = matches!(logical_plan.source(), QuerySource::PreAggregation(_));
@@ -262,10 +264,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         } else {
             logical_plan.modifers().order_by.clone()
         };
+        // Items present in the schema are sorted by their stamped schema
+        // symbol; only a measure absent from the projection carries its
+        // own symbol into the ORDER BY and needs the form here.
         let order_by = if let Some(modifier) = &measure_modifier {
             order_by
                 .iter()
                 .map(|o| -> Result<_, CubeError> {
+                    if !schema.find_member_positions(&o.name()).is_empty() {
+                        return Ok(o.clone());
+                    }
                     Ok(OrderByItem::new(
                         transforms::measures_render_modifier(&o.member_symbol(), modifier)?,
                         o.desc(),

@@ -1,3 +1,4 @@
+use super::window_partition::render_partition_by;
 use super::SqlNode;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
@@ -46,12 +47,7 @@ impl SqlNode for MultiStageWindowNode {
                 if let Some(modifier @ MeasureRenderModifier::MultiStageWindow { partition }) =
                     m.render_modifier()
                 {
-                    if !modifier.applies_to(m) {
-                        return Err(CubeError::internal(format!(
-                            "MultiStageWindow render modifier on incompatible measure {}",
-                            m.full_name()
-                        )));
-                    }
+                    modifier.ensure_applies_to(m)?;
                     let inner_visitor = visitor.with_arg_needs_paren_safe(false);
                     let input_sql = self.input.to_sql(
                         &inner_visitor,
@@ -61,16 +57,12 @@ impl SqlNode for MultiStageWindowNode {
                         templates,
                     )?;
 
-                    let partition_by = if partition.is_empty() {
-                        "".to_string()
-                    } else {
-                        let columns = partition
-                            .iter()
-                            .map(|dim| inner_visitor.apply(dim, node_processor.clone(), templates))
-                            .collect::<Result<Vec<_>, _>>()?
-                            .join(", ");
-                        format!("PARTITION BY {} ", columns)
-                    };
+                    let partition_by = render_partition_by(
+                        partition,
+                        &inner_visitor,
+                        node_processor.clone(),
+                        templates,
+                    )?;
                     let measure_type = m.measure_type();
                     format!("{measure_type}({measure_type}({input_sql})) OVER ({partition_by})")
                 } else {

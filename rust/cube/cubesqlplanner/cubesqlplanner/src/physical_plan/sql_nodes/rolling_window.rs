@@ -8,9 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
-/// Renders cumulative measures (rolling window / running total)
-/// through `input`, delegating non-cumulative measures to
-/// `default_processor`.
+/// Merges the partial values a rolling window produces over `input`.
+/// Aggregation types that have no merge form are delegated to
+/// `default_processor`, which renders them as a plain aggregation.
 pub struct RollingWindowNode {
     input: Rc<dyn SqlNode>,
     default_processor: Rc<dyn SqlNode>,
@@ -39,7 +39,7 @@ impl SqlNode for RollingWindowNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
-            MemberSymbol::Measure(m) if m.is_cumulative() => {
+            MemberSymbol::Measure(m) => {
                 let delegate = || {
                     self.default_processor.to_sql(
                         visitor,
@@ -61,33 +61,30 @@ impl SqlNode for RollingWindowNode {
                 };
                 match m.kind() {
                     MeasureKind::Count(_) => format!("sum({})", render_input()?),
-                    MeasureKind::Aggregated(a) => match a.agg_type() {
-                        AggregationType::CountDistinctApprox => {
-                            templates.hll_cardinality_merge(render_input()?)?
+                    // A state form holds the same aggregation as its
+                    // plain counterpart, stored unmerged, so it merges
+                    // the same way.
+                    MeasureKind::Aggregated(a) | MeasureKind::AggregatedState(a) => {
+                        match a.agg_type() {
+                            AggregationType::CountDistinctApprox => {
+                                templates.hll_cardinality_merge(render_input()?)?
+                            }
+                            AggregationType::Sum => {
+                                format!("sum({})", render_input()?)
+                            }
+                            AggregationType::Min | AggregationType::Max => {
+                                format!("{}({})", a.agg_type().as_str(), render_input()?)
+                            }
+                            AggregationType::Avg
+                            | AggregationType::CountDistinct
+                            | AggregationType::NumberAgg => delegate()?,
                         }
-                        AggregationType::Sum => {
-                            format!("sum({})", render_input()?)
-                        }
-                        AggregationType::Min | AggregationType::Max => {
-                            format!("{}({})", a.agg_type().as_str(), render_input()?)
-                        }
-                        AggregationType::Avg
-                        | AggregationType::CountDistinct
-                        | AggregationType::NumberAgg => delegate()?,
-                    },
+                    }
                     MeasureKind::MultipliedCount(_)
-                    | MeasureKind::AggregatedState(_)
                     | MeasureKind::Calculated(_)
                     | MeasureKind::Rank => delegate()?,
                 }
             }
-            MemberSymbol::Measure(_) => self.default_processor.to_sql(
-                visitor,
-                node,
-                query_tools.clone(),
-                node_processor,
-                templates,
-            )?,
             _ => {
                 return Err(CubeError::internal(format!(
                     "Unexpected evaluation node type for RollingWindowNode"

@@ -13,6 +13,10 @@ cubes:
           - name: created_day
             type: time
             sql: "{CUBE.created_at.day}"
+          # A measure reached through a dimension's expression tree.
+          - name: count_label
+            type: string
+            sql: "CASE WHEN {CUBE.count} > 3 THEN 'high' ELSE 'low' END"
       measures:
           - name: count
             type: count

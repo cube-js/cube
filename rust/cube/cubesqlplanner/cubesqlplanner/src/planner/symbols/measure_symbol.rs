@@ -85,10 +85,9 @@ pub enum MeasureTimeShifts {
 /// select.
 ///
 /// `None` on the symbol means both "no stamping pass has decided yet"
-/// and "the usual final aggregation" — the two coincide because no
-/// pass ever needs to force the default form over an earlier stamp
-/// (stamping only fills `None`). A variant meaning "explicitly the
-/// default" would break that precedence scheme.
+/// and "the usual final aggregation" — the two coincide because
+/// stamping only ever fills `None`, so nothing needs to express
+/// "explicitly the default" to defend it against a later pass.
 #[derive(Clone, Debug)]
 pub enum MeasureRenderModifier {
     /// Raw row-level value without the aggregation wrap, re-aggregated
@@ -124,6 +123,29 @@ impl MeasureRenderModifier {
                 measure.is_multi_stage() && matches!(measure.kind(), MeasureKind::Rank)
             }
             Self::MultiStageWindow { .. } => measure.is_multi_stage() && !measure.is_calculated(),
+        }
+    }
+
+    /// Render-side check that the measure reaching a form's node really
+    /// carries that form's prerequisites.
+    pub fn ensure_applies_to(&self, measure: &MeasureSymbol) -> Result<(), CubeError> {
+        if self.applies_to(measure) {
+            return Ok(());
+        }
+        Err(CubeError::internal(format!(
+            "{} render modifier on incompatible measure {}",
+            self.name(),
+            measure.full_name()
+        )))
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Self::RawValue => "RawValue",
+            Self::UngroupedFinal => "UngroupedFinal",
+            Self::RollingMerge => "RollingMerge",
+            Self::MultiStageRank { .. } => "MultiStageRank",
+            Self::MultiStageWindow { .. } => "MultiStageWindow",
         }
     }
 }
