@@ -3,9 +3,10 @@ title: Authentication
 description: Authenticate REST and SCIM requests with a token sent using the Bearer prefix.
 ---
 
-How you authenticate depends on which API you call. Both the REST management API
-(`/api/v1/…`) and the SCIM API (`/api/scim/v2/…`) take a token in the
-`Authorization` header with the `Bearer` prefix, and only HTTPS is accepted.
+How you authenticate depends on which API you call. The REST management API
+(`/api/v1/…` and `/build/api/v1/…`) and the SCIM API (`/api/scim/v2/…`) all take
+a token in the `Authorization` header with the `Bearer` prefix, and only HTTPS is
+accepted.
 
 ## REST API (`/api/v1`)
 
@@ -16,8 +17,8 @@ the `Bearer` prefix:
 Authorization: Bearer <YOUR_TOKEN>
 ```
 
-The token can be an API key generated in your Cube Cloud account settings, or an
-OAuth access token from Cube Cloud's OAuth flow — both are sent the same way.
+The token can be an API key generated in your Cube account settings, or an
+OAuth access token from Cube's OAuth flow — both are sent the same way.
 
 If the API key is [scoped to specific deployments](/admin/account-billing/api-keys#deployment-scope),
 it only authorizes requests for those deployments. A request targeting a
@@ -29,6 +30,9 @@ curl --request GET \
   --url 'https://<tenant>.cubecloud.dev/api/v1/deployments' \
   --header 'Authorization: Bearer <YOUR_TOKEN>'
 ```
+
+The [data model endpoints](/api-reference/introduction#platform-api) under
+`/build/api/v1/…` take the same token — only the path prefix differs.
 
 ## SCIM API (`/api/scim/v2`)
 
@@ -42,9 +46,9 @@ Authorization: Bearer <YOUR_SCIM_TOKEN>
 The SCIM API requires the `Bearer` prefix because identity providers (Microsoft
 Entra ID, Okta, and others) send credentials this way per
 [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644). The SCIM token is a
-Cube Cloud API key, so `Api-Key <YOUR_SCIM_TOKEN>` is also accepted here.
+Cube API key, so `Api-Key <YOUR_SCIM_TOKEN>` is also accepted here.
 
-Generate a SCIM token in your Cube Cloud account settings, then configure it in
+Generate a SCIM token in your Cube account settings, then configure it in
 your identity provider alongside the
 [base URL](/api-reference/introduction#platform-api).
 
