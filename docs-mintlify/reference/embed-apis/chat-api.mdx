@@ -31,8 +31,17 @@ https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/deployments/{
 Copy the exact URL from the deployment's **Settings → API credentials → Chat API**
 tab, also reachable from the **Chat** entry on the deployment's **Status** page.
 
-Both forms take the same authentication, request body, and streaming response;
-only the agent they resolve to differs.
+The two forms differ in which authentication they accept:
+
+| | [API key](#api-key-authentication) | [Cube token](#cube-token-authentication) |
+|---|:---:|:---:|
+| `/agents/{agentId}/…` | ✓ | ✓ |
+| `/deployments/{deploymentId}/…` | — | ✓ |
+
+The deployment form is served **only** through the Cube token exchange, which is
+what resolves the Auto agent — an API key carries no agent, so a request without
+`{agentId}` in the path is rejected with `403 agentId is required for Api-Key
+authentication`. Request body and streaming response are identical for both.
 
 
 ## Overview
