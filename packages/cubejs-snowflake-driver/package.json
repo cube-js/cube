@@ -23,7 +23,7 @@
     "watch": "tsc -w",
     "unit": "vitest run test/unit",
     "integration": "npm run integration:snowflake",
-    "integration:snowflake": "vitest run",
+    "integration:snowflake": "vitest run test/SnowflakeDriver.test.ts",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
