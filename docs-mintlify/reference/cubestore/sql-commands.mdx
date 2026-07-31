@@ -4,11 +4,11 @@ description: "Reference for the diagnostic, maintenance, and recovery SQL comman
 ---
 
 Cube Store, the [pre-aggregation storage engine][ref-cube-store-architecture],
-partially supports the MySQL protocol and accepts a set of SQL commands beyond
-`SELECT`. They fall into three tiers:
+partially supports the MySQL protocol. Alongside queries, it accepts a set of
+administrative commands, which fall into three tiers:
 
-- [Diagnostics](#diagnostics) — inspect pre-aggregations and query plans. Safe
-  to run at any time.
+- [Diagnostics](#diagnostics) — inspect pre-aggregations and query plans. These
+  don't change cluster state.
 - [Cache and queue](#cache-and-queue) — inspect and manipulate the cache and the
   queue used for pre-aggregation builds.
 - [Store maintenance and recovery](#store-maintenance-and-recovery) — operate on
@@ -52,18 +52,23 @@ This connection is available when you run Cube Store yourself. Cube's cloud
 platform doesn't expose the Cube Store port, so you can't attach a MySQL client
 to it.
 
-You can still run the [diagnostic commands](#diagnostics) there: in the SQL
-Runner, pick the `cache` data source and run them against Cube Store. Only
-read-only statements are accepted on that path, so the [cache and
-queue](#cache-and-queue) and [store maintenance and
-recovery](#store-maintenance-and-recovery) commands below are rejected. If you
-need one of those, contact support.
+You can still inspect query plans there: in the SQL Runner, pick the `cache` data
+source and run `EXPLAIN` or `EXPLAIN ANALYZE` against Cube Store. That path only
+accepts read-only statements, so the [cache and queue](#cache-and-queue) and
+[store maintenance and recovery](#store-maintenance-and-recovery) commands below
+are rejected before they reach Cube Store. If you need one of those, contact
+support.
+
+Avoid `DUMP` there — it isn't blocked, but it writes to the router's local disk
+and nothing cleans it up.
 
 </Note>
 
 ## Diagnostics
 
-These commands only read state and are safe to run on a healthy cluster.
+These commands don't change cluster state and are safe to run on a healthy
+cluster. `DUMP` is the one exception to watch: it doesn't touch cluster state
+either, but it does write to the router's local disk — see below.
 
 ### `information_schema.tables`
 
@@ -181,6 +186,16 @@ DUMP select_statement;
 files the query reads into a new directory under `dumps/` and returns its path.
 Use it to capture the exact state behind a query for offline inspection.
 
+<Warning>
+
+Unlike the other diagnostic commands, `DUMP` writes to the router's local disk,
+and the directory it creates is never cleaned up automatically. A query that
+touches many partitions copies every Parquet file it reads, so repeated dumps on
+a production router accumulate without bound. Delete the directory once you're
+done with it.
+
+</Warning>
+
 ## Cache and queue
 
 Cube Store keeps a key-value cache and a job queue in its cache store. These
@@ -212,14 +227,14 @@ It requires a cache store healthy enough to be read.
 Synopsis:
 
 ```sql
-QUEUE ADD [EXCLUSIVE] [PRIORITY priority] [ORPHANED timeout] key 'value';
+QUEUE ADD [EXCLUSIVE] [PRIORITY priority] [ORPHANED timeout] [EXTERNAL_ID 'id'] key 'value';
 QUEUE GET key;
 QUEUE LIST [WITH_PAYLOAD] prefix;
 QUEUE PENDING [WITH_PAYLOAD] prefix;
 QUEUE ACTIVE [WITH_PAYLOAD] prefix;
-QUEUE RESULT key;
+QUEUE RESULT [EXTERNAL_ID 'id'] key;
 QUEUE RESULT_BLOCKING timeout key;
-QUEUE ACK key result;
+QUEUE ACK key { result | NULL };
 QUEUE CANCEL key;
 QUEUE HEARTBEAT key;
 QUEUE RETRIEVE [EXTENDED] [CONCURRENCY n] key;
@@ -234,6 +249,10 @@ The queue coordinates pre-aggregation builds. `QUEUE LIST`, `QUEUE PENDING`, and
 `QUEUE ACTIVE` inspect it; `QUEUE STALLED`, `QUEUE ORPHANED`, and `QUEUE
 TO_CANCEL` list jobs that have stopped making progress. The remaining commands
 add, claim, acknowledge, and cancel individual jobs.
+
+`QUEUE ADD`'s options may be given in any order. For `GET`, `ACK`, `CANCEL`,
+`HEARTBEAT`, `RESULT`, `RESULT_BLOCKING`, and `MERGE_EXTRA`, `key` is either the
+job's path or its numeric queue id.
 
 `QUEUE CLEAR` empties the queue by iterating over its entries, the same way
 `CACHE CLEAR` does.
@@ -293,8 +312,10 @@ TRUNCATE` and for the same reason.
 
 `SYS CACHESTORE WIPE` goes further: it stops the store's background loops, then
 destroys and reopens RocksDB from scratch to force a clean snapshot. Once the
-teardown begins the previous state cannot be restored. Use it only when the
-cachestore is unrecoverable by other means.
+teardown begins the previous state cannot be restored. If the teardown then fails
+to finish, the cachestore is left closed and rejects every operation until the
+node is restarted. Use it only when the cachestore is unrecoverable by other
+means.
 
 </Warning>
 

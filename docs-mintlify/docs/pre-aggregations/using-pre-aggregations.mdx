@@ -340,8 +340,8 @@ scans on sorted data, and if `GROUP BY` matches index ordering, merge
 sort-based algorithms are used for querying, which are usually much faster
 than hash-based `GROUP BY` in case index ordering doesn't match the query.
 
-If in doubt, always [use `EXPLAIN` and `EXPLAIN ANALYZE`](#explain-queries)
-to figure out the final query plan.
+If in doubt, always [use `EXPLAIN` and `EXPLAIN
+ANALYZE`][ref-cubestore-sql-commands] to figure out the final query plan.
 
 #### Example
 
@@ -784,8 +784,8 @@ first for the single-value filter, then the rest) lets it serve the query with a
 fast merge scan.
 
 With both indexes defined, each query is routed to the most efficient one without
-any change to the query itself. Use [`EXPLAIN`](#explain-queries) to confirm which
-index a given query selects.
+any change to the query itself. Use [`EXPLAIN`][ref-cubestore-sql-commands] to
+confirm which index a given query selects.
 
 ### Compaction
 
