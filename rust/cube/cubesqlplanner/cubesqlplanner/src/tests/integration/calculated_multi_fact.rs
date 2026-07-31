@@ -415,7 +415,12 @@ async fn test_calculated_measure_without_component_measures() {
 /// read off a leaf-measure query that keeps its aggregate, so it needs no
 /// decomposition and must be evaluated whole: its components root at different
 /// cubes, and splitting them would divide `gold_amount` by a `total_amount`
-/// taken over a wider set of rows than its own leg sees.
+/// taken over a different set of rows than its own leg sees.
+///
+/// Evaluated whole, both sides of the ratio see the `customers`-joined rows:
+/// `SUCCESS` is 100 * 300 / 700, p5 having no customer, while the sibling
+/// `payments.total_amount` column reads 1200 over all rows. The two columns are
+/// not meant to reconcile - the ratio is taken within its own leg.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calculated_measure_reaching_other_cubes_without_multiplication() {
     let ctx = create_context();

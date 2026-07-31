@@ -559,6 +559,45 @@ mod tests {
         assert!(groups.single_join().is_err());
     }
 
+    /// Two measures of the same cube can still need different join trees, and
+    /// then they are two groups like any other multi-fact pair - the owning cube
+    /// says nothing about which joins to build.
+    #[test]
+    fn test_two_groups_for_measures_of_one_cube() {
+        let schema = MockSchema::from_yaml_file("common/integration_calculated_multi_fact.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let total_amount = ctx.create_symbol("payments.total_amount").unwrap();
+        let converted_value = ctx.create_symbol("payments.converted_value").unwrap();
+        let meta_value = ctx.create_symbol("payment_meta.value").unwrap();
+
+        assert_eq!(total_amount.cube_name(), converted_value.cube_name());
+
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[meta_value])
+            .build(&[total_amount.clone(), converted_value.clone()])
+            .unwrap();
+
+        let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
+
+        assert!(groups.is_multi_fact());
+        assert_eq!(groups.num_groups(), 2);
+        assert!(groups.single_join().is_err());
+
+        let grouped = groups
+            .groups()
+            .iter()
+            .map(|(_, measures)| measures.iter().map(|m| m.full_name()).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            grouped,
+            vec![
+                vec!["payments.total_amount"],
+                vec!["payments.converted_value"]
+            ]
+        );
+    }
+
     #[test]
     fn test_resolve_join_path_for_measure() {
         let schema = MockSchema::from_yaml_file("common/multi_fact.yaml");
