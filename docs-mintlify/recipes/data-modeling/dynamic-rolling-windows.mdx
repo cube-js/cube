@@ -415,9 +415,9 @@ have to be included: [pre-aggregation matching][ref-matching-switch-dimensions]
 applies the selected value over the rollup scan. Leaving it out also keeps the
 rollup small — including it would multiply the rows by every window in the set.
 
-Include the per-window measures rather than the four `case` measures: the `case`
-measures are [multi-stage][ref-multi-stage] and dispatch to the per-window ones,
-which is what actually gets aggregated.
+List the per-window measures, not the four `case` measures: the `case` measures
+are [multi-stage][ref-multi-stage] and dispatch to the per-window ones, and it's
+those that the rollup has to name to be matched.
 
 <CodeGroup>
 
@@ -431,7 +431,6 @@ cubes:
     pre_aggregations:
       - name: rolling
         measures:
-          - gross_sales
           {%- for months in windows %}
           - r{{ months }}_gross_sales
           {%- endfor %}
@@ -447,10 +446,7 @@ cube(`gross_sales`, {
 
   pre_aggregations: {
     rolling: {
-      measures: [
-        `gross_sales`,
-        ...windows.map(months => `r${months}_gross_sales`)
-      ],
+      measures: windows.map(months => CUBE[`r${months}_gross_sales`]),
       time_dimension: month,
       granularity: `month`
     }
