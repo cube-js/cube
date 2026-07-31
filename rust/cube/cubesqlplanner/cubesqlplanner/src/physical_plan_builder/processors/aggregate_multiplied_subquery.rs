@@ -9,8 +9,29 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::MeasureRenderModifier;
+use crate::planner::{AggregateWrap, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+
+/// The measure subquery renders measures without their aggregate for the select
+/// above to re-apply. A measure carrying none of its own has nothing to
+/// re-apply and would come out neither aggregated nor grouped.
+fn check_measures_survive_measure_subquery(measures: &[Rc<MemberSymbol>]) -> Result<(), CubeError> {
+    for measure in measures.iter() {
+        let Ok(symbol) = measure.as_measure() else {
+            continue;
+        };
+        if matches!(symbol.kind().aggregate_wrap(), AggregateWrap::PassThrough) {
+            return Err(CubeError::user(format!(
+                "{} has no aggregate of its own, so it cannot be computed alongside a measure \
+                 that joins another cube under a dimension that multiplies its rows. Please \
+                 request it in a separate query.",
+                measure.full_name()
+            )));
+        }
+    }
+    Ok(())
+}
 
 pub struct AggregateMultipliedSubqueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
@@ -120,6 +141,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 }
             }
             AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
+                check_measures_survive_measure_subquery(&measure_subquery.schema.measures)?;
                 let subquery = self
                     .builder
                     .process_node(measure_subquery.as_ref(), context)?;

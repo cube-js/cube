@@ -7,7 +7,6 @@ use crate::planner::collectors::{
 use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
-use crate::planner::AggregateWrap;
 use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
@@ -200,7 +199,6 @@ impl MultipliedMeasuresQueryPlanner {
         let should_build_join_for_measure_select =
             self.check_should_build_join_for_measure_select(measures, key_cube_name)?;
         let source = if should_build_join_for_measure_select {
-            Self::check_measures_survive_measure_subquery(measures)?;
             let measure_subquery = self.aggregate_subquery_measure(
                 key_join.clone(),
                 &measures,
@@ -219,30 +217,6 @@ impl MultipliedMeasuresQueryPlanner {
             evaluation_context: scope.evaluation_context().clone(),
             pre_aggregation_override: None,
         }))
-    }
-
-    /// The measure subquery renders every measure without its aggregate so the
-    /// select above can re-apply it. A measure that carries no aggregate of its
-    /// own - `type: number` or `number_agg`, which write theirs by hand or not
-    /// at all - has nothing to re-apply, and would come out neither aggregated
-    /// nor grouped. Say so instead of emitting SQL the database rejects.
-    fn check_measures_survive_measure_subquery(
-        measures: &Vec<Rc<MemberSymbol>>,
-    ) -> Result<(), CubeError> {
-        for measure in measures.iter() {
-            let Ok(symbol) = measure.as_measure() else {
-                continue;
-            };
-            if matches!(symbol.kind().aggregate_wrap(), AggregateWrap::PassThrough) {
-                return Err(CubeError::user(format!(
-                    "{} carries no aggregate of its own and reaches another cube, which cannot be \
-                     combined with a dimension that multiplies its rows. Please rewrite it over \
-                     measures of its own cube, or move the aggregation into a measure.",
-                    measure.full_name()
-                )));
-            }
-        }
-        Ok(())
     }
 
     fn check_should_build_join_for_measure_select(

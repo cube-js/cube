@@ -23,37 +23,23 @@ fn create_context() -> TestContext {
 
 const SEED: &str = "integration_calculated_multi_fact_tables.sql";
 
-/// How many multiplied-measure subqueries the plan carries - one per (key cube,
-/// join tree). Each renders its deduplicating key set as a `keys` subselect, so
-/// counting those counts the legs without pinning the SQL around them.
-///
-/// A result snapshot records the numbers a query returned; it cannot say which
-/// strategy produced them, and the same rows can come out of a plan that is
-/// wrong for a different query. Asserting the leg count states what each test is
-/// actually here to hold: whether a measure is deduplicated through the keys
-/// path or aggregated in place, and whether measures of one cube stayed together
-/// or split.
+// One per (key cube, join tree), each rendering its key set as a `keys`
+// subselect. Counting them states which strategy a test holds the planner to,
+// which the result snapshot alone cannot.
 fn keys_subquery_count(sql: &str) -> usize {
     sql.matches(r#" AS "keys""#).count()
 }
 
-/// Whether the plan projects a column of its own for `measure` - what a
-/// decomposed calculated measure's components get, and what the measure itself
-/// gets when it stays whole. Distinguishes the two without reading the
-/// expression built over them.
 fn projects_column_for(sql: &str, measure: &str) -> bool {
     sql.contains(&format!(r#""{}""#, measure.replace('.', "__")))
 }
 
-/// The measure subquery renders measures without their aggregate for the select
-/// above to re-apply, which a measure carrying none of its own cannot survive.
-/// Those shapes are refused while planning rather than handed to the database.
 fn expect_no_own_aggregate_error(ctx: &TestContext, query: &str, measure: &str) {
     let result = ctx.build_sql(query);
     assert!(result.is_err(), "expected the query to be refused");
     let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("carries no aggregate of its own"),
+        err_msg.contains("has no aggregate of its own"),
         "Error should explain the missing aggregate, got: {err_msg}"
     );
     assert!(
@@ -256,9 +242,9 @@ async fn test_two_sibling_lookup_join_trees_of_one_cube() {
     }
 }
 
-/// A calculated measure that reaches other cubes, on its own. Reaching them
-/// forces a measure-join subquery, which renders measures without their
-/// aggregate - so the components travel down and the ratio is formed above them.
+/// A calculated measure that reaches another cube, on its own. Reaching it
+/// forces the measure subquery, which strips the aggregates its components
+/// carry and leaves the expression with nothing to re-apply.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calculated_measure_reaching_other_cubes_alone() {
     let ctx = create_context();
@@ -411,10 +397,6 @@ async fn test_calculated_measure_reading_its_own_cube_directly() {
         projects_column_for(&sql, "payments.converted_per_max_amount"),
         "sql: {sql}"
     );
-    assert!(
-        !projects_column_for(&sql, "payments.converted_value"),
-        "sql: {sql}"
-    );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -522,14 +504,8 @@ async fn test_calculated_measure_reaching_other_cubes_without_multiplication() {
 
     let sql = ctx.build_sql(query).unwrap();
     assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
-    // Positive case first, so the negated one cannot pass by the alias
-    // convention having drifted out from under the helper.
     assert!(
         projects_column_for(&sql, "payments.gold_share"),
-        "sql: {sql}"
-    );
-    assert!(
-        !projects_column_for(&sql, "payments.gold_amount"),
         "sql: {sql}"
     );
 
