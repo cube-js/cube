@@ -92,6 +92,16 @@ dimension, then a matching pre-aggregation with the same custom granularity will
 be used even if there is also an matching pre-aggregation with a default
 granularity (e.g., `day` or `month`).
 
+<Note>
+
+Provide the date range via [`timeDimensions`][ref-time-dimensions-format] rather
+than an [`inDateRange` filter][ref-in-date-range]. A date range expressed as a
+filter is applied as a generic dimension filter, so it matches only when that
+time dimension is also listed in the pre-aggregation's `dimensions` — the
+granularity matching rules above don't apply to it.
+
+</Note>
+
 ### Matching ungrouped queries
 
 There are extra considerations that apply to matching [ungrouped
@@ -169,16 +179,6 @@ filter pins only one of them; the others fall back to their full set of values,
 and each value emits its own row — so the query returns extra rows.
 Pre-aggregations match either way, so they accelerate that result rather than
 preventing it.
-
-<Note>
-
-Provide the date range via [`timeDimensions`][ref-time-dimensions-format] rather
-than an [`inDateRange` filter][ref-in-date-range]. A date range expressed as a
-filter is applied as a generic dimension filter, so it matches only when that
-time dimension is also listed in the pre-aggregation's `dimensions` — the
-granularity matching rules don't apply to it.
-
-</Note>
 
 ## Matching multi-fact and multi-stage queries
 

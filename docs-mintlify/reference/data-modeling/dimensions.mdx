@@ -927,7 +927,7 @@ a dimension. A dimension can only have one type.
 | `string` | Text fields containing letters or special characters. |
 | `number` | Numeric or integer fields. |
 | `boolean` | Boolean fields or data coercible to boolean. |
-| `switch` | Predefined set of allowed values (enum-like). Requires a `values` sub-parameter and doesn't accept `sql`. Useful for [`case` measures][ref-case-measures]. [Pre-aggregations][ref-matching-switch-dimensions] don't need to include it. Tesseract only. |
+| `switch` | Predefined set of allowed values (enum-like). Takes only a `values` sub-parameter — no `sql`, and no other parameters such as `title` or `public`. Useful for [`case` measures][ref-case-measures]. [Pre-aggregations][ref-matching-switch-dimensions] don't need to include it. Tesseract only. |
 | `geo` | Geographic coordinates. Requires `latitude` and `longitude` sub-parameters instead of `sql`. |
 
 <Warning>

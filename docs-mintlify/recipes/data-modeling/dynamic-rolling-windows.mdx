@@ -419,6 +419,11 @@ List the per-window measures, not the four `case` measures: the `case` measures
 are [multi-stage][ref-multi-stage] and dispatch to the per-window ones, and it's
 those that the rollup has to name to be matched.
 
+In the JavaScript model, reference them through `CUBE[...]` rather than by name
+as strings. Cube resolves member references by recording them as they're
+accessed, so a string never registers as one — the rollup compiles with an empty
+measure list and silently matches nothing.
+
 <CodeGroup>
 
 ```yaml title="YAML"
