@@ -1,4 +1,3 @@
-use super::cube_names_collector::collect_cube_names;
 use crate::planner::{JoinTree, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
@@ -6,7 +5,6 @@ use std::rc::Rc;
 
 struct CompositeMeasuresCollector {
     composite_measures: HashSet<String>,
-    join: Rc<JoinTree>,
 }
 
 #[derive(Clone)]
@@ -21,38 +19,14 @@ impl CompositeMeasureCollectorState {
 }
 
 impl CompositeMeasuresCollector {
-    pub fn new(join: Rc<JoinTree>) -> Self {
+    pub fn new() -> Self {
         Self {
             composite_measures: HashSet::new(),
-            join,
         }
     }
 
     pub fn extract_result(self) -> HashSet<String> {
         self.composite_measures
-    }
-
-    /// True when only component measures stand between `node` and whatever it
-    /// reaches. Those components can be computed separately and the expression
-    /// rebuilt on top of them; anything else - a dimension, a raw cube
-    /// reference - has to be evaluated where the node itself is evaluated, and
-    /// there is nowhere to read it from once the components have moved out.
-    fn travels_only_through_measures(node: &Rc<MemberSymbol>) -> bool {
-        if !node.get_cube_refs().is_empty() {
-            return false;
-        }
-        let dependencies = node.get_dependencies();
-        !dependencies.is_empty() && dependencies.iter().all(|dep| dep.as_measure().is_ok())
-    }
-
-    /// True when evaluating `node` needs a cube other than the one it is
-    /// defined on - the condition under which the planner builds a measure-join
-    /// subquery rather than reading the key cube directly.
-    fn reaches_other_cube(node: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
-        let own_cube = node.cube_name();
-        Ok(collect_cube_names(node)?
-            .iter()
-            .any(|cube_name| cube_name != &own_cube))
     }
 }
 
@@ -64,29 +38,11 @@ impl TraversalVisitor for CompositeMeasuresCollector {
         state: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         let res = match node.as_ref() {
-            MemberSymbol::Measure(measure) => {
+            MemberSymbol::Measure(_) => {
                 if let Some(parent) = &state.parent_measure {
                     if parent.cube_name() != node.cube_name() {
                         self.composite_measures.insert(parent.full_name());
                     }
-                }
-
-                // A calculated measure carries no aggregate of its own, so it
-                // cannot be re-aggregated on top of the ungrouped measure-join
-                // subquery. Treat it as composite so its components travel
-                // instead, each on the join tree its own definition asks for.
-                // Only where that subquery is actually built: the measure has
-                // to be multiplied by this join, and to reach past its own cube.
-                // Anywhere else it is read straight off a leaf-measure query
-                // that keeps its aggregate, and splitting it would only move
-                // work around.
-                let owned = node.with_stripped_join_prefix();
-                if measure.is_calculated()
-                    && self.join.is_multiplied(&owned.cube_name())
-                    && Self::travels_only_through_measures(&owned)
-                    && Self::reaches_other_cube(&owned)?
-                {
-                    self.composite_measures.insert(node.full_name());
                 }
 
                 let new_state = CompositeMeasureCollectorState::new(Some(node.clone()));
@@ -206,7 +162,7 @@ pub fn collect_multiplied_measures(
         }
     }
 
-    let mut composite_collector = CompositeMeasuresCollector::new(join.clone());
+    let mut composite_collector = CompositeMeasuresCollector::new();
     composite_collector.apply(node, &CompositeMeasureCollectorState::new(None))?;
     let composite_measures = composite_collector.extract_result();
     let mut visitor = MultipliedMeasuresCollector::new(composite_measures, join.clone());

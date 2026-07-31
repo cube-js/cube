@@ -9,7 +9,6 @@ mod filter;
 mod join_hints_collector;
 mod measure_symbol;
 mod member_expressions_on_views;
-mod multiplied_measures_collector;
 mod no_query_tools_leak;
 mod positional_params;
 mod string_measures;

@@ -1,11 +1,16 @@
-//! Calculated measures (`type: number` over other measures of the same cube)
-//! combined with a dimension reached through a one-to-many join.
+//! Measures of one cube that need different join trees, combined with a
+//! dimension reached through a one-to-many join.
 //!
-//! The fan-out makes every measure pick one of two strategies: `count_distinct`
-//! survives row multiplication and is aggregated in place, while `sum` has to go
-//! through the keys subquery. A calculated measure is neither — it is an
-//! expression over aggregates and can only be evaluated once its components have
-//! been re-aggregated.
+//! The fan-out makes every measure pick a strategy: `count_distinct` survives
+//! row multiplication and is aggregated in place, while `sum` has to go through
+//! the keys subquery that deduplicates it. The key cube says which primary keys
+//! to deduplicate on and the join tree says which joins to build, so measures
+//! sharing a cube can still need a subquery each.
+//!
+//! A calculated measure (`type: number`) carries no aggregate of its own. It
+//! rides along wherever its own tree takes it, but it cannot survive the
+//! measure subquery that reaching another cube forces - there is nothing to
+//! re-apply above it - and those shapes are refused while planning.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -38,6 +43,23 @@ fn keys_subquery_count(sql: &str) -> usize {
 /// expression built over them.
 fn projects_column_for(sql: &str, measure: &str) -> bool {
     sql.contains(&format!(r#""{}""#, measure.replace('.', "__")))
+}
+
+/// The measure subquery renders measures without their aggregate for the select
+/// above to re-apply, which a measure carrying none of its own cannot survive.
+/// Those shapes are refused while planning rather than handed to the database.
+fn expect_no_own_aggregate_error(ctx: &TestContext, query: &str, measure: &str) {
+    let result = ctx.build_sql(query);
+    assert!(result.is_err(), "expected the query to be refused");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("carries no aggregate of its own"),
+        "Error should explain the missing aggregate, got: {err_msg}"
+    );
+    assert!(
+        err_msg.contains(measure),
+        "Error should name {measure}, got: {err_msg}"
+    );
 }
 
 /// A calculated measure alone: its components are aggregated over the
@@ -250,25 +272,12 @@ async fn test_calculated_measure_reaching_other_cubes_alone() {
           - id: payment_meta.value
     "};
 
-    let sql = ctx.build_sql(query).unwrap();
-    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
-    assert!(
-        projects_column_for(&sql, "payments.converted_value"),
-        "sql: {sql}"
-    );
-    assert!(
-        projects_column_for(&sql, "payments.commissioned_value"),
-        "sql: {sql}"
-    );
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
+    expect_no_own_aggregate_error(&ctx, query, "payments.rate_vs_commission");
 }
 
-/// A calculated measure whose two components need different extra cubes, so its
-/// own footprint is their union - next to a measure that needs neither, which
-/// puts the two on separate join trees.
+/// The same measure next to one that needs neither of the cubes it reaches, so
+/// the two land on separate join trees. The calculated leg is refused all the
+/// same - splitting the query does not give the expression an aggregate.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calculated_measure_over_components_with_different_joins() {
     let ctx = create_context();
@@ -283,12 +292,7 @@ async fn test_calculated_measure_over_components_with_different_joins() {
           - id: payment_meta.value
     "};
 
-    let sql = ctx.build_sql(query).unwrap();
-    assert_eq!(keys_subquery_count(&sql), 3, "sql: {sql}");
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
+    expect_no_own_aggregate_error(&ctx, query, "payments.rate_vs_commission");
 }
 
 /// A star: the dimension pulls in one one-to-many branch and the measure pulls
@@ -417,12 +421,9 @@ async fn test_calculated_measure_reading_its_own_cube_directly() {
     }
 }
 
-/// A calculated measure that reaches another cube past its component measure.
-/// The component cannot travel on its own - `MAX({rates.fx_rate})` would be left
-/// with no `rates` to read from - so the measure stays whole, and whole is where
-/// the measure-join subquery drops its aggregation.
+/// A calculated measure reaching another cube past its component measure, so the
+/// aggregate around `MAX({rates.fx_rate})` is the measure's own.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "calculated measure that cannot be decomposed loses its aggregation in the measure-join subquery"]
 async fn test_calculated_measure_reaching_past_its_components() {
     let ctx = create_context();
 
@@ -435,18 +436,50 @@ async fn test_calculated_measure_reaching_past_its_components() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
+    expect_no_own_aggregate_error(&ctx, query, "payments.amount_over_fx");
 }
 
-/// A calculated measure that reaches another cube and has no component measure
-/// to travel in its place. It must keep going through the keys subquery, or the
-/// fan-out on `p1` would be counted twice.
+/// A calculated measure whose components resolve to join trees rooted at
+/// different cubes. Evaluating it in one place and splitting it apart give
+/// different answers, so it is refused rather than answered either way.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "calculated measure that cannot be decomposed loses its aggregation in the measure-join subquery"]
+async fn test_calculated_measure_over_components_rooted_at_different_cubes() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - payments.gold_share
+        dimensions:
+          - payment_meta.value
+        order:
+          - id: payment_meta.value
+    "};
+
+    expect_no_own_aggregate_error(&ctx, query, "payments.gold_share");
+}
+
+/// A dimension of the joined cube puts the calculated measure and the one that
+/// reaches into the same group, so the measure subquery is built for a measure
+/// that never asked for it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calculated_measure_pulled_into_a_shared_measure_subquery() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - payments.success_rate
+          - payments.converted_value
+        dimensions:
+          - payment_meta.value
+          - rates.currency
+    "};
+
+    expect_no_own_aggregate_error(&ctx, query, "payments.success_rate");
+}
+
+/// A calculated measure reaching another cube with no component measure at all -
+/// its aggregate is written by hand over the joined cube's column.
+#[tokio::test(flavor = "multi_thread")]
 async fn test_calculated_measure_without_component_measures() {
     let ctx = create_context();
 
@@ -460,11 +493,7 @@ async fn test_calculated_measure_without_component_measures() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
-
-    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        insta::assert_snapshot!(result);
-    }
+    expect_no_own_aggregate_error(&ctx, query, "payments.max_fx_rate");
 }
 
 /// A calculated measure that reaches another cube but is not multiplied. It is
