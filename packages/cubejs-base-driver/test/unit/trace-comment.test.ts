@@ -139,16 +139,29 @@ describe('addTraceComment', () => {
     expect(addTraceComment('SELECT 1\n', 'abc-123')).toBe('SELECT 1\n\n/* trace_id: abc-123 */');
   });
 
-  test('stays linear on a long trailing run', () => {
+  test('stays linear when a long run defeats the anchor', () => {
     // Guards against going back to `;[\s;]*$`, which backtracks quadratically
     // when the run never reaches the anchor — ~1.8s at 60k on uncontrolled input.
-    // Both shapes: semicolons, and the whitespace the scan actually tests.
-    for (const filler of [';'.repeat(60_000), ' '.repeat(60_000)]) {
-      const runaway = `SELECT 1${filler}x`;
-      const started = Date.now();
-      expect(addTraceComment(runaway, 'abc-123')).toBe(`${runaway}\n/* trace_id: abc-123 */`);
-      expect(Date.now() - started).toBeLessThan(1000);
-    }
+    // The scan breaks on the `x` immediately; it is the regex that suffers here.
+    const runaway = `SELECT 1${';'.repeat(60_000)}x`;
+    const started = Date.now();
+
+    expect(addTraceComment(runaway, 'abc-123')).toBe(`${runaway}\n/* trace_id: abc-123 */`);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  test('stays linear when the scan walks the whole run', () => {
+    // The complement of the case above: the run reaches the end of the string, so
+    // the loop really does 60k iterations rather than breaking on the first char.
+    const semicolons = `SELECT 1${';'.repeat(60_000)}`;
+    const spaces = `SELECT 1${' '.repeat(60_000)}`;
+    const started = Date.now();
+
+    // The whole separator run collapses to one semicolon.
+    expect(addTraceComment(semicolons, 'abc-123')).toBe('SELECT 1\n/* trace_id: abc-123 */;');
+    // No separator in the run, so the whitespace is left alone.
+    expect(addTraceComment(spaces, 'abc-123')).toBe(`${spaces}\n/* trace_id: abc-123 */`);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 
   test('leaves the query untouched when there is no usable id', () => {
