@@ -23,9 +23,11 @@ the driver's error and saves nothing.
 ## Editing and deleting
 
 Use the **Edit** action on a row to update credentials, or the **Delete**
-action to remove a named source. The **default** source can be edited but
-not deleted — to remove it, clear the bare `CUBEJS_DB_*` variables from
-[**Settings → Environment Variables**][ref-config-ref-env] by hand.
+action to remove a source — including the **default** source (the demo data
+source is the only one that can't be deleted). Deleting a source clears only
+its own connection env vars (the bare `CUBEJS_DB_*` variables for the default
+source, or `CUBEJS_DS_<NAME>_*` for a named one); deployment-wide globals and
+other sources' variables are left untouched.
 
 ## Source name rules
 

@@ -122,8 +122,15 @@ page, or viewing a dashboard never re-runs anything on its own.
 ## On dashboards
 
 Python reports render their **saved output** on dashboards. Nothing re-runs on
-dashboard load, so a dashboard full of Python reports costs no compute to open —
-each widget shows whatever the last **Run** produced.
+dashboard load, so an unfiltered dashboard full of Python reports costs no
+compute to open — each widget shows whatever the last **Run** produced.
+
+If the dashboard applies a filter or time granularity to a Python report, Cube
+re-runs the Python analysis against the filtered SQL and shows that result
+instead of the saved output. This works both in the dashboard builder and on
+published, viewed dashboards. It's not yet supported on the anonymous public
+embed or the signed embedded-app dashboard, which continue to show the saved
+result regardless of filters.
 
 A python widget can be opened in [Explore](/docs/explore-analyze/explore) from a
 dashboard and run from there.
