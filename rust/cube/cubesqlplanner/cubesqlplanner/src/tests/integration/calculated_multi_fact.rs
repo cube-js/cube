@@ -18,6 +18,22 @@ fn create_context() -> TestContext {
 
 const SEED: &str = "integration_calculated_multi_fact_tables.sql";
 
+/// How many multiplied-measure subqueries the plan carries - one per (key cube,
+/// join tree). Each renders its deduplicating key set as a `keys` subselect, so
+/// counting those counts the legs without pinning the SQL around them.
+///
+/// These checks run with or without a database, unlike the result snapshots.
+fn keys_subquery_count(sql: &str) -> usize {
+    sql.matches(r#" AS "keys""#).count()
+}
+
+/// Whether the plan projects a column of its own for `measure`, which is what a
+/// decomposed calculated measure's components get and what the measure itself
+/// gets when it stays whole.
+fn projects_column_for(sql: &str, measure: &str) -> bool {
+    sql.contains(&format!(r#""{}""#, measure.replace('.', "__")))
+}
+
 /// A calculated measure alone: its components are aggregated over the
 /// deduplicated key set, so the fan-out on `p1` does not skew the ratio.
 #[tokio::test(flavor = "multi_thread")]
@@ -33,7 +49,8 @@ async fn test_calculated_measure_alone_by_fan_out_dimension() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 1, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -103,7 +120,8 @@ async fn test_two_sums_of_one_cube_needing_different_joins() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -127,7 +145,8 @@ async fn test_calculated_measure_with_joined_measure() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -174,7 +193,8 @@ async fn test_three_nested_join_trees_of_one_cube() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 3, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -220,7 +240,16 @@ async fn test_calculated_measure_reaching_other_cubes_alone() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
+    assert!(
+        projects_column_for(&sql, "payments.converted_value"),
+        "sql: {sql}"
+    );
+    assert!(
+        projects_column_for(&sql, "payments.commissioned_value"),
+        "sql: {sql}"
+    );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -435,7 +464,12 @@ async fn test_calculated_measure_reaching_other_cubes_without_multiplication() {
           - id: payments.status
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
+    assert!(
+        !projects_column_for(&sql, "payments.gold_amount"),
+        "sql: {sql}"
+    );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -461,7 +495,8 @@ async fn test_split_groups_rooted_at_different_cubes() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
