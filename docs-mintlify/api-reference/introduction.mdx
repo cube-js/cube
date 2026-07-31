@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Cube's HTTP APIs — query your data with the Core Data API, stream agent conversations with the AI API, and manage Cube Cloud with the Platform API.
+description: Cube's HTTP APIs — query your data with the Core Data API, stream agent conversations with the AI API, and manage Cube with the Platform API.
 ---
 
 Cube exposes three HTTP API families, each for a different job and with slightly
@@ -9,8 +9,8 @@ different authentication:
 | API | What it's for | Authentication |
 | --- | --- | --- |
 | **Core Data API** | Query your data model over HTTP — run queries (`/v1/load`) and read metadata (`/v1/meta`) | Cube API token (a JWT) sent **directly** in the `Authorization` header — no prefix |
-| **AI API** | Stream conversations with Cube AI agents (`/chat/stream-chat-state`) | Cube Cloud API key with the **`Api-Key`** prefix |
-| **Platform API** | Manage Cube Cloud — deployments, data models, reports, workbooks, users, policies, and more | **`Bearer`** prefix for REST and SCIM 2.0 |
+| **AI API** | Stream conversations with Cube AI agents (`/chat/stream-chat-state`) | Cube API key with the **`Api-Key`** prefix |
+| **Platform API** | Manage Cube — deployments, data models, reports, workbooks, users, policies, and more | **`Bearer`** prefix for REST and SCIM 2.0 |
 
 The exact header for each is shown above. The Platform and SCIM schemes are
 detailed on the [Authentication](/api-reference/authentication) page; the Core
@@ -18,9 +18,9 @@ Data and AI headers are also documented on their own reference pages.
 
 ## Available endpoints
 
-Each API family has its own base URL — copy the exact host from Cube Cloud where
-noted. Only HTTPS is accepted, and every request must be authenticated (see
-[Authentication](/api-reference/authentication)).
+Each API family has its own base URL — copy the exact host from the Cube
+interface where noted. Only HTTPS is accepted, and every request must be
+authenticated (see [Authentication](/api-reference/authentication)).
 
 ### Core Data API
 

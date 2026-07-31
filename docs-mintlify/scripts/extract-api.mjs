@@ -354,10 +354,10 @@ Object.keys(schemas).sort().forEach((k) => { sortedSchemas[k] = schemas[k]; });
 const out = {
   openapi: '3.1.0',
   info: {
-    title: 'Cube Cloud REST API',
+    title: 'Cube Platform API',
     version: '1.0.0',
     description:
-      'Programmatically manage Cube Cloud: deployments and everything scoped to them\n' +
+      'Programmatically manage Cube: deployments and everything scoped to them\n' +
       '(environments, folders, reports, workbooks, notifications, workspace, and agents),\n' +
       'plus account-level users, groups, policies, embedding, and AI settings. Data-model\n' +
       'authoring, dev mode, branches, and uploads live under /build/api/v1 — same host and\n' +
@@ -367,7 +367,7 @@ const out = {
     {
       url: 'https://{tenant}.cubecloud.dev',
       description: 'Your tenant host. Replace the whole host if you use a custom domain.',
-      variables: { tenant: { default: 'your-tenant', description: 'Your Cube Cloud tenant subdomain' } },
+      variables: { tenant: { default: 'your-tenant', description: 'Your Cube tenant subdomain' } },
     },
   ],
   security: [{ bearerAuth: [] }],
