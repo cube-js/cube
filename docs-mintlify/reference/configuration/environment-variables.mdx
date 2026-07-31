@@ -1348,7 +1348,8 @@ and `FIREBOLT_` variable families are supported.
 Setting any one of these variables switches the data source's pre-aggregations onto the
 dedicated connection. Configure it in full: an unset variable falls back to the driver's
 default rather than to its `CUBEJS_DB_*` counterpart. `CUBEJS_PRE_AGGREGATIONS_DB_TYPE` is
-ignored — the dedicated connection always uses the data source's driver.
+ignored — the dedicated connection always uses the data source's driver. A custom
+[`driver_factory`][ref-config-driver-factory] takes precedence over these variables.
 
 See [pre-aggregation data source][ref-preagg-data-source] for details and examples.
 
@@ -2184,6 +2185,7 @@ The port for a Cube deployment to listen to API connections on.
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
 [ref-config-db]: /admin/connect-to-data/data-sources
+[ref-config-driver-factory]: /reference/configuration/config#driver_factory
 [ref-config-multiple-ds-cloud]: /admin/connect-to-data/multiple-data-sources
 [ref-config-multiple-ds-decorating-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
 [ref-preagg-data-source]: /docs/pre-aggregations/refreshing-pre-aggregations#pre-aggregation-data-source
