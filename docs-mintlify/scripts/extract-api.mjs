@@ -29,7 +29,36 @@
 // `yarn generate:open-api:spec-public`.
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import yaml from 'js-yaml';
+
+// Page slugs in the intro table must be byte-identical to the routes Mintlify
+// generates for the OpenAPI pages, so borrow Mintlify's own slugifier instead of
+// approximating it: it drops apostrophes ("dashboard's" -> "dashboards") and
+// percent-encodes non-ASCII and "/" — a hand-rolled kebab-case would silently
+// emit 404 links. The subpath is not in @mintlify/common's `exports`, so import
+// it by file URL, and fail loudly rather than fall back to a guess.
+const SLUGIFY_PATH = path.join(
+  import.meta.dirname, '..', 'node_modules', '@mintlify', 'common', 'dist', 'slugify.js'
+);
+let mintSlugify;
+try {
+  ({ slugify: mintSlugify } = await import(pathToFileURL(SLUGIFY_PATH).href));
+} catch (err) {
+  console.error(
+    `Aborting: could not load Mintlify's slugifier from\n  ${SLUGIFY_PATH}\n` +
+      `(${err.message})\n\nRun \`yarn install\` in docs-mintlify. If the Mintlify CLI moved the\n` +
+      `file, update SLUGIFY_PATH — page links are only correct when they use Mintlify's own rules.`
+  );
+  process.exit(1);
+}
+
+// Upstream summaries arrive with typographic punctuation, which Mintlify would
+// percent-encode into the page slug (`branch’s` -> `branch%E2%80%99s`). Fold it
+// to ASCII so titles read the same and slugs stay legible.
+function normalizeTypography(s) {
+  return s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-');
+}
 
 // Load docs-mintlify/.env (SRC_SPEC etc.) if present. A real env var or CLI arg
 // still wins, since loadEnvFile does not clobber already-set process.env keys.
@@ -80,10 +109,10 @@ function writeOrCheck(file, content) {
   console.log('Wrote', path.relative(ROOT, file));
 }
 
-// kebab-case a summary/tag the same way Mintlify slugs OpenAPI pages, so the
-// intro-table links resolve to the generated pages.
+// Mintlify's route slug for a tag group / operation page — its own slugifier, so
+// the intro-table links resolve to the generated pages (see SLUGIFY_PATH above).
 function kebab(s) {
-  return String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return mintSlugify(normalizeTypography(String(s).trim()));
 }
 // Longest shared path prefix (by segment) across a tag's paths — the "Resource"
 // column value. Falls back to the single path when a tag has just one.
@@ -97,36 +126,42 @@ function commonPathPrefix(pathList) {
   return split.length === 1 ? first.join('/') : first.slice(0, i).join('/') || '/';
 }
 
-// Only the v1 REST API. SCIM lives in the hand-curated scim.yaml (different auth).
-const INCLUDE_PREFIX = '/api/v1/';
+// The v1 REST API, on both path families it is served under: /api/v1/… on the
+// main console-server pods, and /build/api/v1/… routed to the build pods (which
+// own the data-model / dev-mode / upload surface). Same host, same Bearer token.
+// SCIM lives in the hand-curated scim.yaml (different auth).
+//
+// Paths are emitted at their real absolute path (no prefix stripping), so the
+// server URL is the tenant host root — see `servers` in the output doc below.
+const INCLUDE_PREFIXES = ['/api/v1/', '/build/api/v1/'];
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
 // Operations to hide from the public docs even though the source spec exposes
 // them — e.g. stray/internal admin routes that surface a single, incomplete
-// endpoint. Listed as "METHOD /path" using the normalized path (no /api prefix,
-// no trailing slash). Kept here so re-pulling an updated upstream spec does NOT
-// resurface them. If a path's only operations are excluded, the whole path (and
-// its now-empty nav group) is dropped automatically.
+// endpoint. Listed as "METHOD /path" using the normalized path (the real absolute
+// path, minus any trailing slash). Kept here so re-pulling an updated upstream
+// spec does NOT resurface them. If a path's only operations are excluded, the
+// whole path (and its now-empty nav group) is dropped automatically.
 const EXCLUDE_OPERATIONS = new Set([
   // Stray/incomplete admin routes.
-  'DELETE /v1/groups/{id}',
-  'GET /v1/user-groups',
+  'DELETE /api/v1/groups/{id}',
+  'GET /api/v1/user-groups',
   // Account-level / internal admin APIs kept out of the public docs.
-  'GET /v1/deployments/{deploymentId}/agent-skills',
-  'GET /v1/deployments/{deploymentId}/agents',
-  'POST /v1/meta',
-  'GET /v1/users',
-  'GET /v1/users/embed-theme',
-  'GET /v1/users/me',
-  'DELETE /v1/user-attributes/{id}',
-  'GET /v1/resource-policies',
-  'PUT /v1/resource-policies/group',
-  'PUT /v1/resource-policies/user',
-  'GET /v1/app-theme',
-  'GET /v1/ai-engineer/active-region',
-  'GET /v1/ai-engineer/settings',
+  'GET /api/v1/deployments/{deploymentId}/agent-skills',
+  'GET /api/v1/deployments/{deploymentId}/agents',
+  'POST /api/v1/meta',
+  'GET /api/v1/users',
+  'GET /api/v1/users/embed-theme',
+  'GET /api/v1/users/me',
+  'DELETE /api/v1/user-attributes/{id}',
+  'GET /api/v1/resource-policies',
+  'PUT /api/v1/resource-policies/group',
+  'PUT /api/v1/resource-policies/user',
+  'GET /api/v1/app-theme',
+  'GET /api/v1/ai-engineer/active-region',
+  'GET /api/v1/ai-engineer/settings',
   // Report folders listing — not part of the public docs surface.
-  'GET /v1/deployments/{deploymentId}/report-folders',
+  'GET /api/v1/deployments/{deploymentId}/report-folders',
 ]);
 
 // Explicit display names for tags whose auto-cleaned form would be unclear or
@@ -134,14 +169,23 @@ const EXCLUDE_OPERATIONS = new Set([
 const TAG_MAP = {
   'Deployment Environment Public': 'Environments',
   'Embed Tenant Admin Public': 'Embed Tenants',
+  // Build-pod surface (/build/api/v1). Named for what each area does rather than
+  // the controller, and kept distinct from the same-named /api/v1 tags so the
+  // intro table's "Resource" column stays a real common path prefix.
+  'Deployments Build Public': 'Deployment Creation',
+  'Uploads Public': 'Data Model Uploads',
+  'Git Hub Deployment Public': 'GitHub Connection',
 };
 // Preferred nav order. Tags not listed here are appended alphabetically, so the
 // docs stay complete even when the upstream spec adds new areas.
 const TAG_ORDER = [
-  'Deployments', 'Environments', 'Folders', 'Reports', 'Workbooks',
-  'Notifications', 'Workspace', 'Agents', 'Metadata',
-  'Users', 'Groups', 'User Groups', 'User Attributes', 'Resource Policies',
-  'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants',
+  'Deployments', 'Deployment Creation', 'Environments', 'Env Variables', 'Regions',
+  'Data Model', 'Data Model Uploads', 'GitHub', 'GitHub Connection', 'dbt Sync',
+  'Folders', 'Reports', 'Workbooks', 'Notifications', 'Workspace', 'Agents', 'Metadata',
+  'Users', 'Users Admin', 'Groups', 'User Groups',
+  'User Attributes', 'User Attribute Values', 'Resource Policies', 'Tenant Settings',
+  'OAuth Integrations', 'User OAuth Tokens', 'OIDC Token Configs',
+  'App Theme', 'AI Engineer', 'Embed', 'Embed Tenants', 'Dashboard Embed Access',
 ];
 
 // Mintlify renders the OpenAPI operation `description` as a plain-text node — it
@@ -187,9 +231,12 @@ function applyDescription(op) {
 // "o auth"/"oidc". Matching either way normalizes both to one canonical form.
 const ACRONYMS = [
   [/\bo\s*auth\b/gi, 'OAuth'],
+  [/\bgit\s*hub\b/gi, 'GitHub'],
   [/\boidc\b/gi, 'OIDC'],
   [/\bscim\b/gi, 'SCIM'],
   [/\bai\b/gi, 'AI'],
+  // Product spelling: lowercase, even at the start of a tag or summary.
+  [/\bdbt\b/gi, 'dbt'],
 ];
 
 // Strip the " Public" suffix the source appends to every tag and normalize
@@ -203,13 +250,13 @@ function cleanTag(raw) {
 
 const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 
-// 1. Filter to v1 REST paths, normalize keys (strip leading /api; drop trailing
-//    slash — a trailing slash breaks Mintlify dev), and clean tags + operationIds.
+// 1. Filter to v1 REST paths, normalize keys (keep the real absolute path; drop a
+//    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
+//    operationIds.
 const paths = {};
 for (const [key, val] of Object.entries(src.paths)) {
-  if (!key.startsWith(INCLUDE_PREFIX)) continue;
-  let newKey = key.replace(/^\/api/, '');
-  if (newKey.length > 1) newKey = newKey.replace(/\/$/, ''); // drop trailing slash
+  if (!INCLUDE_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+  let newKey = key.length > 1 ? key.replace(/\/$/, '') : key; // drop trailing slash
   let kept = 0;
   for (const m of METHODS) {
     if (!val[m]) continue;
@@ -225,9 +272,11 @@ for (const [key, val] of Object.entries(src.paths)) {
     // Mintlify shows the operation description as plain text, so move the prose
     // into x-mint.content (rendered as MDX) and keep a plain copy for SEO.
     applyDescription(val[m]);
-    // Normalize acronyms in the summary too (it drives the page title AND slug),
-    // so "O Auth" reads "OAuth" everywhere, not just in the nav tag.
+    // Normalize acronyms and typography in the summary too (it drives the page
+    // title AND slug), so "O Auth" reads "OAuth" everywhere, not just in the nav
+    // tag, and `branch’s` does not percent-encode into the route.
     if (typeof val[m].summary === 'string') {
+      val[m].summary = normalizeTypography(val[m].summary);
       for (const [re, repl] of ACRONYMS) val[m].summary = val[m].summary.replace(re, repl);
     }
     // strip "XxxController." prefix from operationId for clean page slugs
@@ -244,7 +293,7 @@ for (const [key, val] of Object.entries(src.paths)) {
 }
 
 if (!Object.keys(paths).length) {
-  console.error(`Aborting: no paths matched ${INCLUDE_PREFIX}. Check the source spec.`);
+  console.error(`Aborting: no paths matched ${INCLUDE_PREFIXES.join(' / ')}. Check the source spec.`);
   process.exit(1);
 }
 
@@ -305,18 +354,20 @@ Object.keys(schemas).sort().forEach((k) => { sortedSchemas[k] = schemas[k]; });
 const out = {
   openapi: '3.1.0',
   info: {
-    title: 'Cube Cloud REST API',
+    title: 'Cube Platform API',
     version: '1.0.0',
     description:
-      'Programmatically manage Cube Cloud: deployments and everything scoped to them\n' +
+      'Programmatically manage Cube: deployments and everything scoped to them\n' +
       '(environments, folders, reports, workbooks, notifications, workspace, and agents),\n' +
-      'plus account-level users, groups, policies, embedding, and AI settings.',
+      'plus account-level users, groups, policies, embedding, and AI settings. Data-model\n' +
+      'authoring, dev mode, branches, and uploads live under /build/api/v1 — same host and\n' +
+      'token, routed to the build pods.',
   },
   servers: [
     {
-      url: 'https://{tenant}.cubecloud.dev/api',
-      description: 'Cube Cloud API base URL. Replace the whole host if you use a custom domain.',
-      variables: { tenant: { default: 'your-tenant', description: 'Your Cube Cloud tenant subdomain' } },
+      url: 'https://{tenant}.cubecloud.dev',
+      description: 'Your tenant host. Replace the whole host if you use a custom domain.',
+      variables: { tenant: { default: 'your-tenant', description: 'Your Cube tenant subdomain' } },
     },
   ],
   security: [{ bearerAuth: [] }],
@@ -345,16 +396,26 @@ console.log('paths:', Object.keys(paths).length, '| schemas:', Object.keys(schem
 //    docs.json nav and the intro-table rows.
 const byTag = {};
 const pathsForTag = {};
-const firstSummaryForTag = {};
+const summariesForTag = {};
 for (const [p, val] of Object.entries(paths)) {
   for (const m of METHODS) {
     if (!val[m]) continue;
     const tag = (val[m].tags && val[m].tags[0]) || 'Other';
     (byTag[tag] = byTag[tag] || []).push(`${m.toUpperCase()} ${p}`);
     if (!(pathsForTag[tag] || []).includes(p)) (pathsForTag[tag] = pathsForTag[tag] || []).push(p);
-    if (!(tag in firstSummaryForTag)) firstSummaryForTag[tag] = val[m].summary || '';
+    (summariesForTag[tag] = summariesForTag[tag] || []).push(val[m].summary || '');
   }
 }
+
+// The tag's representative page for the intro table: its first operation, unless
+// that summary contains a character Mintlify percent-encodes into the route
+// (typically "/"), in which case the first operation with a clean slug reads
+// better in the table. Both resolve; this just avoids `%2F` in the docs source.
+function linkSummaryForTag(tag) {
+  const summaries = summariesForTag[tag] || [''];
+  return summaries.find((s) => !kebab(s).includes('%')) ?? summaries[0];
+}
+
 const groups = orderedTags
   .filter((t) => byTag[t])
   .map((t) => ({ group: t, openapi: API_REF, pages: byTag[t] }));
@@ -398,7 +459,7 @@ if (s < 0 || e < 0 || e < s) {
 const rows = groups
   .map(
     (g) =>
-      `| [${g.group}](/api-reference/${kebab(g.group)}/${kebab(firstSummaryForTag[g.group])}) ` +
+      `| [${g.group}](/api-reference/${kebab(g.group)}/${kebab(linkSummaryForTag(g.group))}) ` +
       `| \`${commonPathPrefix(pathsForTag[g.group])}\` | v1 |`
   )
   .join('\n');
