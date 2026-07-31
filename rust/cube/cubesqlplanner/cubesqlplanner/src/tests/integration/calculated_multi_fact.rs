@@ -22,14 +22,20 @@ const SEED: &str = "integration_calculated_multi_fact_tables.sql";
 /// join tree). Each renders its deduplicating key set as a `keys` subselect, so
 /// counting those counts the legs without pinning the SQL around them.
 ///
-/// These checks run with or without a database, unlike the result snapshots.
+/// A result snapshot records the numbers a query returned; it cannot say which
+/// strategy produced them, and the same rows can come out of a plan that is
+/// wrong for a different query. Asserting the leg count states what each test is
+/// actually here to hold: whether a measure is deduplicated through the keys
+/// path or aggregated in place, and whether measures of one cube stayed together
+/// or split.
 fn keys_subquery_count(sql: &str) -> usize {
     sql.matches(r#" AS "keys""#).count()
 }
 
-/// Whether the plan projects a column of its own for `measure`, which is what a
-/// decomposed calculated measure's components get and what the measure itself
-/// gets when it stays whole.
+/// Whether the plan projects a column of its own for `measure` - what a
+/// decomposed calculated measure's components get, and what the measure itself
+/// gets when it stays whole. Distinguishes the two without reading the
+/// expression built over them.
 fn projects_column_for(sql: &str, measure: &str) -> bool {
     sql.contains(&format!(r#""{}""#, measure.replace('.', "__")))
 }
@@ -73,7 +79,8 @@ async fn test_calculated_measure_components_by_fan_out_dimension() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -97,7 +104,8 @@ async fn test_joined_measure_with_distinct_count_by_fan_out_dimension() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 1, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -169,7 +177,8 @@ async fn test_calculated_measure_over_sums_with_joined_measure() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -217,7 +226,8 @@ async fn test_two_sibling_lookup_join_trees_of_one_cube() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -273,7 +283,8 @@ async fn test_calculated_measure_over_components_with_different_joins() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 3, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -331,7 +342,8 @@ async fn test_measures_of_two_sibling_fan_out_cubes() {
           - id: payments.status
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -340,7 +352,9 @@ async fn test_measures_of_two_sibling_fan_out_cubes() {
 
 /// Several join-tree shapes at once: a bare aggregate on `{payments}`, a
 /// three-cube measure on `{payments, rates, merchants}`, and a calculated
-/// measure whose components stay inside `{payments}`.
+/// measure whose components stay inside `{payments}`. Two legs, not three - the
+/// grouping is by join tree, so the calculated measure shares one with the bare
+/// aggregate rather than getting its own.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_several_join_tree_shapes_in_one_query() {
     let ctx = create_context();
@@ -356,7 +370,8 @@ async fn test_several_join_tree_shapes_in_one_query() {
           - id: payment_meta.value
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 2, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -383,7 +398,12 @@ async fn test_calculated_measure_reading_its_own_cube_directly() {
           - id: payments.status
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
+    assert!(
+        !projects_column_for(&sql, "payments.converted_value"),
+        "sql: {sql}"
+    );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
@@ -519,7 +539,8 @@ async fn test_calculated_measure_with_joined_measure_without_fan_out() {
           - id: payments.status
     "};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
