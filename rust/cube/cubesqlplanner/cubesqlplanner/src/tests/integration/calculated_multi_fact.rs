@@ -325,8 +325,11 @@ async fn test_star_with_two_fan_out_branches_is_rejected() {
     );
 }
 
-/// Measures owned by two sibling fan-out cubes plus the cube they hang off,
-/// each needing its own deduplication.
+/// Measures owned by two sibling fan-out cubes plus the cube they hang off. Each
+/// gets its own leaf query joined by `FullKeyAggregate`, but none of them is
+/// multiplied - the two fan-out cubes sit on the `many` side of their own joins,
+/// and `total_amount`'s tree stops at `{payments}` because the dimension does -
+/// so nothing takes the keys path.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_measures_of_two_sibling_fan_out_cubes() {
     let ctx = create_context();
@@ -400,6 +403,10 @@ async fn test_calculated_measure_reading_its_own_cube_directly() {
 
     let sql = ctx.build_sql(query).unwrap();
     assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
+    assert!(
+        projects_column_for(&sql, "payments.converted_per_max_amount"),
+        "sql: {sql}"
+    );
     assert!(
         !projects_column_for(&sql, "payments.converted_value"),
         "sql: {sql}"
@@ -486,6 +493,12 @@ async fn test_calculated_measure_reaching_other_cubes_without_multiplication() {
 
     let sql = ctx.build_sql(query).unwrap();
     assert_eq!(keys_subquery_count(&sql), 0, "sql: {sql}");
+    // Positive case first, so the negated one cannot pass by the alias
+    // convention having drifted out from under the helper.
+    assert!(
+        projects_column_for(&sql, "payments.gold_share"),
+        "sql: {sql}"
+    );
     assert!(
         !projects_column_for(&sql, "payments.gold_amount"),
         "sql: {sql}"

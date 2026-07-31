@@ -562,6 +562,10 @@ mod tests {
     /// Two measures of the same cube can still need different join trees, and
     /// then they are two groups like any other multi-fact pair - the owning cube
     /// says nothing about which joins to build.
+    ///
+    /// This is the precondition callers who slice by owning cube depend on, not
+    /// a claim about what they do with it: what each planner emits per group is
+    /// its own to cover.
     #[test]
     fn test_two_groups_for_measures_of_one_cube() {
         let schema = MockSchema::from_yaml_file("common/integration_calculated_multi_fact.yaml");
