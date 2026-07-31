@@ -251,6 +251,9 @@ def build_redirects(old_redirects: list, page_map: dict) -> list:
     out, seen = [], set()
 
     def add(source: str, dest: str):
+        # Next strips a trailing slash before matching redirects, so a slash-terminated
+        # source can never fire — the normalized path matches no rule and 404s.
+        source = source.rstrip("/") or "/"
         if source in seen:
             return
         seen.add(source)
