@@ -122,15 +122,17 @@ impl MultipliedMeasuresQueryPlanner {
             }
             // Every measure of the bucket must land in some group, otherwise it
             // would be missing from the subquery refs the caller joins over.
-            debug_assert_eq!(
-                join_multi_fact_groups
-                    .groups()
-                    .iter()
-                    .map(|(_, ms)| ms.len())
-                    .sum::<usize>(),
-                measures.len(),
-                "join grouping dropped measures of cube {cube_name}"
-            );
+            let grouped_count: usize = join_multi_fact_groups
+                .groups()
+                .iter()
+                .map(|(_, ms)| ms.len())
+                .sum();
+            if grouped_count != measures.len() {
+                return Err(CubeError::internal(format!(
+                    "Join grouping dropped measures of cube {cube_name}: {grouped_count} grouped of {}",
+                    measures.len()
+                )));
+            }
             // The key cube fixes the primary keys to deduplicate on, the join
             // tree fixes the joins to build. Measures of one cube can still
             // need different trees, so each tree gets its own subquery.

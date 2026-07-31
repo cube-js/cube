@@ -411,6 +411,32 @@ async fn test_calculated_measure_without_component_measures() {
     }
 }
 
+/// A calculated measure that reaches another cube but is not multiplied. It is
+/// read off a leaf-measure query that keeps its aggregate, so it needs no
+/// decomposition and must be evaluated whole: its components root at different
+/// cubes, and splitting them would divide `gold_amount` by a `total_amount`
+/// taken over a wider set of rows than its own leg sees.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calculated_measure_reaching_other_cubes_without_multiplication() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - payments.gold_share
+          - payments.total_amount
+        dimensions:
+          - payments.status
+        order:
+          - id: payments.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 /// Split groups whose trees root at different cubes: `total_amount` roots at
 /// `payments`, while `gold_amount` reaches `customers`, which owns the join and
 /// therefore becomes the root. Customerless payments are unreachable from the

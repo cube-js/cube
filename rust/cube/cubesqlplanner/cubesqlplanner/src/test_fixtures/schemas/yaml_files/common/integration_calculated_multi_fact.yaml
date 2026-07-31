@@ -177,3 +177,9 @@ cubes:
             sql: amount
             filters:
               - sql: "{customers.tier} = 'gold'"
+          # Components root at different cubes - `gold_amount` at `customers`,
+          # `total_amount` at `payments` - so splitting them would divide by a
+          # different set of rows than evaluating the ratio in one place.
+          - name: gold_share
+            type: number
+            sql: "100.0 * {gold_amount} / NULLIF({total_amount}, 0)"

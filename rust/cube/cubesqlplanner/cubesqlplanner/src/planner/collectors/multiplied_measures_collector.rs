@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 struct CompositeMeasuresCollector {
     composite_measures: HashSet<String>,
+    join: Rc<JoinTree>,
 }
 
 #[derive(Clone)]
@@ -20,9 +21,10 @@ impl CompositeMeasureCollectorState {
 }
 
 impl CompositeMeasuresCollector {
-    pub fn new() -> Self {
+    pub fn new(join: Rc<JoinTree>) -> Self {
         Self {
             composite_measures: HashSet::new(),
+            join,
         }
     }
 
@@ -45,12 +47,10 @@ impl CompositeMeasuresCollector {
 
     /// True when evaluating `node` needs a cube other than the one it is
     /// defined on - the condition under which the planner builds a measure-join
-    /// subquery rather than reading the key cube directly. Mirrors the planner's
-    /// own check, join prefixes stripped included.
+    /// subquery rather than reading the key cube directly.
     fn reaches_other_cube(node: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
-        let node = node.with_stripped_join_prefix();
         let own_cube = node.cube_name();
-        Ok(collect_cube_names(&node)?
+        Ok(collect_cube_names(node)?
             .iter()
             .any(|cube_name| cube_name != &own_cube))
     }
@@ -73,12 +73,18 @@ impl TraversalVisitor for CompositeMeasuresCollector {
 
                 // A calculated measure carries no aggregate of its own, so it
                 // cannot be re-aggregated on top of the ungrouped measure-join
-                // subquery that reaching another cube forces. Treat it as
-                // composite so its components travel instead, each on the join
-                // tree its own definition asks for.
+                // subquery. Treat it as composite so its components travel
+                // instead, each on the join tree its own definition asks for.
+                // Only where that subquery is actually built: the measure has
+                // to be multiplied by this join, and to reach past its own cube.
+                // Anywhere else it is read straight off a leaf-measure query
+                // that keeps its aggregate, and splitting it would only move
+                // work around.
+                let owned = node.with_stripped_join_prefix();
                 if measure.is_calculated()
-                    && Self::travels_only_through_measures(node)
-                    && Self::reaches_other_cube(node)?
+                    && self.join.is_multiplied(&owned.cube_name())
+                    && Self::travels_only_through_measures(&owned)
+                    && Self::reaches_other_cube(&owned)?
                 {
                     self.composite_measures.insert(node.full_name());
                 }
@@ -200,7 +206,7 @@ pub fn collect_multiplied_measures(
         }
     }
 
-    let mut composite_collector = CompositeMeasuresCollector::new();
+    let mut composite_collector = CompositeMeasuresCollector::new(join.clone());
     composite_collector.apply(node, &CompositeMeasureCollectorState::new(None))?;
     let composite_measures = composite_collector.extract_result();
     let mut visitor = MultipliedMeasuresCollector::new(composite_measures, join.clone());
