@@ -58,9 +58,10 @@ Shows a value relative to a target as a progress bar or circle. Useful for goal 
 | **Target field / row** | The goal or maximum value |
 | **Style** | Bar or circle |
 | **Color** | Fill color for the progress indicator |
+| **Format** | Number formatting applied to the target/goal text |
 
 <Tip>
-To compare against a static number like a quarterly goal, add a calculated field that always returns that number and use it as the **Target** field.
+To compare against a static number like a quarterly goal, toggle **Use custom goal** and enter the number directly — no calculated field needed.
 </Tip>
 
 {/* TODO screenshot: Progress bar block (bar style) and circle style (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
@@ -77,6 +78,7 @@ Renders a compact trend chart — either a bar or line — within the KPI tile. 
 | **Height / Width** | Dimensions of the sparkline in the tile |
 | **Max points** | Limits the number of data points rendered |
 | **Colors** | Line/fill colors |
+| **Format** | Number formatting applied to the headline value |
 
 {/* TODO screenshot: Sparkline block showing a trend line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
