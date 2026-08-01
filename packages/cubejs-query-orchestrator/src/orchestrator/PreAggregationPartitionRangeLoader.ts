@@ -274,7 +274,11 @@ export class PreAggregationPartitionRangeLoader {
         }
         const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
         const filteredResults = loadResults.filter(
-          r => (this.preAggregation.lastRollupLambda || reformatInIsoLocal(r.buildRangeEnd) === reformatInIsoLocal(r.partitionRange[1])) &&
+          r => (!this.preAggregation.matchedTimeDimensionDateRange || !!PreAggregationPartitionRangeLoader.intersectDateRanges(
+            r.partitionRange,
+            this.preAggregation.matchedTimeDimensionDateRange
+          )) &&
+            (this.preAggregation.lastRollupLambda || reformatInIsoLocal(r.buildRangeEnd) === reformatInIsoLocal(r.partitionRange[1])) &&
             rollupLambdaResults.every(result => !result[1].buildRangeEnd || reformatInIsoLocal(result[1].buildRangeEnd) < reformatInIsoLocal(r.partitionRange[0]))
         );
         if (filteredResults.length === 0) {
