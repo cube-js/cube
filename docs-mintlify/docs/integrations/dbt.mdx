@@ -52,9 +52,9 @@ an opt-in option that reads real column types from your warehouse.
 ## Prerequisites
 
 - **A supported data warehouse.** dbt pull supports **Snowflake**,
-  **Amazon Redshift**, **PostgreSQL**, **Google BigQuery**, **Databricks**, and
-  **Amazon Athena**. If your deployment uses any other database type, the pull
-  dialog will tell you it's unsupported.
+  **Amazon Redshift**, **PostgreSQL**, **Google BigQuery**, **Databricks**,
+  **Amazon Athena**, and **ClickHouse**. If your deployment uses any other database
+  type, the pull dialog will tell you it's unsupported.
 - **A Git repository** containing your dbt project, reachable over **HTTPS** or
   **SSH**. GitHub, GitLab, Bitbucket, Azure DevOps, and self-hosted Git servers all
   work.
@@ -242,8 +242,8 @@ An explicit `data_type` in your dbt YAML still wins; the catalog only fills the 
 
 - **This step connects to your warehouse** (`dbt docs generate` queries the warehouse
   metadata), unlike the rest of the pull. The models must already be built.
-- **Supported on Snowflake, Amazon Redshift, and PostgreSQL.** It's skipped on Google
-  BigQuery, Databricks, and Amazon Athena, whose sandbox profiles can't open a
+- **Supported on Snowflake, Amazon Redshift, PostgreSQL, and ClickHouse.** It's skipped
+  on Google BigQuery, Databricks, and Amazon Athena, whose sandbox profiles can't open a
   connection.
 - **Best-effort.** If catalog generation or the catalog read fails — no connectivity,
   unbuilt models, unreadable file — it's logged and skipped, and the pull completes on
@@ -405,7 +405,10 @@ For each dbt model in your project:
   `database.schema.model` (empty parts are dropped, so e.g. Postgres and Athena
   yield `schema.model`). On Databricks, the first segment is the catalog: the
   value of the deployment's `CUBEJS_DB_DATABRICKS_CATALOG` environment variable,
-  or `hive_metastore` if it isn't set.
+  or `hive_metastore` if it isn't set. On ClickHouse, cubes also yield
+  `schema.model`: the **dbt models schema** you configure *is* the ClickHouse
+  database, so `CUBEJS_DB_NAME` doesn't affect the generated `sql_table` (it still
+  sets the connection's default database).
 - **Each column becomes a dimension.** The dimension type is inferred from the
   column's `data_type` where available, then — if
   [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) is
@@ -612,7 +615,7 @@ Each push creates exactly two new files:
 ## Limitations
 
 - **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, Google
-  BigQuery, Databricks, and Amazon Athena.
+  BigQuery, Databricks, Amazon Athena, and ClickHouse.
 - **Imports models, columns, and relationships only** — not dbt metrics, semantic
   models, or exposures. Data tests aren't converted into anything either; `unique`,
   `not_null`, and `relationships` tests are only read as evidence for
@@ -622,8 +625,8 @@ Each push creates exactly two new files:
 - **No warehouse connection** — a pull doesn't trigger a `dbt run`; it assumes your
   tables are already built. The only exception is the opt-in
   [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) option
-  (in preview), which runs `dbt docs generate` on Snowflake, Amazon Redshift, and
-  PostgreSQL.
+  (in preview), which runs `dbt docs generate` on Snowflake, Amazon Redshift,
+  PostgreSQL, and ClickHouse.
 - **One dbt project per deployment.**
 
 ## Troubleshooting
@@ -640,7 +643,8 @@ pull only runs against a dev branch.
 <Accordion title="The pull dialog says the database type is unsupported">
 
 Your deployment uses a database other than Snowflake, Amazon Redshift, PostgreSQL,
-Google BigQuery, Databricks, or Amazon Athena. dbt pull isn't available for it.
+Google BigQuery, Databricks, Amazon Athena, or ClickHouse. dbt pull isn't available
+for it.
 
 </Accordion>
 

@@ -635,7 +635,7 @@
     "permanent": true
   },
   {
-    "source": "/cloud/access-control/",
+    "source": "/cloud/access-control",
     "destination": "https://docs.cube.dev/admin/users-and-permissions/custom-roles",
     "permanent": true
   },
@@ -650,7 +650,7 @@
     "permanent": true
   },
   {
-    "source": "/cloud/dev-tools/alerts/",
+    "source": "/cloud/dev-tools/alerts",
     "destination": "https://docs.cube.dev/docs/introduction",
     "permanent": true
   },
@@ -735,7 +735,7 @@
     "permanent": true
   },
   {
-    "source": "/workspace/sso/",
+    "source": "/workspace/sso",
     "destination": "https://docs.cube.dev/admin/sso",
     "permanent": true
   },
