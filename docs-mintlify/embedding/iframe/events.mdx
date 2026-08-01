@@ -106,7 +106,7 @@ window.addEventListener("message", (event) => {
   `chat` on the standalone chat surface.
 </Note>
 
-#### `cube:event:ready`
+#### `cube:event:ready` {#cube-event-ready}
 
 Emitted once per session, as soon as the embed authenticates and mounts. The
 handshake — the first event you receive, and the moment to record an
@@ -130,7 +130,7 @@ handshake — the first event you receive, and the moment to record an
 }
 ```
 
-#### `cube:event:view`
+#### `cube:event:view` {#cube-event-view}
 
 Emitted when a surface is viewed — on the initial load and again whenever the
 viewer navigates within the embed.
@@ -149,7 +149,7 @@ viewer navigates within the embed.
 }
 ```
 
-#### `cube:event:navigate`
+#### `cube:event:navigate` {#cube-event-navigate}
 
 Emitted when the viewer navigates within the embed (a route change). Use it to
 mirror the embed's location in your own router or analytics.
@@ -166,7 +166,7 @@ mirror the embed's location in your own router or analytics.
 }
 ```
 
-#### `cube:event:dashboard-loaded`
+#### `cube:event:dashboard-loaded` {#cube-event-dashboard-loaded}
 
 Emitted when a dashboard has finished rendering all of its widgets — the "fully
 painted" signal (distinct from `ready`, which fires at mount, before data loads).
@@ -184,7 +184,7 @@ painted" signal (distinct from `ready`, which fires at mount, before data loads)
 }
 ```
 
-#### `cube:event:download`
+#### `cube:event:download` {#cube-event-download}
 
 Emitted when a viewer exports something — a widget's data as CSV, or (in future)
 a dashboard image. Reports _that_ an export happened and its shape — never the
@@ -215,7 +215,7 @@ exported rows themselves.
   viewer uses it.
 </Note>
 
-#### `cube:event:drilldown`
+#### `cube:event:drilldown` {#cube-event-drilldown}
 
 Emitted when a viewer drills into a measure (clicks a chart mark or table cell to
 see its detail rows).
@@ -234,7 +234,7 @@ see its detail rows).
 }
 ```
 
-#### `cube:event:ai-query`
+#### `cube:event:ai-query` {#cube-event-ai-query}
 
 Emitted around an AI / natural-language query — capturing _what_ the viewer asked
 and the lifecycle stage. Fires wherever AI chat is used: the standalone chat
@@ -255,7 +255,7 @@ surface, the dashboard agent, and the embedded app.
 }
 ```
 
-#### `cube:event:error`
+#### `cube:event:error` {#cube-event-error}
 
 Emitted when the embed surfaces an error (a render error, a query failure, an
 auth/session problem). `fatal` distinguishes an error that took the whole surface
@@ -318,7 +318,7 @@ sendAction("cube:action:refresh");
 | [`cube:action:navigate`](#cube-action-navigate) | Navigate the embed to a path | `{ path }` |
 | [`cube:action:refresh`](#cube-action-refresh) | Re-run the embed's queries | _none_ |
 
-#### `cube:action:set-color-scheme`
+#### `cube:action:set-color-scheme` {#cube-action-set-color-scheme}
 
 Switch the embed's color scheme at runtime.
 
@@ -330,7 +330,7 @@ Switch the embed's color scheme at runtime.
 sendAction("cube:action:set-color-scheme", { scheme: "dark" });
 ```
 
-#### `cube:action:set-theme`
+#### `cube:action:set-theme` {#cube-action-set-theme}
 
 Apply a brand theme (colors, fonts) to the embed at runtime. The payload is an
 `embedTheme` object — the same shape the [Generate Session API](/reference/embed-apis/generate-session)
@@ -345,7 +345,7 @@ sendAction("cube:action:set-theme", {
 });
 ```
 
-#### `cube:action:set-locale`
+#### `cube:action:set-locale` {#cube-action-set-locale}
 
 Switch the embed's UI language. Accepts a full code (`es-ES`), a short code
 (`es`), or a regional variant. See [Localization](/embedding/iframe/localization)
@@ -359,7 +359,7 @@ for the list of supported languages and the other ways to set the language.
 sendAction("cube:action:set-locale", { locale: "es" });
 ```
 
-#### `cube:action:set-filter`
+#### `cube:action:set-filter` {#cube-action-set-filter}
 
 Push a filter into a dashboard. The `filterUrlParameter` is the same
 `f_<semantic_view>.<dimension>=<JSON>` form used to
@@ -376,7 +376,7 @@ sendAction("cube:action:set-filter", {
 });
 ```
 
-#### `cube:action:navigate`
+#### `cube:action:navigate` {#cube-action-navigate}
 
 Navigate the embed to an in-embed path.
 
@@ -388,7 +388,7 @@ Navigate the embed to an in-embed path.
 sendAction("cube:action:navigate", { path: "/embed/d/42/app/workbook/130" });
 ```
 
-#### `cube:action:refresh`
+#### `cube:action:refresh` {#cube-action-refresh}
 
 Re-run the embed's queries and refresh its data. No payload.
 
