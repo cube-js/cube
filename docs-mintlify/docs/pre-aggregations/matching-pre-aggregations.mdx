@@ -171,14 +171,10 @@ v1.7.0, it was not enabled by default.
 
 </Warning>
 
-When `case` measures span multiple cubes, **define the `switch` dimension on a
-single shared cube joined into every fact cube**, rather than defining a separate
-one on each cube. All `case` measures then dispatch on the same dimension, so one
-filter resolves every measure. With a `switch` dimension per cube, a single
-filter pins only one of them; the others fall back to their full set of values,
-and each value emits its own row — so the query returns extra rows.
-Pre-aggregations match either way, so they accelerate that result rather than
-preventing it.
+Matching is unaffected by how the `switch` dimension is modeled across cubes. If
+a query returns more rows than expected, that's a modeling concern — see
+[`case` measures][ref-case] — and pre-aggregations accelerate that result rather
+than preventing it.
 
 ## Matching multi-fact and multi-stage queries
 
