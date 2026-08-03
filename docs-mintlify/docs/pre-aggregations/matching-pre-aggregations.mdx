@@ -163,6 +163,11 @@ cube(`sales`, {
 Pre-aggregations that *do* include the `switch` dimension keep matching as well,
 so existing definitions are unaffected.
 
+Matching is unaffected by how the `switch` dimension is modeled across cubes. If
+a query returns more rows than expected, that's a modeling concern — see
+[`case` measures][ref-case] — and pre-aggregations accelerate that result rather
+than preventing it.
+
 <Warning>
 
 `switch` dimensions and `case` measures are powered by Tesseract, the
@@ -170,11 +175,6 @@ so existing definitions are unaffected.
 v1.7.0, it was not enabled by default.
 
 </Warning>
-
-Matching is unaffected by how the `switch` dimension is modeled across cubes. If
-a query returns more rows than expected, that's a modeling concern — see
-[`case` measures][ref-case] — and pre-aggregations accelerate that result rather
-than preventing it.
 
 ## Matching multi-fact and multi-stage queries
 
