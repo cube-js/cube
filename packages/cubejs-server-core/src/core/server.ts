@@ -26,7 +26,7 @@ import {
 
 import type { Application as ExpressApplication } from 'express';
 
-import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, DriverFactoryByDataSource, normalizeSqlPreamble } from '@cubejs-backend/query-orchestrator';
 import type { SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
 
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
@@ -622,8 +622,13 @@ export class CubejsServerCore {
         // with one about the preamble.
         let hasSeparatePreAggSqlPreamble = false;
         try {
-          hasSeparatePreAggSqlPreamble = getEnv('dbSqlPreamble', { dataSource, preAggregations: true })
-            !== getEnv('dbSqlPreamble', { dataSource, preAggregations: false });
+          // Normalized, so the sharing decision matches both the value the
+          // driver runs and the pre-aggregation cache key. A re-indented or
+          // trailing-newline value is the same preamble and must not split the
+          // driver into a second connection pool.
+          hasSeparatePreAggSqlPreamble =
+            normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource, preAggregations: true }))
+            !== normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource, preAggregations: false }));
         } catch (e) {
           hasSeparatePreAggSqlPreamble = false;
         }
