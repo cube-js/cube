@@ -1,5 +1,5 @@
 import { streamToArray } from '@cubejs-backend/shared';
-import { DuckDBDriver } from '../src';
+import { DuckDBDriver } from '../../src';
 
 // DuckDB is embedded, so the preamble actually executes here — this is the one
 // driver where the feature can be verified end-to-end without a cloud account.

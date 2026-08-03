@@ -550,13 +550,27 @@ const variables: Record<string, (...args: any) => any> = {
    *
    * Passed through as one opaque string: the data source parses it, so no
    * delimiter convention is imposed on multi-statement values.
+   *
+   * Unlike the credential vars, the pre-aggregation variant *inherits* the
+   * default when unset: a preamble defining a UDF the model depends on must
+   * reach pre-aggregation builds too, and half-inheritance would fail only
+   * later, at build time, on a missing function. Credentials deliberately do
+   * not inherit — a half-inherited connection target is worse than none — so
+   * the fallback is spelled out here rather than pushed into
+   * `keyByDataSource`, which resolves to exactly one key by design.
    */
   dbSqlPreamble: ({
     dataSource,
     preAggregations,
-  }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', dataSource, preAggregations)).asString()
-  ),
+  }: DataSourceOpts) => {
+    const value = get(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', dataSource, preAggregations)).asString();
+
+    if (value !== undefined || !preAggregations) {
+      return value;
+    }
+
+    return get(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', dataSource, false)).asString();
+  },
 
   /**
    * Database name.

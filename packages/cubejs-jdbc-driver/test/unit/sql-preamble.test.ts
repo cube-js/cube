@@ -141,4 +141,74 @@ describe('JDBC sql preamble', () => {
         .toEqual([MYSQL_BUILT_IN]);
     });
   });
+
+  // Asserting the resolver's return value is not enough: the statements have to
+  // reach the connection. Both paths ran the loop against the wrong shape (or
+  // not at all) while a return-value test stayed green, so these assert the
+  // execution, statement by statement, in order.
+  describe('execution on the connection', () => {
+    const executingDriverFor = (config: Record<string, any>) => {
+      const driver = driverFor(config);
+      const conn = {
+        createStatement: (cb: Function) => cb(null, {
+          cancel: (cb2: Function) => cb2(null),
+          execute: (_sql: string, cb2: Function) => cb2(null, {
+            toObjectIter: (cb3: Function) => cb3(null, {
+              labels: [],
+              types: [],
+              rows: { next: () => ({ done: true }) },
+            }),
+          }),
+        }),
+      };
+
+      driver.pool = {
+        acquire: async () => conn,
+        release: async () => { /* nothing to release in the harness */ },
+      };
+      driver.executed = [];
+      driver.executeStatement = jest.fn(async (_conn: unknown, sql: string) => {
+        driver.executed.push(sql);
+        return [];
+      });
+
+      return driver;
+    };
+
+    it('runs the built-in and the preamble on the query path, built-in first', async () => {
+      const driver = executingDriverFor({ dbType: 'mysql', sqlPreamble: 'SET a = 1' });
+
+      await driver.query('SELECT 1', []);
+
+      expect(driver.executed).toEqual([MYSQL_BUILT_IN, 'SET a = 1', 'SELECT 1']);
+    });
+
+    it('runs each statement of a multi-statement preamble on the query path', async () => {
+      const driver = executingDriverFor({ dbType: 'athena', sqlPreamble: 'SET a = 1; SET b = 2' });
+
+      await driver.query('SELECT 1', []);
+
+      expect(driver.executed).toEqual(['SET a = 1', 'SET b = 2', 'SELECT 1']);
+    });
+
+    it('runs the preamble on the stream path too', async () => {
+      const driver = executingDriverFor({ dbType: 'mysql', sqlPreamble: 'SET a = 1' });
+
+      await driver.stream('SELECT 1', [], { highWaterMark: 100 });
+
+      // The streamed query itself goes through createStatement rather than
+      // executeStatement, so only the preamble shows up here.
+      expect(driver.executed).toEqual([MYSQL_BUILT_IN, 'SET a = 1']);
+    });
+
+    it('runs nothing extra on either path when no preamble is configured', async () => {
+      const queryDriver = executingDriverFor({ dbType: 'athena' });
+      await queryDriver.query('SELECT 1', []);
+      expect(queryDriver.executed).toEqual(['SELECT 1']);
+
+      const streamDriver = executingDriverFor({ dbType: 'athena' });
+      await streamDriver.stream('SELECT 1', [], { highWaterMark: 100 });
+      expect(streamDriver.executed).toEqual([]);
+    });
+  });
 });

@@ -93,4 +93,41 @@ describe('BigQueryDriver.withSqlPreamble', () => {
       expect(result.query).toEqual("SET @@dataset_id = 'analytics';\nSELECT 1");
     });
   });
+
+  // stream() does not go through withSqlPreamble — it builds its own request and
+  // prepends directly. Everything above would stay green with the stream path's
+  // prepend deleted, so it needs the request BigQuery actually receives.
+  describe('the stream path', () => {
+    const streamingDriverWith = (preamble?: string) => {
+      const driver = driverWith(preamble) as any;
+      const requests: { query: string }[] = [];
+
+      driver.bigquery = {
+        createQueryStream: async (request: { query: string }) => {
+          requests.push(request);
+          return { pipe: () => { /* the row stream is not under test */ } };
+        },
+      };
+      driver.buildQueryLabels = () => undefined;
+
+      return { driver, requests };
+    };
+
+    test('prepends the preamble into the streamed query', async () => {
+      const { driver, requests } = streamingDriverWith(TEMP_FN);
+
+      await driver.stream('SELECT double_it(21)', [], {});
+
+      expect(requests).toHaveLength(1);
+      expect(requests[0].query).toEqual(`${TEMP_FN};\nSELECT double_it(21)`);
+    });
+
+    test('leaves the streamed query untouched when no preamble is configured', async () => {
+      const { driver, requests } = streamingDriverWith(undefined);
+
+      await driver.stream('SELECT 1', [], {});
+
+      expect(requests[0].query).toEqual('SELECT 1');
+    });
+  });
 });

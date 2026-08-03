@@ -21,6 +21,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "unit": "jest --verbose dist/test/*.unit.test.js",
     "integration": "npm run integration:postgres",
     "integration:postgres": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",

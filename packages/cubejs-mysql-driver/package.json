@@ -21,6 +21,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "unit": "jest --verbose dist/test/*.unit.test.js",
     "integration": "npm run integration:mysql",
     "integration:mysql": "jest --verbose dist/test",
     "lint": "eslint src/* test/* --ext .ts,.js",

@@ -71,6 +71,33 @@ export function getLastUpdatedAtTimestamp(
   }
 }
 
+/**
+ * The SQL preamble a build for this pre-aggregation would run under.
+ *
+ * A preamble can define a UDF the pre-aggregation's SQL calls, so identical SQL
+ * under a different preamble can produce different rows — serving a table built
+ * under the old one would be wrong. It therefore belongs in the version, and
+ * changing the preamble invalidates every pre-aggregation.
+ *
+ * Resolved from the environment rather than from the driver on purpose: two of
+ * the four `getStructureVersion` call sites are statics with no driver in scope
+ * (`PreAggregations.structureVersion`, reached from the pre-aggregations API
+ * listing), and both version functions are synchronous while every driver
+ * factory is async. A driver-derived value would have to be threaded to some
+ * call sites and re-derived at others, and a listing that computed a different
+ * structure version than the loader would stop matching built tables. Reading
+ * the env keeps one sync resolution shared by all four.
+ *
+ * `preAggregations: true` picks the pre-aggregation-specific preamble, which
+ * falls back to the default one when unset.
+ */
+export function getPreAggregationSqlPreamble(preAggregation): string | undefined {
+  return getEnv('dbSqlPreamble', {
+    dataSource: preAggregation.dataSource || 'default',
+    preAggregations: true,
+  });
+}
+
 export function getStructureVersion(preAggregation) {
   const versionArray = [preAggregation.structureVersionLoadSql || preAggregation.loadSql];
   if (preAggregation.indexesSql?.length) {
@@ -81,6 +108,10 @@ export function getStructureVersion(preAggregation) {
   }
   if (preAggregation.outputColumnTypes) {
     versionArray.push(preAggregation.outputColumnTypes);
+  }
+  const sqlPreamble = getPreAggregationSqlPreamble(preAggregation);
+  if (sqlPreamble) {
+    versionArray.push(sqlPreamble);
   }
 
   return version(versionArray.length === 1 ? versionArray[0] : versionArray);
