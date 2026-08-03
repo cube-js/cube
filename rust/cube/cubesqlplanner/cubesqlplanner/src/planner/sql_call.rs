@@ -624,8 +624,13 @@ impl SymbolDeps for Rc<SqlCall> {
         }
         // Reached whatever the activity, so a rewrite never leaves an inactive
         // column holding a symbol every other reference to it has replaced.
+        for item in call.filter_params.iter_mut() {
+            visitor.filter_params_group(std::slice::from_mut(item))?;
+        }
+        for group in call.filter_groups.iter_mut() {
+            visitor.filter_params_group(&mut group.filter_params)?;
+        }
         for item in call.filter_params_mut() {
-            visitor.filter_params_item(item)?;
             if let Some(call) = &mut item.compiled_call {
                 call.visit_deps_mut(visitor)?;
             }

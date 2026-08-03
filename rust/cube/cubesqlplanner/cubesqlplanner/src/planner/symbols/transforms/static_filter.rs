@@ -97,9 +97,9 @@ fn replace_dimension_case(dimension: &DimensionSymbol, new_case: Case) -> Rc<Dim
 }
 
 /// Marks every `FILTER_PARAMS` binding in the symbol by whether `filters` reach
-/// the member it names. A binding renders only where its filter does, so only
-/// there do the members its column reads count among the symbol's dependencies
-/// and pull their cubes into the join.
+/// the members it renders from. A binding renders only where its filters do, so
+/// only there do the members its column reads count among the symbol's
+/// dependencies and pull their cubes into the join.
 pub fn apply_filter_params_activity_to_symbol(
     symbol: &Rc<MemberSymbol>,
     filters: &[FilterItem],
@@ -126,11 +126,31 @@ impl DepVisitorMut for ActivityVisitor<'_> {
         Ok(())
     }
 
-    fn filter_params_item(&mut self, item: &mut SqlCallFilterParamsItem) -> Result<(), CubeError> {
-        item.active = self
-            .filters
-            .find_subtree_for_members(&[&item.filter_symbol_name])
-            .is_some();
+    fn filter_params_group(
+        &mut self,
+        items: &mut [SqlCallFilterParamsItem],
+    ) -> Result<(), CubeError> {
+        // Matched against the whole group, since that is the predicate the group
+        // renders: an OR group survives only when every member of it matches.
+        let members = items
+            .iter()
+            .map(|item| &item.filter_symbol_name)
+            .collect::<Vec<_>>();
+        let active = self.filters.find_subtree_for_members(&members).is_some();
+        for item in items.iter_mut() {
+            item.active = active;
+        }
         Ok(())
     }
+}
+
+/// `apply_filter_params_activity_to_symbol` over every symbol a filter item
+/// carries.
+pub fn apply_filter_params_activity_to_filter_item(
+    filter_item: &FilterItem,
+    filters: &[FilterItem],
+) -> Result<FilterItem, CubeError> {
+    super::map_filter_item_symbols(filter_item, &|symbol| {
+        apply_filter_params_activity_to_symbol(symbol, filters)
+    })
 }

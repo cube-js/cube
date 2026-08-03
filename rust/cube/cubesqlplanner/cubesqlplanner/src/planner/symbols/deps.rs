@@ -39,11 +39,13 @@ pub trait DepVisitor {
 pub trait DepVisitorMut {
     fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError>;
 
-    /// Every `FILTER_PARAMS` binding reached on the way, whether or not
-    /// it currently contributes dependencies.
-    fn filter_params_item(
+    /// The `FILTER_PARAMS` bindings reached on the way, grouped the way
+    /// they are rendered: a `FILTER_GROUP` arrives as one slice, a
+    /// standalone binding as a slice of one. Bindings that contribute no
+    /// dependencies are handed over all the same.
+    fn filter_params_group(
         &mut self,
-        _item: &mut crate::planner::SqlCallFilterParamsItem,
+        _items: &mut [crate::planner::SqlCallFilterParamsItem],
     ) -> Result<(), CubeError> {
         Ok(())
     }

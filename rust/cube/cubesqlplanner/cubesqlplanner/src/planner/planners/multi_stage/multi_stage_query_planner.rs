@@ -473,12 +473,10 @@ impl MultiStageQueryPlanner {
         let member = member.resolve_reference_chain();
         let member =
             transforms::apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
-        // A stage may filter a member the query around it does not — `filter:
-        // include` adds to the set — so activity is settled again here.
-        let member = transforms::apply_filter_params_activity_to_symbol(
-            &member,
-            &state.all_filter_items(),
-        )?;
+        // `filter: include` lets a stage filter a member the query around it does
+        // not, so activity is settled against this stage's own set.
+        let member =
+            transforms::apply_filter_params_activity_to_symbol(&member, &state.all_filter_items())?;
         let state = if member.is_dimension() {
             let mut new_state = state.as_ref().clone();
             new_state.remove_multistage_dimensions(resolved_multi_stage_dimensions)?;

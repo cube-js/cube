@@ -321,3 +321,111 @@ describe('member references in a cube\'s sql', () => {
     expect(await sqlFor(cubeWith('SELECT * FROM ${base.sql()}', base), false)).toMatch(/FROM\s+raw\b/);
   });
 });
+
+// A column renders wherever the symbol carrying it does, which includes symbols a
+// query reaches only through a filter, a segment or an order item. Its cube has
+// to be joined in every one of those, or the qualifier it renders has no table
+// behind it.
+describe('a column reached through something other than a selected member', () => {
+  const COLUMN = '${FILTER_PARAMS.orders.createdAt.filter((from, to) => `${users.city} IS NOT NULL AND ${CUBE.createdAt} >= ${from}`)}';
+
+  const schema = [
+    'cube(\'orders\', {',
+    '  sql: `SELECT * FROM orders`,',
+    '  joins: {',
+    '    users: {',
+    '      sql: `${CUBE}.user_id = ${users}.id`,',
+    '      relationship: `belongsTo`',
+    '    }',
+    '  },',
+    '  measures: {',
+    '    count: {',
+    '      type: `count`',
+    '    },',
+    `    total: { sql: \`\${CUBE}.amount\`, type: \`sum\`, filters: [{ sql: \`${COLUMN}\` }] },`,
+    '    grouped: {',
+    '      sql: `${CUBE}.amount`,',
+    '      type: `sum`,',
+    '      filters: [{ sql: `${FILTER_GROUP(',
+    '        FILTER_PARAMS.orders.createdAt.filter((from, to) => `${users.city} IS NOT NULL AND ${CUBE.createdAt} >= ${from}`),',
+    '        FILTER_PARAMS.orders.status.filter((v) => `${CUBE.status} = ${v}`)',
+    '      )}` }]',
+    '    }',
+    '  },',
+    '  dimensions: {',
+    '    id: {',
+    '      sql: `id`,',
+    '      type: `number`,',
+    '      primaryKey: true',
+    '    },',
+    '    status: {',
+    '      sql: `status`,',
+    '      type: `string`',
+    '    },',
+    '    createdAt: {',
+    '      sql: `created_at`,',
+    '      type: `time`',
+    '    },',
+    `    flagged: { sql: \`CASE WHEN ${COLUMN} THEN 1 ELSE 0 END\`, type: \`number\` }`,
+    '  },',
+    `  segments: { recent: { sql: \`${COLUMN}\` } }`,
+    '});',
+    'cube(\'users\', {',
+    '  sql: `SELECT * FROM users`,',
+    '  dimensions: {',
+    '    id: {',
+    '      sql: `id`,',
+    '      type: `number`,',
+    '      primaryKey: true',
+    '    },',
+    '    city: {',
+    '      sql: `city`,',
+    '      type: `string`',
+    '    }',
+    '  }',
+    '});',
+  ].join('\n');
+
+  const RANGE = { member: 'orders.createdAt', operator: 'inDateRange', values: ['2025-07-01', '2026-06-30'] };
+
+  async function sqlFor(query: any, useNativeSqlPlanner: boolean) {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+    await compiler.compile();
+
+    return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      ...query,
+      timezone: 'UTC',
+      useNativeSqlPlanner,
+    }).buildSqlAndParams()[0];
+  }
+
+  it.each([
+    ['a segment', { measures: ['orders.count'], segments: ['orders.recent'], filters: [RANGE] }],
+    ['a dimension only named in a filter', { measures: ['orders.count'], filters: [RANGE, { member: 'orders.flagged', operator: 'equals', values: ['1'] }] }],
+    ['a measure only named in a having filter', { measures: ['orders.count'], filters: [RANGE, { member: 'orders.total', operator: 'gt', values: ['1'] }] }],
+    // A FILTER_GROUP renders as one predicate, so its members share one verdict;
+    // an OR group survives only when every member of it matches the query.
+    ['a filter group under an or filter', { measures: ['orders.grouped'], filters: [{ or: [RANGE, { member: 'orders.status', operator: 'equals', values: ['x'] }] }] }],
+  ])('joins the cube read through %s', async (_name, query) => {
+    for (const useNativeSqlPlanner of [false, true]) {
+      const sql = await sqlFor(query, useNativeSqlPlanner);
+
+      expect(sql).toContain('"users".city IS NOT NULL');
+      expect(sql).toMatch(/join\s+users/i);
+    }
+  });
+
+  // The legacy planner cannot build this one at all: collecting its join hints
+  // recurses until the stack runs out.
+  it('joins the cube read through a filter group under an and filter', async () => {
+    const query = {
+      measures: ['orders.grouped'],
+      filters: [RANGE, { member: 'orders.status', operator: 'equals', values: ['x'] }],
+    };
+
+    const sql = await sqlFor(query, true);
+
+    expect(sql).toContain('"users".city IS NOT NULL');
+    expect(sql).toMatch(/join\s+users/i);
+  });
+});
