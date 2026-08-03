@@ -2225,7 +2225,17 @@ class ApiGateway {
              * TODO(ovr): You must finish it, move to ResultWrapper after optimizing it.
              */
             data: rowsToColumnar(response.data),
-            annotation
+            annotation,
+            // Freshness metadata has to travel with the pushed-down result too,
+            // otherwise the SQL API reports "unknown" for every query cubesql
+            // hands over as pre-generated SQL.
+            lastRefreshTime: response.lastRefreshTime?.toISOString(),
+            // Always false: this branch builds its sqlQuery with
+            // `disableExternalPreAggregations` set (above), which makes
+            // `externalPreAggregationQuery()` return false, and the
+            // orchestrator only echoes that flag back. Mirrored anyway for
+            // shape parity with `prepareResultTransformData`.
+            external: response.external,
           }];
         }
 

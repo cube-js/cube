@@ -86,6 +86,7 @@ pub struct SpanId {
     span_start: SystemTime,
     is_data_query: RWLockAsync<bool>,
     last_refresh_time: RWLockAsync<Option<DateTime<Utc>>>,
+    external: RWLockAsync<Option<bool>>,
 }
 
 impl SpanId {
@@ -96,6 +97,7 @@ impl SpanId {
             span_start: SystemTime::now(),
             is_data_query: tokio::sync::RwLock::new(false),
             last_refresh_time: tokio::sync::RwLock::new(None),
+            external: tokio::sync::RwLock::new(None),
         }
     }
 
@@ -123,6 +125,28 @@ impl SpanId {
     pub async fn last_refresh_time(&self) -> Option<String> {
         let read = self.last_refresh_time.read().await;
         read.map(|t| t.to_rfc3339_opts(SecondsFormat::Millis, true))
+    }
+
+    /// Records whether a load result contributing to this span was served from
+    /// an external (CubeStore) pre-aggregation. A span may cover several load
+    /// requests (e.g. a join of cube scans); the span counts as external only
+    /// when *every* one of them was, matching how the flag is folded elsewhere
+    /// (`usages.iter().all(..)` in cubesqlplanner's `base_query`). Otherwise a
+    /// join of one pre-aggregated and one live scan would claim the whole result
+    /// came from a pre-aggregation, while `last_refresh_time` above reports the
+    /// oldest of the two — the two would disagree on the same result.
+    ///
+    /// `None` means no load has reported yet, which is distinct from a load
+    /// having reported `false`.
+    pub async fn set_external(&self, external: bool) {
+        let mut write = self.external.write().await;
+        *write = Some(write.unwrap_or(true) && external);
+    }
+
+    /// `None` when no load has reported yet, so callers can tell a span that
+    /// is silent from one that deliberately folded to `false`.
+    pub async fn external(&self) -> Option<bool> {
+        *self.external.read().await
     }
 
     pub fn duration(&self) -> u64 {
@@ -1099,5 +1123,32 @@ mod tests {
             span_id.last_refresh_time().await,
             Some("2024-01-01T00:00:00.000Z".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn span_id_external_only_when_every_load_is_external() {
+        // No load has reported yet — distinct from a load reporting `false`,
+        // so that consumers can fall back to another source when silent
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+        assert_eq!(span_id.external().await, None);
+
+        // A single external load makes the whole span external
+        span_id.set_external(true).await;
+        assert_eq!(span_id.external().await, Some(true));
+
+        // ...but one live load anywhere in the span clears it, and a later
+        // external load must not bring it back
+        span_id.set_external(false).await;
+        assert_eq!(span_id.external().await, Some(false));
+        span_id.set_external(true).await;
+        assert_eq!(span_id.external().await, Some(false));
+    }
+
+    #[tokio::test]
+    async fn span_id_external_reports_false_for_a_single_live_load() {
+        let span_id = SpanId::new("test".to_string(), serde_json::json!({}));
+
+        span_id.set_external(false).await;
+        assert_eq!(span_id.external().await, Some(false));
     }
 }
