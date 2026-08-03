@@ -105,6 +105,103 @@ describe('FILTER_PARAMS callback column', () => {
 
       expect(loadSql).toMatch(PUSHED_DOWN_PREDICATE);
     });
+
+    // The column applies only what its filter supplies, so an operator carrying
+    // no values leaves nothing to apply.
+    it('applies nothing when the filter on the column carries no values', async () => {
+      const query = await queryFor(useNativeSqlPlanner, {
+        dimensions: ['commission.partner', 'commission.pricingDuration'],
+        timeDimensions: [],
+        filters: [{ member: 'commission.reconciliationDate', operator: 'set' }],
+      });
+      const [sql] = query.buildSqlAndParams();
+
+      expect(sql).not.toMatch(PUSHED_DOWN_PREDICATE);
+      expect(sql).toContain('1 = 1');
+    });
+  });
+
+  // Fewer values than the column takes would leave its trailing bound unbound.
+  // The legacy planner fills that bound in with the current time, quietly
+  // widening the predicate to a range the filter never asked for.
+  it('reports a filter that supplies fewer values than the column takes', async () => {
+    const query = await queryFor(true, {
+      dimensions: ['commission.partner', 'commission.pricingDuration'],
+      timeDimensions: [],
+      filters: [{
+        member: 'commission.reconciliationDate',
+        operator: 'beforeDate',
+        values: ['2025-07-01'],
+      }],
+    });
+
+    expect(() => query.buildSqlAndParams())
+      .toThrow(/takes 2 values but the filter on it supplies 1/);
+  });
+
+  // A column naming another cube cannot bring it into the join, so the qualifier
+  // it renders would have no table behind it.
+  it('reports a column that names another cube', async () => {
+    const schema = [
+      'cube(\'orders\', {',
+      '  sql: `SELECT * FROM orders`,',
+      '  joins: {',
+      '    users: {',
+      '      sql: `${CUBE}.user_id = ${users}.id`,',
+      '      relationship: `belongsTo`',
+      '    }',
+      '  },',
+      '  measures: {',
+      '    total: {',
+      '      sql: `${CUBE}.amount`,',
+      '      type: `sum`,',
+      '      filters: [',
+      '        { sql: `${FILTER_PARAMS.orders.createdAt.filter((from, to) => `${users}.city IS NOT NULL AND ${CUBE.createdAt} >= ${from}`)}` }',
+      '      ]',
+      '    }',
+      '  },',
+      '  dimensions: {',
+      '    id: {',
+      '      sql: `id`,',
+      '      type: `number`,',
+      '      primaryKey: true',
+      '    },',
+      '    createdAt: {',
+      '      sql: `created_at`,',
+      '      type: `time`',
+      '    }',
+      '  }',
+      '});',
+      'cube(\'users\', {',
+      '  sql: `SELECT * FROM users`,',
+      '  dimensions: {',
+      '    id: {',
+      '      sql: `id`,',
+      '      type: `number`,',
+      '      primaryKey: true',
+      '    },',
+      '    city: {',
+      '      sql: `city`,',
+      '      type: `string`',
+      '    }',
+      '  }',
+      '});',
+    ].join('\n');
+
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['orders.total'],
+      filters: [{
+        member: 'orders.createdAt',
+        operator: 'inDateRange',
+        values: ['2025-07-01', '2026-06-30'],
+      }],
+      timezone: 'UTC',
+      useNativeSqlPlanner: true,
+    });
+
+    expect(() => query.buildSqlAndParams()).toThrow(/reads cube `users`/);
   });
 });
 
@@ -156,8 +253,8 @@ describe('member references in a cube\'s sql', () => {
   const REJECTED = /references member `commission\.reconciliationDate`/;
 
   // Each spelling reaches the same place, so each has to be reported the same
-  // way rather than resolved, left to render an out-of-scope qualifier, or —
-  // for the forms that used to recurse — abandoned on a blown stack.
+  // way rather than resolved or left to render a qualifier for a table the query
+  // does not read.
   it.each([
     ['a direct reference', 'SELECT * FROM commission WHERE ${CUBE.reconciliationDate} IS NOT NULL'],
     ['a string filter param column', 'SELECT * FROM commission WHERE ${FILTER_PARAMS.commission.reconciliationDate.filter(`${CUBE.reconciliationDate}`)}'],

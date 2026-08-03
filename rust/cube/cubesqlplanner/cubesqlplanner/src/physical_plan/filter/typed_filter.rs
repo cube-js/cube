@@ -85,7 +85,7 @@ impl TypedFilter {
                 };
                 dispatch_to_sql(self.operation(), &ctx)
             }
-            FilterParamsColumn::Compiled(_) => {
+            FilterParamsColumn::Compiled(compiled) => {
                 if let Some((owner, foreign)) = &item.foreign_cube {
                     return Err(CubeError::user(format!(
                         "FILTER_PARAMS column for `{}` in cube `{}` reads cube `{}`; a column may \
@@ -93,8 +93,32 @@ impl TypedFilter {
                         item.filter_symbol_name, owner, foreign
                     )));
                 }
+                if time_shift.is_some() {
+                    return Err(CubeError::user(format!(
+                        "FILTER_PARAMS column for `{}` is a callback, which cannot carry the time \
+                         shift the surrounding query applies; pass the column as a string instead",
+                        item.filter_symbol_name
+                    )));
+                }
                 let values =
                     self.filter_param_values(query_tools, plan_templates, use_db_time_zone)?;
+                // A filter carrying no values applies nothing, which is what a
+                // `set` or `notSet` operator on the filtered member amounts to.
+                if values.is_empty() {
+                    return plan_templates.always_true();
+                }
+                // Fewer values than the column takes leaves its trailing
+                // placeholders with nothing to bind. Inventing a bound would
+                // silently widen the predicate, so say so instead.
+                if values.len() < compiled.value_params_count {
+                    return Err(CubeError::user(format!(
+                        "FILTER_PARAMS column for `{}` takes {} values but the filter on it \
+                         supplies {}",
+                        item.filter_symbol_name,
+                        compiled.value_params_count,
+                        values.len()
+                    )));
+                }
                 let Some(call) = &item.compiled_call else {
                     return Err(CubeError::internal(format!(
                         "Compiled filter params column for `{}` has no call",
@@ -119,8 +143,8 @@ impl TypedFilter {
         }
     }
 
-    /// The filter's values, formatted the way a `FILTER_PARAMS` column
-    /// expects to receive them.
+    // The filter's values, formatted the way a `FILTER_PARAMS` column expects to
+    // receive them.
     fn filter_param_values(
         &self,
         query_tools: &Rc<QueryTools>,

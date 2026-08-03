@@ -73,8 +73,8 @@ fn measure_filter_callback_column_renders_the_referenced_member() {
 }
 
 // A cube's `sql` builds the table the query reads from, so no member is in scope
-// inside it. Resolving such a reference is what used to recurse between the cube
-// table and the dimension until the stack ran out.
+// inside it. The reference is reported without resolving it, which is also what
+// keeps the cube table and the dimension from resolving each other in a loop.
 #[test]
 fn cube_sql_referencing_a_member_is_rejected() {
     let schema = MockSchema::from_yaml(indoc! {"

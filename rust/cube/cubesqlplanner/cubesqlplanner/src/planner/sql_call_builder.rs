@@ -61,10 +61,10 @@ impl<'a> SqlCallBuilder<'a> {
         self.build_from_template(cube_name, compiled.template, &compiled.args)
     }
 
-    /// Assembles a `SqlCall` from an already-compiled template and the
-    /// dependencies it recorded. Recurses for a `FILTER_PARAMS` column
-    /// that came back compiled, since such a column is a call of its
-    /// own with its own dependency list.
+    // Assembles a `SqlCall` from an already-compiled template and the
+    // dependencies it recorded. Recurses for a `FILTER_PARAMS` column that came
+    // back compiled, since such a column is a call of its own with its own
+    // dependency list.
     fn build_from_template(
         &mut self,
         cube_name: &String,
@@ -121,23 +121,33 @@ impl<'a> SqlCallBuilder<'a> {
         })
     }
 
-    /// The first cube a compiled column reads outside the one owning it.
-    /// Such a column renders only when its filter reaches the query, so the
-    /// members it reads are not dependencies of the enclosing member and
-    /// cannot bring a cube into the join — the qualifier it emits would have
-    /// no table behind it.
+    // A cube a compiled column reads outside the one owning it. Such a column
+    // renders only when its filter reaches the query, so the members it reads are
+    // not dependencies of the enclosing member and cannot bring a cube into the
+    // join — the qualifier it emits would have no table behind it. A cube's table
+    // expression is exempt: it inlines the whole expression and needs no join.
     fn foreign_cube_reference(
         cube_name: &String,
         call: &SqlCall,
     ) -> Result<Option<(String, String)>, CubeError> {
+        let mut foreign = call
+            .get_cube_refs()
+            .iter()
+            .filter(|cube_ref| matches!(cube_ref, CubeRef::Name(_)))
+            .map(|cube_ref| cube_ref.cube_name().clone())
+            .collect::<Vec<_>>();
+
         for dep in call.get_dependencies() {
-            for referenced in collect_cube_names(&dep)? {
-                if &referenced != cube_name {
-                    return Ok(Some((cube_name.clone(), referenced)));
-                }
-            }
+            foreign.extend(collect_cube_names(&dep)?);
         }
-        Ok(None)
+
+        foreign.retain(|referenced| referenced != cube_name);
+        // Reported deterministically: the cube names arrive unordered.
+        foreign.sort();
+        Ok(foreign
+            .into_iter()
+            .next()
+            .map(|referenced| (cube_name.clone(), referenced)))
     }
 
     fn build_filter_group_item(

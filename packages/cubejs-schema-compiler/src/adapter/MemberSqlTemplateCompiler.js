@@ -39,6 +39,10 @@ function placeholder(prefix, index) {
   return `{${prefix}:${index}}`;
 }
 
+// The proxies handed to the member's `sql` function are captured by any
+// `FILTER_PARAMS` column callback it declares, so a nested compile cannot hand
+// them a different state. They record into `state.target`, which
+// `compileColumnCallback` swaps for the duration of that compile.
 function emptyRecording() {
   return {
     symbolPaths: [],
@@ -46,15 +50,6 @@ function emptyRecording() {
     filterGroups: [],
     securityContextValues: [],
   };
-}
-
-// The proxies handed to the member's `sql` function are captured by any
-// `FILTER_PARAMS` column callback it declares, so compiling such a callback has
-// to redirect what those proxies record into. Every recording goes through the
-// state's current target, which `compileColumnCallback` swaps for the duration
-// of the nested compile.
-function target(state) {
-  return state.target;
 }
 
 // Returns the index of an equal path if it already exists, otherwise appends
@@ -91,12 +86,12 @@ function memberReferenceProxy(path, state) {
         return undefined;
       }
       if (prop === 'sql') {
-        const index = uniqueInsertPath(target(state).symbolPaths, [...path, '__sql_fn']);
+        const index = uniqueInsertPath(state.target.symbolPaths, [...path, '__sql_fn']);
         const ph = placeholder(ARG_PREFIX, index);
         return () => ph;
       }
       if (prop === 'toString' || prop === 'valueOf') {
-        const index = uniqueInsertPath(target(state).symbolPaths, path);
+        const index = uniqueInsertPath(state.target.symbolPaths, path);
         const ph = placeholder(ARG_PREFIX, index);
         return () => ph;
       }
@@ -154,6 +149,15 @@ function declaredValueParams(fn) {
   return { count: params.length, rest: params.some(p => p.startsWith('...')) };
 }
 
+// Parsing the parameter list can come up short — a bound or native function
+// exposes no list, and a `)` inside a comment or a string default ends it early.
+// Too few placeholders would render the missing values as `undefined`, so only a
+// count that accounts for every parameter is trusted; `Function.length` stops at
+// the first defaulted parameter and so is a lower bound.
+function valueParamsAreCertain(fn, count) {
+  return count >= fn.length && !fn.toString().includes('[native code]');
+}
+
 // Compiles a column callback into a template of its own: its filter values
 // become `{fpv:N}` placeholders and whatever it references is recorded into its
 // own lists, so the placeholders it emits index its own dependencies rather than
@@ -162,7 +166,7 @@ function declaredValueParams(fn) {
 // callback is left for the caller to invoke at render time.
 function compileColumnCallback(column, state) {
   const { count, rest } = declaredValueParams(column);
-  if (rest) {
+  if (rest || !valueParamsAreCertain(column, count)) {
     return column;
   }
 
@@ -191,8 +195,8 @@ function filterParamsItemProxy(cubeName, name, state) {
         column: typeof column === 'function' ? compileColumnCallback(column, state) : column,
       };
       const toString = () => {
-        const index = target(state).filterParams.length;
-        target(state).filterParams.push(item);
+        const index = state.target.filterParams.length;
+        state.target.filterParams.push(item);
         return placeholder(FILTER_PARAM_PREFIX, index);
       };
       // `__member` lets FILTER_GROUP recover the item; `toString` records and
@@ -222,8 +226,8 @@ function filterGroupFn(state) {
       }
       return arg.__member;
     });
-    const index = target(state).filterGroups.length;
-    target(state).filterGroups.push({ filterParams });
+    const index = state.target.filterGroups.length;
+    state.target.filterGroups.push({ filterParams });
     return placeholder(FILTER_GROUP_PREFIX, index);
   };
 }
@@ -266,7 +270,7 @@ function coerceToStringValue(value) {
 }
 
 function recordSecurityValue(value, state) {
-  return placeholder(SECURITY_VALUE_PREFIX, uniqueInsertString(target(state).securityContextValues, value));
+  return placeholder(SECURITY_VALUE_PREFIX, uniqueInsertString(state.target.securityContextValues, value));
 }
 
 function securityFilterFn(value, required, state) {

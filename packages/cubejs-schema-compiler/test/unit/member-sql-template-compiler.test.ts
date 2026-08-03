@@ -145,6 +145,21 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(typeof res.filterParams[0].column).toBe('function');
   });
 
+  // Too few placeholders would render the missing values as `undefined`, so a
+  // parameter list that cannot be read in full is left to render time.
+  it.each([
+    // eslint-disable-next-line no-extra-bind
+    ['a bound callback', ((from, to) => `d >= ${from} AND d < ${to}`).bind(null)],
+    ['a comment closing the parameter list', (from /* ) */, to) => `d >= ${from} AND d < ${to}`],
+    ['a default containing a paren', (from, to = '(') => `d >= ${from} AND d < ${to}`],
+  ])('leaves %s uncompiled', (_name, column) => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter(column)}`,
+      ['FILTER_PARAMS']
+    );
+    expect(typeof res.filterParams[0].column).toBe('function');
+  });
+
   it('records a security context value referenced from a column callback into the callback', () => {
     const res = compileMemberSql(
       (SECURITY_CONTEXT, FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((v) => `t = ${SECURITY_CONTEXT.tenantId} AND a = ${v}`)}`,
