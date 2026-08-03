@@ -376,6 +376,7 @@
                   "admin/monitoring/monitoring-integrations/cloudwatch",
                   "admin/monitoring/monitoring-integrations/s3",
                   "admin/monitoring/monitoring-integrations/datadog",
+                  "admin/monitoring/monitoring-integrations/gcs",
                   "admin/monitoring/monitoring-integrations/grafana-cloud",
                   "admin/monitoring/monitoring-integrations/new-relic"
                 ]
