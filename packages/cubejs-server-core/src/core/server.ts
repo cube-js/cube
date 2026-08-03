@@ -37,6 +37,7 @@ import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
 import { createLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
+import { driverCacheKey } from './utils';
 import {
   driverDependencies,
   lookupDriverClass,
@@ -601,13 +602,19 @@ export class CubejsServerCore {
        * Driver factory function `DriverFactoryByDataSource`.
        */
       async (dataSource = 'default', preAggregations = false) => {
-        const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
+        const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
+        const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
+
+        // Keyed on the credentials the driver is actually built with, not on the
+        // caller's `preAggregations` flag. Keying on the flag gave a request
+        // that resolves to the data source's own credentials a second cache
+        // entry — so a pre-aggregation build arriving before the first query
+        // made that query build a duplicate driver for one connection.
+        const factoryKey = driverCacheKey(dataSource, usePreAgg);
+
         if (driverPromise[factoryKey]) {
           return driverPromise[factoryKey];
         }
-
-        const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
-        const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
 
         if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
           this.logger('Pre-aggregation driver conflict', {
@@ -645,10 +652,6 @@ export class CubejsServerCore {
           } catch (e) {
             driverPromise[factoryKey] = null;
 
-            if (!preAggregations && !hasSeparatePreAggEnv) {
-              driverPromise[`${dataSource}@pre_agg`] = null;
-            }
-
             if (driver) {
               await driver.release();
             }
@@ -656,11 +659,6 @@ export class CubejsServerCore {
             throw e;
           }
         })();
-
-        // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
-          driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
-        }
 
         return driverPromise[factoryKey];
       },
