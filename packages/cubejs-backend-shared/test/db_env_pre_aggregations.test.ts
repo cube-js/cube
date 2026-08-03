@@ -243,6 +243,33 @@ describe('hasPreAggregationsEnvVars', () => {
     expect(hasPreAggregationsEnvVars('default')).toBe(false);
   });
 
+  // Being exempt from the credential swing must not also mean "a build can share
+  // the query driver". The server keys that decision on whether the two resolved
+  // preambles differ, because this function alone cannot see the difference —
+  // sharing the driver would run the query-path preamble on a build.
+  test('a differing pre-agg preamble is invisible here, so callers must compare the values', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET query_path = 1';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET build_path = 1';
+
+    expect(hasPreAggregationsEnvVars('default')).toBe(false);
+
+    const forBuild = getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: true });
+    const forQuery = getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: false });
+    expect(forBuild).not.toEqual(forQuery);
+
+    delete process.env.CUBEJS_DB_SQL_PREAMBLE;
+  });
+
+  test('an identical pre-agg preamble leaves the two values equal, so sharing stays safe', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET both = 1';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET both = 1';
+
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: true }))
+      .toEqual(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: false }));
+
+    delete process.env.CUBEJS_DB_SQL_PREAMBLE;
+  });
+
   test('a pre-agg preamble alone does not divert credential resolution', () => {
     process.env.CUBEJS_DB_HOST = 'regular-host';
     process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET a = 1';

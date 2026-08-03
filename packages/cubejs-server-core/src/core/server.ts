@@ -609,6 +609,15 @@ export class CubejsServerCore {
         const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
         const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
 
+        // A pre-aggregation preamble that differs from the regular one needs its
+        // own driver even when the credentials are shared. It is excluded from
+        // `hasPreAggregationsEnvVars` on purpose — it is session setup, not a
+        // connection target — so without this the two keys would share one
+        // driver and a build would run the query-path preamble.
+        const hasSeparatePreAggSqlPreamble = getEnv('dbSqlPreamble', { dataSource, preAggregations: true })
+          !== getEnv('dbSqlPreamble', { dataSource, preAggregations: false });
+        const shareDriverAcrossKeys = !preAggregations && !hasSeparatePreAggEnv && !hasSeparatePreAggSqlPreamble;
+
         if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
           this.logger('Pre-aggregation driver conflict', {
             error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
@@ -654,7 +663,7 @@ export class CubejsServerCore {
           } catch (e) {
             driverPromise[factoryKey] = null;
 
-            if (!preAggregations && !hasSeparatePreAggEnv) {
+            if (shareDriverAcrossKeys) {
               driverPromise[`${dataSource}@pre_agg`] = null;
             }
 
@@ -667,7 +676,7 @@ export class CubejsServerCore {
         })();
 
         // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
+        if (shareDriverAcrossKeys) {
           driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
         }
 
