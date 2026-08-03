@@ -1,5 +1,6 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
+use cubeorchestrator::direct_result::DirectData;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
     DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
@@ -257,8 +258,10 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
             result.members().iter().map(|k| cx.string(k)).collect();
 
         let row_count = result.row_count();
+        // One reader per column, so an Arrow-backed column resolves its type once
+        // instead of on every cell.
         let columns: Vec<_> = (0..js_keys.len())
-            .map(|i| result.column(i))
+            .map(|i| result.reader(i))
             .collect::<Result<_, _>>()
             .or_else(|err| cx.throw_error(err.to_string()))?;
         let js_array = JsArray::new(&mut cx, row_count);
@@ -268,11 +271,11 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
                 let js_row = JsObject::new(&mut cx);
 
                 for (col_idx, js_key) in js_keys.iter().enumerate() {
-                    let value = &columns[col_idx][row_idx];
-                    let js_value: Handle<'_, JsValue> = match value {
-                        DBResponsePrimitive::Null => cx.null().upcast(),
-                        // For compatibility, we convert all primitives to strings
-                        other => cx.string(other.to_string()).upcast(),
+                    // For compatibility, we convert all primitives to strings
+                    let js_value: Handle<'_, JsValue> = match columns[col_idx].value_as_str(row_idx)
+                    {
+                        None => cx.null().upcast(),
+                        Some(text) => cx.string(text).upcast(),
                     };
 
                     js_row.set(&mut cx, *js_key, js_value)?;
@@ -307,14 +310,17 @@ pub fn final_query_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     let result_data_js_object = cx.argument::<JsValue>(2)?;
     let deserializer = JsValueDeserializer::new(&mut cx, result_data_js_object);
-    let mut result_data: RequestResultData = match Deserialize::deserialize(deserializer) {
+    let result_data: RequestResultData = match Deserialize::deserialize(deserializer) {
         Ok(data) => data,
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
     let promise = cx
         .task(move || {
-            result_data.prepare_results(&transform_request_data, &cube_store_result)?;
+            // The result is serialized and dropped, so render `data` straight
+            // from the source columns instead of materializing it first.
+            let result_data =
+                result_data.with_data(DirectData::new(&transform_request_data, &cube_store_result));
 
             match serde_json::to_string(&result_data) {
                 Ok(json) => Ok(json),
@@ -353,7 +359,17 @@ pub fn final_query_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> 
 
     let promise = cx
         .task(move || {
-            result_data.prepare_results(&transform_requests, &cube_store_results)?;
+            result_data.prepare_pivot_query()?;
+
+            // As in `final_query_result`: render each `data` member while
+            // serializing, straight from its source columns.
+            let result_data = result_data.with_data(
+                transform_requests
+                    .iter()
+                    .zip(cube_store_results.iter())
+                    .map(|(request, source)| DirectData::new(request, source))
+                    .collect(),
+            )?;
 
             match serde_json::to_string(&result_data) {
                 Ok(json) => Ok(json),
