@@ -614,8 +614,19 @@ export class CubejsServerCore {
         // `hasPreAggregationsEnvVars` on purpose — it is session setup, not a
         // connection target — so without this the two keys would share one
         // driver and a build would run the query-path preamble.
-        const hasSeparatePreAggSqlPreamble = getEnv('dbSqlPreamble', { dataSource, preAggregations: true })
-          !== getEnv('dbSqlPreamble', { dataSource, preAggregations: false });
+        //
+        // Resolution is guarded: it reads the environment through
+        // `assertDataSource`, which rejects a data source absent from
+        // CUBEJS_DATASOURCES. That is already reported further down, by
+        // `resolveDriver`, and pre-empting it here would replace a clear error
+        // with one about the preamble.
+        let hasSeparatePreAggSqlPreamble = false;
+        try {
+          hasSeparatePreAggSqlPreamble = getEnv('dbSqlPreamble', { dataSource, preAggregations: true })
+            !== getEnv('dbSqlPreamble', { dataSource, preAggregations: false });
+        } catch (e) {
+          hasSeparatePreAggSqlPreamble = false;
+        }
         const shareDriverAcrossKeys = !preAggregations && !hasSeparatePreAggEnv && !hasSeparatePreAggSqlPreamble;
 
         if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
