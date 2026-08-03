@@ -2,7 +2,7 @@ import R from 'ramda';
 import crypto from 'crypto';
 import { getEnv, LoggerFn } from '@cubejs-backend/shared';
 
-import { BaseDriver, InlineTable, } from '@cubejs-backend/base-driver';
+import { BaseDriver, InlineTable, normalizeSqlPreamble } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { LRUCache } from 'lru-cache';
 
@@ -90,12 +90,40 @@ export function getLastUpdatedAtTimestamp(
  *
  * `preAggregations: true` picks the pre-aggregation-specific preamble, which
  * falls back to the default one when unset.
+ *
+ * Two consequences of reading the environment, both deliberate:
+ * - A preamble set only through `driverFactory` (the `sqlPreamble` driver
+ *   option, which wins over the environment) does not reach the key, so
+ *   changing it does not invalidate. `BaseDriver.effectiveSqlPreamble()` exposes
+ *   the resolved value for a caller that can reach a driver; the version cannot,
+ *   for the reason above.
+ * - The value must be set identically on every instance. A refresh worker that
+ *   has it and an API instance that does not compute different versions, and the
+ *   API then finds no matching table.
  */
 export function getPreAggregationSqlPreamble(preAggregation): string | undefined {
-  return getEnv('dbSqlPreamble', {
-    dataSource: preAggregation.dataSource || 'default',
-    preAggregations: true,
-  });
+  let fromEnv: string | undefined;
+
+  try {
+    fromEnv = getEnv('dbSqlPreamble', {
+      dataSource: preAggregation.dataSource || 'default',
+      preAggregations: true,
+    });
+  } catch (e) {
+    // `assertDataSource` throws for a data source missing from
+    // CUBEJS_DATASOURCES. This runs inside version computation and inside the
+    // builder for the "no partitions were built" message, so throwing here would
+    // replace an actionable error with a confusing one. A key without the
+    // preamble is the pre-feature behavior, which is the safe fallback.
+    return undefined;
+  }
+
+  // Normalized the same way the drivers normalize it, so the version reflects
+  // the preamble that actually runs: without this, re-indenting a preamble — or
+  // setting a whitespace-only one, which the drivers treat as none at all —
+  // would change the key and rebuild every pre-aggregation for no behavior
+  // difference.
+  return normalizeSqlPreamble(fromEnv);
 }
 
 export function getStructureVersion(preAggregation) {

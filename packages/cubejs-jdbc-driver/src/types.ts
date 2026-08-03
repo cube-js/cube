@@ -13,4 +13,5 @@ export type JDBCDriverConfiguration = {
   sqlPreamble?: string;
   dataSource?: string;
   preAggregations?: boolean;
+  preAggregationsSqlPreamble?: boolean;
 };

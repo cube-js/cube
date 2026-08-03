@@ -37,6 +37,33 @@ describe('pre-aggregation SQL preamble in the version key', () => {
 
     process.env.CUBEJS_DB_SQL_PREAMBLE = '';
     expect(getStructureVersion(basePreAggregation())).toEqual(withoutPreamble);
+
+    // A whitespace-only value is "no preamble" to every driver, so it must not
+    // re-key either — a trailing newline out of a ConfigMap would otherwise
+    // rebuild every pre-aggregation on upgrade.
+    process.env.CUBEJS_DB_SQL_PREAMBLE = '   \n  ';
+    expect(getStructureVersion(basePreAggregation())).toEqual(withoutPreamble);
+  });
+
+  test('reformatting a preamble does not change the structure version', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
+    const tight = getStructureVersion(basePreAggregation());
+
+    process.env.CUBEJS_DB_SQL_PREAMBLE = '  SET a = 1\n';
+    expect(getStructureVersion(basePreAggregation())).toEqual(tight);
+  });
+
+  test('an undeclared data source yields no preamble instead of throwing', () => {
+    // This runs inside version computation and inside the builder for the
+    // "no partitions were built" message; throwing would swap an actionable
+    // error for a confusing one about CUBEJS_DATASOURCES.
+    process.env.CUBEJS_DATASOURCES = 'default,analytics';
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
+    const undeclared = { ...basePreAggregation(), dataSource: 'nope' };
+
+    expect(() => getPreAggregationSqlPreamble(undeclared)).not.toThrow();
+    expect(getPreAggregationSqlPreamble(undeclared)).toBeUndefined();
+    expect(() => getStructureVersion(undeclared)).not.toThrow();
   });
 
   test('setting a preamble changes the structure version', () => {

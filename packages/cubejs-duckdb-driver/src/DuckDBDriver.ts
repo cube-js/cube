@@ -33,6 +33,7 @@ export type DuckDBDriverConfiguration = {
   schema?: string,
   duckdbS3UseCredentialChain?: boolean,
   preAggregations?: boolean,
+  preAggregationsSqlPreamble?: boolean,
 };
 
 type InitPromise = {
@@ -207,8 +208,19 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     };
   }
 
+  // Resolved here rather than in BaseDriver, so the base accessor would
+  // otherwise report no preamble to the pre-aggregation version key.
+  public override effectiveSqlPreamble(): string | undefined {
+    return this.configuredSqlPreamble();
+  }
+
   private configuredSqlPreamble(): string | undefined {
-    return normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', this.config);
+    return normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', {
+      dataSource: this.config.dataSource ?? 'default',
+      // Not `this.config.preAggregations`: a build resolves the preamble from
+      // the pre-aggregation namespace even when its credentials do not.
+      preAggregations: this.config.preAggregationsSqlPreamble ?? this.config.preAggregations,
+    });
   }
 
   /**
@@ -255,13 +267,21 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
    * objects that are already present stay usable.
    */
   private async replaySqlPreamble(execAsync: (sql: string, ...params: any[]) => Promise<void>): Promise<void> {
-    const preamble = this.configuredSqlPreamble() ?? normalizeSqlPreamble(this.config.initSql);
+    const preamble = this.configuredSqlPreamble();
+    // The legacy name swallows failures wherever it runs, so a streamed query
+    // cannot start failing on an `initSql` statement that init() would have
+    // skipped. Only `sqlPreamble` surfaces errors.
+    const legacy = preamble ? undefined : normalizeSqlPreamble(this.config.initSql);
 
-    for (const statement of splitSqlPreamble(preamble)) {
+    for (const statement of splitSqlPreamble(preamble ?? legacy)) {
       try {
         await execAsync(statement);
       } catch (e) {
-        if (!/already exists/i.test((e as Error)?.message ?? '')) {
+        if (legacy) {
+          if (this.logger) {
+            console.error('DuckDB - error on init sql (skipping)', { e });
+          }
+        } else if (!/already exists/i.test((e as Error)?.message ?? '')) {
           throw e;
         }
       }

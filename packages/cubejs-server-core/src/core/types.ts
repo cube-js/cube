@@ -88,6 +88,14 @@ export interface RequestContext {
 export interface DriverContext extends RequestContext {
   dataSource: string;
   preAggregations?: boolean;
+  /**
+   * Whether this driver serves pre-aggregation builds. Separate from
+   * `preAggregations`, which asks the narrower question of whether to resolve
+   * *credentials* from the pre-aggregation namespace: a non-credential setting
+   * such as the SQL preamble has a pre-aggregation variant without switching
+   * the connection target.
+   */
+  preAggregationsSqlPreamble?: boolean;
 }
 
 export interface DbTypeInternalContext {
@@ -153,6 +161,7 @@ export type ScheduledRefreshContextsFn = () => Promise<UserBackgroundContext[]>;
 export type DriverOptions = {
   dataSource?: string,
   preAggregations?: boolean,
+  preAggregationsSqlPreamble?: boolean,
   maxPoolSize?: number,
   testConnectionTimeout?: number,
 };

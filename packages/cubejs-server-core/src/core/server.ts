@@ -625,6 +625,15 @@ export class CubejsServerCore {
                 ...context,
                 dataSource,
                 preAggregations: usePreAgg || false,
+                // Tracks "this driver serves pre-aggregation builds", which is
+                // not the same question as `usePreAgg` ("resolve credentials
+                // from the pre-aggregation namespace"). The SQL preamble is a
+                // non-credential setting, so it deliberately does not switch
+                // the credential namespace — without this flag a build that
+                // set only a pre-aggregation preamble would silently run the
+                // regular one, and the pre-aggregation would be keyed on a
+                // preamble that never ran.
+                preAggregationsSqlPreamble: preAggregations,
               },
               orchestratorOptions,
             );
@@ -891,6 +900,8 @@ export class CubejsServerCore {
         };
       opts.dataSource = assertDataSource(context.dataSource);
       opts.preAggregations = context.preAggregations || false;
+      opts.preAggregationsSqlPreamble =
+        context.preAggregationsSqlPreamble ?? context.preAggregations ?? false;
       return CubejsServerCore.createDriver(type, opts);
     }
   }

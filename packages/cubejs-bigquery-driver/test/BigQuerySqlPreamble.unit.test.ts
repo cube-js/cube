@@ -75,7 +75,7 @@ describe('BigQueryDriver.withSqlPreamble', () => {
     });
 
     test('refuses a SET preamble rather than silently dropping the destination', () => {
-      expect(() => driverWith("SET @@dataset_id = 'analytics'")
+      expect(() => driverWith('SET @@dataset_id = \'analytics\'')
         .withSqlPreamble(destinationJob('CREATE TABLE t AS SELECT 1')))
         .toThrow(/cannot be applied to a pre-aggregation build/);
     });
@@ -87,10 +87,10 @@ describe('BigQueryDriver.withSqlPreamble', () => {
     });
 
     test('still allows the same non-exempt preamble on a normal query job', () => {
-      const result = driverWith("SET @@dataset_id = 'analytics'")
+      const result = driverWith('SET @@dataset_id = \'analytics\'')
         .withSqlPreamble({ query: 'SELECT 1' });
 
-      expect(result.query).toEqual("SET @@dataset_id = 'analytics';\nSELECT 1");
+      expect(result.query).toEqual('SET @@dataset_id = \'analytics\';\nSELECT 1');
     });
   });
 
@@ -129,5 +129,33 @@ describe('BigQueryDriver.withSqlPreamble', () => {
 
       expect(requests[0].query).toEqual('SELECT 1');
     });
+  });
+});
+
+describe('the script-exempt shape tolerates comments', () => {
+  const destinationJobFor = (query: string) => ({
+    query,
+    destination: { id: 'stb_pre_aggregations.orders' } as any,
+  });
+
+  test('a line-commented temp function is still allowed on a destination job', () => {
+    const preamble = '-- Median helper, see the data model\nCREATE TEMP FUNCTION median(x INT64) AS (x)';
+
+    expect(() => driverWith(preamble).withSqlPreamble(destinationJobFor('CREATE TABLE t AS SELECT 1')))
+      .not.toThrow();
+  });
+
+  test('a block-commented temp function is still allowed', () => {
+    const preamble = '/* Median helper */ CREATE TEMP FUNCTION median(x INT64) AS (x)';
+
+    expect(() => driverWith(preamble).withSqlPreamble(destinationJobFor('CREATE TABLE t AS SELECT 1')))
+      .not.toThrow();
+  });
+
+  test('a comment does not smuggle a non-exempt statement past the check', () => {
+    const preamble = '-- looks harmless\nSET @@dataset_id = \'analytics\'';
+
+    expect(() => driverWith(preamble).withSqlPreamble(destinationJobFor('CREATE TABLE t AS SELECT 1')))
+      .toThrow(/cannot be applied to a pre-aggregation build/);
   });
 });
