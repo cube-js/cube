@@ -116,3 +116,56 @@ describe('PostgresDriver sql preamble', () => {
       .rejects.toThrow(/permission denied/);
   });
 });
+
+// The tests above stub the resolver to focus on delivery. These exercise the
+// real path — env var to constructor to the resolved value — which is where a
+// pre-aggregation build was silently reading the query-path preamble.
+describe('PostgresDriver preamble resolution from the environment', () => {
+  const ENV_KEYS = [
+    'CUBEJS_DB_SQL_PREAMBLE',
+    'CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE',
+    'CUBEJS_DATASOURCES',
+  ];
+
+  beforeEach(() => ENV_KEYS.forEach(k => { delete process.env[k]; }));
+  afterEach(() => ENV_KEYS.forEach(k => { delete process.env[k]; }));
+
+  const resolvedBy = (config: Record<string, unknown>) => (new PostgresDriver(config as any) as any).effectiveSqlPreamble();
+
+  test('a query-path driver reads the regular preamble', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET query_path = 1';
+
+    expect(resolvedBy({})).toEqual('SET query_path = 1');
+  });
+
+  test('a build driver reads the pre-aggregation preamble', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET query_path = 1';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET build_path = 1';
+
+    // What the server passes for a build. Note `preAggregations` stays false:
+    // the preamble is not a credential, so it does not switch the connection
+    // target — and the build must still get the pre-aggregation preamble.
+    expect(resolvedBy({ preAggregations: false, preAggregationsSqlPreamble: true }))
+      .toEqual('SET build_path = 1');
+  });
+
+  test('a build driver inherits the regular preamble when no pre-agg one is set', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET query_path = 1';
+
+    expect(resolvedBy({ preAggregations: false, preAggregationsSqlPreamble: true }))
+      .toEqual('SET query_path = 1');
+  });
+
+  test('the driver option still wins over the environment', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET from_env = 1';
+
+    expect(resolvedBy({ sqlPreamble: 'SET from_option = 1' })).toEqual('SET from_option = 1');
+  });
+
+  test('a driver constructed without the flag falls back to preAggregations', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET query_path = 1';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET build_path = 1';
+
+    expect(resolvedBy({ preAggregations: true })).toEqual('SET build_path = 1');
+  });
+});

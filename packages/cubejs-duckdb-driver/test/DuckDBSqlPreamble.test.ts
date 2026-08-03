@@ -114,6 +114,17 @@ describe('DuckDBDriver sql preamble', () => {
       expect(await driver.query('SELECT legacy() AS v', [])).toEqual([{ v: '5' }]);
     });
 
+    // The stream path opens its own connection and replays the preamble on it.
+    // The legacy name has to keep swallowing there too, or a streamed query
+    // starts failing on a statement init() would have skipped.
+    test('legacy initSql failures are swallowed on the stream path too', async () => {
+      const driver = driverWith({ initSql: 'THIS IS NOT SQL' });
+
+      const result = await driver.stream('SELECT 1 AS v', [], { highWaterMark: 100 });
+
+      expect(await streamToArray(result.rowStream as any)).toEqual([{ v: '1' }]);
+    });
+
     test('sqlPreamble takes precedence over legacy initSql', async () => {
       const driver = driverWith({
         sqlPreamble: 'CREATE MACRO pick() AS 2',

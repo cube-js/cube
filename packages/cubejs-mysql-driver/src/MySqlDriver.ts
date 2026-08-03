@@ -116,6 +116,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
        * Whether this driver is used for pre-aggregations.
        */
       preAggregations?: boolean,
+      preAggregationsSqlPreamble?: boolean,
 
       /**
        * Max pool size value for the [cube]<-->[db] pool.
@@ -138,10 +139,15 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+    // Pre-aggregation builds resolve the preamble from the pre-aggregation
+    // namespace even when their credentials do not, since the preamble is not a
+    // connection target. Falls back to `preAggregations` for a driver
+    // constructed directly rather than through the server's driver factory.
+    const preAggregationsSqlPreamble = config.preAggregationsSqlPreamble ?? preAggregations;
 
     super({
       testConnectionTimeout: config.testConnectionTimeout,
-      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations })),
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations: preAggregationsSqlPreamble })),
     });
 
     // sqlPreamble is applied per connection in prepareConnection, so it is kept

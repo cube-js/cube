@@ -99,6 +99,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
        * Whether this driver is used for pre-aggregations.
        */
       preAggregations?: boolean,
+      preAggregationsSqlPreamble?: boolean,
 
       /**
        * Max pool size value for the [cube]<-->[db] pool.
@@ -121,10 +122,15 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+    // Pre-aggregation builds resolve the preamble from the pre-aggregation
+    // namespace even when their credentials do not, since the preamble is not a
+    // connection target. Falls back to `preAggregations` for a driver
+    // constructed directly rather than through the server's driver factory.
+    const preAggregationsSqlPreamble = config.preAggregationsSqlPreamble ?? preAggregations;
 
     super({
       testConnectionTimeout: config.testConnectionTimeout,
-      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations })),
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations: preAggregationsSqlPreamble })),
     });
 
     this.options = {
@@ -500,8 +506,37 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const statements = splitSqlPreamble(preamble);
 
     return statements.length > 0 && statements.every(
-      statement => /^create\s+(or\s+replace\s+)?temp(orary)?\s+function\b/i.test(statement)
+      statement => /^create\s+(or\s+replace\s+)?temp(orary)?\s+function\b/i
+        .test(BigQueryDriver.withoutLeadingComments(statement))
     );
+  }
+
+  /**
+   * Drops leading comments so a documented UDF definition is still recognized as
+   * the script-exempt shape. Comments are kept in the statement text, and a
+   * commented `CREATE TEMP FUNCTION` would otherwise be refused on a
+   * pre-aggregation build with a message telling the user to do what they did.
+   */
+  private static withoutLeadingComments(statement: string): string {
+    let rest = statement.trimStart();
+
+    for (;;) {
+      if (rest.startsWith('--') || rest.startsWith('#')) {
+        const lineEnd = rest.indexOf('\n');
+        if (lineEnd === -1) {
+          return '';
+        }
+        rest = rest.slice(lineEnd + 1).trimStart();
+      } else if (rest.startsWith('/*')) {
+        const blockEnd = rest.indexOf('*/');
+        if (blockEnd === -1) {
+          return '';
+        }
+        rest = rest.slice(blockEnd + 2).trimStart();
+      } else {
+        return rest;
+      }
+    }
   }
 
   protected async runQueryJob<T = QueryRowsResponse>(

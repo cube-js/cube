@@ -133,6 +133,19 @@ export abstract class BaseDriver implements DriverInterface {
     return this.sqlPreambleValue;
   }
 
+  /**
+   * The effective preamble, for callers outside the driver.
+   *
+   * The pre-aggregation version key needs it: a preamble can define a function
+   * the rollup SQL calls, so a table built under a different one must not be
+   * served. Public because the key is computed in the orchestrator, and because
+   * a preamble set through `driverFactory` never passes through the environment
+   * the key would otherwise read.
+   */
+  public effectiveSqlPreamble(): string | undefined {
+    return this.sqlPreambleValue;
+  }
+
   protected informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
