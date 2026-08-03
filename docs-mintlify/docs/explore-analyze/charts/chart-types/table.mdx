@@ -15,6 +15,12 @@ Right-click a column header in the table visualization to hide it. Hidden column
 
 Drag a column header to reorder columns. Dimensions and measures can be interspersed freely when no pivot is active.
 
+## Sorting
+
+Sorting is set on the query, not on the table — use the column header menus or the **Sort** button. See [Sorting](/docs/explore-analyze/workbooks/querying-data#sorting).
+
+Pivot columns are the exception: they can also be sorted from the table itself, as described under [Pivots](#pivots).
+
 ## Pivots
 
 Pivoting a dimension turns its unique values into columns, creating a cross-tab view. Drag a dimension to the **Pivot columns** drop zone in the **Fields** section to pivot it.
@@ -33,41 +39,43 @@ Configure individual columns in the **Columns** section of the **Style** tab (or
 | Option | Description |
 |---|---|
 | **Label** | Override the column header text |
-| **Alignment** | Left, center, or right |
+| **Alignment** | Left, center, or right. Defaults to the column's data type — numbers right, everything else left |
 | **Word wrap** | Allow cell content to wrap to multiple lines |
-| **Width** | **Flexible** (a weight) or **Fixed** (pixels) — see [Column width](#column-width) |
+| **Width** | **Flex** (a weight) or **Fix** (pixels) — see [Column width](#column-width) |
 | **Hide** | Show or hide the column |
 
 When a cell's value is too long for its column and word wrap is off, the value is truncated with an ellipsis. Hover over a truncated cell to see its full value in a tooltip.
 
 ## Column width
 
-Each column's width is set independently in the **Columns** section of the **Style** tab. A column is in one of two modes:
+Each column's width is set independently on its card in the **Columns** section of the **Style** tab, using the **Flex** / **Fix** pair and the number next to it. A column is in one of two modes:
 
-- **Flexible** (the default) — the column shares the table's available width with the other flexible columns, in proportion to its **weight**. A column with weight `2` is twice as wide as a column with weight `1`. New columns start at weight `1`, so by default all columns share the width equally and the table stretches to fill its tile.
-- **Fixed** — the column is locked to an exact pixel width and no longer participates in the weight-based distribution. Fixed columns keep their width regardless of the tile size; if the fixed columns don't fill the tile, the remaining space is left blank.
+- **Flex** (the default) — the column shares the table's available width with the other flexible columns, in proportion to its **weight**, entered next to the mode as `×1`. A column with weight `2` is twice as wide as a column with weight `1`. New columns start at weight `1`, so by default all columns share the width equally and the table stretches to fill its tile.
+- **Fix** — the column is locked to an exact pixel width, entered as `px`, and no longer participates in the weight-based distribution. Fixed columns keep their width regardless of the tile size; if the fixed columns don't fill the tile, the remaining space is left blank. Pixel widths start at 10 and step in tens.
 
 You can mix the two: give a label column a fixed width and let the metric columns flex to share the rest.
 
 ### Setting widths
 
-- **In the panel** — pick **Flexible** or **Fixed** for a column and enter its weight or pixel value.
+- **In the panel** — pick **Flex** or **Fix** for a column and enter its weight or pixel value. Switching to **Fix** reuses the column's last fixed width if it had one, and otherwise starts from the width it's currently drawn at.
 - **By dragging** — drag the border between two column headers on the table. The change is saved into the column's current mode (a flexible column keeps flexing at its new relative size; a fixed column updates its pixel width).
-- **Fit to content** — the **Fit to content** button next to a column's width sizes it to its content and switches it to **Fixed** at that width.
+- **Fit** — the **Fit** button on a column's card sizes it to its content and switches it to **Fix** at that width.
 
   <Note>
 
-  Fit to content measures the rows currently rendered on screen. If a wider value is further down a long, scrolled table, fit to content again after scrolling to it.
+  Fit measures the rows currently rendered on screen. If a wider value is further down a long, scrolled table, fit again after scrolling to it.
 
   </Note>
 
+{/* TODO: screenshot — a column card in the Columns section showing the Flex/Fix width control and the Fit button */}
+
 ### Bulk controls
 
-At the top of the **Columns** section:
+At the top of the **Columns** section, three buttons apply a width mode to every column at once:
 
-- **All flexible** — converts every column to flexible, deriving each weight from its current width (so the layout doesn't jump). Enabled only when at least one column is fixed.
-- **All fixed** — freezes every column at its current rendered pixel width. Enabled only when at least one column is flexible.
-- **All fit to content** — sizes every column to its content and fixes it at that width, in a single action (the bulk equivalent of the per-column **Fit to content**). Like per-column fit to content, it measures the rows currently rendered on screen.
+- **Flex** — converts every column to flexible, deriving each weight from its current width (so the layout doesn't jump). Enabled only when at least one column is fixed.
+- **Fix** — freezes every column at its current rendered pixel width. Enabled only when at least one column is flexible.
+- **Fit** — sizes every column to its content and fixes it at that width, in a single action. Like the per-column **Fit**, it measures the rows currently rendered on screen.
 
 <Note>
 
@@ -75,37 +83,32 @@ Under a column pivot, a width set on a measure applies to every column generated
 
 </Note>
 
-## Display tab — showing columns as links, images, bars, or sparklines
+## Showing columns as bars or sparklines
 
-By default, columns display their raw value. The **Display** tab for each field lets you change this:
+By default, a column displays its value. A **numeric** column can also be drawn as an in-cell visualization — an inline bar or a sparkline — from the column's card in the **Columns** section of the **Style** tab.
 
-### Links
+Each card has a **Value** toggle and, next to it, a **Bars** / **Sparkline** pair:
 
-Display a field's value as a clickable hyperlink. To create dynamic per-row links:
+- **Value** shows the formatted number in the cell. It **composes** with a visualization rather than excluding it — a cell can show a bar and its value together.
+- **Bars** and **Sparkline** are mutually exclusive with each other: picking one replaces the other. Clicking the active one again clears it, returning the column to a plain value.
+- With no visualization active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
 
-1. Add a [calculated field](/docs/explore-analyze/workbooks/calculated-fields) that produces a URL — for example:
-   ```
-   CONCAT("https://example.com/orders/", order_items.order_id)
-   ```
-2. In the table visualization, hide the calculated field column.
-3. In the **Display** tab for the field you want to link, set **Display as** to **Link** and select the hidden URL field as the source.
+These controls appear only on numeric columns.
 
-{/* TODO screenshot: column display dropdown showing Link option selected (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO: screenshot — a numeric column card showing the Value toggle beside the Bars / Sparkline pair */}
 
-### Images
-
-Display a field as an image by setting **Display as** to **Image**. Configure height and width. To make the image a link, check **Link image** and set the **Link URL**.
-
-The URL must be publicly accessible without authentication.
+Bars and sparklines are the only in-cell visualizations the table draws. To turn a
+column's values into clickable links, define [`links` on the
+dimension](/docs/data-modeling/dimensions#links) in the data model — they appear in
+the [cell menu](#cell-menu) rather than in the cell itself.
 
 ### Inline bars
 
-Display a numeric column as a proportional in-cell bar. In the column's per-column section on the **Style** tab, use the **Display as** control — a segmented **Value / Bars / Sparkline** toggle — to switch the column to **Bars**. Each bar's length reflects the value's magnitude within the column's range.
+Display a numeric column as a proportional in-cell bar by selecting **Bars** on the column's card. Each bar's length reflects the value's magnitude within the column's range.
 
 | Option | Description |
 |---|---|
-| **Display as** | A segmented toggle: **Value**, **Bars**, or **Sparkline** — a single choice; the modes are mutually exclusive. Selecting **Bars** reveals the bar options below. |
-| **Show value** | Show the formatted number alongside the bar. Turn it off for a bar-only cell. |
+| **Show value** | The shared **Value** toggle on the column's card. Turn it off for a bar-only cell. |
 | **Positive bar color** | Fill color for non-negative bars |
 | **Negative bar color** | Fill color for negative bars (used when the column contains both positive and negative values) |
 | **Bar scale** | **Auto** anchors each bar at zero and scales to the column's largest value, so even the smallest value still shows a bar; **Manual** scales against the bounds you set |
@@ -117,31 +120,38 @@ When a column contains both positive and negative values, bars are drawn in both
 
 ### Sparklines
 
-Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. In the column's per-column section on the **Style** tab, set **Display as** to **Sparkline**.
+Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. Select **Sparkline** on the column's card in the **Columns** section of the **Style** tab.
 
 A sparkline needs a time dimension to use as its horizontal axis. When you switch a column to **Sparkline** and pick its horizontal axis time dimension, that dimension is **removed from the table query** (if it was there): the table shows one row per remaining dimension, correctly aggregated, while the sparkline plots the measure's value across the time dimension. Values are always correct for any measure type, including counts of distinct values, averages, and custom measures.
 
+Removing the dimension is a one-way change — turning the sparkline back off doesn't restore it to the query. Add it again yourself if you want it back.
+
 <Note>
 
-Internally, sparklines are powered by additional queries grouped by time dimension and granularity: measures sharing the same dimension and granularity are fetched together, so a chart with several sparklines runs at most one extra query per distinct dimension and granularity combination.
+The time dimensions on offer come from the **semantic view the query is built on**, not from the query itself — so **Sparkline** is disabled whenever that view has no time dimension, and equally for a query not built on a view at all, however many time dimensions the query selects.
 
 </Note>
 
 | Option | Description |
 |---|---|
-| **Display as** | On the segmented **Value / Bars / Sparkline** toggle, choose **Sparkline**. Available only for numeric columns, and only when the query has a time dimension. |
-| **Horizontal axis** | The time dimension plotted along the sparkline. Auto-selected (the first time dimension in the query); change it here when the query has several. |
+| **Horizontal axis** | The time dimension plotted along the sparkline. Picked for you when the view offers only one; choose it here when there are several. |
 | **Granularity** | The time bucket for the horizontal axis. Defaults to the dimension's granularity in the query if present, otherwise month. |
 | **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
 | **Line color** / **Area color** | Stroke color for line and bar; fill color for area. |
 | **Line width** | Stroke width in pixels (Line and Area types). |
-| **Show value** | Show the measure's value for the row — the same number the cell would show without a sparkline — as a headline next to it. Turn it off for a chart-only cell. |
+| **Show value** | The shared **Value** toggle on the column's card — shows the measure's value for the row, the same number the cell would show without a sparkline, as a headline next to it. Turn it off for a chart-only cell. Its setting carries over when you switch between **Bars** and **Sparkline**. |
 
 A row needs at least two data points to draw a sparkline; cells with fewer fall back to the formatted value.
 
 <Note>
 
 Choose a reasonable granularity for the data's time span. An overly fine granularity (e.g. by the second over several years) makes the background queries return many rows and can compromise the chart's performance.
+
+</Note>
+
+<Note>
+
+Internally, sparklines are powered by additional queries grouped by time dimension and granularity: measures sharing the same dimension and granularity are fetched together, so a chart with several sparklines runs at most one extra query per distinct dimension and granularity combination.
 
 </Note>
 
@@ -208,6 +218,14 @@ Each of these sections has a compact formatting toolbar that sets, for that part
 
 When you don't pick a color, the element uses the theme's default, which adapts to light and dark mode automatically.
 
+Alignment is set independently in each of the three sections, and their defaults differ: headers align left, totals align right, and values follow the column's data type — numbers right, everything else left. A column's own alignment, set in the **Columns** section, overrides all three.
+
+<Note>
+
+The **Values** alignment control shows left until you set it, even where numeric columns are drawn right-aligned. Choosing left there is still meaningful: it pins numeric columns to the left instead of letting them follow their data type.
+
+</Note>
+
 The **Values** section also holds these table-wide row toggles, shown as icon buttons:
 
 - **Row numbers** — show or hide the row number column.
@@ -248,17 +266,74 @@ Open the menu in the corner of the Borders section to apply a preset — a one-s
 
 Use **Reset** in the section header to clear all border settings.
 
+### Pagination
+
+The **Pagination** section holds a single toggle, off unless you turn it on. With it off, the table renders every row in one scrollable grid; with it on, rows are split into pages of **50**, with page controls below the table. The page size is fixed and can't be changed.
+
+Totals are pinned to the bottom of the table rather than being part of the paged rows, so a totals row stays visible on every page.
+
 ## Conditional formatting
 
 The **Formatting** tab applies cell or row styling based on conditions you define. Configure:
 
 1. The field to evaluate
-2. The condition (e.g. greater than, contains, is null)
+2. The condition — an operator and, for most operators, a value to compare against (see [Conditions](#conditions))
 3. The styling to apply when the condition is met (background color, text color)
 
 To make a background transparent, open the color picker and clear the hex value.
 
-A rule can apply to just its source column, to selected columns, or to the entire row. Under a column pivot, a row spans several values of the same measure (one per pivot combination), so a row-spanning rule (**Entire row** or **Selected columns**) styles each measure cell by its own combination's value. Cells with no single value to test — row headers, row dimensions, and any rule whose source dimension has been pivoted into columns — are left unstyled.
+### Conditions
+
+The operators offered depend on the evaluated field's data type. **is null** and **is not null** are available for every type and take no value.
+
+**Text**
+
+| Operator | Input |
+|---|---|
+| **is**, **is not** | A value |
+| **contains**, **not contains** | A value |
+| **starts with**, **ends with** | A value |
+| **is null**, **is not null** | — |
+
+**Numbers**
+
+| Operator | Input |
+|---|---|
+| **is**, **is not** | A value |
+| **greater than**, **greater than or equal** | A value |
+| **less than**, **less than or equal** | A value |
+| **between** | A lower and an upper bound |
+| **is null**, **is not null** | — |
+
+**Dates**
+
+| Operator | Input |
+|---|---|
+| **is** | A date |
+| **before date**, **after date** | A date |
+| **between** | A start and an end date |
+| **in the last N days** | A number of days |
+| **this week**, **this month**, **this quarter**, **this year** | — |
+| **is null**, **is not null** | — |
+
+**Booleans**
+
+| Operator | Input |
+|---|---|
+| **is true**, **is false** | — |
+| **is null**, **is not null** | — |
+
+### Which cells a rule styles
+
+Each rule's **Format** control sets how far its styling reaches:
+
+- **Source column** — only the column the rule evaluates. The default.
+- **Entire row** — every cell in a matching row.
+- **Select columns** — a chosen set of columns, picked from a checklist in the same popover.
+
+**Select columns** starts with the rule's own field checked. Clearing every column would leave a rule that styles nothing, so it falls back to **Source column** instead.
+
+Under a column pivot, a row spans several values of the same measure (one per pivot combination), so a row-spanning rule (**Entire row** or **Select columns**) styles each measure cell by its own combination's value. Cells with no single value to test — row headers, row dimensions, and any rule whose source dimension has been pivoted into columns — are left unstyled.
 
 {/* TODO screenshot: conditional formatting panel with a condition configured (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
