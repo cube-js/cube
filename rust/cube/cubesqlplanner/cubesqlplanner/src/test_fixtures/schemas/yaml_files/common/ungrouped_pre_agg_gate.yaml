@@ -1,0 +1,461 @@
+# Models for the ungrouped pre-aggregation eligibility rule. Each cube group is
+# self-contained so a query only ever pulls in the cubes it names.
+cubes:
+  # No primary key at all. `collapsing` groups by non-key columns only.
+  - name: no_pk_orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: status
+        type: string
+        sql: status
+      - name: city
+        type: string
+        sql: city
+    measures:
+      - name: total
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: collapsing
+        type: rollup
+        measures:
+          - total
+        dimensions:
+          - status
+          - city
+
+  # Single cube that does declare a key, with a rollup that omits it.
+  - name: sc_orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+      - name: city
+        type: string
+        sql: city
+    measures:
+      - name: total
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: sc_coarse
+        type: rollup
+        measures:
+          - total
+        dimensions:
+          - status
+          - city
+
+  # visitors -> checkins -> cities. `checkins` fans out but is only a transit
+  # hop, so a query naming just visitors and cities members still multiplies.
+  - name: chain_visitors
+    sql: "SELECT * FROM visitors"
+    joins:
+      - name: chain_checkins
+        relationship: one_to_many
+        sql: "{CUBE.id} = {chain_checkins.visitor_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: source
+        type: string
+        sql: source
+    pre_aggregations:
+      - name: chain_rollup
+        type: rollup
+        dimensions:
+          - id
+          - source
+          - chain_cities.id
+          - chain_cities.name
+
+      # Keyed on the root only, with a segment reaching across the fan-out.
+      - name: root_key_seg_rollup
+        type: rollup
+        dimensions:
+          - id
+          - source
+        segments:
+          - chain_cities.named_x
+
+  - name: chain_checkins
+    sql: "SELECT * FROM visitor_checkins"
+    joins:
+      - name: chain_cities
+        relationship: many_to_one
+        sql: "{CUBE.city_id} = {chain_cities.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      - name: city_id
+        type: number
+        sql: city_id
+
+  - name: chain_cities
+    sql: "SELECT * FROM cities"
+    segments:
+      - name: named_x
+        sql: "{CUBE}.name = 'X'"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+  # Canonical star: fact many_to_one dimension cube, so the join cannot
+  # multiply rows and the fact key alone identifies every stored row.
+  - name: star_checkins
+    sql: "SELECT * FROM visitor_checkins"
+    joins:
+      - name: star_visitors
+        relationship: many_to_one
+        sql: "{CUBE.visitor_id} = {star_visitors.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      # Proxy for this cube's own primary key, which row identity does require.
+      - name: own_ref
+        type: number
+        sql: "{id}"
+    measures:
+      - name: cnt
+        type: count
+    pre_aggregations:
+      - name: star_rollup
+        type: rollup
+        measures:
+          - cnt
+        dimensions:
+          - id
+          - star_visitors.source
+
+      # Stores the fact key only through a proxy dimension.
+      - name: proxy_rollup
+        type: rollup
+        measures:
+          - cnt
+        dimensions:
+          - own_ref
+          - star_visitors.source
+
+      # 1:1 with raw rows; the cross-cube segment only filters.
+      - name: seg_rollup
+        type: rollup
+        measures:
+          - cnt
+        dimensions:
+          - id
+          - visitor_id
+        segments:
+          - star_visitors.source_google
+
+  - name: star_visitors
+    sql: "SELECT * FROM visitors"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: source
+        type: string
+        sql: source
+    segments:
+      - name: source_google
+        sql: "{CUBE}.source = 'google'"
+
+  # Pure many_to_one chain: the middle cube only bridges, so it cannot split a
+  # row and its key is not part of row identity.
+  - name: bridge_orders
+    sql: "SELECT * FROM orders"
+    joins:
+      - name: bridge_stores
+        relationship: many_to_one
+        sql: "{CUBE.store_id} = {bridge_stores.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: store_id
+        type: number
+        sql: store_id
+    measures:
+      - name: cnt
+        type: count
+    pre_aggregations:
+      - name: bridge_rollup
+        type: rollup
+        measures:
+          - cnt
+        dimensions:
+          - id
+          - bridge_regions.name
+
+  - name: bridge_stores
+    sql: "SELECT * FROM stores"
+    joins:
+      - name: bridge_regions
+        relationship: many_to_one
+        sql: "{CUBE.region_id} = {bridge_regions.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: region_id
+        type: number
+        sql: region_id
+
+  - name: bridge_regions
+    sql: "SELECT * FROM regions"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+  # Non-additive stored state: a rollup row holds an HLL sketch, not a number.
+  - name: hll_orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+      - name: user_id
+        type: number
+        sql: user_id
+    measures:
+      - name: uniq
+        type: count_distinct_approx
+        sql: user_id
+    pre_aggregations:
+      - name: hll_pk_rollup
+        type: rollup
+        measures:
+          - uniq
+        dimensions:
+          - id
+          - status
+
+  # Fan-out measure: forces the multiplied-subquery planning path.
+  - name: mult_customers
+    sql: "SELECT * FROM customers"
+    joins:
+      - name: mult_orders
+        relationship: one_to_many
+        sql: "{CUBE.id} = {mult_orders.customer_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: mult_collapsing
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - name
+          - mult_orders.status
+
+  - name: mult_orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: customer_id
+        type: number
+        sql: customer_id
+      - name: status
+        type: string
+        sql: status
+
+  # Non-additive rolling measure: its leaf stage is planned ungrouped for
+  # rendering reasons even though the user query is grouped.
+  - name: roll_orders
+    sql: "SELECT * FROM orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: category
+        type: string
+        sql: category
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: rolling_avg_7d
+        type: avg
+        sql: amount
+        rolling_window:
+          trailing: 7 day
+    pre_aggregations:
+      - name: rolling_avg_rollup
+        type: rollup
+        measures:
+          - rolling_avg_7d
+        dimensions:
+          - category
+        time_dimension: created_at
+        granularity: day
+
+  # rollupLambda union where the second branch groups by a non-unique column
+  # that merely shares the short name `id` with the first branch's key.
+  - name: lam_a
+    sql: "SELECT * FROM visitor_checkins"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: lam_base
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+      - name: lam_union
+        type: rollupLambda
+        rollups:
+          - lam_a.lam_base
+          - lam_b.lam_base
+
+  - name: lam_b
+    sql: "SELECT * FROM visitor_checkins"
+    dimensions:
+      - name: row_id
+        type: number
+        sql: row_id
+        primary_key: true
+      # Shares the short name with lam_a's key but is not unique.
+      - name: id
+        type: number
+        sql: visitor_id
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: lam_base
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+  # rollupJoin advertising a primary key that neither member rollup stores.
+  - name: rj_checkins
+    sql: "SELECT * FROM visitor_checkins"
+    joins:
+      - name: rj_visitors
+        relationship: many_to_one
+        sql: "{CUBE.visitor_id} = {rj_visitors.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: rj_base
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - visitor_id
+
+      - name: rj_keys_join
+        type: rollupJoin
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+          - rj_visitors.id
+          - rj_visitors.source
+        rollups:
+          - rj_checkins.rj_base
+          - rj_visitors.rj_base
+
+  - name: rj_visitors
+    sql: "SELECT * FROM visitors"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: source
+        type: string
+        sql: source
+    pre_aggregations:
+      - name: rj_base
+        type: rollup
+        dimensions:
+          - id
+          - source

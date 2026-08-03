@@ -2,17 +2,19 @@ use super::PreAggregationsCompiler;
 use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
-use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOp;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
 use crate::planner::time_dimension::QueryDateTime;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 pub struct PreAggregationUsage {
@@ -40,6 +42,9 @@ pub struct PreAggregationOptimizer {
     allow_multi_stage: bool,
     usages: Vec<PreAggregationUsage>,
     usage_counter: usize,
+    /// Resolved primary-key names per cube. Every candidate pre-aggregation asks
+    /// for the same cubes, and resolving them crosses the JS bridge.
+    primary_keys_cache: RefCell<HashMap<String, Vec<String>>>,
 }
 
 impl PreAggregationOptimizer {
@@ -49,6 +54,7 @@ impl PreAggregationOptimizer {
             allow_multi_stage,
             usages: Vec::new(),
             usage_counter: 0,
+            primary_keys_cache: RefCell::new(HashMap::new()),
         }
     }
 
@@ -88,6 +94,7 @@ impl PreAggregationOptimizer {
             root.query(),
             compiled_pre_aggregations,
             &TimeShiftState::default(),
+            true,
         )? {
             return Ok(Some(Rc::new(
                 RootQuery::builder().ctes(vec![]).query(rewritten).build(),
@@ -109,18 +116,22 @@ impl PreAggregationOptimizer {
         std::mem::take(&mut self.usages)
     }
 
+    // `is_user_query` marks the query the user actually asked for, as opposed to
+    // an internal multi-stage leaf. Only the former's `ungrouped` flag means
+    // "return raw rows"; a leaf may carry it purely for how its stage renders.
     fn try_rewrite_query(
         &mut self,
         query: &Rc<Query>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
         time_shifts: &TimeShiftState,
+        is_user_query: bool,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         for pre_aggregation in compiled_pre_aggregations.iter() {
             let external = pre_aggregation.external.unwrap_or(false);
             let date_range =
                 Self::extract_date_range(&query.filter(), &self.query_tools, time_shifts, external);
             if let Some(rewritten) =
-                self.try_rewrite_simple_query(query, pre_aggregation, date_range)?
+                self.try_rewrite_simple_query(query, pre_aggregation, date_range, is_user_query)?
             {
                 return Ok(Some(rewritten));
             }
@@ -134,10 +145,25 @@ impl PreAggregationOptimizer {
         query: &Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
         date_range: Option<(String, String)>,
+        is_user_query: bool,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        if let Some(matched_measures) =
-            self.is_schema_and_filters_match(&query.schema(), &query.filter(), pre_aggregation)?
-        {
+        // Row identity for an ungrouped read is judged against the join this
+        // very node will render, taken from the node itself rather than
+        // re-resolved, so the two can never disagree.
+        let raw_rows_join = if is_user_query && query.modifers().ungrouped {
+            Some(match query.source() {
+                QuerySource::LogicalJoin(join) => Some(join.clone()),
+                _ => None,
+            })
+        } else {
+            None
+        };
+        if let Some(matched_measures) = self.is_schema_and_filters_match(
+            &query.schema(),
+            &query.filter(),
+            pre_aggregation,
+            raw_rows_join,
+        )? {
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, date_range)?;
             let new_query = Query::builder()
@@ -170,7 +196,7 @@ impl PreAggregationOptimizer {
                 external,
             );
             if let Some(matched_measures) =
-                self.is_schema_and_filters_match(schema, filter, pre_aggregation)?
+                self.is_schema_and_filters_match(schema, filter, pre_aggregation, None)?
             {
                 let source = self.make_pre_aggregation_source(
                     pre_aggregation,
@@ -238,6 +264,7 @@ impl PreAggregationOptimizer {
                             &multi_stage_leaf_measure.query,
                             compiled_pre_aggregations,
                             &multi_stage_leaf_measure.evaluation_context.time_shifts,
+                            false,
                         )? {
                             let new_leaf = Rc::new(MultiStageLeafMeasure {
                                 measures: multi_stage_leaf_measure.measures.clone(),
@@ -481,6 +508,10 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
+        // `Some` when the query returns raw rows: the inner option carries the
+        // node's own join, or `None` when the node is not a plain cube join and
+        // its row grain cannot be established.
+        raw_rows_join: Option<Option<Rc<LogicalJoin>>>,
     ) -> Result<Option<HashSet<String>>, CubeError> {
         let helper = OptimizerHelper::new();
 
@@ -502,6 +533,12 @@ impl PreAggregationOptimizer {
         // and the join-path comparison below, so build them once.
         let query_groups = self.query_join_groups(schema, &all_measures)?;
 
+        if let Some(node_join) = &raw_rows_join {
+            if !self.is_raw_rows_match(node_join.as_ref(), pre_aggregation)? {
+                return Ok(None);
+            }
+        }
+
         // A measure sitting under a row-multiplying join can't be rolled
         // up from a partially matching pre-aggregation.
         if match_state == MatchState::Partial && query_groups.has_multiplied_measures()? {
@@ -516,6 +553,22 @@ impl PreAggregationOptimizer {
         let Some(matched_measures) = matched else {
             return Ok(None);
         };
+
+        // An ungrouped read projects stored columns as they are, with no
+        // aggregate around them, so a measure kept as a mergeable sketch would
+        // reach the client as the sketch instead of a number.
+        if raw_rows_join.is_some() {
+            for measure in pre_aggregation.measures.iter() {
+                if !matched_measures.contains(&measure.full_name()) {
+                    continue;
+                }
+                if let Ok(measure) = measure.as_measure() {
+                    if measure.kind().is_stored_as_state() {
+                        return Ok(None);
+                    }
+                }
+            }
+        }
 
         // Even when the query itself has no multiplied measures, a measure that
         // is multiplied in the pre-aggregation (because the pre-agg groups by a
@@ -564,6 +617,121 @@ impl PreAggregationOptimizer {
         }
 
         Ok(Some(matched_measures))
+    }
+
+    // An ungrouped query returns raw rows, so a pre-aggregation may serve it
+    // only when each of its stored rows is exactly one row of the raw join.
+    //
+    // What identifies such a row is the key of the join root plus the key of
+    // every cube joined in on an edge that splits a row of its parent into
+    // several. A cube reached only over non-splitting edges cannot make the
+    // output finer, so its key is not needed, while a cube that merely transits
+    // the tree still splits rows and counts even when the query names no member
+    // of it. The root is always needed: it is what tells apart the rows an outer
+    // join leaves unmatched. A cube without a primary key has no row identity at
+    // all, so nothing can be read raw from it.
+    //
+    // The join comes from the node being rewritten, so it is by construction the
+    // one that node renders — filters, join hints and order-by members included.
+    fn is_raw_rows_match(
+        &self,
+        node_join: Option<&Rc<LogicalJoin>>,
+        pre_aggregation: &CompiledPreAggregation,
+    ) -> Result<bool, CubeError> {
+        // Only a plain rollup describes the grain its rows were stored at. A
+        // join or union source is described by declared members that need not
+        // reflect what the underlying rollups actually store, so its grain
+        // cannot be established here.
+        if !matches!(
+            pre_aggregation.source.as_ref(),
+            PreAggregationSource::Single(_)
+        ) {
+            return Ok(false);
+        }
+
+        // Anything but a plain cube join — a full-key aggregate, or a source
+        // already rewritten to a pre-aggregation — has no single join to judge
+        // row identity against.
+        let Some(node_join) = node_join else {
+            return Ok(false);
+        };
+        let Some(root) = node_join.root() else {
+            return Ok(false);
+        };
+
+        let stored_dimensions: HashSet<String> = pre_aggregation
+            .dimensions
+            .iter()
+            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .collect();
+
+        let joined_cubes: HashSet<String> = std::iter::once(root.name().clone())
+            .chain(
+                node_join
+                    .joins()
+                    .iter()
+                    .map(|item| item.cube().name().clone()),
+            )
+            .collect();
+
+        // The pre-aggregation must not be stored at a finer grain than the node
+        // reads either: a cube it groups by but the node never joins splits its
+        // rows further, so the same row would come back more than once.
+        for cube_name in Self::pre_aggregation_cubes(pre_aggregation)? {
+            if !joined_cubes.contains(&cube_name) {
+                return Ok(false);
+            }
+        }
+
+        let identifying_cubes = std::iter::once(root.name().clone()).chain(
+            node_join
+                .joins()
+                .iter()
+                .filter(|item| item.splits_rows())
+                .map(|item| item.cube().name().clone()),
+        );
+
+        for cube_name in identifying_cubes {
+            let keys = self.resolved_primary_keys(&cube_name)?;
+            if keys.is_empty() {
+                return Ok(false);
+            }
+            if !keys.iter().all(|key| stored_dimensions.contains(key)) {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Cubes the pre-aggregation's own members span.
+    fn pre_aggregation_cubes(
+        pre_aggregation: &CompiledPreAggregation,
+    ) -> Result<Vec<String>, CubeError> {
+        let members = pre_aggregation
+            .measures
+            .iter()
+            .chain(pre_aggregation.dimensions.iter())
+            .chain(pre_aggregation.time_dimensions.iter())
+            .chain(pre_aggregation.segments.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        collect_cube_names_from_symbols(&members)
+    }
+
+    fn resolved_primary_keys(&self, cube_name: &String) -> Result<Vec<String>, CubeError> {
+        if let Some(cached) = self.primary_keys_cache.borrow().get(cube_name) {
+            return Ok(cached.clone());
+        }
+        let keys = CommonUtils::new(self.query_tools.clone())
+            .primary_keys_dimensions(cube_name)?
+            .into_iter()
+            .map(|key| key.resolve_reference_chain().full_name())
+            .collect::<Vec<_>>();
+        self.primary_keys_cache
+            .borrow_mut()
+            .insert(cube_name.clone(), keys.clone());
+        Ok(keys)
     }
 
     fn query_join_groups(
