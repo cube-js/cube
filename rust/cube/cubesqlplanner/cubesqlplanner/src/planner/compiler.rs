@@ -252,12 +252,37 @@ impl Compiler {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
+        self.compile_sql_call_impl(cube_name, member_sql, true)
+    }
+
+    /// Compiles a cube's own `sql`. Its `FILTER_PARAMS` columns keep their
+    /// callbacks instead of becoming calls, since the innermost FROM has no
+    /// member in scope to resolve a reference against.
+    pub fn compile_cube_sql_call(
+        &mut self,
+        cube_name: &String,
+        member_sql: Rc<dyn MemberSql>,
+    ) -> Result<Rc<SqlCall>, CubeError> {
+        self.compile_sql_call_impl(cube_name, member_sql, false)
+    }
+
+    fn compile_sql_call_impl(
+        &mut self,
+        cube_name: &String,
+        member_sql: Rc<dyn MemberSql>,
+        build_filter_params_calls: bool,
+    ) -> Result<Rc<SqlCall>, CubeError> {
         let call_builder = SqlCallBuilder::new(
             self,
             self.cube_evaluator.clone(),
             self.base_tools.clone(),
             self.security_context.clone(),
         );
+        let call_builder = if build_filter_params_calls {
+            call_builder
+        } else {
+            call_builder.without_filter_params_calls()
+        };
         let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
         Ok(Rc::new(sql_call))
     }

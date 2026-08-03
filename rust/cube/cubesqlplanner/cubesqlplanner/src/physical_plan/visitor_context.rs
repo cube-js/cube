@@ -45,7 +45,7 @@ impl VisitorContext {
     pub fn new_for_filter_params(
         query_tools: Rc<QueryTools>,
         nodes_factory: &SqlNodesFactory,
-        filter_params_columns: HashMap<String, crate::cube_bridge::member_sql::FilterParamsColumn>,
+        filter_params_columns: HashMap<String, crate::planner::sql_call::SqlCallFilterParamsItem>,
         time_shifts: TimeShiftState,
     ) -> Self {
         let filters_context = FiltersContext {

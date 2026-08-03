@@ -21,7 +21,7 @@ impl ToSql for BaseFilter {
         if !filters_ctx.filter_params_columns.is_empty() {
             let symbol_to_match =
                 resolve_base_symbol(self.raw_member_evaluator_ref()).resolve_reference_chain();
-            if let Some(filter_params_column) = filters_ctx
+            if let Some(filter_params_item) = filters_ctx
                 .filter_params_columns
                 .get(&symbol_to_match.full_name())
             {
@@ -31,8 +31,10 @@ impl ToSql for BaseFilter {
                     .get(&symbol_to_match.full_name())
                     .and_then(|shift| shift.interval.as_ref());
                 return self.typed_filter().to_sql_for_filter_params(
-                    filter_params_column,
+                    filter_params_item,
                     time_shift,
+                    visitor,
+                    node_processor,
                     &query_tools,
                     templates,
                     filters_ctx,

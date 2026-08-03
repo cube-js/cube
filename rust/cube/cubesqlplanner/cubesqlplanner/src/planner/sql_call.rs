@@ -95,6 +95,8 @@ impl SqlDependency {
 /// - `fp:N` — Nth filter param.
 /// - `fg:N` — Nth filter group.
 /// - `sv:N` — Nth security-context value.
+/// - `fpv:N` — Nth filter value, supplied when a compiled
+///   `FILTER_PARAMS` column callback is rendered.
 pub struct SqlCallArg;
 
 impl SqlCallArg {
@@ -102,6 +104,7 @@ impl SqlCallArg {
     const FILTER_PARAM_PREFIX: &'static str = "fp";
     const FILTER_GROUP_PREFIX: &'static str = "fg";
     const SECURITY_VALUE_PREFIX: &'static str = "sv";
+    const FILTER_VALUE_PREFIX: &'static str = "fpv";
 
     pub fn dependency(i: usize) -> String {
         format!("{{{}:{}}}", Self::ARG_PREFIX, i)
@@ -124,6 +127,15 @@ impl SqlCallArg {
 pub struct SqlCallFilterParamsItem {
     pub filter_symbol_name: String,
     pub column: FilterParamsColumn,
+    /// The column callback compiled into a call of its own, when the
+    /// data model gave one. Its placeholders index its own
+    /// dependencies, so it is rendered on its own rather than spliced
+    /// into the enclosing template.
+    pub compiled_call: Option<Rc<SqlCall>>,
+    /// The owning cube and a cube the compiled column reads outside it,
+    /// if any. Reported when the column renders, since a column whose
+    /// filter never reaches the query renders nothing at all.
+    pub foreign_cube: Option<(String, String)>,
 }
 
 /// `FILTER_GROUP` binding from the data-model SQL: several
@@ -196,6 +208,20 @@ impl SqlCall {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        self.eval_with_filter_values(visitor, node_processor, query_tools, templates, &[])
+    }
+
+    /// Renders the call with the filter values a compiled
+    /// `FILTER_PARAMS` column takes through its `{fpv:N}`
+    /// placeholders.
+    pub fn eval_with_filter_values(
+        &self,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
+        filter_values: &[String],
+    ) -> Result<String, CubeError> {
         if let SqlTemplate::String(template) = &self.template {
             let (filter_params, filter_groups, deps, context_values) =
                 self.prepare_template_params(visitor, node_processor, &query_tools, templates)?;
@@ -206,6 +232,7 @@ impl SqlCall {
                 &filter_params,
                 &filter_groups,
                 &context_values,
+                filter_values,
             )
         } else {
             Err(CubeError::internal(
@@ -237,6 +264,7 @@ impl SqlCall {
                     &filter_params,
                     &filter_groups,
                     &context_values,
+                    &[],
                 )?]
             }
             SqlTemplate::StringVec(templates) => templates
@@ -248,6 +276,7 @@ impl SqlCall {
                         &filter_params,
                         &filter_groups,
                         &context_values,
+                        &[],
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?,
@@ -349,13 +378,27 @@ impl SqlCall {
         let filter_params = filter_params
             .iter()
             .map(|s| {
-                Self::substitute_template(s, &deps, &filter_params, &filter_groups, &context_values)
+                Self::substitute_template(
+                    s,
+                    &deps,
+                    &filter_params,
+                    &filter_groups,
+                    &context_values,
+                    &[],
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
         let filter_groups = filter_groups
             .iter()
             .map(|s| {
-                Self::substitute_template(s, &deps, &filter_params, &filter_groups, &context_values)
+                Self::substitute_template(
+                    s,
+                    &deps,
+                    &filter_params,
+                    &filter_groups,
+                    &context_values,
+                    &[],
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -363,13 +406,14 @@ impl SqlCall {
     }
 
     /// Substitute placeholders in template string with computed values in a single pass
-    /// Supports placeholders: {arg:N}, {fp:N}, {fg:N}, {sv:N}
+    /// Supports placeholders: {arg:N}, {fp:N}, {fg:N}, {sv:N}, {fpv:N}
     fn substitute_template(
         template: &str,
         deps: &[String],
         filter_params: &[String],
         filter_groups: &[String],
         security_values: &[String],
+        filter_values: &[String],
     ) -> Result<String, CubeError> {
         let mut result = String::with_capacity(template.len());
         let mut chars = template.chars().peekable();
@@ -404,6 +448,7 @@ impl SqlCall {
                             SqlCallArg::FILTER_PARAM_PREFIX => filter_params.get(idx),
                             SqlCallArg::FILTER_GROUP_PREFIX => filter_groups.get(idx),
                             SqlCallArg::SECURITY_VALUE_PREFIX => security_values.get(idx),
+                            SqlCallArg::FILTER_VALUE_PREFIX => filter_values.get(idx),
                             _ => {
                                 result.push('{');
                                 result.push_str(&placeholder);
@@ -456,7 +501,7 @@ impl SqlCall {
                     let mut filter_params_columns = HashMap::new();
                     for itm in items {
                         filter_params_columns
-                            .insert(itm.filter_symbol_name.clone(), itm.column.clone());
+                            .insert(itm.filter_symbol_name.clone(), (*itm).clone());
                     }
 
                     let context = VisitorContext::new_for_filter_params(
@@ -613,6 +658,7 @@ impl crate::utils::debug::DebugSql for SqlCall {
             &filter_params,
             &filter_groups,
             &context_values,
+            &[],
         )
         .unwrap()
     }

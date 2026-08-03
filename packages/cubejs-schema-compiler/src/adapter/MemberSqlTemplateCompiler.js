@@ -11,15 +11,20 @@
  *   {
  *     template: string | string[],
  *     symbolPaths: string[][],                       // {arg:N}
- *     filterParams: [{ cube_name, name, column }],   // {fp:N}, column = fn|string
+ *     filterParams: [{ cube_name, name, column }],   // {fp:N}
  *     filterGroups: [{ filterParams: [...] }],       // {fg:N}
  *     securityContextValues: string[]                // {sv:N}
  *   }
  *
  * Member references are returned as recorded paths — the caller resolves them
- * to symbols. FILTER_PARAMS column callbacks are deferred (returned as the raw
- * JS function for the caller to invoke at render time); SECURITY_CONTEXT is
- * resolved eagerly here against the provided context.
+ * to symbols. SECURITY_CONTEXT is resolved eagerly here against the provided
+ * context.
+ *
+ * A FILTER_PARAMS `column` is a plain string, or — when the data model gave a
+ * callback — a recording of its own in the same shape, with the filter values it
+ * takes as `{fpv:N}` placeholders and `valueParamsCount` of them, plus the
+ * `callback` itself for the contexts that render it as-is. A callback taking its
+ * values through a rest parameter is returned as the bare function.
  *
  * The module holds no planner state — `securityContext` and `sqlUtils` are
  * passed in — so it can be unit-tested in isolation.
@@ -29,9 +34,28 @@ const ARG_PREFIX = 'arg';
 const FILTER_PARAM_PREFIX = 'fp';
 const FILTER_GROUP_PREFIX = 'fg';
 const SECURITY_VALUE_PREFIX = 'sv';
+const FILTER_VALUE_PREFIX = 'fpv';
 
 function placeholder(prefix, index) {
   return `{${prefix}:${index}}`;
+}
+
+function emptyRecording() {
+  return {
+    symbolPaths: [],
+    filterParams: [],
+    filterGroups: [],
+    securityContextValues: [],
+  };
+}
+
+// The proxies handed to the member's `sql` function are captured by any
+// `FILTER_PARAMS` column callback it declares, so compiling such a callback has
+// to redirect what those proxies record into. Every recording goes through the
+// state's current target, which `compileColumnCallback` swaps for the duration
+// of the nested compile.
+function target(state) {
+  return state.target;
 }
 
 // Returns the index of an equal path if it already exists, otherwise appends
@@ -68,12 +92,12 @@ function memberReferenceProxy(path, state) {
         return undefined;
       }
       if (prop === 'sql') {
-        const index = uniqueInsertPath(state.symbolPaths, [...path, '__sql_fn']);
+        const index = uniqueInsertPath(target(state).symbolPaths, [...path, '__sql_fn']);
         const ph = placeholder(ARG_PREFIX, index);
         return () => ph;
       }
       if (prop === 'toString' || prop === 'valueOf') {
-        const index = uniqueInsertPath(state.symbolPaths, path);
+        const index = uniqueInsertPath(target(state).symbolPaths, path);
         const ph = placeholder(ARG_PREFIX, index);
         return () => ph;
       }
@@ -84,13 +108,95 @@ function memberReferenceProxy(path, state) {
 
 // ---- FILTER_PARAMS / FILTER_GROUP ------------------------------------------
 
+// Declared parameters of a column callback: how many filter values it can take,
+// and whether it takes them as a rest parameter. `Function.length` stops at the
+// first defaulted parameter, so the parameter list is read from the source.
+function declaredValueParams(fn) {
+  const source = fn.toString();
+  const open = source.indexOf('(');
+  const arrow = source.indexOf('=>');
+  if (open === -1 || (arrow !== -1 && arrow < open)) {
+    // `v => …`, a single parameter without parentheses.
+    return { count: 1, rest: false };
+  }
+
+  let depth = 0;
+  let close = -1;
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
+      if (depth === 0 && ch === ')') {
+        close = i;
+        break;
+      }
+    }
+  }
+  if (close === -1) {
+    return { count: 0, rest: false };
+  }
+
+  const inner = source.slice(open + 1, close);
+  const params = [];
+  let start = 0;
+  depth = 0;
+  for (let i = 0; i <= inner.length; i++) {
+    const ch = inner[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (i === inner.length || (ch === ',' && depth === 0)) {
+      const param = inner.slice(start, i).trim();
+      if (param) params.push(param);
+      start = i + 1;
+    }
+  }
+
+  return { count: params.length, rest: params.some(p => p.startsWith('...')) };
+}
+
+// Compiles a column callback into a template of its own: its filter values
+// become `{fpv:N}` placeholders and whatever it references is recorded into its
+// own lists, so the placeholders it emits index its own dependencies rather than
+// the enclosing member's. A rest parameter consumes as many values as the query
+// happens to supply, which a fixed set of placeholders cannot express, so such a
+// callback is left for the caller to invoke at render time.
+function compileColumnCallback(column, state) {
+  const { count, rest } = declaredValueParams(column);
+  if (rest) {
+    return column;
+  }
+
+  const values = [];
+  for (let i = 0; i < count; i++) {
+    values.push(placeholder(FILTER_VALUE_PREFIX, i));
+  }
+
+  const recording = emptyRecording();
+  const outer = state.target;
+  state.target = recording;
+  try {
+    const template = parseTemplateResult(column(...values));
+    // The callback travels along with its compiled form: a cube's own `sql` is
+    // the innermost FROM, where nothing a member reference resolves to is in
+    // scope, so the callback is rendered as-is there.
+    return { template, valueParamsCount: count, callback: column, ...recording };
+  } finally {
+    state.target = outer;
+  }
+}
+
 function filterParamsItemProxy(cubeName, name, state) {
   return {
     filter(column) {
-      const item = { cube_name: cubeName, name, column };
+      const item = {
+        cube_name: cubeName,
+        name,
+        column: typeof column === 'function' ? compileColumnCallback(column, state) : column,
+      };
       const toString = () => {
-        const index = state.filterParams.length;
-        state.filterParams.push(item);
+        const index = target(state).filterParams.length;
+        target(state).filterParams.push(item);
         return placeholder(FILTER_PARAM_PREFIX, index);
       };
       // `__member` lets FILTER_GROUP recover the item; `toString` records and
@@ -120,8 +226,8 @@ function filterGroupFn(state) {
       }
       return arg.__member;
     });
-    const index = state.filterGroups.length;
-    state.filterGroups.push({ filterParams });
+    const index = target(state).filterGroups.length;
+    target(state).filterGroups.push({ filterParams });
     return placeholder(FILTER_GROUP_PREFIX, index);
   };
 }
@@ -164,7 +270,7 @@ function coerceToStringValue(value) {
 }
 
 function recordSecurityValue(value, state) {
-  return placeholder(SECURITY_VALUE_PREFIX, uniqueInsertString(state.securityContextValues, value));
+  return placeholder(SECURITY_VALUE_PREFIX, uniqueInsertString(target(state).securityContextValues, value));
 }
 
 function securityFilterFn(value, required, state) {
@@ -247,23 +353,13 @@ function parseTemplateResult(result) {
  * @param {object} sqlUtils the SQL_UTILS object passed through to the template
  */
 function compileMemberSql(sqlFn, argNames, securityContext, sqlUtils) {
-  const state = {
-    symbolPaths: [],
-    filterParams: [],
-    filterGroups: [],
-    securityContextValues: [],
-  };
+  const root = emptyRecording();
+  const state = { target: root };
 
   const args = argNames.map(name => buildArg(name, state, securityContext, sqlUtils));
   const template = parseTemplateResult(sqlFn(...args));
 
-  return {
-    template,
-    symbolPaths: state.symbolPaths,
-    filterParams: state.filterParams,
-    filterGroups: state.filterGroups,
-    securityContextValues: state.securityContextValues,
-  };
+  return { template, ...root };
 }
 
 exports.compileMemberSql = compileMemberSql;

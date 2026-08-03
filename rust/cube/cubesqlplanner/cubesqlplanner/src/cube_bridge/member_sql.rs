@@ -37,12 +37,82 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for SqlTemplate {
     }
 }
 
+/// A column callback compiled into a template of its own. `{fpv:N}`
+/// marks the Nth filter value the planner supplies at render time;
+/// every other placeholder indexes `args`, the dependencies the
+/// callback body touched.
+#[derive(Clone)]
+pub struct CompiledFilterParamsColumn {
+    pub template: SqlTemplate,
+    pub args: SqlTemplateArgs,
+    pub value_params_count: usize,
+    pub callback: Rc<dyn FilterParamsCallback>,
+}
+
+impl std::fmt::Debug for CompiledFilterParamsColumn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CompiledFilterParamsColumn")
+            .field("template", &self.template)
+            .field("args", &self.args)
+            .field("value_params_count", &self.value_params_count)
+            .finish()
+    }
+}
+
+impl CompiledFilterParamsColumn {
+    fn clone_to_context(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<Self, CubeError> {
+        Ok(Self {
+            template: self.template.clone(),
+            args: self.args.clone_to_context(context_ref)?,
+            value_params_count: self.value_params_count,
+            callback: self.callback.clone_to_context(context_ref)?,
+        })
+    }
+}
+
+impl<IT: InnerTypes> NativeDeserialize<IT> for CompiledFilterParamsColumn {
+    fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
+        let object = native_object.to_struct()?;
+        let template = SqlTemplate::from_native(object.get_field("template")?)?;
+        let symbol_paths = Vec::<Vec<String>>::from_native(object.get_field("symbolPaths")?)?;
+        let filter_params = deserialize_filter_params_vec(object.get_field("filterParams")?)?;
+        let filter_groups = object
+            .get_field("filterGroups")?
+            .to_array()?
+            .to_vec()?
+            .into_iter()
+            .map(FilterGroupItem::from_native)
+            .collect::<Result<Vec<_>, _>>()?;
+        let values = Vec::<String>::from_native(object.get_field("securityContextValues")?)?;
+        let value_params_count = f64::from_native(object.get_field("valueParamsCount")?)? as usize;
+        let callback = NativeFilterParamsCallback::from_native(object.get_field("callback")?)?;
+        Ok(Self {
+            template,
+            args: SqlTemplateArgs {
+                symbol_paths,
+                filter_params,
+                filter_groups,
+                security_context: SecutityContextProps { values },
+            },
+            value_params_count,
+            callback: Rc::new(callback),
+        })
+    }
+}
+
 /// Column argument passed to
-/// `FILTER_PARAMS.cube.member.filter(...)`: either a plain column
-/// name string, or a JS callback that produces the SQL snippet.
+/// `FILTER_PARAMS.cube.member.filter(...)`: a plain column name
+/// string, a callback already compiled into its own template, or —
+/// when the callback takes its values as a rest parameter, so a fixed
+/// set of value placeholders cannot express it — the raw JS callback
+/// to invoke at render time.
 #[derive(Clone)]
 pub enum FilterParamsColumn {
     String(String),
+    Compiled(Rc<CompiledFilterParamsColumn>),
     Callback(Rc<dyn FilterParamsCallback>),
 }
 
@@ -53,6 +123,9 @@ impl FilterParamsColumn {
     ) -> Result<Self, CubeError> {
         let res = match self {
             Self::String(s) => Self::String(s.clone()),
+            Self::Compiled(compiled) => {
+                Self::Compiled(Rc::new(compiled.clone_to_context(context_ref)?))
+            }
             Self::Callback(callback) => Self::Callback(callback.clone_to_context(context_ref)?),
         };
         Ok(res)
@@ -66,6 +139,9 @@ impl<IT: InnerTypes> NativeSerialize<IT> for FilterParamsColumn {
     ) -> Result<NativeObjectHandle<IT>, CubeError> {
         match self {
             FilterParamsColumn::String(s) => s.to_native(context.clone()),
+            FilterParamsColumn::Compiled(_) => Err(CubeError::internal(
+                "Compiled filter params column cannot be serialized back".to_string(),
+            )),
             FilterParamsColumn::Callback(cb) => {
                 if let Ok(callback) = cb
                     .clone()
@@ -84,8 +160,13 @@ impl<IT: InnerTypes> NativeSerialize<IT> for FilterParamsColumn {
 }
 impl<IT: InnerTypes> NativeDeserialize<IT> for FilterParamsColumn {
     fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
+        // A compiled column arrives as a struct carrying its template; a rest-param
+        // callback arrives as a bare function, which has no such field.
         let column = if let Ok(string_column) = String::from_native(native_object.clone()) {
             FilterParamsColumn::String(string_column)
+        } else if let Ok(compiled) = CompiledFilterParamsColumn::from_native(native_object.clone())
+        {
+            FilterParamsColumn::Compiled(Rc::new(compiled))
         } else {
             let callback = NativeFilterParamsCallback::from_native(native_object.clone())?;
             FilterParamsColumn::Callback(Rc::new(callback))
@@ -98,6 +179,7 @@ impl std::fmt::Debug for FilterParamsColumn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
+            Self::Compiled(compiled) => f.debug_tuple("Compiled").field(compiled).finish(),
             Self::Callback(_) => f
                 .debug_tuple("Callback")
                 .field(&"JsFunc".to_string())

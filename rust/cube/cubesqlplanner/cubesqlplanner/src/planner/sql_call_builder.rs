@@ -7,6 +7,7 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
+use crate::planner::collectors::collect_cube_names;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -19,6 +20,11 @@ pub struct SqlCallBuilder<'a> {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
+    /// Whether a compiled `FILTER_PARAMS` column becomes a call of its own.
+    /// A cube's own `sql` is the innermost FROM, so a member reference from
+    /// there has nothing in scope to resolve against; its columns stay
+    /// callbacks rendered as-is.
+    build_filter_params_calls: bool,
 }
 
 impl<'a> SqlCallBuilder<'a> {
@@ -33,7 +39,13 @@ impl<'a> SqlCallBuilder<'a> {
             cube_evaluator,
             base_tools,
             security_context,
+            build_filter_params_calls: true,
         }
+    }
+
+    pub fn without_filter_params_calls(mut self) -> Self {
+        self.build_filter_params_calls = false;
+        self
     }
 
     pub fn build(
@@ -46,54 +58,98 @@ impl<'a> SqlCallBuilder<'a> {
             self.security_context.clone(),
             member_sql.args_names().clone(),
         )?;
-        let (template, template_args) = (compiled.template, compiled.args);
+        self.build_from_template(cube_name, compiled.template, &compiled.args)
+    }
 
-        let deps = template_args
+    /// Assembles a `SqlCall` from an already-compiled template and the
+    /// dependencies it recorded. Recurses for a `FILTER_PARAMS` column
+    /// that came back compiled, since such a column is a call of its
+    /// own with its own dependency list.
+    fn build_from_template(
+        &mut self,
+        cube_name: &String,
+        template: SqlTemplate,
+        args: &SqlTemplateArgs,
+    ) -> Result<SqlCall, CubeError> {
+        let deps = args
             .symbol_paths
             .iter()
             .map(|path| self.build_dependency(cube_name, path))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let filter_params = template_args
+        let filter_params = args
             .filter_params
             .iter()
-            .map(|itm| self.build_filter_params_item(itm))
+            .map(|itm| self.build_filter_params_item(cube_name, itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let filter_groups = template_args
+        let filter_groups = args
             .filter_groups
             .iter()
-            .map(|itm| self.build_filter_group_item(itm))
+            .map(|itm| self.build_filter_group_item(cube_name, itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = SqlCall::new(
-            template.clone(),
+        Ok(SqlCall::new(
+            template,
             deps,
             filter_params,
             filter_groups,
-            template_args.security_context.clone(),
-        );
-        Ok(result)
+            args.security_context.clone(),
+        ))
     }
 
     fn build_filter_params_item(
         &mut self,
+        cube_name: &String,
         item: &FilterParamsItem,
     ) -> Result<SqlCallFilterParamsItem, CubeError> {
+        let (compiled_call, foreign_cube) = match &item.column {
+            FilterParamsColumn::Compiled(_) if !self.build_filter_params_calls => (None, None),
+            FilterParamsColumn::Compiled(compiled) => {
+                let call =
+                    self.build_from_template(cube_name, compiled.template.clone(), &compiled.args)?;
+                let foreign_cube = Self::foreign_cube_reference(cube_name, &call)?;
+                (Some(Rc::new(call)), foreign_cube)
+            }
+            _ => (None, None),
+        };
+
         Ok(SqlCallFilterParamsItem {
             filter_symbol_name: format!("{}.{}", item.cube_name, item.name),
             column: item.column.clone(),
+            compiled_call,
+            foreign_cube,
         })
+    }
+
+    /// The first cube a compiled column reads outside the one owning it.
+    /// Such a column renders only when its filter reaches the query, so the
+    /// members it reads are not dependencies of the enclosing member and
+    /// cannot bring a cube into the join — the qualifier it emits would have
+    /// no table behind it.
+    fn foreign_cube_reference(
+        cube_name: &String,
+        call: &SqlCall,
+    ) -> Result<Option<(String, String)>, CubeError> {
+        for dep in call.get_dependencies() {
+            for referenced in collect_cube_names(&dep)? {
+                if &referenced != cube_name {
+                    return Ok(Some((cube_name.clone(), referenced)));
+                }
+            }
+        }
+        Ok(None)
     }
 
     fn build_filter_group_item(
         &mut self,
+        cube_name: &String,
         item: &FilterGroupItem,
     ) -> Result<SqlCallFilterGroupItem, CubeError> {
         let filter_params = item
             .filter_params
             .iter()
-            .map(|itm| self.build_filter_params_item(itm))
+            .map(|itm| self.build_filter_params_item(cube_name, itm))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(SqlCallFilterGroupItem { filter_params })
     }
