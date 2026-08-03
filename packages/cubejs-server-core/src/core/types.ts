@@ -147,12 +147,12 @@ export type DbTypeAsyncFn = (context: DriverContext) =>
 export type DriverFactoryAsyncFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig>;
 
-export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
+export type DialectFactoryFn = (context: DialectContext) => typeof BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
-export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
+export type ExternalDialectFactoryFn = (context: RequestContext) => typeof BaseQuery;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
