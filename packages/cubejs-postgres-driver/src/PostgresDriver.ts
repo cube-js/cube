@@ -109,16 +109,26 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * SQL executed on every acquired connection before the query.
+       */
+      sqlPreamble?: string,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+    });
+
+    // The preamble is applied per connection in prepareConnection, so it is not
+    // part of the pg client config spread below.
+    const { sqlPreamble: _sqlPreamble, ...clientConfig } = config;
 
     const poolConfig: PgClientConfig = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
@@ -127,7 +137,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       user: getEnv('dbUser', { dataSource, preAggregations }),
       password: getEnv('dbPass', { dataSource, preAggregations }),
       ssl: this.getSslOptions(dataSource, preAggregations),
-      ...config
+      ...clientConfig
     };
 
     const poolName = createPoolName('postgres', dataSource, preAggregations);
@@ -330,6 +340,16 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
+
+    // Runs on every acquired connection, which is what makes the preamble's
+    // session state visible to the query that follows — pooled connections are
+    // not guaranteed to be the one the preamble first ran on. This hook is
+    // shared by the query and stream paths, so both are covered.
+    const preamble = this.sqlPreamble();
+
+    if (preamble) {
+      await conn.query(preamble);
+    }
 
     await this.loadUserDefinedTypes(conn);
   }

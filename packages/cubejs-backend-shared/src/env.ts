@@ -154,6 +154,10 @@ export function hasPreAggregationsEnvVars(dataSource: string = 'default'): boole
       'CUBEJS_PRE_AGGREGATIONS_BUILDER',
       'CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME',
       'CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH',
+      // Session setup, not a connection target. Left out, setting a pre-agg
+      // preamble alone would swing every credential into the pre-aggregation
+      // namespace and leave builds without a host, user or password.
+      'CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE',
     ]);
 
     for (const key of Object.keys(process.env)) {
@@ -532,6 +536,19 @@ const variables: Record<string, (...args: any) => any> = {
     preAggregations,
   }: DataSourceOpts) => (
     get(keyByDataSource('CUBEJS_DB_PASS', dataSource, preAggregations)).asString()
+  ),
+
+  /**
+   * SQL executed in the context of every query on the connection.
+   *
+   * Passed through as one opaque string: the data source parses it, so no
+   * delimiter convention is imposed on multi-statement values.
+   */
+  dbSqlPreamble: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => (
+    get(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', dataSource, preAggregations)).asString()
   ),
 
   /**

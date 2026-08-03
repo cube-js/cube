@@ -17,6 +17,8 @@ describe('Pre-aggregation env vars (single datasource)', () => {
     delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_SSL;
     delete process.env.CUBEJS_DB_PORT;
     delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_PORT;
+    delete process.env.CUBEJS_DB_SQL_PREAMBLE;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE;
   });
 
   test('preAggregations: true reads PRE_AGGREGATIONS variant', () => {
@@ -29,6 +31,50 @@ describe('Pre-aggregation env vars (single datasource)', () => {
       .toEqual('regular-host');
     expect(getEnv('dbHost', { dataSource: 'default' }))
       .toEqual('regular-host');
+  });
+
+  test('getEnv("dbSqlPreamble") reads the base and PRE_AGGREGATIONS variants', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET regular = 1';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET preagg = 1';
+
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: true }))
+      .toEqual('SET preagg = 1');
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: false }))
+      .toEqual('SET regular = 1');
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default' }))
+      .toEqual('SET regular = 1');
+
+    delete process.env.CUBEJS_DB_SQL_PREAMBLE;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE;
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default' })).toBeUndefined();
+  });
+
+  test('keyByDataSource derives every sql preamble variant', () => {
+    expect(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', 'default'))
+      .toEqual('CUBEJS_DB_SQL_PREAMBLE');
+    expect(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', 'default', true))
+      .toEqual('CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE');
+
+    process.env.CUBEJS_DATASOURCES = 'default,analytics';
+
+    expect(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', 'analytics'))
+      .toEqual('CUBEJS_DS_ANALYTICS_DB_SQL_PREAMBLE');
+    expect(keyByDataSource('CUBEJS_DB_SQL_PREAMBLE', 'analytics', true))
+      .toEqual('CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE');
+
+    delete process.env.CUBEJS_DATASOURCES;
+  });
+
+  // Pins the gap behind open question #1: unset means undefined, not inherited.
+  // If inheritance is later added at the call site, this asserts the raw env
+  // layer still has none — the two must not be confused again.
+  test('the pre-agg preamble does not fall back to the default at the env layer', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET regular = 1';
+
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: true }))
+      .toBeUndefined();
+
+    delete process.env.CUBEJS_DB_SQL_PREAMBLE;
   });
 
   test('preAggregations: true returns undefined when PRE_AGGREGATIONS variant not set', () => {
@@ -151,8 +197,29 @@ describe('hasPreAggregationsEnvVars', () => {
     delete process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER;
     delete process.env.CUBEJS_PRE_AGGREGATIONS_BACKOFF_MAX_TIME;
     delete process.env.CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH;
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE;
     delete process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST;
     delete process.env.CUBEJS_DATASOURCES;
+  });
+
+  // The preamble is session setup, not a connection target. Were it treated as
+  // a credential var, setting only a pre-agg preamble would swing host, user
+  // and password into the pre-aggregation namespace and leave builds with none.
+  test('ignores CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET a = 1';
+    expect(hasPreAggregationsEnvVars('default')).toBe(false);
+  });
+
+  test('a pre-agg preamble alone does not divert credential resolution', () => {
+    process.env.CUBEJS_DB_HOST = 'regular-host';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET a = 1';
+
+    expect(hasPreAggregationsEnvVars('default')).toBe(false);
+    // Without the guard the pre-agg driver would resolve its host from the
+    // pre-aggregation namespace and get undefined.
+    expect(getEnv('dbHost', { dataSource: 'default' })).toEqual('regular-host');
+
+    delete process.env.CUBEJS_DB_HOST;
   });
 
   test('returns false when no PRE_AGGREGATIONS vars set', () => {

@@ -17,6 +17,8 @@ import {
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   StreamOptions,
+  normalizeSqlPreamble,
+  splitSqlPreamble,
 } from '@cubejs-backend/base-driver';
 import { promisify } from 'util';
 import path from 'path';
@@ -228,11 +230,35 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
-  protected prepareConnectionQueries() {
+  /**
+   * Statements replayed on a connection before the primary query.
+   *
+   * A `sqlPreamble` is appended to the per-dbType built-ins, built-ins first:
+   * `supported-drivers.ts` ships `SET time_zone` for MySQL, and dropping it
+   * would silently change how timestamps are read.
+   *
+   * The deprecated `prepareConnectionQueries` keeps *replacing* those built-ins,
+   * which is what it has always done — someone who set it to override the
+   * timezone still gets that, and only that, until the option is removed.
+   */
+  protected prepareConnectionQueries(): string[] {
     const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
-    return this.config.prepareConnectionQueries ||
-      dbTypeDescription && dbTypeDescription.prepareConnectionQueries ||
-      [];
+    const builtIn = dbTypeDescription && dbTypeDescription.prepareConnectionQueries || [];
+
+    if (this.config.prepareConnectionQueries?.length && !this.config.sqlPreamble) {
+      this.logger?.('Deprecated driver option', {
+        warning: 'The prepareConnectionQueries driver option is deprecated and will be removed in a future release. Use sqlPreamble instead — note it appends to the built-in connection queries rather than replacing them.',
+      });
+
+      return this.config.prepareConnectionQueries;
+    }
+
+    const preamble = normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', {
+      dataSource: this.config.dataSource ?? 'default',
+      preAggregations: this.config.preAggregations,
+    });
+
+    return [...builtIn, ...splitSqlPreamble(preamble)];
   }
 
   protected escapeDialect(): EscapeDialect {
@@ -299,6 +325,12 @@ export class JDBCDriver extends BaseDriver {
     try {
       const query = this.prepareQueryWithParams(sql, values);
       const cancelObj: {cancel?: Function} = {};
+
+      // A streamed query has to run in the preamble's context too; this path
+      // used to skip the connection queries the query path replays.
+      for (const statementSql of this.prepareConnectionQueries()) {
+        await this.executeStatement(conn, statementSql);
+      }
 
       const createStatement = promisify(conn.createStatement.bind(conn));
       const statement = await createStatement();
