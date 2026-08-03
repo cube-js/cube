@@ -82,8 +82,26 @@ deployment][ref-demo-deployment] in Cube Cloud.
 | [`CUBEJS_DB_DUCKDB_COMMUNITY_EXTENSIONS`](/reference/configuration/environment-variables#cubejs_db_duckdb_community_extensions)    | A comma-separated list of DuckDB community extensions to install and load                                             | A comma-separated list of DuckDB community extensions         |    ❌     |
 | `CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN` | A flag to use credentials chain for secrets for S3 connections                                                        | `true`, `false`. Defaults to `false`                          |    ❌     |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)                       | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                    | A valid number                                                |    ❌     |
+| [`CUBEJS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble) | SQL run in the context of every query, typically to define temporary UDFs | A valid SQL statement or batch |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+### SQL preamble
+
+SQL set with [`CUBEJS_DB_SQL_PREAMBLE`](/reference/configuration/environment-variables#cubejs_db_sql_preamble),
+or with the `sqlPreamble` driver option, runs on each connection before the query
+that uses it — including streamed queries, which DuckDB serves on their own
+connection.
+
+<Info>
+
+The `initSql` driver option is deprecated in favour of `sqlPreamble` and will be
+removed in a future release. It keeps its existing behaviour while it lasts: a
+statement that fails is logged and skipped, whereas a failing `sqlPreamble`
+surfaces the error, so a preamble meant to define a function does not fail later
+as a missing function instead.
+
+</Info>
+
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
