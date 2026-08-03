@@ -279,3 +279,71 @@ async fn test_ungrouped_with_time_dimension() {
         insta::assert_snapshot!(result);
     }
 }
+
+const UNGROUPED_DUP_SEED: &str = "ungrouped_multiplied_dup_tables.sql";
+
+// A measure whose own sql already aggregates cannot be projected row-level: the
+// select it lands in must group, or the SQL is not valid at all. This holds for
+// an ungrouped request too, so the multiplied CTE keeps its GROUP BY here.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_multiplied_keeps_group_by_for_aggregate_sql_measure() {
+    let schema = MockSchema::from_yaml_file("common/ungrouped_multiplied_dup.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - dup_customers.ltv_agg_number
+        dimensions:
+          - dup_customers.name
+          - dup_orders.status
+        ungrouped: true
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    let lower = sql.to_lowercase();
+
+    assert!(
+        lower.contains("select distinct"),
+        "expected the keys subquery of a multiplied measure, got:\n{sql}"
+    );
+    assert!(
+        lower.contains("group by"),
+        "a measure that aggregates in its own sql needs the enclosing select to \
+         group, got:\n{sql}"
+    );
+
+    // Executing is the real assertion: without the grouping the engine rejects
+    // the statement outright.
+    if let Some(result) = ctx.try_execute_pg(query, UNGROUPED_DUP_SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A CTE hoisted out of a multi-stage leaf is consumed by the stage above it,
+// which re-aggregates its rows. It projects row-level values for that reason, so
+// it has to keep grouping to the leaf's own grain no matter what the request
+// asked for — an ungrouped request does not make this CTE a raw-row scan.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_request_keeps_group_by_in_hoisted_multi_stage_leaf() {
+    let schema =
+        MockSchema::from_yaml_file("common/integration_multi_stage_multiplied_pre_agg.yaml")
+            .only_pre_aggregations(&[]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - customers.total_lifetime_value_prev_month_by_returns
+        time_dimensions:
+          - dimension: returns.created_at
+            granularity: month
+        ungrouped: true
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    assert!(
+        sql.to_lowercase().contains("group by"),
+        "the hoisted leaf feeds a stage that re-aggregates it, so it must stay \
+         grouped, got:\n{sql}"
+    );
+}
