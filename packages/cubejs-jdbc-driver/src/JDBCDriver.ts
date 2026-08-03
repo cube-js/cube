@@ -253,7 +253,9 @@ export class JDBCDriver extends BaseDriver {
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
     const queryWithParams = this.prepareQueryWithParams(query, values);
     const cancelObj: {cancel?: Function} = {};
-    const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
+    const promise = this.queryPromised(queryWithParams, cancelObj, {
+      prepareConnectionQueries: this.prepareConnectionQueries(),
+    });
     (promise as CancelablePromise<any>).cancel =
       () => cancelObj.cancel && cancelObj.cancel() ||
       Promise.reject(new Error('Statement is not ready'));
@@ -299,6 +301,12 @@ export class JDBCDriver extends BaseDriver {
     try {
       const query = this.prepareQueryWithParams(sql, values);
       const cancelObj: {cancel?: Function} = {};
+
+      // A streamed query runs on its own connection, so it needs the same
+      // connection queries the query path replays.
+      for (const connectionQuery of this.prepareConnectionQueries()) {
+        await this.executeStatement(conn, connectionQuery);
+      }
 
       const createStatement = promisify(conn.createStatement.bind(conn));
       const statement = await createStatement();
