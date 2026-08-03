@@ -79,6 +79,15 @@ cubes:
 
     - name: payments
       sql: "SELECT * FROM payments"
+      # Stores a measure the planner cannot compute through the measure
+      # subquery, at the grain that would force one.
+      pre_aggregations:
+          - name: max_fx_by_meta_value
+            type: rollup
+            measures:
+                - max_fx_rate
+            dimensions:
+                - payment_meta.value
       joins:
           - name: payment_meta
             relationship: one_to_many

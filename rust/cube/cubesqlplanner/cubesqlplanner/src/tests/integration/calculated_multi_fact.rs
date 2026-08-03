@@ -459,6 +459,25 @@ async fn test_calculated_measure_pulled_into_a_shared_measure_subquery() {
     expect_no_own_aggregate_error(&ctx, query, "payments.success_rate");
 }
 
+/// The same shape a rollup stores. The measure subquery is never rendered, so
+/// the query is answered rather than refused - which is why the check belongs
+/// where the subquery is built and not where the plan is.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_refused_shape_is_answered_from_a_rollup() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - payments.max_fx_rate
+        dimensions:
+          - payment_meta.value
+    "};
+
+    let (_sql, usages) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    let names: Vec<&str> = usages.iter().map(|u| u.name().as_str()).collect();
+    assert_eq!(names, vec!["max_fx_by_meta_value"]);
+}
+
 /// A calculated measure reaching another cube with no component measure at all -
 /// its aggregate is written by hand over the joined cube's column.
 #[tokio::test(flavor = "multi_thread")]
