@@ -303,6 +303,7 @@ async fn handle_sql_query(
 
         let session_clone = Arc::clone(&session);
         let span_id_clone = span_id.clone();
+        let span_id_for_schema = span_id.clone();
 
         let (close_tx, close_rx) = oneshot::channel::<()>();
         let close_handler =
@@ -373,20 +374,57 @@ async fn handle_sql_query(
             let mut schema_response = Map::new();
             schema_response.insert("schema".into(), serde_json::to_value(&columns)?);
 
-            if let Some(last_refresh_time) = stream.schema().metadata().get("lastRefreshTime") {
+            // Result freshness metadata is recorded on the span by `load_data`,
+            // so it survives post-processing nodes (a calculated projection over
+            // MEASURE(), a sort, a filter) that rebuild the schema and drop its
+            // metadata. The stream schema is only a fallback for plans with no
+            // span.
+            //
+            // Reading it here, before the first `stream.next()`, relies on
+            // `ExecutionPlan::execute` being async in this DataFusion fork with
+            // every parent awaiting its children's `execute()` before returning
+            // a stream — that is what has already run `load_data` by now. A node
+            // that deferred child execution to first poll would silently empty
+            // this header again, and the tests would not catch it.
+            //
+            // Not covered: stream mode, where `execute` takes the `load_stream`
+            // branch and never calls `load_data`, so neither the span nor the
+            // stream schema carries the metadata and the header omits it.
+            //
+            // Both values take the same precedence: whatever the span reported
+            // wins outright, and the schema is consulted only when the span was
+            // silent. `external` must not be OR-ed with the schema — a span that
+            // folded to `false` because only some of its loads were external
+            // would then be overridden back to `true`, undoing the conservative
+            // fold in `SpanId::set_external`.
+            let (span_last_refresh_time, span_external) = match span_id_for_schema.as_ref() {
+                Some(span_id) => (span_id.last_refresh_time().await, span_id.external().await),
+                None => (None, None),
+            };
+
+            let last_refresh_time = span_last_refresh_time.or_else(|| {
+                stream
+                    .schema()
+                    .metadata()
+                    .get("lastRefreshTime")
+                    .map(|t| t.to_string())
+            });
+            if let Some(last_refresh_time) = last_refresh_time {
                 schema_response.insert(
                     "lastRefreshTime".into(),
-                    serde_json::Value::String(last_refresh_time.clone()),
+                    serde_json::Value::String(last_refresh_time),
                 );
             }
 
-            if stream
-                .schema()
-                .metadata()
-                .get("external")
-                .map(|v| v == "true")
-                .unwrap_or(false)
-            {
+            let external = span_external.unwrap_or_else(|| {
+                stream
+                    .schema()
+                    .metadata()
+                    .get("external")
+                    .map(|v| v == "true")
+                    .unwrap_or(false)
+            });
+            if external {
                 schema_response.insert("external".into(), serde_json::Value::Bool(true));
             }
 
