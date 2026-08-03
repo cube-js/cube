@@ -71,3 +71,43 @@ fn measure_filter_callback_column_renders_the_referenced_member() {
         sql
     );
 }
+
+// A cube's `sql` builds the table the query reads from, so no member is in scope
+// inside it. Resolving such a reference is what used to recurse between the cube
+// table and the dimension until the stack ran out.
+#[test]
+fn cube_sql_referencing_a_member_is_rejected() {
+    let schema = MockSchema::from_yaml(indoc! {"
+        cubes:
+            - name: commission
+              sql: \"SELECT * FROM commission WHERE {CUBE.reconciliation_date} IS NOT NULL\"
+              dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: reconciliation_date
+                    type: time
+                    sql: reconciliation_date
+              measures:
+                  - name: count
+                    type: count
+    "})
+    .unwrap();
+
+    let err = TestContext::new(schema)
+        .and_then(|ctx| {
+            ctx.build_sql_and_params(indoc! {"
+                measures:
+                  - commission.count
+            "})
+        })
+        .expect_err("a member reference in a cube's sql must be reported");
+
+    assert!(
+        err.message
+            .contains("references member `commission.reconciliation_date`"),
+        "unexpected error: {}",
+        err.message
+    );
+}

@@ -41,22 +41,11 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for SqlTemplate {
 /// marks the Nth filter value the planner supplies at render time;
 /// every other placeholder indexes `args`, the dependencies the
 /// callback body touched.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CompiledFilterParamsColumn {
     pub template: SqlTemplate,
     pub args: SqlTemplateArgs,
     pub value_params_count: usize,
-    pub callback: Rc<dyn FilterParamsCallback>,
-}
-
-impl std::fmt::Debug for CompiledFilterParamsColumn {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CompiledFilterParamsColumn")
-            .field("template", &self.template)
-            .field("args", &self.args)
-            .field("value_params_count", &self.value_params_count)
-            .finish()
-    }
 }
 
 impl CompiledFilterParamsColumn {
@@ -68,7 +57,6 @@ impl CompiledFilterParamsColumn {
             template: self.template.clone(),
             args: self.args.clone_to_context(context_ref)?,
             value_params_count: self.value_params_count,
-            callback: self.callback.clone_to_context(context_ref)?,
         })
     }
 }
@@ -88,7 +76,6 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for CompiledFilterParamsColumn {
             .collect::<Result<Vec<_>, _>>()?;
         let values = Vec::<String>::from_native(object.get_field("securityContextValues")?)?;
         let value_params_count = f64::from_native(object.get_field("valueParamsCount")?)? as usize;
-        let callback = NativeFilterParamsCallback::from_native(object.get_field("callback")?)?;
         Ok(Self {
             template,
             args: SqlTemplateArgs {
@@ -98,7 +85,6 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for CompiledFilterParamsColumn {
                 security_context: SecutityContextProps { values },
             },
             value_params_count,
-            callback: Rc::new(callback),
         })
     }
 }

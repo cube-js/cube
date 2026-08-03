@@ -85,7 +85,7 @@ impl TypedFilter {
                 };
                 dispatch_to_sql(self.operation(), &ctx)
             }
-            FilterParamsColumn::Compiled(compiled) => {
+            FilterParamsColumn::Compiled(_) => {
                 if let Some((owner, foreign)) = &item.foreign_cube {
                     return Err(CubeError::user(format!(
                         "FILTER_PARAMS column for `{}` in cube `{}` reads cube `{}`; a column may \
@@ -95,16 +95,19 @@ impl TypedFilter {
                 }
                 let values =
                     self.filter_param_values(query_tools, plan_templates, use_db_time_zone)?;
-                match &item.compiled_call {
-                    Some(call) => call.eval_with_filter_values(
-                        visitor,
-                        node_processor,
-                        query_tools.clone(),
-                        plan_templates,
-                        &values,
-                    ),
-                    None => compiled.callback.call(&values),
-                }
+                let Some(call) = &item.compiled_call else {
+                    return Err(CubeError::internal(format!(
+                        "Compiled filter params column for `{}` has no call",
+                        item.filter_symbol_name
+                    )));
+                };
+                call.eval_with_filter_values(
+                    visitor,
+                    node_processor,
+                    query_tools.clone(),
+                    plan_templates,
+                    &values,
+                )
             }
             FilterParamsColumn::Callback(callback) => {
                 // A callback column is opaque SQL produced by user code, so a

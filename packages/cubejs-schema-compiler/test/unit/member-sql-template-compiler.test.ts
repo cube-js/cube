@@ -99,8 +99,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     // The filter value it takes becomes a placeholder of its own.
     expect(res.filterParams[0].column.template).toBe('{fpv:0} > 0');
     expect(res.filterParams[0].column.valueParamsCount).toBe(1);
-    // The callback travels along for the contexts that render it as-is.
-    expect(res.filterParams[0].column.callback('X')).toBe('X > 0');
+    expect(res.filterParams[0].column.symbolPaths).toEqual([]);
   });
 
   // What a callback references belongs to the callback, not to the member whose

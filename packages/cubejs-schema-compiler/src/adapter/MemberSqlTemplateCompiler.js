@@ -22,9 +22,8 @@
  *
  * A FILTER_PARAMS `column` is a plain string, or — when the data model gave a
  * callback — a recording of its own in the same shape, with the filter values it
- * takes as `{fpv:N}` placeholders and `valueParamsCount` of them, plus the
- * `callback` itself for the contexts that render it as-is. A callback taking its
- * values through a rest parameter is returned as the bare function.
+ * takes as `{fpv:N}` placeholders and `valueParamsCount` of them. A callback
+ * taking its values through a rest parameter is returned as the bare function.
  *
  * The module holds no planner state — `securityContext` and `sqlUtils` are
  * passed in — so it can be unit-tested in isolation.
@@ -177,10 +176,7 @@ function compileColumnCallback(column, state) {
   state.target = recording;
   try {
     const template = parseTemplateResult(column(...values));
-    // The callback travels along with its compiled form: a cube's own `sql` is
-    // the innermost FROM, where nothing a member reference resolves to is in
-    // scope, so the callback is rendered as-is there.
-    return { template, valueParamsCount: count, callback: column, ...recording };
+    return { template, valueParamsCount: count, ...recording };
   } finally {
     state.target = outer;
   }

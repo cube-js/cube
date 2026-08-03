@@ -20,11 +20,11 @@ pub struct SqlCallBuilder<'a> {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
-    /// Whether a compiled `FILTER_PARAMS` column becomes a call of its own.
-    /// A cube's own `sql` is the innermost FROM, so a member reference from
-    /// there has nothing in scope to resolve against; its columns stay
-    /// callbacks rendered as-is.
-    build_filter_params_calls: bool,
+    /// Set while compiling a cube's own `sql`. That sql builds the table the
+    /// query reads from, so no member is in scope inside it — a member
+    /// reference there is rejected instead of resolved, wherever in the sql or
+    /// in one of its `FILTER_PARAMS` columns it appears.
+    is_cube_sql: bool,
 }
 
 impl<'a> SqlCallBuilder<'a> {
@@ -39,12 +39,12 @@ impl<'a> SqlCallBuilder<'a> {
             cube_evaluator,
             base_tools,
             security_context,
-            build_filter_params_calls: true,
+            is_cube_sql: false,
         }
     }
 
-    pub fn without_filter_params_calls(mut self) -> Self {
-        self.build_filter_params_calls = false;
+    pub fn for_cube_sql(mut self) -> Self {
+        self.is_cube_sql = true;
         self
     }
 
@@ -104,7 +104,6 @@ impl<'a> SqlCallBuilder<'a> {
         item: &FilterParamsItem,
     ) -> Result<SqlCallFilterParamsItem, CubeError> {
         let (compiled_call, foreign_cube) = match &item.column {
-            FilterParamsColumn::Compiled(_) if !self.build_filter_params_calls => (None, None),
             FilterParamsColumn::Compiled(compiled) => {
                 let call =
                     self.build_from_template(cube_name, compiled.template.clone(), &compiled.args)?;
@@ -167,6 +166,20 @@ impl<'a> SqlCallBuilder<'a> {
             dep_path,
         )
         .map_err(|e| CubeError::user(format!("Error in `{}`: {}", dep_path.join("."), e)))?;
+
+        if self.is_cube_sql {
+            if let SymbolPathType::Dimension | SymbolPathType::Measure | SymbolPathType::Segment =
+                symbol_path.path_type()
+            {
+                return Err(CubeError::user(format!(
+                    "`sql` of cube `{}` references member `{}`. A cube's sql builds the table the \
+                     query reads from, so no member is in scope there — reference the underlying \
+                     column instead",
+                    current_cube_name,
+                    symbol_path.full_name()
+                )));
+            }
+        }
 
         let path = symbol_path.path().clone();
 
