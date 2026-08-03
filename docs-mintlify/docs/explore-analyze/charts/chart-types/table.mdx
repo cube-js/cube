@@ -95,6 +95,11 @@ Each card has a **Value** toggle and, next to it, a **Bars** / **Sparkline** pai
 
 These controls appear only on numeric columns.
 
+Bars and sparklines are the only in-cell visualizations the table draws. To turn a
+column's values into clickable links, define [`links` on the
+dimension](/docs/data-modeling/dimensions#links) in the data model — they appear in
+the [cell menu](#cell-menu) rather than in the cell itself.
+
 ### Inline bars
 
 Display a numeric column as a proportional in-cell bar by selecting **Bars** on the column's card. Each bar's length reflects the value's magnitude within the column's range.
@@ -125,12 +130,6 @@ The time dimensions on offer come from the **semantic view the query is built on
 
 </Note>
 
-<Note>
-
-Internally, sparklines are powered by additional queries grouped by time dimension and granularity: measures sharing the same dimension and granularity are fetched together, so a chart with several sparklines runs at most one extra query per distinct dimension and granularity combination.
-
-</Note>
-
 {/* TODO: screenshot — a numeric column card showing the Value toggle beside the Bars / Sparkline pair */}
 
 | Option | Description |
@@ -147,6 +146,12 @@ A row needs at least two data points to draw a sparkline; cells with fewer fall 
 <Note>
 
 Choose a reasonable granularity for the data's time span. An overly fine granularity (e.g. by the second over several years) makes the background queries return many rows and can compromise the chart's performance.
+
+</Note>
+
+<Note>
+
+Internally, sparklines are powered by additional queries grouped by time dimension and granularity: measures sharing the same dimension and granularity are fetched together, so a chart with several sparklines runs at most one extra query per distinct dimension and granularity combination.
 
 </Note>
 
@@ -217,7 +222,7 @@ Alignment is set independently in each of the three sections, and their defaults
 
 <Note>
 
-Because the values default follows the data type, the alignment control in the **Values** section shows left until you set it, even where numeric columns are drawn right-aligned. Choosing left there is still meaningful: it pins numeric columns to the left instead of letting them follow their data type.
+The **Values** alignment control shows left until you set it, even where numeric columns are drawn right-aligned. Choosing left there is still meaningful: it pins numeric columns to the left instead of letting them follow their data type.
 
 </Note>
 
