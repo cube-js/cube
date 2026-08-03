@@ -40,6 +40,7 @@ Configure individual columns in the **Columns** section of the **Style** tab (or
 |---|---|
 | **Label** | Override the column header text |
 | **Alignment** | Left, center, or right. Defaults to the column's data type — numbers right, everything else left |
+| **Vertical alignment** | Top, middle, or bottom — where the value sits when the row is taller than one line |
 | **Word wrap** | Allow cell content to wrap to multiple lines |
 | **Width** | **Flex** (a weight) or **Fix** (pixels) — see [Column width](#column-width) |
 | **Hide** | Show or hide the column |
@@ -228,6 +229,7 @@ Each of these sections has a compact formatting toolbar that sets, for that part
 - **Colors** — text and background color (the paired color chip).
 - **Text format** — **bold**, **italic**, and **underline** toggles.
 - **Alignment** — left, center, or right.
+- **Vertical alignment** — top, middle, or bottom (**Values** only; headers and totals are always a single line).
 - **Overflow** — truncate or wrap long content.
 
 When you don't pick a color, the element uses the theme's default, which adapts to light and dark mode automatically.
@@ -239,6 +241,8 @@ Alignment is set independently in each of the three sections, and their defaults
 The **Values** alignment control shows left until you set it, even where numeric columns are drawn right-aligned. Choosing left there is still meaningful: it pins numeric columns to the left instead of letting them follow their data type.
 
 </Note>
+
+Vertical alignment is always available, but it only has a visible effect once a row is taller than one line — set **Overflow** to wrap, or turn on **Word wrap** for an individual column, and the shorter cells beside a wrapped value will sit at the top, middle, or bottom as you choose. Until you set a vertical alignment, values sit at the top. A per-column setting overrides the table-wide one.
 
 The **Values** section also holds these table-wide row toggles, shown as icon buttons:
 
