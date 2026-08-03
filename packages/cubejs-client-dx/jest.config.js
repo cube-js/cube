@@ -1,5 +1,9 @@
+const base = require('../../jest.base.config');
+
+/** @type {import('jest').Config} */
 module.exports = {
-  verbose: true,
+  ...base,
+  rootDir: '.',
   transform: {
     '^.+\\.js$': 'babel-jest',
   },

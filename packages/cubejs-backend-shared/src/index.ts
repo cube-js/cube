@@ -2,7 +2,9 @@ export {
   getEnv,
   assertDataSource,
   keyByDataSource,
+  hasPreAggregationsEnvVars,
   isDockerImage,
+  convertSizeToBytes,
 } from './env';
 export * from './enums';
 export * from './package';
@@ -13,7 +15,18 @@ export * from './convert';
 export * from './helpers';
 export * from './machine-id';
 export * from './type-helpers';
+export * from './shared-types';
+export * from './semver';
 export * from './http-utils';
 export * from './cli';
 export * from './proxy';
 export * from './time';
+export * from './process';
+export * from './platform';
+export * from './FileRepository';
+export * from './decorators';
+export * from './PerfTracker';
+export * from './disposedProxy';
+export * from './logger';
+export * from './pool';
+export * from './sql-escape';

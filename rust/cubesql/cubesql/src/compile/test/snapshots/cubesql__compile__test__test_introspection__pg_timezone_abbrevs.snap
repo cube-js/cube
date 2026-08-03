@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_timezone_abbrevs\n            ORDER BY abbrev\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++--------+------------------------------------------------+--------+
+| abbrev | utc_offset                                     | is_dst |
++--------+------------------------------------------------+--------+
+| UTC    | 0 years 0 mons 0 days 0 hours 0 mins 0.00 secs | false  |
++--------+------------------------------------------------+--------+

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+activity__date_id | activity__impressions_total_clicks
+------------------+-----------------------------------
+1                 | 30                                
+2                 | 30                                
+3                 | 40

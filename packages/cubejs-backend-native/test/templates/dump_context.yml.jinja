@@ -1,0 +1,18 @@
+{# TODO: We need stable sort for dump #}
+<pre>{# debug() #}</pre>
+
+print:
+  bool_true: {{ COMPILE_CONTEXT.bool_true }}
+  bool_false: {{ COMPILE_CONTEXT.bool_false }}
+  string: {{ COMPILE_CONTEXT.string }}
+  int: {{ COMPILE_CONTEXT.int }}
+  float: {{ COMPILE_CONTEXT.float }}
+  array_int: {{ COMPILE_CONTEXT.array_int }}
+  array_bool: {{ COMPILE_CONTEXT.array_bool }}
+  null: {{ COMPILE_CONTEXT.null }}
+  undefined: {{ COMPILE_CONTEXT.undefined }}
+  security_context:
+    userId: {{ COMPILE_CONTEXT.securityContext.userId }}
+  env_var:
+    exist: {{ env_var('NODE_ENV') }}
+    unknown_fallback: {{ env_var('UNKNOWN_ENV', 'value') }}

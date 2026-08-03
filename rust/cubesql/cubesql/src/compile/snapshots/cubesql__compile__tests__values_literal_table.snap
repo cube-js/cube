@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"SELECT a AS a, b AS b FROM (VALUES (1, 2), (3, 4), (5, 6)) AS t(a, b)\"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---+---+
+| a | b |
++---+---+
+| 1 | 2 |
+| 3 | 4 |
+| 5 | 6 |
++---+---+

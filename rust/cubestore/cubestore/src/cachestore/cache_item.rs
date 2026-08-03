@@ -1,7 +1,10 @@
-use crate::metastore::{IndexId, RocksSecondaryIndex, TableId};
-use crate::{base_rocks_secondary_index, rocks_table_impl};
+use crate::metastore::{
+    BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
+};
+use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::ts_seconds_option;
 use chrono::{DateTime, Duration, Utc};
+use cuberockstore::rocksdb::WriteBatch;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -12,6 +15,14 @@ pub struct CacheItem {
     #[serde(with = "ts_seconds_option")]
     pub(crate) expire: Option<DateTime<Utc>>,
 }
+
+// Every RowKey uses 15 bytes
+// Table 58 (flex format)
+// SecondaryIndex::ByPrefix 8 + hash (let's take 18)
+// SecondaryIndex::ByPath 13 + hash (let's take 18)
+pub const CACHE_ITEM_SIZE_WITHOUT_VALUE: u32 = (15 * 3) + 58 + (8 + 18) + (13 + 18);
+
+impl RocksEntity for CacheItem {}
 
 impl CacheItem {
     pub fn parse_path_to_prefix(mut path: String) -> String {
@@ -77,8 +88,35 @@ pub(crate) enum CacheItemRocksIndex {
     ByPath = 1,
     ByPrefix = 2,
 }
+pub struct CacheItemRocksTable<'a> {
+    db: crate::metastore::DbTableRef<'a>,
+}
 
-rocks_table_impl!(CacheItem, CacheItemRocksTable, TableId::CacheItems, {
+impl<'a> CacheItemRocksTable<'a> {
+    pub fn new(db: crate::metastore::DbTableRef<'a>) -> Self {
+        Self { db }
+    }
+}
+
+impl<'a> BaseRocksTable for CacheItemRocksTable<'a> {
+    fn enable_delete_event(&self) -> bool {
+        false
+    }
+
+    fn enable_update_event(&self) -> bool {
+        false
+    }
+
+    fn migrate_table(
+        &self,
+        batch: &mut WriteBatch,
+        _table_info: TableInfo,
+    ) -> Result<(), CubeError> {
+        self.migrate_table_by_truncate(batch)
+    }
+}
+
+rocks_table_new!(CacheItem, CacheItemRocksTable, TableId::CacheItems, {
     vec![
         Box::new(CacheItemRocksIndex::ByPath),
         Box::new(CacheItemRocksIndex::ByPrefix),
@@ -108,6 +146,16 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
         }
     }
 
+    fn raw_value_size(&self, row: &CacheItem) -> u32 {
+        let size: usize = CACHE_ITEM_SIZE_WITHOUT_VALUE as usize + row.value.len();
+
+        if let Ok(size) = u32::try_from(size) {
+            size
+        } else {
+            u32::MAX
+        }
+    }
+
     fn key_to_bytes(&self, key: &CacheItemIndexKey) -> Vec<u8> {
         match key {
             CacheItemIndexKey::ByPrefix(s) | CacheItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
@@ -125,8 +173,15 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
         true
     }
 
-    fn get_expire<'a>(&self, row: &'a CacheItem) -> &'a Option<DateTime<Utc>> {
-        row.get_expire()
+    fn store_ttl_extended_info(&self) -> bool {
+        match self {
+            CacheItemRocksIndex::ByPath => true,
+            CacheItemRocksIndex::ByPrefix => false,
+        }
+    }
+
+    fn get_expire(&self, row: &CacheItem) -> Option<DateTime<Utc>> {
+        row.get_expire().clone()
     }
 
     fn version(&self) -> u32 {

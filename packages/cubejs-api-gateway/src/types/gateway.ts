@@ -14,8 +14,10 @@ import {
   CheckAuthFn,
 } from './auth';
 import {
-  CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
+  ContextRejectionMiddlewareFn,
+  ContextAcceptorFn,
+  ContextToApiScopesFn,
 } from '../interfaces';
 
 type UserBackgroundContext = {
@@ -32,24 +34,34 @@ type UserBackgroundContext = {
   authInfo?: any;
 };
 
+type RequestContext = {
+  // @deprecated Renamed to securityContext, please use securityContext.
+  authInfo?: any;
+  securityContext: any;
+  requestId: string;
+};
+
 /**
- * Function that should provides a logic of scheduled returning of
+ * Function that should provide a logic of scheduled returning of
  * the user background context. Used as a part of a main
- * configuration object of the Gateway to provide extendabillity to
+ * configuration object of the Gateway to provide extendability to
  * this logic.
  */
 type ScheduledRefreshContextsFn =
   () => Promise<UserBackgroundContext[]>;
+
+type ScheduledRefreshTimeZonesFn = (context: RequestContext) => string[] | Promise<string[]>;
 
 /**
  * Gateway configuration options interface.
  */
 interface ApiGatewayOptions {
   standalone: boolean;
+  gatewayPort?: number,
   dataSourceStorage: any;
   refreshScheduler: any;
   scheduledRefreshContexts?: ScheduledRefreshContextsFn;
-  scheduledRefreshTimeZones?: String[];
+  scheduledRefreshTimeZones?: ScheduledRefreshTimeZonesFn;
   basePath: string;
   extendContext?: ExtendContextFn;
   jwt?: JWTOptions;
@@ -58,12 +70,14 @@ interface ApiGatewayOptions {
   subscriptionStore?: any;
   enforceSecurityChecks?: boolean;
   playgroundAuthSecret?: string;
+  /** Rotation window: any listed secret verifies. Takes precedence over `apiSecret`. */
+  apiSecrets?: string[];
   serverCoreVersion?: string;
+  contextRejectionMiddleware?: ContextRejectionMiddlewareFn;
+  wsContextAcceptor?: ContextAcceptorFn;
   checkAuth?: CheckAuthFn;
-  /**
-   * @deprecated Use checkAuth property instead.
-   */
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
+  contextToApiScopes?: ContextToApiScopesFn;
+  event?: (name: string, props?: object) => void;
 }
 
 export {

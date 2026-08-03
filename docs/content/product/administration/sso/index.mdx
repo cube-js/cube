@@ -1,0 +1,62 @@
+---
+asIndexPage: true
+---
+
+# Authentication & SSO
+
+As an account administrator, you can manage how your team and users access Cube Cloud.
+
+You can authenticate using email and password, a GitHub account, or a Google account.
+Cube Cloud also provides single sign-on (SSO) via identity providers supporting
+[SAML](#saml), e.g., Okta, Google Workspace, Azure AD, etc.
+
+<InfoBox>
+
+[SAML](#saml) is available on [Enterprise and above plans](https://cube.dev/pricing).
+
+</InfoBox>
+
+<Diagram
+  src="https://ucarecdn.com/e3b3bce2-117e-4cbc-b516-c71b51b98888/"
+  style="border: 0;"
+/>
+
+## Configuration
+
+To manage authentication settings, navigate to <Btn>Admin → Settings</Btn>
+of your Cube Cloud account, and switch to the <Btn>Authentication & SSO</Btn> tab.
+
+Use the toggles in <Btn>Password</Btn>, <Btn>Google</Btn>, and <Btn>GitHub</Btn>
+sections to enable or disable these authentication options.
+
+### SAML
+
+Use the toggle in the <Btn>SAML</Btn> section to enable or disable the authentication
+via an identity provider supporting the [SAML protocol][wiki-saml].
+Once it's enabled, you'll see the <Btn>SAML Settings</Btn> section directly below.
+
+Check the following guides to get tool-specific instructions on configuration:
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="sso/google-workspace"
+    imageUrl="https://static.cube.dev/icons/google-cloud.svg"
+    title="Google Workspace"
+  />
+  <GridItem
+    url="sso/microsoft-entra-id"
+    imageUrl="https://static.cube.dev/icons/azure.svg"
+    title="Microsoft Entra ID"
+  />
+  <GridItem
+    url="sso/okta"
+    imageUrl="https://static.cube.dev/icons/okta.svg"
+    title="Okta"
+  />
+</Grid>
+
+[wiki-saml]: https://en.wikipedia.org/wiki/SAML_2.0
+[ref-apis]: /product/apis-integrations
+[ref-dap]: /product/auth/data-access-policies
+[ref-security-context]: /product/auth/context
+[ref-auth-integration]: /product/auth#authentication-integration

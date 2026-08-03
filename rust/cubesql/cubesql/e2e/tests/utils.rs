@@ -21,7 +21,7 @@ pub fn escape_snapshot_name(name: String) -> String {
 
     // Windows limit
     if name.len() > 200 {
-        name.chars().into_iter().take(200).collect()
+        name.chars().take(200).collect()
     } else {
         name
     }

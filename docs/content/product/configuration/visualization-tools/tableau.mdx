@@ -1,0 +1,58 @@
+# Tableau
+
+[Tableau](https://www.tableau.com) is a popular visual analytics platform.
+
+## Connect from Cube Cloud
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube Cloud to
+Tableau. It automatically synchronizes the [data model][ref-data-model] with Tableau.
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Tableau</Btn> to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Tableau using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Tableau.
+
+## Connecting from Tableau
+
+Tableau connects to Cube as to a Postgres database.
+
+### Creating a connection
+
+In Tableau, select PostgreSQL connector and enter credentials from the above
+step.
+
+<Screenshot
+  alt="Adding Cube to Tableau as a SQL data source"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/dc025b24-674f-4f32-ac44-421d546ee676.GIF"
+/>
+
+<InfoBox>
+
+It's not recommended to use [Tableau extracts][link-tableau-extracts] when
+connecting to Cube. Use [pre-aggregations][ref-pre-aggs] to improve querying
+performance and manage data freshness upstream of Tableau.
+
+</InfoBox>
+
+### Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+<Screenshot
+  alt="Cube data in Tableau"
+  src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/ea73a998-e2ce-4814-863e-425b4d35860c.gif"
+/>
+
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
+[ref-data-model]: /product/data-modeling/overview
+[link-tableau-extracts]: https://help.tableau.com/current/pro/desktop/en-us/extracting_data.htm

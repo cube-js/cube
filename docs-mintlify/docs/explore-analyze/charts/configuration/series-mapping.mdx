@@ -1,0 +1,35 @@
+---
+title: Series mapping
+description: Assign query columns to chart channels — X axis, Y axis, color, size, and tooltips.
+---
+
+Series mapping controls which query columns are assigned to which chart channels. This is done in the **Fields** tab of the chart configuration panel.
+
+{/* TODO screenshot: Fields tab open showing drag targets for X, Y, Color, Size, Tooltip (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Chart channels
+
+| Channel | Description | Applicable chart types |
+|---|---|---|
+| **X** | The horizontal axis dimension or time field | Bar, line, area, scatter, heatmap, boxplot |
+| **Y** | The vertical axis measure | Bar, line, area, scatter, boxplot |
+| **Color** | Creates one series per unique value; controls stacking behavior | All Vega-based types |
+| **Size** | Scales point radius by a numeric measure | Scatter, map |
+| **Tooltip** | Fields shown on hover | All types |
+| **Theta** (pie) | The measure that determines slice size | Pie |
+
+## Assigning fields
+
+Drag a field from the **Available fields** list at the bottom of the Fields tab into the target channel slot. You can also drag an already-assigned field between channels.
+
+Fields can appear in more than one channel simultaneously — drag from **Available fields** to add a field to a second channel without removing it from the first. For example, you can assign the same dimension to both the X axis and the tooltip.
+
+{/* TODO screenshot: dragging a field from available fields into the Color channel (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Multiple measures on Y
+
+To plot multiple measures as separate series, drag additional measures into the **Y** channel. Each measure renders as its own series, with independent color and style settings in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration).
+
+## Removing a field
+
+Drag a field out of its channel slot back to **Available fields**, or click the **×** on the field token to remove it.

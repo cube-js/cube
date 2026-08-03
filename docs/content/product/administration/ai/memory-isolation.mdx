@@ -1,0 +1,47 @@
+# Agent Memories
+
+_Learn how Cube enforces memory isolation across tenants, spaces, and users._
+
+Memory in Cube allows Agents to learn from and recall past interactions, user preferences, and contextual information. When users interact with Agents, relevant information is stored as memories that can be retrieved in future conversations, enabling more personalized and context-aware responses. Memories help Agents understand user preferences, remember previous decisions, and provide continuity across sessions.
+
+Memories are scoped and enforced at the Tenant/Space boundary. Cube applies both application-layer and (optionally) infrastructure-layer isolation so one customer's end users cannot see another customer's memories.
+
+## How It Works
+
+### Space-Scoped Memories
+
+Cube memories are stored at the Space level. Agents only learn from and retrieve memories within the current Space, ensuring no cross-Space exposure by design. 
+
+### Tenant-Aware Security Context
+
+Every request carries a tenant-bound security context (JWT). Cube maps that context to an app/tenant ID and uses it across caching, orchestration, and query flows. This is the backbone of multi-tenancy isolation.
+
+### RBAC and Policy Guardrails
+
+Role-based access policies gate what entities and content are visible within a tenant. These same guardrails apply to what agents can read and write as memories.
+
+### Data Model and API Isolation
+
+Even when using the SQL API or custom views, hidden members and non-public entities remain inaccessible. Multitenancy configuration ensures queries and artifacts resolve only within the current tenant's scope.
+
+### Optional Infrastructure Isolation
+
+Many customers run in shared multi-tenant regions, but dedicated infrastructure and BYOC (Bring Your Own Cloud) variants are available. These provide stronger blast-radius isolation at the cluster, storage, and key-management levels.
+
+## Practical Implications
+
+- **Tenant Separation**: An end user in Customer A can only create and retrieve memories in Customer A's Spaces
+- **Cross-Tenant Protection**: Memories are not retrievable by Customer B's users or agents, because requests from B carry a different security context and resolve to different Space and tenant IDs
+- **Intra-Tenant Controls**: Even within a customer, RBAC and policies can further restrict which users or agents can contribute to or benefit from memories
+
+## Technical Implementation
+
+Cube ensures memory isolation through multiple layers of security controls:
+
+1. **Tenant Isolation**: Every request is scoped to a specific tenant via JWT and middleware
+2. **User Isolation**: Additional user-level filtering for user-mode memories
+3. **Automatic Filtering**: Database queries are automatically filtered by tenant using decorators
+4. **Vector Store Security**: All vector searches include tenant and user filters
+5. **Container Isolation**: Each tenant gets its own dependency injection container
+6. **JWT Security**: All security context comes from cryptographically signed JWT tokens
+7. **Memory Mode Controls**: Configurable memory isolation levels (user/space/disabled)

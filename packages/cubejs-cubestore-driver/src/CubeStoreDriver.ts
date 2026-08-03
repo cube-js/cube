@@ -1,30 +1,49 @@
 import { pipeline, Writable } from 'stream';
 import { createGzip } from 'zlib';
-import { createWriteStream, createReadStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
 import { unlink } from 'fs-extra';
 import tempy from 'tempy';
 import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
+  CreateTableIndex,
   DownloadTableCSVData,
+  DownloadTableMemoryData,
+  DriverInterface,
   ExternalCreateTableOptions,
-  DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
-  StreamTableData,
-  StreamingSourceTableData,
-  QueryOptions,
   ExternalDriverCompatibilities,
+  IndexesSQL,
+  QueryOptions,
+  StreamingSourceTableData,
+  StreamTableData,
+  TableColumnQueryResult,
+  TableStructure,
 } from '@cubejs-backend/base-driver';
-import { getEnv } from '@cubejs-backend/shared';
-import { format as formatSql, escape } from 'sqlstring';
+import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
+import { escape, format as formatSql } from 'sqlstring';
 import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+import { QueryResultFormat } from '../codegen';
+
+const CubeStoreCapabilityMinVersion = {
+  queueExclusive: '1.6.22',
+  queueExternalId: '1.6.26',
+  sendableParameters: '1.6.38',
+  arrowFormat: '1.6.66',
+} satisfies Record<string, string>;
+type CubeStoreCapability = keyof typeof CubeStoreCapabilityMinVersion;
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
   text: 'varchar(255)',
-  uuid: 'varchar(64)'
+  uuid: 'varchar(64)',
+  // Cube Store uses an old version of sql parser which doesn't support timestamp with custom precision, but
+  // athena driver (I believe old version) allowed to use it
+  'timestamp(3)': 'timestamp',
+  // TODO comes from JDBC. We might consider decimal96 here
+  bigdecimal: 'decimal'
 };
 
 type Column = {
@@ -41,7 +60,15 @@ type CreateTableOptions = {
   files?: string[]
   aggregations?: string
   selectStatement?: string
+  sourceTable?: any
   sealAt?: string
+  delimiter?: string
+  disableQuoting?: boolean
+};
+
+type CubeStoreQueryOptions = QueryOptions & {
+  sendParameters?: boolean,
+  responseFormat?: QueryResultFormat,
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -57,23 +84,43 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     this.config = {
       batchingRowSplitCount: getEnv('batchingRowSplitCount'),
       ...config,
-      // TODO Can arrive as null somehow?
-      host: config?.host || getEnv('cubeStoreHost'),
-      port: config?.port || getEnv('cubeStorePort'),
+      // We use ip here instead of localhost, because Node.js 18 resolve localhost to IPV6 by default
+      // https://github.com/node-fetch/node-fetch/issues/1624
+      host: config?.host || getEnv('cubeStoreHost') || '127.0.0.1',
+      port: config?.port || getEnv('cubeStorePort') || '3030',
       user: config?.user || getEnv('cubeStoreUser'),
       password: config?.password || getEnv('cubeStorePass'),
     };
-    this.baseUrl = (this.config.url || `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
+    this.baseUrl = (this.config.url || `ws://${this.config.host}:${this.config.port}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
+  }
+
+  public async hasCapability(capability: CubeStoreCapability): Promise<boolean> {
+    const minVersion = CubeStoreCapabilityMinVersion[capability];
+
+    return isVersionGte(await this.connection.getCubeStoreVersion(), minVersion);
   }
 
   public async testConnection() {
     await this.query('SELECT 1', []);
   }
 
-  public async query(query: string, values: any[], options?: QueryOptions) {
-    const { inlineTables, ...queryTracingObj } = options ?? {};
-    return this.connection.query(formatSql(query, values || []), inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
+  public async query<R = any>(query: string, values: any[], options?: CubeStoreQueryOptions): Promise<R[]> {
+    const { inlineTables, sendParameters, responseFormat, ...queryTracingObj } = options ?? {};
+
+    if (!sendParameters) {
+      query = formatSql(query, values || []);
+    }
+
+    const tracingObj = { ...queryTracingObj, instance: getEnv('instanceId') };
+
+    return this.connection.query(query, sendParameters ? values : [], {
+      inlineTables: inlineTables ?? [],
+      queryTracingObj: tracingObj,
+      responseFormat: responseFormat ?? (
+        await this.hasCapability('arrowFormat') ? QueryResultFormat.Arrow : QueryResultFormat.Legacy
+      ),
+    });
   }
 
   public async release() {
@@ -81,7 +128,13 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns as columns
+      WHERE columns.table_schema NOT IN ('information_schema', 'system')`;
   }
 
   public createTableSqlWithOptions(tableName, columns, options: CreateTableOptions) {
@@ -92,6 +145,12 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     if (options.inputFormat) {
       withEntries.push(`input_format = '${options.inputFormat}'`);
     }
+    if (options.delimiter) {
+      withEntries.push(`delimiter = '${options.delimiter}'`);
+    }
+    if (options.disableQuoting) {
+      withEntries.push('disable_quoting = true');
+    }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
     }
@@ -100,6 +159,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
     if (options.selectStatement) {
       withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
+    }
+    if (options.sourceTable) {
+      withEntries.push(`source_table = ${escape(`CREATE TABLE ${options.sourceTable.tableName} (${options.sourceTable.types.map(t => `${t.name} ${this.fromGenericType(t.type)}`).join(', ')})`)}`);
     }
     if (options.streamOffset) {
       withEntries.push(`stream_offset = '${options.streamOffset}'`);
@@ -137,6 +199,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  @AsyncDebounce()
   public async getTablesQuery(schemaName) {
     return this.query(
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
@@ -144,12 +207,29 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     );
   }
 
+  @AsyncDebounce()
   public async getPrefixTablesQuery(schemaName, tablePrefixes) {
     const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
     return this.query(
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
     );
+  }
+
+  public async tableColumnTypes(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    const columns = await this.query<TableColumnQueryResult>(
+      `SELECT column_name as ${this.quoteIdentifier('column_name')},
+             table_name as ${this.quoteIdentifier('table_name')},
+             table_schema as ${this.quoteIdentifier('table_schema')},
+             data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      [name, schema]
+    );
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public quoteIdentifier(identifier: string): string {
@@ -162,7 +242,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
   public toColumnValue(value: any, genericType: any) {
     if (genericType === 'timestamp' && typeof value === 'string') {
-      return value && value.replace('Z', '');
+      return value?.replace('Z', '');
     }
     if (genericType === 'boolean' && typeof value === 'string') {
       if (value.toLowerCase() === 'true') {
@@ -179,14 +259,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     const createTableIndexes = externalOptions?.createTableIndexes;
     const aggregationsColumns = externalOptions?.aggregationsColumns;
 
-    const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
+    const indexes = createTableIndexes?.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
 
     let hasAggregatingIndexes = false;
-    if (createTableIndexes && createTableIndexes.length) {
+    if (createTableIndexes?.length) {
       hasAggregatingIndexes = createTableIndexes.some((index) => index.type === 'aggregate');
     }
 
-    const aggregations = hasAggregatingIndexes && aggregationsColumns && aggregationsColumns.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
+    const aggregations = hasAggregatingIndexes && aggregationsColumns?.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
 
     if (tableData.rowStream) {
       await this.importStream(columns, tableData, table, indexes, aggregations, queryTracingObj);
@@ -210,6 +290,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importRows(table: string, columns: Column[], indexesSql: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as rows) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+
     await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd }, queryTracingObj);
     try {
       const batchSize = 2000; // TODO make dynamic?
@@ -237,6 +321,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as csv) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const options: CreateTableOptions = {
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
@@ -245,6 +333,12 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     };
     if (files.length > 0) {
       options.inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
+      if (tableData.csvDelimiter) {
+        options.delimiter = tableData.csvDelimiter;
+      }
+      if (tableData.csvDisableQuoting) {
+        options.disableQuoting = tableData.csvDisableQuoting;
+      }
       options.files = files;
     }
 
@@ -252,6 +346,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string, aggregations: string, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as stream) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+
     const tempFiles: string[] = [];
     try {
       const pipelinePromises: Promise<any>[] = [];
@@ -376,13 +474,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
       }
     }
-    
+
     const options: CreateTableOptions = {
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
       uniqueKey: uniqueKeyColumns.join(','),
       indexes,
       files: locations,
       selectStatement: tableData.selectStatement,
+      sourceTable: tableData.sourceTable,
       streamOffset: tableData.streamOffset,
       sealAt
     };

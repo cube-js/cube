@@ -77,7 +77,7 @@ export default {
       type: Object,
       default: () => ({}),
     },
-    cubejsApi: {
+    cubeApi: {
       type: Object,
       required: true,
     },
@@ -120,7 +120,6 @@ export default {
       availableSegments: [],
       limit: null,
       offset: null,
-      renewQuery: false,
       order: null,
       prevValidatedQuery: null,
       granularities: GRANULARITIES,
@@ -131,7 +130,7 @@ export default {
   render() {
     const {
       chartType,
-      cubejsApi,
+      cubeApi,
       dimensions,
       filters,
       measures,
@@ -151,7 +150,6 @@ export default {
       removeLimit,
       setOffset,
       removeOffset,
-      renewQuery,
       order,
       orderMembers,
     } = this;
@@ -180,7 +178,6 @@ export default {
         removeLimit,
         setOffset,
         removeOffset,
-        renewQuery,
         order,
         orderMembers,
         setOrder: this.setOrder,
@@ -247,7 +244,7 @@ export default {
       QueryRenderer,
       {
         query: this.validatedQuery,
-        cubejsApi,
+        cubeApi,
         builderProps,
         slots: this.$slots,
         on: {
@@ -270,7 +267,12 @@ export default {
         [
           ...this.measures,
           ...this.dimensions,
-          ...this.timeDimensions.map(({ dimension }) => toOrderMember(dimension)),
+          ...this.timeDimensions.reduce((acc, { dimension, granularity }) => {
+            if (granularity !== undefined) {
+              acc.push(toOrderMember(dimension));
+            }
+            return acc;
+          }, []),
         ]
           .map((member, index) => {
             const id = member.name || member.id;
@@ -344,10 +346,6 @@ export default {
         if (this.order) {
           validatedQuery.order = this.order;
         }
-
-        if (this.renewQuery) {
-          validatedQuery.renewQuery = this.renewQuery;
-        }
       }
 
       if (
@@ -376,30 +374,38 @@ export default {
         };
 
         this.chartType = chartType || this.chartType;
-        this.pivotConfig = ResultSet.getNormalizedPivotConfig(
+        let pivot = ResultSet.getNormalizedPivotConfig(
           validatedQuery,
-          pivotConfig || this.pivotConfig
+          pivotConfig !== undefined ? pivotConfig : this.pivotConfig
         );
-        this.copyQueryFromProps(validatedQuery);
+        if (!equals(pivot, this.pivotConfig)) {
+          this.pivotConfig = pivot;
+        }
+
+        if (!areQueriesEqual(this.prevValidatedQuery, validatedQuery)) {
+          this.copyQueryFromProps(validatedQuery);
+        }
       }
 
       // query heuristics should only apply on query change (not applied to the initial query)
-      if (this.prevValidatedQuery !== null) {
+      if (this.prevValidatedQuery !== null && isQueryPresent(validatedQuery)) {
         this.skipHeuristics = false;
       }
 
-      this.prevValidatedQuery = validatedQuery;
+      if (!areQueriesEqual(this.prevValidatedQuery, validatedQuery)) {
+        this.prevValidatedQuery = validatedQuery;
+      }
       return validatedQuery;
     },
   },
 
   async mounted() {
-    this.meta = await this.cubejsApi.meta();
+    this.meta = await this.cubeApi.meta();
 
     this.copyQueryFromProps();
 
     if (isQueryPresent(this.initialQuery)) {
-      const dryRunResponse = await this.cubejsApi.dryRun(this.initialQuery);
+      const dryRunResponse = await this.cubeApi.dryRun(this.initialQuery);
       this.pivotConfig = ResultSet.getNormalizedPivotConfig(
         dryRunResponse?.pivotQuery || {},
         this.pivotConfig
@@ -417,7 +423,6 @@ export default {
         filters = [],
         limit,
         offset,
-        renewQuery,
         order,
       } = query || this.initialQuery;
 
@@ -463,7 +468,6 @@ export default {
       this.availableSegments = this.meta.membersForQuery({}, 'segments') || [];
       this.limit = limit || 10000;
       this.offset = offset || null;
-      this.renewQuery = renewQuery || false;
       this.order = order || null;
     },
     addMember(element, member) {
@@ -639,12 +643,12 @@ export default {
         }
 
         if (isQueryPresent(query) && hasQueryChanged) {
-          this.cubejsApi
+          this.cubeApi
             .dryRun(query, {
               mutexObj: this.mutex,
             })
-            .then(({ pivotQuery }) => {
-              const pivotConfig = ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig);
+            .then((result) => {
+              const pivotConfig = ResultSet.getNormalizedPivotConfig(result?.pivotQuery, this.pivotConfig);
 
               if (!equals(pivotConfig, this.pivotConfig)) {
                 this.pivotConfig = pivotConfig;

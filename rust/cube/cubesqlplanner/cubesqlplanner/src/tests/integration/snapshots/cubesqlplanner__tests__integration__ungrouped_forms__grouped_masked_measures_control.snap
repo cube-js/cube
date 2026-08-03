@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/ungrouped_forms.rs
+expression: result
+---
+orders__status | orders__masked_total_const
+---------------+---------------------------
+cancelled      | -1                        
+completed      | -1                        
+pending        | -1

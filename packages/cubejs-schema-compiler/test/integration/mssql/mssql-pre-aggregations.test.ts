@@ -1,24 +1,18 @@
 import R from 'ramda';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { MSSqlDbRunner } from './MSSqlDbRunner';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
+import { dbRunner } from './MSSqlDbRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
 
 describe('MSSqlPreAggregations', () => {
   jest.setTimeout(200000);
 
-  const dbRunner = new MSSqlDbRunner();
-
-  afterAll(async () => {
-    await dbRunner.tearDown();
-  });
-
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from ##visitors
       \`,
-      
+
       joins: {
         visitor_checkins: {
           relationship: 'hasMany',
@@ -30,22 +24,22 @@ describe('MSSqlPreAggregations', () => {
         count: {
           type: 'count'
         },
-        
+
         checkinsTotal: {
           sql: \`\${checkinsCount}\`,
           type: 'sum'
         },
-        
+
         uniqueSourceCount: {
           sql: 'source',
           type: 'countDistinct'
         },
-        
+
         countDistinctApprox: {
           sql: 'id',
           type: 'countDistinctApprox'
         },
-        
+
         ratio: {
           sql: \`1.0 * \${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
           type: 'number'
@@ -72,13 +66,13 @@ describe('MSSqlPreAggregations', () => {
           subQuery: true
         }
       },
-      
+
       segments: {
         google: {
           sql: \`source = 'google'\`
         }
       },
-      
+
       preAggregations: {
         default: {
           type: 'originalSql'
@@ -89,12 +83,6 @@ describe('MSSqlPreAggregations', () => {
           segmentReferences: [google],
           timeDimensionReference: createdAt,
           granularity: 'day',
-        },
-        approx: {
-          type: 'rollup',
-          measureReferences: [countDistinctApprox],
-          timeDimensionReference: createdAt,
-          granularity: 'day'
         },
         ratioRollup: {
           type: 'rollup',
@@ -125,8 +113,8 @@ describe('MSSqlPreAggregations', () => {
         }
       }
     })
-    
-    
+
+
     cube('visitor_checkins', {
       sql: \`
       select * from ##visitor_checkins
@@ -157,7 +145,7 @@ describe('MSSqlPreAggregations', () => {
           sql: 'created_at'
         }
       },
-      
+
       preAggregations: {
         main: {
           type: 'originalSql'
@@ -168,14 +156,14 @@ describe('MSSqlPreAggregations', () => {
         }
       }
     })
-    
+
     cube('GoogleVisitors', {
       extends: visitors,
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`
     })
     `);
 
-  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+  const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
   function replaceTableName(query, preAggregation, suffix) {
     const [toReplace, params] = query;
@@ -228,20 +216,20 @@ describe('MSSqlPreAggregations', () => {
       .then((res) => {
         expect(res).toEqual([
           {
-            visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
-            visitors__count: 1,
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+            visitors__count: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
-            visitors__count: 1,
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__count: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
-            visitors__count: 1,
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            visitors__count: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
-            visitors__count: 2,
+            visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+            visitors__count: '2',
           },
         ]);
       });
@@ -276,7 +264,7 @@ describe('MSSqlPreAggregations', () => {
 
       expect(preAggregationsDescription[0].invalidateKeyQueries[0][0].replace(/(\r\n|\n|\r)/gm, '')
         .replace(/\s+/g, ' '))
-        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIME2)) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END');
+        .toMatch(/SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD\(day, 7, CAST\(@_1 AS DATETIMEOFFSET\)\) THEN FLOOR\(\(-(?:28800|25200) \+ DATEDIFF\(SECOND,'1970-01-01', GETUTCDATE\(\)\)\) \/ 3600\) END as refresh_key/);
 
       return dbRunner
         .evaluateQueryWithPreAggregations(query)
@@ -284,23 +272,23 @@ describe('MSSqlPreAggregations', () => {
           expect(res)
             .toEqual([
               {
-                visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
-                visitors__checkins_total: 3,
+                visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+                visitors__checkins_total: '3',
                 visitors__source: 'some',
               },
               {
-                visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
-                visitors__checkins_total: 2,
+                visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+                visitors__checkins_total: '2',
                 visitors__source: 'some',
               },
               {
-                visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
-                visitors__checkins_total: 1,
+                visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+                visitors__checkins_total: '1',
                 visitors__source: 'google',
               },
               {
-                visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
-                visitors__checkins_total: 0,
+                visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+                visitors__checkins_total: '0',
                 visitors__source: null
               }
 
@@ -341,19 +329,19 @@ describe('MSSqlPreAggregations', () => {
       .then((res) => {
         expect(res).toEqual([
           {
-            visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
-            visitors__ratio: 0.333333333333,
+            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+            visitors__ratio: '0.333333333333',
           },
           {
-            visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
-            visitors__ratio: 0.5,
+            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors__ratio: '0.5',
           },
           {
-            visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
-            visitors__ratio: 1,
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            visitors__ratio: '1',
           },
           {
-            visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+            visitors__created_at_day: '2017-01-07T00:00:00.000Z',
             visitors__ratio: null,
           },
         ]);
@@ -399,8 +387,8 @@ describe('MSSqlPreAggregations', () => {
         console.log(JSON.stringify(res));
         expect(res).toEqual([
           {
-            visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
-            visitors__checkins_total: 1,
+            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+            visitors__checkins_total: '1',
           },
         ]);
       });
@@ -425,19 +413,19 @@ describe('MSSqlPreAggregations', () => {
         expect(res).toEqual([
           {
             e__eval: 'E',
-            b__bval_sum: 20,
+            b__bval_sum: '20',
           },
           {
             e__eval: 'F',
-            b__bval_sum: 40,
+            b__bval_sum: '40',
           },
           {
             e__eval: 'G',
-            b__bval_sum: 60,
+            b__bval_sum: '60',
           },
           {
             e__eval: 'H',
-            b__bval_sum: 80,
+            b__bval_sum: '80',
           },
         ]);
       });
@@ -467,7 +455,7 @@ describe('MSSqlPreAggregations', () => {
         expect(res).toEqual([
           {
             e__eval: 'E',
-            b__bval_sum: 20,
+            b__bval_sum: '20',
           },
         ]);
       });

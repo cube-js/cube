@@ -5,4 +5,7 @@ target
 index.node
 **/node_modules
 **/.DS_Store
-npm-debug.log*
+npm-debug.log
+benchmarks/result.txt
+test/__pycache__/
+test/subdir_for_test/__pycache__/

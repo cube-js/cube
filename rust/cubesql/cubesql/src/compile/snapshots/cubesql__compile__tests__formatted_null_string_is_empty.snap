@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: result
+---
++--------------------------------+
+| formatted_null_string_is_empty |
++--------------------------------+
+| true                           |
++--------------------------------+

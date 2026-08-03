@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  mongo:
+    image: mongo:${MONGO_TAG}
+    ports:
+      - 27017:27017
+    volumes:
+        - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+        
+  mongosqld:
+    container_name: mongosqld
+    build: 
+      context: ./
+      args:
+        MONGOBI: ${MONGOBI_VERSION}
+    ports:
+      - 3307:3307
+    depends_on:
+      - mongo

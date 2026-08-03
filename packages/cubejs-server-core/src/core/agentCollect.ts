@@ -1,11 +1,14 @@
 import { getEnv } from '@cubejs-backend/shared';
 import http from 'http';
 import https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { HttpProxyAgent } from 'http-proxy-agent';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 import WebSocket from 'ws';
 import zlib from 'zlib';
 import { promisify } from 'util';
+import { LoggerFnParams, LoggerFn } from './types';
 
 const deflate = promisify(zlib.deflate);
 interface AgentTransport {
@@ -50,19 +53,19 @@ class WebSocketTransport implements AgentTransport {
       clearTimeout(this.pingTimeout);
       this.onClose();
     });
-  
+
     this.wsClient.on('error', e => {
       connectionPromiseReject(e);
       this.logger('Agent Error', { error: (e.stack || e).toString() });
     });
-  
+
     this.wsClient.on('message', (data: WebSocket.Data) => {
       try {
         const { method, params } = JSON.parse(data.toString());
         if (method === 'callback' && this.callbacks[params.callbackId]) {
           this.callbacks[params.callbackId](params.result);
         }
-      } catch (e) {
+      } catch (e: any) {
         this.logger('Agent Error', { error: (e.stack || e).toString() });
       }
     });
@@ -103,17 +106,45 @@ class WebSocketTransport implements AgentTransport {
   }
 }
 
+function isOnNoProxyList(url: string): boolean {
+  const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+  if (!noProxy) {
+    return false;
+  }
+
+  const parsedUrl = new URL(url);
+  const { hostname } = parsedUrl;
+  const noProxyList = noProxy.split(',').map((entry) => entry.trim());
+
+  return noProxyList.some((entry) => {
+    if (entry === '*') {
+      return true;
+    }
+    if (entry.startsWith('.')) {
+      return hostname.endsWith(entry);
+    }
+
+    return hostname === entry;
+  });
+}
+
 class HttpTransport implements AgentTransport {
-  private agent: http.Agent | https.Agent;
+  private agent: http.Agent | https.Agent | HttpProxyAgent<string> | HttpsProxyAgent<string>;
 
   public constructor(
     private readonly endpointUrl: string
   ) {
-    const AgentClass = endpointUrl.startsWith('https') ? https.Agent : http.Agent;
-    this.agent = new AgentClass({
+    const agentParams = {
       keepAlive: true,
       maxSockets: getEnv('agentMaxSockets')
-    });
+    };
+    if (!isOnNoProxyList(endpointUrl) && (process.env.http_proxy || process.env.https_proxy)) {
+      this.agent = endpointUrl.startsWith('https') ?
+        new HttpsProxyAgent(process.env.https_proxy, agentParams) :
+        new HttpProxyAgent(process.env.http_proxy, agentParams);
+    } else {
+      this.agent = endpointUrl.startsWith('https') ? new https.Agent(agentParams) : new http.Agent(agentParams);
+    }
   }
 
   public ready() {
@@ -124,8 +155,11 @@ class HttpTransport implements AgentTransport {
     const result = await fetch(this.endpointUrl, {
       agent: this.agent,
       method: 'post',
-      body: JSON.stringify(data),
-      headers: { 'Content-Type': 'application/json' },
+      body: await deflate(JSON.stringify(data)),
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Encoding': 'deflate'
+      },
     });
     return result.status === 200;
   }
@@ -142,11 +176,11 @@ const clearTransport = () => {
   agentInterval = null;
 };
 
-export default async (event: Record<string, any>, endpointUrl: string, logger: any) => {
+export const agentCollect = async (event: LoggerFnParams, endpointUrl: string, logger: LoggerFn) => {
   trackEvents.push({
+    timestamp: new Date().toJSON(),
     ...event,
     id: crypto.randomBytes(16).toString('hex'),
-    timestamp: new Date().toJSON(),
     instanceId: getEnv('instanceId'),
   });
   lastEvent = new Date();
@@ -164,9 +198,9 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
       const sentAt = new Date().toJSON();
       const result = await transport.send(toFlush.map(r => ({ ...r, sentAt })));
       if (!result && retries > 0) return flush(toFlush, retries - 1);
-  
+
       return true;
-    } catch (e) {
+    } catch (e: any) {
       if (retries > 0) return flush(toFlush, retries - 1);
       logger('Agent Error', { error: (e.stack || e).toString() });
     }
@@ -194,3 +228,5 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
     }, getEnv('agentFlushInterval'));
   }
 };
+
+export default agentCollect;

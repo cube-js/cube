@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    SHA1(\n                        pg_user.usename\n                        || '-'\n                        || stl_ddltext.xid\n                        || '-'\n                        || stl_ddltext.pid\n                        || '-'\n                        || stl_ddltext.starttime\n                        || '-'\n                        || stl_ddltext.endtime\n                    ) as query,\n                    stl_ddltext.sequence,\n                    stl_ddltext.text,\n                    pg_user.usename,\n                    stl_ddltext.starttime,\n                    stl_ddltext.endtime\n                FROM stl_ddltext\n                INNER JOIN pg_user ON stl_ddltext.userid = pg_user.usesysid\n                WHERE\n                    endtime >= '2022-11-15 16:18:47.814515'\n                    AND endtime < '2022-11-15 16:31:47.814515'\n                ORDER BY 1, 2\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+----------+------+---------+-----------+---------+
+| query | sequence | text | usename | starttime | endtime |
++-------+----------+------+---------+-----------+---------+
++-------+----------+------+---------+-----------+---------+

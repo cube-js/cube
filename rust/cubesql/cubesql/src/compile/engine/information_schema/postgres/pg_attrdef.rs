@@ -33,11 +33,12 @@ impl PgCatalogAttrdefBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.adrelid.finish()));
-        columns.push(Arc::new(self.adnum.finish()));
-        columns.push(Arc::new(self.adbin.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.adrelid.finish()),
+            Arc::new(self.adnum.finish()),
+            Arc::new(self.adbin.finish()),
+        ];
 
         columns
     }

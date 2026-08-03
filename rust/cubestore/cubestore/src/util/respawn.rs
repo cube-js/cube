@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::process::{exit, Child};
 
 use ipc_channel::ipc::{IpcOneShotServer, IpcSender};
-use mysql_common::serde::de::DeserializeOwned;
-use mysql_common::serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::sys::process::{avoid_child_zombies, die_with_parent};
 use crate::CubeError;

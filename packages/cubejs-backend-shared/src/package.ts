@@ -70,7 +70,7 @@ export function requireFromPackage<T = unknown | null>(pkg: string, options?: Re
 }
 
 export function isSslKey(content: string) {
-  return content.startsWith('-----BEGIN RSA PRIVATE KEY-----');
+  return content.startsWith('-----BEGIN RSA PRIVATE KEY-----') || content.startsWith('-----BEGIN EC PRIVATE KEY-----');
 }
 
 export function isSslCert(content: string) {

@@ -36,16 +36,16 @@ pub const MAX_BUCKETS: u32 = 65536;
 impl HllInstance {
     pub fn new(num_buckets: u32) -> Result<HllInstance> {
         assert!(num_buckets <= MAX_BUCKETS);
-        return Ok(HllInstance::Sparse(SparseHll::new(index_bit_length(
+        Ok(HllInstance::Sparse(SparseHll::new(index_bit_length(
             num_buckets,
-        )?)?));
+        )?)?))
     }
 
     pub fn num_buckets(&self) -> u32 {
-        return match self {
+        match self {
             Sparse(s) => number_of_buckets(s.index_bit_len),
             Dense(d) => number_of_buckets(d.index_bit_len),
-        };
+        }
     }
 
     /// Callers must check that `num_buckets()` is the same for `self` and `other`.
@@ -61,10 +61,10 @@ impl HllInstance {
     }
 
     pub fn index_bit_len(&self) -> u8 {
-        return match self {
+        match self {
             Sparse(s) => s.index_bit_len,
             Dense(d) => d.index_bit_len,
-        };
+        }
     }
 
     /// Returns true iff `self.make_dense_if_necessary` has to be run.
@@ -75,15 +75,15 @@ impl HllInstance {
                 l.merge_with(r);
                 // We need the make this call, but borrow checker won't let us use `self` here.
                 // self.make_dense_if_necessary();
-                return true;
+                true
             }
             (Dense(l), Sparse(r)) => {
                 l.merge_with_sparse(r);
-                return false;
+                false
             }
             (l, Dense(r)) => {
                 l.ensure_dense().merge_with(r);
-                return false;
+                false
             }
         }
     }
@@ -122,7 +122,7 @@ impl HllInstance {
                     "Cannot read HLL with undefined encoding".to_string(),
                 ))
             }
-            n if 1 <= n && n <= 4 => n,
+            n if (1..=4).contains(&n) => n,
             n => {
                 return Err(HllError::new(format!(
                     "Unknown HLL encoding ordinal: {}",
@@ -131,7 +131,7 @@ impl HllInstance {
             }
         };
         let reg_width = 1 + ((data[1] & 0b11100000) >> 5);
-        if reg_width < 1 || 6 < reg_width {
+        if !(1..=6).contains(&reg_width) {
             return Err(HllError::new(format!(
                 "Register width must be between 1 and 6, got {}",
                 reg_width
@@ -139,7 +139,7 @@ impl HllInstance {
         }
         let log_num_buckets = data[1] & 0b00011111;
         // Note: the upper limit in storage spec is 31, but our implementation is limited to 16.
-        if log_num_buckets < 4 || 16 < log_num_buckets {
+        if !(4..=16).contains(&log_num_buckets) {
             return Err(HllError::new(format!(
                 "Log2m must be between 4 and 16, got {}",
                 log_num_buckets
@@ -158,7 +158,7 @@ impl HllInstance {
                         data.len()
                     )));
                 }
-                return HllInstance::new(num_buckets);
+                HllInstance::new(num_buckets)
             }
             ENC_EXPLICIT => {
                 if data.len() % 8 != 0 {
@@ -174,21 +174,53 @@ impl HllInstance {
                         num_hashes
                     )));
                 }
-                // Convert to sparse representation in Airlift.
+                // Convert to sparse representation in Airlift. By analogy with the code from postgress hll:
+                // TODO Algorithm of conversion from EXPLICIT to SPARSE is not part of the storage specification,
+                // so we use the algorithm from the PostgreSql as is.
+                /*
+                   uint64_t mask = nregs - 1;
+
+                   size_t maxregval = (1 << nbits) - 1;
+
+                   size_t ndx = elem & mask;
+
+                   uint64_t ss_val = elem >> log2nregs;
+
+                   size_t p_w = ss_val == 0 ? 0 : __builtin_ctzll(ss_val) + 1;
+
+                   Assert(ndx < msc_regs_idx_limit());
+
+                   if (p_w > maxregval)
+                       p_w = maxregval;
+
+                   if (mscp->msc_regs[ndx] < p_w)
+                       mscp->msc_regs[ndx] = p_w;
+                * */
+                let mask = num_buckets as u64 - 1;
                 let mut indices = Vec::with_capacity(num_hashes);
                 let mut values = Vec::with_capacity(num_hashes);
                 let mut data = Cursor::new(data);
-                while !data.is_empty() {
+                let maxval = (1 << reg_width) as u32 - 1;
+                while data.position() < data.get_ref().len() as u64 {
                     let hash = data.read_u64::<BigEndian>().unwrap();
-                    indices.push(compute_index(hash, log_num_buckets));
-                    values.push(compute_value(hash, log_num_buckets));
+                    let ind = hash & mask;
+                    let val = hash >> log_num_buckets;
+                    let zeroes = if val == 0 {
+                        0
+                    } else {
+                        val.trailing_zeros() + 1
+                    };
+
+                    let zeroes = if zeroes > maxval { maxval } else { zeroes };
+                    indices.push(ind as u32);
+                    values.push(zeroes as u8);
                 }
 
-                return Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
+                Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
                     log_num_buckets,
                     indices,
                     &values,
-                )?));
+                )?))
             }
             ENC_SPARSE => {
                 let mut cursor = BitCursor::new(data);
@@ -199,11 +231,11 @@ impl HllInstance {
                     indices.push((e >> reg_width) as u32);
                     values.push((e & ((1 << reg_width) - 1)) as u8);
                 }
-                return Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
+                Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
                     log_num_buckets,
                     indices,
                     &values,
-                )?));
+                )?))
             }
             ENC_FULL => {
                 let expected_bits = num_buckets * reg_width as u32;
@@ -221,10 +253,10 @@ impl HllInstance {
                 for _ in 0..num_buckets {
                     values.push(cursor.read_bits(reg_width as usize).unwrap() as u8)
                 }
-                return Ok(HllInstance::Dense(DenseHll::new_from_entries(
+                Ok(HllInstance::Dense(DenseHll::new_from_entries(
                     log_num_buckets,
                     values,
-                )?));
+                )?))
             }
             enc => panic!("Unhandled encoding ordinal {}", enc),
         }
@@ -274,19 +306,19 @@ impl HllInstance {
         if data.is_empty() {
             return Err(HllError::new("hll input data is empty"));
         }
-        return match data[0] {
+        match data[0] {
             TAG_SPARSE_V2 => Ok(HllInstance::Sparse(SparseHll::read(&data[1..])?)),
             TAG_DENSE_V1 => Ok(HllInstance::Dense(DenseHll::read_v1(&data[1..])?)),
             TAG_DENSE_V2 => Ok(HllInstance::Dense(DenseHll::read(&data[1..])?)),
             _ => Err(HllError::new(format!("invalid hll format tag {}", data[0]))),
-        };
+        }
     }
 
     pub fn write(&self) -> Vec<u8> {
-        return match self {
+        match self {
             Sparse(s) => s.write(),
             Dense(s) => s.write(),
-        };
+        }
     }
 
     fn ensure_dense(&mut self) -> &mut DenseHll {
@@ -322,6 +354,14 @@ impl HllInstance {
             self.ensure_dense();
         }
     }
+
+    /// Allocated size (not including sizeof::<Self>).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        match self {
+            Sparse(sparse) => sparse.allocated_size(),
+            Dense(dense) => dense.allocated_size(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -339,10 +379,10 @@ impl SparseHll {
 
     pub fn new(index_bit_len: u8) -> Result<SparseHll> {
         SparseHll::is_valid_bit_len(index_bit_len)?;
-        return Ok(SparseHll {
+        Ok(SparseHll {
             index_bit_len,
             entries: Vec::with_capacity(1),
-        });
+        })
     }
 
     fn new_from_indices_and_values(
@@ -360,15 +400,26 @@ impl SparseHll {
         for i in 0..entries.len() {
             // TODO: validate range of index values.
             // High bits are bucket index, followed by zeros and the actual value.
-            // Airlift stores actual bits of the hash in the available bits, but inputs of this
-            // function do not have this information, so we set those bits to 0.
+            // Airlift stores first EXTENDED_PREFIX_BITS bits of the hash in the available bits, and calculate leading
+            // zeroes as leading zeroes in this hash part
+            // if all bits of this hash part is zero then least zeroes count is EXTENDED_PREFIX_BITS - index_bit_len + number from least VALUE_BITS bits of value
+            //
+            // But inputs of this
+            // function do not have this information, so we set leading zeroes manually.
+            // See each_bucket function for more information about expected format
             let bucket = entries[i];
-            entries[i] = (bucket << (32 - index_bit_len)) | (values[i] as u32);
+            let hash_part_bits = Self::EXTENDED_PREFIX_BITS - index_bit_len;
+            let v = if values[i] <= hash_part_bits {
+                1 << (32 - index_bit_len - values[i])
+            } else {
+                (values[i] - hash_part_bits - 1) as u32 & Self::VALUE_MASK
+            };
+
+            entries[i] = (bucket << (32 - index_bit_len)) | v;
         }
 
         // Sort by bucket index.
-        entries
-            .sort_unstable_by(|l, r| (l >> (32 - index_bit_len)).cmp(&(r >> (32 - index_bit_len))));
+        entries.sort_unstable_by_key(|l| l >> (32 - index_bit_len));
 
         Ok(SparseHll {
             index_bit_len,
@@ -390,10 +441,10 @@ impl SparseHll {
         if c.position() != data.len() as u64 {
             return Err(HllError::new("input is too big"));
         }
-        return Ok(SparseHll {
+        Ok(SparseHll {
             index_bit_len,
             entries,
-        });
+        })
     }
 
     pub fn write(&self) -> Vec<u8> {
@@ -407,7 +458,7 @@ impl SparseHll {
         for e in &self.entries {
             r.write_u32::<LittleEndian>(*e).unwrap();
         }
-        return r;
+        r
     }
 
     pub fn cardinality(&self) -> u64 {
@@ -416,7 +467,7 @@ impl SparseHll {
         // while in the sparse regime.
         let total_buckets = number_of_buckets(SparseHll::EXTENDED_PREFIX_BITS);
         let zero_buckets = total_buckets - self.entries.len() as u32;
-        return linear_counting(zero_buckets, total_buckets).round() as u64;
+        linear_counting(zero_buckets, total_buckets).round() as u64
     }
 
     pub fn merge_with(&mut self, o: &SparseHll) {
@@ -427,11 +478,11 @@ impl SparseHll {
         // TODO: this can panic if Sparse HLL had too much precision.
         let mut d = DenseHll::new(self.index_bit_len);
         self.each_bucket(|bucket, zeros| d.insert(bucket, zeros));
-        return d;
+        d
     }
 
     fn estimate_in_memory_size(&self) -> usize {
-        return size_of::<SparseHll>() + 32 * self.entries.capacity();
+        size_of::<SparseHll>() + 32 * self.entries.capacity()
     }
 
     fn each_bucket<F>(&self, mut f: F)
@@ -452,7 +503,7 @@ impl SparseHll {
             // if zeros > EXTENDED_BITS_LENGTH - indexBits, it means all those bits were zeros,
             // so look at the entry value, which contains the number of leading 0 *after* EXTENDED_BITS_LENGTH
             let bits = SparseHll::EXTENDED_PREFIX_BITS - self.index_bit_len;
-            if zeros > bits {
+            if zeros >= bits {
                 zeros = bits + SparseHll::decode_bucket_value(entry);
             }
 
@@ -503,27 +554,27 @@ impl SparseHll {
         }
 
         result.resize(index, 0);
-        return result;
+        result
     }
 
     fn encode_entry(bucket_index: u32, value: u8) -> u32 {
-        return (bucket_index << SparseHll::VALUE_BITS) | value as u32;
+        (bucket_index << SparseHll::VALUE_BITS) | value as u32
     }
 
     fn decode_bucket_value(entry: u32) -> u8 {
-        return (entry & SparseHll::VALUE_MASK) as u8;
+        (entry & SparseHll::VALUE_MASK) as u8
     }
 
     fn decode_bucket_index(entry: u32) -> u32 {
-        return SparseHll::decode_bucket_index_with_bit_len(SparseHll::EXTENDED_PREFIX_BITS, entry);
+        SparseHll::decode_bucket_index_with_bit_len(SparseHll::EXTENDED_PREFIX_BITS, entry)
     }
 
     fn decode_bucket_index_with_bit_len(index_bit_len: u8, entry: u32) -> u32 {
-        return entry >> (32 - index_bit_len);
+        entry >> (32 - index_bit_len)
     }
 
     fn is_valid_bit_len(index_bit_len: u8) -> Result<()> {
-        if 1 <= index_bit_len && index_bit_len <= SparseHll::EXTENDED_PREFIX_BITS {
+        if (1..=SparseHll::EXTENDED_PREFIX_BITS).contains(&index_bit_len) {
             Ok(())
         } else {
             Err(HllError::new(format!(
@@ -531,6 +582,14 @@ impl SparseHll {
                 index_bit_len
             )))
         }
+    }
+
+    /// Allocated size (not including size_of::<Self>).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        fn vec_alloc_size<T: Copy>(v: &Vec<T>) -> usize {
+            v.capacity() * size_of::<T>()
+        }
+        vec_alloc_size(&self.entries)
     }
 }
 
@@ -555,15 +614,15 @@ impl DenseHll {
     pub fn new(index_bit_len: u8) -> DenseHll {
         DenseHll::is_valid_bit_len(index_bit_len).unwrap();
 
-        let num_buckets = number_of_buckets(index_bit_len) as u32;
-        return DenseHll {
+        let num_buckets = number_of_buckets(index_bit_len);
+        DenseHll {
             index_bit_len,
             baseline: 0,
             baseline_count: num_buckets,
             deltas: vec![0; (num_buckets * DenseHll::BITS_PER_BUCKET / 8) as usize],
             overflow_buckets: Vec::new(),
             overflow_values: Vec::new(),
-        };
+        }
     }
 
     pub fn new_from_entries(index_bit_len: u8, values: Vec<u8>) -> Result<DenseHll> {
@@ -614,9 +673,9 @@ impl DenseHll {
 
     pub fn read_v1(_data: &[u8]) -> Result<DenseHll> {
         // TODO: implement this for completeness. Airlift can read Dense HLL in V1 format.
-        return Err(HllError::new(
+        Err(HllError::new(
             "reading of v1 dense sketches is not implemented",
-        ));
+        ))
     }
 
     pub fn read(data: &[u8]) -> Result<DenseHll> {
@@ -665,14 +724,14 @@ impl DenseHll {
             }
         }
 
-        return Ok(DenseHll {
+        Ok(DenseHll {
             index_bit_len,
             baseline,
             baseline_count,
             deltas,
             overflow_buckets,
             overflow_values,
-        });
+        })
     }
 
     pub fn write(&self) -> Vec<u8> {
@@ -693,7 +752,7 @@ impl DenseHll {
             r.write_u16::<LittleEndian>(e.try_into().unwrap()).unwrap();
         }
         r.extend_from_slice(&of_values);
-        return r;
+        r
     }
 
     pub fn cardinality(&self) -> u64 {
@@ -714,7 +773,7 @@ impl DenseHll {
         }
 
         let estimate = (alpha(self.index_bit_len) * num_buckets as f64 * num_buckets as f64) / sum;
-        return self.correct_bias(estimate).round() as u64;
+        self.correct_bias(estimate).round() as u64
     }
 
     pub fn merge_with_sparse(&mut self, other: &SparseHll) {
@@ -759,14 +818,14 @@ impl DenseHll {
                 if delta1 == DenseHll::MAX_DELTA {
                     overflow_entry = self.find_overflow_entry(bucket);
                     if let Some(oe) = overflow_entry {
-                        value1 += self.overflow_values[oe] as u8;
+                        value1 += self.overflow_values[oe];
                     }
                 } else {
                     overflow_entry = None
                 }
 
                 if delta2 == DenseHll::MAX_DELTA {
-                    value2 += other.get_overflow(bucket) as u8;
+                    value2 += other.get_overflow(bucket);
                 }
 
                 let new_value = max(value1, value2);
@@ -783,7 +842,7 @@ impl DenseHll {
                 bucket += 1;
             }
 
-            self.deltas[i] = new_slot as u8;
+            self.deltas[i] = new_slot;
         }
 
         self.baseline = new_baseline as u8;
@@ -859,15 +918,14 @@ impl DenseHll {
 
             bias = (((raw_estimate - x0) * (y1 - y0)) / (x1 - x0)) + y0;
         }
-        return raw_estimate - bias;
+        raw_estimate - bias
     }
 
     fn find_overflow_entry(&self, bucket: u32) -> Option<usize> {
-        return self
-            .overflow_buckets
+        self.overflow_buckets
             .iter()
             .find_position(|x| **x == bucket)
-            .map(|x| x.0);
+            .map(|x| x.0)
     }
 
     fn adjust_baseline_if_needed(&mut self) {
@@ -927,7 +985,7 @@ impl DenseHll {
         } else if let Some(oe) = overflow_entry {
             self.remove_overflow(oe);
         }
-        return delta as u8;
+        delta
     }
 
     fn add_overflow(&mut self, bucket: u32, overflow: u8) {
@@ -960,7 +1018,7 @@ impl DenseHll {
         if delta == DenseHll::MAX_DELTA as u32 {
             delta += self.get_overflow(bucket) as u32;
         }
-        return self.baseline as u32 + delta;
+        self.baseline as u32 + delta
     }
 
     fn get_overflow(&self, bucket: u32) -> u8 {
@@ -969,41 +1027,41 @@ impl DenseHll {
                 return self.overflow_values[i];
             }
         }
-        return 0;
+        0
     }
 
     fn get_delta(&self, bucket: u32) -> u8 {
-        return DenseHll::get_delta_impl(&self.deltas, bucket);
+        DenseHll::get_delta_impl(&self.deltas, bucket)
     }
 
     fn get_delta_impl(deltas: &[u8], bucket: u32) -> u8 {
         let slot = DenseHll::bucket_to_slot(bucket) as usize;
-        return (deltas[slot] >> DenseHll::shift_for_bucket(bucket)) & DenseHll::BUCKET_MASK;
+        (deltas[slot] >> DenseHll::shift_for_bucket(bucket)) & DenseHll::BUCKET_MASK
     }
 
     fn set_delta(&mut self, bucket: u32, value: u8) {
         let slot = DenseHll::bucket_to_slot(bucket) as usize;
 
         // clear the old value
-        let clear_mask = (DenseHll::BUCKET_MASK << DenseHll::shift_for_bucket(bucket)) as u8;
+        let clear_mask = DenseHll::BUCKET_MASK << DenseHll::shift_for_bucket(bucket);
         self.deltas[slot] &= !clear_mask;
 
         // set the new value
-        let set_mask = (value << DenseHll::shift_for_bucket(bucket)) as u8;
+        let set_mask = value << DenseHll::shift_for_bucket(bucket);
         self.deltas[slot] |= set_mask;
     }
 
     fn bucket_to_slot(bucket: u32) -> u32 {
-        return bucket >> 1;
+        bucket >> 1
     }
 
     fn shift_for_bucket(bucket: u32) -> u32 {
         // ((1 - bucket) % 2) * BITS_PER_BUCKET
-        return ((!bucket) & 1) << 2;
+        ((!bucket) & 1) << 2
     }
 
     fn is_valid_bit_len(index_bit_len: u8) -> Result<()> {
-        if 1 <= index_bit_len && index_bit_len <= 16 {
+        if (1..=16).contains(&index_bit_len) {
             Ok(())
         } else {
             Err(HllError::new(format!(
@@ -1019,7 +1077,7 @@ impl DenseHll {
         // to dense representation can happen at different points.
 
         // note: we don't take into account overflow entries since their number can vary.
-        return size_of::<DenseHll>() + /*deltas*/8 * number_of_buckets(index_bit_len) as usize / 2;
+        size_of::<DenseHll>() + /*deltas*/8 * number_of_buckets(index_bit_len) as usize / 2
     }
 
     /// Unlike airlift, we provide a copy of the overflow_bucket to to the reference semantics.
@@ -1054,7 +1112,7 @@ impl DenseHll {
             }
         }
 
-        return (of_buckets, of_values);
+        (of_buckets, of_values)
     }
 
     #[allow(dead_code)]
@@ -1095,6 +1153,16 @@ impl DenseHll {
             self.overflow_buckets
         );
     }
+
+    /// Allocated size of the type.  Does not include size_of::<Self>.  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        fn vec_alloc_size<T: Copy>(v: &Vec<T>) -> usize {
+            v.capacity() * size_of::<T>()
+        }
+        vec_alloc_size(&self.deltas)
+            + vec_alloc_size(&self.overflow_buckets)
+            + vec_alloc_size(&self.overflow_values)
+    }
 }
 
 // TODO: replace with a library routine for binary search.
@@ -1116,7 +1184,7 @@ fn search(raw_estimate: f64, estimate_curve: &[f64]) -> i32 {
         }
     }
 
-    return -(low as i32 + 1);
+    -(low as i32 + 1)
 }
 
 fn index_bit_length(n: u32) -> Result<u8> {
@@ -1129,36 +1197,36 @@ fn index_bit_length(n: u32) -> Result<u8> {
 
 #[allow(dead_code)]
 fn compute_index(hash: u64, index_bit_len: u8) -> u32 {
-    return (hash >> (64 - index_bit_len)) as u32;
+    (hash >> (64 - index_bit_len)) as u32
 }
 
 fn compute_value(hash: u64, index_bit_len: u8) -> u8 {
-    return number_of_leading_zeros(hash, index_bit_len) + 1;
+    number_of_leading_zeros(hash, index_bit_len) + 1
 }
 
 #[allow(dead_code)]
 fn number_of_leading_zeros(hash: u64, index_bit_len: u8) -> u8 {
     // place a 1 in the LSB to preserve the original number of leading zeros if the hash happens to be 0.
     let value = (hash << index_bit_len) | (1 << (index_bit_len - 1));
-    return value.leading_zeros() as u8;
+    value.leading_zeros() as u8
 }
 
 fn number_of_buckets(index_bit_len: u8) -> u32 {
-    return 1 << index_bit_len;
+    1 << index_bit_len
 }
 
 fn alpha(index_bit_len: u8) -> f64 {
-    return match index_bit_len {
+    match index_bit_len {
         4 => 0.673,
         5 => 0.697,
         6 => 0.709,
-        _ => (0.7213 / (1. + 1.079 / number_of_buckets(index_bit_len) as f64)),
-    };
+        _ => 0.7213 / (1. + 1.079 / number_of_buckets(index_bit_len) as f64),
+    }
 }
 
 fn linear_counting(zero_buckets: u32, total_buckets: u32) -> f64 {
     let total_f = total_buckets as f64;
-    return total_f * (total_f / (zero_buckets as f64)).ln();
+    total_f * (total_f / (zero_buckets as f64)).ln()
 }
 
 // const TAG_SPARSE_V1: u8 = 0; // Unsupported.
@@ -1173,7 +1241,7 @@ struct BitCursor<'a> {
 }
 
 impl BitCursor<'_> {
-    pub fn new(input: &[u8]) -> BitCursor {
+    pub fn new(input: &[u8]) -> BitCursor<'_> {
         BitCursor {
             input,
             pos: 0,
@@ -1203,7 +1271,7 @@ impl BitCursor<'_> {
                 self.bit_pos = 0;
             }
         }
-        return Some(r);
+        Some(r)
     }
 }
 
@@ -1234,12 +1302,45 @@ mod tests {
             assert_eq!(
                 &sparse.entries,
                 &[
-                    233832449, 771751938, 1023410177, 1091567620, 1317011458, 1638924290,
-                    1898971139, 2335178753, 2440036353, 2552233986, 2647654404, 2785017858,
-                    3089104897, 3118465025, 3414163458, 3926917123, 3954180098, 4263510017
+                    234356736, 772014080, 1023934464, 1091633152, 1317273600, 1639186432,
+                    1899102208, 2335703040, 2440560640, 2552496128, 2647719936, 2785280000,
+                    3089629184, 3118989312, 3414425600, 3927048192, 3954442240, 4264034304
                 ]
             );
+            let mut lz_counts = vec![];
+            sparse.each_bucket(|_, value| {
+                lz_counts.push(value);
+            });
+
+            assert_eq!(
+                lz_counts,
+                vec![1, 2, 1, 4, 2, 2, 3, 1, 1, 2, 4, 2, 1, 1, 2, 3, 2, 1]
+            );
             assert_eq!(sparse.to_dense().cardinality(), 18);
+
+            let sparse = HllInstance::read_snowflake(
+                r#"{"precision": 12,
+                      "sparse": {
+                        "indices": [223,736,976,1041,1256,1563,1811,2227,2327,2434,2525,2656,2946,2974,3256,3745,3771,4066],
+                        "maxLzCounts": [1,2,8,10,11,12,13,14,15,16,17,18,19,20,60,52,62,63]
+                      },
+                      "version": 4
+                    }"#).unwrap();
+            let sparse = match sparse {
+                HllInstance::Sparse(s) => s,
+                HllInstance::Dense(_) => panic!("expected to read sparse hll"),
+            };
+            assert_eq!(sparse.index_bit_len, 12);
+
+            let mut lz_counts = vec![];
+            sparse.each_bucket(|_, value| {
+                lz_counts.push(value);
+            });
+
+            assert_eq!(
+                lz_counts,
+                vec![1, 2, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 60, 52, 62, 63]
+            );
 
             let dense = HllInstance::read_snowflake(
                 r#"{
@@ -1317,15 +1418,98 @@ mod tests {
             // Explicit encoding, 1 value.
             let h = read("128b7fee22c470691a8134").unwrap();
             assert_eq!(h.cardinality(), 1);
+            let sparse = match h {
+                HllInstance::Sparse(s) => s,
+                HllInstance::Dense(_) => panic!("expected to read sparse hll"),
+            };
+            let mut lz_counts = vec![];
+            sparse.each_bucket(|_, value| {
+                lz_counts.push(value);
+            });
+            assert_eq!(lz_counts, vec![5]);
 
             // Sparse encoding, 169 values.
             // TODO: the estimate is off, fix calculation in sparse mode.
             let h = read("138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1").unwrap();
             assert_eq!(h.cardinality(), 164);
+            let sparse = match h {
+                HllInstance::Sparse(s) => s,
+                HllInstance::Dense(_) => panic!("expected to read sparse hll"),
+            };
+            let mut lz_counts = vec![];
+            sparse.each_bucket(|_, value| {
+                lz_counts.push(value);
+            });
+
+            assert_eq!(
+                lz_counts,
+                vec![
+                    1, 2, 5, 3, 3, 3, 2, 1, 5, 2, 5, 1, 3, 1, 1, 8, 2, 1, 1, 2, 1, 1, 2, 1, 1, 3,
+                    5, 3, 3, 2, 1, 5, 1, 2, 1, 1, 1, 3, 5, 1, 2, 2, 1, 2, 1, 1, 1, 1, 4, 1, 3, 5,
+                    4, 1, 2, 3, 1, 1, 1, 2, 1, 1, 1, 1, 3, 2, 6, 1, 1, 1, 1, 3, 2, 1, 2, 1, 1, 7,
+                    3, 2, 1, 3, 1, 3, 1, 4, 2, 7, 1, 1, 1, 3, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 3, 1,
+                    2, 1, 4, 2, 4, 1, 2, 2, 3, 1, 1, 4, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 3, 1,
+                    2, 1, 1, 3, 3, 1, 1, 1, 3, 3, 3, 2, 3, 3, 2, 4, 1, 1, 1, 1, 2, 1, 3, 1, 2, 1,
+                    3, 4, 4, 3, 4, 1, 2, 1
+                ]
+            );
 
             // Full (dense) encoding, 10k values.
             let h = read("148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822").unwrap();
             assert_eq!(h.cardinality(), 9722);
+        }
+
+        #[test]
+        fn test_hll_postgr_test() {
+            let t1 = "Eot/HUOjtjMdhpk=";
+            let t2 = "FIt/OVKSkKYhSlQQhClKcpXEIRBEEKZJCHKlRjGKQhSlMwx0HQVRUFIdJkEOc5iEKY6TnIZJCFMRBUESgyimIhSDIKUxzGIgyCmWYpikIYxjHKVRknOVJzGMUyzoKUqTmKcpSIWQpTGMQ5CmQcxkEIgqiISoxzmWgpylQUxirQUhzGQkxDGQhJkjOhRyHKZBDlQRRjMSUhCmIVBTFKQqDGOcxUFOQpTlKkxSnMgqkJOU5iIKYxSGOY5TIQVRTGIMpiHOkozFKVRSlKgiSFIUpjlIchilQcpylGYZkIMghzHOgpzGQkpylIYhklMYpSFMYxTFKcxzHKkhyGOkpTmSQpjLcYpkFKhaCFMY6BnKYpknKdBUEOUxilMdBioMVCCIOYpzmSkxkGIgxSmQYpyqOcxjIKUpEHMc5VGMopzmKgxjJKYpiEGghjGKZRUFQQyTEMc5zGQcx0GGYhCqKQ6UnKc5inOUhUFIcpzlMUyEHOQxkJWUxkJQlCTlYRCymKchVJOdBzFQY5TlMUhiHMVJSlKUpkGIopSnUUhjFQcpjKQQpjoMYxDKKkxDpSYqCHUZJToQcijrIchTjI0x0GMciCKUghUJKkxTIQhJjGOYylHMwxzlIlSCnOkqCJKcpllOQiVHKZAzpOYhkHMU6zFGYpylKhRznKQxCGIQ5DFMYxmkKQxTFKYxznQUxCJMZRiLKUpzHQUyCoKVCTKKYpSkKg6UHIlBSmQYxTlQYqDIIdJimKY5zIKYpiGMcxylOkqCFQVJylOcxSmKkpjIIZRWEKUpTGIY5xsMdB0HKk6BjGYxjFKQxjmQZBSlMYhEpMlRSHKU5TmKQhjIKYxyEMU6DmMcpkFOgxEEKQpToScxxkMVBCIKVCVGOY5UqQYxikKUxCKSY5CnWQ6TlIg6TFKURTGKZCUJSlRRqKZJ2EOgiSESMpDmQQpyISRCDmOopilIQpSIeUo0lMYiSGKcpynQUhDkKRBDoOVpTIIU5SGKUhjIKcxTHIYxGEQY5UkIUhjHQUxDoGUiTlOUhzmGg6imOY5ilKUpCFQZBjGKYhjEMUhRqMUyCnMQxTIQkyTGMkwzHQg5RmKQiTJKQ50FORpypMVBxlKRBTLMcpEGMZBjlMg5TpMUqkpQkxjHScqjlUgqSmOVJlHIYxhmIQyEGWkxyEOMpTEKY5SoQZhjHQUpzGWVChlKghymOZhDmQYpEnQcpDnOUpTGGY5jlMc5TkKUxzFOcxSmIkpToQU5DoMgyhmIhRimIYhykKU5jmQk6FHcUpjJIc5TFIU5UoIUwzGKUhjJScpilMhJDFKNBjHKkpUHMYhkHQNBUEQpSDHOghhkKYpRmKYpzGOYxjFIYpjleY53FGU5SmKYpiJMRDjlMpBiHKgyhoMU5iHUUqEKOg5CJOUg0GOcpiESghDkac6UESUyTHSUy0FOgqDGUU5TGMUyTHKUpkGMdBzpGlBCFMU5TmMY5UGQYyEmKQxCnMRZyGKYqDJKZBilOUx0HIZBTFKMxiJSg5TEYQxUJOkxDlOYZ0EKRCTHOUxknQQh1FKQpSIOdBUnMVQzHKQ5imWsxhlQpBSoKZCDMIk5zQMUpilOMxUGIUxiFMU6THOUplEIYxyFORR1mKZJTFKUoyrIYhTFKY6DmOkiEFKZJEKMYhitIgyyGKUxjkKgxTmMZBCjKQpDmScpjkQchyFQYhinQhIzKMQ=";
+            let t3 = "FIt/OVKSkKYhSlQQhClKcpXEIRBEEKZJCHKlRjGKQhSlMwx0HQVRUFIdJkEOc5iEKY6TnIZJCFMRBUESgyimIhSDIKUxzGIgyCmWYpikIYxjHKVRknOVJzGMUyzoKUqTmKcpSIWQpTGMQ5CmQcxkEIgqiISoxzmWgpylQUxirQUhzGQkxDGQhJkjOhRyHKZBDlQRRjMSUhCmIVBTFKQqDGOcxUFOQpTlKkxSnMgqkJOU5iIKYxSGOY5TIQVRTGIMpiHOkozFKVRSlKgiSFIUpjlIchilQcpylGYZkIMghzHOgpzGQkpylIYhklMYpSFMYxTFKcxzHKkhyGOkpTmSQpjLcYpkFKhaCFMY6BnKYpknKdBUEOUxilMdBioMVCCIOYpzmSkxkGIgxSmQYpyqOcxjIKUpEHMc5VGMopzmKgxjJKYpiEGghjGKZRUFQQyTEMc5zGQcx0GGYhCqKQ6UnKc5inOUhUFIcpzlMUyEHOQxkJWUxkJQlCTlYRCymKchVJOdBzFQY5TlMUhiHMVJSlKUpkGIopSnUUhjFQcpjKQQpjoMYxDKKkxDpSYqCHUZJToQcijrIchTjI0x0GMciCKUghUJKkxTIQhJjGOYylHMwxzlIlSCnOkqCJKcpllOQiVHKZAzpOYhkHMU6zFGYpylKhRznKQxCGIQ5DFMYxmkKQxTFKYxznQUxCJMZRiLKUpzHQUyCoKVCTKKYpSkKg6UHIlBSmQYxTlQYqDIIdJimKY5zIKYpiGMcxylOkqCFQVJylOcxSmKkpjIIZRWEKUpTGIY5xsMdB0HKk6BjGYxjFKQxjmQZBSlMYhEpMlRSHKU5TmKQhjIKYxyEMU6DmMcpkFOgxEEKQpToScxxkMVBCIKVCVGOY5UqQYxikKUxCKSY5CnWQ6TlIg6TFKURTGKZCUJSlRRqKZJ2EOgiSESMpDmQQpyISRCDmOopilIQpSIeUo0lMYiSGKcpynQUhDkKRBDoOVpTIIU5SGKUhjIKcxTHIYxGEQY5UkIUhjHQUxDoGUiTlOUhzmGg6imOY5ilKUpCFQZBjGKYhjEMUhRqMUyCnMQxTIQkyTGMkwzHQg5RmKQiTJKQ50FORpypMVBxlKRBTLMcpEGMZBjlMg5TpMUqkpQkxjHScqjlUgqSmOVJlHIYxhmIQyEGWkxyEOMpTEKY5SoQZhjHQUpzGWVChlKghymOZhDmQYpEnQcpDnOUpTGGY5jlMc5TkKUxzFOcxSmIkpToQU5DoMgyhmIhRimIYhykKU5jmQk6FHcUpjJIc5TFIU5UoIUwzGKUhjJScpilMhJDFKNBjHKkpUHMYhkHQNBUEQpSDHOghhkKYpRmKYpzGOYxjFIYpjleY53FGU5SmKYpiJMRDjlMpBiHKgyhoMU5iHUUqEKOg5CJOUhUGOcpiESghDkac6UESUyTHSUy0FOgqDGUU5TGMUyTHKUpkGMdBzpGlBCFMU5TmMY5UGQYyEmKQxCnMRZyGKYqDJKZBilOUx0HIZBTFKMxiJSg5TEYQxUJOkxDlOYZ0EKRCTHOUxknQQh1FKQpSIOdBUnMVQzHKQ5imWsxhlQpBSoKZCDMIk5zQMUpilOMxUGIUxiFMU6THOUplEIYxyFORR1mKZJTFKUoyrIYhTFKY6DmOkiEFKZJEKMYhitIgyyGKUxjkKgxTmMZBCjKQpDmScpjkQchyFQYhinQhIzKMQ=";
+            let s1 = base64::decode(t1).unwrap();
+            let s2 = base64::decode(t2).unwrap();
+            let s3 = base64::decode(t3).unwrap();
+
+            let h1 = HllInstance::read_hll_storage_spec(&s1).unwrap();
+            let mut h2 = HllInstance::read_hll_storage_spec(&s2).unwrap();
+            let h3 = HllInstance::read_hll_storage_spec(&s3).unwrap();
+            h2.merge_with(&h1);
+            assert_eq!(h2.cardinality(), h3.cardinality());
+
+            let data = vec![
+                "FIt/GEZDGAQSBBCYxBkCIgRkAIJwjYMoQjOQJgDEEgBFIIQyjKMIhiGEJSACQgQhEcRAiGMARgGEwhDOMABhCIIhACUQjDEQgCDKIRDDCQYRECAYjDAIJhGIcIhCKBAzCGRBhhEEYhDEMghgIYYRiGEIzFMIIhCGAhxBGQYiGCQZTkCIwQhIIAxDGUJCDIMAhDGI4QjGQIkDCJBCCEIYhBGUZAiKIBhEQMQxhIQYwCIEIiAEMhBCGMAQkGMJTHCEIAiEMZBkCEoglMEZRgEYQyDOQgxhAMIhnGEQlCIEZADEEQgiIgYhEIAgwiCIQRCEIAhiEEggiCMQRCIIojBIEQhlEIhBGEMYkjEEIAlCMZRjGIYkjCIAzDGMIwnGAYiBGEoinCYoBBIIIxhKEQxCGEIRhGQIRlAkYihIAQxIIIQwhIMAhiEUhRCAQYRBEIAhCIcZggEMZCBSQYhkIEoAiEYZBiEEQSDMIQxDGQgxCEIoCCAkJhkIMQCCEIQRCSMghiCUICgAEYgkMYAgiGYYQFAERCBEMBglCMxBBIMIAiKEIykGMoRCIMRTFCUQxkOMRQhGUg0hIMAxDAUghjIMQSFCE5AjEIYiCEUZBCGMQxACYIAjGMIhlKYYxCIQYBiIEgTCEMJAhGEoBjAUYSkEIRRCOMIBgAMZACEIZRiCIhRkAIJACEMZAiEIYyjCERABCUAwBAMARhEQKBCEMZiiGEQhBCQ4hDIQQQkCIQzCMcTBlEMRhCCIZDFEARQhKIgjjAIRRkEIYyCEIwwDAQgiCKMZQFCIYiECIgwECUIRFOMYRgEMQSAEMQyBCQgQhAAQzgEIQSAGEQQACMYSAAIIwmIIIhiCMYAiEAYhAIcYSiCMYhiCEIQCKIJAiGMwRjCQgxCIEYQDEMoShKEYRiEAYgiGYgQgCMRhiAMQCBAUoTiKIZyAGMZRBEIZSAOcghGKcYwgCIohCCMowCOQYjCCYQgkGMRADGIghBCQQwlIEYhDIEAxBEQYRHKcgRAEYQQDCMRBhKEYTECQIgCGEQwEKEgxkMEYiiGQIxDEMYRGAFJhDQIYgjGIxBjEUgiDKIJhjEEQwiGIhSEEMICHEIpRCEI4xBEUIxjGQIxBCIQlrEQQigAEQQjMEgACCIQhCIIIjCGMoxkEIQBhIQCBCYIggiEIIhDIMoiCEI4wlGUhBBGYQwjCIIiEKQQQhCEABBEEZABKIoAjGcIRgCIoxjEIYyECQoxjEEYhnKMJRlIgYyjEEYhkMAIQDCIIRCEUZBCGIAyCEQAxCGEARiKAIgkEUIRjEEQhkIUIQjKEYwiAJARACIghDCIgAnIBATCKUgAjCYghFKQYBGEUZSiGIZRDEMgSBCMIRDEEIglGRBCiCEQhiGUIxCKIhhBCUJBDIIgiEEcBQmGMZBiKIQjBIUhyCAMYTAEEJhEKcAhlGMIyBEMgQiEIJRCGUYRBCEIhDMMpBAIEYwjEgIRnEEogDIQKyhOIxhhCAYhhEIYRKIIAiBGIAxEOMQgiGEoikEEIzBIIYQmGUghCEYg0HGIRDjGYYihAEYSFEMoxjEUIyDCQAyiAMQBhGIA0AOEwiCCIRiBGEohCEkpSFEYJRjCEYSCGUwikEMgijCEYhEIIJxhCMQhAGEQSiCEQyiEQBBjGUYxFKYIxCCIYhCIUISFCIJBBCMRSjEMYglEIAhCCMohBCMQgBEA=",
+                "Eot/N/V0+Dra68JKY2b5infzYg==",
+                "Eot/nfbBQcQmvryrcT/HeEIr+TjmHhUfcAhxS8JqwhqTkVc=",
+                "Eot/i+Maa9q3Pl2rcT/HeEIr+dia8C0nGCAp32rJA0BsgmjqDgl0H80IFwAgw9nW8KyqAfMaTuSaSd4DpLQ1/wbePwn7TSReKmlKDY9/upc1F7EXJma/UlPIlB1Do7YzHYaZKoZ81rErd7M8oiKE48iUBUvCasIak5FXTVvP7qD1bL1ZEdvj/XdSn1kcl825sFyfW59PXFg63Xs=",
+                "Eot/q3E/x3hCK/n1ez0SRvHbdQOktDX/Bt4/DY9/upc1F7EdQ6O2Mx2GmT7tBKe0OOhnS8JqwhqTkVdTolBQZ3OBiA==",
+                "Eot/meyhcPXwINercT/HeEIr+cfRuk85mN3Xyr17q/7Vsbb1ez0SRvHbdQOktDX/Bt4/DY9/upc1F7EdQ6O2Mx2GmT7tBKe0OOhnS8JqwhqTkVdTolBQZ3OBiF6O7ZUxlIvn",
+                "Eot/i5sL9kkhF32Va4iiJAu05pnsoXD18CDXq3E/x3hCK/nEt+0x8tYDBMdkCa7rbU/Ox9G6TzmY3dfKvXur/tWxtuoOCXQfzQgX7j2z4n57XQfyucQN3nza+fV7PRJG8dt1AfMaTuSaSd4OZTh4gGsmOCiJ+YZ9f69hNEwUhJajGDw2Xmst196uez0a3g/OhU5dPu0Ep7Q46GdEeUrZY43XEUvCasIak5FXXo7tlTGUi+c=",
+                "Eot/hcAJsOLh1jSZ7KFw9fAg16OYIybf6b2MxLftMfLWAwTHZAmu621PzsfRuk85mN3X6g4JdB/NCBfuPbPifntdB/IPx3OOduIe8rnEDd582vn1ez0SRvHbdfgFvOX+82nw+2Ki4IUoK6oB8xpO5JpJ3g5lOHiAayY4KIn5hn1/r2EqhnzWsSt3sy7lDvgGMuoEM19zGxVkuYw0TBSElqMYPDZeay3X3q57OLzfa+2Zad89Gt4PzoVOXT1BnKktRP5EPu0Ep7Q46GdEeUrZY43XEUvCasIak5FXU3j20JANH7BUFmOsisFcfFVhinXSpw6bXO+cZIKmHJpeju2VMZSL522ThR9aHW6Eb9Cg/IT8/tFwz2PdVyWupHf8N0m+YCRbeuiUcbw8O0t9TgF40Z3XDg==",
+                "Eot/gg7mggN4JvaDxlqkBg+CDoXACbDi4dY0iwYSXz9MKYSUdmltfSU3Xpd13r+XY6C3meyhcPXwINea1FV5stU0KJv/47gurOdVnZmQ4JyQm0Cd9sFBxCa+vKBDUeVuqAwSo5gjJt/pvYynjvL1pOitwakkjZXrSIDbqWs95MMDzp6zprnmbILIE7ubKwq6WpKfvl5t80wECODECzf0ibItvMY+EJQhvCWnxuXBb4e+cjvHZAmu621PzsfRuk85mN3XzLusZayMBr/PqVRNfB+ENtD+qkP6lgAF0dL/kXOoqbzVNo8Cg3obbNcKTUNinx6R3UCPX8yQ3vXipJUbWvvD3uO798hd9HqT5xcAyvL5WTLqDgl0H80IF+pBr1JzZ6Pb6kjckO2VFz/qlW0V93VFw+vfq2Vu4ucT7j2z4n57XQfvNTLvQSN18vKCmDCAnTVM8rnEDd582vn0p91ibFklHPV7PRJG8dt1+AW85f7zafD45fsBYd46R/qe1CuYRtPv+2Ki4IUoK6r+y+UTgEgSigAEn0AlBX8gADwoS0dVe5QBEunwu1csSgHzGk7kmkneDmU4eIBrJjgS8+iVuPJoWSDrfYnvbt/pIijirl0GdysoifmGfX+vYSmTVC1hhv/VLbx+Sb2mBlQu5Q74BjLqBDNfcxsVZLmMNybER4tfZjc4vN9r7Zlp3z0a3g/OhU5dPUGcqS1E/kQ+7QSntDjoZ0R5StljjdcRRez4F3QIbSpM+NIfUQU9eE0SqSr4hdYvUycSIGnILVNUFmOsisFcfFVhinXSpw6bXo7tlTGUi+dirfQ40siHFWc3ib9uql07bZOFH1odboRumQtO3quRfW7dJCBNzMhnb0YYRivavrJv0KD8hPz+0XDPY91XJa6kdqq47AJdmQ96Cq5pau2km3rolHG8PDtLfSjmgFilk40=",
+                "Eot/gcrQwjF27KiEtR2aiLKqoYchpZ+alKTXh5DHMgPXHlmIULN/kEFZuoqJV9tWZaE7jaktDPojYA6OVuJmTOAuq4/90kXjY3VHklsIwQBiGZ6SccGF+ht5z5NUfLp0t8T2k11Tser7evSUdmltfSU3XpSfKXOy1j6YlzFmAllc+DGXdd6/l2Ogt5lmIytsVXGVm0UxTOysljOb/+O4LqznVZwZD99QMmy1nIWb99wBHkidmZDgnJCbQJ5P1DVWZ12Unxr1lcRRKPuj/Gcmk5B9rKulm6Ot+YuFri2QpIGHRzuwOSpXWX6hurB7VlwCP1VNsVys/KrF3zWzOoHNvtsqYbOmueZsgsgTs+Mqtaqp/1i3EOKGB6lVULekePx3DMzct8zqcnLjx8m4TepGYNncQbhfzcDWfxkqu5srCrpakp+7nGIWg+LcF70FJR/00sFMvl5t80wECOC/bNlFE+/8rMIBnIehff7Yw7euRuPy8eDGLLPIPFAIdsfRuk85mN3XyEpsKKKm3GjIi6raHFTpWcivoPXZ1sMSyaf+83B2H/HL2+56liRJfs2EsJHu/o8dzvpMhqueNSHPqVRNfB+ENtCchzTglv7p0OivBUeVUbXRM0Iq4v6TaNXc2nKlmRn/1hCozhh9BvXWtWnk8FhotNjHQLQFO1Rq2opF4Do2rhnfgJ8frHqdduATmhYPaGSF4JyWvqQU5L/ju/fIXfR6k+oOCXQfzQgX6kGvUnNno9vqSNyQ7ZUXP+qWkBfilMEH6saH9tM/UNLrHUoywcHsA+vfq2Vu4ucT6/8lSrfBQsLv8eqXnyWNhvG7Q1ok+IEb8e/gVoyVHaTygpgwgJ01TPPcUoXHxLu39KfdYmxZJRz1ez0SRvHbdfgFvOX+82nw+p7UK5hG0+/74OYr5SLd4/7L5ROASBKK/1ndauVl1oMABJ9AJQV/IACsbvCSwZ8fARLp8LtXLEoB1J8VNQQFgQHzGk7kmkneBp6qAA7YcokJrWTxpAiQAAnnkozxDygrDK4VEJGCWS4Q8J1p7cYjPhSasfK10qXoHVS5AMjhTqgevLzwBRKdmiDrfYnvbt/pJVHL4Pa9k/wmSO9EePozqChlMm6Ashs9KIn5hn1/r2Epi+SlirXZhCms1j8s+MGlKg3+hZh7iNgqgBXzZSNaZy7lDvgGMuoELzB2JHus1ugvVKTQ0+8JUi/y9UAvEhi6MIULIna4vtI0k4ecVxKq2TXbTSiZOrW5NzxbjpEd95g3PKo6TFL7YzwWvouRWt9BPUGcqS1E/kREJunJpa2GRURgwsWM2WdRR7CwhyVwtKRIvMkiWTNKhUoDie9b6cNeSrTSznBVRRFNB6JDcJkTEU0SqSr4hdYvThh7k3ka53BQ76CXpCLJhlJ5mWdlKCSuWF8/2vbIJXde/+y3r9fzJl/EDyqKK0GXYKVukuFerQVirfQ40siHFWc3ib9uql07Z9MaFaFp3VZtk4UfWh1uhG7dJCBNzMhnbz1NwNYfiyRv0KD8hPz+0W/i6KxOH28hcLKkbI3B5E9wz2PdVyWupHE6ODhjFnBMcptBOcuSeMV2G4U71cAYfXiHZHoyMliHfSjmgFilk40=",
+                "E4t/AAEBIwHjAkICYwKBAuEDAgNBA8EEhATBB4EIQwiBCKUI4QmCCaEKIwphCuELRwtkDOINAQ4BDkMPohAhESMSoRMGEyEUAxUBFWEWAhZDFuMXBRdBF8MYYRiCGeIaQhrjHEEcghzDHeEeAx5CHwEgQyHDImEigSLDI0IlQidBJ2MnoimEKgIrISyiLqEvYTCBMYEyATKiMyIzwTSBNeQ2BTZhN0M3YTeBOCE4QTjhOQE64TsBPCE9Yj4hPoI+oT8DP8Q/4UBhQIFAwkECQqFFYUWCRiRGQUdBSuFMok2iTuZPZVAEUONRQlGhUmFSgVTJVgJWJVfBWERZAVsBW6NcoV0BXcJfIWEiYeJjYWXDZsFnoWhCaOFpImmBaeFqo2wFbOFtAm4LbqFu4m8jb2ZwInFjcgFyg3OCc6V1QXWCdaF2pXbCduF3YXfDeAN4QXkheiJ7Y31ifaR94n7Bf4KA4YKhg2GEgYSmheGGIoZDhsWIIYkCiUGJwonhiiGKoYsii6SNAY1CjgKPwZCjkWGRwpHikkGSxpNClcGWoZbCl0OXg5ehmIGaA5qhmuObBZzCnUGfIaDCoSKiJKJDo8GkoqVhpaKmQqdhqCKpgauBrQGtI63CryOvgq+isAGwgrDBsaOzQbRjtOG1IbXhtyK4ZLiluWG6JLrhvWW+Yb8CwSHDIcSBxUHFosZhxwPHgsilyWTJwspiyqjLIcuBzGLMxM0FzeTOJM+B0ATSIdMk04HT4tUB1aHXwtlh2iPaQ9rh3QLdId1j3aPfI+IB4iLiY+KB4qXjQ+Ph5QLlQ+Xl5qLnAuci54HnyOkC6WHpweoB6qProuwh7KLtY+4h7mHuoe7k7yLvYu+h8AHyQfLk82PzofSB9aH14/oh+qP7A/wk/KL8xv0h/cH+Qf6H",
+                "E4t/AAEAgQHjAiICYQLhAwIEYgTBBWMGQQeDB+UIAQiDCKUIwQjhCYUKBAojCmMK4gtmDEEM4g0hDWINgw3iDgEOIQ6BD6IP4xAhEEEQYhDEEQIRIxKFEqETghOiE+EUARRBFQEVIRVCFcEWAxbCFuMXgRghGIIYoRrjGwIbQhvhHAEcIR2hHeEeAx5BHuEfYR+hICEgQyDCISIhgSLhI2Ej4iRhJIElIyVCJgImgibCJ2MnwSfkKYQpwyoBKkEqYishK4IsoizGLWEvQi+FMIEwoTDBMSExQTGBNEE0YTUBNUM15DZhNsI3RTgBOCE4RjihOWM6IjphOoI6oTtiO8E8ITyCPKM85D1iPYM9wT3mPoI/CT+DP+FAoUECQgNDgUPCQ+FEgUWCRiRG4UchR0JH4UhBSMFKJEqhSyFLQUvhTCFMxU2iTmFO5k/CUCFQQVCBUKRQwlDjUSRRQlIEUmFShVKhUwVTxFQhVGFUyVUCVUNVYVWiVgJW4VciV2FXwVgHWERYg1ikWQJaIlpjWuFbA1siXKVdAV1CXWJegV8BXyNfQV+jYGZgwWJBYuFjJGPBY+NkAmWBZcJmRWbBZwJnYmekZ8Vn42gBaCFoQmlEaqNsQmzIbQJtzW4BbiNug3BCcGNwwXEBcSNx4XIBcsVzIXOCc8F1RnVidcN2YXaDd6R3w3lBeYF5onnjeiJ6gXrhewR7Y3ume8F8AnwjfGF8gXzCfYN+gX7BfyGBYoIigkGCwYOBg6KEIYSChSSFwYZhhoSGxYiCiUGJwYohi8SMIYyljMKNQo6hjuGPA5ABkKGQxJFBkcGSoZTBlOKVIZWhlgGWwpdDmAGYgZmBmgGaRJqBmuObBZthm6GcoZzCnoOfAp+ooCOgQqBhoQGhgaGjo8GkYqSBpQKlQaWnpeKmIqcip2GoIahkqKGowqjiqYepoqnFqeGrgavhrGGsoazBrOKtAa0jrkGuwa9Dr4KvxbAhsMKxIbGjsgKzJLNBs4G0ArSBtMG1A7ZhtoK2wbcit4K4AbiBuKO5A7lhuYK6JLpjuoK6orrIuuG7gbxhvWG+Yb8Cv0K/or/owAXAw8EBwSLBocIBwkLCgcKiwwHDIcWixiLGpMcDx2PIAcglyIPIpclkyeLKqMtBy2TLgcxhzILM4c0izYHOJM8BzyPPgc/D0AHRAdFB0eHSAtOB0+LUpdTC1QHVJNXi1oLW4dcG18LX5NgB2CTY4doD2iHaY9th2+PcAdyi3ULdo93B3gHeQd6h3uPfAt+h4CHhBOEh4ULhYeIC4iLiY+Kh4uPjAeNC5ITkweUh5aHmIeZB5qLngeiC6MLpQemB6cHqBeoj6qPqw+th6+HsAuwh7ILswe0B7WPtoe4m7oHuwe8h72LwgfEG8ULyQ/Lh8wHzIvSB9YL1pvXj9qL3Zfgh+GH4gfoC+iH6ofsD++H8JPxi/KL9Av2j/kH+gf8C/2H/wQ==",
+                "E4t/AAEAoQDCAWEB4wInAmEC4wNmA6MEIQSBBMEFIwWCBaEFwwYCBkIHgQemB8EH4QhECKEIwgkiCYIJxAnhCiMKpAsBCyML4QxBDOINAQ7DDuEPohAhEGIQohDBEOERAhEjEWER5RKhFIEUohUDFSEWQxhEGOEZQRmiGkIaoRrCGuMbQxzjHQUdQx2CHcQd4R5CIEMhIiFmI2Ej4iTkJaMlxCYiJqEnYyfkKIoowSjhKWIphioiKkEqYSrCKyErRyuBK+IsAS2hLeEuYi9CL4EwAjBhMIExAzEkMWExojJCMqIywzNhNIE1RjVhNYE15DYFNmE2wjcBN0U3oTfCN+M4QTjkOaI54zohO2I8IT1jPcE/4UCBQQNBxUKjQyNDgUPCQ+JEAkTBRORFJUXBRiRGpkcBR8FIQUhhSQRKJEphSwFLIUuBTCFMYk0CTWJNgk2iTmFOwU7mTwJQIVBBUKRQ41EhUUJSAVIhUqNTAlRhVINUyVUBVgJWRFdhWIFYpFkBWSFZQVnCWqFbIVuiW8FdQl4EXoFeol+CX8Jf4mCiYMNhQmPBZUJlgWWiZgNmoWbiZwJnqGfjaEJopWnBaqNrImvDbMJtAm3BbgNuIW6CbsJu4m+lb8FwAnGDcoNyxXMhc4J0YnTmdQF1YnXBdoF2wncBd2N3pXfEd+F44nmieiJ64Xtje8F8gnzCfON9IX2hfcF+YX6hfsJ/IYAhgQOCIYMig0SEIYUkhUOFYYbFhuGHg4hDicGKAYpBiueLQYzCjUKOQo6hj+GQoZFBkcGR4ZKhk6OT4pQBlGOUgZTClOGVIpWElcGW4pdDl4OYIpiBmKGYwpjjmUOZYZrDmuObY5uBnWKdo53BniSgQqBhoKWgwqDhoQShSqPBpIKkxKVBpaKmwadhp8Go4amCqaKpxaoBqoGqwavhrGGtYa3hroWvYrABsCGwwbFisaOyI7LjsyKzQbPhtIK1AbZGtoK2wrbhtyK3orghuQe5YbqiuuG7BbuBu6G8ArxhvKK9ZL2BvcK94r6BvsG/Qr+Bv6HCosMhxaLGYscCx+LIQchiyMHI4clkyaHJwsomykTK4stBy2TLgcwhzGHMhM1BzcHOJM8jz4HPw9DE0UHSotOB0+LUYtTC1QHWI9bB10HXYdhh2IHY49oD2iHaY9sh22Hbod3k3kHfAt/B4AHgIuDB4cLiAuIi4mPigeKl4uPjQ+Oj5ITkoeTB5QLlIeVD5cHl4eYh5oPmxuci54HoA+iB6aPpwenh6iPqo+rh64HsAuwh7ILtY+4B7mLuwe7j7wPvYu/B8OLxBvFB8mHywvSB9KH2IvZi90L3ZPgi+IT4ofkh+UL6Avoh+oH7AvtH++H8Bvwk/GH85f0i/UP+Qf9h",
+                "E4t/AAIAgQDBAQEBQQGBAaEB4wInAmEDogPBBCEHgQeiCAEIoQjCCSIJgwnhCsMLAQtjC6MMQQykDUENwg4hDmIOoQ7hDyEPYQ+iD+IQIhBiEKEQxBDhEQERYhHCEqETAhNDFIEUohUBFSIVRBWjF4EXoRgEGEIZQRlhGaIaIRrjG0Mc4x1hHgIeIx5CHwIfIR/EIMIhwyIiIoQjASNhJaMlxCaCJqEm4SciJ2MoRCiKKOEpBikhKaIqASrCKyErQSvBK+IsQSykLMEtQy2hLkEuYi7BLwEvQS+BL+MwYTEDMcEzoTPCNIE0oTTBNWE15DZhNqE2wjcBNyE3RTfCOCQ4QTihOOQ5ZDpBPCE8QTzBPWI+AT/hQIFAokEDQSJBgUJBQsZDQUPCQ+JFwUYkR2VIgkkESYNJo0uhTCFMYkzjTURNYk2CTuZPAVABUCFRJFFCUYJSAVJkUoFUAVQkVEFUgVTJVQFVIVYCVkNWwldhV6FYAViCWaJZ41oBWmNbolwEXIRdA16iXwJgIWCBYKFgwWFBYeJiRWKhY8Fk4mVCZcJl4mbhZ4FnoWfjaANogWijacFqo2tBbAJsImzCbQJtwW4BbwFvQm9lb6Vv5HACcIJxAXFhciJyxXLic4JzpHQFdEN0onUDdUF1YnZjdsJ3onjBeqF6wXrhe2N8JHxEfIJ9A30hfgF+Qn6jfwR/goABgSGBYoMBg8GD4YRhhOKFJIVChYOFwYXihsWG4YhCiGGJIYlBigGKgYtBi+KMwo1CjqGPAY8jkCGQopDCkcGSA5Jhk2GUAZTClOGVQZXBleGWBpbhl0OXhZjimQKZIplBmWGZ4ZoBmiGaQZpkmuObAZuDnCKdw53hnmKew58hn6SgQqBhoIKiAqKho8GkgaTBpUGlYqaGpuKnYafBqOGpoqnFqiGqgaqhqyKsAaylrYGuIq6BruGvobChsMGxAbGjscGzQbOjs+G1AbXBtgG2grcit4S3orghuMK5QblhukS64bsFu6G8ArxhvIK8orzkvQW9Ib1FvWS9gr3ivkG/Ir9CwKLCA8Mhw0HDYcOhxQTFosakxwPHgcflyKLJZMmDykfKY8qBy4LLwc1BzWLN4c4BziTOwc7kzwHPgdEh0WHSAdKB0qHTAtPk1MLU4tUB1STVQdWF10XYg9oD2iLag9rh22HbodwC3KLeQd8B38HgAeAi4QPh4+IB4iLiROJj4qXjQ+Nj48HkhOTB5SHlQ+XB5eLmg+bE5uLnIedh54HoBOiD6OHpwenh6iPqo+vC7CHsQeyh7MLtAe3B7gHugu7B7uPvYu/C8EPwY/FB8YTxo/Hh8kLyYfLk8+H0ofTi9SL1YfWB9aH2Yvah9sH3Rvgi+IT5gfoB+iH6YfqB+wL7Yvvh/Ab8Y/yh/QH9Qf5B/uE=",
+                "FIt/EAAAgCAIBhAAAwHAEIBAENABCCAAQBAAABAAIAQgAEYABAAIBACIQAAAAQAAAAABAAAABCAAYAgAYAAAEEIgACMAAAGAQABAIABBAAIAgEAIgAAMgQBAAIgAAAAABAIQAAAAAABAAAhACIAQACUAFBCAIQCAAIBAAAAQBCAAQjEIAQAAAAgDCAAgAAAAAAAEAwAAEAAAAMAAAAEAQAAAAAAEAABGAAAQAAEAgACAIAACAwAAAAAQAAAAAAAMgAAAAQTAAIAAAEAAAAAAITAEAAAAGAABBAAAQgAAIgAKIBAgAAAAEAAAACAEAAAEAABBAEAwhMMZBAEMIQFAAIAAAEYAAGARQACAQAAAMQAEAAAQAEMAgCAAQQACAAQECAAAAAEAQAEEAAAEAAAgAEQBAAAAxAAAAAAAAABAAAAAgEEAAACAABhAAAAAEMIABAAIADAAAAEAAABCAAAAACMxAAAAAgAEUAAEAAAAAAAAAAAAABkAAAAgCAAABAAAgiAEAABAAgAACEQQACAIAAEABAiAEZAAAQQBAAAIgCAAAAAAAAAAAAAACSAgQACMIhAGAAAAAAAgGAAIAAAAQQAAAIQAAIAxAAAIAAAIgAAAEAwDIIAAAAAgAgCIAAgAUARAAAAgBCAAAAAAAQCAAAQAAAAAgAAIAAAIACgEAJECEAQABAEQAAAgQwAAAAwBIAYAACAAQAAAAACIAAgACIQAAEEQQAAAIAAAAABEAMIAAEQQAAAAAQAAEIQgAIogAKEAAAGUAAAGEAAAAAYgAAAAADGEQQACEAAAGAAAAIEAACAAAgAAAAABCAIwAAMIABEIQBhCAgAAAEQQkAAhQAEEAABAAAgDAYAgCAAAAAAMAAjIAAABAAYQEAIABAGAIgAGAQigAAAABAAARBCAAACCAIBCGIYgAAAAAAEAQAEAAAAGEAQAAAAIgAAAAAAAAAQAAAAACEAAAAAAAQAAIAAgAEQAAAAIADAAQQgCAAwgMAAAAAIABgAAQABAAAQAAIYRgIAIAAAEAygGEYAAAEAAAAEAACAAAACAAIBgAEAAgMAIBBGUIABAEYAAEAAAgAAYAAAMAAAAAAABOAIQBIAYgAMAAAAAEAAgAEYBAAAAABAIIACAAIAgAEAQAAAIgBAU4wAAUIBgAIAAAIEAAACEABBAAAAAAAQADCIAAAAAoAACAAwgAEAACAAgAgEAAgAMAABAEAICCMABQAIAAgAGEAAAAAgAAAMoAAAEABACMAhDKEpACAEAAACEAAAEAASBCEAAAAAAABCAAAACAAwAAEIQAAAAQCAIACBIAAggAAAgkAEYAAAUAAAAAYggCMAAAEMADhAAJgACAYAGCAAQAEEQAiAAAAkAAAAkCAoAjGAAAAAEAAAAEABDIMAwAAAIADAQpAhAABRCCAQSgAAAADCAAAAAIABhAAAgAIQBRBAAAAAAQYSBAAARBAAAAAAIAAAAAIAgAAgAAAARwAAAZACAEAAAGAIQAAAIiDAEAAAGQQAhAEAiACEAQAAEAwgAIYQAAIAQgCAAAACAAAACAAABAMQADAAAQAAEQAAAAAABCQAAACAIAACAIxgAIJBDMEAAgAAAAAIMAQAAEAgCAAAgAAAIQACEIACAERgAAAAABCAADACMAQCAEgAFGEYQgEEAQAEAABAOAADgEAAQAAIIBhAIAAACAAwCAAAQgAQ=",
+                "FIt/GQQgiEEoxjEYZCHGAQBBENASjGYQgCGMQRgKIoRhGEYRAGQxwBGIQgDGUYhkEMRiiCUYhDKIJQlKYgQhEIhAoCIQkhEAAxhGMRhhGAJSDCIQyhCMITCCMIRFAMAREEEQxiCMZhjAQIgAIEIglCAIBjEAQhiEQAQECMIgjIAQDDCIIAhEUhBDCYQSgKQIRkGMQSCCEIhiCEIRECEYAhMEQigGMQRGOEBhiCIRQlKMQwiEMIxECQZBAGMYggCEgxkCIQDDCMYUkKMZBiEIgTDEEQRDCEYRCEYQRCAIYhBAIAxBGE5xlEEIRAKMYhBKIYwCCEIyDUMJAgEQIxAOApAiGIYxkMIgRCEMIxBIEZAlKQIjCGQYwBCMQxEGQJiEGIAxBCIhhAKARRjGEQADGEohkIERAiEEoRgCIIxGGUAxDGMQinEAohhEM4wiAMACCEFARhGIaRnKcIkDCIAQjCARBjEIgghIAowiEcKgCGRIghCIQiDIMZBjEEYjBMcwwjGIYxFEEgBFEUaACCUIAnEIZBiAMZBCEUZRACAYhGEQJCBMEQkCEEIQgSEQBEAIJAiGIwwhEEhQhGQQRlEQIQlEsIxJEAYyDAEQTEGIgQjKMYxBCEQAiEUoiFEAYRDIUQTDCQAhBKIQQDKEJAlEIIBDEcYBCCQIRBCIYiFCAoyCEMQQjCYQBjAUYxhAIYhhAIYAiCIRQCAARCDCEoRBEERwiEQQREAQQThGMQxmAIQFCIYAykGEJRkGEJACOFARDKAgRhEIQzkAERRhCQQgkAYJAAGEQRFEQxBDGAqRAEUQgDCMYBCCIISoKMQxhENAgkGEohBGIICjCIYxFIMhRgEQQSiEEIwDIgQBiGAgxCMAYhBEEgAjCEJCBIEAgiCMQhCQEQijCEAQhCURAjIMgwDCQRCiIEYAgCIIQiEMIxkMMAhEEEgAjUFAhjCABgCEEQThGMYhDIIQhCGQQwGCAJAlCYQAjAAghEAMgzDEUQQnEEpADAAJAiAQgxBCQAhhAEIQiQUoSnGMAyjCQhAhMIIxiGIQQBEMxBEEQYBhGEYQkCIIRCEMJSDEEIyCEIIBBGEYRDCIIRjKMIQhOAIRBGIpQDMYYxBAIJREEEYxBEQJiGIMYyCCcIQiCMIQgIEJRDGUQSDOcIxBCQBwpCIIwFCQwhDAIQgiCQpDjCMQyjMApBFEMZgEEEYhCCEghlCIYAiEYxBhQIBiFEARCEIERBHIIIAkGAIxoEEoRBIEZACKM4yDGQZBjEExAjIEIwgEQQwhCWowjAMJCFEEYiBMEYgBIEYQEAAYwjAAQSCIIYyBIIgxHAEZBkCEYQEGMoghEEYgiGMRCiEAAQAEAQxiCA4RBOMQwiAMJAEIEAQCCIYTAKIQwhCIIyFEMQQCIMYSAGYgBCGIQilIMKBDGFIwDIMIAiEMARDGIAhhEMIgkKAghBGIJRDCMYhjEYBAgEMIRhEIIhlEYAxEUEIwBEIAxHGIYhDGIIwjGMJBjCQoyDCEQRDMQQhEGUAzACAxBBGMAxkEEYhCCMQxjQIZBgCAQikCAIhDEUgxjIIQihAEQCCEQgDDCQRgGGMoRFGIRgkEIghCEEIxjGEQiAIEQhAAUpkBCIBRhGYQiAEMgRCCFRAhEYZBDKQgjBGARiCAAhBFGAIxkEIgSBEEYCDOQIzjEQwhDIMYCCGMYxkKEgxiCIgQCEQ=",
+                "FIt/QQQShGMYxjEYZSnIUhQlEVAwiEcQykKJACDGkghhEIYiIGchAlEIZxkEIhSiQUQhjEMIylIURRmKYoSnGQhBCCgghkGQQxjEMZCiQMoyDGQYwiEYgyDKMIxkIMQQhCMhBEKUYiBGMoykCQpiDGQhSDEQQhiIMJjBQMoxJEdYxlQMYxhEUYxJGYZSiGIgxlKIZCEIYYhkEMQhlGIhSESIIyoOIwTFIgQwjCIRUFKIQxDGMRCFCUZSoKMRAiIUyiEEAhRjOMpUjEQhEFUIYjBGM5TEEMYxDEEgxEIQYhiEoxSEMI4yFIQggjKghREKIYgnOEQikKIRCiEQowjKIwjEEsZCCMQxSCIMozEGIRiEGUJRkGcpCCIMRSkEUhRkKEQyCSMxhDIMgxkGYgxjEQI0DKohiDEQZjkKMojlAIYhjGQg0GGIgykCMwyCENAxDGcQyiGMxRkEQZjEScZCmGEhijEUYxEIQowkCQRjCIUIDCGgoyGQQRRkYIqzCCMRCDMMgQhEMoxEEQghkGQRyCIIpBhIQZSiMQhhqEQoimGQYhEMZZCCOUQxiSIRQiMIQiiGNJDiGEZTiKIggiIQQhEMQQypEUaBEIMYRjIYYTBGIYzCGIwxHCUhhCKQgiEGIZDCMURihCMYymKUJRlKcRQhQMoiFMMZClIJJRHGMohjKQQhEGEYRBEQQzJIUYjkGIgxBOMRBFMMxAjEERxjIMQxkKIYxDIIQTiGQYyDCQZTCEEJHlEYoykEMYzhIMrhhIMQSDGFJBEGQIxIKEYhDGghBkIMQ1EIgYClMIwwjEIRSFGMhCCIQpRmIIxCDQYojDIcghnMIpCBIMwzjEQiAkEEQxFGgYjEIQRRiGcYjlMMQzCOEZBmMMRSDKQYhjQMhCiIEgilMIoxIIIQhDKIKREGIhCCKIoRiOMYhiEMpBCGUhCEEIZBjIQyRlMMZiDIAhhkEQhCDEQgyDIIpCIEUghkEMJBEKQgiDGMYzDSUhgkIgRRjIUySnGQiUEEIRwiGQpCFKJKDkGUJBiYIZRGGQhSFKIYgjEUQxFKEoxiGcRCiKMRBGGJJDiOMZBmMRgykGIYhFEMZCEEIYSEEQoxFOU5CjEUYjkIERRkGIIhkCIZBkOYJBoCYYyoMY5CjGEJBhGU4iFGcgwjEIJCJIkBCEGMZSIMIghGEIRClGMyQlEMoxjOE4xiGQIyGIMYiHGYhCiEQpgjEMhClYYYyGIMgiHCMYxkEERzoMIpCCGYZBCEQJBiGcpRDGERBiIUgyjGEx1iEQhhDEIZBkGUgyiGURBDMEiDEKUYxDGcQyJGIgxjMQYxkEMYzEKUYgjGEZglKIBShGEIzmGMZQjEI4SCEM5RFIUZhECUoSEGApBFKMQhCGcRyEKcZgkIIxRDIQwxEIIYjiIIpRIIMSCGGMqCjMIgiiGQYhEGUAhkGMBSEGIgjEKIQxmGQoyDIsxjlGMQhmEIiRlEYYxKYIRSGEMwiEGIZxiKUIhhOQoyEMQQgkMVQijMMRChGUoyhMUJhlKIYzGCMggjGQZBiQIpBEGEQiAKJKhEIMQhjCUYykGMZBDQQgxGOQZgjKMRAiKQZSmEI4RkGMJSCOQwSDIIRFCGMR0EOYQziIMhCEGIgSCKIYijKQYxiCMhAlGEggkKQhChIIQ2FIMJCCKMYioEURBjGMxxDEMZBjKUYyCQMohCOMoRnKM=",
+                "FIt/OQRCFUMZTDMU4zHKMgzjIRAyjOUpRmKUZBkKMgxjOUYijGQqRkMIZyDGUxDkQMYyGIMxyHEIZhFIcohkGogxjGYwyHMQSDjEUoxpKYoylIIpiHGUoyEENAxjKUpDEMUpBkKcYiGGYgxDIMoyCIQiiFUEZECOMoxEQQpzFQMozDQQZTIQM4ynKYhmjGQhVpQQZCEGYZhlIQpkEIQhCoKcZxEKMgijGUxhlKQSEFKQZhkGQgzlKUZSoOcRRGIZoiFGQhBiMQpRpKRZDFIMZDDGU4zDGMhCDKIYiDKQZCFMQqiDGchBFIUZCDGY5yGMQZjDMMoiEKMZUEOUpDMOMpUGKYxzDKN42mUMaBkMMhCDGURSCGcxSFMIRCoGMgyDGMhCkSgxSGEQZRkGUhRmGIpBkGUayjMI5xkOIYjGKNQxmIUhyGIQYiEGMoykGIhylGYYxiQQwjkYIgjEScpjGIkxFjGIpBmIUZCDIcgjFGgxBjIM5SGKYZyFUIpDFQMpiHGcpBEGMwxlKNJhkKURyFKQhSDGcZEDMQhDHUMhimGMyCmMY4xjKU5iESMiTEKUxTEMMyhkGMhjlUIgjDKVBDFMQhSHKYZyEOQgzEQUgjEMkZDDIMZCjMURCEKYZDnOcpjGIUyClKIwzmKUJCGKchikQcYTFOQZBGKMxyFIQRBkKQQiHIYxCIGUxTEKRRCkMQZRDOYoyIGcpyGMIxiFMVAijGUayCIcxVoIQwyHCQphkKERVDIQZTFIRBjmGRBDFOMhCKGJJRDGMgxEIUhiEMgiUoEMhjFMgoxiGJBSmGkgzFEUgyDGkxSlGUZElWQwxkMQ4yDGYhBmIZJBpIkiCGIQiTlIQpRFMUhTkGchTlIkxDFIIZSDIMaCpIUYiiGQpBDGYqimMYpSIKEhTiMNBSEGQ4zDIMpRFIIwijIIZRCYEhRiMMgyjIIZikKUpylMURjkOQJjDGcZhmKMZDHIRpCEGMYzEOoxiIIUYzEGUhjEEgZTmOExiDOQg0EGQpCIMYYzlKYpTmMIgyEGQpSGEYhUFEkhhkKcxCJEIhzEKJBSkOQoxmOJJiIEYiSFIQYxGIRJSEOQZSjKMpCnGUhSmENRBjORRBmIUZTkKMhhlEUpSDGYpDJMQ5UDMMZTFIUZzCGlBCEIchhIKMZypKU0jFEUZBEGMhimGUhDFKMhDJGMRBEOU5SEMYgyGIQZDHKUY0GOYxCkMQhhkGUhCDIQxSEEYxAkIk5RkKIpDEEMpjlKYRFCGcRSjIMxjEKIiBkQQxTIGQpTDEMZCoIYxBkGMZCEKQgTGKUYyGGUpSJWIpRjOYZDJGIhCFKUoikGghQjKEgyKGYxEDIQiSGEQhCCGIZBnIMhSEKUpRlEUIhkIs5CmKQpikKUaEDMIwzEGMxSkIM5ToKYhCDGYiDDGMqBkIQhSDIMxSEIJBEHEcRRDGYxECKMxBmKU5hCGsZRDIUwzDEUiRjGYhyqUUQxlEUySEGgZlDKZIyjOcg0EGMgkmMMphiGYpBkEUoyEKYgyEKkZCEIQxEHOQhRlQMhClMMxhmKdBCGKQoyFGUw0qKYZSFQIZSFOQyRoIMhBlGMQymGcQykMUxCFOU4yCMMRhkINB0FIQZClIMhDMGYpCIIIRClIMhjmMUhkrKMphmMUpCmGQYymEUhymKgaTIKQaBmGQpzGMoZRFQMhRmQYZTEGMgyHIU=",
+                "FIt/QQhSGKYZSEMIhTHIUhToOgo2FKYxDFKQhUkMUpDFKYxyFKQpSkKMiTEKYpyHOVZEFKgpiiMUpjEIY5TlGMxDDMQozDMRJimWQ6iGIM5CFKYZCHCYiSHMRCCkKQoyjMdRCGOcZTGMUpSEKYoxmKU6ikSUyDEKRIzjQQpTJGcgzHIgRDGQgaDkUYhClMUpSHIQZUsIQxSDGQyEFSdBzmIcxTEGQyTFGYYypKMpCFMQiDEKUo0nMYwyIMUihEIgxSHOQhSGMYp0kMUzjlMQiEmGMZTlIQhSIMIxSEMZJjLGcpjFGQ5TlMQhTFOcpUEOYZDHMM5DEKcxSFIUozoKchTCKQyCjGcZRFUMqEmIopSmMURTEKcyBoMQpkIGchSnOQqSpKUyCDKIgxpQI4ymIQ5SGKMZSmMc40FMQijmMQxTmMkhUGMIhSlKkpTFOdZTGGcwiqIUxTGMQhCnSYhDjIYZjHOhKEkIQhClKURSFMUxDGOQoykIYqBoQgxEGOZBilKYoyHMYxRFMNLxoKUgxlIY5hmKQxTGKQwzjIQ5TGGQqDmMQpSjMMZyFSMhylOQ5DJMQpSkMkhjtKY5jFGUhikMg4zHGYxzGSUgykGQiDlKwZSkKYyCkMkZiEKYZDlMcpzGMUhCFKchznMUxSGKcpinQcxjFKYwykGQhilKMpxkGYZDHKYZTmIYhRoMgpRlIQxTkKYpSIIcxDkGQpSjOQhCkKQhSEMUwzoMU5iFMkZiJaYpCEKMpSFIQpTjMY5BoKYpTKGMxSlOchilMcpyEIMxTFIMxSFIYpSlMUySGGNBSFOYgxlIZAyHIQZkFKgyxkSQ5SlEYpDlOZIhlKkyBmKYpklIY42DIZRSlIkpTkQQpCmIc5CGIMpDqQUxDlGZJSEIMqioOgxRoKRBiLMUhRpIU5EEMMpiHOQoklIQhSjIQpCoMM5TEUdJiFIQpEFIgpDkKQZlEKY5CFGUiyDIRBBkIVCTHOUhCFIQ4zDUUxinOQhjDKQxCnMQozGMQpSrGc5UjKdKTmIcpjlIQ5SGEYpSFMcpiEMcZCkIhBVjKQhCjMQqBmOYpiIIUhBmKUaCFIpJDkMVCSFOQ5ijOUhSjIQ4yEOYZTEKYhSFMYyyHIQhTEOYwxpSZxCISohUoIQZClKg5hkQQiRoINAyGKQxhmKQpikMUhSlIUZzFIYhzmKMiDDIQ5DJOQ5CGMgxDEIUhSnQUhknIhRyHKYpEGIQximKQxymGkyioKgSTIKUhClIYpiDIUhSIKQxiDKMoyjUUhyFGapBEKQhBnIYZDFIUpyMSQgyGIMpCnKQ4iFIpBzkOQgynIUxDFKoZCFKMyTlIUojpIcxDpGYxCDIQhClGYaTjIchSEGZBBkKgpylMQp0HIRCimKQ5iFGYxTGMQyTEOQ5CnMYpCmGUaEGKMhlEOMxjkIUZkFKkaCmMQ5iFKYhxiKNJBmKchDDSYxSEKQ5SEOQqRkKYxCKIRBCFGQ5TGGgZjEIVIyDMQZDFQMxCFMQpTlKQpDDGUwynIciDFEUiBjKQZzmGkqTlQYxiFMgpBnKcxCCMMpipMUwjjOcpRlgQhinKQySoOgpEmGNhiEOdAzjOMhSHKUoiDIUZCnIQiEIUYhTjKc5TDOYpyIKZREkIVCDjIQ5jGSYxzmMUxjmIQwjIKUJClMZBjGORBTkIQ5CIKchRqOghzjQYYzDIMZSKIQ=",
+                "FIt/McZDIKQxylMkxDHIUpSoIQxEEIQxSGKgqjFOkgkmIc5FmQYpiEKQpzEKYpyFOIozLIMZCkIghUoKM6joMkhSkKNRSGOhJUmWYqilKQxjIOUhSHIVBDmMRCymaQxCmSchCFKc5DIOUpzGKUo0FIU6jlIUxTmKQxDoQUxDIMQhkFIQhxmSYpinIg5zHGcpTnMQxSsIMxDJKZRCpScpDGKUhSFKM4ylKUhyoKcpUFOVJymIUxUHQchimGYhkFGQoynOQoylMY5SDKUqEFOVBjFQVJUkQQqTlMgxkpKQZRmKQpzEOU5CLMYwxnMcpTEIZZDEQY5TKIsZBmIUqToKYhjHKUySFKUhzFUZyCIIY5DnIUaikIUoykORg0lGQyTEQopynEUxiIIYhjjQUYxkKYhilMQpjFIYhTlOQpzkIUxkjIYqBlIU6CoOQyCFMQpDFSchjqKUxSGKc5ykEYpUlMYpSnOYazlOVJynKUxDHOQxjGUcpSDKQqDHKcqUGKQpkDIspDHMQpynGQpDFMYZyHKQxhmIQaDmMVJUnQQ5SGOQqCkQQpSqKcpTJSgqTKOlBDlKUqjHMQhTlMkhyGKUhymKg5iHIZRSlMc5zGIYw0GIwhhkIRAypMcZSFKYpjmMU5jlMQo0EMMhTnOMpjlKopSHMcpzEKUhDCKU5CGOopmmMUZEHIYhDnMQxSkMgpRpUVJUHOUhTkOghiFOUoyGKMhSHKkiyDGIxTkKY5imMghhoKVBSHQUpknKhBSHKZBCIMQhSKMUpCGKQhCEMVBzlIgyFFIYpTFSYyCEOUySmIUhxlKUpSHQg5BlOQqEJMYxTFMQ5DDKYyznGYyEIIUqElIUhikOcpjEIhBTmIZBTQKcxhlMY5EDIMpTKMMxTFGchSHQQhikMNCRlIUgzJKUhFFGc5kHIUZSkIZKkkOcxUjSNBSkIQhUsIUhSlIchCGMQhClKYxjKKQaSkIUqDDGRBDmMdCTnOUxioGVYyjKUiiKKghDIIghDkKcoxlIQpxmQY5olQYiSEMUhTkGchyGIghzFMU5SkMchEmQYZSmI0hznQQwyGMYhiHIU5iGKRBSlIdJiFGQaiEQZAzCOQqSkKYpikIQpkmIcZDFIYxiEKIhioOcxSmOcxCIKw5TlKgqTFMU5RoUMxDFOQhEFOkg0jKkhykIohSmKRJToGYhSlKZCDDIUxCEOQqTlKQhDGIUpCDMYhhFKMhSEMUxSFOYpSlKZBxmMcqDoMMiTjIUwzkIc5iFMUhSmSkzDDKcZCFSgpilGgYzFKQhEkQYxClGQhFsKkyDIOVJBGMUxEqIpBzHOQhDHIQxjHQopCFGNBTlEQg0HMYpzpWdBFnIUpTFKVBSMKQhCGEVBiHQU5yGKQjxlOkozHOUaElIghTlIQxhmMQxTEKYhBGGMiEDKQYzEMUpiGMcpEFMRSSHOQpyGOQx0DKoxRmMcpjjIk5CkKQ5zFIUxhEIZRSFIopSGKUiRnIUxioOUhSIOYxELUo5DGKIhTlKQoznOQwyFMUpSmOQhjFMRCDEIchTmSdBhkMQqTqKMxiHIYZilORBzKOMxiEMUpijKUxjIMkhUkIRiCEMcpxkMchTHS1ByEMcZCHOYZEIIU6DkGVRiKOUpyEIYhSlIUiBlIQhSlMUxSkMUyDoKQhCoKY5TkIhRDGGUxiEOQpVHKZRjGMcpykQYxRkIQZxkKU=",
+                "FIt/KUREFUYhylMIqFHIcpXHMY5mFMchTGKM6ElKUpyjMRxCLOYxjGQYhCkIRBSkIMxDDMUiCEKYpSEKQijnKdhimKhRzFOhJCqWQ5TFQQxDGMQpSnKlBjnKQhTDQgxDjOYxCFQcxSGIcpykMUhTEKY6jkSYwzlOgpSEKYpTFKcqUEKUp0kKVpEpOg5znGUxzFMUxCsMYxBkKQ5SEQU6UMKU6RmKQxTFKUplFMMhkEOQgzIMQgysOUyEHIQhClMVRBnMUpiFMYyhmOUZTFKUpjGMRJiGOUpxkKgpjEMQh0HKQxjFIMxymIYZDkMYhSEGQhSEMcojGKcpVFOkpSoKYxzlMcyCjOk5imMRyGpKQpikKQpCFKUpSkGQhUEMUxioMZZzGUgpRmQQhTEQU5SGKUhTjOYqSmOcpjmKMiDmMgxEkQYxBjSghSCOZKCmMUiSwMcZDJQchSGKUhCEOUZDFKU5kHIYxClMYpikKYhTnOQhkFMghSnQM5yEOdCzmScpjlIMxklKkhxnIQgylMdIzlGc6RlIUhSHIUhDFUYpVEOkZykMYhCqKUaCDSghUEIdBSFMUpiFIc5RmIVQzGMcpCDOg5inKdRzKKY4zFQM6jFOw5SjOcpUnKkpyHKUpEGONRjmQUxlkMUiCnKURijIk5VGQcxTJOQpTHIU5SmKQ5zmMVCDEKch0nKYpSIMdRBlQlJDnMMhCISUpkkOdBTlKU5kHMkhSlMUqDEQQ5DlIcximKcplFMQpikGUpSHIZBClOQpCHOYpDkGQhilIQxzFOQxilIYhFFSQiBnKUySkGUhDFKYhjkMcxjFKQ5kHOdBTGMQ5ikMchDHGcxClWUyCjIUpiFKYaCGMdBRlSlJDGKghSnMUxTHIc5iKIYxzEMQhSFSYpinQQwxmMUxzFOQhSkSdBRmKRJSlOYhWEOhJDjMRJiEMkqCFOgRBkIQxUEOUpEHKkhjFOMySmUUpSEOc5HEMZBBHKU5CIIIxCHKUpTqIQxTESUxCkIYhDLKQpBoKchSFIVJDkMYpSGIQ5lDEo5TFMkhlFKggymMYhjFKVBSkOQpRIMYhiFKchzEKlBylOUpDmKQaREKY5iFOcpSmIQ5CkKRBDFIYhjpGYxCEKgxSpOM5zIOYxSESU5ioIgiTmMU5SHOYhSEMQhTpIk40HMUhyjIoqimIViClQdBTJKVCCjMQ5DGOcihmMMhClKQxiEMUqllKM5SlOUxTEKYxiGKVByHKkqjFKYxTIGchzkKUyEFMRKRmKQpEEKU5TFSQZinIQhzKMY5UGQYpTHIcpVpKciBmMYgzIOUpDFMYyinOYhCmMVBilQohDFGoxCFQQxUHOQhSmGM5SFIcxjFKQpyIQQhyGKhAyHIQxylMUxDEIchSkMQhRLMYyDFMU5UEKQxVHKkhTmIk6DmKMZylOQpjjMU5DGMUpiJKVJSGKgpkGMMpSLMIaUDSkxylMVJClKYqSmOY0CGUchyGGM6TnKMxjIYYpSmMchELIcxTFUZRDEKY5TDQUpjmMYpCnOUxzEKQjCrOcqElIsxxmOQZSlKlBiHIUxDDMUhToKUhiFIUphjKQ5jIOQpCmKUxylSgZSGIchjIO0xTmOURCkOcwzDIlIyjGYpjjOYoyrKY5CkMYiSnIU6jGQRBSmKUxSFMM5SIKYhSDMgpjnOUxileNJDFIYpDFOc5yDQYgyHIghVmKQ=",
+                "FIt/OU5TkKYpiLIU6DHOU5RqMdBTHIYpjGMY4xlKVBylQYpDGMRRiEKcySkQUpyoKUgxlIYxzoIUyUFSg6jHKQhREKUhCHOgyCFGYxCDIUxTFMc6DHKUiCkMRC0GIRQyEOcpimMc5DnIc6CnKdBiIKYpzJSYpzlOgpTlKQxjFQYZDGQU6lEIQZEGOgZDHWUpRlKVBhsMQxykMQ5jlOQhynOYhDFQYh2lIgpCGMUyUJMUhFDMQpDpKYhimIUqiEOUpinOgpSjOMpUHeVBTlIUpTGMRJjEMcx1FIQximMUh0nMM6DDMUxyHGchjEOYZyrKRRSFIUpSnKkxCEOYpSlOYxiLMlSDFIM6CGIgqmmKYxDFKcpjEMQ5SjMUpUkQYpBmMoqSlSVBEoQg5SmKYxylMRRDlKYpDEQQxToKVBiFMgxClGYpTGSVBCmMYxVFMQijFMgpiFIMxCmKchkGMUx0EKQhyHMUhCkIwiCFKchzHIYxEGMkpDFMUaVGQZBCmGUxjlOc5SmMkxylGRBiFKUhSKKVKCmIUpjmUVBDDMYoyGOYpzmMQ5BlKQRipSUhynOchDoOlKCqKQiTFKVJzFQcqFKKg5ipKNSzFKghimOUgzlMwhDlIU50IIQqBqKUpTkMVRhlOYhSEIYpzHMUqTHOYqVGKVRCFIcpijMYpymKQxiIQQ5SnWYhDlOYZisKYhSGKsxDkIUhEISIxSjOUpCGKY5iHSlBDIKUo0mMY5DmMdJimQUpxoKYpCmOcpiEMZCSjKQhSHIcpiEOcphkIc50FWY5TIKcxyESchTHOUyTFQUhEFKQhiGMcxjEIY50mMVCClIY5SESQpEjGc6ToIlCDmIU6iFKYiCEQRBkGKYpTmGQxClMYp1DIcpjHKYxyoMUZ0KSYgyFMcxSIIcxzmIUZWFIdBSmKcpSHOYhGFOgpjFIUZiqKcw0kKRBSmKQxikUQpVMMUxTEKQpEoMYpSJIRpjFIRBTFOUpiFIUpTJSgqjqGMxDIMYoylIYpTHGQpDGKYpzlMYZDmOchyGIUpimKY5CGKkwxmIUxCDMYhDGQRCCoMQo0nMMhSFKtCTGMUpSnOYhCFKYqRjMQwykKQgykQU5hnKVDjEKc6DkGgxjkOghUpKUqjIMQxymSVJUoIgyTDKg5CEUZJiGOZByGKUxClMcpSmKciinKVhHFQYZEpIZBhkQMxkFUYhCEKYaBnQcxCkMYxjFIM5SnOdSCEIggzGKYpzHQgqCoOgxDFGUzDFOMxTkIZCSFIkpTEKYxVGMkhhnMapBlGUhhoMMxzGKYZ1lMdJjGMdJTlQk5DHIY6TGKMhDGKRZSnQpRDFKpBjlKQxCmQY5hmOVB0pScxyEIUhypGUpilKoZSGIU5TlMZBzHMcyEIMMhTLKUxyFKU5FHKU5TkMghClGMyDlMhBzIKUxymOUpSFQQqEIKRJCHIUhzjKppirKYpzGIkxiGIYxkGKoqUHKZEEHQUhUlIU5SGKkhTJKMxilMU50FWdpjkSYxijIYpSnKUoyqQYpSnOQxjmKUxzlOYx0lQgxUlKU5DFIUyCJOM5CmIshSlQxJjkKdBkqGQ6ymMU5iwORJkFSdBUFMMhhlKM5SGKYpjkScpTEIUpUHKcpTkOUhTlMY6RLQYxSmMUhilKdByqSM5iFOchBoMUpjGKMxzlOUxijIYxTIKYpCnMgpSmQYxTGKY5TkKQ=",
+                "FIt/OVKSkKYhSlQQhClKcpXEIRBEEKZJCHKlRjGKQhSlMwx0HQVRUFIdJkEOc5iEKY6TnIZJCFMRBUESgyimIhSDIKUxzGIgyCmWYpikIYxjHKVRknOVJzGMUyzoKUqTmKcpSIWQpTGMQ5CmQcxkEIgqiISoxzmWgpylQUxirQUhzGQkxDGQhJkjOhRyHKZBDlQRRjMSUhCmIVBTFKQqDGOcxUFOQpTlKkxSnMgqkJOU5iIKYxSGOY5TIQVRTGIMpiHOkozFKVRSlKgiSFIUpjlIchilQcpylGYZkIMghzHOgpzGQkpylIYhklMYpSFMYxTFKcxzHKkhyGOkpTmSQpjLcYpkFKhaCFMY6BnKYpknKdBUEOUxilMdBioMVCCIOYpzmSkxkGIgxSmQYpyqOcxjIKUpEHMc5VGMopzmKgxjJKYpiEGghjGKZRUFQQyTEMc5zGQcx0GGYhCqKQ6UnKc5inOUhUFIcpzlMUyEHOQxkJWUxkJQlCTlYRCymKchVJOdBzFQY5TlMUhiHMVJSlKUpkGIopSnUUhjFQcpjKQQpjoMYxDKKkxDpSYqCHUZJToQcijrIchTjI0x0GMciCKUghUJKkxTIQhJjGOYylHMwxzlIlSCnOkqCJKcpllOQiVHKZAzpOYhkHMU6zFGYpylKhRznKQxCGIQ5DFMYxmkKQxTFKYxznQUxCJMZRiLKUpzHQUyCoKVCTKKYpSkKg6UHIlBSmQYxTlQYqDIIdJimKY5zIKYpiGMcxylOkqCFQVJylOcxSmKkpjIIZRWEKUpTGIY5xsMdB0HKk6BjGYxjFKQxjmQZBSlMYhEpMlRSHKU5TmKQhjIKYxyEMU6DmMcpkFOgxEEKQpToScxxkMVBCIKVCVGOY5UqQYxikKUxCKSY5CnWQ6TlIg6TFKURTGKZCUJSlRRqKZJ2EOgiSESMpDmQQpyISRCDmOopilIQpSIeUo0lMYiSGKcpynQUhDkKRBDoOVpTIIU5SGKUhjIKcxTHIYxGEQY5UkIUhjHQUxDoGUiTlOUhzmGg6imOY5ilKUpCFQZBjGKYhjEMUhRqMUyCnMQxTIQkyTGMkwzHQg5RmKQiTJKQ50FORpypMVBxlKRBTLMcpEGMZBjlMg5TpMUqkpQkxjHScqjlUgqSmOVJlHIYxhmIQyEGWkxyEOMpTEKY5SoQZhjHQUpzGWVChlKghymOZhDmQYpEnQcpDnOUpTGGY5jlMc5TkKUxzFOcxSmIkpToQU5DoMgyhmIhRimIYhykKU5jmQk6FHcUpjJIc5TFIU5UoIUwzGKUhjJScpilMhJDFKNBjHKkpUHMYhkHQNBUEQpSDHOghhkKYpRmKYpzGOYxjFIYpjleY53FGU5SmKYpiJMRDjlMpBiHKgyhoMU5iHUUqEKOg5CJOUg0GOcpiESghDkac6UESUyTHSUy0FOgqDGUU5TGMUyTHKUpkGMdBzpGlBCFMU5TmMY5UGQYyEmKQxCnMRZyGKYqDJKZBilOUx0HIZBTFKMxiJSg5TEYQxUJOkxDlOYZ0EKRCTHOUxknQQh1FKQpSIOdBUnMVQzHKQ5imWsxhlQpBSoKZCDMIk5zQMUpilOMxUGIUxiFMU6THOUplEIYxyFORR1mKZJTFKUoyrIYhTFKY6DmOkiEFKZJEKMYhitIgyyGKUxjkKgxTmMZBCjKQpDmScpjkQchyFQYhinQhIzKMQ=",
+                "FIt/OMyEpQkikHIc6THKdKFHKNDDGIYpjGQtAzlKcpCmKxxjGMUxjHIUhyEKYpSlMZBimMYhyGKZBTEIUqipKcxioMcxFEKkpzGOUxTmWoxRnOQ50kKU5TnKNSzEMYpjGIUpDHOY5jEI05DnQcpUIMZiikSUxjmOgxCoQsZiMQc5jFOU5ElQU5EjQMpCnKgpSFKY5TsMUgzGGVBjoKkZynKUyCFGc5TlKlBTlOZCkEORKTFMcxTLKVBSlMUqDkKRRTuQQxTDMVRSIGYiTFSYijnMoiDGScxSlOZZkGIgqEmOg5SkMYqBEIUxzIKYaTlOUhilQUxynIQh0FMlBjHMgxylKcqCkQUhTFMUyEpKMqTHMcplHIUpCoIZBCoKQ5ilOcpzEQZBWmSQp0mQYhDkKUxjoMc50HOc5iKKQxymKUyTGKcpSlUYxTFOZBSkMVCSkOY50GKUxiqIUykGMQ5WIMZBjIMkxTHOVJiJUUpCHKY5EFIYZiHKkqCGQUximKUykGOoxzEQtBTmUQ5ilQZBjEKUZjmKcxTnUUpklMUpjEKUZTmKgpSlGUqCqSYp0lINIzEQkyCkOtAykOYxCkGZBkGUgiClMY6TGOg6EFOUylHQxBjkMYpCoMkxzpQgpTsOgqynKUhyoIY5THQVJUFOYhinKVRznMQ5yFIYxClMY5DFMcqDIKYxTjOQhjJMUxiHOYxjFMgxikMY5joOU6DGKc5FGMUpTjIZCCkMUhTJIU6SmKYpCkKUxzlKQqxnOQyTmKQg1KOcxxmMciSlIg5RlMY5hmKcxzIMU5TFKY5zINAxTIKU5kHKkySmMUxCHKYxzHIM5imOhhDGKYxkIIgiFlOkhTHIgxiJKYhUFSZBClKY5CHIkpCmKgxEKIgyDHKYpxnSUxTIMQxCIGYhTjKYxyHKQ5znOc5iEOk5TGMQxjGUQiykUgpilIZBjGKc5ymMYxVMOUxEHMYqTGQgqynMVpTKGkpjkOUozoMcZznMY5UFOY5DJSZBTkIcpSGIQxTnKUhUoMUhjoWUhTmMU5SmKc5iHOcxTFMU5CEKQ5EHWMpWqMgximUZBjKKQxjGIYpTGMYpClIQiTEKNSElKppDJOdBilKZBTEOcpinMc4ykMohymIYp0oMkpjFIcqjEOgqSEKU5UEQY5jGMg5ilWhJioSgxyoKk6iKKkpzmKciCoMVCSlKU5DmSg5znQUpSmMgxVlKVBzEIY5iFUU5ClMUxynKs5knQkxSFUUwzoKgzGFMUxipMQpzoGgxjnUUpFLMcxzmMepjGOUxEGKY5EGIdJkFKYZjJOZJTFKRJknKUximIQxTIIYpCmQoqUFUUxDEKRZiFQg5iGWYyDJIUpzHKZBCFIUpSmOYpjGMUhSlOpRSpKc5inIUiDIUUqCFMZJCpIcpTEKchTFSk6SEQYxyHMgqSoOUpTHQgyClUU5ylMghVkKYq0GMYpTEMVBEkMYySEOcyUGQUxTHUUhWFSVaDmKUZiHIYyxlMcpELIVJjlIYpUlQgxTlKU6EFKUpjmIQpzpMciEmMQxUlKYhSkOohSlMUxipOcqDnMQpClWc5jFMohCpKQ6ksOchjwKUxDkMUpylIRJjnMQxykKYpElQdB0FKY5TmWU6jGQVBjnIY5SqOYaDEOUZjGKgpjmMQZkFMdRTkKUxDnUhRDFMYxSlKQpkFIcqCGMgpjmQchEGig5FKMU=",
+            ];
+
+            let mut hll = HllInstance::new(2048).unwrap();
+
+            for d in data {
+                let s = base64::decode(d).unwrap();
+                let h = HllInstance::read_hll_storage_spec(&s).unwrap();
+                hll.merge_with(&h);
+            }
+
+            assert_eq!(hll.cardinality(), 260925);
         }
     }
 
@@ -1568,10 +1752,10 @@ mod tests {
 
     impl TestingHll {
         pub fn new(index_bit_len: u8) -> TestingHll {
-            return TestingHll {
+            TestingHll {
                 index_bit_length: index_bit_len,
                 buckets: vec![0; number_of_buckets(index_bit_len) as usize],
-            };
+            }
         }
 
         pub fn insert_hash(&mut self, hash: u64) {
@@ -1582,7 +1766,7 @@ mod tests {
         }
 
         pub fn buckets(&self) -> &[u32] {
-            return &self.buckets;
+            &self.buckets
         }
     }
 }

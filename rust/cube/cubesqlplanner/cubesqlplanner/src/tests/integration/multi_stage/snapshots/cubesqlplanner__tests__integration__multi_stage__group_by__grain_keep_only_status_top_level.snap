@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/group_by.rs
+assertion_line: 121
+expression: result
+---
+orders__category | orders__amount_grain_keep_only_status
+-----------------+--------------------------------------
+books            | 2250.00                              
+clothing         | 2250.00                              
+electronics      | 2250.00

@@ -32,9 +32,7 @@ tokens {
 }
 
 @lexer::header {
-  import { Token } from 'antlr4ts/Token';
-  import { CommonToken } from 'antlr4ts/CommonToken';
-  import { Python3Parser } from './Python3Parser';
+import Python3Parser from './Python3Parser';
 }
 
 @lexer::members {

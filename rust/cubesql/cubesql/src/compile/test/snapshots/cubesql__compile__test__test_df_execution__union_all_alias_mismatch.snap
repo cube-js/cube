@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_df_execution.rs
+expression: "execute_query(query.to_string(), DatabaseProtocol::PostgreSQL,).await.unwrap()"
+---
++-----+-----+
+| foo | bar |
++-----+-----+
+| foo | bar |
++-----+-----+

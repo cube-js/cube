@@ -20,7 +20,7 @@ pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, ProtocolError> {
             None => Ok(PgTypeId::TIMESTAMP),
             Some(_) => Ok(PgTypeId::TIMESTAMPTZ),
         },
-        DataType::Null => Ok(PgTypeId::BOOL),
+        DataType::Null => Ok(PgTypeId::TEXT),
         DataType::List(field) => match field.data_type() {
             DataType::Boolean => Ok(PgTypeId::ARRAYBOOL),
             DataType::Int8 => Ok(PgTypeId::ARRAYINT2),

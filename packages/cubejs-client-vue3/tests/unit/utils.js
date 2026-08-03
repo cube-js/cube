@@ -1,7 +1,7 @@
-import cubejsApi from '@cubejs-client/core';
+import cubeApi from '@cubejs-client/core';
 
-export function createCubejsApi() {
-  return cubejsApi('token', {
+export function createCubeApi() {
+  return cubeApi('token', {
     apiUrl: 'http://localhost:4000'
   });
 }

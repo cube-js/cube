@@ -1,22 +1,22 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('AsyncModule', () => {
   jest.setTimeout(200000);
 
   it('gutter', async () => {
-    const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
-    const rp = require('request-promise');
-    
+    const { joinGraph, cubeEvaluator, compiler } = prepareJsCompiler(`
+    const fetch = require('node-fetch');
+
     asyncModule(async () => {
-      await rp('http://www.google.com');
-      
+      await fetch('http://www.google.com');
+
       cube('visitors', {
         sql: \`
         select * from visitors
         \`,
-  
+
         measures: {
           visitor_count: {
             type: 'count',
@@ -29,7 +29,7 @@ describe('AsyncModule', () => {
             drillMemberReferences: [source, created_at]
           }
         },
-  
+
         dimensions: {
           source: {
             type: 'string',
@@ -57,9 +57,9 @@ describe('AsyncModule', () => {
   });
 
   it('import local node module', async () => {
-    const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
+    const { joinGraph, cubeEvaluator, compiler } = prepareJsCompiler(`
     import { foo } from '../../test/unit/TestHelperForImport.js';
-    
+
     cube(foo(), {
       sql: \`
       select * from visitors

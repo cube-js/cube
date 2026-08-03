@@ -1,14 +1,14 @@
-use crate::{sql::SessionState, CubeError};
-use log::{Level, LevelFilter, Log};
+use crate::{compile::DatabaseProtocolDetails, sql::SessionState, CubeError};
+use arc_swap::ArcSwap;
+use log::{Level, LevelFilter};
 use std::{
     collections::HashMap,
     fmt::Debug,
-    sync::{Arc, RwLock},
+    sync::{Arc, LazyLock},
 };
 
-lazy_static! {
-    static ref REPORTER: RwLock<Box<dyn LogReporter>> = RwLock::new(Box::new(LocalReporter::new()));
-}
+static REPORTER: LazyLock<ArcSwap<Box<dyn LogReporter>>> =
+    LazyLock::new(|| ArcSwap::from_pointee(Box::new(LocalReporter::new())));
 
 pub trait LogReporter: Send + Sync + Debug {
     fn log(&self, event: String, properties: HashMap<String, String>, level: Level);
@@ -37,21 +37,16 @@ impl LogReporter for LocalReporter {
 pub struct ReportingLogger {}
 
 impl ReportingLogger {
-    pub fn init(
-        logger: Box<dyn Log>,
-        reporter: Box<dyn LogReporter>,
-        max_level: LevelFilter,
-    ) -> Result<(), CubeError> {
-        let mut guard = REPORTER
-            .write()
-            .expect("failed to unlock REPORTER for writing");
-        *guard = reporter;
-
-        log::set_boxed_logger(logger)?;
+    pub fn init(reporter: Box<dyn LogReporter>, max_level: LevelFilter) -> Result<(), CubeError> {
+        REPORTER.swap(Arc::new(reporter));
         log::set_max_level(max_level);
 
         Ok(())
     }
+}
+
+pub fn set_reporter(reporter: Box<dyn LogReporter>) {
+    REPORTER.swap(Arc::new(reporter));
 }
 
 pub trait ContextLogger: Send + Sync + Debug {
@@ -74,7 +69,8 @@ impl SessionLogger {
         if let Some(name) = self.session_state.get_variable("application_name") {
             meta_fields.insert("appName".to_string(), name.value.to_string());
         }
-        let protocol = self.session_state.protocol.to_string();
+
+        let protocol = self.session_state.protocol.get_name().to_string();
         meta_fields.insert("protocol".to_string(), protocol);
         meta_fields.insert("apiType".to_string(), "sql".to_string());
 
@@ -93,9 +89,7 @@ impl ContextLogger for SessionLogger {
 }
 
 fn report(event: String, properties: HashMap<String, String>, level: Level) -> bool {
-    let guard = REPORTER
-        .read()
-        .expect("failed to unlock REPORTER for reading");
+    let guard = REPORTER.load();
     if !guard.is_active() {
         return false;
     }

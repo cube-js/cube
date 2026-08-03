@@ -1,0 +1,14 @@
+---
+source: cubesqlplanner/src/tests/integration/views.rs
+expression: result
+---
+orders_view__id | orders_view__status | orders_view__count
+----------------+---------------------+-------------------
+1               | completed           | 1                 
+2               | completed           | 1                 
+3               | pending             | 1                 
+4               | completed           | 1                 
+5               | pending             | 1                 
+6               | completed           | 1                 
+7               | pending             | 1                 
+8               | completed           | 1

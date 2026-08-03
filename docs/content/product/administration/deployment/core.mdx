@@ -1,0 +1,544 @@
+# Deploying Cube Core with Docker
+
+This guide walks you through deploying Cube with Docker.
+
+<WarningBox>
+
+This is an example of a production-ready deployment, but real-world deployments
+can vary significantly depending on desired performance and scale.
+
+</WarningBox>
+
+<InfoBox>
+
+If you'd like to deploy Cube to [Kubernetes](https://kubernetes.io), please
+refer to the following resources with Helm charts:
+[`gadsme/charts`](https://github.com/gadsme/charts) or
+[`OpstimizeIcarus/cubejs-helm-charts-kubernetes`](https://github.com/OpstimizeIcarus/cubejs-helm-charts-kubernetes/tree/release-v0.1).
+
+These resources are community-maintained, and they are not maintained by the
+Cube team. Please direct questions related to these resources to their authors.
+
+</InfoBox>
+
+## Prerequisites
+
+- [Docker Desktop][link-docker-app]
+
+## Configuration
+
+Create a Docker Compose stack by creating a `docker-compose.yml`. A
+production-ready stack would at minimum consist of:
+
+- One or more Cube API instance
+- A Cube Refresh Worker
+- A Cube Store Router node
+- One or more Cube Store Worker nodes
+
+An example stack using BigQuery as a data source is provided below:
+
+<InfoBox>
+
+**Using macOS or Windows?** Use `CUBEJS_DB_HOST=host.docker.internal` instead of
+`localhost` if your database is on the same machine.
+
+</InfoBox>
+
+<InfoBox>
+
+**Using macOS on Apple Silicon (arm64)?** Use the `arm64v8` tag for Cube Store
+[Docker images](https://hub.docker.com/r/cubejs/cubestore/tags?page=&page_size=&ordering=&name=arm64v8),
+e.g., `cubejs/cubestore:arm64v8`. 
+
+</InfoBox>
+
+<InfoBox>
+
+Note that it's a best practice to use specific locked versions, e.g.,
+`cubejs/cube:v0.36.0`, instead of `cubejs/cube:latest` in production.
+
+</InfoBox>
+
+```yaml
+services:
+  cube_api:
+    restart: always
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_API_SECRET=secret
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cube_refresh_worker
+      - cubestore_router
+      - cubestore_worker_1
+      - cubestore_worker_2
+
+  cube_refresh_worker:
+    restart: always
+    image: cubejs/cube:latest
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_API_SECRET=secret
+      - CUBEJS_REFRESH_WORKER=true
+    volumes:
+      - .:/cube/conf
+
+  cubestore_router:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+
+  cubestore_worker_1:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
+      - CUBESTORE_WORKER_PORT=10001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+    depends_on:
+      - cubestore_router
+
+  cubestore_worker_2:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
+      - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
+      - CUBESTORE_WORKER_PORT=10002
+      - CUBESTORE_REMOTE_DIR=/cube/data
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+    volumes:
+      - .cubestore:/cube/data
+    depends_on:
+      - cubestore_router
+```
+
+## Set up reverse proxy
+
+In production, the Cube API should be served over an HTTPS connection to ensure
+security of the data in-transit. We recommend using a reverse proxy; as an
+example, let's use [NGINX][link-nginx].
+
+<InfoBox>
+
+You can also use a reverse proxy to enable HTTP 2.0 and GZIP compression
+
+</InfoBox>
+
+First we'll create a new server configuration file called `nginx/cube.conf`:
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name cube.my-domain.com;
+
+  ssl_protocols               TLSv1 TLSv1.1 TLSv1.2;
+  ssl_ecdh_curve              secp384r1;
+  # Replace the ciphers with the appropriate values
+  ssl_ciphers                 "ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384 OLD_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 OLD_TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256";
+  ssl_prefer_server_ciphers   on;
+  ssl_certificate             /etc/ssl/private/cert.pem;
+  ssl_certificate_key         /etc/ssl/private/key.pem;
+  ssl_session_timeout         10m;
+  ssl_session_cache           shared:SSL:10m;
+  ssl_session_tickets         off;
+  ssl_stapling                on;
+  ssl_stapling_verify         on;
+
+  location / {
+    proxy_pass http://cube:4000/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
+```
+
+Then we'll add a new service to our Docker Compose stack:
+
+```yaml
+services:
+  ...
+  nginx:
+    image: nginx
+    ports:
+      - 443:443
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+      - ./ssl:/etc/ssl/private
+```
+
+Don't forget to create a `ssl` directory with the `cert.pem` and `key.pem` files
+inside so the Nginx service can find them.
+
+For automatically provisioning SSL certificates with LetsEncrypt, [this blog
+post][medium-letsencrypt-nginx] may be useful.
+
+## Security
+
+### Use JSON Web Tokens
+
+Cube can be configured to use industry-standard JSON Web Key Sets for securing
+its API and limiting access to data. To do this, we'll define the relevant
+options on our Cube API instance:
+
+<WarningBox>
+
+If you're using [`queryRewrite`][ref-config-queryrewrite] for access control,
+then you must also configure
+[`scheduledRefreshContexts`][ref-config-sched-ref-ctx] so the refresh workers
+can correctly create pre-aggregations.
+
+</WarningBox>
+
+```yaml
+services:
+  cube_api:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_API_SECRET=secret
+      - CUBEJS_JWK_URL=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>/.well-known/jwks.json
+      - CUBEJS_JWT_AUDIENCE=<APPLICATION_URL>
+      - CUBEJS_JWT_ISSUER=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>
+      - CUBEJS_JWT_ALGS=RS256
+      - CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_worker_1
+      - cubestore_worker_2
+      - cube_refresh_worker
+```
+
+### Securing Cube Store
+
+All Cube Store nodes (both router and workers) should only be accessible to Cube
+API instances and refresh workers. To do this with Docker Compose, we simply
+need to make sure that none of the Cube Store services have any exposed
+
+## Monitoring
+
+All Cube logs can be found by through the Docker Compose CLI:
+
+```bash
+docker-compose ps
+
+           Name                           Command               State                    Ports
+---------------------------------------------------------------------------------------------------------------------------------
+cluster_cube_1                 docker-entrypoint.sh cubej ...   Up      0.0.0.0:4000->4000/tcp,:::4000->4000/tcp
+cluster_cubestore_router_1     ./cubestored                     Up      3030/tcp, 3306/tcp
+cluster_cubestore_worker_1_1   ./cubestored                     Up      3306/tcp, 9001/tcp
+cluster_cubestore_worker_2_1   ./cubestored                     Up      3306/tcp, 9001/tcp
+
+docker-compose logs
+
+cubestore_router_1    | 2021-06-02 15:03:20,915 INFO  [cubestore::metastore] Creating metastore from scratch in /cube/.cubestore/data/metastore
+cubestore_router_1    | 2021-06-02 15:03:20,950 INFO  [cubestore::cluster] Meta store port open on 0.0.0.0:9999
+cubestore_router_1    | 2021-06-02 15:03:20,951 INFO  [cubestore::mysql] MySQL port open on 0.0.0.0:3306
+cubestore_router_1    | 2021-06-02 15:03:20,952 INFO  [cubestore::http] Http Server is listening on 0.0.0.0:3030
+cube_1                | 🚀 Cube API server (vX.XX.XX) is listening on 4000
+cubestore_worker_2_1  | 2021-06-02 15:03:24,945 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
+cubestore_worker_1_1  | 2021-06-02 15:03:24,830 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
+```
+
+## Update to the latest version
+
+Find the latest stable release version [from
+Docker Hub][link-cubejs-docker]. Then update your `docker-compose.yml` to use
+a specific tag instead of `latest`:
+
+```yaml
+services:
+  cube_api:
+    image: cubejs/cube:v0.36.0
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
+      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
+      - CUBEJS_DB_EXPORT_BUCKET=cubestore
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_API_SECRET=secret
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_router
+      - cube_refresh_worker
+```
+
+## Extend the Docker image
+
+If you need to use dependencies (i.e., Python or npm packages) with native
+extensions inside [configuration files][ref-config-files] or [dynamic data
+models][ref-dynamic-data-models], build a custom Docker image.
+
+You can do this by creating a `Dockerfile` and a corresponding
+`.dockerignore` file:
+
+```bash
+touch Dockerfile
+touch .dockerignore
+```
+
+Add this to the `Dockerfile`:
+
+```dockerfile
+FROM cubejs/cube:latest
+
+COPY . .
+RUN apt update && apt install -y pip
+RUN pip install -r requirements.txt
+RUN npm install
+```
+
+And this to the `.dockerignore`:
+
+```gitignore
+model
+cube.py
+cube.js
+.env
+node_modules
+npm-debug.log
+```
+
+Then start the build process by running the following command:
+
+```bash
+docker build -t <YOUR-USERNAME>/cube-custom-image .
+```
+
+Finally, update your `docker-compose.yml` to use your newly-built image:
+
+```yaml
+services:
+  cube_api:
+    image: <YOUR-USERNAME>/cube-custom-image
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_API_SECRET=secret
+      # Other environment variables
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - cubestore_router
+      - cube_refresh_worker
+      # Other container dependencies
+```
+
+Note that you shoudn't mount the whole current folder (`.:/cube/conf`)
+if you have dependencies in `package.json`. Doing so would effectively
+hide the `node_modules` folder inside the container, where dependency files
+installed with `npm install` reside, and result in errors like this:
+`Error: Cannot find module 'my_dependency'`. In that case, mount individual files:
+
+```yaml
+    # ...
+    volumes:
+      - ./model:/cube/conf/model
+      - ./cube.js:/cube/conf/cube.js
+      # Other necessary files
+```
+
+## Production checklist
+
+<InfoBox>
+
+Thinking of migrating to the cloud instead? [Click
+here][blog-migrate-to-cube-cloud] to learn more about migrating a self-hosted
+installation to [Cube Cloud][link-cube-cloud].
+
+</InfoBox>
+
+This is a checklist for configuring and securing Cube for a production
+deployment.
+
+### Disable Development Mode
+
+When running Cube in production environments, make sure development mode is
+disabled both on API Instances and Refresh Worker. Running Cube in development
+mode in a production environment can lead to security vulnerabilities. Enabling
+Development Mode in Cube Cloud is not recommended. Development Mode will expose
+your data to the internet. You can read more on the differences between
+[production and development mode here][link-cubejs-dev-vs-prod].
+
+<InfoBox>
+
+Development mode is disabled by default.
+
+</InfoBox>
+
+```dotenv
+# Set this to false or leave unset to disable development mode
+CUBEJS_DEV_MODE=false
+```
+
+### Set up Refresh Worker
+
+To refresh in-memory cache and [pre-aggregations][ref-schema-ref-preaggs] in the
+background, we recommend running a separate Cube Refresh Worker instance. This
+allows your Cube API Instance to continue to serve requests with high
+availability.
+
+```dotenv
+# Set to true so a Cube instance acts as a refresh worker
+CUBEJS_REFRESH_WORKER=true
+```
+
+### Set up Cube Store
+
+<WarningBox>
+
+While Cube can operate with in-memory cache and queue storage, there're multiple
+parts of Cube which require Cube Store in production mode. Replicating Cube
+instances without Cube Store can lead to source database degraded performance,
+various race conditions and cached data inconsistencies.
+
+</WarningBox>
+
+Cube Store manages in-memory cache, queue and pre-aggregations for Cube. Follow
+the [instructions here][ref-caching-cubestore] to set it up.
+
+Depending on your database, Cube may need to "stage" pre-aggregations inside
+your database first before ingesting them into Cube Store. In this case, Cube
+will require write access to a dedicated schema inside your database.
+The schema name is `prod_pre_aggregations` by default. It can be set using the
+[`pre_aggregations_schema` configration option][ref-conf-preaggs-schema].
+
+<InfoBox>
+
+You may consider enabling an export bucket which allows Cube to build large
+pre-aggregations in a much faster manner. It is currently supported for
+BigQuery, Redshift, Snowflake, and some other data sources. Check [the relevant
+documentation for your configured database][ref-config-connect-db] to set it up.
+
+</InfoBox>
+
+### Secure the deployment
+
+If you're using JWTs, you can configure Cube to correctly decode them and inject
+their contents into the [Security Context][ref-sec-ctx]. Add your authentication
+provider's configuration under [the `jwt` property of your `cube.js`
+configuration file][ref-config-jwt], or if using environment variables, see
+`CUBEJS_JWK_*`, `CUBEJS_JWT_*` in the [Environment Variables
+reference][ref-env-vars].
+
+### Set up health checks
+
+Cube provides [Kubernetes-API compatible][link-k8s-healthcheck-api] health check
+(or probe) endpoints that indicate the status of the deployment. Configure your
+monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
+[`/livez`][ref-api-livez] API endpoints so you can check on the Cube
+deployment's health and be alerted to any issues.
+
+### Appropriate cluster sizing
+
+There's no one-size-fits-all when it comes to sizing a Cube cluster and its
+resources. Resources required by Cube significantly depend on the amount of
+traffic Cube needs to serve and the amount of data it needs to process. The
+following sizing estimates are based on default settings and are very generic,
+which may not fit your Cube use case, so you should always tweak resources based
+on consumption patterns you see.
+
+#### Memory and CPU
+
+Each Cube cluster should contain at least 2 Cube API instances. Every Cube API
+instance should have at least 3GB of RAM and 2 CPU cores allocated for it.
+
+Refresh workers tend to be much more CPU and memory intensive, so at least 6GB
+of RAM is recommended. Please note that to take advantage of all available RAM,
+the Node.js heap size should be adjusted accordingly by using the
+[`--max-old-space-size` option][node-heap-size]:
+
+```sh
+NODE_OPTIONS="--max-old-space-size=6144"
+```
+
+[node-heap-size]:
+  https://nodejs.org/api/cli.html#--max-old-space-sizesize-in-megabytes
+
+The Cube Store router node should have at least 6GB of RAM and 4 CPU cores
+allocated for it. Every Cube Store worker node should have at least 8GB of RAM
+and 4 CPU cores allocated for it. The Cube Store cluster should have at least
+two worker nodes.
+
+#### RPS and data volume
+
+Depending on data model size, every Core Cube API instance can serve 1 to 10
+requests per second. Every Core Cube Store router node can serve 50-100 queries
+per second. As a rule of thumb, you should provision 1 Cube Store worker node
+per one Cube Store partition or 1M of rows scanned in a query. For example if
+your queries scan 16M of rows per query, you should have at least 16 Cube Store
+worker nodes provisioned. Please note that the number of raw data rows doesn't
+usually equal the number of rows in pre-aggregation. At the same time, queries
+don't usually scan all the data in pre-aggregations, as Cube Store uses
+partition pruning to optimize queries. `EXPLAIN ANALYZE` can be used to see
+scanned partitions involved in a Cube Store query. Cube Cloud ballpark
+performance numbers can differ as it has different Cube runtime.
+
+### Optimize usage
+
+<ReferenceBox>
+
+See [this recipe][ref-data-store-cost-saving-guide] to learn how to optimize
+data source usage.
+
+</ReferenceBox>
+
+[blog-migrate-to-cube-cloud]:
+  https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
+[link-cube-cloud]: https://cubecloud.dev
+[link-cubejs-dev-vs-prod]: /product/configuration#development-mode
+[link-k8s-healthcheck-api]:
+  https://kubernetes.io/docs/reference/using-api/health-checks/
+[ref-config-connect-db]: /connecting-to-the-database
+[ref-caching-cubestore]: /product/caching/running-in-production
+[ref-conf-preaggs-schema]: /product/configuration/reference/config#pre_aggregations_schema
+[ref-env-vars]: /product/configuration/reference/environment-variables
+[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
+[ref-sec-ctx]: /product/auth/context
+[ref-config-jwt]: /product/configuration/reference/config#jwt
+[ref-api-readyz]: /product/apis-integrations/rest-api/reference#readyz
+[ref-api-livez]: /product/apis-integrations/rest-api/reference#livez
+[ref-data-store-cost-saving-guide]: /product/configuration/recipes/data-store-cost-saving-guide
+[medium-letsencrypt-nginx]:
+  https://pentacent.medium.com/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71
+[link-cubejs-docker]: https://hub.docker.com/r/cubejs/cube
+[link-docker-app]: https://www.docker.com/products/docker-app
+[link-nginx]: https://www.nginx.com/
+[ref-config-files]: /product/configuration#cubepy-and-cubejs-files
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
+[ref-config-sched-ref-ctx]:
+  /product/configuration/reference/config#scheduledrefreshcontexts

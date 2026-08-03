@@ -20,7 +20,7 @@ export class CubeCheckDuplicatePropTranspiler implements TranspilerInterface {
     };
   }
 
-  protected compileExpression(expr: t.Expression) {
+  protected compileExpression(expr: t.Expression | t.PrivateName) {
     if (expr.type === 'Identifier') {
       return expr.name;
     }

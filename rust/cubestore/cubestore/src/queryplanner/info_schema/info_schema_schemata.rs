@@ -1,9 +1,9 @@
 use crate::metastore::{IdRow, MetaStoreTable, Schema};
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
-use arrow::array::{ArrayRef, StringArray};
-use arrow::datatypes::{DataType, Field};
 use async_trait::async_trait;
+use datafusion::arrow::array::{ArrayRef, StringBuilder};
+use datafusion::arrow::datatypes::{DataType, Field};
 use std::sync::Arc;
 
 pub struct SchemataInfoSchemaTableDef;
@@ -12,22 +12,27 @@ pub struct SchemataInfoSchemaTableDef;
 impl InfoSchemaTableDef for SchemataInfoSchemaTableDef {
     type T = IdRow<Schema>;
 
-    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.meta_store.schemas_table().all_rows().await?))
+    async fn rows(
+        &self,
+        ctx: InfoSchemaTableDefContext,
+        _limit: Option<usize>,
+    ) -> Result<Vec<Self::T>, CubeError> {
+        Ok(ctx.meta_store.schemas_table().all_rows().await?)
     }
 
-    fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {
-        vec![(
-            Field::new("schema_name", DataType::Utf8, false),
-            Box::new(|tables| {
-                Arc::new(StringArray::from(
-                    tables
-                        .iter()
-                        .map(|row| row.get_row().get_name().as_str())
-                        .collect::<Vec<_>>(),
-                ))
-            }),
-        )]
+    fn schema(&self) -> Vec<Field> {
+        vec![Field::new("schema_name", DataType::Utf8, false)]
+    }
+
+    fn columns(&self, rows: Vec<Self::T>) -> Vec<ArrayRef> {
+        let num_rows = rows.len();
+        let mut name_builder = StringBuilder::with_capacity(num_rows, num_rows * 32);
+
+        for row in rows.into_iter() {
+            name_builder.append_value(row.get_row().get_name());
+        }
+
+        vec![Arc::new(name_builder.finish())]
     }
 }
 

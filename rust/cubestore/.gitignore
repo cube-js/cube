@@ -2,10 +2,14 @@
 /.idea
 upstream
 .cubestore
-.cargo/config.toml
+.claude
 dist
 node_modules
 downloaded
 cubestore/target
 cubesql/target
 cubestore-sql-tests/data/**
+cubestore/db-tmp
+# RocksDB scratch dirs left by metastore unit tests (run from the crate root)
+/cubestore/test-*-local/
+/cubestore/test-*-upstream/

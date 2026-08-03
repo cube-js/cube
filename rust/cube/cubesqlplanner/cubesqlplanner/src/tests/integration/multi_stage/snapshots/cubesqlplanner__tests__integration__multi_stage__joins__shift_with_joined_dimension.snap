@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/joins.rs
+expression: result
+---
+customers__city | orders__created_at_month | orders__total_amount | orders__amount_prev_month
+----------------+--------------------------+----------------------+--------------------------
+Berlin          | 2024-03-01 00:00:00      | 1000.00              | NULL                     
+London          | 2024-02-01 00:00:00      | 750.00               | NULL                     
+London          | 2024-03-01 00:00:00      | NULL                 | 750.00                   
+New York        | 2024-01-01 00:00:00      | 500.00               | NULL                     
+New York        | 2024-02-01 00:00:00      | NULL                 | 500.00

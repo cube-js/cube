@@ -1,0 +1,17 @@
+---
+source: cubesql/src/compile/engine/df/wrapper.rs
+expression: "UngroupedMemberDef\n{\n    cube_name: \"cube\".to_string(), alias: \"alias\".to_string(), expr:\n    UngroupedMemberExpr::SqlFunction(SqlFunctionExpr\n    {\n        cube_params: vec![\"cube\".to_string(), \"other\".to_string()], sql:\n        \"1 + 2\".to_string(),\n    }), grouping_set: None,\n}"
+---
+{
+  "cubeName": "cube",
+  "alias": "alias",
+  "expr": {
+    "type": "SqlFunction",
+    "cubeParams": [
+      "cube",
+      "other"
+    ],
+    "sql": "1 + 2"
+  },
+  "groupingSet": null
+}

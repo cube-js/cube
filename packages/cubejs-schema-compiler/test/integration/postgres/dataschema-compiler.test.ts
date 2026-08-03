@@ -1,6 +1,6 @@
 import { CompileError } from '../../../src/compiler/CompileError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { prepareCompiler as originalPrepareCompiler } from '../../../src/compiler/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
@@ -8,7 +8,7 @@ describe('DataSchemaCompiler', () => {
   jest.setTimeout(200000);
 
   it('gutter', async () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -43,7 +43,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('error', async () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube({}, {
       measures: {}
     })
@@ -59,7 +59,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('duplicate member', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -135,14 +135,14 @@ describe('DataSchemaCompiler', () => {
     `;
 
     it('Should compile without error, allowJsDuplicatePropsInSchema = false, valid schema', () => {
-      const { compiler } = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
+      const { compiler } = prepareJsCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
       });
     });
 
     it('Should throw error, allowJsDuplicatePropsInSchema = false, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
+      const { compiler } = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
         throw new Error();
@@ -153,58 +153,15 @@ describe('DataSchemaCompiler', () => {
     });
 
     it('Should compile without error, allowJsDuplicatePropsInSchema = true, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
+      const { compiler } = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
-      });
-    });
-
-    describe('Test perfomance', () => {
-      const schema = `
-        cube('visitors', {
-          sql: 'select * from visitors',
-          measures: {
-            count: {
-              type: 'count',
-              sql: 'id'
-            },
-            duration: {
-              type: 'avg',
-              sql: 'duration'
-            },
-          },
-          dimensions: {
-            date: {
-              type: 'string',
-              sql: 'date'
-            },
-            browser: {
-              type: 'string',
-              sql: 'browser'
-            }
-          }
-        })
-      `;
-
-      it('Should compile 200 schemas in less than 2500ms * 10', async () => {
-        const repeats = 200;
-
-        const compilerWith = prepareCompiler(schema, { allowJsDuplicatePropsInSchema: false });
-        const start = new Date().getTime();
-        for (let i = 0; i < repeats; i++) {
-          delete compilerWith.compiler.compilePromise; // Reset compile result
-          await compilerWith.compiler.compile();
-        }
-        const end = new Date().getTime();
-        const time = end - start;
-
-        expect(time).toBeLessThan(2500 * 10);
       });
     });
   });
 
   it('calculated metrics', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -272,7 +229,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('static dimension case', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -326,7 +283,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('filtered dates', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -368,7 +325,7 @@ describe('DataSchemaCompiler', () => {
 
     await compiler.compile();
 
-    const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
+    const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_or_on_date'].map((operator, index) => {
       const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
       return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [],
@@ -397,6 +354,7 @@ describe('DataSchemaCompiler', () => {
 
   it('export import', async () => {
     const { compiler, cubeEvaluator, joinGraph } = originalPrepareCompiler({
+      localPath: () => '',
       dataSchemaFiles: () => Promise.resolve([
         {
           fileName: 'main.js',
@@ -434,7 +392,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('contexts', async () => {
-    const { compiler, contextEvaluator } = prepareCompiler(`
+    const { compiler, contextEvaluator } = prepareJsCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -467,7 +425,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('views should not contain own members', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     view('Visitors', {
       dimensions: {
         id: {
@@ -487,10 +445,10 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('foreign cubes', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('Visitors', {
       sql: 'select * from visitors',
-      
+
       dimensions: {
         foo: {
           type: 'number',
@@ -498,10 +456,10 @@ describe('DataSchemaCompiler', () => {
         }
       }
     });
-    
+
     cube('Foreign', {
       sql: 'select * from foreign',
-      
+
       dimensions: {
         bar: {
           type: 'number',
@@ -517,5 +475,921 @@ describe('DataSchemaCompiler', () => {
       console.log(error);
       expect(error).toBeInstanceOf(CompileError);
     });
+  });
+
+  it('view_groups defined via standalone view_group()', async () => {
+    const { compiler, metaTransformer, viewGroupEvaluator } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      cube('Customers', {
+        sql: \`select * from customers\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+
+      view('customers_view', {
+        cubes: [{
+          joinPath: Customers,
+          includes: '*'
+        }]
+      })
+
+      view_group('sales', {
+        title: 'Sales',
+        description: 'Sales related views',
+        views: [revenue, customers_view]
+      });
+    `);
+    await compiler.compile();
+
+    expect(viewGroupEvaluator.viewGroupList).toEqual(['sales']);
+    expect(viewGroupEvaluator.compiledViewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      description: 'Sales related views',
+      views: ['revenue', 'customers_view'],
+      includes: ['revenue', 'customers_view'],
+    }]);
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      description: 'Sales related views',
+      views: ['revenue', 'customers_view'],
+      includes: ['revenue', 'customers_view'],
+    }]);
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
+
+    const customersView = metaTransformer.cubes.find(c => c.config.name === 'customers_view');
+    expect(customersView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('view_group with string references', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+
+      view_group('sales', {
+        title: 'Sales',
+        views: ['revenue']
+      });
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      views: ['revenue'],
+      includes: ['revenue'],
+    }]);
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('view_group defined via view property', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        viewGroup: 'sales',
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+
+      view_group('sales', {});
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      views: ['revenue'],
+      includes: ['revenue'],
+    }]);
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('plural viewGroups property on view', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        viewGroups: ['sales', 'finance'],
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+
+      view_group('sales', {
+        title: 'Sales',
+      });
+
+      view_group('finance', {
+        title: 'Finance',
+      });
+    `);
+    await compiler.compile();
+
+    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    expect(salesGroup?.views).toContain('revenue');
+    expect(salesGroup?.title).toBe('Sales');
+
+    const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
+    expect(financeGroup?.views).toContain('revenue');
+    expect(financeGroup?.title).toBe('Finance');
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
+  });
+
+  it('singular viewGroup and plural viewGroups are merged', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        viewGroup: 'sales',
+        viewGroups: ['finance'],
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+
+      view_group('sales', {});
+      view_group('finance', {});
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toHaveLength(2);
+    expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
+    expect(metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
+  });
+
+  it('view-level viewGroup as bare reference to view_group', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view_group('sales', {
+        title: 'Sales',
+      });
+
+      view('revenue', {
+        viewGroup: sales,
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('view-level viewGroups as bare references to view_group', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view_group('sales', { title: 'Sales' });
+      view_group('finance', { title: 'Finance' });
+
+      view('revenue', {
+        viewGroups: [sales, finance],
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+    `);
+    await compiler.compile();
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
+  });
+
+  it('view_group merges standalone and view-level definitions', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      cube('Customers', {
+        sql: \`select * from customers\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        viewGroup: 'sales',
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+
+      view('customers_view', {
+        cubes: [{
+          joinPath: Customers,
+          includes: '*'
+        }]
+      })
+
+      view_group('sales', {
+        title: 'Sales',
+        description: 'Sales related views',
+        views: ['customers_view']
+      });
+    `);
+    await compiler.compile();
+
+    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    expect(salesGroup).toBeDefined();
+    expect(salesGroup?.title).toBe('Sales');
+    expect(salesGroup?.description).toBe('Sales related views');
+    expect(salesGroup?.views).toContain('customers_view');
+    expect(salesGroup?.views).toContain('revenue');
+  });
+
+  it('view_groups in YAML format', async () => {
+    const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: Orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: Orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    description: Sales related views
+    views:
+      - revenue
+    `);
+    await compiler.compile();
+
+    expect(viewGroupEvaluator.viewGroupList).toEqual(['sales']);
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      description: 'Sales related views',
+      views: ['revenue'],
+      includes: ['revenue'],
+    }]);
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('view_group via view property in YAML', async () => {
+    const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: Orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+views:
+  - name: revenue
+    view_group: sales
+    cubes:
+      - join_path: Orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      views: ['revenue'],
+      includes: ['revenue'],
+    }]);
+
+    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    expect(revenueView?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('fails when view references non-existent view group', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { type: 'number', sql: 'id', primaryKey: true },
+        }
+      })
+
+      view('revenue', {
+        viewGroup: 'nonexistent',
+        cubes: [{
+          joinPath: Orders,
+          includes: '*'
+        }]
+      })
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View "revenue" references view group "nonexistent" which is not defined');
+    }
+  });
+
+  it('view_group with includes (string references)', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      cube('Customers', {
+        sql: \`select * from customers\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+      view('customers_view', { cubes: [{ joinPath: Customers, includes: '*' }] })
+
+      view_group('sales', {
+        title: 'Sales',
+        includes: ['revenue', 'customers_view']
+      });
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      views: ['revenue', 'customers_view'],
+      includes: ['revenue', 'customers_view'],
+    }]);
+
+    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales']);
+    expect(metaTransformer.cubes.find(c => c.config.name === 'customers_view')?.config.viewGroups).toEqual(['sales']);
+  });
+
+  it('view_group with includes (bare and mixed references)', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      cube('Customers', {
+        sql: \`select * from customers\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+      view('customers_view', { cubes: [{ joinPath: Customers, includes: '*' }] })
+
+      view_group('sales', {
+        title: 'Sales',
+        includes: [revenue, 'customers_view']
+      });
+    `);
+    await compiler.compile();
+
+    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    expect(salesGroup?.views).toEqual(['revenue', 'customers_view']);
+    expect(salesGroup?.includes).toEqual(['revenue', 'customers_view']);
+  });
+
+  it('view_group with nested view groups (includes)', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+      view('enterprise_deals', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        title: 'Sales',
+        description: 'Sales related views',
+        includes: [
+          revenue,
+          {
+            name: 'ent_sales',
+            title: 'Enterprise Sales',
+            description: 'Enterprise deals',
+            includes: [enterprise_deals]
+          }
+        ]
+      });
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      description: 'Sales related views',
+      views: ['revenue'],
+      includes: [
+        'revenue',
+        {
+          name: 'ent_sales',
+          title: 'Enterprise Sales',
+          description: 'Enterprise deals',
+          views: ['enterprise_deals'],
+          includes: ['enterprise_deals'],
+        },
+      ],
+    }]);
+
+    // Most-specific membership: a view in a nested group maps to the nested group only.
+    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales']);
+    expect(metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals')?.config.viewGroups).toEqual(['ent_sales']);
+  });
+
+  it('view_group with deeply nested view groups', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('a', { cubes: [{ joinPath: Orders, includes: '*' }] })
+      view('b', { cubes: [{ joinPath: Orders, includes: '*' }] })
+      view('c', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('root', {
+        includes: [
+          a,
+          {
+            name: 'mid',
+            includes: [
+              b,
+              { name: 'leaf', includes: [c] }
+            ]
+          }
+        ]
+      });
+    `);
+    await compiler.compile();
+
+    const root = metaTransformer.viewGroups.find(g => g.name === 'root');
+    expect(root?.views).toEqual(['a']);
+    const mid = root?.includes.find((i: any) => typeof i !== 'string' && i.name === 'mid') as any;
+    expect(mid.views).toEqual(['b']);
+    const leaf = mid.includes.find((i: any) => typeof i !== 'string' && i.name === 'leaf') as any;
+    expect(leaf.views).toEqual(['c']);
+    expect(leaf.includes).toEqual(['c']);
+
+    expect(metaTransformer.cubes.find(c => c.config.name === 'a')?.config.viewGroups).toEqual(['root']);
+    expect(metaTransformer.cubes.find(c => c.config.name === 'b')?.config.viewGroups).toEqual(['mid']);
+    expect(metaTransformer.cubes.find(c => c.config.name === 'c')?.config.viewGroups).toEqual(['leaf']);
+  });
+
+  it('view can belong to two sibling top-level view groups via includes', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', { title: 'Sales', includes: [revenue] });
+      view_group('finance', { title: 'Finance', includes: [revenue] });
+    `);
+    await compiler.compile();
+
+    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    expect(salesGroup?.views).toEqual(['revenue']);
+    expect(salesGroup?.includes).toEqual(['revenue']);
+
+    const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
+    expect(financeGroup?.views).toEqual(['revenue']);
+    expect(financeGroup?.includes).toEqual(['revenue']);
+
+    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales', 'finance']);
+  });
+
+  it('view can belong to both a view group and its nested child group', async () => {
+    const { compiler, metaTransformer } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        title: 'Sales',
+        includes: [
+          revenue,
+          { name: 'ent_sales', title: 'Enterprise Sales', includes: [revenue] }
+        ]
+      });
+    `);
+    await compiler.compile();
+
+    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    expect(salesGroup?.views).toEqual(['revenue']);
+    expect(salesGroup?.includes).toEqual([
+      'revenue',
+      {
+        name: 'ent_sales',
+        title: 'Enterprise Sales',
+        views: ['revenue'],
+        includes: ['revenue'],
+      },
+    ]);
+
+    // The view is a direct member of both the parent and the nested child.
+    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales', 'ent_sales']);
+  });
+
+  it('fails when view group uses both views and includes', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+      view('orders_overview', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        views: ['revenue'],
+        includes: ['orders_overview']
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View group must use either "views" or "includes", but not both');
+    }
+  });
+
+  it('view_group with nested view groups in YAML', async () => {
+    const { compiler, metaTransformer } = prepareYamlCompiler(`
+cubes:
+  - name: Orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+views:
+  - name: revenue
+    cubes:
+      - join_path: Orders
+        includes: '*'
+  - name: enterprise_deals
+    cubes:
+      - join_path: Orders
+        includes: '*'
+
+view_groups:
+  - name: sales
+    title: Sales
+    includes:
+      - revenue
+      - name: ent_sales
+        title: Enterprise Sales
+        description: Enterprise deals
+        includes:
+          - enterprise_deals
+    `);
+    await compiler.compile();
+
+    expect(metaTransformer.viewGroups).toEqual([{
+      name: 'sales',
+      title: 'Sales',
+      views: ['revenue'],
+      includes: [
+        'revenue',
+        {
+          name: 'ent_sales',
+          title: 'Enterprise Sales',
+          description: 'Enterprise deals',
+          views: ['enterprise_deals'],
+          includes: ['enterprise_deals'],
+        },
+      ],
+    }]);
+
+    expect(metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals')?.config.viewGroups).toEqual(['ent_sales']);
+  });
+
+  it('fails when view group includes a non-existent view', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: ['revenue', 'ghost']
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View group "sales" includes "ghost" which is not a defined view');
+    }
+  });
+
+  it('fails on duplicate nested view group name', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'dup', includes: [revenue] },
+          { name: 'dup', includes: [revenue] }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View group "dup" already exists');
+    }
+  });
+
+  it('fails on malformed nested view group (missing name)', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { title: 'No name', includes: [revenue] }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('view group');
+    }
+  });
+
+  it('fails on nested view group name colliding across sibling top-level groups', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'dup', includes: [revenue] }
+        ]
+      });
+
+      view_group('finance', {
+        includes: [
+          { name: 'dup', includes: [revenue] }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View group "dup" already exists');
+    }
+  });
+
+  it('fails when a nested view group name collides with a top-level group name', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'finance', includes: [revenue] }
+        ]
+      });
+
+      view_group('finance', {
+        includes: [revenue]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('View group "finance" already exists');
+    }
+  });
+
+  it('fails on a nested view group using the legacy views field', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'ent_sales', views: ['revenue'] }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('view group');
+    }
+  });
+
+  it('fails on an empty nested view group (neither views nor includes)', async () => {
+    const { compiler } = prepareJsCompiler(`
+      cube('Orders', {
+        sql: \`select * from orders\`,
+        measures: { count: { type: 'count' } },
+        dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } }
+      })
+
+      view('revenue', { cubes: [{ joinPath: Orders, includes: '*' }] })
+
+      view_group('sales', {
+        includes: [
+          { name: 'empty' }
+        ]
+      });
+    `);
+
+    try {
+      await compiler.compile();
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('view group');
+    }
   });
 });

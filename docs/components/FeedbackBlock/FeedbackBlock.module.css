@@ -1,0 +1,104 @@
+.FeedbackBlock {
+  display: flex;
+  flex-direction: column;
+  margin: 2rem 0 0;
+}
+
+.FeedbackBlock__wrap {
+  display: flex;
+  align-items: center;
+}
+
+.FeedbackBlock__question {
+  font-weight: 700;
+  margin: 0;
+  margin-right: 1rem;
+}
+
+.ButtonGroup {
+  display: flex;
+  margin: 1rem 0;
+  gap: 0.5rem;
+}
+
+.Button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  padding: 0.625rem 1.5rem;
+  border: none;
+  font: inherit;
+  color: inherit;
+  background-color: transparent;
+  cursor: pointer;
+  transition: background-color 0.3s ease-in-out, border 0.3s ease-in-out;
+  background-color: #fff;
+  border: 1px solid rgba(20, 20, 70, 0.1);
+  border-radius: 0.25rem;
+  color: rgba(20, 20, 70, 0.85);
+}
+
+.Button span {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.Button svg {
+  margin-right: 0.5rem;
+}
+
+.success:hover {
+  background-color: rgba(233, 249, 242, 0.5);
+  border-color: rgba(38, 83, 75, 0.1);
+}
+
+.success:active {
+  background-color: #E9F9F2;
+  border-color: rgba(38, 83, 75, 0.1);
+  color: #26534B;
+}
+
+.danger:hover {
+  background-color: rgba(252, 235, 235, 0.5);
+  border-color: rgba(131, 20, 20, 0.1);
+}
+
+.danger:active {
+  background-color: #FCEBEB;
+  border-color: rgba(131, 20, 20, 0.1);
+  color: #831414;
+}
+
+.ThanksBlock {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 28px;
+  padding: 2rem 0;
+  background: transparent;
+  border-radius: 8px;
+  color: rgba(20, 20, 70, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 104px;
+  width: 100%;
+}
+
+@media (max-width: 950px) {
+  .FeedbackBlock {
+    padding: 32px;
+  }
+
+  .FeedbackBlock__wrap {
+    flex-direction: column;
+  }
+
+  .FeedbackBlock__question {
+    margin-bottom: 16px;
+  }
+
+  .ThanksBlock {
+    padding: 20px 32px;
+  }
+}

@@ -13,6 +13,7 @@ import {
   DriverInterface,
   StreamTableData,
   DownloadTableCSVData,
+  GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
 import {
   Firebolt,
@@ -30,6 +31,7 @@ export type FireboltDriverConfiguration = {
   readOnly?: boolean;
   apiEndpoint?: string;
   connection: ConnectionOptions;
+  requestTimeout: number;
 };
 
 const FireboltTypeToGeneric: Record<string, string> = {
@@ -46,7 +48,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 5;
+    return 10;
   }
 
   private config: FireboltDriverConfiguration;
@@ -60,30 +62,54 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: Partial<FireboltDriverConfiguration> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {},
   ) {
-    super(config);
+    // Set connection timeout to 2 minutes to allow the engine to start if it's stopped
+    super({ testConnectionTimeout: 120000, ...config });
 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
+
+    const username = getEnv('dbUser', { dataSource, preAggregations });
+    const auth = username.includes('@')
+      ? { username, password: getEnv('dbPass', { dataSource, preAggregations }) }
+      : { client_id: username, client_secret: getEnv('dbPass', { dataSource, preAggregations }) };
 
     this.config = {
       readOnly: true,
-      apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }),
+      requestTimeout: getEnv('dbQueryTimeout') * 1000,
+      apiEndpoint:
+        getEnv('fireboltApiEndpoint', { dataSource, preAggregations }) || 'api.app.firebolt.io',
       ...config,
       connection: {
-        username: getEnv('dbUser', { dataSource }),
-        password: getEnv('dbPass', { dataSource }),
-        database: getEnv('dbName', { dataSource }),
-        // The propery `account` is deprecated according to Firebolt SDK docs
-        // and will be removed in the future.
-        // account: <string>process.env.CUBEJS_FIREBOLT_ACCOUNT,
-        engineName: getEnv('fireboltEngineName', { dataSource }),
+        auth,
+        database: getEnv('dbName', { dataSource, preAggregations }),
+        account: getEnv('fireboltAccount', { dataSource, preAggregations }),
+        engineName: getEnv('fireboltEngineName', { dataSource, preAggregations }),
         // engineEndpoint was deprecated in favor of engineName + account
-        engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource }),
+        engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource, preAggregations }),
         additionalParameters: {
           userClients: [{
             name: 'CubeDev+Cube',
@@ -106,6 +132,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   private async initConnection() {
     try {
       const connection = await this.firebolt.connect(this.config.connection);
+      await this.ensureEngineRunning();
       return connection;
     } catch (e) {
       this.connection = null;
@@ -154,16 +181,17 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection(): Promise<void> {
     try {
-      await this.query('select 1');
+      const connection = await this.getConnection();
+      await connection.testConnection();
     } catch (error) {
       console.log(error);
-      throw new Error('Unable to connect');
+      throw error;
     }
   }
 
   private getHydratedValue(value: unknown, meta: Meta) {
     const { type } = meta;
-    if (isNumberType(type)) {
+    if (isNumberType(type) && value !== null) {
       return `${value}`;
     }
     return value;
@@ -206,7 +234,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       const connection = await this.getConnection();
 
       const statement = await connection.execute(query, {
-        settings: { output_format: OutputFormat.JSON },
+        settings: { output_format: OutputFormat.JSON, statement_timeout: this.config.requestTimeout },
         parameters,
         response: { hydrateRow: this.hydrateRow }
       });
@@ -256,7 +284,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       const connection = await this.getConnection();
 
       const statement = await connection.execute(query, {
-        settings: { output_format: OutputFormat.JSON },
+        settings: { output_format: OutputFormat.JSON, statement_timeout: this.config.requestTimeout },
         parameters,
         response: { hydrateRow: this.hydrateRow }
       });
@@ -308,21 +336,28 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       type: this.toGenericType(row.data_type),
     }));
   }
-  /* eslint-enable camelcase */
 
-  public toGenericType(columnType: string) {
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     if (columnType in FireboltTypeToGeneric) {
       return FireboltTypeToGeneric[columnType];
     }
 
-    const match = columnType.match(COMPLEX_TYPE);
+    let match = columnType.match(COMPLEX_TYPE);
     if (match) {
       const [_, _outerType, innerType] = match;
       if (columnType in FireboltTypeToGeneric) {
         return FireboltTypeToGeneric[innerType];
       }
     }
-    return super.toGenericType(columnType);
+
+    match = columnType.trim().toLowerCase().match(/^numeric\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+
+    if (match) {
+      precision = Number(match[1]);
+      scale = Number(match[2]);
+    }
+
+    return super.toGenericType(columnType, precision, scale);
   }
 
   public readOnly() {
@@ -336,7 +371,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   public async release() {
     if (this.connection) {
       const connection = await this.connection;
-      connection.destroy();
+      await connection.destroy();
       this.connection = null;
     }
   }

@@ -1,0 +1,34 @@
+# Load data
+
+The following steps will guide you through setting up a Databricks account and
+uploading the demo dataset, which is stored as CSV files in a public S3 bucket.
+
+First, download the following files to your local machine:
+
+- [`line_items.csv`](https://cube-tutorial.s3.us-east-2.amazonaws.com/line_items.csv)
+- [`orders.csv`](https://cube-tutorial.s3.us-east-2.amazonaws.com/orders.csv)
+- [`users.csv`](https://cube-tutorial.s3.us-east-2.amazonaws.com/users.csv)
+- [`products.csv`](https://cube-tutorial.s3.us-east-2.amazonaws.com/products.csv)
+
+Next, let's ensure we have a SQL warehouse that is active. Log in to your
+Databricks account, then from the sidebar, click on <Btn>SQL → SQL
+Warehouses</Btn>:
+
+<Screenshot
+  alt="Databricks SQL Warehouses screen"
+  src="https://ucarecdn.com/92e82ca3-0ca4-4064-8ed6-394e5a66e869/"
+/>
+
+<InfoBox>
+
+Ensure the warehouse is active by checking its status; if it is inactive, click
+
+<Btn>▶️</Btn> to start it.
+
+</InfoBox>
+
+Next, click <Btn>New → File upload</Btn> from the sidebar, and upload
+`line_items.csv`. The UI will show a preview of the data within the file; when
+ready, click <Btn>Create table</Btn>.
+
+Repeat the above steps for the three other files.

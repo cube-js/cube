@@ -2,6 +2,7 @@ use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
 
+use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt32Builder},
@@ -13,8 +14,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::compile::CubeMetaTable;
 
 struct PgCatalogStatioUserTablesBuilder {
     relid: UInt32Builder,
@@ -62,19 +61,19 @@ impl PgCatalogStatioUserTablesBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.relid.finish()));
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.relname.finish()));
-        columns.push(Arc::new(self.heap_blks_read.finish()));
-        columns.push(Arc::new(self.heap_blks_hit.finish()));
-        columns.push(Arc::new(self.idx_blks_read.finish()));
-        columns.push(Arc::new(self.idx_blks_hit.finish()));
-        columns.push(Arc::new(self.toast_blks_read.finish()));
-        columns.push(Arc::new(self.toast_blks_hit.finish()));
-        columns.push(Arc::new(self.tidx_blks_read.finish()));
-        columns.push(Arc::new(self.tidx_blks_hit.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.relid.finish()),
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.relname.finish()),
+            Arc::new(self.heap_blks_read.finish()),
+            Arc::new(self.heap_blks_hit.finish()),
+            Arc::new(self.idx_blks_read.finish()),
+            Arc::new(self.idx_blks_hit.finish()),
+            Arc::new(self.toast_blks_read.finish()),
+            Arc::new(self.toast_blks_hit.finish()),
+            Arc::new(self.tidx_blks_read.finish()),
+            Arc::new(self.tidx_blks_hit.finish()),
+        ];
 
         columns
     }
@@ -85,7 +84,7 @@ pub struct PgCatalogStatioUserTablesProvider {
 }
 
 impl PgCatalogStatioUserTablesProvider {
-    pub fn new(cube_tables: &Vec<CubeMetaTable>) -> Self {
+    pub fn new(cube_tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogStatioUserTablesBuilder::new(cube_tables.len());
 
         for table in cube_tables.iter() {

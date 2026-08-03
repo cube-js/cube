@@ -55,6 +55,36 @@ export class KsqlQuery extends BaseQuery {
     return `\`${name}\``;
   }
 
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // ksqlDB quotes identifiers with backticks, not double quotes.
+    templates.quotes = {
+      identifiers: '`',
+      escape: '``',
+    };
+    // ksqlDB has no `||` string operator — concatenation and LIKE-pattern
+    // wildcards must use CONCAT (mirrors concatStringsSql / KsqlFilter).
+    templates.expressions.concat_strings = 'CONCAT({{ strings | join(\', \') }})';
+    // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
+    // ksqlDB silently returns NULL when casting strings with a trailing 'Z'
+    // (confluentinc/ksql#9094), so the markers are stripped and the UTC zone is passed
+    // to PARSE_TIMESTAMP explicitly. The base template renders the value bare, which
+    // is invalid syntax
+    templates.expressions.timestamp_literal = 'PARSE_TIMESTAMP(\'{{ value | replace("T", " ") | replace("Z", "") }}\', \'yyyy-MM-dd HH:mm:ss.SSS\', \'UTC\')';
+    templates.filters.like_pattern =
+      '{% if start_wild or end_wild %}CONCAT(' +
+      '{% if start_wild %}\'%\', {% endif %}{{ value }}{% if end_wild %}, \'%\'{% endif %})' +
+      '{% else %}{{ value }}{% endif %}';
+    // ksqlDB does not support positional GROUP BY — group by the full
+    // expressions instead of column ordinals.
+    templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
+    return templates;
+  }
+
+  public castToString(sql: string) {
+    return `CAST(${sql} as varchar(255))`;
+  }
+
   public concatStringsSql(strings: string[]) {
     return `CONCAT(${strings.join(', ')})`;
   }
@@ -69,6 +99,9 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public groupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
     const dimensionsForSelect: any[] = this.dimensionsForSelect();
     const dimensionColumns = dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
       .reduce((a, b) => a.concat(b), [])
@@ -76,7 +109,7 @@ export class KsqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public partitionInvalidateKeyQueries(cube: string, preAggregation: any) {
+  public partitionInvalidateKeyQueries(_cube: string, _preAggregation: any) {
     return [];
   }
 
@@ -90,7 +123,7 @@ export class KsqlQuery extends BaseQuery {
       }
     }
     const res = this.evaluateSymbolSqlWithContext(() => [
-      
+
       preAggregation.refreshRangeStart && [this.evaluateSql(cube, preAggregation.refreshRangeStart.sql, {}), [], { external: true }],
       preAggregation.refreshRangeEnd && [this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql, {}), [], { external: true }]
     ], { preAggregationQuery: true });
@@ -99,11 +132,16 @@ export class KsqlQuery extends BaseQuery {
 
   public preAggregationReadOnly(cube: string, preAggregation: any) {
     const [sql] = this.preAggregationSql(cube, preAggregation);
-    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql));
+    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql)) ||
+      preAggregation.type === 'rollup' && !!this.dimensionsForSelect().find(d => d.definition().primaryKey);
+  }
+
+  public preAggregationAllowUngroupingWithPrimaryKey(_cube: any, _preAggregation: any) {
+    return true;
   }
 
   public static extractTableFromSimpleSelectAsteriskQuery(sql: string) {
-    const match = sql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*/i);
+    const match = sql.replace(/\n/g, ' ').match(/^\s*select\s+.*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*/i);
     return match && match[1];
   }
 }

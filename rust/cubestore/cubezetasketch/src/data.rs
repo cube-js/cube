@@ -56,14 +56,14 @@ pub fn linear_counting_threshold(precision: i32) -> i32 {
         350000, // precision 18
     ];
 
-    if MINIMUM_PRECISION <= precision && precision <= MAXIMUM_PRECISION {
+    if (MINIMUM_PRECISION..=MAXIMUM_PRECISION).contains(&precision) {
         return LINEAR_COUNTING_THRESHOLD[(precision - MINIMUM_PRECISION) as usize];
     }
 
     // Fall back to the threshold of 5m/2 as used in the original HLL paper for precisions where
     // empirical thresholds have not yet been determined. See the HLL++ paper
     // (https://goo.gl/pc916Z) Section 5.2 for details.
-    return 5 * (1 << precision) / 2;
+    5 * (1 << precision) / 2
 }
 
 /// Returns the value of *α_m* (where *m = 2^precision*) as
@@ -75,7 +75,7 @@ pub fn alpha(precision: i32) -> f64 {
     //
     // where m is 2 ^ precision. The values were taken verbatim from the Go
     // and C++ implementations.
-    return 0.7213 / (1. + 1.079 / (1 << precision) as f64);
+    0.7213 / (1. + 1.079 / (1 << precision) as f64)
 }
 
 /// Returns the bias correction for the given estimate and precision. These values have been
@@ -100,13 +100,13 @@ pub fn estimate_bias(estimate: f64, precision: i32) -> f64 {
         total_weight += 1.0 / bias.distance;
         sum += bias.bias / bias.distance;
     }
-    return sum / total_weight;
+    sum / total_weight
 }
 
 /// Returns 6 closest biases and their distance to the estimate, sorted by increasing distance.
 fn closest_biases(estimate: f64, precision: i32) -> Vec<WeightedBias> {
     // Return no bias correction when precision is out of defined bounds.
-    if precision < MINIMUM_PRECISION || MAXIMUM_PRECISION < precision {
+    if !(MINIMUM_PRECISION..=MAXIMUM_PRECISION).contains(&precision) {
         return Vec::new();
     }
 
@@ -145,7 +145,7 @@ fn closest_biases(estimate: f64, precision: i32) -> Vec<WeightedBias> {
 
     result.sort_by(|l, r| l.distance.partial_cmp(&r.distance).unwrap());
     result.truncate(NUMBER_OF_NEIGHBORS_IN_KNN);
-    return result;
+    result
 }
 
 struct WeightedBias {

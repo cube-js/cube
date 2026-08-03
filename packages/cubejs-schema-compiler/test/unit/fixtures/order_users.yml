@@ -1,0 +1,17 @@
+cubes:
+  - name: order_users
+    sql: SELECT * FROM order_users;
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string

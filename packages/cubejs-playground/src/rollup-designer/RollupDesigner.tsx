@@ -87,7 +87,7 @@ function getSelectedKeys(references: PreAggregationReferences) {
         keys.add(`td:${dimension}`);
       }
     } else {
-      references[memberKey]?.map((key) => keys.add(key));
+      references[memberKey]?.map((key) => key != null && keys.add(key));
     }
   });
 
@@ -229,7 +229,7 @@ export function RollupDesigner({
     if (transformedQuery) {
       cubeName = (
         transformedQuery?.leafMeasures[0] ||
-        transformedQuery?.sortedDimensions[0] ||
+        transformedQuery?.ownedDimensions[0] ||
         'CubeName'
       ).split('.')[0];
     } else if (!areReferencesEmpty(references)) {
@@ -387,7 +387,7 @@ export function RollupDesigner({
           <Space direction="vertical" style={{width: '100%'}} size={32}>
             <Flex justifyContent="end" gap={2} alignItems="center">
               <Box>
-                <Typography.Text>Schema Format</Typography.Text>
+                <Typography.Text>Data Model Format</Typography.Text>
               </Box>
 
               <Box>
@@ -603,7 +603,7 @@ export function RollupDesigner({
                         rollup is configured with the additive measures that
                         calculate this non-additive measure. See more info in{' '}
                         <Typography.Link
-                          href="https://cube.dev/docs/recipes/non-additivity#data-schema-decomposing-into-a-formula-with-additive-measures"
+                          href="https://cube.dev/recipes/pre-aggregations/non-additivity"
                           target="_blank"
                         >
                           our docs

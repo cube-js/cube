@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/chained_subquery.rs
+assertion_line: 60
+expression: result
+---
+visitors__source | visitor_checkins__cards_count | visitors__visitor_count
+-----------------+-------------------------------+------------------------
+some             | 0                             | 2                      
+google           | 1                             | 1

@@ -29,7 +29,7 @@ export function RollupDesignerModal({
       wrapClassName="rollup-designer"
       footer={
         <Link
-          href="https://cube.dev/docs/caching/pre-aggregations/getting-started"
+          href="https://cube.dev/docs/pre-aggregations/getting-started-pre-aggregations"
           target="_blank"
         >
           <Flex justifyContent="center" gap={1}>

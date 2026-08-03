@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_user_mapping\n            ORDER BY oid\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-----+--------+----------+-----------+
+| oid | umuser | umserver | umoptions |
++-----+--------+----------+-----------+
++-----+--------+----------+-----------+

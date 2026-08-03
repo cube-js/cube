@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 #![feature(test)]
 
 pub use crate::benches::cubestore_benches;
@@ -8,7 +7,7 @@ use async_trait::async_trait;
 use cubestore::sql::{QueryPlans, SqlQueryContext, SqlService};
 use cubestore::store::DataFrame;
 use cubestore::CubeError;
-use std::env;
+use std::env::args;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use test::TestFn::DynTestFn;
@@ -16,7 +15,7 @@ use test::{ShouldPanic, TestDesc, TestDescAndFn, TestName, TestType};
 use tests::sql_tests;
 
 mod benches;
-mod files;
+pub mod files;
 #[cfg(not(target_os = "windows"))]
 pub mod multiproc;
 #[allow(unused_parens, non_snake_case)]
@@ -32,6 +31,33 @@ pub trait SqlClient: Send + Sync {
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError>;
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
+    fn prefix(&self) -> &str;
+    /// Used by FilterWritesSqlClient in migration tests, ignored for others.
+    fn migration_run_next_query(&self) {}
+    /// Used by FilterWritesSqlClient in migration tests, ignored for others.
+    fn migration_hardcode_next_query(&self, _next_result: Result<Arc<DataFrame>, CubeError>) {}
+}
+
+impl dyn SqlClient {
+    /// Use this instead of prefix() so that other uses of prefix() are easily searchable and
+    /// enumerable.
+    fn is_migration(&self) -> bool {
+        self.prefix() == "migration"
+    }
+
+    /// Doesn't do anything but is a searchable token for later test management.
+    fn note_non_idempotent_migration_test(&self) {}
+
+    /// We tolerate the next query but we want to revisit later because maybe it should be a rule in
+    /// the FilterWritesSqlClient's recognized queries list.
+    fn tolerate_next_query_revisit(&self) {
+        self.migration_run_next_query()
+    }
+
+    /// Hardcodes an error return value, for when the presence of an error but not the message is asserted.
+    fn migration_hardcode_generic_err(&self) {
+        self.migration_hardcode_next_query(Err(CubeError::user(String::new())));
+    }
 }
 
 pub fn run_sql_tests(
@@ -39,7 +65,7 @@ pub fn run_sql_tests(
     extra_args: Vec<String>,
     runner: impl Fn(/*test_name*/ &str, TestFn) + RefUnwindSafe + Send + Sync + Clone + 'static,
 ) {
-    let tests = sql_tests()
+    let tests = sql_tests(prefix)
         .into_iter()
         .map(|(name, test_fn)| {
             let runner = runner.clone();
@@ -49,26 +75,53 @@ pub fn run_sql_tests(
                     ignore: false,
                     should_panic: ShouldPanic::No,
                     ignore_message: None,
+                    source_file: "",
+                    start_line: 0,
+                    start_col: 0,
+                    end_line: 0,
                     compile_fail: false,
                     no_run: false,
                     test_type: TestType::IntegrationTest,
+                    end_col: 0,
                 },
-                testfn: DynTestFn(Box::new(move || runner(name, test_fn))),
+                testfn: DynTestFn(Box::new(move || {
+                    runner(name, test_fn);
+                    Ok(())
+                })),
             }
         })
         .collect();
 
-    test::test_main(
-        &env::args().chain(extra_args).collect::<Vec<String>>(),
-        tests,
-        None,
-    );
+    test::test_main(&merge_args(args().collect(), extra_args), tests, None);
+}
+
+fn merge_args(mut base: Vec<String>, extra: Vec<String>) -> Vec<String> {
+    for extra_arg in extra.into_iter() {
+        if let Some((arg_name, _arg_value)) = extra_arg.split_once('=') {
+            base.retain(|a| !a.starts_with(arg_name));
+        }
+
+        base.push(extra_arg.to_string());
+    }
+
+    base
+}
+
+pub struct BasicSqlClient {
+    /// Used rarely in some test cases, or maybe frequently for the "migration" prefix.
+    pub prefix: &'static str,
+    pub service: Arc<dyn SqlService>,
 }
 
 #[async_trait]
-impl SqlClient for Arc<dyn SqlService> {
+impl SqlClient for BasicSqlClient {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError> {
-        self.as_ref().exec_query(query).await
+        self.service
+            .as_ref()
+            .exec_query(query)
+            .await?
+            .collect()
+            .await
     }
 
     async fn exec_query_with_context(
@@ -76,10 +129,46 @@ impl SqlClient for Arc<dyn SqlService> {
         context: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        self.as_ref().exec_query_with_context(context, query).await
+        self.service
+            .as_ref()
+            .exec_query_with_context(context, query)
+            .await?
+            .collect()
+            .await
     }
 
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError> {
-        self.as_ref().plan_query(query).await
+        self.service.as_ref().plan_query(query).await
+    }
+
+    fn prefix(&self) -> &str {
+        self.prefix
+    }
+}
+
+#[cfg(test)]
+mod test_helpers {
+    use super::*;
+
+    #[test]
+    fn test_merge_args() {
+        let base = vec![
+            "path/to/executable".to_string(),
+            "--test-threads=1".to_string(),
+        ];
+        let extra = vec![
+            "--test-threads=2".to_string(),
+            "--skip=planning_inplace_aggregate2".to_string(),
+        ];
+
+        let merged = merge_args(base, extra);
+        assert_eq!(
+            merged,
+            vec![
+                "path/to/executable",
+                "--test-threads=2",
+                "--skip=planning_inplace_aggregate2"
+            ]
+        );
     }
 }

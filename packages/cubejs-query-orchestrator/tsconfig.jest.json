@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "paths": {
+      "@cubejs-backend/shared": ["../cubejs-backend-shared/src"],
+      "@cubejs-backend/base-driver": ["../cubejs-base-driver/src"]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "sourceMap": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "resolveJsonModule": true
+  }
+}

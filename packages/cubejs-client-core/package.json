@@ -1,48 +1,73 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.31.33",
+  "version": "1.7.16",
   "engines": {},
+  "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-core"
   },
-  "description": "cube.js client",
-  "main": "dist/cubejs-client-core.js",
-  "module": "dist/cubejs-client-core.esm.js",
-  "types": "index.d.ts",
+  "description": "Cube client",
+  "main": "dist/cubejs-client-core.cjs",
+  "browser": "dist/cubejs-client-core.umd.js",
+  "typings": "dist/src/index.d.ts",
   "author": "Cube Dev, Inc.",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "require": "./dist/cubejs-client-core.cjs"
+    },
+    "./format": {
+      "types": "./dist/src/format.d.ts",
+      "import": "./dist/src/format.js",
+      "require": "./dist/format.cjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "format": [
+        "./dist/src/format.d.ts"
+      ]
+    }
+  },
   "dependencies": {
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
+    "d3-format": "^3.1.0",
+    "d3-time-format": "^4.1.0",
     "dayjs": "^1.10.4",
     "ramda": "^0.27.2",
     "url-search-params-polyfill": "^7.0.0",
-    "uuid": "^8.3.2"
+    "uuid": "^11.1.0"
   },
   "scripts": {
+    "build:client-core": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest",
-    "lint": "eslint src/*.js",
-    "lint:fix": "eslint --fix src/*.js"
+    "unit": "vitest run --coverage",
+    "bench": "vitest bench",
+    "lint": "eslint src/* test/ --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
   },
   "files": [
-    "src",
     "dist",
-    "index.d.ts"
+    "!dist/tsconfig.tsbuildinfo"
   ],
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.3.3",
-    "@babel/preset-env": "^7.3.1",
-    "@babel/runtime": "^7.1.2",
-    "@types/jest": "^26.0.9",
+    "@cubejs-backend/linter": "1.7.16",
+    "@types/d3-format": "^3",
+    "@types/d3-time-format": "^4",
     "@types/moment-range": "^4.0.0",
-    "babel-jest": "^26.0.1",
-    "eslint": "^7.21.0",
-    "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
-    "jest": "^26.0.1"
+    "@types/ramda": "^0.27.34",
+    "@vitest/coverage-v8": "^4",
+    "typescript": "~5.2.2",
+    "vitest": "^4"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   }
 }

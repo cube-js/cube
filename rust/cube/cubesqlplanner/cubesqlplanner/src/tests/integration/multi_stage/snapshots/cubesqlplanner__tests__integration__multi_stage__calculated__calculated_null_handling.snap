@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/calculated.rs
+expression: result
+---
+orders__created_at_month | orders__mom_growth
+-------------------------+-------------------
+2024-01-01 00:00:00      | NULL

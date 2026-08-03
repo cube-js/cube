@@ -1,0 +1,112 @@
+/*
+ * Copyright 2024 Cube Dev, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+pub use crate::error::Result;
+use std::fmt::{Debug, Formatter};
+
+use dsrs::{HLLSketch, HLLType, HLLUnion};
+
+pub struct HLLDataSketch {
+    pub(crate) instance: HLLSketch,
+}
+
+unsafe impl Send for HLLDataSketch {}
+unsafe impl Sync for HLLDataSketch {}
+
+impl Debug for HLLDataSketch {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HLLDataSketch")
+            .field("instance", &"<hidden>");
+
+        Ok(())
+    }
+}
+
+impl HLLDataSketch {
+    pub fn read(data: &[u8]) -> Result<Self> {
+        Ok(Self {
+            instance: HLLSketch::deserialize(data)?,
+        })
+    }
+
+    pub fn cardinality(&self) -> u64 {
+        self.instance.estimate().round() as u64
+    }
+
+    pub fn get_lg_config_k(&self) -> u8 {
+        self.instance.get_lg_config_k()
+    }
+
+    pub fn write(&self) -> Vec<u8> {
+        // TODO(ovr): Better way?
+        self.instance.serialize().as_ref().to_vec()
+    }
+}
+
+pub struct HLLUnionDataSketch {
+    pub(crate) instance: HLLUnion,
+}
+
+impl Debug for HLLUnionDataSketch {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HLLUnionDataSketch")
+            .field("instance", &"<hidden>");
+
+        Ok(())
+    }
+}
+
+unsafe impl Send for HLLUnionDataSketch {}
+unsafe impl Sync for HLLUnionDataSketch {}
+
+impl HLLUnionDataSketch {
+    pub fn new(lg_max_k: u8) -> Result<Self> {
+        Ok(Self {
+            instance: HLLUnion::new(lg_max_k),
+        })
+    }
+
+    pub fn get_lg_config_k(&self) -> u8 {
+        self.instance.get_lg_config_k()
+    }
+
+    pub fn write(&self) -> Vec<u8> {
+        let sketch = self.instance.sketch(HLLType::HLL_4);
+        // TODO(ovr): Better way?
+        sketch.serialize().as_ref().to_vec()
+    }
+
+    pub fn merge_with(&mut self, other: HLLDataSketch) -> Result<()> {
+        self.instance.merge(other.instance);
+
+        Ok(())
+    }
+
+    /// Allocated size, not including size_of::<Self>().  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        let lg_k = self.get_lg_config_k();
+        let k = 1 << lg_k;
+
+        // HLL union starts with an hll sketch with HLL_8, and the storage footprint according to
+        // hll.hpp (in datasketches-rs) is k bytes.  We are assuming we're using maximum memory
+        // usage, even though the HLL implementation internally starts out with smaller buffers
+        // (until you add enough rows).  Also, we're eyeballing the C++ struct overhead as 32 bytes.
+        //
+        // This function is supposed to be exact, but it is not exact.
+
+        32 + k
+    }
+}

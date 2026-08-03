@@ -2,14 +2,13 @@ import dotenv from '@cubejs-backend/dotenv';
 
 import CubeCore, {
   CreateOptions as CoreCreateOptions,
-  CubejsServerCore,
   DatabaseType,
   DriverContext,
   DriverOptions,
-  SystemOptions
+  SystemOptions,
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
-import express from 'express';
+import express, { Express } from 'express';
 import http from 'http';
 import util from 'util';
 import bodyParser from 'body-parser';
@@ -29,17 +28,16 @@ dotenv.config({
   multiline: 'line-breaks',
 });
 
-export type InitAppFn = (app: express.Application) => void | Promise<void>;
-
 interface HttpOptions {
   cors?: CorsOptions;
 }
 
 export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions, SQLServerOptions {
   webSockets?: boolean;
-  initApp?: InitAppFn;
   http?: HttpOptions;
   gracefulShutdown?: number;
+  serverKeepAliveTimeout?: number;
+  serverHeadersTimeout?: number;
 }
 
 type RequireOne<T, K extends keyof T> = {
@@ -49,9 +47,9 @@ type RequireOne<T, K extends keyof T> = {
 };
 
 export class CubejsServer {
-  protected readonly core: CubejsServerCore;
+  protected readonly core: CubeCore;
 
-  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'>;
+  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort' | 'serverHeadersTimeout' | 'serverKeepAliveTimeout'>;
 
   protected server: GracefulHttpServer | null = null;
 
@@ -67,21 +65,27 @@ export class CubejsServer {
       webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
       pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
-      sqlNonce: config.sqlNonce || getEnv('sqlNonce'),
+      gatewayPort: config.gatewayPort || getEnv('nativeApiGatewayPort'),
+      serverHeadersTimeout: config.serverHeadersTimeout ?? getEnv('serverHeadersTimeout'),
+      serverKeepAliveTimeout: config.serverKeepAliveTimeout ?? getEnv('serverKeepAliveTimeout'),
       http: {
         ...config.http,
         cors: {
           allowedHeaders: 'authorization,content-type,x-request-id',
-          ...config.http?.cors
-        }
+          ...config.http?.cors,
+        },
       },
     };
 
-    this.core = CubeCore.create(config, systemOptions);
+    this.core = this.createCoreInstance(this.config, systemOptions);
     this.server = null;
   }
 
-  public async listen(options: http.ServerOptions = {}) {
+  protected createCoreInstance(config: CreateOptions, systemOptions?: SystemOptions): CubeCore {
+    return new CubeCore(config, systemOptions);
+  }
+
+  public async listen(options: http.ServerOptions = {}): Promise<{app: Express, port: number, server: GracefulHttpServer, version: any }> {
     try {
       if (this.server) {
         throw new Error('CubeServer is already listening');
@@ -89,14 +93,10 @@ export class CubejsServer {
 
       const app = express();
       app.use(cors(this.config.http.cors));
-      app.use(bodyParser.json({ limit: '50mb' }));
+      app.use(bodyParser.json({ limit: getEnv('maxRequestSize') }));
 
       if (this.config.gracefulShutdown) {
         app.use(gracefulMiddleware(this.status, this.config.gracefulShutdown));
-      }
-
-      if (this.config.initApp) {
-        await this.config.initApp(app);
       }
 
       await this.core.initApp(app);
@@ -116,6 +116,14 @@ export class CubejsServer {
       if (this.config.sqlPort || this.config.pgSqlPort) {
         this.sqlServer = this.core.initSQLServer();
         await this.sqlServer.init(this.config);
+      }
+
+      if (this.config.serverKeepAliveTimeout) {
+        this.server.keepAliveTimeout = this.config.serverKeepAliveTimeout;
+      }
+
+      if (this.config.serverHeadersTimeout) {
+        this.server.headersTimeout = this.config.serverHeadersTimeout;
       }
 
       const PORT = getEnv('port');
@@ -200,7 +208,11 @@ export class CubejsServer {
   }
 
   public static apiSecret() {
-    return process.env.CUBEJS_API_SECRET;
+    return getEnv('apiSecret');
+  }
+
+  public static apiSecrets(): string[] | undefined {
+    return getEnv('apiSecrets');
   }
 
   public static version() {
@@ -233,6 +245,12 @@ export class CubejsServer {
         );
       }
 
+      if (this.sqlServer) {
+        locks.push(
+          this.sqlServer.shutdown(graceful && (signal === 'SIGTERM') ? 'semifast' : 'fast')
+        );
+      }
+
       if (this.server) {
         locks.push(
           this.server.stop(
@@ -241,13 +259,19 @@ export class CubejsServer {
         );
       }
 
-      if (graceful) {
-        // Await before all connections/refresh scheduler will end jobs
-        await Promise.all(locks);
-      }
+      const shutdownAll = async () => {
+        try {
+          if (graceful) {
+            // Await before all connections/refresh scheduler will end jobs
+            await Promise.all(locks);
+          }
+          await this.core.shutdown();
+        } finally {
+          timeoutKiller.cancel();
+        }
+      };
 
-      await this.core.shutdown();
-      await timeoutKiller.cancel();
+      await Promise.any([shutdownAll(), timeoutKiller]);
 
       return 0;
     } catch (e: any) {

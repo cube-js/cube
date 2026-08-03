@@ -1,18 +1,61 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
+import { Readable } from 'stream';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
-  constructor({ csvImport } = {}) {
-    this.tables = [];
+  constructor({ csvImport, schemaData } = {}) {
+    this.tablesObj = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
+    this.droppedTables = [];
     this.csvImport = csvImport;
     this.now = new Date().getTime();
+    this.schemaData = schemaData;
+  }
+
+  get tables() {
+    return this.tablesObj.map(t => t.tableName || t);
+  }
+
+  resetTables() {
+    this.tablesObj = [];
   }
 
   query(query) {
     this.executedQueries.push(query);
+
+    // Handle metadata operations - check if query is an array with metadata operation
+    if (Array.isArray(query) && query.length > 0 && typeof query[0] === 'string') {
+      const operation = query[0];
+      if (operation === 'METADATA:GET_SCHEMAS') {
+        return this.getSchemas();
+      } else if (operation === 'METADATA:GET_TABLES_FOR_SCHEMAS') {
+        // Parse parameters from the query array
+        let params = {};
+        try {
+          params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        } catch (error) {
+          console.warn('Failed to parse JSON parameters for METADATA:GET_TABLES_FOR_SCHEMAS:', error);
+        }
+        return this.getTablesForSpecificSchemas(params.schemas || []);
+      } else if (operation === 'METADATA:GET_COLUMNS_FOR_TABLES') {
+        // Parse parameters from the query array
+        let params = {};
+        try {
+          params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        } catch (error) {
+          console.warn('Failed to parse JSON parameters for METADATA:GET_COLUMNS_FOR_TABLES:', error);
+        }
+        return this.getColumnsForSpecificTables(params.tables || []);
+      }
+    }
+
+    // Handle regular SQL queries - ensure query is a string
+    if (typeof query !== 'string') {
+      return Promise.resolve([]);
+    }
+
     let promise = Promise.resolve([query]);
     if (query.match('orders_too_big')) {
       promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 3000)));
@@ -24,6 +67,10 @@ class MockDriver {
 
     if (query.match(/^SELECT NOW\(\)$/)) {
       promise = promise.then(() => [{ now: new Date().toJSON() }]);
+    }
+
+    if (query.match(/^SELECT '(\d+-\d+-\d+)'/)) {
+      promise = promise.then(() => [{ date: new Date(`${query.match(/^SELECT '(\d+-\d+-\d+)'/)[1]}T00:00:00.000Z`).toJSON() }]);
     }
 
     if (query.match(/^SELECT MAX\(timestamp\)/)) {
@@ -56,7 +103,11 @@ class MockDriver {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
-    return this.tables.filter(t => t.split('.')[0] === schema).map(t => ({ table_name: t.replace(`${schema}.`, '') }));
+    return this.tablesObj.filter(t => (t.tableName || t).split('.')[0] === schema)
+      .map(t => ({
+        table_name: (t.tableName || t).replace(`${schema}.`, ''),
+        build_range_end: t.buildRangeEnd
+      }));
   }
 
   delay(timeout) {
@@ -69,7 +120,7 @@ class MockDriver {
   }
 
   loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
-    this.tables.push(preAggregationTableName.substring(0, 100));
+    this.tablesObj.push({ tableName: preAggregationTableName.substring(0, 100) });
     const promise = this.query(loadSql);
     const resPromise = promise.then(() => this.tablesReady.push(preAggregationTableName.substring(0, 100)));
     resPromise.cancel = promise.cancel;
@@ -77,8 +128,22 @@ class MockDriver {
   }
 
   async dropTable(tableName) {
-    this.tables = this.tables.filter(t => t !== tableName);
-    return this.query(`DROP TABLE ${tableName}`);
+    if (this.droppedTables.indexOf(tableName) !== -1) {
+      throw new Error(`Can't drop table twice: ${tableName}`);
+    }
+    this.droppedTables.push(tableName);
+    console.log(`Driver drops ${tableName}`);
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
+    await this.query(`DROP TABLE ${tableName}`);
+    if (this.tablesDropDelay) {
+      await this.delay(this.tablesDropDelay);
+    }
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
+    this.tablesObj = this.tablesObj.filter(t => (t.tableName || t) !== tableName);
   }
 
   async downloadTable(table, { csvImport } = {}) {
@@ -99,6 +164,12 @@ class MockDriver {
   capabilities() {
     return {};
   }
+
+  async stream(sql) {
+    return {
+      rowStream: Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)))
+    };
+  }
 }
 
 class ExternalMockDriver extends MockDriver {
@@ -109,12 +180,16 @@ class ExternalMockDriver extends MockDriver {
   }
 
   async uploadTable(table) {
-    this.tables.push(table.substring(0, 100));
+    this.tablesObj.push({ tableName: table.substring(0, 100) });
     throw new Error('uploadTable has been called instead of uploadTableWithIndexes');
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
-    this.tables.push(table.substring(0, 100));
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj, externalOptions) {
+    this.tablesObj.push({
+      tableName: table.substring(0, 100),
+      buildRangeEnd: queryTracingObj?.buildRangeEnd,
+      sealAt: externalOptions?.sealAt
+    });
     if (tableData.csvFile) {
       this.csvFiles.push(tableData.csvFile);
     }
@@ -134,7 +209,7 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
   capabilities() {
     return { unloadWithoutTempTable: true };
   }
-  
+
   queryColumnTypes() {
     return [];
   }
@@ -170,13 +245,25 @@ describe('QueryOrchestrator', () => {
   let streamingSourceMockDriver = null;
   let externalMockDriver = null;
   let queryOrchestrator = null;
+  let queryOrchestrator2 = null;
   let queryOrchestratorExternalRefresh = null;
   let queryOrchestratorDropWithoutTouch = null;
   let testCount = 1;
+  const schemaData = {
+    public: {
+      orders: [
+        {
+          name: 'id',
+          type: 'integer',
+          attributes: [],
+        },
+      ],
+    },
+  };
 
   beforeEach(() => {
     const mockDriverLocal = new MockDriver();
-    const fooMockDriverLocal = new MockDriver();
+    const fooMockDriverLocal = new MockDriver({ schemaData });
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const mockDriverUnloadWithoutTempTableSupportLocal = new MockDriverUnloadWithoutTempTableSupport();
@@ -201,39 +288,44 @@ describe('QueryOrchestrator', () => {
     };
     const logger =
       (msg, params) => console.log(new Date().toJSON(), msg, params);
-    const options = {
+    const options = (processUid) => ({
       externalDriverFactory: () => externalMockDriverLocal,
       queryCacheOptions: {
         queueOptions: () => ({
           concurrency: 2,
+          processUid,
         }),
       },
       preAggregationsOptions: {
-        maxPartitions: 32,
+        maxPartitions: 100,
         queueOptions: () => ({
           executionTimeout: 2,
           concurrency: 2,
+          processUid,
         }),
         usedTablePersistTime: 1
       },
-    };
+    });
 
     queryOrchestrator =
-      new QueryOrchestrator(redisPrefix, driverFactory, logger, options);
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
+    queryOrchestrator2 =
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p2'));
     queryOrchestratorExternalRefresh =
       new QueryOrchestrator(redisPrefix, driverFactory, logger, {
-        ...options,
+        ...options('p1'),
         preAggregationsOptions: {
-          ...options.preAggregationsOptions,
+          ...options('p1').preAggregationsOptions,
           externalRefresh: true,
         },
       });
     queryOrchestratorDropWithoutTouch =
       new QueryOrchestrator(redisPrefix, driverFactory, logger, {
-        ...options,
+        ...options('p1'),
         preAggregationsOptions: {
-          ...options.preAggregationsOptions,
+          ...options('p1').preAggregationsOptions,
           dropPreAggregationsWithoutTouch: true,
+          touchTablePersistTime: 1,
         },
       });
     mockDriver = mockDriverLocal;
@@ -265,7 +357,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'basic'
     };
     const promise = queryOrchestrator.fetchQuery(query);
@@ -294,7 +386,7 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_number_and_count_week20191101'
         }],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'indexes'
     };
     const result = await queryOrchestrator.fetchQuery(query);
@@ -321,7 +413,7 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_number_and_count_week20191102'
         }],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'index is part of query key'
     });
     await new Promise(resolve => setTimeout(() => resolve(), 400));
@@ -339,7 +431,7 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
         indexesSql: [],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'index is part of query key'
     });
     console.log(result.data[0]);
@@ -365,7 +457,7 @@ describe('QueryOrchestrator', () => {
         }],
         external: true
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'external indexes'
     };
     const result = await queryOrchestrator.fetchQuery(query);
@@ -397,7 +489,7 @@ describe('QueryOrchestrator', () => {
         external: true,
         dataSource: 'bar'
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'external join',
       dataSource: 'foo',
       external: true
@@ -431,7 +523,7 @@ describe('QueryOrchestrator', () => {
         external: true,
         dataSource: 'csv',
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'csv import'
     };
     const result = await queryOrchestrator.fetchQuery(query);
@@ -454,7 +546,7 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
         dataSource: 'foo'
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'non default data source pre-aggregation',
       dataSource: 'foo',
     };
@@ -472,7 +564,7 @@ describe('QueryOrchestrator', () => {
         renewalThreshold: 21600,
         queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
       },
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'non default data source query',
       dataSource: 'foo',
     };
@@ -496,7 +588,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count_and_very_very_very_very_very_very_long20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'silent truncate'
     };
     let thrown = true;
@@ -523,7 +615,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20181101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders_too_big AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2018-11-01T00:00:00Z', '2018-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'cancel pre-aggregation'
     };
     try {
@@ -535,7 +627,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('save structure versions', async () => {
-    mockDriver.tables = [];
+    mockDriver.resetTables();
     await queryOrchestrator.fetchQuery({
       query: 'SELECT * FROM stb_pre_aggregations.orders',
       values: [],
@@ -549,7 +641,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'save structure versions'
     });
 
@@ -566,7 +658,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders1', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'save structure versions'
     });
 
@@ -586,7 +678,7 @@ describe('QueryOrchestrator', () => {
           loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
           invalidateKeyQueries: [['SELECT 2', []]]
         }],
-        renewQuery: true,
+        cacheMode: 'must-revalidate',
         requestId: 'save structure versions'
       });
     }
@@ -685,7 +777,7 @@ describe('QueryOrchestrator', () => {
     // start renew refresh as scheduled refresh does
     const refresh = queryOrchestrator.fetchQuery({
       ...baseQuery,
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: `${requestId}: start refresh`
     });
 
@@ -762,6 +854,40 @@ describe('QueryOrchestrator', () => {
     ).toBe(true);
   });
 
+  test('in memory expire', async () => {
+    const query = (id) => ({
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        queries: [
+          ['SELECT NOW()', [], {
+            renewalThreshold: 21600,
+          }],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
+            renewalThreshold: 21600,
+          }]
+        ]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d20201103',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT NOW() as now', [], {
+          renewalThreshold: 86400,
+        }]]
+      }],
+      expireSecs: 2,
+      requestId: `in memory expire ${id}`,
+    });
+    await queryOrchestrator.fetchQuery(query(0));
+    await queryOrchestrator.fetchQuery(query(1));
+    await mockDriver.delay(2000);
+    await queryOrchestrator.fetchQuery(query(2));
+    expect(
+      mockDriver.executedQueries.filter(q => q.match(/timestamptz/)).length
+    ).toBe(2);
+  });
+
   test('load cache should respect external flag', async () => {
     const preAggregationsLoadCacheByDataSource = {};
     const externalPreAggregation = {
@@ -779,7 +905,7 @@ describe('QueryOrchestrator', () => {
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
         external: true,
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'load cache should respect external flag'
     };
     const internalPreAggregation = {
@@ -796,7 +922,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.internal AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
         invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'load cache should respect external flag'
     };
     await queryOrchestrator.fetchQuery(internalPreAggregation);
@@ -821,7 +947,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
         invalidateKeyQueries: [['SELECT 2', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation version entries'
     });
 
@@ -838,7 +964,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE stb_pre_aggregations_2.orders AS SELECT * FROM public.orders', []],
         invalidateKeyQueries: [['SELECT 3', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation version entries'
     });
 
@@ -897,7 +1023,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation schema cache'
     });
 
@@ -914,7 +1040,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE pre_aggregations_2.orders AS SELECT * FROM public.orders WHERE tenant_id = 2', []],
         invalidateKeyQueries: [['SELECT 2', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation schema cache'
     });
 
@@ -931,7 +1057,7 @@ describe('QueryOrchestrator', () => {
         loadSql: ['CREATE TABLE pre_aggregations_1.orders AS SELECT * FROM public.orders WHERE tenant_id = 1', []],
         invalidateKeyQueries: [['SELECT 1', []]]
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'pre-aggregation schema cache'
     });
 
@@ -968,6 +1094,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(timestamp) FROM orders', []],
         ],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'range partitions',
@@ -1010,6 +1137,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(timestamp) FROM orders', []],
         ],
         partitionGranularity: 'hour',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'range partitions',
@@ -1017,7 +1145,7 @@ describe('QueryOrchestrator', () => {
     await expect(async () => {
       await queryOrchestrator.fetchQuery(query);
     }).rejects.toThrow(
-      'The maximum number of partitions (32) was reached for the pre-aggregation'
+      'Pre-aggregation \'stb_pre_aggregations.orders_d\' requested to build 745 partitions which exceeds the maximum number of partitions per pre-aggregation of 100'
     );
   });
 
@@ -1050,6 +1178,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(created_at) FROM orders', []],
         ],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'empty partitions',
@@ -1060,8 +1189,8 @@ describe('QueryOrchestrator', () => {
   });
 
   test('empty partitions with externalRefresh', async () => {
-    const query = {
-      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+    const query = ({ startQuery, endQuery, matchedTimeDimensionDateRange }) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_empty',
       values: [],
       cacheKeyQueries: {
         queries: []
@@ -1084,19 +1213,29 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_d_main'
         }],
         preAggregationStartEndQueries: [
-          ['SELECT MIN(created_at) FROM orders', []],
-          ['SELECT MAX(created_at) FROM orders', []],
+          [startQuery || 'SELECT MIN(created_at) FROM orders', []],
+          [endQuery || 'SELECT MAX(created_at) FROM orders', []],
         ],
         partitionGranularity: 'day',
-        timezone: 'UTC'
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        matchedTimeDimensionDateRange
       }],
-      requestId: 'empty partitions',
-    };
+      requestId: 'empty partitions with externalRefresh',
+    });
     await expect(async () => {
-      await queryOrchestratorExternalRefresh.fetchQuery(query);
+      await queryOrchestratorExternalRefresh.fetchQuery(query({}));
     }).rejects.toThrow(
       /refresh worker/
     );
+    await queryOrchestrator.fetchQuery(query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
+    const result = await queryOrchestratorExternalRefresh.fetchQuery(query({
+      startQuery: 'SELECT \'2021-05-01\'',
+      endQuery: 'SELECT \'2021-05-15\'',
+      matchedTimeDimensionDateRange: ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']
+    }));
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_empty20210515/);
   });
 
   test('empty intersection', async () => {
@@ -1129,12 +1268,217 @@ describe('QueryOrchestrator', () => {
         ],
         matchedTimeDimensionDateRange: ['2021-08-01T00:00:00.000', '2021-08-30T00:00:00.000'],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'empty intersection',
     };
     const result = await queryOrchestrator.fetchQuery(query);
     expect(result.data[0]).toMatch(/orders_d20210601/);
+  });
+
+  test('lambda partitions', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_h',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_h AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT \'2021-05-30\'', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        external: true,
+        partitionGranularity: 'hour',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        lastRollupLambda: true,
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'lambda partitions',
+      external: true,
+    });
+    let result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_d20210501/);
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+
+    result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+
+    result = await queryOrchestratorExternalRefresh.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_d20210501/);
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+  });
+
+  test('lambda partitions week', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_w UNION ALL SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_w',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_w AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'week',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_h',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_h AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT \'2021-05-30\'', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        external: true,
+        partitionGranularity: 'hour',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        lastRollupLambda: true,
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'lambda partitions',
+      external: true,
+    });
+    const result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+  });
+
+  test('real-time sealing partitions', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        partitionInvalidateKeyQueries: [],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'real-time sealing partitions',
+      external: true,
+    });
+    const result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(externalMockDriver.tablesObj.find(t => t.tableName.indexOf('stb_pre_aggregations.orders_d20210531') !== -1).sealAt).toBe('2021-05-31T23:59:59.999Z');
   });
 
   test('loadRefreshKeys', async () => {
@@ -1155,7 +1499,7 @@ describe('QueryOrchestrator', () => {
         ]
       },
       preAggregations: [],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
       requestId: 'loadRefreshKeys should respect external flag'
     };
 
@@ -1218,8 +1562,8 @@ describe('QueryOrchestrator', () => {
         dataSource: 'mockDriverUnloadWithoutTempTableSupport',
         external: true,
       }],
-      renewQuery: true,
-      
+      cacheMode: 'must-revalidate',
+
       requestId: 'basic'
     };
     const promise = queryOrchestrator.fetchQuery(query);
@@ -1245,7 +1589,7 @@ describe('QueryOrchestrator', () => {
         dataSource: 'streaming',
         external: true,
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
 
       requestId: 'basic'
     };
@@ -1272,7 +1616,7 @@ describe('QueryOrchestrator', () => {
         external: true,
         streamOffset: 'earliest'
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
 
       requestId: 'basic'
     };
@@ -1302,7 +1646,7 @@ describe('QueryOrchestrator', () => {
         streamOffset: 'earliest',
         readOnly: true
       }],
-      renewQuery: true,
+      cacheMode: 'must-revalidate',
 
       requestId: 'basic'
     };
@@ -1347,5 +1691,543 @@ describe('QueryOrchestrator', () => {
     }
     await Promise.all(promises);
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
+  });
+
+  test('streaming simple', async () => {
+    const query = (id) => ({
+      query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [],
+      requestId: 'streaming simple',
+      persistent: true,
+      aliasNameToMember: {
+        query: 'Foo.query'
+      }
+    });
+    await Promise.all([
+      queryOrchestrator.fetchQuery(query(1)),
+      queryOrchestrator.fetchQuery(query(2)),
+      queryOrchestrator.fetchQuery(query(3)),
+      queryOrchestrator.fetchQuery(query(4)),
+    ].map(async streamPromise => {
+      const stream = await streamPromise;
+      const data = await new Promise((resolve, reject) => {
+        stream.on('data', (row) => {
+          resolve(row);
+        });
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      });
+      expect(data['Foo.query']).toMatch(/orders_d/);
+    }));
+  });
+
+  test('streaming two nodes', async () => {
+    const query = (id) => ({
+      query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [],
+      requestId: 'streaming simple',
+      persistent: true,
+      aliasNameToMember: {
+        query: 'Foo.query'
+      }
+    });
+    const fetchLongPolling = (orchestrator, q) => orchestrator.fetchQuery(q).catch(e => {
+      console.log(e.toString());
+      if (e.toString().match(/Continue wait/)) {
+        return fetchLongPolling(orchestrator, q);
+      }
+      throw e;
+    });
+    await Promise.all([
+      fetchLongPolling(queryOrchestrator, query(1)),
+      fetchLongPolling(queryOrchestrator, query(2)),
+      fetchLongPolling(queryOrchestrator2, query(3)),
+      fetchLongPolling(queryOrchestrator2, query(4)),
+    ].map(async streamPromise => {
+      const stream = await streamPromise;
+      const data = await new Promise((resolve, reject) => {
+        stream.on('data', (row) => {
+          resolve(row);
+        });
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      });
+      expect(data['Foo.query']).toMatch(/orders_d/);
+    }));
+  });
+
+  test('drop lock', async () => {
+    mockDriver.tablesDropDelay = 300;
+    for (let i = 0; i < 10; i++) {
+      const promises = [];
+      for (let j = 0; j < 10; j++) {
+        // eslint-disable-next-line no-loop-func
+        promises.push((async () => {
+          await mockDriver.delay(100 * j);
+          await queryOrchestratorDropWithoutTouch.fetchQuery({
+            query: `SELECT * FROM stb_pre_aggregations.orders_d2018110${j}`,
+            values: [],
+            cacheKeyQueries: {
+              renewalThreshold: 21600,
+              queries: []
+            },
+            preAggregations: [{
+              preAggregationsSchema: 'stb_pre_aggregations',
+              tableName: `stb_pre_aggregations.orders_d2018110${j}`,
+              loadSql: [`CREATE TABLE stb_pre_aggregations.orders_d2018110${j} AS SELECT * FROM public.orders_d`, []],
+              invalidateKeyQueries: [['SELECT NOW()', [], {
+                renewalThreshold: 0.001
+              }]],
+              external: true,
+            }],
+            requestId: `drop lock ${i}-${j}`
+          });
+        })());
+      }
+
+      await Promise.all(promises);
+
+      await mockDriver.delay(200);
+    }
+    // expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
+  });
+
+  describe('Data Source Metadata Methods', () => {
+    let metadataOrchestrator;
+    let metadataMockDriver;
+
+    beforeEach(() => {
+      metadataMockDriver = new MockDriver();
+
+      // Mock metadata methods
+      metadataMockDriver.getSchemas = jest.fn().mockResolvedValue([
+        { schema_name: 'public' },
+        { schema_name: 'analytics' },
+        { schema_name: 'staging' }
+      ]);
+
+      metadataMockDriver.getTablesForSpecificSchemas = jest.fn().mockImplementation((schemas) => {
+        const tables = [];
+        schemas.forEach(schema => {
+          if (schema.schema_name === 'public') {
+            tables.push(
+              { schema_name: 'public', table_name: 'users' },
+              { schema_name: 'public', table_name: 'orders' },
+              { schema_name: 'public', table_name: 'products' }
+            );
+          } else if (schema.schema_name === 'analytics') {
+            tables.push(
+              { schema_name: 'analytics', table_name: 'user_metrics' },
+              { schema_name: 'analytics', table_name: 'sales_summary' }
+            );
+          }
+        });
+        return Promise.resolve(tables);
+      });
+
+      metadataMockDriver.getColumnsForSpecificTables = jest.fn().mockImplementation((tables) => {
+        const columns = [];
+        tables.forEach(table => {
+          if (table.table_name === 'users') {
+            columns.push(
+              {
+                schema_name: 'public',
+                table_name: 'users',
+                column_name: 'id',
+                data_type: 'integer',
+                attributes: ['PRIMARY_KEY']
+              },
+              {
+                schema_name: 'public',
+                table_name: 'users',
+                column_name: 'name',
+                data_type: 'varchar',
+                attributes: []
+              },
+              {
+                schema_name: 'public',
+                table_name: 'users',
+                column_name: 'email',
+                data_type: 'varchar',
+                attributes: ['UNIQUE']
+              }
+            );
+          } else if (table.table_name === 'orders') {
+            columns.push(
+              {
+                schema_name: 'public',
+                table_name: 'orders',
+                column_name: 'id',
+                data_type: 'integer',
+                attributes: ['PRIMARY_KEY']
+              },
+              {
+                schema_name: 'public',
+                table_name: 'orders',
+                column_name: 'user_id',
+                data_type: 'integer',
+                attributes: [],
+                foreign_keys: [{ target_table: 'users', target_column: 'id' }]
+              },
+              {
+                schema_name: 'public',
+                table_name: 'orders',
+                column_name: 'total',
+                data_type: 'decimal',
+                attributes: []
+              }
+            );
+          }
+        });
+        return Promise.resolve(columns);
+      });
+
+      const driverFactory = () => metadataMockDriver;
+
+      metadataOrchestrator = new QueryOrchestrator(
+        'ORCHESTRATOR_TEST_METADATA',
+        driverFactory,
+        console.log,
+        {
+          cacheAndQueueDriver: 'memory',
+          continueWaitTimeout: 5,
+          queryCacheOptions: {
+            queueOptions: () => ({
+              concurrency: 2,
+              processUid: 'metadata_test',
+            }),
+          },
+          preAggregationsOptions: {
+            queueOptions: () => ({
+              concurrency: 2,
+              processUid: 'metadata_test',
+            }),
+          },
+        }
+      );
+
+      jest.clearAllMocks();
+
+      if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.memoryCache) {
+        metadataOrchestrator.queryCache.memoryCache.clear();
+      }
+
+      if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.getCacheDriver()) {
+        const cacheDriver = metadataOrchestrator.queryCache.getCacheDriver();
+        if (cacheDriver.store) {
+          Object.keys(cacheDriver.store).forEach(key => delete cacheDriver.store[key]);
+        }
+      }
+    });
+
+    afterEach(async () => {
+      await metadataOrchestrator.cleanup();
+    });
+
+    describe('queryDataSourceSchemas', () => {
+      test('should query and cache schemas for default datasource', async () => {
+        const result = await metadataOrchestrator.queryDataSourceSchemas();
+
+        expect(result).toEqual([
+          { schema_name: 'public' },
+          { schema_name: 'analytics' },
+          { schema_name: 'staging' }
+        ]);
+      });
+
+      test('should query schemas for specific datasource', async () => {
+        const result = await metadataOrchestrator.queryDataSourceSchemas('custom');
+
+        expect(result).toEqual([
+          { schema_name: 'public' },
+          { schema_name: 'analytics' },
+          { schema_name: 'staging' }
+        ]);
+      });
+
+      test('should use cache when syncJobId is provided', async () => {
+        // First call with syncJobId
+        await metadataOrchestrator.queryDataSourceSchemas('default', { syncJobId: 'job-123' });
+
+        // Clear the mock calls
+        metadataMockDriver.getSchemas.mockClear();
+
+        // Second call with same syncJobId should use cache
+        const result = await metadataOrchestrator.queryDataSourceSchemas('default', { syncJobId: 'job-123' });
+
+        expect(result).toEqual([
+          { schema_name: 'public' },
+          { schema_name: 'analytics' },
+          { schema_name: 'staging' }
+        ]);
+
+        // Verify driver wasn't called again
+        expect(metadataMockDriver.getSchemas).not.toHaveBeenCalled();
+      });
+
+      test('should refresh when syncJobId is not provided', async () => {
+        // First call
+        await metadataOrchestrator.queryDataSourceSchemas();
+        // Second call without syncJobId should refresh
+        await metadataOrchestrator.queryDataSourceSchemas();
+
+        // Driver should be called twice
+        expect(metadataMockDriver.getSchemas).toHaveBeenCalledTimes(2);
+      });
+
+      test('should pass requestId option', async () => {
+        const requestId = 'test-request-123';
+        await metadataOrchestrator.queryDataSourceSchemas('default', { requestId });
+
+        expect(metadataMockDriver.getSchemas).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('queryTablesForSchemas', () => {
+      test('should query tables for given schemas', async () => {
+        const schemas = [
+          { schema_name: 'public' },
+          { schema_name: 'analytics' }
+        ];
+
+        const result = await metadataOrchestrator.queryTablesForSchemas(schemas);
+
+        expect(result).toEqual([
+          { schema_name: 'public', table_name: 'users' },
+          { schema_name: 'public', table_name: 'orders' },
+          { schema_name: 'public', table_name: 'products' },
+          { schema_name: 'analytics', table_name: 'user_metrics' },
+          { schema_name: 'analytics', table_name: 'sales_summary' }
+        ]);
+        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledWith(schemas);
+      });
+
+      test('should use cache when syncJobId is provided', async () => {
+        const schemas = [{ schema_name: 'public' }];
+
+        // First call with syncJobId - will execute and store in cache
+        await metadataOrchestrator.queryTablesForSchemas(schemas, 'default', { syncJobId: 'job-123' });
+
+        // Add a delay to ensure the first query has completed and cached its result
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Clear the mock calls
+        metadataMockDriver.getTablesForSpecificSchemas.mockClear();
+
+        // Create equivalent but different object instance
+        // Our hash function should handle this correctly
+        const schemas2 = [{ schema_name: 'public' }];
+
+        // Second call with same syncJobId should use cache
+        const result = await metadataOrchestrator.queryTablesForSchemas(schemas2, 'default', { syncJobId: 'job-123' });
+
+        expect(result).toEqual([
+          { schema_name: 'public', table_name: 'users' },
+          { schema_name: 'public', table_name: 'orders' },
+          { schema_name: 'public', table_name: 'products' }
+        ]);
+
+        // Verify driver wasn't called again
+        expect(metadataMockDriver.getTablesForSpecificSchemas).not.toHaveBeenCalled();
+      });
+
+      test('should handle empty schema list', async () => {
+        const result = await metadataOrchestrator.queryTablesForSchemas([]);
+
+        expect(result).toEqual([]);
+        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledWith([]);
+      });
+
+      test('should refresh when syncJobId is not provided', async () => {
+        const schemas = [{ schema_name: 'public' }];
+
+        await metadataOrchestrator.queryTablesForSchemas(schemas);
+        await metadataOrchestrator.queryTablesForSchemas(schemas);
+
+        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('queryColumnsForTables', () => {
+      test('should query columns for given tables', async () => {
+        const tables = [
+          { schema_name: 'public', table_name: 'users' },
+          { schema_name: 'public', table_name: 'orders' }
+        ];
+
+        const result = await metadataOrchestrator.queryColumnsForTables(tables);
+
+        expect(result).toEqual([
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'id',
+            data_type: 'integer',
+            attributes: ['PRIMARY_KEY']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'name',
+            data_type: 'varchar',
+            attributes: []
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'email',
+            data_type: 'varchar',
+            attributes: ['UNIQUE']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'orders',
+            column_name: 'id',
+            data_type: 'integer',
+            attributes: ['PRIMARY_KEY']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'orders',
+            column_name: 'user_id',
+            data_type: 'integer',
+            attributes: [],
+            foreign_keys: [{ target_table: 'users', target_column: 'id' }]
+          },
+          {
+            schema_name: 'public',
+            table_name: 'orders',
+            column_name: 'total',
+            data_type: 'decimal',
+            attributes: []
+          }
+        ]);
+        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledWith(tables);
+      });
+
+      test('should use cache when syncJobId is provided', async () => {
+        const tables = [{ schema_name: 'public', table_name: 'users' }];
+
+        // First call with syncJobId - will execute and store in cache
+        await metadataOrchestrator.queryColumnsForTables(tables, 'default', { syncJobId: 'job-123' });
+
+        // Add a delay to ensure the first query has completed and cached its result
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Clear the mock calls
+        metadataMockDriver.getColumnsForSpecificTables.mockClear();
+
+        // Create equivalent but different object instance
+        // Our hash function should handle this correctly
+        const tables2 = [{ schema_name: 'public', table_name: 'users' }];
+
+        // Second call with same syncJobId should use cache
+        const result = await metadataOrchestrator.queryColumnsForTables(tables2, 'default', { syncJobId: 'job-123' });
+
+        expect(result).toEqual([
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'id',
+            data_type: 'integer',
+            attributes: ['PRIMARY_KEY']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'name',
+            data_type: 'varchar',
+            attributes: []
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'email',
+            data_type: 'varchar',
+            attributes: ['UNIQUE']
+          }
+        ]);
+
+        // Verify driver wasn't called again
+        expect(metadataMockDriver.getColumnsForSpecificTables).not.toHaveBeenCalled();
+      });
+
+      test('should handle empty table list', async () => {
+        const result = await metadataOrchestrator.queryColumnsForTables([]);
+
+        expect(result).toEqual([]);
+        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledWith([]);
+      });
+
+      test('should refresh when syncJobId is not provided', async () => {
+        const tables = [{ schema_name: 'public', table_name: 'users' }];
+
+        await metadataOrchestrator.queryColumnsForTables(tables);
+        await metadataOrchestrator.queryColumnsForTables(tables);
+
+        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('Integration Tests', () => {
+      test('should handle full metadata workflow', async () => {
+        // Query schemas
+        const schemas = await metadataOrchestrator.queryDataSourceSchemas();
+        expect(schemas).toHaveLength(3);
+
+        // Query tables for specific schemas
+        const publicSchema = schemas.filter(s => s.schema_name === 'public');
+        const tables = await metadataOrchestrator.queryTablesForSchemas(publicSchema);
+        expect(tables).toHaveLength(3);
+
+        // Query columns for specific tables
+        const userTable = tables.filter(t => t.table_name === 'users');
+        const columns = await metadataOrchestrator.queryColumnsForTables(userTable);
+        expect(columns).toHaveLength(3);
+        expect(columns[0].column_name).toBe('id');
+        expect(columns[0].data_type).toBe('integer');
+        expect(columns[0].attributes).toContain('PRIMARY_KEY');
+      });
+
+      test('should handle concurrent metadata requests', async () => {
+        const schemas = [{ schema_name: 'public' }];
+
+        // Make concurrent requests
+        const promises = [
+          metadataOrchestrator.queryDataSourceSchemas(),
+          metadataOrchestrator.queryDataSourceSchemas(),
+          metadataOrchestrator.queryTablesForSchemas(schemas),
+          metadataOrchestrator.queryTablesForSchemas(schemas)
+        ];
+
+        const results = await Promise.all(promises);
+
+        // All requests should return the same data
+        expect(results[0]).toEqual(results[1]);
+        expect(results[2]).toEqual(results[3]);
+      });
+
+      test('should handle error scenarios gracefully', async () => {
+        // Mock driver error
+        metadataMockDriver.getSchemas.mockRejectedValueOnce(new Error('Database connection failed'));
+
+        await expect(metadataOrchestrator.queryDataSourceSchemas()).rejects.toThrow('Database connection failed');
+
+        // Should retry on next call
+        metadataMockDriver.getSchemas.mockResolvedValueOnce([{ schema_name: 'recovered' }]);
+        const result = await metadataOrchestrator.queryDataSourceSchemas();
+        expect(result).toEqual([{ schema_name: 'recovered' }]);
+      });
+    });
   });
 });

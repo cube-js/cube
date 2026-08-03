@@ -1,0 +1,640 @@
+import { vi } from 'vitest';
+import ResultSet from '../src/ResultSet.js';
+
+vi.mock('moment-range', async () => {
+  const Moment = await vi.importActual('moment');
+  const MomentRange: any = await vi.importActual('moment-range');
+  const moment = MomentRange.extendMoment(Moment);
+  return {
+    extendMoment: () => moment,
+  };
+});
+
+const loadResponse = (query = {}) => ({
+  queryType: 'regularQuery',
+  results: [
+    {
+      query: {
+        measures: ['Orders.count'],
+        timeDimensions: [
+          {
+            dimension: 'Orders.ts',
+            granularity: 'day',
+            dateRange: ['2020-08-01T00:00:00.000', '2020-08-07T23:59:59.999'],
+          },
+        ],
+        filters: [],
+        timezone: 'UTC',
+        order: [],
+        dimensions: [],
+        ...query,
+      },
+      data: [
+        {
+          'Orders.ts.day': '2020-08-01T00:00:00.000',
+          'Orders.ts': '2020-08-01T00:00:00.000',
+          'Orders.count': 1,
+        },
+        {
+          'Orders.ts.day': '2020-08-02T00:00:00.000',
+          'Orders.ts': '2020-08-02T00:00:00.000',
+          'Orders.count': 2,
+        },
+      ],
+      annotation: {
+        measures: {
+          'Orders.count': {
+            title: 'Orders Count',
+            shortTitle: 'Count',
+            type: 'number',
+            drillMembers: ['Orders.id', 'Orders.title'],
+            drillMembersGrouped: {
+              measures: [],
+              dimensions: ['Orders.id', 'Orders.title'],
+            },
+          },
+        },
+        dimensions: {},
+        segments: {},
+        timeDimensions: {
+          'Orders.ts.day': {
+            title: 'Orders Ts',
+            shortTitle: 'Ts',
+            type: 'time',
+          },
+          'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
+        },
+      },
+    },
+  ],
+  pivotQuery: {
+    measures: ['Orders.count'],
+    timeDimensions: [
+      {
+        dimension: 'Orders.ts',
+        granularity: 'day',
+        dateRange: ['2020-08-01T00:00:00.000', '2020-08-07T23:59:59.999'],
+      },
+    ],
+    filters: [],
+    timezone: 'UTC',
+    order: [],
+    dimensions: [],
+    ...query,
+  },
+});
+
+const loadResponse2 = {
+  queryType: 'regularQuery',
+  results: [
+    {
+      query: {
+        measures: ['Orders.count'],
+        timeDimensions: [
+          {
+            dimension: 'Orders.createdAt',
+            granularity: 'week',
+            dateRange: ['2023-05-10T00:00:00.000', '2023-05-14T23:59:59.999'],
+          },
+        ],
+        limit: 10000,
+        timezone: 'UTC',
+        order: [],
+        filters: [],
+        dimensions: [],
+        rowLimit: 10000,
+        queryType: 'regularQuery',
+      },
+      data: [
+        {
+          'Orders.createdAt.week': '2023-05-08T00:00:00.000',
+          'Orders.createdAt': '2023-05-08T00:00:00.000',
+          'Orders.count': '21',
+        },
+      ],
+      lastRefreshTime: '2023-05-22T14:46:45.000Z',
+      usedPreAggregations: {
+        'prod_pre_aggregations.orders_main': {
+          targetTableName:
+            'prod_pre_aggregations.orders_main20230508_instgodu_ehgypjtt_1i6n02l',
+          refreshKeyValues: [[]],
+          lastUpdatedAt: 1684766805000,
+        },
+      },
+      transformedQuery: {
+        sortedDimensions: [],
+        sortedTimeDimensions: [['Orders.createdAt', 'day']],
+        timeDimensions: [['Orders.createdAt', 'week']],
+        measures: ['Orders.count'],
+        leafMeasureAdditive: true,
+        leafMeasures: ['Orders.count'],
+        measureToLeafMeasures: {
+          'Orders.count': [
+            { measure: 'Orders.count', additive: true, type: 'count' },
+          ],
+        },
+        hasNoTimeDimensionsWithoutGranularity: true,
+        allFiltersWithinSelectedDimensions: true,
+        isAdditive: true,
+        granularityHierarchies: {
+          year: [
+            'year',
+            'quarter',
+            'month',
+            'month',
+            'day',
+            'hour',
+            'minute',
+            'second',
+          ],
+          quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
+          month: ['month', 'day', 'hour', 'minute', 'second'],
+          week: ['week', 'day', 'hour', 'minute', 'second'],
+          day: ['day', 'hour', 'minute', 'second'],
+          hour: ['hour', 'minute', 'second'],
+          minute: ['minute', 'second'],
+          second: ['second'],
+        },
+        hasMultipliedMeasures: false,
+        hasCumulativeMeasures: false,
+        windowGranularity: null,
+        filterDimensionsSingleValueEqual: {},
+        ownedDimensions: [],
+        ownedTimeDimensionsWithRollupGranularity: [['Orders.createdAt', 'day']],
+        ownedTimeDimensionsAsIs: [['Orders.createdAt', 'week']],
+      },
+      requestId: 'x',
+      annotation: {
+        measures: {
+          'Orders.count': {
+            title: 'Orders Count',
+            shortTitle: 'Count',
+            type: 'number',
+            drillMembers: ['Orders.id', 'Orders.createdAt'],
+            drillMembersGrouped: {
+              measures: [],
+              dimensions: ['Orders.id', 'Orders.createdAt'],
+            },
+          },
+        },
+        dimensions: {},
+        segments: {},
+        timeDimensions: {
+          'Orders.createdAt.week': {
+            title: 'Orders Created at',
+            shortTitle: 'Created at',
+            type: 'time',
+          },
+          'Orders.createdAt': {
+            title: 'Orders Created at',
+            shortTitle: 'Created at',
+            type: 'time',
+          },
+        },
+      },
+      dataSource: 'default',
+      dbType: 'postgres',
+      extDbType: 'cubestore',
+    },
+  ],
+  pivotQuery: {
+    measures: ['Orders.count'],
+    timeDimensions: [
+      {
+        dimension: 'Orders.createdAt',
+        granularity: 'week',
+        dateRange: ['2023-05-10T00:00:00.000', '2023-05-14T23:59:59.999'],
+      },
+    ],
+    limit: 10000,
+    timezone: 'UTC',
+    order: [],
+    filters: [],
+    dimensions: [],
+    rowLimit: 10000,
+    queryType: 'regularQuery',
+  },
+  slowQuery: false,
+};
+
+describe('drill down query', () => {
+  const resultSet1 = new ResultSet(loadResponse() as any);
+  const resultSet2 = new ResultSet(
+    loadResponse({
+      timezone: 'America/Los_Angeles',
+    }) as any
+  );
+  const resultSet3 = new ResultSet(
+    loadResponse({
+      filters: [
+        {
+          member: 'Users.country',
+          operator: 'equals',
+          values: ['Los Angeles'],
+        },
+      ],
+    }) as any
+  );
+  const resultSet4 = new ResultSet(
+    loadResponse({
+      dimensions: ['Statuses.potential'],
+      timeDimensions: [],
+    }) as any
+  );
+  const resultSet5 = new ResultSet(
+    loadResponse({
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          granularity: 'week',
+        }
+      ]
+    }) as any
+  );
+
+  it('handles a query with a time dimension', () => {
+    expect(
+      resultSet1.drillDown({
+        xValues: ['2020-08-01T00:00:00.000'],
+      })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.title'],
+      filters: [
+        {
+          member: 'Orders.count',
+          operator: 'measureFilter',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.999'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+  });
+
+  it('respects the time zone', () => {
+    expect(
+      resultSet2.drillDown({
+        xValues: ['2020-08-01T00:00:00.000'],
+      })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.title'],
+      filters: [
+        {
+          member: 'Orders.count',
+          operator: 'measureFilter',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.999'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+    });
+  });
+
+  it('propagates parent filters', () => {
+    expect(
+      resultSet3.drillDown({
+        xValues: ['2020-08-01T00:00:00.000'],
+      })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.title'],
+      filters: [
+        {
+          member: 'Orders.count',
+          operator: 'measureFilter',
+        },
+        {
+          member: 'Users.country',
+          operator: 'equals',
+          values: ['Los Angeles'],
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.999'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+  });
+
+  it('handles null values', () => {
+    expect(resultSet4.drillDown({ xValues: [] })).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.title'],
+      filters: [
+        {
+          member: 'Orders.count',
+          operator: 'measureFilter',
+        },
+        {
+          member: 'Statuses.potential',
+          operator: 'notSet',
+        },
+      ],
+      timeDimensions: [],
+      timezone: 'UTC',
+    });
+  });
+
+  it('respects the parent time dimension date range', () => {
+    const resultSet = new ResultSet(loadResponse2 as any);
+
+    expect(
+      resultSet.drillDown({ xValues: ['2023-05-08T00:00:00.000'] })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.createdAt'],
+      filters: [
+        {
+          operator: 'measureFilter',
+          member: 'Orders.count',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.createdAt',
+          dateRange: ['2023-05-10T00:00:00.000', '2023-05-14T23:59:59.999'],
+        },
+      ],
+      timezone: 'UTC'
+    });
+  });
+
+  it('snap date range to granularity if the date range is not defined in the time dimension', () => {
+    expect(
+      resultSet5.drillDown({ xValues: ['2020-08-01T00:00:00.000'] })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.title'],
+      filters: [
+        {
+          member: 'Orders.count',
+          operator: 'measureFilter',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          dateRange: ['2020-07-27T00:00:00.000', '2020-08-02T23:59:59.999'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+  });
+
+  it('handles custom granularity with interval and origin', () => {
+    const EVALUATION_PERIOD = 5;
+    const LAST_EVALUATED_AT = '2020-08-01T00:00:00.000';
+
+    const customGranularityResponse = {
+      queryType: 'regularQuery',
+      results: [
+        {
+          query: {
+            measures: ['Transactions.count'],
+            timeDimensions: [
+              {
+                dimension: 'Transactions.createdAt',
+                granularity: 'alerting_monitor',
+                dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T01:00:00.000'],
+              },
+            ],
+            filters: [],
+            timezone: 'UTC',
+            order: [],
+            dimensions: [],
+          },
+          data: [
+            {
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:00:00.000',
+              'Transactions.createdAt': '2020-08-01T00:00:00.000',
+              'Transactions.count': 10,
+            },
+            {
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:05:00.000',
+              'Transactions.createdAt': '2020-08-01T00:05:00.000',
+              'Transactions.count': 15,
+            },
+            {
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:10:00.000',
+              'Transactions.createdAt': '2020-08-01T00:10:00.000',
+              'Transactions.count': 8,
+            },
+          ],
+          annotation: {
+            measures: {
+              'Transactions.count': {
+                title: 'Transactions Count',
+                shortTitle: 'Count',
+                type: 'number',
+                drillMembers: ['Transactions.id', 'Transactions.createdAt'],
+                drillMembersGrouped: {
+                  measures: [],
+                  dimensions: ['Transactions.id', 'Transactions.createdAt'],
+                },
+              },
+            },
+            dimensions: {},
+            segments: {},
+            timeDimensions: {
+              'Transactions.createdAt.alerting_monitor': {
+                title: 'Transaction created at',
+                shortTitle: 'Created at',
+                type: 'time',
+                granularity: {
+                  name: 'alerting_monitor',
+                  title: 'Alerting Monitor',
+                  interval: `${EVALUATION_PERIOD} minutes`,
+                  origin: LAST_EVALUATED_AT,
+                },
+              },
+              'Transactions.createdAt': {
+                title: 'Transaction created at',
+                shortTitle: 'Created at',
+                type: 'time',
+              },
+            },
+          },
+        },
+      ],
+      pivotQuery: {
+        measures: ['Transactions.count'],
+        timeDimensions: [
+          {
+            dimension: 'Transactions.createdAt',
+            granularity: 'alerting_monitor',
+            dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T01:00:00.000'],
+          },
+        ],
+        filters: [],
+        timezone: 'UTC',
+        order: [],
+        dimensions: [],
+      },
+    };
+
+    const resultSet = new ResultSet(customGranularityResponse as any);
+
+    // Test drilling down on the second data point (00:05:00)
+    expect(
+      resultSet.drillDown({ xValues: ['2020-08-01T00:05:00.000'] })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Transactions.id', 'Transactions.createdAt'],
+      filters: [
+        {
+          member: 'Transactions.count',
+          operator: 'measureFilter',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Transactions.createdAt',
+          // Should create a date range for the 5-minute interval starting at 00:05:00
+          dateRange: ['2020-08-01T00:05:00.000', '2020-08-01T00:09:59.999'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+  });
+
+  it('handles custom granularity with non-aligned origin', () => {
+    const EVALUATION_PERIOD = 5;
+    const NON_ALIGNED_ORIGIN = '2020-08-01T00:02:00.000'; // Origin at 00:02 instead of 00:00
+
+    const customGranularityResponse = {
+      queryType: 'regularQuery',
+      results: [
+        {
+          query: {
+            measures: ['Transactions.count'],
+            timeDimensions: [
+              {
+                dimension: 'Transactions.createdAt',
+                granularity: 'alerting_monitor',
+                dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T01:00:00.000'],
+              },
+            ],
+            filters: [],
+            timezone: 'UTC',
+            order: [],
+            dimensions: [],
+          },
+          data: [
+            {
+              // First bucket starts at 00:02:00 (origin)
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:02:00.000',
+              'Transactions.createdAt': '2020-08-01T00:02:00.000',
+              'Transactions.count': 10,
+            },
+            {
+              // Second bucket starts at 00:07:00 (origin + 5 minutes)
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:07:00.000',
+              'Transactions.createdAt': '2020-08-01T00:07:00.000',
+              'Transactions.count': 15,
+            },
+            {
+              // Third bucket starts at 00:12:00 (origin + 10 minutes)
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:12:00.000',
+              'Transactions.createdAt': '2020-08-01T00:12:00.000',
+              'Transactions.count': 8,
+            },
+          ],
+          annotation: {
+            measures: {
+              'Transactions.count': {
+                title: 'Transactions Count',
+                shortTitle: 'Count',
+                type: 'number',
+                drillMembers: ['Transactions.id', 'Transactions.createdAt'],
+                drillMembersGrouped: {
+                  measures: [],
+                  dimensions: ['Transactions.id', 'Transactions.createdAt'],
+                },
+              },
+            },
+            dimensions: {},
+            segments: {},
+            timeDimensions: {
+              'Transactions.createdAt.alerting_monitor': {
+                title: 'Transaction created at',
+                shortTitle: 'Created at',
+                type: 'time',
+                granularity: {
+                  name: 'alerting_monitor',
+                  title: 'Alerting Monitor',
+                  interval: `${EVALUATION_PERIOD} minutes`,
+                  origin: NON_ALIGNED_ORIGIN,
+                },
+              },
+              'Transactions.createdAt': {
+                title: 'Transaction created at',
+                shortTitle: 'Created at',
+                type: 'time',
+              },
+            },
+          },
+        },
+      ],
+      pivotQuery: {
+        measures: ['Transactions.count'],
+        timeDimensions: [
+          {
+            dimension: 'Transactions.createdAt',
+            granularity: 'alerting_monitor',
+            dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T01:00:00.000'],
+          },
+        ],
+        filters: [],
+        timezone: 'UTC',
+        order: [],
+        dimensions: [],
+      },
+    };
+
+    const resultSet = new ResultSet(customGranularityResponse as any);
+
+    // Test drilling down on the second data point (00:07:00)
+    // Since origin is 00:02:00, the bucket is 00:07:00 - 00:11:59
+    expect(
+      resultSet.drillDown({ xValues: ['2020-08-01T00:07:00.000'] })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Transactions.id', 'Transactions.createdAt'],
+      filters: [
+        {
+          member: 'Transactions.count',
+          operator: 'measureFilter',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Transactions.createdAt',
+          // Should align to origin: bucket starts at 00:07:00 (origin + 5min)
+          dateRange: ['2020-08-01T00:07:00.000', '2020-08-01T00:11:59.999'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+  });
+});

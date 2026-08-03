@@ -1,0 +1,245 @@
+# Snowflake
+
+[Snowflake][snowflake] is a popular cloud-based data platform.
+
+## Prerequisites
+
+<InfoBox>
+
+In order to connect Cube to Snowflake, you need to grant certain permissions to the Snowflake role
+used by Cube. Cube requires the role to have `USAGE` on databases and schemas
+and `SELECT` on tables. An example configuration:
+```
+GRANT USAGE ON DATABASE ABC TO ROLE XYZ;
+GRANT USAGE ON ALL SCHEMAS IN DATABASE ABC TO ROLE XYZ;
+GRANT USAGE ON FUTURE SCHEMAS IN DATABASE ABC TO ROLE XYZ;
+GRANT SELECT ON ALL TABLES IN DATABASE ABC TO ROLE XYZ;
+GRANT SELECT ON FUTURE TABLES IN DATABASE ABC TO ROLE XYZ;
+```
+
+</InfoBox>
+
+- [Account/Server URL][snowflake-docs-account-id] for Snowflake.
+- User name and password or an RSA private key for the Snowflake account.
+- Optionally, the warehouse name, the user role, and the database name.
+
+## Setup
+
+<WarningBox>
+If you're having Network error and Snowflake can't be reached please make sure you tried
+[format 2 for an account id][snowflake-format-2].
+</WarningBox>
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=snowflake
+CUBEJS_DB_SNOWFLAKE_ACCOUNT=XXXXXXXXX.us-east-1
+CUBEJS_DB_SNOWFLAKE_WAREHOUSE=MY_SNOWFLAKE_WAREHOUSE
+CUBEJS_DB_NAME=my_snowflake_database
+CUBEJS_DB_USER=snowflake_user
+CUBEJS_DB_PASS=**********
+```
+
+### Cube Cloud
+
+<InfoBox heading="Allowing connections from Cube Cloud IP">
+
+In some cases you'll need to allow connections from your Cube Cloud deployment
+IP address to your database. You can copy the IP address from either the
+Database Setup step in deployment creation, or from <Btn>Settings →
+Configuration</Btn> in your deployment.
+
+</InfoBox>
+
+The following fields are required when creating a Snowflake connection:
+
+<Screenshot
+  alt="Cube Cloud Snowflake Configuration Screen"
+  src="https://ucarecdn.com/2a113d20-33ca-4634-b6fa-8886df4d215c/"
+/>
+
+Cube Cloud also supports connecting to data sources within private VPCs
+if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
+[VPC connectivity guide][ref-cloud-conf-vpc] for details.
+
+[ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
+[ref-cloud-conf-vpc]: /product/deployment/cloud/vpc
+
+## Environment Variables
+
+| Environment Variable                                 | Description                                                                                                                                         | Possible Values                                                        | Required |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | :------: |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_ACCOUNT</EnvVar>                        | The Snowflake account identifier to use when connecting to the database                                                                             | [A valid Snowflake account ID][snowflake-docs-account-id]              |    ✅    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_REGION</EnvVar>                         | The Snowflake region to use when connecting to the database                                                                                         | [A valid Snowflake region][snowflake-docs-regions]                     |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_WAREHOUSE</EnvVar>                      | The Snowflake warehouse to use when connecting to the database                                                                                      | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account |    ✅    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_ROLE</EnvVar>                           | The Snowflake role to use when connecting to the database                                                                                           | [A valid Snowflake role][snowflake-docs-roles] in the account          |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE</EnvVar>      | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |
+| <EnvVar>CUBEJS_DB_NAME</EnvVar>                                     | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |
+| <EnvVar>CUBEJS_DB_USER</EnvVar>                                     | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |
+| <EnvVar>CUBEJS_DB_PASS</EnvVar>                                     | The password used to connect to the database                                                                                                        | A valid database password                                              |    ✅    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR</EnvVar>                  | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`, `OAUTH`                                  |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY</EnvVar>                    | The content of the private RSA key                                                                                                                  | Content of the private RSA key (encrypted or not)                      |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH</EnvVar>               | The path to the private RSA key                                                                                                                     | A valid path to the private RSA key                                    |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS</EnvVar>               | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN</EnvVar>                    | The OAuth token                                                                                                                                     | A valid OAuth token (string)                                           |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH</EnvVar>               | The path to the valid oauth toket file                                                                                                              | A valid path for the oauth token file                                  |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_HOST</EnvVar>                           | Host address to which the driver should connect                                                                                                     | A valid hostname                                                       |    ❌    |
+| <EnvVar>CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE</EnvVar> | Whether or not [quoted identifiers should be case insensitive][link-snowflake-quoted-identifiers]. Default is `false`                               | `true`, `false`                                                        |    ❌    |
+| <EnvVar>CUBEJS_DB_MAX_POOL</EnvVar>                                 | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |
+| <EnvVar>CUBEJS_CONCURRENCY</EnvVar>                                 | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                                                  | A valid number                                                         |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+be used in pre-aggregations when using Snowflake as a source database. To learn
+more about Snowflake's support for approximate aggregate functions, [click
+here][snowflake-docs-approx-agg-fns].
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
+
+By default, Snowflake uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for Snowflake.
+
+### Export Bucket
+
+Snowflake supports using both [AWS S3][aws-s3] and [Google Cloud
+Storage][google-cloud-storage] for export bucket functionality.
+
+#### AWS S3
+
+<InfoBox>
+
+Ensure proper IAM privileges are configured for S3 bucket reads and writes, using either 
+storage integration or user credentials for Snowflake and either IAM roles/IRSA or user 
+credentials for Cube Store, with mixed configurations supported.
+
+</InfoBox>
+
+Using IAM user credentials for both:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+Using a [Storage Integration][snowflake-docs-aws-integration] to write to export buckets and 
+user credentials to read from Cube Store:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_INTEGRATION=aws_int
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+Using a Storage Integration to write to export bucket and IAM role/IRSA to read from Cube Store:**
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_INTEGRATION=aws_int
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+
+#### Google Cloud Storage
+
+<InfoBox>
+
+When using an export bucket, remember to assign the **Storage Object Admin**
+role to your Google Cloud credentials (<EnvVar>CUBEJS_DB_EXPORT_GCS_CREDENTIALS</EnvVar>).
+
+</InfoBox>
+
+Before configuring Cube, an [integration must be created and configured in
+Snowflake][snowflake-docs-gcs-integration]. Take note of the integration name
+(`gcs_int` from the example link) as you'll need it to configure Cube.
+
+Once the Snowflake integration is set up, configure Cube using the following:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET=snowflake-export-bucket
+CUBEJS_DB_EXPORT_BUCKET_TYPE=gcs
+CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
+CUBEJS_DB_EXPORT_INTEGRATION=gcs_int
+```
+
+#### Azure
+
+To use Azure Blob Storage as an export bucket, follow [the guide on
+using a Snowflake storage integration (Option 1)][snowflake-docs-azure].
+Take note of the integration name (`azure_int` from the example link)
+as you'll need it to configure Cube.
+
+[Retrieve the storage account access key][azure-bs-docs-get-key] from your Azure
+account.
+
+Once the Snowflake integration is set up, configure Cube using the following:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=azure
+CUBEJS_DB_EXPORT_BUCKET=wasbs://my-container@my-storage-account.blob.core.windows.net
+CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY=<AZURE_STORAGE_ACCOUNT_ACCESS_KEY>
+CUBEJS_DB_EXPORT_INTEGRATION=azure_int
+```
+
+
+## SSL
+
+Cube does not require any additional configuration to enable SSL as Snowflake
+connections are made over HTTPS.
+
+[aws-s3]: https://aws.amazon.com/s3/
+[google-cloud-storage]: https://cloud.google.com/storage
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
+[self-preaggs-batching]: #batching
+[snowflake]: https://www.snowflake.com/
+[snowflake-docs-account-id]:
+  https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
+[snowflake-docs-connection-options]: https://docs.snowflake.com/en/developer-guide/node-js/nodejs-driver-options#additional-connection-options
+[snowflake-docs-aws-integration]: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration
+[snowflake-docs-gcs-integration]:
+  https://docs.snowflake.com/en/user-guide/data-load-gcs-config.html
+[snowflake-docs-regions]:
+  https://docs.snowflake.com/en/user-guide/intro-regions.html
+[snowflake-docs-roles]:
+  https://docs.snowflake.com/en/user-guide/security-access-control-overview.html#roles
+[snowflake-docs-approx-agg-fns]:
+  https://docs.snowflake.com/en/sql-reference/functions/approx_count_distinct.html
+[snowflake-docs-warehouse]:
+  https://docs.snowflake.com/en/user-guide/warehouses.html
+[snowflake-format-2]: https://docs.snowflake.com/en/user-guide/admin-account-identifier#format-2-account-locator-in-a-region
+[snowflake-docs-azure]: https://docs.snowflake.com/en/user-guide/data-load-azure-config#option-1-configuring-a-snowflake-storage-integration
+[azure-bs-docs-get-key]: https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&tabs=azure-portal#view-account-access-keys
+[link-snowflake-quoted-identifiers]: https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers

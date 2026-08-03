@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/filtered_measures.rs
+expression: result
+---
+orders__completed_count
+-----------------------
+3

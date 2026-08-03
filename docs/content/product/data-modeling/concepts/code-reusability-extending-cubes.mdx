@@ -1,0 +1,207 @@
+# Extension
+
+The `extends` parameter, supported for [cubes][ref-cube-extends] and
+[views][ref-view-extends], allows you to create a _child_ cube (or a view) that reuses
+all declared members of a _parent_ cube (or a view). This helps build reusable data models.
+
+Cubes declare members such as measures, dimensions, and segments. When a child cube extends
+the parent cube, lists of measures, dimensions, and segments are merged.
+For example, if the parent cube defines the `a` measure and the child cube defines the `b`
+measure, the resulting cube will have both measures `a` and `b`.
+
+The usual pattern is to extract common measures, dimensions, and joins into
+the parent cube and then extend from it. This helps prevent code duplication
+and makes code easier to maintain and refactor.
+
+In the example below, the `base_events` cube defines the common events measures,
+dimensions, and a join to the `users` cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: base_events
+    sql_table: events
+
+    joins:
+      - name: users
+        relationship: many_to_one
+        sql: "{CUBE}.user_id = {users.id}"
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: timestamp
+        sql: time
+        type: time
+```
+
+```javascript
+cube(`base_events`, {
+  sql_table: `events`,
+
+  joins: {
+    users: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.user_id = ${users.id}`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  dimensions: {
+    timestamp: {
+      sql: `time`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+<InfoBox>
+
+It’s important to use the [`CUBE` variable][ref-cube-variable] when referencing members
+and columns of the cube. Not specifying the cube name or using `${base_events}` does not
+work when the cube is extended.
+
+</InfoBox>
+
+The `product_purchases` and `page_views` cubes are extended from `base_events`
+and define only the specific dimensions: `product_name` for product purchases
+and `page_path` for page views.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: product_purchases
+    sql_table: product_purchases
+    extends: base_events
+
+    dimensions:
+      - name: product_name
+        sql: product_name
+        type: string
+
+  - name: page_views
+    sql_table: page_views
+    extends: base_events
+
+    dimensions:
+      - name: page_path
+        sql: page_path
+        type: string
+```
+
+```javascript
+cube(`product_purchases`, {
+  sql_table: `product_purchases`,
+  extends: base_events,
+
+  dimensions: {
+    product_name: {
+      sql: `product_name`,
+      type: `string`
+    }
+  }
+})
+
+cube(`page_views`, {
+  sql_table: `page_views`,
+  extends: base_events,
+
+  dimensions: {
+    page_path: {
+      sql: `page_path`,
+      type: `string`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+## Usage with `FILTER_PARAMS`
+
+If the parent cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
+in any `sql` parameter, then child cubes can accomodate to that in two ways.
+
+First, the `sql` parameter can be overridden in each child cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: product_purchases
+    sql: |
+      SELECT *
+      FROM events
+      WHERE {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
+
+    # ...
+```
+
+```javascript
+cube(`product_purchases`, {
+  sql: `
+    SELECT *
+    FROM events
+    WHERE ${FILTER_PARAMS.product_purchases.timestamp.filter("time")}
+  `,
+
+  // ...
+})
+```
+
+</CodeTabs>
+
+Alternatively, all filters can be put inside the parent cube and referenced
+in the child cubes using `AND`. The unused filters will be rendered to `1 = 1`
+in the SQL query:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: base_events
+    sql: |
+      SELECT *
+      FROM events
+      WHERE
+        {FILTER_PARAMS.base_events.timestamp.filter('time')} AND
+        {FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
+        {FILTER_PARAMS.page_views.timestamp.filter('time')}
+
+    # ...
+```
+
+```javascript
+cube(`base_events`, {
+  sql: `
+    SELECT *
+    FROM events
+    WHERE
+      {$FILTER_PARAMS.base_events.timestamp.filter('time')} AND
+      {$FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
+      {$FILTER_PARAMS.page_views.timestamp.filter('time')}
+  `,
+
+  // ...
+})
+```
+
+</CodeTabs>
+
+
+[ref-cube-extends]: /product/data-modeling/reference/cube#extends
+[ref-view-extends]: /product/data-modeling/reference/view#extends
+[ref-schema-ref-cube-filter-params]: /product/data-modeling/reference/cube#filter-params
+[ref-cube-variable]: /product/data-modeling/syntax#cube-variable

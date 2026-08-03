@@ -34,12 +34,12 @@ impl PgCatalogEnumBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.enumtypid.finish()));
-        columns.push(Arc::new(self.enumsortorder.finish()));
-        columns.push(Arc::new(self.enumlabel.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.enumtypid.finish()),
+            Arc::new(self.enumsortorder.finish()),
+            Arc::new(self.enumlabel.finish()),
+        ];
 
         columns
     }

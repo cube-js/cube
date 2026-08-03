@@ -1,0 +1,132 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ErrorReporter should deduplicate identical errors and warnings 1`] = `
+Object {
+  "errors": Array [
+    Object {
+      "fileName": "test.js",
+      "message": "Syntax Error: Duplicate error
+[0m[31m[1m>[22m[39m[90m 1 |[39m test content
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m [31m[1mDuplicate error[22m[39m[0m",
+      "plainMessage": "Syntax Error: Duplicate error",
+    },
+  ],
+  "warnings": Array [
+    Object {
+      "fileName": "test.js",
+      "message": "Duplicate warning",
+    },
+  ],
+}
+`;
+
+exports[`ErrorReporter should group and format errors and warnings from different files: grouped-errors-message 1`] = `
+"Compile errors:
+Errors:
+Generic error
+
+config/database.js Errors:
+Connection failed
+
+schema/custom.js Errors:
+Parse error
+
+schema/orders.js Errors:
+Missing required field
+
+schema/products.js Errors:
+Validation error
+
+schema/users.js Errors:
+Syntax Error: Invalid measure definition
+[0m [90m 2 |[39m   sql[33m:[39m [32m\`SELECT * FROM users\`[39m[33m,[39m
+ [90m 3 |[39m   measures[33m:[39m {
+[31m[1m>[22m[39m[90m 4 |[39m     count[33m:[39m {
+ [90m   |[39m    [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m [31m[1mInvalid measure definition[22m[39m
+ [90m 5 |[39m       type[33m:[39m [32m'count'[39m
+ [90m 6 |[39m     }
+ [90m 7 |[39m   }[0m
+"
+`;
+
+exports[`ErrorReporter should group and format errors and warnings from different files: grouped-errors-plain-message 1`] = `
+"schema/users.js Errors:
+Syntax Error: Invalid measure definition
+"
+`;
+
+exports[`ErrorReporter should group and format errors and warnings from different files: warning-logs 1`] = `
+Array [
+  "schema/users.js:
+Warning: Deprecated syntax
+[0m [90m 1 |[39m cube([32m'Users'[39m[33m,[39m {
+[31m[1m>[22m[39m[90m 2 |[39m   sql[33m:[39m [32m\`SELECT * FROM users\`[39m[33m,[39m
+ [90m   |[39m  [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m [31m[1mDeprecated syntax[22m[39m
+ [90m 3 |[39m   measures[33m:[39m {
+ [90m 4 |[39m     count[33m:[39m {
+ [90m 5 |[39m       type[33m:[39m [32m'count'[39m[0m",
+  "schema/orders.js:
+Consider adding indexes",
+  "schema/analytics.js:
+Performance warning",
+]
+`;
+
+exports[`ErrorReporter should handle addErrors and addWarnings 1`] = `
+Object {
+  "errors": Array [
+    Object {
+      "fileName": "batch.js",
+      "lineNumber": undefined,
+      "message": "Error 1",
+      "position": undefined,
+    },
+    Object {
+      "fileName": "batch.js",
+      "lineNumber": undefined,
+      "message": "Error 2",
+      "position": undefined,
+    },
+    Object {
+      "fileName": "batch.js",
+      "lineNumber": undefined,
+      "message": "Error 3",
+      "position": undefined,
+    },
+  ],
+  "warnings": Array [
+    Object {
+      "fileName": undefined,
+      "message": "Warning 1",
+    },
+    Object {
+      "fileName": undefined,
+      "message": "Warning 2",
+    },
+  ],
+}
+`;
+
+exports[`ErrorReporter should handle errors without fileName at the end 1`] = `
+"Compile errors:
+Errors:
+Generic error without file
+
+fileA.js Errors:
+Error in file A
+
+fileB.js Errors:
+Error in file B
+"
+`;
+
+exports[`ErrorReporter should handle inContext correctly 1`] = `
+Array [
+  Object {
+    "fileName": undefined,
+    "lineNumber": undefined,
+    "message": "Processing Users cube: Test error",
+    "position": undefined,
+  },
+]
+`;

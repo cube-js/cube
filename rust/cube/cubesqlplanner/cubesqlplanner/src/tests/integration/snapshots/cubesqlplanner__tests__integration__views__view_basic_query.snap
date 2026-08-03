@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/src/tests/integration/views.rs
+expression: result
+---
+orders_view__status | orders_view__count | orders_view__total_amount
+--------------------+--------------------+--------------------------
+completed           | 5                  | 1150.00                  
+pending             | 3                  | 225.00

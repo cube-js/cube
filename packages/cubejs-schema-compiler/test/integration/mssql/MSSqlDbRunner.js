@@ -1,55 +1,58 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { GenericContainer, Wait } from 'testcontainers';
-import sql from 'mssql';
+import { MSSqlDriver } from '@cubejs-backend/mssql-driver';
 
-import { BaseDbRunner } from '../postgres/BaseDbRunner';
+import { BaseDbRunner } from '../utils/BaseDbRunner';
+import { MssqlQuery } from '../../../src';
 
 export class MSSqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
+    const driver = new MSSqlDriver({
+      server: 'localhost',
+      port,
+      user: 'sa',
+      password: this.password(),
+      readOnly: false,
+      options: {
+        trustServerCertificate: true,
+        encrypt: false,
+      },
+      pool: {
+        max: 4,
+        min: 0,
+        idleTimeoutMillis: 30000,
+        acquireTimeoutMillis: 20000,
+      },
+    });
+
+    await driver.testConnection();
+
     return {
-      testQueries: async (queries, fixture) => {
-        const pool = new sql.ConnectionPool({
-          server: 'localhost',
-          port,
-          user: 'sa',
-          password: this.password()
-        });
-
-        await pool.connect();
-
-        try {
-          const tx = new sql.Transaction(pool);
-          await tx.begin();
-          try {
-            await this.prepareFixture(tx, fixture);
-            const result = await queries.map(query => async () => {
-              const request = new sql.Request(tx);
-              (query[1] || []).forEach((v, i) => request.input(`_${i + 1}`, v));
-              return (await request.query(query[0])).recordset;
-            }).reduce((a, b) => a.then(b), Promise.resolve());
-            await tx.commit();
-            return result;
-          } catch (e) {
-            // console.log(e.stack);
-            await tx.rollback();
-            throw e;
-          }
-        } finally {
-          await pool.close();
+      testQueries: async (queries, _fixture) => {
+        await this.prepareFixture(driver);
+        let result;
+        for (const query of queries) {
+          result = await driver.query(query[0], query[1] || []);
         }
-      }
+        return result;
+      },
+      close: async () => {
+        await driver.release();
+      },
     };
   }
 
-  async prepareFixture(tx) {
-    const query = async (q) => {
-      const request = new sql.Request(tx);
-      await request.query(q);
-    };
-    await query('CREATE TABLE ##visitors (id INT, amount INT, created_at datetime, updated_at datetime, status INT, source VARCHAR(MAX), latitude DECIMAL, longitude DECIMAL)');
-    await query('CREATE TABLE ##visitor_checkins (id INT, visitor_id INT, created_at datetime, source VARCHAR(MAX))');
-    await query('CREATE TABLE ##cards (id INT, visitor_id INT, visitor_checkin_id INT)');
-    await query(`
+  /**
+   * @param {MSSqlDriver} driver
+   */
+  async prepareFixture(driver) {
+    await driver.query('DROP TABLE IF EXISTS ##visitors', []);
+    await driver.query('DROP TABLE IF EXISTS ##visitor_checkins', []);
+    await driver.query('DROP TABLE IF EXISTS ##cards', []);
+    await driver.query('DROP TABLE IF EXISTS ##numbers', []);
+    await driver.query('CREATE TABLE ##visitors (id INT, amount INT, created_at datetime, updated_at datetime, status INT, source VARCHAR(MAX), latitude DECIMAL, longitude DECIMAL)', []);
+    await driver.query('CREATE TABLE ##visitor_checkins (id INT, visitor_id INT, created_at datetime, source VARCHAR(MAX))', []);
+    await driver.query('CREATE TABLE ##cards (id INT, visitor_id INT, visitor_checkin_id INT)', []);
+    await driver.query(`
     INSERT INTO
     ##visitors
     (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
@@ -59,8 +62,8 @@ export class MSSqlDbRunner extends BaseDbRunner {
     (4, 400, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 10.60),
     (5, 500, '2017-01-07', '2017-01-25', 2, NULL, 120.120, 58.10),
     (6, 500, '2016-09-07', '2016-09-07', 2, NULL, 120.120, 58.10)
-    `);
-    await query(`
+    `, []);
+    await driver.query(`
     INSERT INTO
     ##visitor_checkins
     (id, visitor_id, created_at, source) VALUES
@@ -70,41 +73,78 @@ export class MSSqlDbRunner extends BaseDbRunner {
     (4, 2, '2017-01-05', NULL),
     (5, 2, '2017-01-05', NULL),
     (6, 3, '2017-01-06', NULL)
-    `);
-    await query(`
+    `, []);
+    await driver.query(`
     INSERT INTO
     ##cards
     (id, visitor_id, visitor_checkin_id) VALUES
     (1, 1, 1),
     (2, 1, 2),
     (3, 3, 6)
-    `);
+    `, []);
+    await driver.query('CREATE TABLE ##numbers (num INT);', []);
+    await driver.query(`
+    INSERT INTO ##numbers (num) VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9),
+                                  (10), (11), (12), (13), (14), (15), (16), (17), (18), (19),
+                                  (20), (21), (22), (23), (24), (25), (26), (27), (28), (29),
+                                  (30), (31), (32), (33), (34), (35), (36), (37), (38), (39),
+                                  (40), (41), (42), (43), (44), (45), (46), (47), (48), (49),
+                                  (50), (51), (52), (53), (54), (55), (56), (57), (58), (59);
+    `, []);
   }
 
   password() {
     return process.env.TEST_DB_PASSWORD || 'Test1test';
   }
 
+  sqlcmdPrefix(version) {
+    if (version === '2017-latest') {
+      return '/opt/mssql-tools/bin/';
+    }
+
+    // Thanks, Microsoft the last 2019 Version that has same path is "2019-CU27-ubuntu-20.04"
+    // Starting with "2019-latest" published on 08/01/2024 - new path is "/opt/mssql-tools18/bin/"
+    // @see https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2019/cumulativeupdate28#3217207
+    return '/opt/mssql-tools18/bin/';
+  }
+
   async containerLazyInit() {
-    const version = process.env.TEST_MSSQL_VERSION || '2017-latest';
+    const version = process.env.TEST_MSSQL_VERSION || '2019-latest';
 
     return new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
-      .withEnv('ACCEPT_EULA', 'Y')
-      .withEnv('MSSQL_PID', 'Developer')
-      .withEnv('MSSQL_SA_PASSWORD', this.password())
-      .withHealthCheck({
-        test: `/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`,
-        interval: 2 * 1000,
-        timeout: 3 * 1000,
-        retries: 5,
-        startPeriod: 10 * 1000,
+      .withEnvironment({
+        ACCEPT_EULA: 'Y',
+        MSSQL_PID: 'Developer',
+        MSSQL_SA_PASSWORD: this.password(),
       })
       .withExposedPorts(this.port())
+      .withHealthCheck({
+        test: [
+          'CMD-SHELL',
+          `${this.sqlcmdPrefix(version)}sqlcmd -C -l 1 -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`
+        ],
+        interval: 1000,
+        timeout: 1100,
+        retries: 20,
+        startPeriod: 2 * 1000,
+      })
       .withWaitStrategy(Wait.forHealthCheck())
+      .withStartupTimeout(10 * 1000)
       .start();
   }
 
   port() {
     return 1433;
   }
+
+  newTestQuery(compilers, query) {
+    return new MssqlQuery(compilers, query);
+  }
 }
+
+export const dbRunner = new MSSqlDbRunner();
+
+// eslint-disable-next-line no-undef
+afterAll(async () => {
+  await dbRunner.tearDown();
+});

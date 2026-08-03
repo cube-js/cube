@@ -1,0 +1,44 @@
+version: "2.2"
+
+services:
+  cube:
+    container_name: birdbox-cube
+    image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
+    environment:
+      CUBEJS_DB_TYPE: vertica
+
+      CUBEJS_DB_HOST: db
+      CUBEJS_DB_PORT: 5433
+      CUBEJS_DB_NAME: vmart
+      CUBEJS_DB_USER: dbadmin
+      CUBEJS_DB_PASS:
+
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_WEB_SOCKETS: "true"
+      CUBEJS_API_SECRET: mysupersecret
+    volumes:
+      - ./vertica/schema:/cube/conf/schema
+    ports:
+      - "4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+    restart: always
+
+  # Database instances, for troubleshooting.
+  # NOT required.
+  # Tests provide db instances via testcontainers, in both LOCAL and DOCKER modes.
+
+  db:
+    container_name: birdbox-db
+    image: vertica/vertica-ce:12.0.4-0
+    ports:
+      - "5433"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/vertica/bin/vsql -c 'select 1;' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

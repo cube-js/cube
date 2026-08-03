@@ -23,6 +23,6 @@ pub trait AsyncTestSuite: Debug {
 }
 
 pub enum AsyncTestConstructorResult {
-    Sucess(Box<dyn AsyncTestSuite>),
+    Success(Box<dyn AsyncTestSuite>),
     Skipped(String),
 }

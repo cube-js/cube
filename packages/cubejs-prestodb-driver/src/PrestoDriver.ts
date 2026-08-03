@@ -10,32 +10,59 @@ import {
   StreamOptions,
   StreamTableData,
   TableStructure,
-  BaseDriver
+  BaseDriver,
+  UnloadOptions
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
   assertDataSource,
+  formatAnsi,
 } from '@cubejs-backend/shared';
+
 import { Transform, TransformCallback } from 'stream';
+import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
+
 import {
   map, zipObj, prop, concat
 } from 'ramda';
-import SqlString from 'sqlstring';
 
 const presto = require('presto-client');
 
-export type PrestoDriverConfiguration = {
+export type PrestoDriverExportBucket = {
+  exportBucket?: string,
+  bucketType?: 'gcs' | 's3',
+  credentials?: any,
+  accessKeyId?: string,
+  secretAccessKey?: string,
+  exportBucketRegion?: string,
+  exportBucketS3AdvancedFS?: boolean,
+  exportBucketCsvEscapeSymbol?: string,
+};
+
+export type PrestoDriverInternalConfiguration = {
+    engine?: 'presto' | 'trino';
+};
+
+export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverInternalConfiguration & {
   host?: string;
   port?: string;
   catalog?: string;
   schema?: string;
   user?: string;
   // eslint-disable-next-line camelcase
+  custom_auth?: string;
+  // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
-  ssl?: string;
+  ssl?: TLSConnectionOptions;
   dataSource?: string;
+  queryTimeout?: number;
+  preAggregations?: boolean;
+  useSelectTestConnection?: boolean;
+  // @see https://trino.io/docs/current/develop/client-protocol.html
+  headers?: Record<string, string>;
 };
 
+const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
 /**
  * Presto driver class.
  */
@@ -47,11 +74,13 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return 2;
   }
 
-  private config: PrestoDriverConfiguration;
+  protected readonly config: PrestoDriverConfiguration;
 
-  private catalog: string | undefined;
+  protected readonly catalog: string | undefined;
 
-  private client: any;
+  protected client: any;
+
+  protected useSelectTestConnection: boolean;
 
   /**
    * Class constructor.
@@ -62,49 +91,132 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
+
+    const dbUser = getEnv('dbUser', { dataSource, preAggregations });
+    const dbPassword = getEnv('dbPass', { dataSource, preAggregations });
+    const authToken = getEnv('prestoAuthToken', { dataSource, preAggregations });
+
+    if (authToken && dbPassword) {
+      throw new Error('Both user/password and auth token are set. Please remove password or token.');
+    }
+
+    this.useSelectTestConnection = config.useSelectTestConnection ??
+      getEnv('dbUseSelectTestConnection', { dataSource, preAggregations });
 
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
       catalog:
-        getEnv('prestoCatalog', { dataSource }) ||
-        getEnv('dbCatalog', { dataSource }),
+        getEnv('prestoCatalog', { dataSource, preAggregations }) ||
+        getEnv('dbCatalog', { dataSource, preAggregations }),
       schema:
-        getEnv('dbName', { dataSource }) ||
-        getEnv('dbSchema', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      basic_auth: getEnv('dbPass', { dataSource })
-        ? {
-          user: getEnv('dbUser', { dataSource }),
-          password: getEnv('dbPass', { dataSource }),
-        }
-        : undefined,
-      ssl: this.getSslOptions(dataSource),
+        getEnv('dbName', { dataSource, preAggregations }) ||
+        getEnv('dbSchema', { dataSource, preAggregations }),
+      user: dbUser,
+      ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
+      ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
+      ssl: this.getSslOptions(dataSource, preAggregations),
+      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource, preAggregations }),
+      exportBucket: getEnv('dbExportBucket', { dataSource, preAggregations }),
+      accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource, preAggregations }),
+      secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource, preAggregations }),
+      exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource, preAggregations }),
+      credentials: getEnv('dbExportGCSCredentials', { dataSource, preAggregations }),
+      queryTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
       ...config
     };
     this.catalog = this.config.catalog;
-    this.client = new presto.Client(this.config);
+    this.client = new presto.Client({
+      timeout: this.config.queryTimeout,
+      engine: 'presto',
+      ...this.config,
+    });
+
+    this.applyCustomHeadersToAllRequests(this.client);
   }
 
-  public testConnection() {
-    const query = SqlString.format('show catalogs like ?', [`%${this.catalog}%`]);
+  /**
+   * https://github.com/tagomoris/presto-client-node/pull/97
+   *
+   * Reason for monkey patching:
+   *
+   * The underlying `presto-client` only applies custom headers to the initial
+   * `POST /v1/statement` request. The follow-up `nextUri` GET polls (and the
+   * cancel/kill/node requests) are issued with a fresh, empty header set.
+   */
+  protected applyCustomHeadersToAllRequests(client: any) {
+    const customHeaders = this.config.headers;
+    if (!customHeaders || Object.keys(customHeaders).length === 0) {
+      return;
+    }
 
-    return (<Promise<any[]>> this.queryPromised(query, false))
-      .then(catalogs => {
-        if (catalogs.length === 0) {
-          throw new Error(`Catalog not found '${this.catalog}'`);
+    // `request` lives on the prototype; capture it before shadowing it on the instance.
+    const originalRequest = client.request;
+
+    client.request = function patchedRequest(opts: any, callback: any) {
+      if (typeof opts === 'string') {
+        // `opts` is a `nextUri` URL string. The upstream client rebuilds GET
+        // options from it with empty headers, dropping our custom headers. We
+        // recreate those options ourselves (seeded with the custom headers) and
+        // invoke the original `request` with a client "view" whose host/port/
+        // protocol point at the `nextUri` target. The original object branch
+        // otherwise forces the client's configured host, so the view preserves
+        // upstream's host-following behaviour.
+        let href;
+        try {
+          href = new URL(opts);
+        } catch (error) {
+          return callback(error);
+        }
+
+        const view = Object.create(this);
+        view.host = href.hostname;
+        view.port = href.port || (href.protocol === 'https:' ? '443' : '80');
+        view.protocol = href.protocol;
+
+        return originalRequest.call(view, {
+          method: 'GET',
+          path: href.pathname + href.search,
+          headers: { ...customHeaders },
+        }, callback);
+      }
+
+      // Object form (POST /v1/statement, DELETE cancel/kill, node list, ...).
+      // Merge in the custom headers, letting any explicitly-provided headers win.
+      opts.headers = { ...customHeaders, ...(opts.headers || {}) };
+      return originalRequest.call(this, opts, callback);
+    };
+  }
+
+  public async testConnection(): Promise<void> {
+    if (this.useSelectTestConnection) {
+      return this.testConnectionViaSelect();
+    }
+
+    return new Promise((resolve, reject) => {
+      // Get node list of presto cluster and return it.
+      // @see https://prestodb.io/docs/current/rest/node.html
+      this.client.nodes(null, (error: any, _result: any[]) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
         }
       });
+    });
+  }
+
+  protected async testConnectionViaSelect() {
+    await this.queryPromised('SELECT 1', false);
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {
     return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false);
   }
 
-  public prepareQueryWithParams(query: string, values: unknown[]) {
-    return SqlString.format(query, (values || []).map(value => (typeof value === 'string' ? {
-      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1'),
-    } : value)));
+  protected prepareQueryWithParams(query: string, values: unknown[]) {
+    return formatAnsi(query, values || []);
   }
 
   public queryPromised(query: string, streaming: boolean): Promise<any[] | StreamTableData> {
@@ -123,6 +235,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
+          session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
               rowStream,
@@ -150,6 +264,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          headers: this.config.headers,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
             fullData = concat(normalData, fullData);
@@ -172,6 +287,58 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return super.downloadQueryResults(query, values, options);
   }
 
+  protected override informationSchemaQuery() {
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+    const schemaFilter = this.config.schema ? ` AND columns.table_schema = '${this.config.schema}'` : '';
+
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM ${catalogPrefix}information_schema.columns
+      WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${schemaFilter}
+   `;
+  }
+
+  protected override getSchemasQuery() {
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+
+    return `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM ${catalogPrefix}information_schema.tables
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      GROUP BY table_schema
+    `;
+  }
+
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+
+    const query = `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')},
+            table_name as ${this.quoteIdentifier('table_name')}
+      FROM ${catalogPrefix}information_schema.tables as columns
+      WHERE table_schema IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+
+    const query = `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('schema_name')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM ${catalogPrefix}information_schema.columns as columns
+      WHERE ${conditionString}
+    `;
+
+    return query;
+  }
+
   public normalizeResultOverColumns(data: any[], columns: TableStructure) {
     const columnNames = map(prop('name'), columns || []);
     const arrayToObject = zipObj(columnNames);
@@ -188,5 +355,139 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return {
       unloadWithoutTempTable: true
     };
+  }
+
+  public async createSchemaIfNotExists(schemaName: string) {
+    await this.query(
+      `CREATE SCHEMA IF NOT EXISTS ${this.config.catalog}.${schemaName}`,
+      [],
+    );
+  }
+
+  // Export bucket methods
+  public async isUnloadSupported() {
+    return this.config.exportBucket !== undefined;
+  }
+
+  public async unload(tableName: string, options: UnloadOptions) {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+
+    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
+      throw new Error(`Unsupported export bucket type: ${this.config.bucketType}`);
+    }
+
+    const types = options.query
+      ? await this.unloadWithSql(tableName, options.query.sql, options.query.params)
+      : await this.unloadWithTable(tableName);
+
+    const csvFile = await this.getCsvFiles(tableName);
+
+    return {
+      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
+      csvFile,
+      types,
+      csvNoHeader: true,
+    };
+  }
+
+  private splitTableFullName(tableFullName: string) {
+    const [schema, tableName] = tableFullName.split('.');
+    return { schema, tableName };
+  }
+
+  private generateTableColumnsForExport(types: { name: string, type: string }[]) {
+    return types.map((c) => `CAST(${c.name} AS varchar) ${c.name}`).join(', ');
+  }
+
+  private async unloadWithSql(tableFullName: string, sql: string, params: any[]) {
+    return this.unloadGeneric({
+      tableFullName,
+      typeSql: sql,
+      typeParams: params,
+      fromSql: sql,
+      fromParams: params
+    });
+  }
+
+  private async unloadWithTable(tableFullName: string) {
+    return this.unloadGeneric({
+      tableFullName,
+      typeSql: `SELECT * FROM ${tableFullName}`,
+      typeParams: [],
+      fromSql: tableFullName,
+      fromParams: []
+    });
+  }
+
+  private async unloadGeneric(params: { tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[] }) {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+
+    const { bucketType, exportBucket } = this.config;
+    const types = await this.queryColumnTypes(params.typeSql, params.typeParams);
+
+    const { schema, tableName } = this.splitTableFullName(params.tableFullName);
+    const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
+
+    const protocol = {
+      gcs: 'gs',
+      s3: this.config.exportBucketS3AdvancedFS ? 's3a' : 's3'
+    }[bucketType || 'gcs'];
+
+    const externalLocation = `${protocol}://${exportBucket}/${schema}/${tableName}`;
+    const withParams = `( external_location = '${externalLocation}', format = 'CSV')`;
+    const select = `SELECT ${this.generateTableColumnsForExport(types)} FROM (${params.fromSql})`;
+    const createTableQuery = `CREATE TABLE ${tableWithCatalogAndSchema} WITH ${withParams} AS (${select})`;
+
+    try {
+      await this.query(
+        createTableQuery,
+        params.fromParams,
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS ${tableWithCatalogAndSchema}`, []);
+    }
+
+    return types;
+  }
+
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: string; type: string; }[]> {
+    const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1 });
+    const result = [];
+    for (const column of response.types || []) {
+      result.push({ name: column.name, type: this.toGenericType(column.type) });
+    }
+    return result;
+  }
+
+  private async getCsvFiles(
+    tableFullName: string,
+  ): Promise<string[]> {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+    const { bucketType, exportBucket } = this.config;
+    const { schema, tableName } = this.splitTableFullName(tableFullName);
+
+    switch (bucketType) {
+      case 'gcs':
+        return this.extractFilesFromGCS({ credentials: this.config.credentials }, exportBucket, `${schema}/${tableName}`);
+      case 's3':
+        return this.extractUnloadedFilesFromS3({
+          credentials: this.config.accessKeyId && this.config.secretAccessKey
+            ? {
+              accessKeyId: this.config.accessKeyId,
+              secretAccessKey: this.config.secretAccessKey,
+            }
+            : undefined,
+          region: this.config.exportBucketRegion,
+        },
+        exportBucket, `${schema}/${tableName}`);
+      default:
+        throw new Error(`Unsupported export bucket type: ${bucketType}`);
+    }
   }
 }

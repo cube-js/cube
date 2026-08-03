@@ -12,8 +12,14 @@ export function IndexPage() {
 
   useEffect(() => {
     async function loadFiles() {
-      const res = await fetch('/playground/files');
+      const res = await fetch('playground/files');
       const result = await res.json();
+
+      if (result.error?.includes('Model files not found')) {
+        setFiles([]);
+      } else if (result.error) {
+        throw result.error;
+      }
 
       if (isMounted()) {
         setFiles(result.files);

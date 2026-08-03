@@ -1,0 +1,45 @@
+cubes:
+  - name: base_cube
+    sql_table: foo
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: parent_dim_no_type
+        sql: barbus
+
+      - name: parent_dim_bad_type
+        type: bad_type
+        sql: badus
+
+      - name: parent_dim_no_sql
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: parent_meas_no_type
+
+      - name: parent_meas_bad_type
+        type: bad_type
+
+  - name: child_cube
+    extends: base_cube
+
+    dimensions:
+      - name: bar
+        sql: bar
+        type: string
+
+      - name: child_dim_no_type
+        sql: barbus
+
+      - name: child_dim_bad_type
+        type: bad_type
+        sql: shmarbus
+
+      - name: child_dim_no_sql
+        type: number

@@ -82,7 +82,7 @@ export default function GraphiQLSandbox({
     try {
       const converter = new CubeGraphQLConverter(query, types);
       return converter.convert().replace('{', ' { ').replace('}', ' } ');
-    } catch (error) {
+    } catch (error: any) {
       return `# ${error}\n`;
     }
   }, [query, types]);

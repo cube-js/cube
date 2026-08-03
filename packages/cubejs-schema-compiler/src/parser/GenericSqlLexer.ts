@@ -1,21 +1,17 @@
-// Generated from src/parser/GenericSql.g4 by ANTLR 4.9.0-SNAPSHOT
-
-
-import { ATN } from "antlr4ts/atn/ATN";
-import { ATNDeserializer } from "antlr4ts/atn/ATNDeserializer";
-import { CharStream } from "antlr4ts/CharStream";
-import { Lexer } from "antlr4ts/Lexer";
-import { LexerATNSimulator } from "antlr4ts/atn/LexerATNSimulator";
-import { NotNull } from "antlr4ts/Decorators";
-import { Override } from "antlr4ts/Decorators";
-import { RuleContext } from "antlr4ts/RuleContext";
-import { Vocabulary } from "antlr4ts/Vocabulary";
-import { VocabularyImpl } from "antlr4ts/VocabularyImpl";
-
-import * as Utils from "antlr4ts/misc/Utils";
-
-
-export class GenericSqlLexer extends Lexer {
+// Generated from src/parser/GenericSql.g4 by ANTLR 4.13.2
+// noinspection ES6UnusedImports,JSUnusedGlobalSymbols,JSUnusedLocalSymbols
+import {
+	ATN,
+	ATNDeserializer,
+	CharStream,
+	DecisionState, DFA,
+	Lexer,
+	LexerATNSimulator,
+	RuleContext,
+	PredictionContextCache,
+	Token
+} from "antlr4";
+export default class GenericSqlLexer extends Lexer {
 	public static readonly T__0 = 1;
 	public static readonly T__1 = 2;
 	public static readonly T__2 = 3;
@@ -37,159 +33,162 @@ export class GenericSqlLexer extends Lexer {
 	public static readonly IS = 19;
 	public static readonly NULL = 20;
 	public static readonly CAST = 21;
-	public static readonly INDEXED_PARAM = 22;
-	public static readonly ID = 23;
-	public static readonly DIGIT = 24;
-	public static readonly QUOTED_ID = 25;
-	public static readonly STRING = 26;
-	public static readonly WHITESPACE = 27;
+	public static readonly REGEXP = 22;
+	public static readonly INDEXED_PARAM = 23;
+	public static readonly PARAM_PLACEHOLDER = 24;
+	public static readonly ID = 25;
+	public static readonly DIGIT = 26;
+	public static readonly QUOTED_ID = 27;
+	public static readonly STRING = 28;
+	public static readonly WHITESPACE = 29;
+	public static readonly COMMENT = 30;
+	public static readonly MULTILINE_COMMENT = 31;
+	public static readonly EOF = Token.EOF;
 
-	// tslint:disable:no-trailing-whitespace
-	public static readonly channelNames: string[] = [
-		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
-	];
-
-	// tslint:disable:no-trailing-whitespace
-	public static readonly modeNames: string[] = [
-		"DEFAULT_MODE",
-	];
+	public static readonly channelNames: string[] = [ "DEFAULT_TOKEN_CHANNEL", "HIDDEN" ];
+	public static readonly literalNames: (string | null)[] = [ null, "'('", 
+                                                            "')'", "','", 
+                                                            "'.'", "'SELECT'", 
+                                                            "'*'", "'FROM'", 
+                                                            "'WHERE'", "'AND'", 
+                                                            "'OR'", "'NOT'", 
+                                                            "'AS'", "'<'", 
+                                                            "'<='", "'>'", 
+                                                            "'>='", "'='", 
+                                                            null, "'IS'", 
+                                                            "'NULL'", "'CAST'", 
+                                                            "'REGEXP'", 
+                                                            null, "'?'" ];
+	public static readonly symbolicNames: (string | null)[] = [ null, null, 
+                                                             null, null, 
+                                                             null, "SELECT", 
+                                                             "ASTERISK", 
+                                                             "FROM", "WHERE", 
+                                                             "AND", "OR", 
+                                                             "NOT", "AS", 
+                                                             "LT", "LTE", 
+                                                             "GT", "GTE", 
+                                                             "EQUALS", "NOT_EQUALS", 
+                                                             "IS", "NULL", 
+                                                             "CAST", "REGEXP", 
+                                                             "INDEXED_PARAM", 
+                                                             "PARAM_PLACEHOLDER", 
+                                                             "ID", "DIGIT", 
+                                                             "QUOTED_ID", 
+                                                             "STRING", "WHITESPACE", 
+                                                             "COMMENT", 
+                                                             "MULTILINE_COMMENT" ];
+	public static readonly modeNames: string[] = [ "DEFAULT_MODE", ];
 
 	public static readonly ruleNames: string[] = [
 		"T__0", "T__1", "T__2", "T__3", "SELECT", "ASTERISK", "FROM", "WHERE", 
 		"AND", "OR", "NOT", "AS", "LT", "LTE", "GT", "GTE", "EQUALS", "NOT_EQUALS", 
-		"IS", "NULL", "CAST", "INDEXED_PARAM", "ID", "DIGIT", "QUOTED_ID", "STRING", 
-		"WHITESPACE",
+		"IS", "NULL", "CAST", "REGEXP", "INDEXED_PARAM", "PARAM_PLACEHOLDER", 
+		"ID", "DIGIT", "QUOTED_ID", "STRING", "WHITESPACE", "COMMENT", "MULTILINE_COMMENT",
 	];
-
-	private static readonly _LITERAL_NAMES: Array<string | undefined> = [
-		undefined, "'('", "')'", "','", "'.'", "'SELECT'", "'*'", "'FROM'", "'WHERE'", 
-		"'AND'", "'OR'", "'NOT'", "'AS'", "'<'", "'<='", "'>'", "'>='", "'='", 
-		undefined, "'IS'", "'NULL'", "'CAST'",
-	];
-	private static readonly _SYMBOLIC_NAMES: Array<string | undefined> = [
-		undefined, undefined, undefined, undefined, undefined, "SELECT", "ASTERISK", 
-		"FROM", "WHERE", "AND", "OR", "NOT", "AS", "LT", "LTE", "GT", "GTE", "EQUALS", 
-		"NOT_EQUALS", "IS", "NULL", "CAST", "INDEXED_PARAM", "ID", "DIGIT", "QUOTED_ID", 
-		"STRING", "WHITESPACE",
-	];
-	public static readonly VOCABULARY: Vocabulary = new VocabularyImpl(GenericSqlLexer._LITERAL_NAMES, GenericSqlLexer._SYMBOLIC_NAMES, []);
-
-	// @Override
-	// @NotNull
-	public get vocabulary(): Vocabulary {
-		return GenericSqlLexer.VOCABULARY;
-	}
-	// tslint:enable:no-trailing-whitespace
 
 
 	constructor(input: CharStream) {
 		super(input);
-		this._interp = new LexerATNSimulator(GenericSqlLexer._ATN, this);
+		this._interp = new LexerATNSimulator(this, GenericSqlLexer._ATN, GenericSqlLexer.DecisionsToDFA, new PredictionContextCache());
 	}
 
-	// @Override
 	public get grammarFileName(): string { return "GenericSql.g4"; }
 
-	// @Override
+	public get literalNames(): (string | null)[] { return GenericSqlLexer.literalNames; }
+	public get symbolicNames(): (string | null)[] { return GenericSqlLexer.symbolicNames; }
 	public get ruleNames(): string[] { return GenericSqlLexer.ruleNames; }
 
-	// @Override
-	public get serializedATN(): string { return GenericSqlLexer._serializedATN; }
+	public get serializedATN(): number[] { return GenericSqlLexer._serializedATN; }
 
-	// @Override
 	public get channelNames(): string[] { return GenericSqlLexer.channelNames; }
 
-	// @Override
 	public get modeNames(): string[] { return GenericSqlLexer.modeNames; }
 
-	public static readonly _serializedATN: string =
-		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x02\x1D\xB4\b\x01" +
-		"\x04\x02\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06" +
-		"\x04\x07\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r" +
-		"\t\r\x04\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t" +
-		"\x12\x04\x13\t\x13\x04\x14\t\x14\x04\x15\t\x15\x04\x16\t\x16\x04\x17\t" +
-		"\x17\x04\x18\t\x18\x04\x19\t\x19\x04\x1A\t\x1A\x04\x1B\t\x1B\x04\x1C\t" +
-		"\x1C\x03\x02\x03\x02\x03\x03\x03\x03\x03\x04\x03\x04\x03\x05\x03\x05\x03" +
-		"\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03\x07\x03\x07\x03" +
-		"\b\x03\b\x03\b\x03\b\x03\b\x03\t\x03\t\x03\t\x03\t\x03\t\x03\t\x03\n\x03" +
-		"\n\x03\n\x03\n\x03\v\x03\v\x03\v\x03\f\x03\f\x03\f\x03\f\x03\r\x03\r\x03" +
-		"\r\x03\x0E\x03\x0E\x03\x0F\x03\x0F\x03\x0F\x03\x10\x03\x10\x03\x11\x03" +
-		"\x11\x03\x11\x03\x12\x03\x12\x03\x13\x03\x13\x03\x13\x03\x13\x05\x13t" +
-		"\n\x13\x03\x14\x03\x14\x03\x14\x03\x15\x03\x15\x03\x15\x03\x15\x03\x15" +
-		"\x03\x16\x03\x16\x03\x16\x03\x16\x03\x16\x03\x17\x03\x17\x06\x17\x85\n" +
-		"\x17\r\x17\x0E\x17\x86\x03\x17\x03\x17\x03\x18\x03\x18\x07\x18\x8D\n\x18" +
-		"\f\x18\x0E\x18\x90\v\x18\x03\x19\x03\x19\x03\x1A\x03\x1A\x07\x1A\x96\n" +
-		"\x1A\f\x1A\x0E\x1A\x99\v\x1A\x03\x1A\x03\x1A\x03\x1A\x07\x1A\x9E\n\x1A" +
-		"\f\x1A\x0E\x1A\xA1\v\x1A\x03\x1A\x05\x1A\xA4\n\x1A\x03\x1B\x03\x1B\x03" +
-		"\x1B\x03\x1B\x07\x1B\xAA\n\x1B\f\x1B\x0E\x1B\xAD\v\x1B\x03\x1B\x03\x1B" +
-		"\x03\x1C\x03\x1C\x03\x1C\x03\x1C\x02\x02\x02\x1D\x03\x02\x03\x05\x02\x04" +
-		"\x07\x02\x05\t\x02\x06\v\x02\x07\r\x02\b\x0F\x02\t\x11\x02\n\x13\x02\v" +
-		"\x15\x02\f\x17\x02\r\x19\x02\x0E\x1B\x02\x0F\x1D\x02\x10\x1F\x02\x11!" +
-		"\x02\x12#\x02\x13%\x02\x14\'\x02\x15)\x02\x16+\x02\x17-\x02\x18/\x02\x19" +
-		"1\x02\x1A3\x02\x1B5\x02\x1C7\x02\x1D\x03\x02\t\x03\x022;\x04\x02B\\aa" +
-		"\x05\x022;B\\aa\x03\x02$$\x03\x02bb\x03\x02))\x05\x02\v\f\x0F\x0F\"\"" +
-		"\x02\xBB\x02\x03\x03\x02\x02\x02\x02\x05\x03\x02\x02\x02\x02\x07\x03\x02" +
-		"\x02\x02\x02\t\x03\x02\x02\x02\x02\v\x03\x02\x02\x02\x02\r\x03\x02\x02" +
-		"\x02\x02\x0F\x03\x02\x02\x02\x02\x11\x03\x02\x02\x02\x02\x13\x03\x02\x02" +
-		"\x02\x02\x15\x03\x02\x02\x02\x02\x17\x03\x02\x02\x02\x02\x19\x03\x02\x02" +
-		"\x02\x02\x1B\x03\x02\x02\x02\x02\x1D\x03\x02\x02\x02\x02\x1F\x03\x02\x02" +
-		"\x02\x02!\x03\x02\x02\x02\x02#\x03\x02\x02\x02\x02%\x03\x02\x02\x02\x02" +
-		"\'\x03\x02\x02\x02\x02)\x03\x02\x02\x02\x02+\x03\x02\x02\x02\x02-\x03" +
-		"\x02\x02\x02\x02/\x03\x02\x02\x02\x021\x03\x02\x02\x02\x023\x03\x02\x02" +
-		"\x02\x025\x03\x02\x02\x02\x027\x03\x02\x02\x02\x039\x03\x02\x02\x02\x05" +
-		";\x03\x02\x02\x02\x07=\x03\x02\x02\x02\t?\x03\x02\x02\x02\vA\x03\x02\x02" +
-		"\x02\rH\x03\x02\x02\x02\x0FJ\x03\x02\x02\x02\x11O\x03\x02\x02\x02\x13" +
-		"U\x03\x02\x02\x02\x15Y\x03\x02\x02\x02\x17\\\x03\x02\x02\x02\x19`\x03" +
-		"\x02\x02\x02\x1Bc\x03\x02\x02\x02\x1De\x03\x02\x02\x02\x1Fh\x03\x02\x02" +
-		"\x02!j\x03\x02\x02\x02#m\x03\x02\x02\x02%s\x03\x02\x02\x02\'u\x03\x02" +
-		"\x02\x02)x\x03\x02\x02\x02+}\x03\x02\x02\x02-\x82\x03\x02\x02\x02/\x8A" +
-		"\x03\x02\x02\x021\x91\x03\x02\x02\x023\xA3\x03\x02\x02\x025\xA5\x03\x02" +
-		"\x02\x027\xB0\x03\x02\x02\x029:\x07*\x02\x02:\x04\x03\x02\x02\x02;<\x07" +
-		"+\x02\x02<\x06\x03\x02\x02\x02=>\x07.\x02\x02>\b\x03\x02\x02\x02?@\x07" +
-		"0\x02\x02@\n\x03\x02\x02\x02AB\x07U\x02\x02BC\x07G\x02\x02CD\x07N\x02" +
-		"\x02DE\x07G\x02\x02EF\x07E\x02\x02FG\x07V\x02\x02G\f\x03\x02\x02\x02H" +
-		"I\x07,\x02\x02I\x0E\x03\x02\x02\x02JK\x07H\x02\x02KL\x07T\x02\x02LM\x07" +
-		"Q\x02\x02MN\x07O\x02\x02N\x10\x03\x02\x02\x02OP\x07Y\x02\x02PQ\x07J\x02" +
-		"\x02QR\x07G\x02\x02RS\x07T\x02\x02ST\x07G\x02\x02T\x12\x03\x02\x02\x02" +
-		"UV\x07C\x02\x02VW\x07P\x02\x02WX\x07F\x02\x02X\x14\x03\x02\x02\x02YZ\x07" +
-		"Q\x02\x02Z[\x07T\x02\x02[\x16\x03\x02\x02\x02\\]\x07P\x02\x02]^\x07Q\x02" +
-		"\x02^_\x07V\x02\x02_\x18\x03\x02\x02\x02`a\x07C\x02\x02ab\x07U\x02\x02" +
-		"b\x1A\x03\x02\x02\x02cd\x07>\x02\x02d\x1C\x03\x02\x02\x02ef\x07>\x02\x02" +
-		"fg\x07?\x02\x02g\x1E\x03\x02\x02\x02hi\x07@\x02\x02i \x03\x02\x02\x02" +
-		"jk\x07@\x02\x02kl\x07?\x02\x02l\"\x03\x02\x02\x02mn\x07?\x02\x02n$\x03" +
-		"\x02\x02\x02op\x07>\x02\x02pt\x07@\x02\x02qr\x07#\x02\x02rt\x07?\x02\x02" +
-		"so\x03\x02\x02\x02sq\x03\x02\x02\x02t&\x03\x02\x02\x02uv\x07K\x02\x02" +
-		"vw\x07U\x02\x02w(\x03\x02\x02\x02xy\x07P\x02\x02yz\x07W\x02\x02z{\x07" +
-		"N\x02\x02{|\x07N\x02\x02|*\x03\x02\x02\x02}~\x07E\x02\x02~\x7F\x07C\x02" +
-		"\x02\x7F\x80\x07U\x02\x02\x80\x81\x07V\x02\x02\x81,\x03\x02\x02\x02\x82" +
-		"\x84\x07&\x02\x02\x83\x85\t\x02\x02\x02\x84\x83\x03\x02\x02\x02\x85\x86" +
-		"\x03\x02\x02\x02\x86\x84\x03\x02\x02\x02\x86\x87\x03\x02\x02\x02\x87\x88" +
-		"\x03\x02\x02\x02\x88\x89\x07&\x02\x02\x89.\x03\x02\x02\x02\x8A\x8E\t\x03" +
-		"\x02\x02\x8B\x8D\t\x04\x02\x02\x8C\x8B\x03\x02\x02\x02\x8D\x90\x03\x02" +
-		"\x02\x02\x8E\x8C\x03\x02\x02\x02\x8E\x8F\x03\x02\x02\x02\x8F0\x03\x02" +
-		"\x02\x02\x90\x8E\x03\x02\x02\x02\x91\x92\t\x02\x02\x02\x922\x03\x02\x02" +
-		"\x02\x93\x97\x07$\x02\x02\x94\x96\n\x05\x02\x02\x95\x94\x03\x02\x02\x02" +
-		"\x96\x99\x03\x02\x02\x02\x97\x95\x03\x02\x02\x02\x97\x98\x03\x02\x02\x02" +
-		"\x98\x9A\x03\x02\x02\x02\x99\x97\x03\x02\x02\x02\x9A\xA4\x07$\x02\x02" +
-		"\x9B\x9F\x07b\x02\x02\x9C\x9E\n\x06\x02\x02\x9D\x9C\x03\x02\x02\x02\x9E" +
-		"\xA1\x03\x02\x02\x02\x9F\x9D\x03\x02\x02\x02\x9F\xA0\x03\x02\x02\x02\xA0" +
-		"\xA2\x03\x02\x02\x02\xA1\x9F\x03\x02\x02\x02\xA2\xA4\x07b\x02\x02\xA3" +
-		"\x93\x03\x02\x02\x02\xA3\x9B\x03\x02\x02\x02\xA44\x03\x02\x02\x02\xA5" +
-		"\xAB\x07)\x02\x02\xA6\xAA\n\x07\x02\x02\xA7\xA8\x07)\x02\x02\xA8\xAA\x07" +
-		")\x02\x02\xA9\xA6\x03\x02\x02\x02\xA9\xA7\x03\x02\x02\x02\xAA\xAD\x03" +
-		"\x02\x02\x02\xAB\xA9\x03\x02\x02\x02\xAB\xAC\x03\x02\x02\x02\xAC\xAE\x03" +
-		"\x02\x02\x02\xAD\xAB\x03\x02\x02\x02\xAE\xAF\x07)\x02\x02\xAF6\x03\x02" +
-		"\x02\x02\xB0\xB1\t\b\x02\x02\xB1\xB2\x03\x02\x02\x02\xB2\xB3\b\x1C\x02" +
-		"\x02\xB38\x03\x02\x02\x02\v\x02s\x86\x8E\x97\x9F\xA3\xA9\xAB\x03\x02\x03" +
-		"\x02";
-	public static __ATN: ATN;
+	public static readonly _serializedATN: number[] = [4,0,31,227,6,-1,2,0,
+	7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,7,7,7,2,8,7,8,2,9,
+	7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,2,14,7,14,2,15,7,15,2,16,7,
+	16,2,17,7,17,2,18,7,18,2,19,7,19,2,20,7,20,2,21,7,21,2,22,7,22,2,23,7,23,
+	2,24,7,24,2,25,7,25,2,26,7,26,2,27,7,27,2,28,7,28,2,29,7,29,2,30,7,30,1,
+	0,1,0,1,1,1,1,1,2,1,2,1,3,1,3,1,4,1,4,1,4,1,4,1,4,1,4,1,4,1,5,1,5,1,6,1,
+	6,1,6,1,6,1,6,1,7,1,7,1,7,1,7,1,7,1,7,1,8,1,8,1,8,1,8,1,9,1,9,1,9,1,10,
+	1,10,1,10,1,10,1,11,1,11,1,11,1,12,1,12,1,13,1,13,1,13,1,14,1,14,1,15,1,
+	15,1,15,1,16,1,16,1,17,1,17,1,17,1,17,3,17,122,8,17,1,18,1,18,1,18,1,19,
+	1,19,1,19,1,19,1,19,1,20,1,20,1,20,1,20,1,20,1,21,1,21,1,21,1,21,1,21,1,
+	21,1,21,1,22,1,22,4,22,146,8,22,11,22,12,22,147,1,22,1,22,1,23,1,23,1,24,
+	1,24,5,24,156,8,24,10,24,12,24,159,9,24,1,25,1,25,1,26,1,26,5,26,165,8,
+	26,10,26,12,26,168,9,26,1,26,1,26,1,26,5,26,173,8,26,10,26,12,26,176,9,
+	26,1,26,3,26,179,8,26,1,27,1,27,1,27,1,27,5,27,185,8,27,10,27,12,27,188,
+	9,27,1,27,1,27,1,28,1,28,1,28,1,28,1,29,1,29,1,29,1,29,5,29,200,8,29,10,
+	29,12,29,203,9,29,1,29,3,29,206,8,29,1,29,1,29,3,29,210,8,29,1,29,1,29,
+	1,30,1,30,1,30,1,30,5,30,218,8,30,10,30,12,30,221,9,30,1,30,1,30,1,30,1,
+	30,1,30,1,219,0,31,1,1,3,2,5,3,7,4,9,5,11,6,13,7,15,8,17,9,19,10,21,11,
+	23,12,25,13,27,14,29,15,31,16,33,17,35,18,37,19,39,20,41,21,43,22,45,23,
+	47,24,49,25,51,26,53,27,55,28,57,29,59,30,61,31,1,0,8,1,0,48,57,2,0,64,
+	90,95,95,3,0,48,57,64,90,95,95,1,0,34,34,1,0,96,96,1,0,39,39,3,0,9,10,13,
+	13,32,32,2,0,10,10,13,13,238,0,1,1,0,0,0,0,3,1,0,0,0,0,5,1,0,0,0,0,7,1,
+	0,0,0,0,9,1,0,0,0,0,11,1,0,0,0,0,13,1,0,0,0,0,15,1,0,0,0,0,17,1,0,0,0,0,
+	19,1,0,0,0,0,21,1,0,0,0,0,23,1,0,0,0,0,25,1,0,0,0,0,27,1,0,0,0,0,29,1,0,
+	0,0,0,31,1,0,0,0,0,33,1,0,0,0,0,35,1,0,0,0,0,37,1,0,0,0,0,39,1,0,0,0,0,
+	41,1,0,0,0,0,43,1,0,0,0,0,45,1,0,0,0,0,47,1,0,0,0,0,49,1,0,0,0,0,51,1,0,
+	0,0,0,53,1,0,0,0,0,55,1,0,0,0,0,57,1,0,0,0,0,59,1,0,0,0,0,61,1,0,0,0,1,
+	63,1,0,0,0,3,65,1,0,0,0,5,67,1,0,0,0,7,69,1,0,0,0,9,71,1,0,0,0,11,78,1,
+	0,0,0,13,80,1,0,0,0,15,85,1,0,0,0,17,91,1,0,0,0,19,95,1,0,0,0,21,98,1,0,
+	0,0,23,102,1,0,0,0,25,105,1,0,0,0,27,107,1,0,0,0,29,110,1,0,0,0,31,112,
+	1,0,0,0,33,115,1,0,0,0,35,121,1,0,0,0,37,123,1,0,0,0,39,126,1,0,0,0,41,
+	131,1,0,0,0,43,136,1,0,0,0,45,143,1,0,0,0,47,151,1,0,0,0,49,153,1,0,0,0,
+	51,160,1,0,0,0,53,178,1,0,0,0,55,180,1,0,0,0,57,191,1,0,0,0,59,195,1,0,
+	0,0,61,213,1,0,0,0,63,64,5,40,0,0,64,2,1,0,0,0,65,66,5,41,0,0,66,4,1,0,
+	0,0,67,68,5,44,0,0,68,6,1,0,0,0,69,70,5,46,0,0,70,8,1,0,0,0,71,72,5,83,
+	0,0,72,73,5,69,0,0,73,74,5,76,0,0,74,75,5,69,0,0,75,76,5,67,0,0,76,77,5,
+	84,0,0,77,10,1,0,0,0,78,79,5,42,0,0,79,12,1,0,0,0,80,81,5,70,0,0,81,82,
+	5,82,0,0,82,83,5,79,0,0,83,84,5,77,0,0,84,14,1,0,0,0,85,86,5,87,0,0,86,
+	87,5,72,0,0,87,88,5,69,0,0,88,89,5,82,0,0,89,90,5,69,0,0,90,16,1,0,0,0,
+	91,92,5,65,0,0,92,93,5,78,0,0,93,94,5,68,0,0,94,18,1,0,0,0,95,96,5,79,0,
+	0,96,97,5,82,0,0,97,20,1,0,0,0,98,99,5,78,0,0,99,100,5,79,0,0,100,101,5,
+	84,0,0,101,22,1,0,0,0,102,103,5,65,0,0,103,104,5,83,0,0,104,24,1,0,0,0,
+	105,106,5,60,0,0,106,26,1,0,0,0,107,108,5,60,0,0,108,109,5,61,0,0,109,28,
+	1,0,0,0,110,111,5,62,0,0,111,30,1,0,0,0,112,113,5,62,0,0,113,114,5,61,0,
+	0,114,32,1,0,0,0,115,116,5,61,0,0,116,34,1,0,0,0,117,118,5,60,0,0,118,122,
+	5,62,0,0,119,120,5,33,0,0,120,122,5,61,0,0,121,117,1,0,0,0,121,119,1,0,
+	0,0,122,36,1,0,0,0,123,124,5,73,0,0,124,125,5,83,0,0,125,38,1,0,0,0,126,
+	127,5,78,0,0,127,128,5,85,0,0,128,129,5,76,0,0,129,130,5,76,0,0,130,40,
+	1,0,0,0,131,132,5,67,0,0,132,133,5,65,0,0,133,134,5,83,0,0,134,135,5,84,
+	0,0,135,42,1,0,0,0,136,137,5,82,0,0,137,138,5,69,0,0,138,139,5,71,0,0,139,
+	140,5,69,0,0,140,141,5,88,0,0,141,142,5,80,0,0,142,44,1,0,0,0,143,145,5,
+	36,0,0,144,146,7,0,0,0,145,144,1,0,0,0,146,147,1,0,0,0,147,145,1,0,0,0,
+	147,148,1,0,0,0,148,149,1,0,0,0,149,150,5,36,0,0,150,46,1,0,0,0,151,152,
+	5,63,0,0,152,48,1,0,0,0,153,157,7,1,0,0,154,156,7,2,0,0,155,154,1,0,0,0,
+	156,159,1,0,0,0,157,155,1,0,0,0,157,158,1,0,0,0,158,50,1,0,0,0,159,157,
+	1,0,0,0,160,161,7,0,0,0,161,52,1,0,0,0,162,166,5,34,0,0,163,165,8,3,0,0,
+	164,163,1,0,0,0,165,168,1,0,0,0,166,164,1,0,0,0,166,167,1,0,0,0,167,169,
+	1,0,0,0,168,166,1,0,0,0,169,179,5,34,0,0,170,174,5,96,0,0,171,173,8,4,0,
+	0,172,171,1,0,0,0,173,176,1,0,0,0,174,172,1,0,0,0,174,175,1,0,0,0,175,177,
+	1,0,0,0,176,174,1,0,0,0,177,179,5,96,0,0,178,162,1,0,0,0,178,170,1,0,0,
+	0,179,54,1,0,0,0,180,186,5,39,0,0,181,185,8,5,0,0,182,183,5,39,0,0,183,
+	185,5,39,0,0,184,181,1,0,0,0,184,182,1,0,0,0,185,188,1,0,0,0,186,184,1,
+	0,0,0,186,187,1,0,0,0,187,189,1,0,0,0,188,186,1,0,0,0,189,190,5,39,0,0,
+	190,56,1,0,0,0,191,192,7,6,0,0,192,193,1,0,0,0,193,194,6,28,0,0,194,58,
+	1,0,0,0,195,196,5,45,0,0,196,197,5,45,0,0,197,201,1,0,0,0,198,200,8,7,0,
+	0,199,198,1,0,0,0,200,203,1,0,0,0,201,199,1,0,0,0,201,202,1,0,0,0,202,209,
+	1,0,0,0,203,201,1,0,0,0,204,206,5,13,0,0,205,204,1,0,0,0,205,206,1,0,0,
+	0,206,207,1,0,0,0,207,210,5,10,0,0,208,210,5,0,0,1,209,205,1,0,0,0,209,
+	208,1,0,0,0,210,211,1,0,0,0,211,212,6,29,0,0,212,60,1,0,0,0,213,214,5,47,
+	0,0,214,215,5,42,0,0,215,219,1,0,0,0,216,218,9,0,0,0,217,216,1,0,0,0,218,
+	221,1,0,0,0,219,220,1,0,0,0,219,217,1,0,0,0,220,222,1,0,0,0,221,219,1,0,
+	0,0,222,223,5,42,0,0,223,224,5,47,0,0,224,225,1,0,0,0,225,226,6,30,0,0,
+	226,62,1,0,0,0,13,0,121,147,157,166,174,178,184,186,201,205,209,219,1,0,
+	1,0];
+
+	private static __ATN: ATN;
 	public static get _ATN(): ATN {
 		if (!GenericSqlLexer.__ATN) {
-			GenericSqlLexer.__ATN = new ATNDeserializer().deserialize(Utils.toCharArray(GenericSqlLexer._serializedATN));
+			GenericSqlLexer.__ATN = new ATNDeserializer().deserialize(GenericSqlLexer._serializedATN);
 		}
 
 		return GenericSqlLexer.__ATN;
 	}
 
-}
 
+	static DecisionsToDFA = GenericSqlLexer._ATN.decisionToState.map( (ds: DecisionState, index: number) => new DFA(ds, index) );
+}

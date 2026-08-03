@@ -1,0 +1,69 @@
+cubes:
+  - name: line_items
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: product_id
+        sql: product_id
+        type: number
+
+      - name: order_id
+        sql: order_id
+        type: number
+
+      - name: quantity
+        sql: quantity
+        type: number
+
+      - name: price
+        sql: price
+        type: number
+
+  - name: orders
+    sql_table: public.orders
+    joins:
+      - name: line_items
+        sql: "{CUBE}.id = {line_items}.order_id"
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: user_id
+        sql: user_id
+        type: number
+      - name: amount
+        sql: amount
+        type: number
+      - name: status
+        sql: status
+        type: string
+      - name: status_new
+        sql: status || '_new'
+        type: string
+      - name: created_at
+        sql: created_at
+        type: time
+    measures:
+      - name: count
+        type: count
+      - name: total_qty
+        type: sum
+        sql: amount
+
+    pre_aggregations:
+      - name: pre_agg_with_multiplied_measures
+        dimensions:
+          - orders.status
+          - line_items.product_id
+        measures:
+          - orders.count
+          - orders.total_qty
+        timeDimension: orders.created_at
+        granularity: month

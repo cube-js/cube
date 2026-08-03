@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DriverTests } from '@cubejs-backend/testing-shared';
+import { streamToArray } from '@cubejs-backend/shared';
 
 import { BigQueryDriver } from '../src';
 
@@ -9,7 +10,7 @@ describe('BigQueryDriver', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    tests = new DriverTests(new BigQueryDriver({}));
+    tests = new DriverTests(new BigQueryDriver({}), { expectStringFields: true });
   });
 
   afterAll(async () => {
@@ -32,5 +33,42 @@ describe('BigQueryDriver', () => {
     await tests.testUnloadEscapeSymbolOp1(BigQueryDriver);
     await tests.testUnloadEscapeSymbolOp2(BigQueryDriver);
     await tests.testUnloadEscapeSymbolOp3(BigQueryDriver);
+  });
+
+  const QUERY_TO_TEST_HYDRATION = `
+      SELECT CAST(1 as NUMERIC) as numeric, CAST(9223372036854775807 as INT64) as bigint, CAST(1265.88 as FLOAT64) as float
+      UNION ALL
+      SELECT CAST(255.44 as NUMERIC), CAST(-9223372036854775808 as INT64), CAST(0.1 as FLOAT64);
+  `;
+
+  function assertHydrationResults(tableData: any) {
+    expect(tableData).toEqual([
+      {
+        numeric: '1',
+        bigint: '9223372036854775807',
+        float: '1265.88',
+      },
+      {
+        numeric: '255.44',
+        bigint: '-9223372036854775808',
+        float: '0.1',
+      }
+    ]);
+  }
+
+  test('query hydration', async () => {
+    const driver = new BigQueryDriver({});
+
+    const tableData = await driver.query(QUERY_TO_TEST_HYDRATION, []);
+    assertHydrationResults(tableData);
+  });
+
+  test('stream hydration', async () => {
+    const driver = new BigQueryDriver({});
+
+    const tableData = await driver.stream(QUERY_TO_TEST_HYDRATION, []);
+
+    const result = await streamToArray(tableData.rowStream as any);
+    assertHydrationResults(result);
   });
 });

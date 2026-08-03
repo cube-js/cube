@@ -1,0 +1,22 @@
+{
+  "schemaName": "students",
+  "dimensionFieldSpecs": [
+    {
+      "name": "studentID",
+      "dataType": "INT"
+    },
+    {
+      "name": "firstName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "lastName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "gender",
+      "dataType": "STRING"
+    }
+  ],
+  "primaryKeyColumns": ["studentID"]
+}

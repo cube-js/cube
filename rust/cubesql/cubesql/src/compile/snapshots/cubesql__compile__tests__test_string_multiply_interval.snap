@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT NULL * INTERVAL '1 day' n, '5' * INTERVAL '1 day' d5\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+------------------------------------------------+
+| n    | d5                                             |
++------+------------------------------------------------+
+| NULL | 0 years 0 mons 5 days 0 hours 0 mins 0.00 secs |
++------+------------------------------------------------+

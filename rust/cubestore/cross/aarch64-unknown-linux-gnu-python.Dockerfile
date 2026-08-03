@@ -1,0 +1,34 @@
+FROM base
+
+ARG PYTHON_VERSION
+ARG PYTHON_VERSION_SUFFIX
+ARG PYTHON_RELEASE
+
+# python  is required for cross compiling python :D
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python${PYTHON_RELEASE} \
+    && rm -rf /var/lib/apt/lists/*;
+
+# --enable-optimizations is disabled, because it's not supported with CROSS
+RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX}.tgz -O - | tar -xz \
+    && cd Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX} \
+    && touch config.site-aarch64 \
+    && echo "ac_cv_buggy_getaddrinfo=no" >> config.site-aarch64 \
+    && echo "ac_cv_file__dev_ptmx=no" >> config.site-aarch64 \
+    && echo "ac_cv_file__dev_ptc=no" >> config.site-aarch64 \
+    && CONFIG_SITE=config.site-aarch64 ./configure  \
+      --enable-shared \
+      --disable-ipv6 \
+      --prefix=/usr/aarch64-linux-gnu \
+      --build=aarch64-unknown-linux-gnu \
+      --host=x86_64-linux-gnu \
+      --with-build-python=/usr/bin/python${PYTHON_RELEASE} \
+    && make -j $(nproc) \
+    && make install \
+    && cd .. && rm -rf Python-${PYTHON_VERSION} \
+    && rm -rf /var/lib/apt/lists/*;
+
+ENV PYO3_CROSS_PYTHON_VERSION=${PYTHON_RELEASE} \
+    PYO3_CROSS_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
+    PYO3_CROSS_LIB_DIR=/usr/aarch64-linux-gnu/lib
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8

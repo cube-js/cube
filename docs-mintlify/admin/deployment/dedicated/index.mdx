@@ -1,0 +1,80 @@
+---
+title: Dedicated Infrastructure
+description: Run Cube on dedicated single-tenant infrastructure (managed by Cube) or on your own AWS, Azure, or GCP account (BYOC), with private connectivity to your data sources and APIs.
+---
+
+Cube offers two flavors of single-tenant deployment: **Dedicated Infrastructure**
+managed by Cube in our cloud accounts, and **Bring Your Own Cloud (BYOC)** managed
+by Cube inside your own cloud account. Both options give you isolated compute,
+the ability to route traffic over private networks, and integrations with
+services in your VPC or VNet.
+
+<Note>
+
+Available on the [Enterprise plan](https://cube.dev/pricing) with the
+[Dedicated Infrastructure][ref-dedicated-infra] add-on.
+
+</Note>
+
+## Single-tenant Cube cluster
+
+With Dedicated Infrastructure, Cube provisions and operates a **single-tenant**
+cluster for you in a Cube-managed account on AWS, GCP, or Azure. *Single-tenant*
+means the cluster — VPC/VNet, compute, storage, and the Cube data plane that
+runs your deployments — is dedicated entirely to your organization and not
+shared with any other customer. The cluster lives in a Cube
+[Region][cube-region], can be peered or PrivateLink/PSC-connected to your own
+networks, and can optionally expose Cube's APIs to your network so that no Cube
+traffic ever crosses the public internet.
+
+## Bring Your Own Cloud (BYOC)
+
+On the Enterprise plan, Cube is also available as **Bring Your Own Cloud**: all
+components that interact with your private data are deployed inside your own
+AWS, Azure, or GCP account and managed remotely by the Cube Control Plane via
+the Cube Operator. This keeps all data plane resources within your boundary
+while preserving the managed-service experience.
+[Contact us](https://cube.dev/contact) for details.
+
+## Backend and frontend connectivity
+
+There are two distinct directions in which Cube exchanges traffic with your
+network, and each has its own connectivity story:
+
+- **Backend connectivity** — traffic that flows **from Cube into your network**.
+  Cube uses these connections to query the things it needs to function:
+  databases and warehouses, auth providers (e.g. an internal OIDC issuer),
+  upstream BI APIs that Semantic Layer Sync targets, and any other service the
+  Cube data plane has to reach. PrivateLink, Private Link, Private Service
+  Connect, and Peering on the provider pages below all configure backend
+  connectivity.
+- **Frontend connectivity** — traffic that flows **from your network into
+  Cube**. Anything that needs to query Cube falls in this bucket: the Cube UI
+  running in employee browsers, application servers, BI tools, embedded
+  analytics clients, and Semantic Layer Sync-generated configs. Frontend
+  connectivity is currently documented for AWS in
+  [Private API Connectivity on AWS][aws-private-api-connectivity], and
+  equivalent patterns are available on Azure and GCP on request.
+
+Most enterprise deployments end up using both: a backend
+PrivateLink/PSC/peering into the customer's data network, plus a frontend
+private API endpoint so the Cube UI and BI tools talk to Cube over the same
+private fabric.
+
+## Choose a provider
+
+<CardGroup cols={3}>
+  <Card title="Amazon Web Services" icon="brand-aws" href="/admin/deployment/dedicated/aws">
+    Dedicated Infrastructure, BYOC, and private connectivity on AWS.
+  </Card>
+  <Card title="Google Cloud Platform" icon="google" href="/admin/deployment/dedicated/gcp">
+    Dedicated Infrastructure and BYOC on GCP.
+  </Card>
+  <Card title="Microsoft Azure" icon="microsoft" href="/admin/deployment/dedicated/azure">
+    Dedicated Infrastructure, BYOC, and private connectivity on Azure.
+  </Card>
+</CardGroup>
+
+[ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region

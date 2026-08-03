@@ -1,0 +1,30 @@
+{%- import ".utils.jinja" as utils -%}
+
+{%- set payment_methods = {
+  "bank_transfer": "TRANSFER",
+  "credit_card": "CREDIT",
+  "gift_card": "GIFT"
+} -%}
+
+cubes:
+  - name: cube_01_1
+    sql: >
+      SELECT
+        order_id,
+        {%- for method, title in payment_methods | items %}
+        SUM(CASE WHEN payment_method = '{{ utils.escape_single_quotes(title) }}' THEN amount END) AS {{ method | safe }}_amount,
+        {%- endfor %}
+        SUM(amount) AS total_amount
+      FROM app_data.payments
+      GROUP BY 1
+      
+  - name: cube_01_2
+    sql: >
+      SELECT
+        order_id,
+        {%- for method, title in payment_methods | items %}
+        SUM(CASE WHEN payment_method = '{{ utils.escape_single_quotes(title) }}' THEN amount END) AS {{ method | safe }}_amount
+        {%- if not loop.last %},{% endif %}
+        {%- endfor %}
+      FROM app_data.payments
+      GROUP BY 1

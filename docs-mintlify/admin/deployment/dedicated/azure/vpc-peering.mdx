@@ -1,0 +1,137 @@
+---
+title: Setting up VNet Peering on Azure
+sidebarTitle: VNet Peering
+description: End-to-end checklist for VNet peering Cube's Dedicated Infrastructure with your Azure VNet for private data access.
+---
+
+<Note>
+
+This page covers **backend connectivity** — Cube reaching into your network to
+query data sources, auth providers, BI APIs targeted by Semantic Layer Sync,
+and other upstream services. See
+[Backend and frontend connectivity][backend-frontend] for the full picture.
+For **frontend connectivity** (exposing Cube's APIs to your applications,
+browsers, BI tools, and embedded analytics clients), see
+[Private API Connectivity on AWS][aws-private-api-connectivity]; the
+equivalent pattern is available on Azure on request.
+
+</Note>
+
+For cross-tenant peering in Azure, you assign the peering role to the service
+principal of the peering party. Using the steps outlined below, you would
+register the Cube tenant in your organization, grant peering access to the
+Cube service principal, and hand over the information Cube needs to initiate
+the peering.
+
+## Granting peering access to Cube
+
+### Add the Cube tenant to your organization
+
+First, add the Cube tenant to your organization. Open the
+[Azure Portal][azure-console] and go to&nbsp;**Azure Active Directory** →
+**External Identities** → **Cross-tenant access settings** →
+**Organizational Settings** → **Add Organization**.
+
+For Tenant ID, enter `197e5263-87f4-4ce1-96c4-351b0c0c714a`.
+
+Make sure that&nbsp;**B2B Collaboration** → **Inbound Access** →
+**Applications** is set to&nbsp;**Allows access**.
+
+### Register the Cube service principal at your organization
+
+To register the Cube service principal for your organization, follow these
+steps:
+
+1.  Log in with an account that has permissions to register Enterprise
+    applications.
+2.  Open a browser tab and go to the following URL, replacing `<TENANT_ID>`
+    with your tenant ID:
+    `https://login.microsoftonline.com/<TENANT_ID>/oauth2/authorize?client_id=7f3afcf3-e061-4e1b-8261-f396646d7fc7&response_type=code&redirect_uri=https%3A%2F%2Fwww.microsoft.com%2F`
+3.  The Cube service principal has specific credentials. Check that the
+    following details match exactly what you see on the dialog box that
+    pops up:
+
+    - Client ID: `7f3afcf3-e061-4e1b-8261-f396646d7fc7`
+    - Name: `cube-dedicated-infra-peering-sp`
+
+    Once you have confirmed that all the information is correct,
+    select&nbsp;**Consent on behalf of your organization** and
+    click&nbsp;**Accept**.
+
+### Grant peering permissions on your virtual network
+
+As the peering role you can use the built-in `Network Contributor` role or
+create a custom role (e.g. `cube-peering-role`) with the following
+permissions:
+
+- `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write`
+- `Microsoft.Network/virtualNetworks/peer/action`
+- `Microsoft.ClassicNetwork/virtualNetworks/peer/action`
+- `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read`
+- `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/delete`
+
+On the [Azure Portal][azure-console], go to&nbsp;**Virtual networks** →
+_Virtual Network Name_ → **Access Control (IAM)** → **Add** →
+**Add role assignment** and fill in the following details:
+
+- Role: `Network Contributor` or `cube-peering-role`
+- Members: `cube-dedicated-infra-peering-sp`
+
+## Information required by Cube
+
+When reaching out to Cube support, please provide the following information:
+
+- **Virtual Network ID:** Find this at&nbsp;**Virtual Networks** →
+  _Virtual Network Name_ → **Overview** → **JSON view** →
+  **Resource ID** on the [Azure Portal][azure-console].
+- **Virtual Network Address Spaces:** Find this at&nbsp;**Virtual Networks**
+  → _Virtual Network Name_ → **Overview** → **JSON view** →
+  **properties** → **addressSpace** on the [Azure Portal][azure-console].
+- **Tenant ID:** Find this in&nbsp;**Azure Active Directory** →
+  **Properties** → **Tenant ID** section of the
+  [Azure Portal][azure-console].
+- **Cube Region:** VNet Peering requires Cube to be hosted on
+  [Dedicated Infrastructure][cube-region]. Specify which Cube Region should
+  host your Dedicated Infrastructure.
+
+## Firewall and routing
+
+Once the peering is established, allow traffic from Cube's VNet CIDR block to
+reach your data source:
+
+1. **Network Security Groups (NSGs)** attached to the data-source subnet (or
+   the resource itself) must include an inbound rule that permits TCP traffic
+   from Cube's VNet CIDR on the database port. For example, for PostgreSQL:
+
+   | Priority | Source                       | Source Port | Destination | Service / Port | Action |
+   | -------- | ---------------------------- | ----------- | ----------- | -------------- | ------ |
+   | 1000     | Cube VNet CIDR (e.g. 10.x/16)| `*`         | `VirtualNetwork` | TCP / 5432 | Allow  |
+
+   Cube's VNet CIDR is shared with you alongside the peering request and is
+   also visible in the Azure Portal on the **Virtual networks** →
+   **\<your VNet\>** → **Peerings** → **\<Cube peering\>** → **Address
+   space** field.
+
+2. **Azure Firewall / third-party NVAs**: if traffic between your subnets
+   transits a firewall, add a rule permitting TCP from the Cube VNet CIDR to
+   the data source's IP and port.
+
+3. **User-defined routes (UDRs)**: confirm that the route tables on your
+   subnets do not blackhole Cube's CIDR via `0.0.0.0/0` next-hop appliances.
+   Ensure traffic destined for Cube's VNet CIDR is routed to the **Virtual
+   network peering** next-hop.
+
+4. **Data source firewall**: if the resource has its own firewall (e.g. an
+   Azure SQL Server firewall or a PaaS-level allow-list), add Cube's VNet
+   CIDR there as well.
+
+## Supported Regions
+
+VNet Peering is available in all Azure commercial regions where Dedicated
+Infrastructure can be provisioned. Azure operated by 21Vianet (China) and
+Azure Government regions are not supported.
+
+[azure-console]: https://portal.azure.com
+[cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

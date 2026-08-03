@@ -1,0 +1,10 @@
+{%- set unsafe_string = '"unsafe string" <>' -%}
+{%- set safe_string = new_safe_string() -%}
+{%- set dict_as_obj = new_object_from_dict() -%}
+
+test:
+  unsafe_string: "{{ unsafe_string }}"
+  safe_string: "{{ safe_string }}"
+
+dump:
+  dict_as_obj: {{ debug(dict_as_obj) }}

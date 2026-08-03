@@ -5,12 +5,13 @@ use crate::{
     ProtocolError,
 };
 use byteorder::{BigEndian, ByteOrder};
+use std::backtrace::Backtrace;
 
 /// This trait explains how to decode values from the protocol
 /// It's used in the Bind message
 pub trait FromProtocolValue {
     // Converts native type to raw value in specific format
-    fn from_protocol(raw: &Vec<u8>, format: Format) -> Result<Self, ProtocolError>
+    fn from_protocol(raw: &[u8], format: Format) -> Result<Self, ProtocolError>
     where
         Self: Sized,
     {
@@ -21,73 +22,129 @@ pub trait FromProtocolValue {
     }
 
     /// Decodes raw value to native type in text format
-    fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError>
+    fn from_text(raw: &[u8]) -> Result<Self, ProtocolError>
     where
         Self: Sized;
 
     /// Decodes raw value to native type in binary format
-    fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError>
+    fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError>
     where
         Self: Sized;
 }
 
 impl FromProtocolValue for String {
-    fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
-        })
+    fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
+        std::str::from_utf8(raw)
+            .map(|s| s.to_string())
+            .map_err(|err| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+                backtrace: Backtrace::capture(),
+            })
     }
 
-    fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
-        })
+    fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
+        std::str::from_utf8(raw)
+            .map(|s| s.to_string())
+            .map_err(|err| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+                backtrace: Backtrace::capture(),
+            })
     }
 }
 
 impl FromProtocolValue for i64 {
-    fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        let as_str = String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
+    fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
+        let as_str = std::str::from_utf8(raw).map_err(|err| ProtocolError::ErrorResponse {
+            source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+            backtrace: Backtrace::capture(),
         })?;
 
-        as_str.parse::<i64>().map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
-        })
+        as_str
+            .parse::<i64>()
+            .map_err(|err| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+                backtrace: Backtrace::capture(),
+            })
     }
 
-    fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        Ok(BigEndian::read_i64(&raw[..]))
+    fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
+        if raw.len() != 8 {
+            return Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!(
+                        "Invalid binary int8 format, expected 8 bytes, got {}",
+                        raw.len()
+                    ),
+                ),
+                backtrace: Backtrace::capture(),
+            });
+        }
+
+        Ok(BigEndian::read_i64(raw))
     }
 }
 
 impl FromProtocolValue for bool {
-    fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        match raw[0] {
-            b't' => Ok(true),
-            b'f' => Ok(false),
-            other => Err(ErrorResponse::error(
-                ErrorCode::ProtocolViolation,
-                format!("Unable to decode bool from text, actual: {}", other),
-            )
-            .into(): ProtocolError),
+    fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
+        match raw.first() {
+            Some(b't') => Ok(true),
+            Some(b'f') => Ok(false),
+            other => Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!("Unable to decode bool from text, actual: {:?}", other),
+                ),
+                backtrace: Backtrace::capture(),
+            }),
         }
     }
 
-    fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        match raw[0] {
-            1 => Ok(true),
-            0 => Ok(false),
-            other => Err(ErrorResponse::error(
-                ErrorCode::ProtocolViolation,
-                format!("Unable to decode bool from binary, actual: {}", other),
-            )
-            .into(): ProtocolError),
+    fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
+        match raw.first() {
+            Some(1) => Ok(true),
+            Some(0) => Ok(false),
+            other => Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!("Unable to decode bool from binary, actual: {:?}", other),
+                ),
+                backtrace: Backtrace::capture(),
+            }),
         }
+    }
+}
+
+impl FromProtocolValue for f64 {
+    fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
+        let as_str = std::str::from_utf8(raw).map_err(|err| ProtocolError::ErrorResponse {
+            source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+            backtrace: Backtrace::capture(),
+        })?;
+
+        as_str
+            .parse::<f64>()
+            .map_err(|err| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+                backtrace: Backtrace::capture(),
+            })
+    }
+
+    fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
+        if raw.len() != 8 {
+            return Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!(
+                        "Invalid binary float8 format, expected 8 bytes, got {}",
+                        raw.len()
+                    ),
+                ),
+                backtrace: Backtrace::capture(),
+            });
+        }
+
+        Ok(BigEndian::read_f64(raw))
     }
 }
 
@@ -96,7 +153,10 @@ mod tests {
     use crate::*;
 
     use crate::protocol::Format;
+    use crate::values::timestamp::TimestampValue;
     use bytes::BytesMut;
+    #[cfg(feature = "with-chrono")]
+    use chrono::NaiveDate;
 
     fn assert_test_decode<T: ToProtocolValue + FromProtocolValue + std::cmp::PartialEq>(
         value: T,
@@ -121,6 +181,19 @@ mod tests {
         assert_test_decode(false, Format::Text)?;
         assert_test_decode(1_i64, Format::Text)?;
         assert_test_decode(100_i64, Format::Text)?;
+        assert_test_decode(std::f64::consts::PI, Format::Text)?;
+        assert_test_decode(-std::f64::consts::E, Format::Text)?;
+        assert_test_decode(0.0_f64, Format::Text)?;
+        assert_test_decode(TimestampValue::new(1650890322000000000, None), Format::Text)?;
+        assert_test_decode(TimestampValue::new(0, None), Format::Text)?;
+        assert_test_decode(TimestampValue::new(1234567890123456000, None), Format::Text)?;
+
+        #[cfg(feature = "with-chrono")]
+        {
+            assert_test_decode(NaiveDate::from_ymd_opt(2025, 8, 8).unwrap(), Format::Text)?;
+            assert_test_decode(NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(), Format::Text)?;
+            assert_test_decode(NaiveDate::from_ymd_opt(1999, 12, 31).unwrap(), Format::Text)?;
+        }
 
         Ok(())
     }
@@ -132,7 +205,45 @@ mod tests {
         assert_test_decode(false, Format::Binary)?;
         assert_test_decode(1_i64, Format::Binary)?;
         assert_test_decode(100_i64, Format::Binary)?;
+        assert_test_decode(std::f64::consts::PI, Format::Binary)?;
+        assert_test_decode(-std::f64::consts::E, Format::Binary)?;
+        assert_test_decode(0.0_f64, Format::Binary)?;
+        assert_test_decode(
+            TimestampValue::new(1650890322000000000, None),
+            Format::Binary,
+        )?;
+        assert_test_decode(TimestampValue::new(0, None), Format::Binary)?;
+        assert_test_decode(
+            TimestampValue::new(1234567890123456000, None),
+            Format::Binary,
+        )?;
+
+        #[cfg(feature = "with-chrono")]
+        {
+            assert_test_decode(NaiveDate::from_ymd_opt(2025, 8, 8).unwrap(), Format::Binary)?;
+            assert_test_decode(NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(), Format::Binary)?;
+            assert_test_decode(
+                NaiveDate::from_ymd_opt(1999, 12, 31).unwrap(),
+                Format::Binary,
+            )?;
+        }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_binary_decoders_reject_short_values() {
+        // A client-supplied Bind value shorter than the fixed width must
+        // produce a protocol error, not panic the connection task.
+        assert!(<i64 as FromProtocolValue>::from_binary(&[]).is_err());
+        assert!(<i64 as FromProtocolValue>::from_binary(&[0, 1, 2, 3, 4, 5, 6]).is_err());
+        assert!(<f64 as FromProtocolValue>::from_binary(&[]).is_err());
+        assert!(<f64 as FromProtocolValue>::from_binary(&[0, 1, 2, 3, 4, 5, 6]).is_err());
+    }
+
+    #[test]
+    fn test_bool_decoders_reject_empty_values() {
+        assert!(<bool as FromProtocolValue>::from_binary(&[]).is_err());
+        assert!(<bool as FromProtocolValue>::from_text(&[]).is_err());
     }
 }

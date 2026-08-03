@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+assertion_line: 223
+expression: result
+---
+orders__category | orders__total_amount | orders__amount_keep_only_segment
+-----------------+----------------------+---------------------------------
+books            | 600.00               | 600.00                          
+clothing         | NULL                 | 300.00                          
+electronics      | NULL                 | 500.00

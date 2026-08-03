@@ -1,0 +1,139 @@
+---
+title: Dashboards
+description: Embed Cube dashboards into your applications via iframe.
+---
+
+<Info>
+  Iframe embedding is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+</Info>
+
+Embed any [dashboard](/docs/explore-analyze/dashboards) into your application using an iframe. Dashboards can be embedded with either authentication mode:
+
+- **[Private embedding](/embedding/iframe/auth/private)** — for internal users with Cube accounts (e.g., embedding in Notion, Salesforce, internal tools)
+- **[Signed embedding](/embedding/iframe/auth/signed)** — for external/customer-facing applications using server-generated sessions
+
+## Embed with private embedding
+
+To embed a dashboard for internal users:
+
+1. Open your dashboard in Cube
+2. Click **Share** → **Embed**
+3. Copy the generated iframe code
+
+<img src="https://lgo0ecceic.ucarecd.net/24999bd4-1a7a-4c15-999a-848e6ec3fbe4/" alt="Share embed dialog" />
+
+Then paste the iframe code into your application:
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-account.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+Users will be prompted to sign in with their Cube credentials when accessing the embedded dashboard. See [Private embedding](/embedding/iframe/auth/private) for details on the auth model and integration examples (Notion, Salesforce).
+
+## Embed with signed embedding
+
+Signed embedding must be allowed on the dashboard first: open the dashboard,
+click **Share** → **Embed**, and turn on **Allow signed embedding**. You can
+also toggle it without opening the UI using the [Cube CLI](/reference/cli):
+
+```bash
+cube embed enable-dashboard YOUR_DASHBOARD_PUBLIC_ID
+cube embed disable-dashboard YOUR_DASHBOARD_PUBLIC_ID
+```
+
+To embed a dashboard for external/customer-facing applications, generate a session on your backend and pass the session ID into the iframe:
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
+
+## Pre-set dashboard filters via URL
+
+You can pre-set dashboard filter values by adding URL parameters in the format
+`?f_<semantic_view>.<dimension>=<JSON>`. The `<semantic_view>` and `<dimension>`
+must match the internal names (not display titles) of the semantic view and
+dimension configured on the filter widget. If the filter type is omitted, it
+defaults to `equals`.
+
+Example:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&f_orders_transactions.users_country={"value":"USA"}
+```
+
+This works on both regular and published (embedded) dashboards. The filter is
+only applied if a matching filter widget for that dimension already exists on the
+dashboard.
+
+## Allow CSV export
+
+By default, embedded dashboards do not expose a download action on individual
+widgets. To let viewers download a chart widget's data as a CSV file, add the
+`allowExport=true` query parameter to the embed URL:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true
+```
+
+When enabled, each chart widget's ⋮ menu shows a **Download as CSV** action. The
+CSV is generated client-side from the data already loaded into the widget, so no
+additional query is issued. The parameter is opt-in — omit it (the default) to
+keep the download action hidden.
+
+## Show or hide the AI chat
+
+Embedded dashboards show an AI chat (the agent panel and its launcher bubble) by
+default. You can control it in two ways:
+
+- **Globally, in the UI.** Toggle **Show dashboard chat** under
+  **Embed → Settings** in the Cube Cloud console. This switch is
+  account-wide — it turns the AI chat on or off for the entire embedded surface,
+  i.e. every embedded dashboard.
+- **Per session, via the API.** Pass `settings.showDashboardChat` when you
+  [generate the session](/reference/embed-apis/generate-session#session-settings). A per-session
+  value takes precedence over the global toggle — `false` hides the chat for that
+  session even when it is enabled account-wide, and `true` shows it even when it
+  is disabled:
+
+```javascript
+body: JSON.stringify({
+  deploymentId: DEPLOYMENT_ID,
+  externalId: "user@example.com",
+  settings: {
+    // Hide the AI chat for this viewer only
+    showDashboardChat: false,
+  },
+}),
+```
+
+This applies to embedded published dashboards; it does not affect the standalone
+[Analytics Chat](/embedding/iframe/analytics-chat) surface, where embedding the
+chat is itself the opt-in.
+
+## Set the language
+
+Embedded dashboards render their UI in the account's default language, which you can
+override per embed by adding the `?locale=` query parameter:
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&locale=es-MX
+```
+
+See [Localization](/embedding/iframe/localization) for the list of supported languages
+and the other ways to set the language.
+
+## Customize appearance
+
+You can style an embedded dashboard — background, padding, widget borders, titles, and fonts — from the **Styling** panel in the Dashboard Builder. See [Dashboards → Styling](/docs/explore-analyze/dashboards/styling) for the full list of options.

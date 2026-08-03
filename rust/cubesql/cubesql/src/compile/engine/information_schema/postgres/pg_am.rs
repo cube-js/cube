@@ -18,6 +18,7 @@ struct PgCatalogAmBuilder {
     amname: StringBuilder,
     amhandler: StringBuilder,
     amtype: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogAmBuilder {
@@ -29,15 +30,18 @@ impl PgCatalogAmBuilder {
             amname: StringBuilder::new(capacity),
             amhandler: StringBuilder::new(capacity),
             amtype: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.amname.finish()));
-        columns.push(Arc::new(self.amhandler.finish()));
-        columns.push(Arc::new(self.amtype.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.amname.finish()),
+            Arc::new(self.amhandler.finish()),
+            Arc::new(self.amtype.finish()),
+            Arc::new(self.xmin.finish()),
+        ];
 
         columns
     }
@@ -73,6 +77,7 @@ impl TableProvider for PgCatalogAmProvider {
             Field::new("amname", DataType::Utf8, false),
             Field::new("amhandler", DataType::Utf8, false),
             Field::new("amtype", DataType::Utf8, false),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

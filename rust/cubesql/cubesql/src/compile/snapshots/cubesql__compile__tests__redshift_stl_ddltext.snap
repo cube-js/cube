@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM stl_ddltext ORDER BY xid ASC, sequence ASC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------+-----+-----+-------+-----------+---------+----------+------+
+| userid | xid | pid | label | starttime | endtime | sequence | text |
++--------+-----+-----+-------+-----------+---------+----------+------+
++--------+-----+-----+-------+-----------+---------+----------+------+

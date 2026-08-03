@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/cubestore/switch_rolling.rs
+expression: normalize(result)
+---
+accounts__name|sales__created_at_month|sales__rolling_amount
+acme|2024-04-01 00:00:00|900.0000000000
+acme|2024-05-01 00:00:00|1201.0000000000
+acme|2024-06-01 00:00:00|1501.0000000000
+globex|2024-04-01 00:00:00|90.0000000000
+globex|2024-05-01 00:00:00|122.0000000000
+globex|2024-06-01 00:00:00|152.0000000000

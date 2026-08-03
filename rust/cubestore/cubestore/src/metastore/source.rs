@@ -1,6 +1,6 @@
 use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::base_rocks_secondary_index;
-use crate::metastore::DataFrameValue;
+use crate::metastore::{DataFrameValue, RocksEntity};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 
@@ -35,6 +35,8 @@ pub struct Source {
     source_credentials: SourceCredentials
 }
 }
+
+impl RocksEntity for Source {}
 
 impl Source {
     pub fn new(name: String, source_credentials: SourceCredentials) -> Self {

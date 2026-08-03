@@ -1,0 +1,16 @@
+{
+  "tableName": "scores",
+  "tableType":"OFFLINE",
+  "segmentsConfig" : {
+    "timeColumnName": "score_date",
+    "replication" : "1"
+  },
+  "tableIndexConfig" : {
+    "loadMode"  : "MMAP"
+  },
+  "tenants" : {
+    "broker":"DefaultTenant",
+    "server":"DefaultTenant"
+  },
+  "metadata": {}
+}

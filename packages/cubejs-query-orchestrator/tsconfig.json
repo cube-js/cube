@@ -13,6 +13,6 @@
     "strictNullChecks": false,
     "strictFunctionTypes": false,
     "strictBindCallApply": false,
-    "strictPropertyInitialization": false,
+    "strictPropertyInitialization": false
   },
 }

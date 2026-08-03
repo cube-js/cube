@@ -19,7 +19,6 @@ declare module "@cubejs-client/core" {
     offset?: number;
     order?: IntrospectedTQueryOrderObject | IntrospectedTQueryOrderArray;
     timezone?: string;
-    renewQuery?: boolean;
     ungrouped?: boolean;
   }
 

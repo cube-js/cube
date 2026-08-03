@@ -1,6 +1,6 @@
-export { default as DashboardPage } from './Dashboard/DashboardPage';
-export { default as SchemaPage } from './Schema/SchemaPage';
-export { default as TemplateGalleryPage } from './TemplateGallery/TemplateGalleryPage';
+export * from './Schema/SchemaPage';
 export * from './ConnectionWizard/ConnectionWizardPage';
 export * from './Explore/ExplorePage';
 export * from './Index/IndexPage';
+export * from './CubeBI/CubeBiPage';
+export * from './FrontendIntegrations/FrontendIntegrationsPage';

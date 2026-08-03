@@ -5,4 +5,8 @@ export class CompileError extends Error {
   ) {
     super(`Compile errors:\n${messages}`);
   }
+
+  public get plainMessage(): string | undefined {
+    return this.plainMessages;
+  }
 }

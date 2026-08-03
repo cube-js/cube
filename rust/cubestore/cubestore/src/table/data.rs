@@ -1,22 +1,28 @@
 use crate::metastore::{Column, ColumnType};
+use crate::queryplanner::try_make_memory_data_source;
 use crate::table::{Row, TableValue, TimestampValue};
-use crate::util::decimal::Decimal;
-use arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
-use arrow::record_batch::RecordBatch;
+use crate::util::decimal::{Decimal, Decimal96};
+use crate::util::int96::Int96;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
-use datafusion::cube_ext::ordfloat::OrdF64;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use crate::cube_ext::ordfloat::OrdF64;
+use datafusion::arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
+use datafusion::arrow::compute::concat_batches;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::execution::TaskContext;
+use datafusion::physical_plan::SendableRecordBatchStream;
 use std::fmt;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum TableValueR<'a> {
     Null,
     String(&'a str),
     Int(i64),
+    Int96(Int96),
     Decimal(Decimal),
+    Decimal96(Decimal96),
     Float(OrdF64),
     Bytes(&'a [u8]),
     Timestamp(TimestampValue),
@@ -29,7 +35,9 @@ impl TableValueR<'_> {
             TableValue::Null => TableValueR::Null,
             TableValue::String(s) => TableValueR::String(&s),
             TableValue::Int(i) => TableValueR::Int(*i),
+            TableValue::Int96(i) => TableValueR::Int96(*i),
             TableValue::Decimal(d) => TableValueR::Decimal(*d),
+            TableValue::Decimal96(d) => TableValueR::Decimal96(*d),
             TableValue::Float(f) => TableValueR::Float(*f),
             TableValue::Bytes(b) => TableValueR::Bytes(&b),
             TableValue::Timestamp(v) => TableValueR::Timestamp(v.clone()),
@@ -117,7 +125,9 @@ pub fn cmp_same_types(l: &TableValueR, r: &TableValueR) -> Ordering {
         (_, TableValueR::Null) => Ordering::Greater,
         (TableValueR::String(a), TableValueR::String(b)) => a.cmp(b),
         (TableValueR::Int(a), TableValueR::Int(b)) => a.cmp(b),
+        (TableValueR::Int96(a), TableValueR::Int96(b)) => a.cmp(b),
         (TableValueR::Decimal(a), TableValueR::Decimal(b)) => a.cmp(b),
+        (TableValueR::Decimal96(a), TableValueR::Decimal96(b)) => a.cmp(b),
         (TableValueR::Float(a), TableValueR::Float(b)) => a.cmp(b),
         (TableValueR::Bytes(a), TableValueR::Bytes(b)) => a.cmp(b),
         (TableValueR::Timestamp(a), TableValueR::Timestamp(b)) => a.cmp(b),
@@ -129,25 +139,23 @@ pub fn cmp_same_types(l: &TableValueR, r: &TableValueR) -> Ordering {
 #[macro_export]
 macro_rules! match_column_type {
     ($t: expr, $matcher: ident) => {{
-        use arrow::array::*;
+        use datafusion::arrow::array::*;
         let t = $t;
         match t {
             ColumnType::String => $matcher!(String, StringBuilder, String),
             ColumnType::Int => $matcher!(Int, Int64Builder, Int),
+            ColumnType::Int96 => $matcher!(Int96, Decimal128Builder, Int96),
             ColumnType::Bytes => $matcher!(Bytes, BinaryBuilder, Bytes),
             ColumnType::HyperLogLog(_) => $matcher!(HyperLogLog, BinaryBuilder, Bytes),
             ColumnType::Timestamp => $matcher!(Timestamp, TimestampMicrosecondBuilder, Timestamp),
             ColumnType::Boolean => $matcher!(Boolean, BooleanBuilder, Boolean),
-            ColumnType::Decimal { .. } => match t.target_scale() {
-                0 => $matcher!(Decimal, Int64Decimal0Builder, Decimal, 0),
-                1 => $matcher!(Decimal, Int64Decimal1Builder, Decimal, 1),
-                2 => $matcher!(Decimal, Int64Decimal2Builder, Decimal, 2),
-                3 => $matcher!(Decimal, Int64Decimal3Builder, Decimal, 3),
-                4 => $matcher!(Decimal, Int64Decimal4Builder, Decimal, 4),
-                5 => $matcher!(Decimal, Int64Decimal5Builder, Decimal, 5),
-                10 => $matcher!(Decimal, Int64Decimal10Builder, Decimal, 10),
-                n => panic!("unhandled target scale: {}", n),
-            },
+            // scale and precision are used when creating but not when appending, hence underscore here.
+            ColumnType::Decimal { scale: _scale, precision: _precision } => {
+                $matcher!(Decimal, Decimal128Builder, Decimal, _scale, _precision)
+            }
+            ColumnType::Decimal96 { scale: _scale, precision: _precision } => {
+                $matcher!(Decimal96, Decimal128Builder, Decimal96, _scale, _precision)
+            }
             ColumnType::Float => $matcher!(Float, Float64Builder, Float),
         }
     }};
@@ -155,8 +163,30 @@ macro_rules! match_column_type {
 
 pub fn create_array_builder(t: &ColumnType) -> Box<dyn ArrayBuilder> {
     macro_rules! create_builder {
+        ($type: tt, Decimal128Builder, Decimal, $scale: expr, $precision: expr) => {
+            Box::new(Decimal128Builder::new().with_data_type(
+                datafusion::arrow::datatypes::DataType::Decimal128(
+                    *$precision as u8,
+                    *$scale as i8,
+                ),
+            ))
+        };
+        ($type: tt, Decimal128Builder, Decimal96, $scale: expr, $precision: expr) => {
+            Box::new(Decimal128Builder::new().with_data_type(
+                datafusion::arrow::datatypes::DataType::Decimal128(
+                    *$precision as u8,
+                    *$scale as i8,
+                ),
+            ))
+        };
+        ($type: tt, Decimal128Builder, Int96) => {
+            Box::new(
+                Decimal128Builder::new()
+                    .with_data_type(datafusion::arrow::datatypes::DataType::Decimal128(38, 0)),
+            )
+        };
         ($type: tt, $builder: tt $(,$arg: tt)*) => {
-            Box::new($builder::new(0))
+            Box::new($builder::new())
         };
     }
     match_column_type!(t, create_builder)
@@ -182,6 +212,12 @@ pub fn append_value(b: &mut dyn ArrayBuilder, c: &ColumnType, v: &TableValue) {
         (Decimal, $v: expr) => {{
             $v.raw_value()
         }};
+        (Decimal96, $v: expr) => {{
+            $v.raw_value()
+        }};
+        (Int96, $v: expr) => {{
+            $v.raw_value()
+        }};
         (Float, $v: expr) => {{
             $v.0
         }};
@@ -202,14 +238,14 @@ pub fn append_value(b: &mut dyn ArrayBuilder, c: &ColumnType, v: &TableValue) {
         ($type: tt, $builder: tt, $tv_enum: tt $(, $arg:tt)*) => {{
             let b = b.as_any_mut().downcast_mut::<$builder>().unwrap();
             if is_null {
-                b.append_null().unwrap();
+                b.append_null();
                 return;
             }
             let v = match v {
                 TableValue::$tv_enum(v) => convert_value!($tv_enum, v),
                 other => panic!("unexpected value {:?} for type {:?}", other, c),
             };
-            b.append_value(v).unwrap();
+            b.append_value(v);
         }};
     }
     match_column_type!(c, append)
@@ -223,18 +259,18 @@ pub fn rows_to_columns(cols: &[Column], rows: &[Row]) -> Vec<ArrayRef> {
     builders.into_iter().map(|mut b| b.finish()).collect_vec()
 }
 
-pub async fn to_stream(r: RecordBatch) -> SendableRecordBatchStream {
+pub fn to_stream(r: RecordBatch) -> SendableRecordBatchStream {
     let schema = r.schema();
-    MemoryExec::try_new(&[vec![r]], schema, None)
+    // TaskContext::default is OK here because it's a plain memory exec.
+    try_make_memory_data_source(&[vec![r]], schema, None)
         .unwrap()
-        .execute(0)
-        .await
+        .execute(0, Arc::new(TaskContext::default()))
         .unwrap()
 }
 
 pub fn concat_record_batches(rs: &[RecordBatch]) -> RecordBatch {
     assert_ne!(rs.len(), 0);
-    RecordBatch::concat(&rs[0].schema(), rs).unwrap()
+    concat_batches(&rs[0].schema(), rs).unwrap()
 }
 
 #[macro_export]

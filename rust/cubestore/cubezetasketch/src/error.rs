@@ -26,32 +26,32 @@ pub struct ZetaError {
 
 impl Display for ZetaError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        write!(f, "ZetaError: {}", self.message)
     }
 }
 
 impl ZetaError {
     pub fn new<Str: ToString>(message: Str) -> ZetaError {
-        return ZetaError {
+        ZetaError {
             message: message.to_string(),
-        };
+        }
     }
 }
 
 impl From<std::io::Error> for ZetaError {
     fn from(err: std::io::Error) -> Self {
-        return ZetaError::new(err);
+        ZetaError::new(err)
     }
 }
 
 impl From<ProtobufError> for ZetaError {
     fn from(err: ProtobufError) -> Self {
-        return ZetaError::new(err);
+        ZetaError::new(format!("Protobuf: {}", err))
     }
 }
 
 impl From<TryFromIntError> for ZetaError {
     fn from(err: TryFromIntError) -> Self {
-        return ZetaError::new(err);
+        ZetaError::new(err)
     }
 }

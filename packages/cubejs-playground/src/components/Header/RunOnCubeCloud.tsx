@@ -34,7 +34,7 @@ export function RunOnCubeCloud() {
       ) : (
         <CloudFilled />
       )}
-      {!active ? 'Run' : 'Running'} on Cube Cloud
+      {!active ? 'Run' : 'Running'} in Cloud
     </StyledMenuButton>
   );
 
@@ -84,7 +84,7 @@ function LivePreviewOverlay({
         <Typography.Paragraph>
           Playground uses the following API URL to execute queries on Cloud. You
           can use this API to test queries in your application.{' '}
-          <Typography.Link href="https://cube.dev/docs/cloud" target="_blank">
+          <Typography.Link href="https://cube.dev/docs/introduction" target="_blank">
             Learn more
           </Typography.Link>{' '}
           on developing and testing with Cube Cloud.

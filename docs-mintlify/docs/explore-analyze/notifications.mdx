@@ -1,0 +1,110 @@
+---
+title: Notifications
+description: Notifications are available on Premium and Enterprise plans.
+---
+
+<Info>
+
+Notifications are available on [Premium and Enterprise plans](https://cube.dev/pricing).
+<br/ >Users need at least the [Explorer][ref-roles] role and Edit or Manage permission
+on the workbook to set up notifications.
+
+</Info>
+
+Notifications let you send email or Slack messages with a screenshot of a
+dashboard after each [scheduled refresh][ref-scheduled-refreshes]. This is useful
+for distributing regular updates to stakeholders without requiring them to log in.
+
+## Creating a notification
+
+Notifications are configured as part of a [scheduled refresh][ref-scheduled-refreshes].
+When creating or editing a schedule, click **Add notification** to expand
+the notification configuration card.
+
+<Tip>
+
+To send the same dashboard to another channel or recipient list, [duplicate an
+existing schedule][ref-duplicate] instead of configuring the notification from
+scratch — the copy carries over the source schedule's notification settings.
+
+</Tip>
+
+### Delivery channel
+
+Toggle between two delivery channels:
+
+- **Email** — select recipients using a searchable picker with checkboxes. The
+  picker is grouped into **Users** and **User groups** sections, so you can add
+  individual workspace users, entire [user groups][ref-user-groups], or a mix of
+  both.
+- **Slack** — select a Slack channel to post to. Requires connecting your Slack
+  workspace first (one-time OAuth flow via **Connect to Slack**). Once
+  connected, select a channel from a searchable picker.
+
+### Screenshot attachment
+
+Choose the format for the dashboard screenshot attached to the notification:
+
+- **PNG** (default)
+- **PDF**
+
+Select the format using the **Attach screenshot as** option. The same
+formats are available for ad-hoc [downloads from the dashboard
+header][ref-download].
+
+[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+
+### Removing a notification
+
+To remove a notification from a scheduled refresh, click the X button in the
+notification card header before saving.
+
+## Email notifications
+
+Email notifications are sent to the selected recipients after a scheduled
+refresh completes. Each recipient receives a message with a link to the
+dashboard and the attached screenshot.
+
+<Tip>
+
+Recipients don't have to be added by an editor. Anyone who can view the dashboard
+can [subscribe themselves][ref-subscribe] to a schedule's email notifications
+from the published dashboard.
+
+</Tip>
+
+### Recipients
+
+The recipient picker is split into two sections:
+
+- **Users** — individual workspace users.
+- **User groups** — [user groups][ref-user-groups]. A group is expanded to its
+  current members each time the notification is sent, so adding or removing
+  members takes effect on the next run without editing the schedule. The **User
+  groups** section only appears when your workspace has at least one user group.
+
+A recipient who is selected individually and also belongs to a selected group is
+emailed only once.
+
+## Slack notifications
+
+Slack notifications post a message with the dashboard screenshot to a single
+Slack channel per schedule.
+
+### Connecting Slack
+
+Before you can send Slack notifications, connect your Slack workspace:
+
+1. When configuring a notification, select **Slack** as the delivery
+   channel.
+2. Click **Connect to Slack** to start the OAuth flow.
+3. Authorize Cube to post to your Slack workspace.
+
+This is a one-time setup. Once connected, you can select any channel your Slack
+workspace has access to.
+
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
+[ref-user-groups]: /admin/users-and-permissions/user-groups
+[ref-subscribe]: /docs/explore-analyze/scheduled-refreshes#subscribing-to-notifications

@@ -1,0 +1,300 @@
+cubes:
+  - name: users
+    sql: "SELECT 1"
+    joins:
+      - name: orders
+        relationship: one_to_many
+        sql: "{users}.id = {orders.user_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+      # Regular dimensions refers to foreign cubes
+      - name: otherCubeRefInSql
+        type: string
+        sql: "{orders}.user_name"
+
+      - name: otherCubeRefInSql2
+        type: string
+        sql: "{CUBE}.val + {orders}.user_name"
+
+      - name: otherCubeRefInLongitude
+        type: geo
+        longitude: "{orders}.longitude"
+        latitude: "{CUBE}.latitude"
+
+      - name: otherCubeRefInLatitude
+        type: geo
+        longitude: "{CUBE}.longitude"
+        latitude: "{orders}.latitude"
+
+      - name: otherCubeRefInCaseItem
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.id = 1"
+              label: a
+            - sql: "{orders}.id = 1"
+              label: b
+          else:
+            label: c
+
+      - name: otherCubeRefInCaseSwitchSwitch
+        type: string
+        case:
+          switch: "{orders}.state"
+          when:
+            - value: "a"
+              sql: "{CUBE}.a"
+            - value: "b"
+              sql: "{CUBE}.b"
+          else:
+            sql: "{CUBE}.c"
+
+      - name: otherCubeRefInCaseSwitchItem
+        type: string
+        case:
+          switch: "{CUBE}.state"
+          when:
+            - value: "a"
+              sql: "{orders}.a"
+            - value: "b"
+              sql: "{CUBE}.b"
+          else:
+            sql: "{CUBE}.c"
+
+      - name: otherCubeRefInCaseSwitchElse
+        type: string
+        case:
+          switch: "{CUBE}.state"
+          when:
+            - value: "a"
+              sql: "{CUBE}.a"
+            - value: "b"
+              sql: "{CUBE}.b"
+          else:
+            sql: "{orders}.c"
+
+      # MultiStage dimensions refers any cubes
+      - name: multiStageCubeRefInSql
+        type: string
+        multi_stage: true
+        sql: "{CUBE}.id"
+
+      - name: multiStageOtherCubeRefInSql
+        type: string
+        multi_stage: true
+        sql: "{orders}.id"
+
+      - name: multiStageCubeRefInLongitude
+        type: geo
+        longitude: "{CUBE}.longitude"
+        latitude: "{CUBE.id}"
+        multi_stage: true
+
+      - name: multiStageCubeRefInLatitude
+        type: geo
+        longitude: "{CUBE.id}"
+        latitude: "{CUBE}.latitude"
+        multi_stage: true
+
+      - name: multiStageCubeRefInCaseItem
+        type: string
+        multi_stage: true
+        case:
+          when:
+            - sql: "{CUBE}.id = 1"
+              label: a
+            - sql: "{orders}.id = 1"
+              label: b
+          else:
+            label: c
+
+      - name: multiStageCubeRefInCaseSwitchSwitch
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE}.state"
+          when:
+            - value: "a"
+              sql: "{CUBE.id}"
+            - value: "b"
+              sql: "{CUBE.id}"
+          else:
+            sql: "{orders.id}"
+
+      - name: multiStageCubeRefInCaseSwitchItem
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE.id}"
+          when:
+            - value: "a"
+              sql: "{CUBE}.a"
+            - value: "b"
+              sql: "{CUBE.id}"
+          else:
+            sql: "{orders.id}"
+
+      - name: multiStageCubeRefInCaseSwitchElse
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE.id}"
+          when:
+            - value: "a"
+              sql: "{CUBE.id}"
+            - value: "b"
+              sql: "{orders.id}"
+          else:
+            sql: "{CUBE}.c"
+
+      # MultiStage dimensions withiout references to other members
+      - name: multiStageWithoutRefInSql
+        type: string
+        multi_stage: true
+        sql: "id"
+
+      - name: multiStageWithoutRefInLongitude
+        type: geo
+        longitude: "longitude"
+        latitude: "{CUBE.id}"
+        multi_stage: true
+
+      - name: multiStageWithoutRefInLatitude
+        type: geo
+        longitude: "{CUBE.id}"
+        latitude: "latitude"
+        multi_stage: true
+
+      - name: multiStageWithoutRefInCaseItem
+        type: string
+        multi_stage: true
+        case:
+          when:
+            - sql: "{CUBE.id} = 1"
+              label: a
+            - sql: "id = 1"
+              label: b
+          else:
+            label: c
+
+      - name: multiStageWithoutRefInCaseSwitchSwitch
+        type: string
+        multi_stage: true
+        case:
+          switch: "state"
+          when:
+            - value: "a"
+              sql: "{CUBE.id}"
+            - value: "b"
+              sql: "{CUBE.id}"
+          else:
+            sql: "{orders.id}"
+
+      - name: multiStageWithoutRefInCaseSwitchItem
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE.id}"
+          when:
+            - value: "a"
+              sql: "a"
+            - value: "b"
+              sql: "{CUBE.id}"
+          else:
+            sql: "{orders.id}"
+
+      - name: multiStageWithoutRefInCaseSwitchElse
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE.id}"
+          when:
+            - value: "a"
+              sql: "{CUBE.id}"
+            - value: "b"
+              sql: "{orders.id}"
+          else:
+            sql: "c"
+
+    measures:
+      - name: count
+        type: count
+
+      - name: mOtherCubeRefInSql
+        type: string
+        sql: "{orders}.count"
+
+      - name: mMultiStageCubeRefInSql
+        type: string
+        multi_stage: true
+        sql: "{CUBE}.count"
+
+      - name: mMultiStageWithoutRefInCaseSwitchSwitch
+        type: string
+        multi_stage: true
+        case:
+          switch: "state"
+          when:
+            - value: "a"
+              sql: "{CUBE.count}"
+            - value: "b"
+              sql: "{CUBE.count}"
+          else:
+            sql: "{orders.count}"
+
+      - name: mMultiStageWithoutRefInCaseSwitchItem
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE.id}"
+          when:
+            - value: "a"
+              sql: "a"
+            - value: "b"
+              sql: "{CUBE.count}"
+          else:
+            sql: "{orders.count}"
+
+      - name: mMultiStageWithoutRefInCaseSwitchElse
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE.count}"
+          when:
+            - value: "a"
+              sql: "{CUBE.count}"
+            - value: "b"
+              sql: "{orders.count}"
+          else:
+            sql: "c"
+
+  - name: orders
+    sql: "SELECT 1"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: orderUserName
+        type: string
+        sql: "{users.userName}"
+      - name: orderType
+        type: string
+        sql: "{CUBE}.order_type"
+      - name: latitude
+        type: number
+        sql: "{CUBE}.latitude"
+      - name: longitude
+        type: number
+        sql: "{CUBE}.longitude"
+    measures:
+      - name: count
+        type: count
+
+      - name: revenue
+        type: sum
+        sql: "{CUBE}.revenue"

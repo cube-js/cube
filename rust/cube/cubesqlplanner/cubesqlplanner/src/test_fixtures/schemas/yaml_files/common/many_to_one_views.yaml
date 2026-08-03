@@ -1,0 +1,65 @@
+cubes:
+  - name: many_to_one_root
+    sql: "SELECT * FROM many_to_one_root"
+    joins:
+      - name: many_to_one_child
+        relationship: many_to_one
+        sql: "{many_to_one_root}.child_id = {many_to_one_child.id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: child_id
+        type: number
+        sql: child_id
+      - name: root_dim
+        type: string
+        sql: dim
+      - name: root_test_dim
+        type: string
+        sql: test_dim
+    measures:
+      - name: root_val_sum
+        type: sum
+        sql: val
+      - name: root_val_avg
+        type: avg
+        sql: val
+
+  - name: many_to_one_child
+    sql: "SELECT * FROM many_to_one_child"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: child_dim
+        type: string
+        sql: dim
+      - name: child_test_dim
+        type: string
+        sql: test_dim
+    measures:
+      - name: child_val_sum
+        type: sum
+        sql: val
+      - name: child_val_avg
+        type: avg
+        sql: val
+
+views:
+  - name: many_to_one_view
+    cubes:
+      - join_path: many_to_one_root
+        includes:
+          - root_dim
+          - root_test_dim
+          - root_val_sum
+          - root_val_avg
+      - join_path: many_to_one_root.many_to_one_child
+        includes:
+          - child_dim
+          - child_test_dim
+          - child_val_sum
+          - child_val_avg

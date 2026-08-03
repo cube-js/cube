@@ -1,16 +1,19 @@
-use crate::sql::shim::ConnectionError;
 use itertools::Itertools;
 use log::trace;
-use msql_srv::Column as MysqlColumn;
 use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
-    BindValue, PgType,
+    BindValue, PgType, PgTypeId,
 };
-use sqlparser::ast::{self, Expr, Function, FunctionArgExpr, Ident, Value};
+use sqlparser::ast::{
+    self, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList, FunctionArguments,
+    Ident, ObjectName, ObjectNamePart, Value,
+};
 use std::{collections::HashMap, error::Error};
 
-use super::types::{ColumnFlags, ColumnType};
+use super::types::ColumnType;
+use crate::sql::postgres::ConnectionError;
 
+#[derive(Debug)]
 enum PlaceholderType {
     String,
     Number,
@@ -22,6 +25,24 @@ impl PlaceholderType {
             Self::String => ColumnType::String,
             Self::Number => ColumnType::Int64,
         }
+    }
+}
+
+fn new_function(name: &str, args: Vec<FunctionArg>) -> Function {
+    Function {
+        name: ObjectName::from(vec![Ident::new(name)]),
+        uses_odbc_syntax: false,
+        parameters: FunctionArguments::None,
+        args: FunctionArguments::List(FunctionArgumentList {
+            duplicate_treatment: None,
+            args,
+            clauses: vec![],
+        }),
+        filter: None,
+        null_treatment: None,
+        over: None,
+        within_group: vec![],
+        approximate: false,
     }
 }
 
@@ -42,13 +63,22 @@ trait Visitor<'ast, E: Error> {
         self.visit_expr_with_placeholder_type(expr, PlaceholderType::String)
     }
 
+    /// Hook invoked for every expression before its children are visited, allowing a visitor to
+    /// rewrite/replace the node in place. The default is a no-op; recursion below then descends
+    /// into whatever node it has been replaced with.
+    fn transform_expr(&mut self, _expr: &mut Expr) -> Result<(), E> {
+        Ok(())
+    }
+
     fn visit_expr_with_placeholder_type(
         &mut self,
         expr: &mut Expr,
         placeholder_type: PlaceholderType,
     ) -> Result<(), E> {
+        self.transform_expr(expr)?;
+
         match expr {
-            Expr::Value(value) => self.visit_value(value, placeholder_type)?,
+            Expr::Value(value) => self.visit_value(&mut value.value, placeholder_type)?,
             Expr::Identifier(identifier) => self.visit_identifier(identifier)?,
             Expr::CompoundIdentifier(identifiers) => {
                 for ident in identifiers.iter_mut() {
@@ -58,28 +88,24 @@ trait Visitor<'ast, E: Error> {
             Expr::Nested(v) => self.visit_expr(&mut *v)?,
             Expr::Cast { .. } => self.visit_cast(expr)?,
             Expr::Between {
-                expr,
-                negated: _,
-                low,
-                high,
+                expr, low, high, ..
             } => {
                 self.visit_expr(&mut *expr)?;
                 self.visit_expr(&mut *low)?;
                 self.visit_expr(&mut *high)?;
             }
-            Expr::AnyOp(expr) => {
-                self.visit_expr(expr)?;
+            Expr::AnyOp { left, right, .. } | Expr::AllOp { left, right, .. } => {
+                self.visit_expr(&mut *left)?;
+                self.visit_expr(&mut *right)?;
             }
-            Expr::AllOp(expr) => {
-                self.visit_expr(&mut *expr)?;
-            }
-            Expr::BinaryOp { left, op: _, right } => {
+            Expr::BinaryOp { left, right, .. } => {
                 self.visit_expr(&mut *left)?;
                 self.visit_expr(&mut *right)?;
             }
             Expr::Like { expr, pattern, .. }
             | Expr::ILike { expr, pattern, .. }
-            | Expr::SimilarTo { expr, pattern, .. } => {
+            | Expr::SimilarTo { expr, pattern, .. }
+            | Expr::RLike { expr, pattern, .. } => {
                 self.visit_expr(&mut *expr)?;
                 self.visit_expr(&mut *pattern)?;
             }
@@ -93,23 +119,29 @@ trait Visitor<'ast, E: Error> {
             Expr::Case {
                 operand,
                 conditions,
-                results,
                 else_result,
+                ..
             } => {
                 if let Some(op) = operand {
                     self.visit_expr(&mut *op)?;
                 }
-                for con in conditions.iter_mut() {
-                    self.visit_expr(&mut *con)?;
-                }
-                for res in results.iter_mut() {
-                    self.visit_expr(&mut *res)?;
+                for when in conditions.iter_mut() {
+                    self.visit_expr(&mut when.condition)?;
+                    self.visit_expr(&mut when.result)?;
                 }
                 if let Some(res) = else_result {
                     self.visit_expr(&mut *res)?;
                 }
             }
-            Expr::IsNull(expr) | Expr::IsNotNull(expr) => self.visit_expr(expr)?,
+            Expr::IsNull(expr)
+            | Expr::IsNotNull(expr)
+            | Expr::IsTrue(expr)
+            | Expr::IsNotTrue(expr)
+            | Expr::IsFalse(expr)
+            | Expr::IsNotFalse(expr)
+            | Expr::IsUnknown(expr)
+            | Expr::IsNotUnknown(expr)
+            | Expr::IsNormalized { expr, .. } => self.visit_expr(expr)?,
             Expr::IsDistinctFrom(expr_1, expr_2) | Expr::IsNotDistinctFrom(expr_1, expr_2) => {
                 self.visit_expr(expr_1)?;
                 self.visit_expr(expr_2)?;
@@ -124,14 +156,21 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(expr)?;
                 self.visit_expr(array_expr)?;
             }
-            Expr::UnaryOp { expr, .. } => {
-                self.visit_expr(expr)?;
-            }
-            Expr::TryCast { expr, .. } | Expr::Extract { expr, .. } => self.visit_expr(expr)?,
+            Expr::UnaryOp { expr, .. }
+            | Expr::Convert { expr, .. }
+            | Expr::Extract { expr, .. }
+            | Expr::Ceil { expr, .. }
+            | Expr::Floor { expr, .. }
+            | Expr::OuterJoin(expr)
+            | Expr::Prior(expr)
+            | Expr::Named { expr, .. }
+            | Expr::Prefixed { value: expr, .. } => self.visit_expr(expr)?,
+            Expr::AtTimeZone { timestamp, .. } => self.visit_expr(timestamp)?,
             Expr::Substring {
                 expr,
                 substring_from,
                 substring_for,
+                ..
             } => {
                 self.visit_expr(expr)?;
                 if let Some(res) = substring_from {
@@ -141,42 +180,56 @@ trait Visitor<'ast, E: Error> {
                     self.visit_expr(res)?;
                 }
             }
-            Expr::Trim { expr, trim_where } => {
+            Expr::Trim {
+                expr,
+                trim_what,
+                trim_characters,
+                ..
+            } => {
                 self.visit_expr(expr)?;
-                if let Some((_, res)) = trim_where {
+                if let Some(res) = trim_what {
+                    self.visit_expr(res)?;
+                }
+                if let Some(chars) = trim_characters {
+                    for res in chars.iter_mut() {
+                        self.visit_expr(res)?;
+                    }
+                }
+            }
+            Expr::Overlay {
+                expr,
+                overlay_what,
+                overlay_from,
+                overlay_for,
+            } => {
+                self.visit_expr(expr)?;
+                self.visit_expr(overlay_what)?;
+                self.visit_expr(overlay_from)?;
+                if let Some(res) = overlay_for {
                     self.visit_expr(res)?;
                 }
             }
             Expr::Collate { expr, collation } => {
                 self.visit_expr(expr)?;
                 for res in collation.0.iter_mut() {
-                    self.visit_identifier(res)?;
-                }
-            }
-            Expr::MapAccess { column, keys } => {
-                self.visit_expr(column)?;
-                for res in keys.iter_mut() {
-                    self.visit_expr(res)?;
-                }
-            }
-            Expr::Function(fun) => self.visit_function(fun)?,
-            Expr::Exists(query) | Expr::Subquery(query) => self.visit_query(query)?,
-            Expr::ListAgg(list_agg) => {
-                self.visit_expr(&mut list_agg.expr)?;
-                if let Some(separator) = &mut list_agg.separator {
-                    self.visit_expr(separator)?;
-                }
-                if let Some(on_overflow) = &mut list_agg.on_overflow {
-                    if let ast::ListAggOnOverflow::Truncate { filler, .. } = on_overflow {
-                        if let Some(expr) = filler {
-                            self.visit_expr(expr)?;
-                        }
+                    if let ObjectNamePart::Identifier(ident) = res {
+                        self.visit_identifier(ident)?;
                     }
                 }
-                for order_expr in list_agg.within_group.iter_mut() {
-                    self.visit_expr(&mut order_expr.expr)?;
+            }
+            Expr::CompoundFieldAccess { root, access_chain } => {
+                self.visit_expr(root)?;
+                for access in access_chain.iter_mut() {
+                    match access {
+                        ast::AccessExpr::Dot(expr) => self.visit_expr(expr)?,
+                        ast::AccessExpr::Subscript(subscript) => self.visit_subscript(subscript)?,
+                    }
                 }
             }
+            Expr::JsonAccess { value, .. } => self.visit_expr(value)?,
+            Expr::Function(fun) => self.visit_function(fun)?,
+            Expr::Exists { subquery, .. } => self.visit_query(subquery)?,
+            Expr::Subquery(query) => self.visit_query(query)?,
             Expr::GroupingSets(vec) | Expr::Cube(vec) | Expr::Rollup(vec) => {
                 for v in vec.iter_mut() {
                     for expr in v.iter_mut() {
@@ -189,27 +242,42 @@ trait Visitor<'ast, E: Error> {
                     self.visit_expr(expr)?;
                 }
             }
-            Expr::ArrayIndex { obj, indexs } => {
-                self.visit_expr(obj)?;
-                for expr in indexs.iter_mut() {
-                    self.visit_expr(expr)?;
-                }
-            }
             Expr::Array(arr) => {
                 for expr in arr.elem.iter_mut() {
                     self.visit_expr(expr)?;
                 }
             }
-            Expr::ArraySubquery(query) => self.visit_query(query)?,
-            Expr::DotExpr { expr, field } => {
-                self.visit_expr(expr)?;
-                self.visit_identifier(field)?;
-            }
-            Expr::TypedString { .. } => (),
-            Expr::AtTimeZone { timestamp, .. } => self.visit_expr(timestamp)?,
+            Expr::Interval(interval) => self.visit_expr(&mut interval.value)?,
+            Expr::TypedString { .. } | Expr::Wildcard(_) | Expr::QualifiedWildcard(..) => (),
             Expr::Position { expr, r#in } => {
                 self.visit_expr(expr)?;
                 self.visit_expr(r#in)?;
+            }
+            // Exotic / dialect-specific variants (Struct, Map, Dictionary, MatchAgainst,
+            // Lambda, MemberOf, ...) carry no placeholders in CubeSQL's workload.
+            _ => {}
+        };
+
+        Ok(())
+    }
+
+    fn visit_subscript(&mut self, subscript: &mut ast::Subscript) -> Result<(), E> {
+        match subscript {
+            ast::Subscript::Index { index } => self.visit_expr(index)?,
+            ast::Subscript::Slice {
+                lower_bound,
+                upper_bound,
+                stride,
+            } => {
+                if let Some(expr) = lower_bound {
+                    self.visit_expr(expr)?;
+                }
+                if let Some(expr) = upper_bound {
+                    self.visit_expr(expr)?;
+                }
+                if let Some(expr) = stride {
+                    self.visit_expr(expr)?;
+                }
             }
         };
 
@@ -228,25 +296,49 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(expr)?;
                 self.visit_table_alias(alias)?;
             }
-            ast::TableFactor::NestedJoin(table_with_joins) => {
+            ast::TableFactor::NestedJoin {
+                table_with_joins,
+                alias,
+            } => {
                 self.visit_table_with_joins(&mut *table_with_joins)?;
+                self.visit_table_alias(alias)?;
             }
             ast::TableFactor::Table {
                 name,
                 alias,
                 args,
                 with_hints,
+                ..
             } => {
-                for ident in name.0.iter_mut() {
-                    self.visit_identifier(ident)?;
-                }
+                self.visit_object_name(name)?;
                 self.visit_table_alias(alias)?;
-                self.visit_function_args(args)?;
+                if let Some(args) = args {
+                    self.visit_function_args(&mut args.args)?;
+                }
                 for hint in with_hints.iter_mut() {
                     self.visit_expr(hint)?;
                 }
             }
+            ast::TableFactor::Function {
+                name, args, alias, ..
+            } => {
+                self.visit_object_name(name)?;
+                self.visit_function_args(args)?;
+                self.visit_table_alias(alias)?;
+            }
+            // UNNEST, JSON_TABLE, OPENJSON, PIVOT, ... are not produced by CubeSQL's workload.
+            _ => {}
         };
+
+        Ok(())
+    }
+
+    fn visit_object_name(&mut self, name: &mut ObjectName) -> Result<(), E> {
+        for part in name.0.iter_mut() {
+            if let ObjectNamePart::Identifier(ident) = part {
+                self.visit_identifier(ident)?;
+            }
+        }
 
         Ok(())
     }
@@ -255,23 +347,49 @@ trait Visitor<'ast, E: Error> {
         self.visit_table_factor(&mut join.relation)?;
 
         match &mut join.join_operator {
-            ast::JoinOperator::Inner(constr)
+            ast::JoinOperator::Join(constr)
+            | ast::JoinOperator::Inner(constr)
+            | ast::JoinOperator::Left(constr)
             | ast::JoinOperator::LeftOuter(constr)
+            | ast::JoinOperator::Right(constr)
             | ast::JoinOperator::RightOuter(constr)
-            | ast::JoinOperator::FullOuter(constr) => match constr {
-                ast::JoinConstraint::On(expr) => {
-                    self.visit_expr(expr)?;
+            | ast::JoinOperator::FullOuter(constr)
+            | ast::JoinOperator::CrossJoin(constr)
+            | ast::JoinOperator::Semi(constr)
+            | ast::JoinOperator::LeftSemi(constr)
+            | ast::JoinOperator::RightSemi(constr)
+            | ast::JoinOperator::Anti(constr)
+            | ast::JoinOperator::LeftAnti(constr)
+            | ast::JoinOperator::RightAnti(constr)
+            | ast::JoinOperator::StraightJoin(constr) => self.visit_join_constraint(constr)?,
+            ast::JoinOperator::AsOf {
+                match_condition,
+                constraint,
+            } => {
+                self.visit_expr(match_condition)?;
+                self.visit_join_constraint(constraint)?;
+            }
+            ast::JoinOperator::CrossApply
+            | ast::JoinOperator::OuterApply
+            | ast::JoinOperator::ArrayJoin
+            | ast::JoinOperator::LeftArrayJoin
+            | ast::JoinOperator::InnerArrayJoin => (),
+        };
+
+        Ok(())
+    }
+
+    fn visit_join_constraint(&mut self, constr: &mut ast::JoinConstraint) -> Result<(), E> {
+        match constr {
+            ast::JoinConstraint::On(expr) => {
+                self.visit_expr(expr)?;
+            }
+            ast::JoinConstraint::Using(names) => {
+                for name in names.iter_mut() {
+                    self.visit_object_name(name)?;
                 }
-                ast::JoinConstraint::Using(idents) => {
-                    for ident in idents.iter_mut() {
-                        self.visit_identifier(ident)?;
-                    }
-                }
-                ast::JoinConstraint::Natural | ast::JoinConstraint::None => (),
-            },
-            ast::JoinOperator::CrossJoin
-            | ast::JoinOperator::CrossApply
-            | ast::JoinOperator::OuterApply => (),
+            }
+            ast::JoinConstraint::Natural | ast::JoinConstraint::None => (),
         };
 
         Ok(())
@@ -290,13 +408,15 @@ trait Visitor<'ast, E: Error> {
     fn visit_select_item(&mut self, select: &mut ast::SelectItem) -> Result<(), E> {
         match select {
             ast::SelectItem::ExprWithAlias { expr, .. } => self.visit_expr(expr)?,
+            ast::SelectItem::ExprWithAliases { expr, .. } => self.visit_expr(expr)?,
             ast::SelectItem::UnnamedExpr(expr) => self.visit_expr(expr)?,
-            ast::SelectItem::QualifiedWildcard(name) => {
-                for ident in name.0.iter_mut() {
-                    self.visit_identifier(ident)?;
+            ast::SelectItem::QualifiedWildcard(kind, _) => match kind {
+                ast::SelectItemQualifiedWildcardKind::ObjectName(name) => {
+                    self.visit_object_name(name)?
                 }
-            }
-            ast::SelectItem::Wildcard => (),
+                ast::SelectItemQualifiedWildcardKind::Expr(expr) => self.visit_expr(expr)?,
+            },
+            ast::SelectItem::Wildcard(_) => (),
         };
 
         Ok(())
@@ -319,6 +439,12 @@ trait Visitor<'ast, E: Error> {
             self.visit_expr(having)?;
         }
 
+        if let ast::GroupByExpr::Expressions(exprs, _) = &mut select.group_by {
+            for group_by in exprs.iter_mut() {
+                self.visit_expr(group_by)?;
+            }
+        }
+
         Ok(())
     }
 
@@ -331,13 +457,17 @@ trait Visitor<'ast, E: Error> {
                 self.visit_set_expr(&mut *right)?;
             }
             ast::SetExpr::Values(vals) => {
-                for v in vals.0.iter_mut() {
-                    for expr in v.iter_mut() {
+                for row in vals.rows.iter_mut() {
+                    for expr in row.content.iter_mut() {
                         self.visit_expr(expr)?;
                     }
                 }
             }
-            ast::SetExpr::Insert(_) => (),
+            ast::SetExpr::Insert(_)
+            | ast::SetExpr::Update(_)
+            | ast::SetExpr::Delete(_)
+            | ast::SetExpr::Merge(_)
+            | ast::SetExpr::Table(_) => (),
         };
 
         Ok(())
@@ -348,8 +478,35 @@ trait Visitor<'ast, E: Error> {
         if let Some(with) = query.with.as_mut() {
             self.visit_with(with)?;
         }
-        if let Some(limit) = query.limit.as_mut() {
-            self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number)?;
+        if let Some(order_by) = query.order_by.as_mut() {
+            if let ast::OrderByKind::Expressions(exprs) = &mut order_by.kind {
+                for order_expr in exprs.iter_mut() {
+                    self.visit_expr(&mut order_expr.expr)?;
+                }
+            }
+        }
+        match query.limit_clause.as_mut() {
+            Some(ast::LimitClause::LimitOffset { limit, offset, .. }) => {
+                if let Some(limit) = limit {
+                    self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number)?;
+                }
+                if let Some(offset) = offset {
+                    self.visit_expr_with_placeholder_type(
+                        &mut offset.value,
+                        PlaceholderType::Number,
+                    )?;
+                }
+            }
+            Some(ast::LimitClause::OffsetCommaLimit { offset, limit }) => {
+                self.visit_expr_with_placeholder_type(offset, PlaceholderType::Number)?;
+                self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number)?;
+            }
+            None => {}
+        }
+        if let Some(fetch) = query.fetch.as_mut() {
+            if let Some(quantity) = fetch.quantity.as_mut() {
+                self.visit_expr_with_placeholder_type(quantity, PlaceholderType::Number)?;
+            }
         }
 
         Ok(())
@@ -367,7 +524,13 @@ trait Visitor<'ast, E: Error> {
         match statement {
             ast::Statement::Query(query) => self.visit_query(query)?,
             ast::Statement::Explain { statement, .. } => self.visit_statement(statement)?,
-            ast::Statement::Declare { query, .. } => self.visit_query(query)?,
+            ast::Statement::Declare { stmts } => {
+                for declare in stmts.iter_mut() {
+                    if let Some(query) = declare.for_query.as_mut() {
+                        self.visit_query(query)?;
+                    }
+                }
+            }
             // TODO:
             _ => {}
         };
@@ -389,18 +552,39 @@ trait Visitor<'ast, E: Error> {
     }
 
     fn visit_function(&mut self, fun: &mut ast::Function) -> Result<(), E> {
-        for res in fun.name.0.iter_mut() {
-            self.visit_identifier(res)?;
+        self.visit_object_name(&mut fun.name)?;
+        self.visit_function_arguments(&mut fun.parameters)?;
+        self.visit_function_arguments(&mut fun.args)?;
+        if let Some(filter) = &mut fun.filter {
+            self.visit_expr(filter)?;
         }
-        self.visit_function_args(&mut fun.args)?;
-        if let Some(over) = &mut fun.over {
-            for res in over.partition_by.iter_mut() {
-                self.visit_expr(res)?;
-            }
-            for order_expr in over.order_by.iter_mut() {
-                self.visit_expr(&mut order_expr.expr)?;
-            }
+        for order_expr in fun.within_group.iter_mut() {
+            self.visit_expr(&mut order_expr.expr)?;
         }
+        if let Some(ast::WindowType::WindowSpec(spec)) = &mut fun.over {
+            self.visit_window_spec(spec)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_window_spec(&mut self, spec: &mut ast::WindowSpec) -> Result<(), E> {
+        for res in spec.partition_by.iter_mut() {
+            self.visit_expr(res)?;
+        }
+        for order_expr in spec.order_by.iter_mut() {
+            self.visit_expr(&mut order_expr.expr)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_function_arguments(&mut self, args: &mut FunctionArguments) -> Result<(), E> {
+        match args {
+            FunctionArguments::None => {}
+            FunctionArguments::Subquery(query) => self.visit_query(query)?,
+            FunctionArguments::List(list) => self.visit_function_args(&mut list.args)?,
+        };
 
         Ok(())
     }
@@ -408,8 +592,12 @@ trait Visitor<'ast, E: Error> {
     fn visit_function_args(&mut self, args: &mut Vec<ast::FunctionArg>) -> Result<(), E> {
         for a in args.iter_mut() {
             match a {
-                ast::FunctionArg::Named { name, arg } => {
+                ast::FunctionArg::Named { name, arg, .. } => {
                     self.visit_identifier(name)?;
+                    self.visit_function_arg_expr(arg)?;
+                }
+                ast::FunctionArg::ExprNamed { name, arg, .. } => {
+                    self.visit_expr(name)?;
                     self.visit_function_arg_expr(arg)?;
                 }
                 ast::FunctionArg::Unnamed(arg) => self.visit_function_arg_expr(arg)?,
@@ -422,12 +610,8 @@ trait Visitor<'ast, E: Error> {
     fn visit_function_arg_expr(&mut self, arg: &mut ast::FunctionArgExpr) -> Result<(), E> {
         match arg {
             ast::FunctionArgExpr::Expr(expr) => self.visit_expr(expr)?,
-            ast::FunctionArgExpr::QualifiedWildcard(name) => {
-                for ident in name.0.iter_mut() {
-                    self.visit_identifier(ident)?;
-                }
-            }
-            ast::FunctionArgExpr::Wildcard => (),
+            ast::FunctionArgExpr::QualifiedWildcard(name) => self.visit_object_name(name)?,
+            ast::FunctionArgExpr::Wildcard | ast::FunctionArgExpr::WildcardWithOptions(_) => (),
         };
 
         Ok(())
@@ -436,8 +620,8 @@ trait Visitor<'ast, E: Error> {
     fn visit_table_alias(&mut self, alias: &mut Option<ast::TableAlias>) -> Result<(), E> {
         if let Some(a) = alias {
             self.visit_identifier(&mut a.name)?;
-            for ident in a.columns.iter_mut() {
-                self.visit_identifier(ident)?;
+            for col in a.columns.iter_mut() {
+                self.visit_identifier(&mut col.name)?;
             }
         }
 
@@ -450,9 +634,7 @@ trait Visitor<'ast, E: Error> {
                 ConnectionError::from(ErrorResponse::error(
                     ErrorCode::SyntaxError,
                     format!(
-                        "Unable to extract position for placeholder, actual: {}, err: {}",
-                        name,
-                        err.to_string()
+                        "Unable to extract position for placeholder, actual: {name}, err: {err}"
                     ),
                 ))
             })?;
@@ -488,26 +670,17 @@ impl FoundParameter {
     }
 }
 
-impl Into<MysqlColumn> for FoundParameter {
-    fn into(self) -> MysqlColumn {
-        MysqlColumn {
-            table: String::new(),
-            column: "not implemented".to_owned(),
-            coltype: self.coltype.to_mysql(),
-            colflags: ColumnFlags::empty().to_mysql(),
-        }
-    }
-}
-
 #[derive(Debug)]
-pub struct PostgresStatementParamsFinder {
-    parameters: HashMap<String, FoundParameter>,
+pub struct PostgresStatementParamsFinder<'t> {
+    parameters: HashMap<usize, FoundParameter>,
+    types: &'t [u32],
 }
 
-impl PostgresStatementParamsFinder {
-    pub fn new() -> Self {
+impl<'t> PostgresStatementParamsFinder<'t> {
+    pub fn new(types: &'t [u32]) -> Self {
         Self {
             parameters: HashMap::new(),
+            types,
         }
     }
 
@@ -523,7 +696,7 @@ impl PostgresStatementParamsFinder {
     }
 }
 
-impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
+impl<'ast, 't> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder<'t> {
     fn visit_value(
         &mut self,
         v: &mut ast::Value,
@@ -533,44 +706,15 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
             Value::Placeholder(name) => {
                 let position = self.extract_placeholder_index(&name)?;
 
+                let coltype = self
+                    .types
+                    .get(position)
+                    .and_then(|pg_type_oid| PgTypeId::from_oid(*pg_type_oid))
+                    .and_then(|pg_type| ColumnType::from_pg_tid(pg_type).ok())
+                    .unwrap_or_else(|| pt.to_coltype());
+
                 self.parameters
-                    .insert(position.to_string(), FoundParameter::new(pt.to_coltype()));
-            }
-            _ => {}
-        };
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct MySQLStatementParamsFinder {
-    parameters: Vec<FoundParameter>,
-}
-
-impl MySQLStatementParamsFinder {
-    pub fn new() -> Self {
-        Self {
-            parameters: Vec::new(),
-        }
-    }
-
-    pub fn find(mut self, stmt: &ast::Statement) -> Result<Vec<FoundParameter>, ConnectionError> {
-        self.visit_statement(&mut stmt.clone())?;
-
-        Ok(self.parameters)
-    }
-}
-
-impl<'ast> Visitor<'ast, ConnectionError> for MySQLStatementParamsFinder {
-    fn visit_value(
-        &mut self,
-        v: &mut ast::Value,
-        pt: PlaceholderType,
-    ) -> Result<(), ConnectionError> {
-        match v {
-            Value::Placeholder(_) => {
-                self.parameters.push(FoundParameter::new(pt.to_coltype()));
+                    .insert(position, FoundParameter::new(coltype));
             }
             _ => {}
         };
@@ -629,77 +773,16 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsBinder {
                     BindValue::Float64(v) => {
                         *value = ast::Value::Number(v.to_string(), *v < 0_f64);
                     }
+                    BindValue::Timestamp(v) => {
+                        *value = ast::Value::SingleQuotedString(v.to_string());
+                    }
+                    BindValue::Date(v) => {
+                        *value = ast::Value::SingleQuotedString(v.to_string());
+                    }
                     BindValue::Null => {
                         *value = ast::Value::Null;
                     }
                 }
-            }
-            _ => {}
-        };
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct MysqlStatementParamsBinder {
-    values: Vec<BindValue>,
-    position: usize,
-}
-
-impl MysqlStatementParamsBinder {
-    pub fn new(values: Vec<BindValue>) -> Self {
-        Self {
-            values,
-            position: 0,
-        }
-    }
-
-    pub fn bind(mut self, stmt: &mut ast::Statement) -> Result<(), ConnectionError> {
-        self.visit_statement(stmt)
-    }
-}
-
-impl<'ast> Visitor<'ast, ConnectionError> for MysqlStatementParamsBinder {
-    fn visit_value(
-        &mut self,
-        value: &mut ast::Value,
-        placeholder_type: PlaceholderType,
-    ) -> Result<(), ConnectionError> {
-        match &value {
-            ast::Value::Placeholder(_) => {
-                let to_replace = self.values.get(self.position).ok_or({
-                    ConnectionError::from(ErrorResponse::error(
-                        ErrorCode::InternalError,
-                        format!(
-                            "Unable to find value for placeholder at position: {}",
-                            self.position
-                        ),
-                    ))
-                })?;
-                match to_replace {
-                    BindValue::String(v) => {
-                        // FIXME: this workaround is needed as we don't know types on Bind
-                        *value = match placeholder_type {
-                            PlaceholderType::String => ast::Value::SingleQuotedString(v.clone()),
-                            PlaceholderType::Number => ast::Value::Number(v.clone(), false),
-                        };
-                    }
-                    BindValue::Bool(v) => {
-                        *value = ast::Value::Boolean(*v);
-                    }
-                    BindValue::Int64(v) => {
-                        *value = ast::Value::Number(v.to_string(), *v < 0_i64);
-                    }
-                    BindValue::Float64(v) => {
-                        *value = ast::Value::Number(v.to_string(), *v < 0_f64);
-                    }
-                    BindValue::Null => {
-                        *value = ast::Value::Null;
-                    }
-                };
-
-                self.position += 1;
             }
             _ => {}
         };
@@ -716,8 +799,8 @@ impl StatementPlaceholderReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> Result<ast::Statement, ConnectionError> {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> Result<ast::Statement, ConnectionError> {
+        let mut result = stmt;
 
         self.visit_statement(&mut result)?;
 
@@ -732,6 +815,8 @@ impl<'ast> Visitor<'ast, ConnectionError> for StatementPlaceholderReplacer {
         placeholder_type: PlaceholderType,
     ) -> Result<(), ConnectionError> {
         match &value {
+            // NOTE: it does not do any harm if a numeric placeholder is replaced with a string,
+            // this will be handled with Bind anyway
             ast::Value::Placeholder(_) => {
                 *value = match placeholder_type {
                     PlaceholderType::String => {
@@ -755,8 +840,8 @@ impl CastReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -776,14 +861,20 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
         if let Expr::Cast {
             expr: cast_expr,
             data_type,
+            ..
         } = expr
         {
             match data_type {
-                ast::DataType::Custom(name) => match name.to_string().to_lowercase().as_str() {
+                ast::DataType::Custom(name, _) => match name.to_string().to_lowercase().as_str() {
                     "name" | "oid" | "information_schema.cardinal_number" | "regproc" => {
                         self.visit_expr(&mut *cast_expr)?;
 
                         *expr = *cast_expr.clone();
+                    }
+                    "xid" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::IntUnsigned(None);
                     }
                     "int2" => {
                         self.visit_expr(&mut *cast_expr)?;
@@ -803,7 +894,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                     "float8" => {
                         self.visit_expr(&mut *cast_expr)?;
 
-                        *data_type = ast::DataType::Double;
+                        *data_type = ast::DataType::Double(ast::ExactNumberInfo::None);
                     }
                     "bool" => {
                         self.visit_expr(&mut *cast_expr)?;
@@ -813,22 +904,104 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                     "timestamptz" => {
                         self.visit_expr(&mut *cast_expr)?;
 
-                        *data_type = ast::DataType::Timestamp
+                        *data_type = ast::DataType::Timestamp(None, ast::TimezoneInfo::None);
+                    }
+                    "regtype" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        if let Expr::Identifier(_) = &**cast_expr {
+                            *expr = Expr::Function(new_function(
+                                "format_type",
+                                vec![
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(*cast_expr.clone())),
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                                        Value::Null.into(),
+                                    ))),
+                                ],
+                            ))
+                        }
+                    }
+                    "\"char\"" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Text;
                     }
                     // TODO:
                     _ => (),
                 },
+                // Postgres `timestamptz` now parses as a built-in `Timestamp(_, Tz)`
+                // (not a `Custom` type as in sqlparser 0.16); drop the timezone so DataFusion
+                // casts to a plain timestamp.
+                ast::DataType::Timestamp(_, ast::TimezoneInfo::Tz) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::Timestamp(None, ast::TimezoneInfo::None);
+                }
+                ast::DataType::Bool => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::Boolean;
+                }
+                ast::DataType::Int2(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::SmallInt(None);
+                }
+                ast::DataType::Int4(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::Int(None);
+                }
+                ast::DataType::Int8(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::BigInt(None);
+                }
+                ast::DataType::Int2Unsigned(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::SmallIntUnsigned(None);
+                }
+                ast::DataType::Int4Unsigned(_) | ast::DataType::IntegerUnsigned(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::IntUnsigned(None);
+                }
+                ast::DataType::Int8Unsigned(_) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::BigIntUnsigned(None);
+                }
+                ast::DataType::Float8 => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::Double(ast::ExactNumberInfo::None);
+                }
+                ast::DataType::Numeric(info) => {
+                    let info = *info;
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::Decimal(info);
+                }
+                ast::DataType::CharacterVarying(len) => {
+                    let len = *len;
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    *data_type = ast::DataType::Varchar(len);
+                }
                 ast::DataType::Regclass => match &**cast_expr {
                     Expr::Value(val) => {
-                        let str_val = self.parse_value_to_str(&val);
-                        if str_val.is_none() {
+                        let str_val = self.parse_value_to_str(&val.value);
+                        let Some(str_val) = str_val else {
                             return Ok(());
-                        }
+                        };
+                        let str_val = str_val.strip_prefix("pg_catalog.").unwrap_or(&str_val);
 
-                        let str_val = str_val.unwrap();
                         for typ in PgType::get_all() {
                             if typ.typname == str_val {
-                                *expr = Expr::Value(Value::Number(typ.typrelid.to_string(), false));
+                                *expr = Expr::Value(
+                                    Value::Number(typ.typrelid.to_string(), false).into(),
+                                );
                                 return Ok(());
                             }
                         }
@@ -841,23 +1014,95 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                     _ => {
                         self.visit_expr(&mut *cast_expr)?;
 
-                        *expr = ast::Expr::Function(ast::Function {
-                            name: ast::ObjectName(vec![ast::Ident {
-                                value: "__cube_regclass_cast".to_string(),
-                                quote_style: None,
-                            }]),
-                            args: vec![ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                        *expr = ast::Expr::Function(new_function(
+                            "__cube_regclass_cast",
+                            vec![ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
                                 *cast_expr.clone(),
                             ))],
-                            over: None,
-                            distinct: false,
-                            special: false,
-                            approximate: false,
-                        })
+                        ))
                     }
                 },
                 _ => self.visit_expr(&mut *cast_expr)?,
             }
+        };
+
+        Ok(())
+    }
+}
+
+/// Normalizes a handful of expression nodes that sqlparser 0.62 introduced/renamed back into the
+/// shapes our DataFusion 7 fork understands:
+/// - `FLOOR(expr)` / `CEIL(expr)` are now dedicated `Expr::Floor` / `Expr::Ceil` nodes (they used
+///   to parse as ordinary function calls); convert the plain numeric form back to `floor(expr)` /
+///   `ceil(expr)` function calls.
+/// - the `^` operator now parses as `BinaryOperator::PGExp` instead of `BinaryOperator::BitwiseXor`;
+///   the fork maps `BitwiseXor` to exponentiation, so rewrite it back.
+#[derive(Debug)]
+pub struct SqlParser062Normalizer {}
+
+impl SqlParser062Normalizer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'a> Visitor<'a, ConnectionError> for SqlParser062Normalizer {
+    fn transform_expr(&mut self, expr: &mut Expr) -> Result<(), ConnectionError> {
+        match expr {
+            Expr::Floor {
+                expr: inner,
+                field: ast::CeilFloorKind::DateTimeField(ast::DateTimeField::NoDateTime),
+            } => {
+                *expr = Expr::Function(new_function(
+                    "floor",
+                    vec![FunctionArg::Unnamed(FunctionArgExpr::Expr(
+                        (**inner).clone(),
+                    ))],
+                ));
+            }
+            Expr::Ceil {
+                expr: inner,
+                field: ast::CeilFloorKind::DateTimeField(ast::DateTimeField::NoDateTime),
+            } => {
+                *expr = Expr::Function(new_function(
+                    "ceil",
+                    vec![FunctionArg::Unnamed(FunctionArgExpr::Expr(
+                        (**inner).clone(),
+                    ))],
+                ));
+            }
+            Expr::BinaryOp {
+                op: op @ ast::BinaryOperator::PGExp,
+                ..
+            } => {
+                *op = ast::BinaryOperator::BitwiseXor;
+            }
+            // `EXTRACT('YEAR' FROM ...)` parses the quoted field as `DateTimeField::Custom` keeping
+            // its quote style, so it stringifies as `'year'` and breaks date-part resolution. Drop
+            // the quotes to restore the bare `year` form expected downstream.
+            Expr::Extract {
+                field: ast::DateTimeField::Custom(ident),
+                ..
+            } => {
+                ident.quote_style = None;
+            }
+            // sqlparser 0.62 already unescapes `U&'..'` literals at tokenize time, but our
+            // DataFusion fork unescapes them a second time and rejects any literal backslash.
+            // Downgrade to a plain string literal carrying the already-decoded value.
+            Expr::Value(value) => {
+                if let Value::UnicodeStringLiteral(s) = &value.value {
+                    value.value = Value::SingleQuotedString(s.clone());
+                }
+            }
+            _ => {}
         };
 
         Ok(())
@@ -872,8 +1117,8 @@ impl RedshiftDatePartReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -883,36 +1128,35 @@ impl RedshiftDatePartReplacer {
 
 impl<'ast> Visitor<'ast, ConnectionError> for RedshiftDatePartReplacer {
     fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
-        for res in fun.name.0.iter_mut() {
-            self.visit_identifier(res)?;
-        }
+        self.visit_object_name(&mut fun.name)?;
         let fn_name = fun.name.to_string().to_lowercase();
-        if (fn_name == "datediff" || fn_name == "dateadd") && fun.args.len() == 3 {
-            if let ast::FunctionArg::Unnamed(arg) = &mut fun.args[0] {
-                if let FunctionArgExpr::Expr(arg) = arg {
-                    if let Expr::Identifier(ident) = arg {
-                        let granularity_in_identifier = ident.value.to_lowercase();
-                        match granularity_in_identifier.as_str() {
-                            "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
-                            | "year" => {
-                                *arg = Expr::Value(Value::SingleQuotedString(
-                                    granularity_in_identifier,
-                                ));
+        if fn_name == "datediff" || fn_name == "dateadd" {
+            if let FunctionArguments::List(list) = &mut fun.args {
+                if list.args.len() == 3 {
+                    if let ast::FunctionArg::Unnamed(FunctionArgExpr::Expr(
+                        arg @ Expr::Identifier(_),
+                    )) = &mut list.args[0]
+                    {
+                        if let Expr::Identifier(ident) = &*arg {
+                            let granularity_in_identifier = ident.value.to_lowercase();
+                            match granularity_in_identifier.as_str() {
+                                "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
+                                | "year" => {
+                                    *arg = Expr::Value(
+                                        Value::SingleQuotedString(granularity_in_identifier).into(),
+                                    );
+                                }
+                                _ => {}
                             }
-                            _ => {}
                         }
                     }
                 }
             }
         }
-        self.visit_function_args(&mut fun.args)?;
-        if let Some(over) = &mut fun.over {
-            for res in over.partition_by.iter_mut() {
-                self.visit_expr(res)?;
-            }
-            for order_expr in over.order_by.iter_mut() {
-                self.visit_expr(&mut order_expr.expr)?;
-            }
+
+        self.visit_function_arguments(&mut fun.args)?;
+        if let Some(ast::WindowType::WindowSpec(spec)) = &mut fun.over {
+            self.visit_window_spec(spec)?;
         }
 
         Ok(())
@@ -928,8 +1172,8 @@ impl ToTimestampReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -955,8 +1199,8 @@ impl UdfWildcardArgReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -995,13 +1239,13 @@ impl UdfWildcardArgReplacer {
             .iter()
             .map(|(index, column)| match &args[*index] {
                 ast::FunctionArg::Unnamed(ast::FunctionArgExpr::QualifiedWildcard(
-                    ast::ObjectName(idents),
+                    ast::ObjectName(parts),
                 )) => {
-                    let mut new_idents = idents.clone();
-                    new_idents.push(ast::Ident {
-                        value: column.to_string(),
-                        quote_style: None,
-                    });
+                    let mut new_idents = parts
+                        .iter()
+                        .map(|part| part.as_ident().cloned())
+                        .collect::<Option<Vec<ast::Ident>>>()?;
+                    new_idents.push(ast::Ident::new(column.to_string()));
                     let new_arg = ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
                         ast::Expr::CompoundIdentifier(new_idents),
                     ));
@@ -1017,20 +1261,15 @@ impl UdfWildcardArgReplacer {
 
 impl<'a> Visitor<'a, ConnectionError> for UdfWildcardArgReplacer {
     fn visit_function(&mut self, fun: &mut ast::Function) -> Result<(), ConnectionError> {
-        if let Some(new_args) = self.get_new_args_for_fn(&fun.name.to_string(), &fun.args) {
-            fun.args = new_args
-        }
-        for res in fun.name.0.iter_mut() {
-            self.visit_identifier(res)?;
-        }
-        self.visit_function_args(&mut fun.args)?;
-        if let Some(over) = &mut fun.over {
-            for res in over.partition_by.iter_mut() {
-                self.visit_expr(res)?;
+        if let FunctionArguments::List(list) = &mut fun.args {
+            if let Some(new_args) = self.get_new_args_for_fn(&fun.name.to_string(), &list.args) {
+                list.args = new_args
             }
-            for order_expr in over.order_by.iter_mut() {
-                self.visit_expr(&mut order_expr.expr)?;
-            }
+        }
+        self.visit_object_name(&mut fun.name)?;
+        self.visit_function_arguments(&mut fun.args)?;
+        if let Some(ast::WindowType::WindowSpec(spec)) = &mut fun.over {
+            self.visit_window_spec(spec)?;
         }
 
         Ok(())
@@ -1044,8 +1283,8 @@ impl ApproximateCountDistinctVisitor {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1055,10 +1294,19 @@ impl ApproximateCountDistinctVisitor {
 
 impl<'a> Visitor<'a, ConnectionError> for ApproximateCountDistinctVisitor {
     fn visit_function(&mut self, fun: &mut ast::Function) -> Result<(), ConnectionError> {
-        if fun.approximate && fun.distinct && &fun.name.to_string().to_uppercase() == "COUNT" {
-            fun.name = ast::ObjectName(vec![ast::Ident::new("APPROX_DISTINCT")]);
+        let is_distinct = matches!(
+            &fun.args,
+            FunctionArguments::List(FunctionArgumentList {
+                duplicate_treatment: Some(ast::DuplicateTreatment::Distinct),
+                ..
+            })
+        );
+        if fun.approximate && is_distinct && &fun.name.to_string().to_uppercase() == "COUNT" {
+            fun.name = ObjectName::from(vec![ast::Ident::new("APPROX_DISTINCT")]);
             fun.approximate = false;
-            fun.distinct = false;
+            if let FunctionArguments::List(list) = &mut fun.args {
+                list.duplicate_treatment = None;
+            }
         }
 
         Ok(())
@@ -1073,8 +1321,8 @@ impl SensitiveDataSanitizer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1092,7 +1340,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
             ast::Value::SingleQuotedString(str)
             | ast::Value::DoubleQuotedString(str)
             | ast::Value::NationalStringLiteral(str) => {
-                if vec!["false", "true"].contains(&str.as_str()) || str.len() < 4 {
+                if ["false", "true"].contains(&str.as_str()) || str.len() < 4 {
                     return Ok(());
                 }
                 *str = "[REPLACED]".to_string();
@@ -1107,14 +1355,18 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compile::parser::MySqlDialectWithBackTicks, CubeError};
+    use crate::CubeError;
+    use pg_srv::{DateValue, TimestampValue};
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let replacer = CastReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmt);
 
         assert_eq!(res.to_string(), output);
 
@@ -1126,13 +1378,26 @@ mod tests {
         run_cast_replacer("SELECT 'pg_class'::regclass", "SELECT 1259")?;
         run_cast_replacer("SELECT 'pg_class'::regclass::oid", "SELECT 1259")?;
         run_cast_replacer("SELECT 64::information_schema.cardinal_number", "SELECT 64")?;
-        run_cast_replacer(
-            "SELECT NOW()::timestamptz",
-            "SELECT CAST(NOW() AS TIMESTAMP)",
-        )?;
+        run_cast_replacer("SELECT NOW()::timestamptz", "SELECT NOW()::TIMESTAMP")?;
         run_cast_replacer(
             "SELECT CAST(1 + 1 as Regclass);",
             "SELECT __cube_regclass_cast(1 + 1)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INTEGER UNSIGNED)",
+            "SELECT CAST(1 AS INT UNSIGNED)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INT4 UNSIGNED)",
+            "SELECT CAST(1 AS INT UNSIGNED)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INT2 UNSIGNED)",
+            "SELECT CAST(1 AS SMALLINT UNSIGNED)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 as INT8 UNSIGNED)",
+            "SELECT CAST(1 AS BIGINT UNSIGNED)",
         )?;
 
         Ok(())
@@ -1142,7 +1407,7 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let replacer = RedshiftDatePartReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmts[0].clone());
 
         assert_eq!(res.to_string(), output);
 
@@ -1174,10 +1439,13 @@ mod tests {
         output: &str,
         values: Vec<BindValue>,
     ) -> Result<(), ConnectionError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = PostgresStatementParamsBinder::new(values);
-        let mut res = stmts[0].clone();
+        let mut res = stmt;
         binder.bind(&mut res)?;
 
         assert_eq!(res.to_string(), output);
@@ -1283,6 +1551,26 @@ mod tests {
             vec![BindValue::String("test1".to_string())],
         )?;
 
+        // test TimestampValue binding in the WHERE clause
+        run_pg_binder(
+            "SELECT * FROM events WHERE created_at BETWEEN $1 AND $2",
+            "SELECT * FROM events WHERE created_at BETWEEN '2022-04-25T12:38:42.000' AND '2025-08-08T09:30:45.123'",
+            vec![
+                BindValue::Timestamp(TimestampValue::new(1650890322000000000, None)),
+                BindValue::Timestamp(TimestampValue::new(1754645445123456000, None)),
+            ],
+        )?;
+
+        // test DateValue binding in the WHERE clause
+        run_pg_binder(
+            "SELECT * FROM orders WHERE order_date >= $1 AND order_date <= $2",
+            "SELECT * FROM orders WHERE order_date >= '1999-12-31' AND order_date <= '2000-01-01'",
+            vec![
+                BindValue::Date(DateValue::from_ymd_opt(1999, 12, 31).unwrap()),
+                BindValue::Date(DateValue::from_ymd_opt(2000, 1, 1).unwrap()),
+            ],
+        )?;
+
         Ok(())
     }
 
@@ -1292,7 +1580,7 @@ mod tests {
     ) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
-        let finder = PostgresStatementParamsFinder::new();
+        let finder = PostgresStatementParamsFinder::new(&[]);
         let result = finder.find(&stmts[0]).unwrap();
 
         assert_eq!(result, expected);
@@ -1337,35 +1625,27 @@ mod tests {
             ],
         )?;
 
-        Ok(())
-    }
+        assert_pg_params_finder(
+            "SELECT 1 OFFSET $1",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
-    fn assert_mysql_params_finder(
-        input: &str,
-        expected: Vec<FoundParameter>,
-    ) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&MySqlDialectWithBackTicks {}, &input).unwrap();
-
-        let finder = MySQLStatementParamsFinder::new();
-        let result = finder.find(&stmts[0]).unwrap();
-
-        assert_eq!(result, expected);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_mysql_placeholder_find() -> Result<(), CubeError> {
-        assert_mysql_params_finder("SELECT ?", vec![FoundParameter::new(ColumnType::String)])?;
+        assert_pg_params_finder(
+            "SELECT 1 FETCH FIRST $1 ROWS ONLY",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
         Ok(())
     }
 
     fn assert_placeholder_replacer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = StatementPlaceholderReplacer::new();
-        let result = binder.replace(&stmts[0]).unwrap();
+        let result = binder.replace(stmt).unwrap();
 
         assert_eq!(result.to_string(), output);
 
@@ -1374,17 +1654,25 @@ mod tests {
 
     #[test]
     fn test_placeholder_replacer() -> Result<(), CubeError> {
-        assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
-        assert_placeholder_replacer("SELECT 1 LIMIT ?", "SELECT 1 LIMIT 1")?;
+        assert_placeholder_replacer("SELECT $1", "SELECT 'replaced_placeholder'")?;
+        assert_placeholder_replacer("SELECT 1 LIMIT $1", "SELECT 1 LIMIT 1")?;
+        assert_placeholder_replacer("SELECT 1 OFFSET $1", "SELECT 1 OFFSET 1")?;
+        assert_placeholder_replacer(
+            "SELECT 1 FETCH FIRST $1 ROWS ONLY",
+            "SELECT 1 FETCH FIRST 1 ROWS ONLY",
+        )?;
 
         Ok(())
     }
 
     fn assert_sensitive_data_sanitizer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = SensitiveDataSanitizer::new();
-        let result = binder.replace(&stmts[0]);
+        let result = binder.replace(stmt);
 
         assert_eq!(result.to_string(), output);
 

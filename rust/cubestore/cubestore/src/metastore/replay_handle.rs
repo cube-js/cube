@@ -1,6 +1,6 @@
 use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::metastore::table::Table;
-use crate::metastore::IdRow;
+use crate::metastore::{IdRow, RocksEntity};
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
@@ -19,6 +19,8 @@ pub struct ReplayHandle {
     has_failed_to_persist_chunks: bool
 }
 }
+
+impl RocksEntity for ReplayHandle {}
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct SeqPointer {
@@ -201,7 +203,7 @@ pub fn seq_pointer_for_location<'a>(
         ))
     })?;
     if locations.len() != seq_pointers_by_location.len() {
-        return Err(CubeError::internal(format!(
+        return Err(CubeError::corrupt_data(format!(
             "Location array size mismatch during accessing seq pointers: {:?} and {:?}",
             table.get_row().locations(),
             seq_pointers_by_location
@@ -209,6 +211,25 @@ pub fn seq_pointer_for_location<'a>(
     }
     let pos = location_position(table, location)?;
     Ok(&seq_pointers_by_location[pos])
+}
+
+pub fn validate_seq_pointers_by_location(
+    table: &IdRow<Table>,
+    seq_pointers_by_location: &Option<Vec<Option<SeqPointer>>>,
+) -> Result<(), CubeError> {
+    if let Some(seq_pointers) = seq_pointers_by_location {
+        let locations_len = table.get_row().locations().map(|l| l.len()).unwrap_or(0);
+        if locations_len != seq_pointers.len() {
+            return Err(CubeError::internal(format!(
+                "Refusing to persist replay handle for table {}: {} locations but {} seq pointers: {:?}",
+                table.get_id(),
+                locations_len,
+                seq_pointers.len(),
+                seq_pointers
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub fn location_position(table: &IdRow<Table>, location: &str) -> Result<usize, CubeError> {
@@ -361,5 +382,58 @@ impl RocksSecondaryIndex<ReplayHandle, ReplayHandleIndexKey> for ReplayHandleRoc
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn table_with_locations(count: usize) -> IdRow<Table> {
+        let locations = (0..count).map(|i| format!("loc-{}", i)).collect::<Vec<_>>();
+        IdRow::new(
+            1,
+            Table::new(
+                "t".to_string(),
+                1,
+                Vec::new(),
+                Some(locations),
+                None,
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                None,
+                None,
+                None,
+            ),
+        )
+    }
+
+    fn pointers(count: usize) -> Option<Vec<Option<SeqPointer>>> {
+        Some(vec![Some(SeqPointer::new(Some(0), Some(1))); count])
+    }
+
+    #[test]
+    fn validate_matching_length_ok() {
+        let table = table_with_locations(3);
+        assert!(validate_seq_pointers_by_location(&table, &pointers(3)).is_ok());
+    }
+
+    #[test]
+    fn validate_mismatching_length_err() {
+        let table = table_with_locations(3);
+        assert!(validate_seq_pointers_by_location(&table, &pointers(6)).is_err());
+        assert!(validate_seq_pointers_by_location(&table, &pointers(2)).is_err());
+    }
+
+    #[test]
+    fn validate_none_pointers_ok() {
+        let table = table_with_locations(3);
+        assert!(validate_seq_pointers_by_location(&table, &None).is_ok());
     }
 }

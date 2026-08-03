@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT (11.0::double precision)::text AS eleven;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------+
+| eleven |
++--------+
+| 11     |
++--------+

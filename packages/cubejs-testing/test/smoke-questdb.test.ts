@@ -1,16 +1,22 @@
 import { StartedTestContainer } from 'testcontainers';
 import { QuestDBRunner } from '@cubejs-backend/testing-shared';
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import {
+  DEFAULT_API_TOKEN,
+  DEFAULT_CONFIG,
+  JEST_AFTER_ALL_DEFAULT_TIMEOUT,
+  JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  testQueryMeasure,
+} from './smoke-tests';
 
 describe('questdb', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
 
   beforeAll(async () => {
     db = await QuestDBRunner.startContainer({});
@@ -31,15 +37,15 @@ describe('questdb', () => {
         schemaDir: 'questdb/schema',
       }
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
     await birdbox.stop();
     await db.stop();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query measure', () => testQueryMeasure(client));
 

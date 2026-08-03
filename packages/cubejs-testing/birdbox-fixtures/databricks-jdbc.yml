@@ -7,11 +7,6 @@ services:
     environment:
       CUBEJS_DB_TYPE: databricks-jdbc
 
-      # from env
-      CUBEJS_DB_BQ_PROJECT_ID: ${CUBEJS_DB_BQ_PROJECT_ID}
-      CUBEJS_DB_BQ_CREDENTIALS: ${CUBEJS_DB_BQ_CREDENTIALS}
-      CUBEJS_DB_EXPORT_BUCKET: ${CUBEJS_DB_EXPORT_BUCKET}
-
       # from test
       CUBEJS_SCHEDULED_REFRESH_DEFAULT: ${CUBEJS_SCHEDULED_REFRESH_DEFAULT}
       CUBEJS_REFRESH_WORKER: ${CUBEJS_REFRESH_WORKER}
@@ -22,6 +17,7 @@ services:
       # defaults
       CUBEJS_DEV_MODE: "true"
       CUBEJS_API_SECRET: mysupersecret
+      CUBEJS_SCHEMA_PATH: schema
     volumes:
       - ./databricks-jdbc/cube.js:/cube/conf/cube.js
     ports:

@@ -1,0 +1,144 @@
+---
+title: Setting up Google Private Service Connect
+sidebarTitle: Private Service Connect
+description: How to publish a Service Attachment and coordinate Private Service Connect so Cube's Dedicated Infrastructure reaches your VPC privately.
+---
+
+<Note>
+
+This page covers **backend connectivity** — Cube reaching into your network to
+query data sources, auth providers, BI APIs targeted by Semantic Layer Sync,
+and other upstream services. See
+[Backend and frontend connectivity][backend-frontend] for the full picture.
+For **frontend connectivity** (exposing Cube's APIs to your applications,
+browsers, BI tools, and embedded analytics clients), see
+[Private API Connectivity on AWS][aws-private-api-connectivity]; the
+equivalent pattern is available on GCP on request.
+
+</Note>
+
+[Private Service Connect][gcp-docs-psc] (PSC) provides private connectivity
+between VPC networks in different projects or organizations, without VPC
+peering or exposing your traffic to the public internet. To set up a PSC
+connection between Cube's Dedicated Infrastructure and your own VPC, you'll
+need to publish a Service Attachment, share its details with the Cube team,
+and approve the incoming connection request.
+
+<Note>
+
+**Dedicated Infrastructure vs. Bring Your Own Cloud.** The flow described on
+this page — sharing service details with the Cube team and letting Cube create
+the PSC endpoint and DNS overrides — applies to
+[Dedicated Infrastructure][cube-region] operated by Cube.
+
+In a [Bring Your Own Cloud (BYOC)][gcp-byoc] deployment, the Cube VPC lives in
+**your own GCP project**, so you own the networking. The service account
+granted to the Cube Operator does not include Cloud DNS admin permissions,
+which means Cube cannot create the PSC endpoint or the private DNS zone needed
+for the hostname override on your behalf. In BYOC, create the PSC endpoint in
+the Cube VPC against the provider's Service Attachment yourself, then create a
+Cloud DNS private zone for the TLS hostname and attach it to the Cube VPC.
+
+</Note>
+
+## Preparing the Service Attachment
+
+There are two common scenarios for preparing the Service Attachment:
+
+- Connecting to a service in your GCP infrastructure
+- Connecting to a service provided by a third party such as Snowflake,
+  Databricks, Confluent Cloud, etc.
+
+In the case of your own infrastructure, follow the
+[official GCP documentation][gcp-docs-publish-service] to publish a Service
+Attachment that points at an
+[internal passthrough or proxy Network Load Balancer][gcp-docs-internal-lb]
+in front of your data source.
+
+If your data source is hosted in a third-party infrastructure, follow the
+vendor's documentation for creating and managing a Service Attachment.
+
+## Allowing the Cube consumer project
+
+PSC service attachments can restrict which consumer projects are allowed to
+create a PSC endpoint against them. Cube's PSC consumer project is
+`cube-cloud-dedicated`.
+
+In the GCP Console, go to **Network services → Private Service Connect →
+Published services → \<your service\>** and add `cube-cloud-dedicated` to
+**Accepted projects**. For faster connection establishment, you can also
+add the same project to the **auto-accept** list so the connection is
+approved automatically when Cube initiates it.
+
+<Info>
+
+`cube-cloud-dedicated` is the GCP project Cube uses to host Dedicated
+Infrastructure PSC endpoints. Adding it to your accepted-projects list
+authorizes Cube to create a private endpoint against your Service
+Attachment; nothing else in Cube's GCP estate gains access to your network.
+
+</Info>
+
+## Gathering required information
+
+To request establishing a PSC connection, please share the following
+information with the Cube team:
+
+- **Service Attachment URI** (such as
+  `projects/<your-project>/regions/<region>/serviceAttachments/<name>`)
+- **Reference Name** for the record (such as "Snowflake-prod" or
+  "clickhouse-dev")
+- **Ports**: a list of ports that will be accessed through this connection
+- **DNS Name(s)**: see [DNS and TLS](#dns-and-tls) below
+- **Cube Region:** PSC requires Cube to be hosted on
+  [Dedicated Infrastructure][cube-region]. Specify which Cube Region should
+  host your Dedicated Infrastructure.
+
+## DNS and TLS
+
+How your data source is addressed inside Cube depends on whether it speaks
+TLS:
+
+- **If the service uses TLS** (HTTPS, JDBC `sslmode=require`, etc.), share
+  the **DNS name(s)** the certificate is issued for — typically the same
+  hostname your in-network clients already use to reach it. Cube creates
+  internal DNS overrides inside the Dedicated Infrastructure so that the
+  same hostname resolves to the PSC endpoint. Keeping the original hostname
+  is what preserves TLS validity: the certificate's CN/SAN keeps matching
+  what Cube dials.
+- **If the service does not use TLS** and you don't supply a DNS name, the
+  Cube team will share back an internal endpoint hostname that you can
+  configure as the upstream when you wire the connection into Cube.
+
+## Accepting the connection
+
+The approval flow depends on how your Service Attachment is configured:
+
+- **Manual acceptance.** Cube will notify you once the connection request
+  has been sent. Approve it in the GCP Console under **Network services →
+  Private Service Connect → Published services → \<your service\> →
+  Connected endpoints**, then select the pending connection and click
+  **Accept**.
+- **Auto-accept.** If you added `cube-cloud-dedicated` to the auto-accept
+  list, the connection is approved automatically upon creation and no
+  further action is required.
+
+## Using the connection
+
+Once the connection is established, you can access your data source by
+addressing it via the DNS name(s) you supplied (TLS case) or the internal
+endpoint hostname returned to you by the Cube team (non-TLS case).
+
+## Supported Regions
+
+Private Service Connect is available in all GCP commercial regions where
+Dedicated Infrastructure can be provisioned. GCP regions in mainland China
+(serviced by partner providers) are not supported.
+
+[gcp-docs-psc]: https://cloud.google.com/vpc/docs/private-service-connect
+[gcp-docs-publish-service]: https://cloud.google.com/vpc/docs/configure-private-service-connect-producer
+[gcp-docs-internal-lb]: https://cloud.google.com/load-balancing/docs/internal
+[cube-region]: /admin/deployment/infrastructure#understanding-cube-cloud-region
+[gcp-byoc]: /admin/deployment/dedicated/gcp/byoc
+[aws-private-api-connectivity]: /admin/deployment/dedicated/aws/private-api-connectivity
+[backend-frontend]: /admin/deployment/dedicated#backend-and-frontend-connectivity

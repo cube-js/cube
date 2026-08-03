@@ -25,7 +25,7 @@ export default function Base64Upload({ onInput, ...props }) {
           JSON.parse(fileContent);
 
           base64text = btoa(fileContent);
-        } catch (e) {
+        } catch (e: any) {
           setError('Invalid JSON file');
 
           console.error(e);

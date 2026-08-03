@@ -1,13 +1,11 @@
 <p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube.js" width="300px"></a></p>
 
-[Website](https://cube.dev) • [Docs](https://cube.dev/docs) •
-[Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
+[Website](https://cube.dev) • [Docs](https://docs.cube.dev) •
+[Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
 # Supported tags and respective `Dockerfile` links
 
 Debian based: `<version>`, `latest`, `dev`
-
-Alpine based: `alpine`, `<version>-alpine`
 
 # Quick reference
 
@@ -26,7 +24,7 @@ Supported architectures: `amd64`
 Need the documentation? Check out the [Cube.js documentation
 website][link-cubejs-docs].
 
-[link-cubejs-docs]: https://cube.dev/docs
+[link-cubejs-docs]: https://docs.cube.dev
 
 # What is Cube.js?
 
@@ -65,7 +63,7 @@ The Cube.js Developer Playground will be available at `http://localhost:4000`.
 For more information about supported environment variables, please consult the
 documentation for [Environment Variables][link-cubejs-env-vars].
 
-[link-cubejs-env-vars]: https://cube.dev/docs/reference/environment-variables
+[link-cubejs-env-vars]: https://docs.cube.dev/reference/configuration/environment-variables
 
 ### Using Docker Compose
 

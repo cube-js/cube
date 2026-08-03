@@ -5,7 +5,10 @@ import {
   retryWithTimeout,
   withTimeout,
   withTimeoutRace,
-  asyncMemoize, asyncRetry, asyncDebounce, asyncMemoizeBackground,
+  asyncMemoize,
+  asyncRetry,
+  asyncDebounceFn,
+  asyncMemoizeBackground,
 } from '../src';
 
 test('createCancelablePromise', async () => {
@@ -224,7 +227,7 @@ test('withTimeoutRace(timeout)', async () => {
     );
 
     throw new Error('Unexpected');
-  } catch (e) {
+  } catch (e: any) {
     expect(e.message).toEqual('Timeout reached after 250ms');
   }
 
@@ -442,7 +445,7 @@ describe('asyncRetry', () => {
       );
 
       throw new Error('should throw exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('test');
       expect(called).toEqual(3);
     }
@@ -453,7 +456,7 @@ describe('asyncDebounce', () => {
   test('multiple async calls to single', async () => {
     let called = 0;
 
-    const doOnce = asyncDebounce(
+    const doOnce = asyncDebounceFn(
       async (arg1: string, arg2: string) => {
         called++;
 
@@ -485,7 +488,7 @@ describe('asyncDebounce', () => {
 
 describe('asyncMemoizeBackground', () => {
   beforeEach(() => {
-    jest.useFakeTimers('legacy');
+    jest.useFakeTimers();
   });
 
   afterEach(() => {
@@ -494,7 +497,7 @@ describe('asyncMemoizeBackground', () => {
 
   // Wait for promises running in the non-async timer callback to complete.
   // From https://stackoverflow.com/a/58716087/308237
-  const flushPromises = () => new Promise(resolve => setImmediate(resolve));
+  const flushPromises = () => new Promise(jest.requireActual('timers').setImmediate);
 
   test('asyncMemoizeBackground cache', async () => {
     let called = 0;

@@ -1,0 +1,14 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT generate_subscripts(r.a, 1, true) FROM (SELECT ARRAY[1,2,3] as a UNION ALL SELECT ARRAY[3,4,5]) as r;\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------------------------------+
+| generate_subscripts(r.a,Int64(1),Boolean(true)) |
++-------------------------------------------------+
+| 3                                               |
+| 2                                               |
+| 1                                               |
+| 3                                               |
+| 2                                               |
+| 1                                               |
++-------------------------------------------------+

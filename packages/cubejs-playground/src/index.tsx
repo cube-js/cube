@@ -4,13 +4,13 @@ import { createHashHistory } from 'history';
 
 import App from './App';
 import { page } from './events';
-import { TemplateGalleryPage } from './pages';
 import {
   ExplorePage,
-  DashboardPage,
   ConnectionWizardPage,
   SchemaPage,
   IndexPage,
+  CubeBiPage,
+  FrontendIntegrationsPage,
 } from './pages';
 import { SecurityContextProvider } from './components/SecurityContext/SecurityContextProvider';
 import { AppContextProvider } from './components/AppContext';
@@ -26,7 +26,7 @@ async function onTokenPayloadChange(payload: Record<string, any>, token) {
     return token;
   }
 
-  const response = await fetch('/playground/token', {
+  const response = await fetch('playground/token', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
@@ -74,11 +74,15 @@ ReactDOM.render(
           path="/connection"
           component={() => <ConnectionWizardPage history={history} />}
         />
-        <Route key="dashboard" path="/dashboard" component={DashboardPage} />
         <Route
-          key="template-gallery"
-          path="/template-gallery"
-          component={TemplateGalleryPage}
+          key="cube-bi"
+          path="/cube-bi"
+          component={CubeBiPage}
+        />
+        <Route
+          key="frontend-integrations"
+          path="/frontend-integrations"
+          component={FrontendIntegrationsPage}
         />
       </App>
     </AppContextProvider>

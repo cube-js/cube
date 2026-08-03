@@ -1,0 +1,12 @@
+views:
+  - name: users_with_links
+    cubes:
+      - join_path: users
+        includes:
+          - full_name
+          - city
+
+  - name: users_all
+    cubes:
+      - join_path: users
+        includes: "*"

@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/crate-driver",
   "description": "Cube.js Crate database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.33",
+  "version": "1.7.16",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-crate-driver"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/src",
@@ -24,23 +24,26 @@
     "test": "yarn integration",
     "integration": "npm run integration:crate",
     "integration:crate": "jest --verbose dist/test",
+    "unit": "jest --forceExit --verbose dist/test/CrateDriver.unit.test.js",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/postgres-driver": "^0.31.33",
-    "@cubejs-backend/shared": "^0.31.33",
-    "pg": "^8.7.1"
+    "@cubejs-backend/postgres-driver": "1.7.16",
+    "@cubejs-backend/shared": "1.7.16"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.31.0",
-    "@cubejs-backend/testing-shared": "^0.31.33",
-    "testcontainers": "^8.12",
-    "typescript": "~4.1.5"
+    "@cubejs-backend/linter": "1.7.16",
+    "@cubejs-backend/testing-shared": "1.7.16",
+    "testcontainers": "^10.28.0",
+    "typescript": "~5.2.2"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "jest": {
+    "testEnvironment": "node"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

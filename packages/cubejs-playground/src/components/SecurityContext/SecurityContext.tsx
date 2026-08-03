@@ -81,7 +81,7 @@ export function SecurityContext() {
     try {
       JSON.parse(value);
       setIsJsonValid(true);
-    } catch (error) {
+    } catch (error: any) {
       setIsJsonValid(false);
     }
   }
@@ -100,7 +100,7 @@ export function SecurityContext() {
         await saveToken(
           await onTokenPayloadChange(JSON.parse(tmpPayload || '{}'), null)
         );
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
       }
 
@@ -226,7 +226,7 @@ export function SecurityContext() {
 
           <Text type="secondary">
             Learn more about Security Context in{' '}
-            <Link href="https://cube.dev/docs/security/context" target="_blank">
+            <Link href="https://cube.dev/embedding/authentication/security-context" target="_blank">
               docs
             </Link>
           </Text>

@@ -1,9 +1,28 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
 import crypto from 'crypto';
+import { LRUCache } from 'lru-cache';
 
 import { Optional } from './type-helpers';
 
-type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
+export type PromiseLock = {
+  promise: Promise<void>,
+  resolve: () => void,
+};
+
+export function createPromiseLock(): PromiseLock {
+  let resolve: any = null;
+
+  return {
+    promise: new Promise<void>((resolver) => {
+      resolve = resolver;
+    }),
+    resolve: () => {
+      resolve();
+    }
+  };
+}
+
+export type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
 
 export interface CancelablePromise<T> extends Promise<T> {
   cancel: CancelablePromiseCancel;
@@ -104,7 +123,7 @@ export interface CancelableIntervalOptions {
 }
 
 /**
- * It's helps to create an interval that can be canceled with awaiting latest execution
+ * It helps to create an interval that can be canceled with awaiting latest execution
  */
 export function createCancelableInterval<T>(
   fn: (token: CancelToken) => Promise<T>,
@@ -115,7 +134,7 @@ export function createCancelableInterval<T>(
   let intervalId: number = 0;
   let duplicatedExecutionTracked: boolean = false;
 
-  const timeout = setInterval(
+  const timerId = setInterval(
     async () => {
       if (execution) {
         if (options.onDuplicatedExecution) {
@@ -152,7 +171,7 @@ export function createCancelableInterval<T>(
 
   return {
     cancel: async (waitExecution: boolean = true) => {
-      clearInterval(timeout);
+      clearInterval(timerId);
 
       if (execution) {
         await execution.cancel(waitExecution);
@@ -246,28 +265,35 @@ export const retryWithTimeout = <T>(
     timeout
   );
 
-/**
- * High order function that makes to debounce multi async calls to single call at one time
- */
-export const asyncDebounce = <Ret, Arguments>(
+export type AsyncDebounceOptions = {
+  max?: number;
+  ttl?: number;
+};
+
+export const asyncDebounceFn = <Ret, Arguments>(
   fn: (...args: Arguments[]) => Promise<Ret>,
+  options: AsyncDebounceOptions = {}
 ) => {
-  const cache = new Map<string, Promise<Ret>>();
+  const { max = 100, ttl = 60 * 1000 } = options;
+
+  const cache = new LRUCache<string, Promise<Ret>>({
+    max,
+    ttl,
+  });
 
   return async (...args: Arguments[]) => {
     const key = crypto.createHash('md5')
       .update(args.map((v) => JSON.stringify(v)).join(','))
       .digest('hex');
 
-    if (cache.has(key)) {
-      return <Promise<Ret>>cache.get(key);
+    const existing = cache.get(key);
+    if (existing) {
+      return existing;
     }
 
     try {
       const promise = fn(...args);
-
       cache.set(key, promise);
-
       return await promise;
     } finally {
       cache.delete(key);
@@ -291,7 +317,7 @@ export const asyncMemoize = <Ret, Arguments>(
 ) => {
   const cache = new Map<string, MemoizeBucket<Ret>>();
 
-  const debouncedFn = asyncDebounce(fn);
+  const debouncedFn = asyncDebounceFn(fn);
 
   const call = async (...args: Arguments[]) => {
     const key = options.extractKey(...args);
@@ -354,7 +380,7 @@ export const asyncMemoizeBackground = <Ret, Arguments>(
 ) => {
   const cache = new Map<string, BackgroundMemoizeBucket<Ret, Arguments>>();
 
-  const debouncedFn = asyncDebounce(fn);
+  const debouncedFn = asyncDebounceFn(fn);
 
   const refreshBucket = async (bucket: BackgroundMemoizeBucket<Ret, Arguments>) => {
     try {
@@ -362,7 +388,7 @@ export const asyncMemoizeBackground = <Ret, Arguments>(
 
       bucket.item = item;
       bucket.lifetime = Date.now() + options.extractCacheLifetime(item);
-    } catch (e) {
+    } catch (e: any) {
       options.onBackgroundException(e);
     }
   };

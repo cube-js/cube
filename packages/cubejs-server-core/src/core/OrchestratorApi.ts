@@ -1,26 +1,27 @@
 /* eslint-disable no-throw-literal */
+import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
-  QueryOrchestrator,
   ContinueWaitError,
   DriverFactoryByDataSource,
   DriverType,
-  QueryOrchestratorOptions,
   QueryBody,
+  QueryOrchestrator,
+  QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
+import { DatabaseType, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
-  contextToDbType: DbTypeAsyncFn;
-  contextToExternalDbType: ExternalDbTypeFn;
+  contextToDbType: (dataSource: string) => Promise<DatabaseType>;
+  contextToExternalDbType: () => DatabaseType;
   redisPrefix?: string;
 }
 
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
-  protected readonly orchestrator: QueryOrchestrator;
+  protected orchestrator: QueryOrchestrator;
 
   protected readonly continueWaitTimeout: number;
 
@@ -29,7 +30,7 @@ export class OrchestratorApi {
     protected readonly logger,
     protected readonly options: OrchestratorApiOptions
   ) {
-    this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
+    this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
 
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
@@ -54,12 +55,23 @@ export class OrchestratorApi {
   }
 
   /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable. Throw otherwise.
+   *
+   * @throw Error
+   */
+  public async streamQuery(query: QueryBody): Promise<stream.Writable> {
+    // TODO merge with fetchQuery
+    return this.orchestrator.streamQuery(query);
+  }
+
+  /**
    * Push query to the queue, fetch and return result if query takes
    * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
    * error otherwise.
    */
   public async executeQuery(query: QueryBody) {
-    const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
+    const queryForLog = query.query?.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
     try {
@@ -69,18 +81,18 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      let fetchQueryPromise = query.loadRefreshKeysOnly
+      let fetchQueryPromise: Promise<any> = query.loadRefreshKeysOnly
         ? this.orchestrator.loadRefreshKeys(query)
         : this.orchestrator.fetchQuery(query);
 
       if (query.isJob) {
-        // We want to immediately resolve and return a jobed build query result
+        // We want to immediately resolve and return a jobbed build query result
         // (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint)
         // because the following stack was optimized for such behavior.
         const job = await fetchQueryPromise;
         return job;
       }
-      
+
       fetchQueryPromise = pt.timeout(fetchQueryPromise, this.continueWaitTimeout * 1000);
 
       const data = await fetchQueryPromise;
@@ -92,38 +104,23 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      const extractDbType = async (response) => {
-        const dbType = await this.options.contextToDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        });
-        return dbType;
-      };
-
-      const extractExternalDbType = (response) => (
-        this.options.contextToExternalDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        })
-      );
-
       if (Array.isArray(data)) {
         const res = await Promise.all(
           data.map(async (item) => ({
             ...item,
-            dbType: await extractDbType(item),
-            extDbType: extractExternalDbType(item),
+            dbType: await this.options.contextToDbType(item.dataSource),
+            extDbType: this.options.contextToExternalDbType(),
           }))
         );
         return res;
       }
 
-      data.dbType = await extractDbType(data);
-      data.extDbType = extractExternalDbType(data);
+      data.dbType = await this.options.contextToDbType(data.dataSource);
+      data.extDbType = this.options.contextToExternalDbType();
 
       return data;
     } catch (err) {
-      if ((err instanceof pt.TimeoutError || err instanceof ContinueWaitError)) {
+      if (err instanceof pt.TimeoutError || err instanceof ContinueWaitError) {
         this.logger('Continue wait', {
           duration: ((new Date()).getTime() - startQueryTime),
           query: queryForLog,
@@ -131,14 +128,18 @@ export class OrchestratorApi {
           requestId: query.requestId
         });
 
+        if (query.scheduledRefresh) {
+          throw {
+            error: 'Continue wait',
+            stage: null
+          };
+        }
+
         const fromCache = await this
           .orchestrator
           .resultFromCacheIfExists(query);
-        if (
-          !query.renewQuery &&
-          fromCache &&
-          !query.scheduledRefresh
-        ) {
+
+        if ((query.cacheMode === 'stale-if-slow' || query.cacheMode === 'stale-while-revalidate') && fromCache) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
@@ -155,9 +156,7 @@ export class OrchestratorApi {
 
         throw {
           error: 'Continue wait',
-          stage: !query.scheduledRefresh
-            ? await this.orchestrator.queryStage(query)
-            : null
+          stage: await this.orchestrator.queryStage(query)
         };
       }
 
@@ -177,14 +176,12 @@ export class OrchestratorApi {
   }
 
   /**
-   * Tests worker's connections to the Cubstore and, if not in the rollup only
+   * Tests worker's connections to the Cubestore and, if not in the rollup only
    * mode, to the datasources.
    */
   public async testConnection() {
     if (this.options.rollupOnlyMode) {
-      return Promise.all([
-        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
-      ]);
+      return this.testDriverConnection(this.options.externalDriverFactory, DriverType.External);
     } else {
       return Promise.all([
         ...Object.keys(this.seenDataSources).map(
@@ -228,7 +225,7 @@ export class OrchestratorApi {
     dataSource = 'default',
     schema: string,
     table: string,
-    key: any[],
+    key: any,
     token: string,
   ): Promise<[boolean, string]> {
     return this.orchestrator.isPartitionExist(
@@ -263,7 +260,7 @@ export class OrchestratorApi {
     this.seenDataSources[dataSource] = true;
   }
 
-  public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema) {
+  public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema): Promise<any> {
     return this.orchestrator.getPreAggregationVersionEntries(
       preAggregations,
       preAggregationsSchema,
@@ -292,19 +289,19 @@ export class OrchestratorApi {
     return this.orchestrator.checkPartitionsBuildRangeCache(queryBody);
   }
 
-  public async getPreAggregationQueueStates() {
-    return this.orchestrator.getPreAggregationQueueStates();
+  public async getPreAggregationQueueStates(dataSource?: string) {
+    return this.orchestrator.getPreAggregationQueueStates(dataSource);
   }
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource: string) {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id, callback) {
-    return this.orchestrator.subscribeQueueEvents(id, callback);
+  public async cancelQueryByRequestId(requestId: string) {
+    return this.orchestrator.cancelQueryByRequestId(requestId);
   }
 
-  public async unSubscribeQueueEvents(id) {
-    return this.orchestrator.unSubscribeQueueEvents(id);
+  public async updateRefreshEndReached() {
+    return this.orchestrator.updateRefreshEndReached();
   }
 }

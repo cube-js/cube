@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT information_schema._pg_numeric_scale(1700, 50);\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------------------------------------------+
+| information_schema._pg_numeric_scale(Int64(1700),Int64(50)) |
++-------------------------------------------------------------+
+| 46                                                          |
++-------------------------------------------------------------+

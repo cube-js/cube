@@ -33,7 +33,7 @@ services:
     restart: always
 
   coordinator:
-    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
+    image: apache/druid:${TEST_DRUID_VERSION:-27.0.0}
     container_name: coordinator
     volumes:
       - ./storage:/opt/data
@@ -56,7 +56,7 @@ services:
       start_period: 60s
 
   broker:
-    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
+    image: apache/druid:${TEST_DRUID_VERSION:-27.0.0}
     container_name: broker
     volumes:
       - broker_var:/opt/druid/var
@@ -79,7 +79,7 @@ services:
       start_period: 60s
 
   historical:
-    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
+    image: apache/druid:${TEST_DRUID_VERSION:-27.0.0}
     container_name: historical
     volumes:
       - ./storage:/opt/data
@@ -103,7 +103,7 @@ services:
       start_period: 60s
 
   middlemanager:
-    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
+    image: apache/druid:${TEST_DRUID_VERSION:-27.0.0}
     container_name: middlemanager
     volumes:
       - ./storage:/opt/data
@@ -127,7 +127,7 @@ services:
       start_period: 60s
 
   router:
-    image: apache/druid:${TEST_DRUID_VERSION:-0.19.0}
+    image: apache/druid:${TEST_DRUID_VERSION:-27.0.0}
     container_name: router
     volumes:
       - router_var:/opt/druid/var

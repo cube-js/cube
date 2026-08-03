@@ -14,7 +14,6 @@ services:
       timeout: 20s
       interval: 15s
       retries: 5
-      start_period: 20s
 
   router:
     image: koxudaxi/local-data-api:${TEST_LOCAL_DATA_API_VERSION:-0.6.4}

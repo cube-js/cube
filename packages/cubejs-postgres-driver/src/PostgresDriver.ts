@@ -4,25 +4,25 @@
  * @fileoverview The `PostgresDriver` and related types declaration.
  */
 
-import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
-import { types, Pool, PoolConfig, PoolClient, FieldDef } from 'pg';
+import { getEnv, assertDataSource, Pool, type PoolUserOptions } from '@cubejs-backend/shared';
+import { types, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
-import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
+import { PgClient, PgClientConfig } from './PgClient';
+import { ConnectionError, PostgresError } from './errors';
+import { dateTypeParser, timestampTypeParser, timestampTzTypeParser } from './type-parsers';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
   double: 'decimal',
+  int: 'int8',
   // Revert mapping for internal pre-aggregations
   HLL_POSTGRES: 'hll',
 };
@@ -32,32 +32,28 @@ const NativeTypeToPostgresType: Record<string, string> = {};
 Object.entries(types.builtins).forEach(([key, value]) => {
   NativeTypeToPostgresType[value] = key;
 });
+// pg-types lacks the default `unknown` type since it's a pseudo-type
+NativeTypeToPostgresType['705'] = 'UNKNOWN';
 
 const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // bpchar (“blank-padded char”, the internal name of the character data type)
   bpchar: 'varchar',
-  // Numeric is an alias
-  numeric: 'decimal',
   // External mapping
   hll: 'HLL_POSTGRES',
 };
 
-const timestampDataTypes = [
-  // @link TypeId.DATE
-  1082,
-  // @link TypeId.TIMESTAMP
-  1114,
-  // @link TypeId.TIMESTAMPTZ
-  1184
-];
-const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 const hllTypeParser = (val: string) => Buffer.from(
   // Postgres uses prefix as \x for encoding
   val.slice(2),
   'hex'
 ).toString('base64');
 
-export type PostgresDriverConfiguration = Partial<PoolConfig> & {
+export type PostgresDriverConfiguration = PgClientConfig & PoolUserOptions & {
+  // @deprecated Please use maxPoolSize
+  max?: number | undefined;
+  // @deprecated Please use minPoolSize
+  min?: number | undefined;
+
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
@@ -82,49 +78,144 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   private enabled: boolean = false;
 
-  protected readonly pool: Pool;
+  protected readonly pool: Pool<PgClient>;
 
   protected readonly config: Partial<Config>;
 
-  /**
-   * Class constructor.
-   */
   public constructor(
     config: Partial<Config> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Min pool size value for the [cube]<-->[db] pool.
+       */
+      minPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
-    this.pool = new Pool({
-      idleTimeoutMillis: 30000,
+    const preAggregations = config.preAggregations || false;
+
+    const poolConfig: PgClientConfig = {
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      ssl: this.getSslOptions(dataSource, preAggregations),
+      ...config
+    };
+
+    const poolName = createPoolName('postgres', dataSource, preAggregations);
+    this.pool = new Pool<PgClient>(poolName, {
+      create: async () => this.createConnection(poolConfig, poolName),
+      validate: async (client) => {
+        if (client.isEnding() || client.isEnded()) {
+          return false;
+        }
+
+        return client.isQueryable();
+      },
+      destroy: async (client) => {
+        await client.end();
+      },
+    }, {
+      min: config.minPoolSize ||
+        config.min ||
+        getEnv('dbMinPoolSize', { dataSource, preAggregations }) ||
+        0,
       max:
         config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        config.max ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
-      ...config
+      evictionRunIntervalMillis: config.evictionRunIntervalMillis || 10000,
+      softIdleTimeoutMillis: config.softIdleTimeoutMillis || 30000,
+      idleTimeoutMillis: config.idleTimeoutMillis || 30000,
+      acquireTimeoutMillis: config.acquireTimeoutMillis || 20000,
+      testOnBorrow: true,
     });
-    this.pool.on('error', (err) => {
-      console.log(`Unexpected error on idle client: ${err.stack || err}`); // TODO
-    });
+
+    // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
+    this.pool.on('factoryCreateError', (err) => this.databasePoolError(err));
+    this.pool.on('factoryDestroyError', (err) => this.databasePoolError(err));
+
     this.config = <Partial<Config>>{
-      ...this.getInitialConfiguration(dataSource),
-      executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      ...this.getInitialConfiguration(dataSource, preAggregations),
+      executionTimeout: getEnv('dbQueryTimeout', { dataSource, preAggregations }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
       ...config,
     };
     this.enabled = true;
+  }
+
+  protected async createConnection(poolConfig: PgClientConfig, poolName: string): Promise<PgClient> {
+    const client = new PgClient(poolConfig);
+    client.on('error', (err) => this.databasePoolError(err));
+
+    try {
+      await client.connect();
+    } catch (e: unknown) {
+      throw new ConnectionError(e as Error, poolName);
+    }
+
+    return client;
+  }
+
+  protected primaryKeysQuery(conditionString?: string): string | null {
+    return `SELECT
+      columns.table_schema as ${this.quoteIdentifier('table_schema')},
+      columns.table_name as ${this.quoteIdentifier('table_name')},
+      columns.column_name as ${this.quoteIdentifier('column_name')}
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+    JOIN information_schema.columns AS columns ON columns.table_schema = tc.constraint_schema
+      AND tc.table_name = columns.table_name AND ccu.column_name = columns.column_name
+    WHERE constraint_type = 'PRIMARY KEY' AND columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`;
+  }
+
+  protected foreignKeysQuery(conditionString?: string): string | null {
+    return `SELECT
+        tc.table_schema as ${this.quoteIdentifier('table_schema')},
+        tc.table_name as ${this.quoteIdentifier('table_name')},
+        kcu.column_name as ${this.quoteIdentifier('column_name')},
+        columns.table_name as ${this.quoteIdentifier('target_table')},
+        columns.column_name as ${this.quoteIdentifier('target_column')}
+      FROM
+        information_schema.table_constraints AS tc
+      JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+      JOIN information_schema.constraint_column_usage AS columns
+        ON columns.constraint_name = tc.constraint_name
+      WHERE
+         constraint_type = 'FOREIGN KEY'
+         AND ${this.getColumnNameForSchemaName()} NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+         ${conditionString ? ` AND (${conditionString})` : ''}
+    `;
   }
 
   /**
@@ -132,8 +223,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    * you cannot call method in RedshiftDriver.constructor before super.
    */
   protected getInitialConfiguration(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    dataSource: string,
+    _dataSource: string,
+    _preAggregations?: boolean,
   ): Partial<PostgresDriverConfiguration> {
     return {
       readOnly: true,
@@ -141,9 +232,19 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected getTypeParser = (dataTypeID: TypeId, format: TypeFormat | undefined) => {
-    const isTimestamp = timestampDataTypes.includes(dataTypeID);
-    if (isTimestamp) {
+    // @link TypeId.DATE
+    if (dataTypeID === 1082) {
+      return dateTypeParser;
+    }
+
+    // @link TypeId.TIMESTAMP
+    if (dataTypeID === 1114) {
       return timestampTypeParser;
+    }
+
+    // @link TypeId.TIMESTAMPTZ
+    if (dataTypeID === 1184) {
+      return timestampTzTypeParser;
     }
 
     const typeName = this.getPostgresTypeForField(dataTypeID);
@@ -152,8 +253,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       return hllTypeParser;
     }
 
-    const parser = types.getTypeParser(dataTypeID, format);
-    return (val: any) => parser(val);
+    return types.getTypeParser(dataTypeID, format);
   };
 
   /**
@@ -175,21 +275,29 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   public async testConnection(): Promise<void> {
+    // eslint-disable-next-line no-underscore-dangle
+    const conn: PgClient = await this.pool._factory.create();
+
     try {
-      await this.pool.query('SELECT $1::int AS number', ['1']);
+      await conn.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
       if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
-        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
+        throw new PostgresError(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`, { cause: e as Error });
       }
 
       throw e;
+    } finally {
+      // eslint-disable-next-line no-underscore-dangle
+      await this.pool._factory.destroy(conn);
     }
   }
 
-  protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
+  protected async loadUserDefinedTypes(conn: PgClient): Promise<void> {
     if (!this.userDefinedTypes) {
       // Postgres enum types defined as typcategory = 'E' these can be assumed
       // to be of type varchar for the drivers purposes.
+      // Postgres array types defined as typcategory = 'A' these can be assumed
+      // to be of type text for the drivers purposes.
       // TODO: if full implmentation the constraints can be looked up via pg_enum
       // https://www.postgresql.org/docs/9.1/catalog-pg-enum.html
       const customTypes = await conn.query(
@@ -197,12 +305,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
             oid,
             CASE
                 WHEN typcategory = 'E' THEN 'varchar'
+                WHEN typcategory = 'A' THEN 'text'
                 ELSE typname
-            END
+            END AS typname
         FROM
             pg_type
         WHERE
-            typcategory in ('U', 'E')`,
+            typcategory in ('U', 'E', 'A')`,
         []
       );
 
@@ -214,7 +323,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected async prepareConnection(
-    conn: PoolClient,
+    conn: PgClient,
     options: { executionTimeout: number } = {
       executionTimeout: this.config.executionTimeout ? <number>(this.config.executionTimeout) * 1000 : 600000
     }
@@ -229,7 +338,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return fields.map((f) => {
       const postgresType = this.getPostgresTypeForField(f.dataTypeID);
       if (!postgresType) {
-        throw new Error(
+        throw new PostgresError(
           `Unable to detect type for field "${f.name}" with dataTypeID: ${f.dataTypeID}`
         );
       }
@@ -246,7 +355,9 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
-    const conn = await this.pool.connect();
+    PostgresDriver.checkValuesLimit(values);
+
+    const conn = await this.pool.acquire();
 
     try {
       await this.prepareConnection(conn);
@@ -258,26 +369,49 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         highWaterMark
       });
       const rowStream: QueryStream = await conn.query(queryStream);
-      const meta = await rowStream.fields();
+      const fields = await rowStream.fields();
 
       return {
         rowStream,
-        types: this.mapFields(meta),
+        types: this.mapFields(fields),
         release: async () => {
-          await conn.release();
+          await this.pool.release(conn);
         }
       };
     } catch (e) {
-      await conn.release();
+      await this.pool.release(conn);
 
       throw e;
     }
   }
 
-  protected async queryResponse(query: string, values: unknown[]) {
-    const conn = await this.pool.connect();
+  protected static checkValuesLimit(values?: unknown[]) {
+    // PostgreSQL protocol allows sending up to 65535 params in a single bind message
+    // See https://github.com/postgres/postgres/blob/REL_16_0/src/backend/tcop/postgres.c#L1698-L1708
+    // See https://github.com/postgres/postgres/blob/REL_16_0/src/backend/libpq/pqformat.c#L428-L431
+    // But 'pg' module does not check for params count, and ends up sending incorrect bind message
+    // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/serializer.ts#L155
+    // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/buffer-writer.ts#L32-L37
+    const length = (values?.length ?? 0);
+    if (length >= 65536) {
+      throw new PostgresError(`PostgreSQL protocol does not support more than 65535 parameters, but ${length} passed`);
+    }
+  }
+
+  protected async withConnection<T>(fn: (conn: PgClient) => Promise<T>): Promise<T> {
+    const conn = await this.pool.acquire();
 
     try {
+      return await fn(conn);
+    } finally {
+      await this.pool.release(conn);
+    }
+  }
+
+  protected async queryResponse(query: string, values: unknown[]) {
+    PostgresDriver.checkValuesLimit(values);
+
+    return this.withConnection(async (conn) => {
       await this.prepareConnection(conn);
 
       const res = await conn.query({
@@ -288,9 +422,15 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         },
       });
       return res;
-    } finally {
-      await conn.release();
+    });
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 63) {
+      throw new PostgresError('PostgreSQL can not work with table names longer than 63 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
     }
+    return super.createTable(quotedTableName, columns);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -311,12 +451,12 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     };
   }
 
-  public toGenericType(columnType: string): GenericDataBaseType {
-    if (columnType in PostgresToGenericType) {
-      return PostgresToGenericType[columnType];
-    }
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    return this.tableColumnTypesWithPrecision(table);
+  }
 
-    return super.toGenericType(columnType);
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
+    return PostgresToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType, precision, scale);
   }
 
   public readOnly() {
@@ -330,7 +470,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     indexesSql: IndexesSQL
   ) {
     if (!tableData.rows) {
-      throw new Error(`${this.constructor} driver supports only rows upload`);
+      throw new PostgresError(`${this.constructor} driver supports only rows upload`);
     }
 
     await this.createTable(table, columns);
@@ -355,7 +495,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   public async release() {
     if (this.enabled) {
-      this.pool.end();
+      await this.pool.drain();
+      await this.pool.clear();
       this.enabled = false;
     }
   }
@@ -366,5 +507,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   public fromGenericType(columnType: string) {
     return GenericTypeToPostgres[columnType] || super.fromGenericType(columnType);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

@@ -20,11 +20,23 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadTableCSVData,
-  DriverInterface, QueryOptions, StreamTableData,
+  BaseDriver,
+  DatabaseStructure,
+  DriverCapabilities,
+  DriverInterface,
+  QueryColumnsResult,
+  QueryOptions,
+  QuerySchemasResult,
+  QueryTablesResult,
+  StreamOptions,
+  StreamTableData,
+  TableCSVData,
 } from '@cubejs-backend/base-driver';
-import { Query } from '@google-cloud/bigquery/build/src/bigquery';
-import { HydrationStream } from './HydrationStream';
+import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
+
+import { HydrationStream, transformRow } from './HydrationStream';
+
+import { version } from '../package.json';
 
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
@@ -43,6 +55,13 @@ interface BigQueryDriverOptions extends BigQueryOptions {
 
 type BigQueryDriverOptionsInitialized =
   Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
+
+// BigQuery type mappings for types not in the base DbTypeToGenericType
+const BigQueryToGenericType: Record<string, string> = {
+  bignumeric: 'decimal',
+  bigdecimal: 'decimal',
+  decimal: 'decimal'
+};
 
 /**
  * BigQuery driver.
@@ -74,51 +93,67 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       dataSource?: string,
 
       /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.options = {
       scopes: [
         'https://www.googleapis.com/auth/bigquery',
         'https://www.googleapis.com/auth/drive',
       ],
-      projectId: getEnv('bigqueryProjectId', { dataSource }),
-      keyFilename: getEnv('bigqueryKeyFile', { dataSource }),
-      credentials: getEnv('bigqueryCredentials', { dataSource })
+      projectId: getEnv('bigqueryProjectId', { dataSource, preAggregations }),
+      keyFilename: getEnv('bigqueryKeyFile', { dataSource, preAggregations }),
+      credentials: getEnv('bigqueryCredentials', { dataSource, preAggregations })
         ? JSON.parse(
           Buffer.from(
-            getEnv('bigqueryCredentials', { dataSource }),
+            getEnv('bigqueryCredentials', { dataSource, preAggregations }),
             'base64',
           ).toString('utf8')
         )
         : undefined,
       exportBucket:
-        getEnv('dbExportBucket', { dataSource }) ||
-        getEnv('bigqueryExportBucket', { dataSource }),
-      location: getEnv('bigqueryLocation', { dataSource }),
+        getEnv('dbExportBucket', { dataSource, preAggregations }) ||
+        getEnv('bigqueryExportBucket', { dataSource, preAggregations }),
+      location: getEnv('bigqueryLocation', { dataSource, preAggregations }),
       ...config,
       pollTimeout: (
         config.pollTimeout ||
-        getEnv('dbPollTimeout', { dataSource }) ||
-        getEnv('dbQueryTimeout', { dataSource })
+        getEnv('dbPollTimeout', { dataSource, preAggregations }) ||
+        getEnv('dbQueryTimeout', { dataSource, preAggregations })
       ) * 1000,
       pollMaxInterval: (
         config.pollMaxInterval ||
-        getEnv('dbPollMaxInterval', { dataSource })
+        getEnv('dbPollMaxInterval', { dataSource, preAggregations })
       ) * 1000,
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource, preAggregations }),
+      userAgent: `CubeDev_Cube/${version}`,
     };
 
     getEnv('dbExportBucketType', {
       dataSource,
+      preAggregations,
       supported: ['gcp'],
     });
 
@@ -129,9 +164,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
+  /**
+   * Returns the configurable driver options
+   * Note: It returns the unprefixed option names.
+   * In case of using multisources options need to be prefixed manually.
+   */
   public static driverEnvVariables() {
-    // TODO (buntarb): check how this method can/must be used with split
-    // names by the data source.
     return [
       'CUBEJS_DB_BQ_PROJECT_ID',
       'CUBEJS_DB_BQ_KEY_FILE',
@@ -139,9 +177,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.bigquery.query({
-      query: 'SELECT ? AS number', params: ['1']
-    });
+    // From the BigQuery Docs:
+    // You are not charged for list, get, patch, update and delete calls.
+    // Examples include (but are not limited to): listing datasets, updating
+    // a dataset's access control list, updating a table's description, or
+    // listing user-defined functions in a dataset.
+    // @see https://cloud.google.com/bigquery/pricing#free
+    await this.bigquery.getDatasets();
   }
 
   public readOnly() {
@@ -153,12 +195,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
     }, options);
 
     return <any>(
       data[0] && data[0].map(
-        row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
+        row => transformRow(row)
       )
     );
   }
@@ -178,11 +221,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
       if (result.length) {
         return R.reduce(
-          this.informationColumnsSchemaReducer, {}, result[0]
+          this.informationColumnsSchemaReducer, {}, this.informationColumnsSchemaSorter(result[0])
         );
       }
 
-      return [];
+      return {};
     } catch (e) {
       if ((<any>e).message.includes('Permission bigquery.tables.get denied on table')) {
         return {};
@@ -192,13 +235,60 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async tablesSchema() {
+  public async tablesSchema(): Promise<DatabaseStructure> {
     const dataSets = await this.bigquery.getDatasets();
     const dataSetsColumns = await Promise.all(
       dataSets[0].map((dataSet) => this.loadTablesForDataset(dataSet))
     );
 
     return dataSetsColumns.reduce((prev, current) => Object.assign(prev, current), {});
+  }
+
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    const dataSets = await this.bigquery.getDatasets();
+    return dataSets[0].filter((dataSet) => dataSet.id).map((dataSet) => ({
+      schema_name: dataSet.id!,
+    }));
+  }
+
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+    try {
+      const allTablePromises = schemas.map(async schema => {
+        const tables = await this.getTablesQuery(schema.schema_name);
+        return tables
+          .filter(table => table.table_name)
+          .map(table => ({ schema_name: schema.schema_name, table_name: table.table_name! }));
+      });
+
+      const allTables = await Promise.all(allTablePromises);
+
+      return allTables.flat();
+    } catch (e) {
+      console.error('Error fetching tables for schemas:', e);
+      throw e;
+    }
+  }
+
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+    try {
+      const allColumnPromises = tables.map(async table => {
+        const tableName = `${table.schema_name}.${table.table_name}`;
+        const columns = await this.tableColumnTypes(tableName);
+        return columns.map((column: any) => ({
+          schema_name: table.schema_name,
+          table_name: table.table_name,
+          data_type: column.type,
+          column_name: column.name,
+        }));
+      });
+
+      const allColumns = await Promise.all(allColumnPromises);
+
+      return allColumns.flat();
+    } catch (e) {
+      console.error('Error fetching columns for tables:', e);
+      throw e;
+    }
   }
 
   public async getTablesQuery(schemaName: string) {
@@ -220,11 +310,21 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
     const [bigQueryTable] = await this.bigquery.dataset(schema).table(name).getMetadata();
-    return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
+    return bigQueryTable.schema.fields.map((c: any) => {
+      // BigQuery NUMERIC is always (38, 9), BIGNUMERIC is (76, 38)
+      // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#decimal_types
+      if (c.type === 'NUMERIC' || c.type === 'DECIMAL') {
+        return { name: c.name, type: this.toGenericType(c.type, 38, 9) };
+      }
+      if (c.type === 'BIGNUMERIC' || c.type === 'BIGDECIMAL') {
+        return { name: c.name, type: this.toGenericType(c.type, 76, 38) };
+      }
+      return { name: c.name, type: this.toGenericType(c.type) };
+    });
   }
 
-  public async createSchemaIfNotExists(schemaName: string) {
-    return this.bigquery.dataset(schemaName).get({ autoCreate: true });
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    await this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }
 
   public async isUnloadSupported() {
@@ -233,13 +333,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async stream(
     query: string,
-    values: unknown[]
+    values: unknown[],
+    options?: StreamOptions
   ): Promise<StreamTableData> {
+    const labels = this.buildQueryLabels(options);
     const stream = await this.bigquery.createQueryStream({
       query,
       params: values,
       parameterMode: 'positional',
-      useLegacySql: false
+      useLegacySql: false,
+      wrapIntegers: true,
+      ...(labels ? { labels } : {}),
     });
 
     const rowStream = new HydrationStream();
@@ -250,7 +354,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public async unload(table: string): Promise<DownloadTableCSVData> {
+  public async unload(table: string): Promise<TableCSVData> {
     if (!this.bucket) {
       throw new Error('Unload is not configured');
     }
@@ -260,6 +364,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
     const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
     await this.waitForJobResult(job, { table }, false);
+    // There is an implementation for extracting and signing urls from S3
+    // @see BaseDriver->extractUnloadedFilesFromS3()
+    // Please use that if you need. Here is a different flow
+    // because bigquery requires storage/bucket object for other things,
+    // and there is no need to initiate another one (created in extractUnloadedFilesFromS3()).
     const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
     const urls = await Promise.all(files.map(async file => {
       const [url] = await file.getSignedUrl({
@@ -297,6 +406,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected async awaitForJobStatus(job: Job, options: any, withResults: boolean) {
     const [result] = await job.getMetadata();
+
     if (result.status && result.status.state === 'DONE') {
       if (result.status.errorResult) {
         throw new Error(
@@ -310,7 +420,28 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       return null;
     }
 
-    return withResults ? job.getQueryResults() : true;
+    return withResults ? job.getQueryResults({ wrapIntegers: true }) : true;
+  }
+
+  /**
+   * @see https://cloud.google.com/bigquery/docs/labels-intro#requirements
+   */
+  protected buildQueryLabels(options?: QueryOptions): { [k: string]: string } | undefined {
+    const requestId = options?.requestId;
+    if (!requestId) {
+      return undefined;
+    }
+
+    const rawId = String(requestId);
+    const spanIdx = rawId.lastIndexOf('-span-');
+    const queryUuid = spanIdx !== -1 ? rawId.substring(0, spanIdx) : rawId;
+
+    const value = queryUuid.toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 63);
+    if (!value) {
+      return undefined;
+    }
+
+    return { cube_request_id: value };
   }
 
   protected async runQueryJob<T = QueryRowsResponse>(
@@ -318,7 +449,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     options: any,
     withResults: boolean = true
   ): Promise<T> {
-    const [job] = await this.bigquery.createQueryJob(bigQueryQuery);
+    const labels = this.buildQueryLabels(options);
+    const jobRequest: Query = labels
+      ? { ...bigQueryQuery, labels: { ...bigQueryQuery.labels, ...labels } }
+      : bigQueryQuery;
+    const [job] = await this.bigquery.createQueryJob(jobRequest);
+
     return <any> this.waitForJobResult(job, options, withResults);
   }
 
@@ -351,5 +487,16 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       }
       return `\`${identifier}\``;
     }).join('.');
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
+  }
+
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): string {
+    const mappedType = BigQueryToGenericType[columnType.toLowerCase()] || columnType;
+    return super.toGenericType(mappedType, precision, scale);
   }
 }

@@ -1,7 +1,16 @@
+import { LRUCache } from 'lru-cache';
 import type { OrchestratorApi } from './OrchestratorApi';
 
 export class OrchestratorStorage {
-  protected readonly storage: Map<string, OrchestratorApi> = new Map();
+  protected readonly storage: LRUCache<string, OrchestratorApi>;
+
+  public constructor(options: { compilerCacheSize?: number, maxCompilerCacheKeepAlive?: number, updateCompilerCacheKeepAlive?: boolean } = { compilerCacheSize: 100 }) {
+    this.storage = new LRUCache<string, OrchestratorApi>({
+      max: options.compilerCacheSize,
+      ttl: options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+    });
+  }
 
   public has(orchestratorId: string) {
     return this.storage.has(orchestratorId);
@@ -20,37 +29,15 @@ export class OrchestratorStorage {
   }
 
   public async testConnections() {
-    const result = [];
-
-    // eslint-disable-next-line no-restricted-syntax
-    for (const orchestratorApi of this.storage.values()) {
-      result.push(orchestratorApi.testConnection());
-    }
-
-    return Promise.all(result);
+    return Promise.all([...this.storage.values()].map(api => api.testConnection()));
   }
 
   public async testOrchestratorConnections() {
-    const result = [];
-
-    // eslint-disable-next-line no-restricted-syntax
-    for (const orchestratorApi of this.storage.values()) {
-      result.push(orchestratorApi.testOrchestratorConnections());
-    }
-
-    return Promise.all(result);
+    return Promise.all([...this.storage.values()].map(api => api.testOrchestratorConnections()));
   }
 
   public async releaseConnections() {
-    const result = [];
-
-    // eslint-disable-next-line no-restricted-syntax
-    for (const orchestratorApi of this.storage.values()) {
-      result.push(orchestratorApi.release());
-    }
-
-    await Promise.all(result);
-
+    await Promise.all([...this.storage.values()].map(api => api.release()));
     this.storage.clear();
   }
 }

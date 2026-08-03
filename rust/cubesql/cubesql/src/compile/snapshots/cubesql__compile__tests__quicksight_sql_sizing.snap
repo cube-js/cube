@@ -1,0 +1,19 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT supported_value\n                FROM INFORMATION_SCHEMA.SQL_SIZING\n                WHERE\n                    sizing_id = 34\n                    or sizing_id = 30\n                    or sizing_id = 31\n                    or sizing_id = 10005\n                    or sizing_id = 32\n                    or sizing_id = 35\n                    or sizing_id = 107\n                    or sizing_id = 97\n                    or sizing_id = 99\n                    or sizing_id = 100\n                    or sizing_id = 101\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-----------------+
+| supported_value |
++-----------------+
+| 0               |
+| 0               |
+| 1664            |
+| 1600            |
+| 63              |
+| 63              |
+| 63              |
+| 63              |
+| 63              |
+| 63              |
+| 63              |
++-----------------+

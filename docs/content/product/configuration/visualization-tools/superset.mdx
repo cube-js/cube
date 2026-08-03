@@ -1,0 +1,125 @@
+# Apache Superset / Preset
+
+[Apache Superset][superset] is a popular open-source data exploration and
+visualization platform. [Preset][preset] is a fully-managed service for
+Superset.
+
+Here's a short video guide:
+
+<LoomVideo url="https://www.loom.com/embed/3e85b7fe3fef4c7bbb8b255ad3f2c675" />
+
+## Connect from Cube Cloud
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube Cloud to
+Superset or Preset. It automatically synchronizes the [data model][ref-data-model]
+with Superset or Preset.
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Apache Superset</Btn> or
+<Btn>Preset</Btn> to get detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Superset or Preset using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Metabase.
+
+## Connecting from Superset or Preset
+
+Superset and Preset connect to Cube as to a Postgres database.
+
+### Creating a connection
+
+In Superset or Preset, go to **Data > Databases**, then click **+ Database** to add
+a new database:
+
+<Screenshot
+  alt="Apache Superset: databases page"
+  src="https://ucarecdn.com/cb3fe91a-6ce2-4c0e-8997-fdb2d4507beb/"
+/>
+
+### Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+Let's use the following Cube data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: created
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+Using the SQL API, `orders` will be exposed as a table. In Superset, we can
+create datasets based on tables. Let's create one from `orders` table:
+
+<Screenshot
+  alt="Apache Superset: SQL Editor page with successful query"
+  src="https://ucarecdn.com/eebd3839-03db-4492-a7e4-a7cc1d9ffc73/"
+/>
+
+Now, we can explore this dataset. Let's create a new chart of type line with
+"Orders" dataset.
+
+<Screenshot
+  alt="Apache Superset: SQL Editor page with successful query"
+  src="https://ucarecdn.com/c509c6fb-f633-4ded-ae94-d4768978c47a/"
+/>
+
+We can select the `COUNT(*)` as a metric and `created_at` as the time column
+with a time grain of `month`.
+
+The `COUNT(*)` aggregate function is being mapped to a measure of type
+[count](/product/data-modeling/reference/types-and-formats#count) in Cube's
+**Orders** data model file.
+
+
+[superset]: https://superset.apache.org/
+[preset]: https://preset.io
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-data-model]: /product/data-modeling/overview

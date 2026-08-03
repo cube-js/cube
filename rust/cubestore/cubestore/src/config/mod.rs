@@ -1,8 +1,13 @@
-#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.
+#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.confi
 pub mod injection;
 pub mod processing_loop;
 
-use crate::cachestore::{CacheStore, ClusterCacheStoreClient, RocksCacheStore};
+use crate::cachestore::{
+    CacheEvictionPolicy, CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient,
+    LazyRocksCacheStore,
+};
+use crate::cluster::ingestion::job_processor::{JobProcessor, JobProcessorImpl};
+use crate::cluster::rate_limiter::{BasicProcessRateLimiter, ProcessRateLimiter};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -11,35 +16,45 @@ use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::{ImportService, ImportServiceImpl};
-use crate::metastore::{BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore};
+use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
+use crate::metastore::{
+    BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
+    TracedMetaStore,
+};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
+use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
+use crate::remotefs::cleanup::RemoteFsCleanup;
 use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+use crate::remotefs::{ExtendedRemoteFs, LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
+use crate::sql::cache::SqlResultCache;
 use crate::sql::{SqlService, SqlServiceImpl};
+use crate::sql::{TableExtensionService, TableExtensionServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::kafka::{KafkaClientService, KafkaClientServiceImpl};
 use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
-use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
+use crate::table::parquet::{
+    CubestoreMetadataCacheFactory, CubestoreMetadataCacheFactoryImpl,
+    CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl,
+};
 use crate::telemetry::tracing::{TracingHelper, TracingHelperImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
+use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
+use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
-use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
-use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
@@ -56,9 +71,8 @@ use tokio::time::{timeout_at, Duration, Instant};
 pub struct CubeServices {
     pub injector: Arc<Injector>,
     pub sql_service: Arc<dyn SqlService>,
-    pub scheduler: Arc<SchedulerImpl>,
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
-    pub rocks_cache_store: Option<Arc<RocksCacheStore>>,
+    pub rocks_cache_store: Option<Arc<LazyRocksCacheStore>>,
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
 }
@@ -83,7 +97,7 @@ impl CubeServices {
         Self::wait_loops(self.spawn_processing_loops().await?).await
     }
 
-    async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
+    pub async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
         join_all(loops)
             .await
             .into_iter()
@@ -93,25 +107,35 @@ impl CubeServices {
 
     async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
+
         let cluster = self.cluster.clone();
         futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
+
         let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
         futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
+
+        if self.injector.has_service_typed::<RemoteFsCleanup>().await {
+            let cleanup = self.injector.get_service_typed::<RemoteFsCleanup>().await;
+            futures.push(cube_ext::spawn(async move {
+                cleanup.wait_local_cleanup_loop().await;
+                Ok(())
+            }));
+        }
+
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
+                rocks_meta_store.wait_upload_loop().await;
                 Ok(())
             }));
 
             let rocks_cache_store = self.rocks_cache_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                RocksCacheStore::wait_upload_loop(rocks_cache_store).await;
-                Ok(())
+                rocks_cache_store.run_processing_loops().await
             }));
 
             let cluster = self.cluster.clone();
@@ -121,8 +145,22 @@ impl CubeServices {
             }));
             started_rx.await?;
 
-            let scheduler = self.scheduler.clone();
-            futures.extend(SchedulerImpl::spawn_processing_loops(scheduler));
+            if self.injector.has_service_typed::<SchedulerImpl>().await {
+                let scheduler = self.injector.get_service_typed::<SchedulerImpl>().await;
+                futures.extend(scheduler.spawn_processing_loops());
+            }
+
+            if self
+                .injector
+                .has_service_typed::<CacheStoreSchedulerImpl>()
+                .await
+            {
+                let scheduler = self
+                    .injector
+                    .get_service_typed::<CacheStoreSchedulerImpl>()
+                    .await;
+                futures.extend(scheduler.spawn_processing_loops());
+            }
 
             if self.injector.has_service_typed::<MySqlServer>().await {
                 let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
@@ -184,6 +222,7 @@ impl CubeServices {
                 .stop_processing()
                 .await?;
         }
+
         if self.injector.has_service_typed::<HttpServer>().await {
             self.injector
                 .get_service_typed::<HttpServer>()
@@ -191,7 +230,29 @@ impl CubeServices {
                 .stop_processing()
                 .await;
         }
-        self.scheduler.stop_processing_loops()?;
+
+        if self.injector.has_service_typed::<SchedulerImpl>().await {
+            let scheduler = self.injector.get_service_typed::<SchedulerImpl>().await;
+            scheduler.stop_processing_loops()?;
+        }
+
+        if self.injector.has_service_typed::<RemoteFsCleanup>().await {
+            let cleanup = self.injector.get_service_typed::<RemoteFsCleanup>().await;
+            cleanup.stop();
+        }
+
+        if self
+            .injector
+            .has_service_typed::<CacheStoreSchedulerImpl>()
+            .await
+        {
+            let scheduler = self
+                .injector
+                .get_service_typed::<CacheStoreSchedulerImpl>()
+                .await;
+            scheduler.stop_processing_loops()?;
+        }
+
         stop_track_event_loop().await;
         stop_agent_event_loop().await;
         Ok(())
@@ -296,15 +357,50 @@ pub struct Config {
     injector: Arc<Injector>,
 }
 
+/// How an inactive parent's persisted chunks are repartitioned into its children.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepartitionStrategy {
+    /// One chunk at a time, each split independently into the children.
+    PerChunk,
+    /// One job per partition that k-way merges all its chunks in groups and splits the
+    /// merged stream into the children at the wal-split limit.
+    PerPartition,
+    /// Many jobs sliced at schedule time, each merging an inclusive chunk-id range;
+    /// spreads across workers by the hash of the range bounds.
+    Range,
+}
+
+impl FromStr for RepartitionStrategy {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "per_chunk" | "perchunk" | "per-chunk" => Ok(RepartitionStrategy::PerChunk),
+            "per_partition" | "perpartition" | "per-partition" => {
+                Ok(RepartitionStrategy::PerPartition)
+            }
+            "range" => Ok(RepartitionStrategy::Range),
+            _ => Err(format!(
+                "unknown repartition strategy '{}' (expected per_chunk, per_partition or range)",
+                s
+            )),
+        }
+    }
+}
+
 #[automock]
 pub trait ConfigObj: DIService {
     fn partition_split_threshold(&self) -> u64;
+
+    fn partition_size_split_threshold_bytes(&self) -> u64;
 
     fn max_partition_split_threshold(&self) -> u64;
 
     fn compaction_chunks_total_size_threshold(&self) -> u64;
 
     fn compaction_chunks_count_threshold(&self) -> u64;
+
+    fn compaction_chunks_in_memory_size_threshold(&self) -> u64;
 
     fn compaction_chunks_max_lifetime_threshold(&self) -> u64;
 
@@ -320,13 +416,24 @@ pub trait ConfigObj: DIService {
 
     fn compaction_in_memory_chunks_ratio_check_threshold(&self) -> u64;
 
+    fn compaction_in_memory_chunks_schedule_period_secs(&self) -> u64;
+
     fn wal_split_threshold(&self) -> u64;
 
+    /// Optional in-flight WAL data frame byte size at which an import splits the frame, in
+    /// addition to the row count threshold. `None` (env unset or `0`) disables the size check,
+    /// leaving the row-count split as the only trigger.
+    fn wal_split_size_threshold_bytes(&self) -> Option<u64>;
+
     fn select_worker_pool_size(&self) -> usize;
+
+    fn select_worker_idle_timeout(&self) -> u64;
 
     fn job_runners_count(&self) -> usize;
 
     fn long_term_job_runners_count(&self) -> usize;
+
+    fn csv_import_job_runners_count(&self) -> usize;
 
     fn bind_address(&self) -> &Option<String>;
 
@@ -346,9 +453,13 @@ pub trait ConfigObj: DIService {
 
     fn meta_store_log_upload_interval(&self) -> u64;
 
+    fn meta_store_log_upload_size_limit(&self) -> u64;
+
     fn gc_loop_interval(&self) -> u64;
 
     fn stale_stream_timeout(&self) -> u64;
+
+    fn streaming_lag_timeout_ms(&self) -> u64;
 
     fn select_workers(&self) -> &Vec<String>;
 
@@ -356,7 +467,55 @@ pub trait ConfigObj: DIService {
 
     fn metastore_bind_address(&self) -> &Option<String>;
 
+    fn metastore_rocksdb_config(&self) -> &RocksStoreConfig;
+
     fn metastore_remote_address(&self) -> &Option<String>;
+
+    fn cachestore_log_upload_interval(&self) -> u64;
+
+    fn cachestore_log_enabled(&self) -> bool;
+
+    fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
+
+    fn cachestore_gc_loop_interval(&self) -> u64;
+
+    fn cachestore_cache_eviction_loop_interval(&self) -> u64;
+
+    fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64;
+
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u8;
+
+    fn cachestore_cache_max_size(&self) -> u64;
+
+    fn cachestore_cache_max_entry_size(&self) -> usize;
+
+    fn cachestore_cache_compaction_trigger_size(&self) -> u64;
+
+    fn cachestore_cache_max_keys(&self) -> u32;
+
+    fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy;
+
+    fn cachestore_cache_eviction_batch_size(&self) -> usize;
+
+    fn cachestore_cache_eviction_below_threshold(&self) -> u8;
+
+    fn cachestore_cache_persist_batch_size(&self) -> usize;
+
+    fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32;
+
+    fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32;
+
+    fn cachestore_cache_ttl_notify_channel(&self) -> usize;
+
+    fn cachestore_cache_ttl_buffer_max_size(&self) -> usize;
+
+    fn cachestore_cache_lfu_log_factor(&self) -> u8;
+
+    fn cachestore_cache_lfu_decay_time(&self) -> u32;
+
+    fn cachestore_queue_results_expire(&self) -> u64;
+
+    fn cachestore_metrics_interval(&self) -> u64;
 
     fn download_concurrency(&self) -> u64;
 
@@ -374,11 +533,89 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    /// When enabled, a TableImportCSV job is placed on the worker with the fewest in-flight
+    /// CSV imports (load-aware), instead of by stateless hash of (table_id, location). Off by
+    /// default (hash placement); kept as a flag for rollout/rollback.
+    fn load_aware_import_placement_enabled(&self) -> bool;
+
+    /// Time budget for a single batch repartition job. The job yields its runner
+    /// slot once the budget is exceeded (after the current chunk); the remainder
+    /// is drained by a follow-up job via the cascade. Kept separate from
+    /// import_job_timeout, which is the hard stuck-job kill, not a fairness knob.
+    fn repartition_chunks_time_budget_secs(&self) -> u64;
+
+    /// When enabled (default), the sorted partial aggregate is pushed below the partition merge
+    /// so the merge carries partial aggregate states instead of all raw rows. Kept as a flag for
+    /// emergency rollback to the pre-push plan shape.
+    fn push_partial_aggregate_below_merge_enabled(&self) -> bool;
+
+    /// When enabled, compaction sizes the partition split by the bytes actually being written
+    /// (existing main table plus the pending chunks merged in this pass) instead of the main
+    /// table alone, so a partition with large accumulated chunks splits in a single pass. Off
+    /// by default; kept as a flag for rollout/rollback.
+    fn compaction_split_by_total_file_size_enabled(&self) -> bool;
+
+    /// When enabled, the worker trims in-memory chunks by the dedup-safe pushable predicate
+    /// before they cross IPC to the select subprocess (which re-applies the same predicate).
+    /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
+    fn prefilter_in_memory_chunks_enabled(&self) -> bool;
+
+    /// When enabled, a merge group's chunk parquets (PerPartition / Range strategies) are
+    /// downloaded concurrently before building the merge inputs, instead of one at a time.
+    /// The group is already bounded by repartition_merge_max_input_files and the download
+    /// pool by download_concurrency, so no extra budget is needed. Off by default.
+    fn repartition_concurrent_download(&self) -> bool;
+
+    /// Which repartition strategy to use for an inactive parent's persisted chunks.
+    /// Defaults to PerChunk.
+    fn repartition_strategy(&self) -> RepartitionStrategy;
+
+    /// Cap on the number of chunks merged together in one Merge group / RepartitionRange.
+    /// Bounds the concurrent parquet readers, the k-way merge width, the swap size and
+    /// (since a range downloads its chunks sequentially) the per-job download time.
+    fn repartition_merge_max_input_files(&self) -> usize;
+
+    /// Cap on the total rows merged together in one Merge group / RepartitionRange.
+    fn repartition_merge_max_rows(&self) -> u64;
+
+    /// When enabled, the merge repartition path deactivates a table as corrupt if the
+    /// active children resolved for an inactive parent overlap. Off by default: the
+    /// streaming split never drops rows (the first child is the low catch-all, the last
+    /// the high one), and the legacy per-chunk path performed no such metadata check.
+    fn repartition_check_overlapping_children(&self) -> bool;
+    /// Factor `f` controlling when the worker-side partial hash aggregate trims its output to the
+    /// top-k groups. Trimming happens only when the number of local groups exceeds `f * k`, where
+    /// `k = limit + offset`. `0` disables the optimization.
+    fn group_by_limit_factor(&self) -> usize;
+
+    /// When the worker group-by-limit hash trim is active, controls where the worker's hash table
+    /// lives: `false` (default) coalesces the partial aggregate's input to one partition (one hash
+    /// table per worker, "over merge"); `true` keeps the raw multi-partition input so it runs per
+    /// partition ("under merge").
+    fn group_by_limit_per_partition(&self) -> bool;
+
+    /// Replace the sort-preserving merge feeding a grouped Linear (hash) aggregate with a plain
+    /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
+    fn coalesce_under_hash_aggregate(&self) -> bool;
+
+    /// Router-side merge strategy for distributed value-ordered top-k.
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
+
+    fn allow_decimal128(&self) -> bool;
+
+    fn enable_remove_orphaned_remote_files(&self) -> bool;
+
     fn enable_startup_warmup(&self) -> bool;
 
     fn malloc_trim_every_secs(&self) -> u64;
 
-    fn max_cached_queries(&self) -> usize;
+    fn query_cache_max_capacity_bytes(&self) -> u64;
+
+    fn query_queue_cache_max_capacity(&self) -> u64;
+
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
+
+    fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64>;
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
 
@@ -386,17 +623,67 @@ pub trait ConfigObj: DIService {
 
     fn stream_replay_check_interval_secs(&self) -> u64;
 
+    fn check_ws_orphaned_messages_interval_secs(&self) -> u64;
+
+    fn drop_ws_processing_messages_after_secs(&self) -> u64;
+
+    fn drop_ws_complete_messages_after_secs(&self) -> u64;
+
     fn skip_kafka_parsing_errors(&self) -> bool;
 
     fn dump_dir(&self) -> &Option<PathBuf>;
+
+    fn snapshots_deletion_batch_size(&self) -> u64;
+
+    fn minimum_metastore_snapshots_count(&self) -> u64;
+
+    fn metastore_snapshots_lifetime(&self) -> u64;
+
+    fn minimum_cachestore_snapshots_count(&self) -> u64;
+
+    fn cachestore_snapshots_lifetime(&self) -> u64;
+
+    fn max_disk_space(&self) -> u64;
+    fn max_disk_space_per_worker(&self) -> u64;
+
+    fn disk_space_cache_duration_secs(&self) -> u64;
+
+    fn disk_space_compute_lock_timeout_ms(&self) -> u64;
+
+    fn metastore_batch_rpc(&self) -> bool;
+
+    fn transport_max_message_size(&self) -> usize;
+    fn transport_max_frame_size(&self) -> usize;
+
+    fn local_files_cleanup_interval_secs(&self) -> u64;
+
+    fn remote_files_cleanup_interval_secs(&self) -> u64;
+
+    fn local_files_cleanup_size_threshold(&self) -> u64;
+    fn local_files_cleanup_delay_secs(&self) -> u64;
+
+    fn remote_files_cleanup_delay_secs(&self) -> u64;
+
+    fn remote_files_cleanup_batch_size(&self) -> u64;
+
+    fn create_table_max_retries(&self) -> u64;
+
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64>;
+
+    fn max_joined_partitions(&self) -> usize;
+
+    fn max_joined_partitions_message(&self) -> &str;
 }
 
 #[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
     pub partition_split_threshold: u64,
+    pub partition_size_split_threshold_bytes: u64,
     pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub compaction_chunks_threshold_multiplier: f64,
+    pub compaction_chunks_in_memory_size_threshold: u64,
     pub compaction_chunks_max_lifetime_threshold: u64,
     pub compaction_in_memory_chunks_max_lifetime_threshold: u64,
     pub compaction_in_memory_chunks_size_limit: u64,
@@ -404,13 +691,17 @@ pub struct ConfigObjImpl {
     pub compaction_in_memory_chunks_count_threshold: usize,
     pub compaction_in_memory_chunks_ratio_threshold: u64,
     pub compaction_in_memory_chunks_ratio_check_threshold: u64,
+    pub compaction_in_memory_chunks_schedule_period_secs: u64,
     pub wal_split_threshold: u64,
+    pub wal_split_size_threshold_bytes: Option<u64>,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
+    pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
     pub long_term_job_runners_count: usize,
+    pub csv_import_job_runners_count: usize,
     pub bind_address: Option<String>,
     pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
@@ -420,13 +711,39 @@ pub struct ConfigObjImpl {
     pub in_memory_not_used_timeout: u64,
     pub import_job_timeout: u64,
     pub meta_store_log_upload_interval: u64,
+    pub meta_store_log_upload_size_limit: u64,
     pub meta_store_snapshot_interval: u64,
     pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
+    pub streaming_lag_timeout_ms: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
     pub metastore_remote_address: Option<String>,
+    pub metastore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_log_upload_interval: u64,
+    pub cachestore_log_enabled: bool,
+    pub cachestore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_gc_loop_interval: u64,
+    pub cachestore_cache_eviction_loop_interval: u64,
+    pub cachestore_cache_ttl_persist_loop_interval: u64,
+    pub cachestore_cache_max_size: u64,
+    pub cachestore_cache_max_entry_size: usize,
+    pub cachestore_cache_compaction_trigger_size: u64,
+    pub cachestore_cache_threshold_to_force_eviction: u8,
+    pub cachestore_queue_results_expire: u64,
+    pub cachestore_metrics_interval: u64,
+    pub cachestore_cache_max_keys: u32,
+    pub cachestore_cache_policy: CacheEvictionPolicy,
+    pub cachestore_cache_eviction_batch_size: usize,
+    pub cachestore_cache_eviction_below_threshold: u8,
+    pub cachestore_cache_persist_batch_size: usize,
+    pub cachestore_cache_eviction_proactive_size_threshold: u32,
+    pub cachestore_cache_eviction_proactive_ttl_threshold: u32,
+    pub cachestore_cache_ttl_notify_channel: usize,
+    pub cachestore_cache_ttl_buffer_max_size: usize,
+    pub cachestore_cache_lfu_log_factor: u8,
+    pub cachestore_cache_lfu_decay_time: u32,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -434,13 +751,57 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub load_aware_import_placement_enabled: bool,
+    pub repartition_chunks_time_budget_secs: u64,
+    pub push_partial_aggregate_below_merge_enabled: bool,
+    pub compaction_split_by_total_file_size_enabled: bool,
+    pub prefilter_in_memory_chunks_enabled: bool,
+    pub repartition_concurrent_download: bool,
+    pub repartition_strategy: RepartitionStrategy,
+    pub repartition_merge_max_input_files: usize,
+    pub repartition_merge_max_rows: u64,
+    pub repartition_check_overlapping_children: bool,
+    pub group_by_limit_factor: usize,
+    pub group_by_limit_per_partition: bool,
+    pub coalesce_under_hash_aggregate: bool,
+    pub topk_aggregate_strategy: TopKAggregateStrategy,
+    pub allow_decimal128: bool,
+    pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
-    pub max_cached_queries: usize,
+    pub query_cache_max_capacity_bytes: u64,
+    pub query_queue_cache_max_capacity: u64,
+    pub query_cache_time_to_idle_secs: Option<u64>,
+    pub query_cache_stale_while_revalidate_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
+    pub check_ws_orphaned_messages_interval_secs: u64,
+    pub drop_ws_processing_messages_after_secs: u64,
+    pub drop_ws_complete_messages_after_secs: u64,
     pub skip_kafka_parsing_errors: bool,
+    pub snapshots_deletion_batch_size: u64,
+    pub minimum_metastore_snapshots_count: u64,
+    pub metastore_snapshots_lifetime: u64,
+    pub minimum_cachestore_snapshots_count: u64,
+    pub cachestore_snapshots_lifetime: u64,
+    pub max_disk_space: u64,
+    pub max_disk_space_per_worker: u64,
+    pub disk_space_cache_duration_secs: u64,
+    pub disk_space_compute_lock_timeout_ms: u64,
+    pub metastore_batch_rpc: bool,
+    pub transport_max_message_size: usize,
+    pub transport_max_frame_size: usize,
+    pub local_files_cleanup_interval_secs: u64,
+    pub remote_files_cleanup_interval_secs: u64,
+    pub local_files_cleanup_size_threshold: u64,
+    pub local_files_cleanup_delay_secs: u64,
+    pub remote_files_cleanup_delay_secs: u64,
+    pub remote_files_cleanup_batch_size: u64,
+    pub create_table_max_retries: u64,
+    pub compaction_readiness_chunks_threshold: Option<u64>,
+    pub max_joined_partitions: usize,
+    pub max_joined_partitions_message: String,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -451,20 +812,28 @@ impl ConfigObj for ConfigObjImpl {
         self.partition_split_threshold
     }
 
+    fn partition_size_split_threshold_bytes(&self) -> u64 {
+        self.partition_size_split_threshold_bytes
+    }
+
     fn max_partition_split_threshold(&self) -> u64 {
         self.max_partition_split_threshold
     }
 
     fn compaction_chunks_total_size_threshold(&self) -> u64 {
-        self.compaction_chunks_total_size_threshold
+        (self.compaction_chunks_total_size_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
-        self.compaction_chunks_count_threshold
+        (self.compaction_chunks_count_threshold as f64
+            * self.compaction_chunks_threshold_multiplier)
+            .floor() as u64
     }
 
-    fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
-        self.compaction_in_memory_chunks_size_limit
+    fn compaction_chunks_in_memory_size_threshold(&self) -> u64 {
+        self.compaction_chunks_in_memory_size_threshold
     }
 
     fn compaction_chunks_max_lifetime_threshold(&self) -> u64 {
@@ -473,6 +842,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn compaction_in_memory_chunks_max_lifetime_threshold(&self) -> u64 {
         self.compaction_in_memory_chunks_max_lifetime_threshold
+    }
+
+    fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
+        self.compaction_in_memory_chunks_size_limit
     }
 
     fn compaction_in_memory_chunks_total_size_limit(&self) -> u64 {
@@ -491,12 +864,24 @@ impl ConfigObj for ConfigObjImpl {
         self.compaction_in_memory_chunks_ratio_check_threshold
     }
 
+    fn compaction_in_memory_chunks_schedule_period_secs(&self) -> u64 {
+        self.compaction_in_memory_chunks_schedule_period_secs
+    }
+
     fn wal_split_threshold(&self) -> u64 {
         self.wal_split_threshold
     }
 
+    fn wal_split_size_threshold_bytes(&self) -> Option<u64> {
+        self.wal_split_size_threshold_bytes
+    }
+
     fn select_worker_pool_size(&self) -> usize {
         self.select_worker_pool_size
+    }
+
+    fn select_worker_idle_timeout(&self) -> u64 {
+        self.select_worker_idle_timeout
     }
 
     fn job_runners_count(&self) -> usize {
@@ -505,6 +890,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn long_term_job_runners_count(&self) -> usize {
         self.long_term_job_runners_count
+    }
+
+    fn csv_import_job_runners_count(&self) -> usize {
+        self.csv_import_job_runners_count
     }
 
     fn bind_address(&self) -> &Option<String> {
@@ -543,12 +932,20 @@ impl ConfigObj for ConfigObjImpl {
         self.meta_store_log_upload_interval
     }
 
+    fn meta_store_log_upload_size_limit(&self) -> u64 {
+        self.meta_store_log_upload_size_limit
+    }
+
     fn gc_loop_interval(&self) -> u64 {
         self.gc_loop_interval
     }
 
     fn stale_stream_timeout(&self) -> u64 {
         self.stale_stream_timeout
+    }
+
+    fn streaming_lag_timeout_ms(&self) -> u64 {
+        self.streaming_lag_timeout_ms
     }
 
     fn select_workers(&self) -> &Vec<String> {
@@ -563,8 +960,96 @@ impl ConfigObj for ConfigObjImpl {
         &self.metastore_bind_address
     }
 
+    fn metastore_rocksdb_config(&self) -> &RocksStoreConfig {
+        &self.metastore_rocks_store_config
+    }
+
     fn metastore_remote_address(&self) -> &Option<String> {
         &self.metastore_remote_address
+    }
+
+    fn cachestore_log_upload_interval(&self) -> u64 {
+        self.cachestore_log_upload_interval
+    }
+
+    fn cachestore_log_enabled(&self) -> bool {
+        self.cachestore_log_enabled
+    }
+
+    fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
+        &self.cachestore_rocks_store_config
+    }
+
+    fn cachestore_gc_loop_interval(&self) -> u64 {
+        self.cachestore_gc_loop_interval
+    }
+
+    fn cachestore_cache_eviction_loop_interval(&self) -> u64 {
+        self.cachestore_cache_eviction_loop_interval
+    }
+
+    fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64 {
+        self.cachestore_cache_ttl_persist_loop_interval
+    }
+
+    fn cachestore_cache_max_size(&self) -> u64 {
+        self.cachestore_cache_max_size
+    }
+
+    fn cachestore_cache_max_entry_size(&self) -> usize {
+        self.cachestore_cache_max_entry_size
+    }
+
+    fn cachestore_cache_compaction_trigger_size(&self) -> u64 {
+        self.cachestore_cache_compaction_trigger_size
+    }
+
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u8 {
+        self.cachestore_cache_threshold_to_force_eviction
+    }
+
+    fn cachestore_cache_max_keys(&self) -> u32 {
+        self.cachestore_cache_max_keys
+    }
+
+    fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy {
+        self.cachestore_cache_policy.clone()
+    }
+
+    fn cachestore_cache_eviction_batch_size(&self) -> usize {
+        self.cachestore_cache_eviction_batch_size
+    }
+
+    fn cachestore_cache_persist_batch_size(&self) -> usize {
+        self.cachestore_cache_persist_batch_size
+    }
+
+    fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32 {
+        self.cachestore_cache_eviction_proactive_ttl_threshold
+    }
+
+    fn cachestore_cache_ttl_notify_channel(&self) -> usize {
+        self.cachestore_cache_ttl_notify_channel
+    }
+
+    fn cachestore_cache_ttl_buffer_max_size(&self) -> usize {
+        self.cachestore_cache_ttl_buffer_max_size
+    }
+
+    fn cachestore_cache_lfu_log_factor(&self) -> u8 {
+        self.cachestore_cache_lfu_log_factor
+    }
+
+    fn cachestore_cache_lfu_decay_time(&self) -> u32 {
+        self.cachestore_cache_lfu_decay_time
+    }
+
+    fn cachestore_queue_results_expire(&self) -> u64 {
+        self.cachestore_queue_results_expire
+    }
+
+    fn cachestore_metrics_interval(&self) -> u64 {
+        self.cachestore_metrics_interval
     }
 
     fn download_concurrency(&self) -> u64 {
@@ -586,17 +1071,68 @@ impl ConfigObj for ConfigObjImpl {
     fn server_name(&self) -> &String {
         &self.server_name
     }
-
     fn max_ingestion_data_frames(&self) -> usize {
         self.max_ingestion_data_frames
     }
-
     fn upload_to_remote(&self) -> bool {
         self.upload_to_remote
     }
-
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+    fn load_aware_import_placement_enabled(&self) -> bool {
+        self.load_aware_import_placement_enabled
+    }
+    fn repartition_chunks_time_budget_secs(&self) -> u64 {
+        self.repartition_chunks_time_budget_secs
+    }
+    fn push_partial_aggregate_below_merge_enabled(&self) -> bool {
+        self.push_partial_aggregate_below_merge_enabled
+    }
+    fn compaction_split_by_total_file_size_enabled(&self) -> bool {
+        self.compaction_split_by_total_file_size_enabled
+    }
+    fn prefilter_in_memory_chunks_enabled(&self) -> bool {
+        self.prefilter_in_memory_chunks_enabled
+    }
+    fn repartition_concurrent_download(&self) -> bool {
+        self.repartition_concurrent_download
+    }
+    fn repartition_strategy(&self) -> RepartitionStrategy {
+        self.repartition_strategy
+    }
+    fn repartition_merge_max_input_files(&self) -> usize {
+        self.repartition_merge_max_input_files
+    }
+    fn repartition_merge_max_rows(&self) -> u64 {
+        self.repartition_merge_max_rows
+    }
+    fn repartition_check_overlapping_children(&self) -> bool {
+        self.repartition_check_overlapping_children
+    }
+
+    fn group_by_limit_factor(&self) -> usize {
+        self.group_by_limit_factor
+    }
+
+    fn group_by_limit_per_partition(&self) -> bool {
+        self.group_by_limit_per_partition
+    }
+
+    fn coalesce_under_hash_aggregate(&self) -> bool {
+        self.coalesce_under_hash_aggregate
+    }
+
+    fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy {
+        self.topk_aggregate_strategy
+    }
+
+    fn allow_decimal128(&self) -> bool {
+        self.allow_decimal128
+    }
+
+    fn enable_remove_orphaned_remote_files(&self) -> bool {
+        self.enable_remove_orphaned_remote_files
     }
 
     fn enable_startup_warmup(&self) -> bool {
@@ -605,24 +1141,145 @@ impl ConfigObj for ConfigObjImpl {
     fn malloc_trim_every_secs(&self) -> u64 {
         self.malloc_trim_every_secs
     }
-    fn max_cached_queries(&self) -> usize {
-        self.max_cached_queries
+    fn query_cache_max_capacity_bytes(&self) -> u64 {
+        self.query_cache_max_capacity_bytes
     }
+    fn query_queue_cache_max_capacity(&self) -> u64 {
+        self.query_queue_cache_max_capacity
+    }
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
+        self.query_cache_time_to_idle_secs
+    }
+    fn query_cache_stale_while_revalidate_secs(&self) -> Option<u64> {
+        self.query_cache_stale_while_revalidate_secs
+    }
+
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
         self.metadata_cache_max_capacity_bytes
     }
+
     fn metadata_cache_time_to_idle_secs(&self) -> u64 {
         self.metadata_cache_time_to_idle_secs
     }
+
     fn stream_replay_check_interval_secs(&self) -> u64 {
         self.stream_replay_check_interval_secs
     }
+
+    fn check_ws_orphaned_messages_interval_secs(&self) -> u64 {
+        self.check_ws_orphaned_messages_interval_secs
+    }
+
+    fn drop_ws_processing_messages_after_secs(&self) -> u64 {
+        self.drop_ws_processing_messages_after_secs
+    }
+
+    fn drop_ws_complete_messages_after_secs(&self) -> u64 {
+        self.drop_ws_complete_messages_after_secs
+    }
+
     fn skip_kafka_parsing_errors(&self) -> bool {
         self.skip_kafka_parsing_errors
     }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
         &self.dump_dir
+    }
+
+    fn snapshots_deletion_batch_size(&self) -> u64 {
+        self.snapshots_deletion_batch_size
+    }
+
+    fn minimum_metastore_snapshots_count(&self) -> u64 {
+        self.minimum_metastore_snapshots_count
+    }
+
+    fn metastore_snapshots_lifetime(&self) -> u64 {
+        self.metastore_snapshots_lifetime
+    }
+
+    fn minimum_cachestore_snapshots_count(&self) -> u64 {
+        self.minimum_cachestore_snapshots_count
+    }
+
+    fn cachestore_snapshots_lifetime(&self) -> u64 {
+        self.cachestore_snapshots_lifetime
+    }
+
+    fn max_disk_space(&self) -> u64 {
+        self.max_disk_space
+    }
+
+    fn max_disk_space_per_worker(&self) -> u64 {
+        self.max_disk_space_per_worker
+    }
+
+    fn disk_space_cache_duration_secs(&self) -> u64 {
+        self.disk_space_cache_duration_secs
+    }
+
+    fn disk_space_compute_lock_timeout_ms(&self) -> u64 {
+        self.disk_space_compute_lock_timeout_ms
+    }
+
+    fn metastore_batch_rpc(&self) -> bool {
+        self.metastore_batch_rpc
+    }
+
+    fn transport_max_message_size(&self) -> usize {
+        self.transport_max_message_size
+    }
+
+    fn transport_max_frame_size(&self) -> usize {
+        self.transport_max_frame_size
+    }
+
+    fn local_files_cleanup_interval_secs(&self) -> u64 {
+        self.local_files_cleanup_interval_secs
+    }
+
+    fn remote_files_cleanup_interval_secs(&self) -> u64 {
+        self.remote_files_cleanup_interval_secs
+    }
+
+    fn local_files_cleanup_size_threshold(&self) -> u64 {
+        self.local_files_cleanup_size_threshold
+    }
+
+    fn local_files_cleanup_delay_secs(&self) -> u64 {
+        self.local_files_cleanup_delay_secs
+    }
+
+    fn remote_files_cleanup_delay_secs(&self) -> u64 {
+        self.remote_files_cleanup_delay_secs
+    }
+
+    fn remote_files_cleanup_batch_size(&self) -> u64 {
+        self.remote_files_cleanup_batch_size
+    }
+
+    fn create_table_max_retries(&self) -> u64 {
+        self.create_table_max_retries
+    }
+
+    fn compaction_readiness_chunks_threshold(&self) -> Option<u64> {
+        self.compaction_readiness_chunks_threshold
+    }
+
+    fn max_joined_partitions(&self) -> usize {
+        self.max_joined_partitions
+    }
+
+    fn max_joined_partitions_message(&self) -> &str {
+        &self.max_joined_partitions_message
+    }
+
+    fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
+        self.cachestore_cache_eviction_below_threshold
+    }
+
+    fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32 {
+        self.cachestore_cache_eviction_proactive_size_threshold
     }
 }
 
@@ -645,15 +1302,59 @@ pub async fn init_test_logger() {
     }
 }
 
+/// Router-side merge strategy for distributed value-ordered top-k (`SELECT ... GROUP BY x ORDER BY
+/// agg(...) LIMIT k`). Selected by `CUBESTORE_TOPK_STRATEGY`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopKAggregateStrategy {
+    /// Original streaming NRA merge with per-row state (default).
+    Streaming,
+    /// Same streaming NRA merge (keeps early termination, bounded router memory), but vectorized.
+    VectorizedStreaming,
+    /// ClickHouse-style full re-aggregation on the router + fetch-limited sort. Drops early
+    /// termination, so the router materializes every distinct group.
+    FullMerge,
+}
+
+/// Parses [`TopKAggregateStrategy`] from an env var. Lenient: an unset or unrecognized value falls
+/// back to the default (`Streaming`) with a warning rather than panicking -- a malformed perf toggle
+/// must never take a node down.
+fn env_topk_strategy(name: &str) -> TopKAggregateStrategy {
+    match env::var(name) {
+        Err(_) => TopKAggregateStrategy::Streaming,
+        Ok(v) => match v.trim().to_ascii_lowercase().as_str() {
+            "" | "streaming" | "default" | "v1" => TopKAggregateStrategy::Streaming,
+            "vectorized" | "vectorized_streaming" | "v2" => {
+                TopKAggregateStrategy::VectorizedStreaming
+            }
+            "full_merge" | "full-merge" | "fullmerge" => TopKAggregateStrategy::FullMerge,
+            other => {
+                log::warn!(
+                    "unknown {} value '{}', using default (streaming)",
+                    name,
+                    other
+                );
+                TopKAggregateStrategy::Streaming
+            }
+        },
+    }
+}
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
         .map(|x| match x.as_str() {
-            "0" => false,
-            "1" => true,
-            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+            "0" | "false" => false,
+            "1" | "true" => true,
+            _ => panic!("expected '0'/'1'/true/false for '{}', found '{}'", name, &x),
         })
         .unwrap_or(default)
+}
+
+/// Lenient boolean env read for opt-in toggles: only `1`/`true` enable it, anything else (including a
+/// typo) is treated as off. Unlike [`env_bool`] it never panics -- a malformed value on a
+/// performance flag must not take a node down on startup.
+fn env_flag(name: &str) -> bool {
+    env::var(name).map_or(false, |v| v == "true" || v == "1")
 }
 
 pub fn env_parse<T>(name: &str, default: T) -> T
@@ -662,6 +1363,161 @@ where
     T::Err: Display,
 {
     env_optparse(name).unwrap_or(default)
+}
+
+/// Lenient numeric env read for opt-in performance toggles: an unparseable value logs a warning and
+/// falls back to the default instead of panicking, so a typo can't take a node down on startup.
+pub fn env_parse_lenient<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    match env::var(name) {
+        Ok(v) => match v.parse::<T>() {
+            Ok(n) => n,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring environment variable '{}' with '{}' value: {}; using default",
+                    name,
+                    v,
+                    e
+                );
+                default
+            }
+        },
+        Err(_) => default,
+    }
+}
+
+pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
+where
+    T: FromStr + PartialOrd + Display,
+    T::Err: Display,
+{
+    let v = match env::var(name).ok() {
+        None => {
+            return default;
+        }
+        Some(v) => v,
+    };
+
+    let n = match v.parse::<T>() {
+        Ok(n) => n,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                max
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                min
+            )
+        }
+    };
+
+    n
+}
+
+pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
+    let v = match env::var(name).ok() {
+        None => {
+            if cfg!(debug_assertions) {
+                // It's needed to check that default values are correct
+                default.to_string()
+            } else {
+                return default;
+            }
+        }
+        Some(v) => v,
+    };
+
+    let n = match parse_size::parse_size(&v) {
+        Ok(n) => n as usize,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                humansize::format_size(max, humansize::DECIMAL)
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                humansize::format_size(min, humansize::DECIMAL)
+            )
+        }
+    };
+
+    n
+}
+
+/// Parses a human-readable byte size env var into `Some(bytes)`. Returns `None` when the var is
+/// unset or set to `0`, which callers treat as "disabled".
+pub fn env_parse_optional_size(
+    name: &str,
+    max: Option<usize>,
+    min: Option<usize>,
+) -> Option<usize> {
+    let v = env::var(name).ok()?;
+
+    let n = match parse_size::parse_size(&v) {
+        Ok(n) => n as usize,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if n == 0 {
+        return None;
+    }
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                humansize::format_size(max, humansize::DECIMAL)
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                humansize::format_size(min, humansize::DECIMAL)
+            )
+        }
+    };
+
+    Some(n)
 }
 
 fn env_optparse<T>(name: &str) -> Option<T>
@@ -678,10 +1534,80 @@ where
     })
 }
 
+// Unlike env_optparse, an unparseable value is not fatal: it logs a warning and falls
+// back to per_chunk, so a typo in the strategy env never takes the process down.
+fn env_repartition_strategy() -> RepartitionStrategy {
+    match env::var("CUBESTORE_REPARTITION_STRATEGY") {
+        Ok(v) => match v.parse::<RepartitionStrategy>() {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring CUBESTORE_REPARTITION_STRATEGY: {}; using per_chunk",
+                    e
+                );
+                RepartitionStrategy::PerChunk
+            }
+        },
+        Err(_) => RepartitionStrategy::PerChunk,
+    }
+}
+
 impl Config {
+    fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
+        let trigger_size = match cache_max_size >> 20 {
+            d if d < 32 => 640 << 20,
+            d if d < 64 => 1280 << 20,
+            d if d < 512 => cache_max_size * 5,
+            d if d < 1024 => cache_max_size * 4,
+            d if d < 4096 => cache_max_size * 3,
+            _ => cache_max_size * 2,
+        };
+
+        std::cmp::max(trigger_size, 512 << 20)
+    }
+
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
-        Config {
+        let query_cache_stale_while_revalidate_secs: u64 =
+            env_parse("CUBESTORE_QUERY_CACHE_STALE_WHILE_REVALIDATE", 0);
+        let query_cache_time_to_idle_secs = env_parse(
+            "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
+            // 1 hour
+            60 * 60,
+        );
+
+        let cachestore_cache_max_size = env_parse_size(
+            "CUBESTORE_CACHE_MAX_SIZE",
+            4096 << 20,
+            // 16384 mb
+            Some(16_384 << 20),
+            // 32 mb
+            Some(32 << 20),
+        );
+
+        let transport_max_message_size = env_parse_size(
+            "CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE",
+            64 << 20,
+            Some(256 << 20),
+            Some(16 << 20),
+        );
+
+        let cachestore_cache_max_entry_size = env_parse_size(
+            "CUBESTORE_CACHE_MAX_ENTRY_SIZE",
+            (64 << 20) - (1024 << 10),
+            Some(transport_max_message_size - (1024 << 10)),
+            None,
+        );
+
+        let cachestore_cache_compaction_trigger_size = env_parse_size(
+            "CUBESTORE_CACHE_COMPACTION_TRIGGER_SIZE",
+            Self::calculate_cache_compaction_trigger_size(cachestore_cache_max_size),
+            None,
+            // 256 mb
+            Some(256 << 20),
+        ) as u64;
+
+        let result = Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
                 data_dir: env::var("CUBESTORE_DATA_DIR")
@@ -695,11 +1621,27 @@ impl Config {
                     "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
                     1048576 * 2,
                 ),
+                partition_size_split_threshold_bytes: env_parse_size(
+                    "CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD",
+                    100 * 1024 * 1024,
+                    None,
+                    Some(32 << 20),
+                ) as u64,
                 max_partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_MAX_SPLIT_THRESHOLD",
                     1048576 * 8,
                 ),
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
+                compaction_chunks_threshold_multiplier: env_parse(
+                    "CUBESTORE_COMPACTION_CHUNKS_THRESHOLD_MULTIPLIER",
+                    1.0_f64,
+                ),
+                compaction_chunks_in_memory_size_threshold: env_parse_size(
+                    "CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD",
+                    1 * 1024 * 1024 * 1024,
+                    None,
+                    Some(1 * 1024 * 1024 * 1024),
+                ) as u64,
                 compaction_chunks_total_size_threshold: env_parse(
                     "CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD",
                     1048576 * 2,
@@ -732,6 +1674,10 @@ impl Config {
                     "CUBESTORE_IN_MEMORY_CHUNKS_RATIO_CHECK_THRESHOLD",
                     1000,
                 ),
+                compaction_in_memory_chunks_schedule_period_secs: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_SCHEDULE_PERIOD_SECS",
+                    5,
+                ),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -760,6 +1706,12 @@ impl Config {
                     }
                 },
                 select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
+                select_worker_idle_timeout: env_parse_duration(
+                    "CUBESTORE_SELECT_WORKERS_IDLE_TIMEOUT",
+                    10 * 60,
+                    Some(2 * 60 * 60),
+                    None,
+                ),
                 bind_address: Some(
                     env::var("CUBESTORE_BIND_ADDR")
                         .ok()
@@ -776,9 +1728,16 @@ impl Config {
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
                 meta_store_log_upload_interval: 30,
+                meta_store_log_upload_size_limit: env_parse_size(
+                    "CUBESTORE_METASTORE_UPLOAD_LOG_SIZE_LIMIT",
+                    100 * 1024 * 1024,
+                    Some(1024 * 1024 * 1024),
+                    Some(1 * 1024 * 1024),
+                ) as u64,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stale_stream_timeout: env_parse("CUBESTORE_STALE_STREAM_TIMEOUT", 600),
+                streaming_lag_timeout_ms: env_parse("CUBESTORE_STREAMING_LAG_TIMEOUT_MS", 5000),
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
@@ -790,21 +1749,182 @@ impl Config {
                     env_optparse::<u16>("CUBESTORE_META_PORT").map(|v| format!("0.0.0.0:{}", v))
                 }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: env_parse_duration(
+                    "CACHESTORE_LOG_UPLOAD_INTERVAL",
+                    30,
+                    Some(60),
+                    Some(15),
+                ),
+                cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", false),
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
+                cachestore_gc_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHESTORE_GC_LOOP",
+                    15,
+                    // 1 minute
+                    Some(60 * 1),
+                    Some(1),
+                ),
+                cachestore_cache_eviction_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_LOOP",
+                    60,
+                    // 2 h
+                    Some(2 * 60 * 60),
+                    // 0 to disable
+                    Some(1),
+                ),
+                cachestore_cache_ttl_persist_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHE_TTL_PERSIST_LOOP",
+                    15,
+                    // 5m
+                    Some(5 * 60),
+                    // 0 to disable
+                    Some(0),
+                ),
+                cachestore_cache_max_size: cachestore_cache_max_size as u64,
+                cachestore_cache_max_entry_size,
+                cachestore_cache_compaction_trigger_size,
+                cachestore_cache_threshold_to_force_eviction: 25,
+                cachestore_queue_results_expire: env_parse_duration(
+                    "CUBESTORE_QUEUE_RESULTS_EXPIRE",
+                    60,
+                    // 5 minutes = TTL of QueueResult
+                    Some(60 * 5),
+                    Some(1),
+                ),
+                cachestore_metrics_interval: env_parse_duration(
+                    "CUBESTORE_CACHESTORE_METRICS_LOOP",
+                    15,
+                    Some(60 * 10),
+                    Some(0),
+                ),
+                cachestore_cache_max_keys: env_parse("CUBESTORE_CACHE_MAX_KEYS", 100_000),
+                cachestore_cache_policy: env_parse(
+                    "CUBESTORE_CACHE_POLICY",
+                    CacheEvictionPolicy::AllKeysLru,
+                ),
+                cachestore_cache_eviction_batch_size: env_parse(
+                    "CUBESTORE_CACHE_EVICTION_BATCH_SIZE",
+                    150,
+                ),
+                cachestore_cache_eviction_below_threshold: 15,
+                cachestore_cache_persist_batch_size: env_parse(
+                    "CUBESTORE_CACHE_PERSIST_BATCH_SIZE",
+                    150,
+                ),
+                cachestore_cache_eviction_proactive_size_threshold: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_PROACTIVE_SIZE_THRESHOLD",
+                    // 256 kb
+                    256 << 10,
+                    Some(cachestore_cache_max_entry_size as u32),
+                    // It's not allowed to be less than 128 kb, because it can proactively evict refresh keys
+                    Some(128 << 10),
+                ),
+                cachestore_cache_eviction_proactive_ttl_threshold: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_PROACTIVE_TTL_THRESHOLD",
+                    5,
+                    Some(5 * 60),
+                    Some(0),
+                ),
+                cachestore_cache_ttl_notify_channel: env_parse(
+                    "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
+                    4_096,
+                ),
+                cachestore_cache_ttl_buffer_max_size: env_parse(
+                    "CUBESTORE_CACHE_TTL_BUFFER_MAX_SIZE",
+                    16_384,
+                ),
+                cachestore_cache_lfu_log_factor: env_parse("CUBESTORE_CACHE_LFU_LOG_FACTOR", 10),
+                cachestore_cache_lfu_decay_time: env_parse("CUBESTORE_CACHE_LFU_DECAY_TIME", 60),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
+                wal_split_size_threshold_bytes: env_parse_optional_size(
+                    "CUBESTORE_WAL_SPLIT_SIZE_THRESHOLD",
+                    None,
+                    None,
+                )
+                .map(|v| v as u64),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
+                csv_import_job_runners_count: env_parse("CUBESTORE_CSV_IMPORT_JOB_RUNNERS", 0),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                load_aware_import_placement_enabled: env_bool(
+                    "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
+                    false,
+                ),
+                repartition_chunks_time_budget_secs: env_parse(
+                    "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
+                    60,
+                ),
+                push_partial_aggregate_below_merge_enabled: env_bool(
+                    "CUBESTORE_PUSH_PARTIAL_AGGREGATE_BELOW_MERGE",
+                    true,
+                ),
+                compaction_split_by_total_file_size_enabled: env_bool(
+                    "CUBESTORE_COMPACTION_SPLIT_BY_TOTAL_FILE_SIZE",
+                    false,
+                ),
+                prefilter_in_memory_chunks_enabled: env_bool(
+                    "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
+                    false,
+                ),
+                repartition_concurrent_download: env_bool(
+                    "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
+                    false,
+                ),
+                repartition_strategy: env_repartition_strategy(),
+                repartition_merge_max_input_files: env_parse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_INPUT_FILES",
+                    50,
+                ),
+                repartition_merge_max_rows: env_parse(
+                    "CUBESTORE_REPARTITION_MERGE_MAX_ROWS",
+                    4_000_000,
+                ),
+                repartition_check_overlapping_children: env_bool(
+                    "CUBESTORE_REPARTITION_CHECK_OVERLAPPING_CHILDREN",
+                    false,
+                ),
+                group_by_limit_factor: env_parse_lenient("CUBESTORE_GROUP_BY_LIMIT_FACTOR", 0),
+                group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION"),
+                coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE"),
+                topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
+                allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
+                enable_remove_orphaned_remote_files: env_bool(
+                    "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
+                    false,
+                ),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
-                max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                query_cache_max_capacity_bytes: env_parse_size(
+                    "CUBESTORE_QUERY_CACHE_MAX_CAPACITY",
+                    512 << 20,
+                    Some(16384 << 20),
+                    Some(0),
+                ) as u64,
+                query_queue_cache_max_capacity: env_parse(
+                    "CUBESTORE_QUEUE_CACHE_MAX_CAPACITY",
+                    10000,
+                ),
+                query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
+                    None
+                } else {
+                    Some(query_cache_time_to_idle_secs)
+                },
+                query_cache_stale_while_revalidate_secs: if query_cache_stale_while_revalidate_secs
+                    == 0
+                {
+                    None
+                } else {
+                    Some(query_cache_stale_while_revalidate_secs)
+                },
                 metadata_cache_max_capacity_bytes: env_parse(
                     "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
                     0,
@@ -815,25 +1935,149 @@ impl Config {
                 ),
                 stream_replay_check_interval_secs: env_parse(
                     "CUBESTORE_STREAM_REPLAY_CHECK_INTERVAL",
-                    0,
+                    60,
+                ),
+                check_ws_orphaned_messages_interval_secs: env_parse(
+                    "CUBESTORE_CHECK_WS_ORPHANED_MESSAGES_INTERVAL",
+                    30,
+                ),
+                drop_ws_processing_messages_after_secs: env_parse(
+                    "CUBESTORE_DROP_WS_PROCESSING_MESSAGES_AFTER",
+                    60 * 60,
+                ),
+                drop_ws_complete_messages_after_secs: env_parse(
+                    "CUBESTORE_DROP_WS_COMPLETE_MESSAGES_AFTER",
+                    10 * 60,
                 ),
                 skip_kafka_parsing_errors: env_parse("CUBESTORE_SKIP_KAFKA_PARSING_ERRORS", false),
+                // Presently, not useful to make more than upload_concurrency times constant
+                snapshots_deletion_batch_size: env_parse(
+                    "CUBESTORE_SNAPSHOTS_DELETION_BATCH_SIZE",
+                    80,
+                ),
+                minimum_metastore_snapshots_count: env_parse(
+                    "CUBESTORE_MINIMUM_METASTORE_SNAPSHOTS_COUNT",
+                    5,
+                ),
+                metastore_snapshots_lifetime: env_parse(
+                    "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
+                    24 * 60 * 60,
+                ),
+                minimum_cachestore_snapshots_count: env_parse(
+                    "CUBESTORE_MINIMUM_CACHESTORE_SNAPSHOTS_COUNT",
+                    5,
+                ),
+                cachestore_snapshots_lifetime: env_parse(
+                    "CUBESTORE_CACHESTORE_SNAPSHOTS_LIFETIME",
+                    60 * 60,
+                ),
+                max_disk_space: env_parse("CUBESTORE_MAX_DISK_SPACE_GB", 0) * 1024 * 1024 * 1024,
+                max_disk_space_per_worker: env_parse("CUBESTORE_MAX_DISK_SPACE_PER_WORKER_GB", 0)
+                    * 1024
+                    * 1024
+                    * 1024,
+                disk_space_cache_duration_secs: 300,
+                disk_space_compute_lock_timeout_ms: env_parse_duration(
+                    "CUBESTORE_DISK_SPACE_LOCK_WAIT_MS",
+                    1000,
+                    Some(60_000),
+                    None,
+                ),
+                metastore_batch_rpc: env_parse("CUBESTORE_METASTORE_BATCH_RPC", false),
+                transport_max_message_size,
+                transport_max_frame_size: env_parse_size(
+                    "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
+                    64 << 20,
+                    Some(256 << 20),
+                    Some(4 << 20),
+                ),
+                local_files_cleanup_interval_secs: env_parse(
+                    "CUBESTORE_LOCAL_FILES_CLEANUP_INTERVAL_SECS",
+                    600,
+                ),
+                remote_files_cleanup_interval_secs: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_INTERVAL_SECS",
+                    6 * 600,
+                ),
+                local_files_cleanup_size_threshold: env_parse_size(
+                    "CUBESTORE_LOCAL_FILES_CLEANUP_SIZE_THRESHOLD",
+                    1024 * 1024 * 1024,
+                    None,
+                    None,
+                ) as u64,
+                local_files_cleanup_delay_secs: env_parse(
+                    "CUBESTORE_LOCAL_FILES_CLEANUP_DELAY_SECS",
+                    600,
+                ),
+                remote_files_cleanup_delay_secs: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_DELAY_SECS",
+                    3600,
+                ),
+                remote_files_cleanup_batch_size: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
+                    50000,
+                ),
+                create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
+                compaction_readiness_chunks_threshold: env_optparse(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
+                ),
+                max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
+                max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }),
-        }
+        };
+        result.validate_config();
+        result
     }
 
     pub fn test(name: &str) -> Config {
-        let query_timeout = 15;
+        Self::make_test_config(Self::test_config_obj(name))
+    }
+
+    pub fn migration_test(name: &str) -> Config {
+        let config_obj_impl = Self::test_config_obj(name);
         Config {
             injector: Injector::new(),
-            config_obj: Arc::new(ConfigObjImpl {
-                data_dir: env::current_dir()
-                    .unwrap()
-                    .join(format!("{}-local-store", name)),
+            config_obj: Arc::new(config_obj_impl),
+        }
+    }
+
+    /// Possibly there is nothing test-specific about this; its purpose is to be publicly used by Config::test.
+    pub fn make_test_config(config_obj_impl: ConfigObjImpl) -> Config {
+        Config {
+            injector: Injector::new(),
+            config_obj: Arc::new(config_obj_impl),
+        }
+    }
+
+    /// Constructs the underlying ConfigObjImpl used in `Config::test`, so that you can modify it
+    /// before passing it to Config::make_test_config.
+    pub fn test_config_obj(name: &str) -> ConfigObjImpl {
+        Self::test_config_obj_in_directory(&env::current_dir().unwrap(), name)
+    }
+
+    pub fn test_data_dir_path(directory: &Path, test_name: &str) -> PathBuf {
+        directory.join(format!("{}-local-store", test_name))
+    }
+
+    pub fn test_remote_dir_path(directory: &Path, test_name: &str) -> PathBuf {
+        directory.join(format!("{}-upstream", test_name))
+    }
+
+    /// `directory` is likely `env::current_dir().unwrap()`, but it might used to make data_dir and
+    /// remote_dir be pre-existing locations.
+    pub fn test_config_obj_in_directory(directory: &PathBuf, name: &str) -> ConfigObjImpl {
+        let query_timeout = 15;
+        // Git blame history preserving block
+        {
+            ConfigObjImpl {
+                data_dir: Self::test_data_dir_path(directory, name),
                 dump_dir: None,
                 partition_split_threshold: 20,
+                partition_size_split_threshold_bytes: 2 * 1024,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
+                compaction_chunks_threshold_multiplier: 1.0,
+                compaction_chunks_in_memory_size_threshold: 3 * 1024 * 1024 * 1024,
                 compaction_chunks_total_size_threshold: 10,
                 compaction_chunks_max_lifetime_threshold: 600,
                 compaction_in_memory_chunks_max_lifetime_threshold: 60,
@@ -842,16 +2086,15 @@ impl Config {
                 compaction_in_memory_chunks_count_threshold: 10,
                 compaction_in_memory_chunks_ratio_threshold: 3,
                 compaction_in_memory_chunks_ratio_check_threshold: 1000,
+                compaction_in_memory_chunks_schedule_period_secs: 5,
                 store_provider: FileStoreProvider::Filesystem {
-                    remote_dir: Some(
-                        env::current_dir()
-                            .unwrap()
-                            .join(format!("{}-upstream", name)),
-                    ),
+                    remote_dir: Some(Self::test_remote_dir_path(directory, name)),
                 },
                 select_worker_pool_size: 0,
+                select_worker_idle_timeout: 600,
                 job_runners_count: 4,
                 long_term_job_runners_count: 8,
+                csv_import_job_runners_count: 2,
                 bind_address: None,
                 status_bind_address: None,
                 http_bind_address: None,
@@ -860,29 +2103,102 @@ impl Config {
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
                 stale_stream_timeout: 60,
+                streaming_lag_timeout_ms: 5000,
                 select_workers: Vec::new(),
                 worker_bind_address: None,
                 metastore_bind_address: None,
                 metastore_remote_address: None,
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: 30,
+                cachestore_log_enabled: true,
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
+                cachestore_gc_loop_interval: 30,
+                cachestore_cache_eviction_loop_interval: 60,
+                cachestore_cache_ttl_persist_loop_interval: 15,
+                cachestore_cache_max_size: 4096 << 20,
+                cachestore_cache_max_entry_size: 64 << 20,
+                cachestore_cache_compaction_trigger_size: 4096 * 2 << 20,
+                cachestore_cache_threshold_to_force_eviction: 25,
+                cachestore_queue_results_expire: 90,
+                cachestore_metrics_interval: 15,
+                cachestore_cache_max_keys: 100_000,
+                cachestore_cache_policy: CacheEvictionPolicy::SampledLru,
+                cachestore_cache_eviction_batch_size: 150,
+                cachestore_cache_eviction_below_threshold: 15,
+                cachestore_cache_persist_batch_size: 200,
+                cachestore_cache_eviction_proactive_size_threshold: 4096,
+                cachestore_cache_eviction_proactive_ttl_threshold: 5,
+                cachestore_cache_ttl_notify_channel: 4_096,
+                cachestore_cache_ttl_buffer_max_size: 16_384,
+                cachestore_cache_lfu_log_factor: 10,
+                cachestore_cache_lfu_decay_time: 60,
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
                 wal_split_threshold: 262144,
+                wal_split_size_threshold_bytes: None,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                load_aware_import_placement_enabled: false,
+                repartition_chunks_time_budget_secs: 60,
+                push_partial_aggregate_below_merge_enabled: true,
+                compaction_split_by_total_file_size_enabled: false,
+                // Production default is off; kept on in tests so prefilter_chunks_shared_scan
+                // and the rest of the suite keep exercising the worker-side trim path.
+                prefilter_in_memory_chunks_enabled: true,
+                repartition_concurrent_download: false,
+                repartition_strategy: RepartitionStrategy::PerChunk,
+                repartition_merge_max_input_files: 50,
+                repartition_merge_max_rows: 4_000_000,
+                repartition_check_overlapping_children: false,
+                group_by_limit_factor: 2,
+                group_by_limit_per_partition: false,
+                coalesce_under_hash_aggregate: false,
+                topk_aggregate_strategy: TopKAggregateStrategy::Streaming,
+                allow_decimal128: false,
+                enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
-                max_cached_queries: 10_000,
+                query_cache_max_capacity_bytes: 512 << 20,
+                query_queue_cache_max_capacity: 10000,
+                query_cache_time_to_idle_secs: Some(600),
+                query_cache_stale_while_revalidate_secs: None,
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
+                meta_store_log_upload_size_limit: 100 * 1024 * 1024,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stream_replay_check_interval_secs: 60,
+                check_ws_orphaned_messages_interval_secs: 1,
+                drop_ws_processing_messages_after_secs: 60,
+                drop_ws_complete_messages_after_secs: 10,
                 skip_kafka_parsing_errors: false,
-            }),
+                snapshots_deletion_batch_size: 80,
+                minimum_metastore_snapshots_count: 3,
+                metastore_snapshots_lifetime: 24 * 3600,
+                minimum_cachestore_snapshots_count: 3,
+                cachestore_snapshots_lifetime: 3600,
+                max_disk_space: 0,
+                max_disk_space_per_worker: 0,
+                disk_space_cache_duration_secs: 0,
+                disk_space_compute_lock_timeout_ms: 1000,
+                metastore_batch_rpc: false,
+                transport_max_message_size: 64 << 20,
+                transport_max_frame_size: 16 << 20,
+                local_files_cleanup_interval_secs: 600,
+                remote_files_cleanup_interval_secs: 600,
+                local_files_cleanup_size_threshold: 0,
+                local_files_cleanup_delay_secs: 600,
+                remote_files_cleanup_delay_secs: 3600,
+                remote_files_cleanup_batch_size: 50000,
+                create_table_max_retries: 3,
+                compaction_readiness_chunks_threshold: None,
+                max_joined_partitions: 5,
+                max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
+            }
         }
     }
 
@@ -891,15 +2207,31 @@ impl Config {
         update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl,
     ) -> Config {
         let new_config = self.config_obj.as_ref().clone();
-        Self {
+        let config = Self {
             injector: self.injector.clone(),
             config_obj: Arc::new(update_config(new_config)),
+        };
+        config.validate_config();
+        config
+    }
+
+    fn validate_config(&self) {
+        if let Some(readiness) = self.config_obj.compaction_readiness_chunks_threshold {
+            let compaction = self.config_obj.compaction_chunks_count_threshold;
+            if readiness < compaction {
+                panic!(
+                    "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD ({}) must not be lower than \
+                     CUBESTORE_CHUNKS_COUNT_THRESHOLD ({}), otherwise compaction will never \
+                     reduce chunks below the readiness threshold",
+                    readiness, compaction,
+                );
+            }
         }
     }
 
     pub async fn start_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options::<_, T, _, _>(
             true,
@@ -915,9 +2247,26 @@ impl Config {
         .await
     }
 
+    pub async fn start_migration_test<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
+    where
+        T: Future<Output = Result<(), CubeError>> + Send,
+    {
+        self.start_migration_test_with_options::<_, T, _, _>(
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
+    }
+
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options::<_, T, _, _>(
             false,
@@ -939,7 +2288,7 @@ impl Config {
         test_fn: impl FnOnce(CubeServices) -> T2,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
     {
         self.start_test_with_options(true, Some(configure_injector), test_fn)
             .await
@@ -952,7 +2301,7 @@ impl Config {
         test_fn: F,
     ) where
         T1: Future<Output = ()> + Send,
-        T2: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
@@ -962,10 +2311,10 @@ impl Config {
         let remote_fs = self.remote_fs().await.unwrap();
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let remote_files = remote_fs.list("").await.unwrap();
+            let remote_files = remote_fs.list("".to_string()).await.unwrap();
             for file in remote_files {
                 debug!("Cleaning {}", file);
-                let _ = remote_fs.delete_file(file.as_str()).await.unwrap();
+                let _ = remote_fs.delete_file(file).await.unwrap();
             }
         }
         {
@@ -978,8 +2327,10 @@ impl Config {
 
             // Should be long enough even for CI.
             let timeout = Duration::from_secs(600);
-            if let Err(_) = timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
-                panic!("Test timed out after {} seconds", timeout.as_secs());
+            match timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                Err(_) => panic!("Test timed out after {} seconds", timeout.as_secs()),
+                Ok(Err(e)) => panic!("Test failed: {}", e.display_with_backtrace()),
+                Ok(Ok(())) => {}
             }
 
             services.stop_processing_loops().await.unwrap();
@@ -989,18 +2340,71 @@ impl Config {
         let _ = DB::destroy(&Options::default(), self.cache_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let remote_files = remote_fs.list("").await.unwrap();
+            let remote_files = remote_fs.list("".to_string()).await.unwrap();
             for file in remote_files {
-                let _ = remote_fs.delete_file(file.as_str()).await;
+                let _ = remote_fs.delete_file(file).await;
             }
+        }
+    }
+
+    pub async fn start_migration_test_with_options<T1, T2, I, F>(
+        &self,
+        configure_injector: Option<I>,
+        test_fn: F,
+    ) where
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = Result<(), CubeError>> + Send,
+        I: FnOnce(Arc<Injector>) -> T1,
+        F: FnOnce(CubeServices) -> T2,
+    {
+        init_test_logger().await;
+
+        let store_path = self.local_dir().clone();
+        let remote_fs = self.remote_fs().await.unwrap();
+
+        {
+            self.configure_injector().await;
+            if let Some(configure_injector) = configure_injector {
+                configure_injector(self.injector.clone()).await;
+            }
+            let services = self.cube_services().await;
+            services.start_processing_loops().await.unwrap();
+
+            // Should be long enough even for CI.
+            let timeout = Duration::from_secs(600);
+            match timeout_at(Instant::now() + timeout, test_fn(services.clone())).await {
+                Err(_) => panic!("Test timed out after {} seconds", timeout.as_secs()),
+                Ok(Err(e)) => panic!("Test failed: {}", e.display_with_backtrace()),
+                Ok(Ok(())) => {}
+            }
+
+            services.stop_processing_loops().await.unwrap();
+        }
+
+        let _ = DB::destroy(&Options::default(), self.meta_store_path());
+        let _ = DB::destroy(&Options::default(), self.cache_store_path());
+        let _ = fs::remove_dir_all(store_path.clone());
+
+        let remote_files = remote_fs.list("".to_string()).await.unwrap();
+        for file in remote_files {
+            let _ = remote_fs.delete_file(file).await;
         }
     }
 
     pub async fn run_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
     where
-        T: Future<Output = ()> + Send,
+        T: Future<Output = Result<(), CubeError>> + Send,
     {
         Self::test(name).start_test(test_fn).await;
+    }
+
+    pub async fn run_migration_test<T>(name: &str, test_fn: impl FnOnce(CubeServices) -> T)
+    where
+        T: Future<Output = Result<(), CubeError>> + Send,
+    {
+        Self::migration_test(name)
+            .start_migration_test(test_fn)
+            .await;
     }
 
     pub fn config_obj(&self) -> Arc<dyn ConfigObj> {
@@ -1026,7 +2430,7 @@ impl Config {
         self.local_dir().join("cachestore")
     }
 
-    async fn configure_remote_fs(&self) {
+    pub async fn configure_remote_fs(&self) {
         let config_obj_to_register = self.config_obj.clone();
         self.injector
             .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
@@ -1094,35 +2498,79 @@ impl Config {
         };
     }
 
-    async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {
-        self.configure_remote_fs().await;
-        Ok(self.injector.get_service("original_remote_fs").await)
-    }
+    pub async fn configure_cache_store(&self) {
+        let (cachestore_event_sender, _) = broadcast::channel(2048); // TODO config
+        let cachestore_event_sender_to_move = cachestore_event_sender.clone();
 
-    pub fn injector(&self) -> Arc<Injector> {
-        self.injector.clone()
-    }
+        if uses_remote_metastore(&self.injector).await {
+            self.injector
+                .register_typed::<dyn CacheStore, _, _, _>(async move |_| {
+                    Arc::new(ClusterCacheStoreClient {})
+                })
+                .await;
+        } else {
+            self.injector
+                .register("cachestore_fs", async move |i| {
+                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                    let original_remote_fs: Arc<dyn ExtendedRemoteFs> =
+                        i.get_service("original_remote_fs").await;
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_cachestore(
+                        original_remote_fs,
+                        i.get_service_typed().await,
+                    );
 
-    pub async fn configure_injector(&self) {
-        self.configure_remote_fs().await;
-
-        self.injector
-            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
-                QueueRemoteFs::new(
-                    i.get_service_typed::<dyn ConfigObj>().await,
-                    i.get_service("original_remote_fs").await,
+                    arc
+                })
+                .await;
+            let path = self.cache_store_path().to_str().unwrap().to_string();
+            self.injector
+                .register_typed_with_default::<dyn CacheStore, LazyRocksCacheStore, _, _>(
+                    async move |i| {
+                        let config = i.get_service_typed::<dyn ConfigObj>().await;
+                        let cachestore_fs = i.get_service("cachestore_fs").await;
+                        let cache_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                            LazyRocksCacheStore::load_from_dump(
+                                &Path::new(&path),
+                                dump_dir,
+                                cachestore_fs,
+                                config,
+                                vec![cachestore_event_sender],
+                            )
+                            .await
+                            .unwrap()
+                        } else {
+                            LazyRocksCacheStore::load_from_remote(
+                                &path,
+                                cachestore_fs,
+                                config,
+                                vec![cachestore_event_sender],
+                            )
+                            .await
+                            .unwrap()
+                        };
+                        cache_store
+                    },
                 )
-            })
-            .await;
-
-        let (event_sender, _) = broadcast::channel(10000); // TODO config
-        let event_sender_to_move = event_sender.clone();
+                .await;
+        }
 
         self.injector
-            .register_typed::<dyn ClusterTransport, _, _, _>(async move |i| {
-                ClusterTransportImpl::new(i.get_service_typed().await)
+            .register_typed::<CacheStoreSchedulerImpl, _, _, _>(async move |i| {
+                Arc::new(CacheStoreSchedulerImpl::new(
+                    cachestore_event_sender_to_move.subscribe(),
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                ))
             })
             .await;
+    }
+
+    pub async fn configure_meta_store(&self) {
+        // Bounded broadcast of metastore events; sized for bursts (e.g. orphaned-job cleanup
+        // emitting hundreds of UpdateJob events at once). Listeners that still lag past this fall
+        // back to authoritative metastore re-checks rather than failing.
+        let (metastore_event_sender, _) = broadcast::channel(32768);
+        let metastore_event_sender_to_move = metastore_event_sender.clone();
 
         if let Some(_) = self.config_obj.metastore_remote_address() {
             self.injector
@@ -1136,90 +2584,55 @@ impl Config {
             self.injector
                 .register_typed::<dyn MetaStore, _, _, _>(async move |i| {
                     let transport = ClusterMetaStoreClient::new(i.get_service_typed().await);
-                    Arc::new(MetaStoreRpcClient::new(transport))
+                    TracedMetaStore::new(Arc::new(MetaStoreRpcClient::new(transport)))
                 })
                 .await;
         } else {
             self.injector
                 .register("metastore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                    let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> =
-                        BaseRocksStoreFs::new(original_remote_fs, "metastore");
+                    let original_remote_fs: Arc<dyn ExtendedRemoteFs> =
+                        i.get_service("original_remote_fs").await;
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_metastore(
+                        original_remote_fs,
+                        i.get_service_typed().await,
+                    );
 
                     arc
                 })
                 .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
+            // Register the concrete RocksMetaStore (some code fetches it by type),
+            // then expose `dyn MetaStore` wrapped in TracedMetaStore so local calls
+            // are traced too.
             self.injector
-                .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
-                    async move |i| {
-                        let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        let metastore_fs = i.get_service("metastore_fs").await;
-                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksMetaStore::load_from_dump(
-                                &Path::new(&path),
-                                dump_dir,
-                                metastore_fs,
-                                config,
-                            )
+                .register_typed::<RocksMetaStore, RocksMetaStore, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
+                    let metastore_fs = i.get_service("metastore_fs").await;
+                    let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                        RocksMetaStore::load_from_dump(
+                            &Path::new(&path),
+                            dump_dir,
+                            metastore_fs,
+                            config,
+                        )
+                        .await
+                        .unwrap()
+                    } else {
+                        RocksMetaStore::load_from_remote(&path, metastore_fs, config)
                             .await
                             .unwrap()
-                        } else {
-                            RocksMetaStore::load_from_remote(&path, metastore_fs, config)
-                                .await
-                                .unwrap()
-                        };
-                        meta_store.add_listener(event_sender).await;
-                        meta_store
-                    },
-                )
+                    };
+                    meta_store.add_listener(metastore_event_sender).await;
+                    meta_store
+                })
+                .await;
+            self.injector
+                .register_typed::<dyn MetaStore, TracedMetaStore, _, _>(async move |i| {
+                    TracedMetaStore::new(i.get_service_typed::<RocksMetaStore>().await)
+                })
                 .await;
         };
-
-        if uses_remote_metastore(&self.injector).await {
-            self.injector
-                .register_typed::<dyn CacheStore, _, _, _>(async move |_| {
-                    Arc::new(ClusterCacheStoreClient {})
-                })
-                .await;
-        } else {
-            self.injector
-                .register("cachestore_fs", async move |i| {
-                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                    let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> =
-                        BaseRocksStoreFs::new(original_remote_fs, "cachestore");
-
-                    arc
-                })
-                .await;
-            let path = self.cache_store_path().to_str().unwrap().to_string();
-            self.injector
-                .register_typed_with_default::<dyn CacheStore, RocksCacheStore, _, _>(
-                    async move |i| {
-                        let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        let cachestore_fs = i.get_service("cachestore_fs").await;
-                        let cache_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksCacheStore::load_from_dump(
-                                &Path::new(&path),
-                                dump_dir,
-                                cachestore_fs,
-                                config,
-                            )
-                            .await
-                            .unwrap()
-                        } else {
-                            RocksCacheStore::load_from_remote(&path, cachestore_fs, config)
-                                .await
-                                .unwrap()
-                        };
-
-                        cache_store
-                    },
-                )
-                .await;
-        }
 
         self.injector
             .register_typed::<dyn WALDataStore, _, _, _>(async move |i| {
@@ -1235,11 +2648,15 @@ impl Config {
 
         self.injector
             .register_typed::<dyn ChunkDataStore, _, _, _>(async move |i| {
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await;
                 ChunkStore::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    metadata_cache_factory,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
@@ -1250,10 +2667,14 @@ impl Config {
         self.injector
             .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
+                let cubestore_metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await;
+                let metadata_cache_factory: &_ = cubestore_metadata_cache_factory.cache_factory();
                 CubestoreParquetMetadataCacheImpl::new(
                     match c.metadata_cache_max_capacity_bytes() {
-                        0 => NoopParquetMetadataCache::new(),
-                        max_cached_metadata => LruParquetMetadataCache::new(
+                        0 => metadata_cache_factory.make_noop_cache(),
+                        max_cached_metadata => metadata_cache_factory.make_lru_cache(
                             max_cached_metadata,
                             Duration::from_secs(c.metadata_cache_time_to_idle_secs()),
                         ),
@@ -1264,22 +2685,22 @@ impl Config {
 
         self.injector
             .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await;
                 CompactionServiceImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    metadata_cache_factory,
                 )
             })
             .await;
 
         self.injector
-            .register_typed::<ConcurrencyLimits, _, _, _>(async move |i| {
-                Arc::new(ConcurrencyLimits::new(
-                    i.get_service_typed::<dyn ConfigObj>()
-                        .await
-                        .max_ingestion_data_frames(),
-                ))
+            .register_typed::<dyn LocationsValidator, _, _, _>(async move |_| {
+                LocationsValidatorImpl::new()
             })
             .await;
 
@@ -1292,7 +2713,14 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn TableExtensionService, _, _, _>(async move |_| {
+                TableExtensionServiceImpl::new()
             })
             .await;
 
@@ -1304,6 +2732,10 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory()
+                        .clone(),
                 )
             })
             .await;
@@ -1319,28 +2751,12 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                )
+            .register_typed::<dyn ProcessRateLimiter, _, _, _>(async move |_| {
+                BasicProcessRateLimiter::new()
             })
             .await;
 
-        self.injector
-            .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
-                QueryExecutorImpl::new(i.get_service_typed().await)
-            })
-            .await;
-
-        self.injector
-            .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
-                TracingHelperImpl::new()
-            })
-            .await;
-
-        let cluster_meta_store_sender = event_sender_to_move.clone();
+        let cluster_meta_store_sender = metastore_event_sender_to_move.clone();
 
         self.injector
             .register_typed_with_default::<dyn Cluster, _, _, _>(async move |i| {
@@ -1359,10 +2775,116 @@ impl Config {
                     cluster_meta_store_sender,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
 
+        self.injector
+            .register_typed::<SchedulerImpl, _, _, _>(async move |i| {
+                Arc::new(SchedulerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    metastore_event_sender_to_move.subscribe(),
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
+
+        self.injector
+            .register_typed::<RemoteFsCleanup, _, _, _>(async move |i| {
+                Arc::new(RemoteFsCleanup::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
+    }
+
+    pub async fn configure_common(&self) {
+        self.injector
+            .register_typed::<dyn CubestoreMetadataCacheFactory, _, _, _>(async move |_| {
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new()))
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
+                QueueRemoteFs::new(
+                    i.get_service_typed::<dyn ConfigObj>().await,
+                    i.get_service("original_remote_fs").await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn ClusterTransport, _, _, _>(async move |i| {
+                ClusterTransportImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        let query_cache = Arc::new(SqlResultCache::new(
+            self.config_obj.query_cache_max_capacity_bytes(),
+            self.config_obj.query_cache_time_to_idle_secs(),
+            self.config_obj.query_queue_cache_max_capacity(),
+            self.config_obj.query_cache_stale_while_revalidate_secs(),
+        ));
+
+        let query_cache_to_move = query_cache.clone();
+        self.injector
+            .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await
+                    .cache_factory()
+                    .clone();
+                QueryPlannerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    query_cache_to_move,
+                    metadata_cache_factory,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
+                QueryExecutorImpl::new(
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory()
+                        .clone(),
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed::<dyn ConfigObj>().await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<ConcurrencyLimits, _, _, _>(async move |i| {
+                Arc::new(ConcurrencyLimits::new(
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .max_ingestion_data_frames(),
+                ))
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
+                TracingHelperImpl::new()
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn MemoryHandler, _, _, _>(async move |_| MemoryHandlerImpl::new())
+            .await;
+
+        let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
@@ -1377,23 +2899,25 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
-                    c.max_cached_queries(),
+                    query_cache_to_move,
+                    i.get_service_typed().await,
                 )
             })
             .await;
 
         self.injector
-            .register_typed::<SchedulerImpl, _, _, _>(async move |i| {
-                Arc::new(SchedulerImpl::new(
+            .register_typed::<dyn JobProcessor, _, _, _>(async move |i| {
+                JobProcessorImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    event_sender_to_move.subscribe(),
                     i.get_service_typed().await,
-                ))
+                    i.get_service_typed().await,
+                )
             })
             .await;
 
@@ -1421,32 +2945,52 @@ impl Config {
 
             self.injector
                 .register_typed::<HttpServer, _, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
                     HttpServer::new(
-                        i.get_service_typed::<dyn ConfigObj>()
-                            .await
-                            .http_bind_address()
-                            .as_ref()
-                            .unwrap()
-                            .to_string(),
+                        config.http_bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
                         i.get_service_typed().await,
+                        Duration::from_secs(config.check_ws_orphaned_messages_interval_secs()),
+                        Duration::from_secs(config.drop_ws_processing_messages_after_secs()),
+                        Duration::from_secs(config.drop_ws_complete_messages_after_secs()),
+                        config.transport_max_message_size(),
+                        config.transport_max_frame_size(),
                     )
                 })
                 .await;
         }
     }
 
+    async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {
+        self.configure_remote_fs().await;
+        Ok(self.injector.get_service("original_remote_fs").await)
+    }
+
+    pub fn injector(&self) -> Arc<Injector> {
+        self.injector.clone()
+    }
+
+    pub async fn configure_injector(&self) {
+        self.configure_remote_fs().await;
+        self.configure_cache_store().await;
+        self.configure_meta_store().await;
+        self.configure_common().await;
+    }
+
     pub async fn cube_services(&self) -> CubeServices {
         CubeServices {
             injector: self.injector.clone(),
             sql_service: self.injector.get_service_typed().await,
-            scheduler: self.injector.get_service_typed().await,
             rocks_meta_store: if self.injector.has_service_typed::<RocksMetaStore>().await {
                 Some(self.injector.get_service_typed().await)
             } else {
                 None
             },
-            rocks_cache_store: if self.injector.has_service_typed::<RocksCacheStore>().await {
+            rocks_cache_store: if self
+                .injector
+                .has_service_typed::<LazyRocksCacheStore>()
+                .await
+            {
                 Some(self.injector.get_service_typed().await)
             } else {
                 None
@@ -1476,4 +3020,26 @@ pub async fn uses_remote_metastore(i: &Injector) -> bool {
 
 pub fn is_router(c: &dyn ConfigObj) -> bool {
     !c.worker_bind_address().is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repartition_strategy_from_str() {
+        assert_eq!(
+            "per_chunk".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerChunk
+        );
+        assert_eq!(
+            "per_partition".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::PerPartition
+        );
+        assert_eq!(
+            "RANGE".parse::<RepartitionStrategy>().unwrap(),
+            RepartitionStrategy::Range
+        );
+        assert!("nonsense".parse::<RepartitionStrategy>().is_err());
+    }
 }

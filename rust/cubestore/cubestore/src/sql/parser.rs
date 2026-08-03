@@ -1,10 +1,13 @@
+use crate::cachestore::{QueueItemStatus, QueueKey};
+use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::{
-    HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
+    ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
+    SqlOption, Statement as SQLStatement, Value,
 };
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
-use sqlparser::tokenizer::{Token, Tokenizer};
+use sqlparser::tokenizer::{Span, Token, Tokenizer};
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
@@ -24,6 +27,11 @@ impl Dialect for MySqlDialectWithBackTicks {
 
     fn is_identifier_part(&self, ch: char) -> bool {
         self.is_identifier_start(ch) || (ch >= '0' && ch <= '9')
+    }
+
+    // Behavior we previously had hard-coded into sqlparser
+    fn supports_string_literal_backslash_escape(&self) -> bool {
+        true
     }
 }
 
@@ -54,27 +62,11 @@ pub enum Statement {
         credentials: Vec<SqlOption>,
         or_update: bool,
     },
-    CacheSet {
-        key: Ident,
-        value: String,
-        ttl: Option<u32>,
-        nx: bool,
-    },
-    CacheGet {
-        key: Ident,
-    },
-    CacheKeys {
-        prefix: Ident,
-    },
-    CacheRemove {
-        key: Ident,
-    },
-    CacheTruncate {},
-    CacheIncr {
-        path: Ident,
-    },
+    Cache(CacheCommand),
+    Queue(QueueCommand),
     System(SystemCommand),
     Dump(Box<Query>),
+    ExplainAnalyzeDetailed(Box<Query>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -84,33 +76,213 @@ pub enum RocksStoreName {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum CacheCommand {
+    Set {
+        key: Ident,
+        value: String,
+        ttl: Option<u32>,
+        nx: bool,
+    },
+    Get {
+        key: Ident,
+    },
+    Keys {
+        prefix: Ident,
+    },
+    Remove {
+        key: Ident,
+    },
+    Clear {},
+    Incr {
+        path: Ident,
+    },
+}
+
+impl CacheCommand {
+    pub fn as_tag_command(&self) -> &'static str {
+        match self {
+            CacheCommand::Set { .. } => "set",
+            CacheCommand::Get { .. } => "get",
+            CacheCommand::Keys { .. } => "keys",
+            CacheCommand::Remove { .. } => "remove",
+            CacheCommand::Clear { .. } => "clear",
+            CacheCommand::Incr { .. } => "incr",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum QueueCommand {
+    Add {
+        exclusive: bool,
+        priority: i64,
+        orphaned: Option<u32>,
+        key: Ident,
+        value: String,
+        external_id: Option<String>,
+    },
+    Get {
+        key: QueueKey,
+    },
+    ToCancel {
+        prefix: Ident,
+        heartbeat_timeout: Option<u32>,
+        orphaned_timeout: Option<u32>,
+    },
+    List {
+        prefix: Ident,
+        with_payload: bool,
+        status_filter: Option<QueueItemStatus>,
+        sort_by_priority: bool,
+    },
+    Cancel {
+        key: QueueKey,
+    },
+    Heartbeat {
+        key: QueueKey,
+    },
+    Ack {
+        key: QueueKey,
+        result: Option<String>,
+    },
+    MergeExtra {
+        key: QueueKey,
+        payload: String,
+    },
+    Retrieve {
+        key: Ident,
+        concurrency: u32,
+        extended: bool,
+    },
+    Result {
+        key: QueueKey,
+        external_id: Option<String>,
+    },
+    ResultBlocking {
+        key: QueueKey,
+        timeout: u64,
+    },
+    Clear {},
+}
+
+impl QueueCommand {
+    pub fn as_tag_command(&self) -> &'static str {
+        match self {
+            QueueCommand::Add { .. } => "add",
+            QueueCommand::Get { .. } => "get",
+            QueueCommand::ToCancel { .. } => "to_cancel",
+            QueueCommand::List { status_filter, .. } => match status_filter {
+                Some(QueueItemStatus::Active) => "active",
+                Some(QueueItemStatus::Pending) => "pending",
+                _ => "list",
+            },
+            QueueCommand::Cancel { .. } => "cancel",
+            QueueCommand::Heartbeat { .. } => "heartbeat",
+            QueueCommand::Ack { .. } => "ack",
+            QueueCommand::MergeExtra { .. } => "merge_extra",
+            QueueCommand::Retrieve { .. } => "retrieve",
+            QueueCommand::Result { .. } => "result",
+            QueueCommand::ResultBlocking { .. } => "result_blocking",
+            QueueCommand::Clear { .. } => "clear",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SystemCommand {
-    Compaction { store: Option<RocksStoreName> },
     KillAllJobs,
     Repartition { partition_id: u64 },
+    Drop(DropCommand),
     PanicWorker,
+    MetaStore(MetaStoreCommand),
+    CacheStore(CacheStoreCommand),
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DropCommand {
+    DropQueryCache,
+    DropAllCache,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetaStoreCommand {
+    SetCurrent { id: u128 },
+    Compaction,
+    Healthcheck,
+    Truncate,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CacheStoreCommand {
+    Compaction,
+    Healthcheck,
+    Eviction,
+    Info,
+    Persist,
+    Wipe,
+    Truncate,
+}
+
+type QueryParameterHolder = Option<QueryParameter>;
 
 pub struct CubeStoreParser<'a> {
     parser: Parser<'a>,
+    parameters: Option<Vec<QueryParameterHolder>>,
+    placeholder_index: usize,
+}
+
+macro_rules! parse_sql_options {
+    ($self:expr, { $($name:literal => $body:expr),* $(,)? }) => {{
+        const _OPTION_COUNT: usize = { let mut n = 0usize; $( { let _ = $name; n += 1; } )* n };
+        const _: () = assert!(_OPTION_COUNT <= 32, "parse_sql_options! supports at most 32 options");
+
+        let mut __seen = [false; _OPTION_COUNT];
+        let mut __idx: usize;
+
+        loop {
+            __idx = 0;
+            $(
+                if $self.parse_custom_token($name) {
+                    if __seen[__idx] {
+                        return Err(ParserError::ParserError(format!(
+                            "Duplicate option: {}", $name.to_uppercase()
+                        )));
+                    }
+                    __seen[__idx] = true;
+                    $body;
+                    continue;
+                }
+                __idx += 1;
+            )*
+            break;
+        }
+    }};
 }
 
 impl<'a> CubeStoreParser<'a> {
-    pub fn new(sql: &str) -> Result<Self, ParserError> {
+    pub fn new(sql: &str, parameters: Option<QueryParameters>) -> Result<Self, ParserError> {
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, sql);
         let tokens = tokenizer.tokenize()?;
+
         Ok(CubeStoreParser {
-            parser: Parser::new(tokens, dialect),
+            parser: Parser::new(dialect).with_tokens(tokens),
+            parameters: parameters
+                .map(|parameters| parameters.into_iter().map(|p| Some(p)).collect()),
+            placeholder_index: 0,
         })
     }
 
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
-        match self.parser.peek_token() {
+        match self.parser.peek_token().token {
             Token::Word(w) => match w.keyword {
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
                     self.parse_system()
+                }
+                _ if w.value.eq_ignore_ascii_case("queue") => {
+                    self.parser.next_token();
+                    self.parse_queue()
                 }
                 Keyword::CACHE => {
                     self.parser.next_token();
@@ -133,9 +305,59 @@ impl<'a> CubeStoreParser<'a> {
                     };
                     Ok(Statement::Dump(q))
                 }
+                _ if self.is_explain_analyze_detailed() => {
+                    self.parser.next_token(); // EXPLAIN
+                    self.parser.next_token(); // ANALYZE
+                    self.parser.next_token(); // DETAILED
+                    Ok(Statement::ExplainAnalyzeDetailed(
+                        self.parser.parse_query()?,
+                    ))
+                }
                 _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
             },
             _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
+        }
+    }
+
+    fn is_explain_analyze_detailed(&self) -> bool {
+        fn is_word(token: Token, value: &str) -> bool {
+            matches!(token, Token::Word(w) if w.value.eq_ignore_ascii_case(value))
+        }
+        is_word(self.parser.peek_token().token, "explain")
+            && is_word(self.parser.peek_nth_token(1).token, "analyze")
+            && is_word(self.parser.peek_nth_token(2).token, "detailed")
+    }
+
+    fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
+        match self.parser.peek_token().token {
+            Token::Placeholder(placeholder) => {
+                self.parser.next_token();
+
+                match self.unwrap_placeholder(&placeholder)? {
+                    QueryParameter::StringValue(v) => Ok(QueueKey::ByPath(v)),
+                    QueryParameter::Int64Value(v) => {
+                        let id = QueryParameter::Int64Value(v)
+                            .try_as_u64()
+                            .map_err(ParserError::ParserError)?;
+                        Ok(QueueKey::ById(id))
+                    }
+                    other => Err(ParserError::ParserError(format!(
+                        "Wrong parameters type, actual: {}, expected: string or integer parameter",
+                        other.get_type()
+                    ))),
+                }
+            }
+            Token::Word(w) => {
+                self.parser.next_token();
+
+                Ok(QueueKey::ByPath(w.into_ident(Span::empty()).value))
+            }
+            Token::SingleQuotedString(v) => {
+                self.parser.next_token();
+
+                Ok(QueueKey::ByPath(v))
+            }
+            _ => Ok(QueueKey::ById(self.parse_integer("id", false)?)),
         }
     }
 
@@ -153,68 +375,432 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
-    fn parse_cache(&mut self) -> Result<Statement, ParserError> {
-        let command = match self.parser.next_token() {
-            Token::Word(w) => w.value.to_ascii_lowercase(),
-            _ => {
-                return Err(ParserError::ParserError(
-                    "Unknown cache command, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE"
-                        .to_string(),
+    pub fn parse_streaming_source_table(&mut self) -> Result<Vec<ColumnDef>, ParserError> {
+        if self.parser.parse_keyword(Keyword::CREATE) && self.parser.parse_keyword(Keyword::TABLE) {
+            let statement = self.parser.parse_create_table(false, false, None, false)?;
+            if let SQLStatement::CreateTable(CreateTable { columns, .. }) = statement {
+                Ok(columns)
+            } else {
+                Err(ParserError::ParserError(
+                    "source_table param should be CREATE TABLE statement".to_string(),
                 ))
+            }
+        } else {
+            Err(ParserError::ParserError(
+                "source_table param should be CREATE TABLE statement".to_string(),
+            ))
+        }
+    }
+
+    fn unwrap_placeholder(&mut self, placeholder: &str) -> Result<QueryParameter, ParserError> {
+        let parameters = if let Some(parameters) = self.parameters.as_mut() {
+            parameters
+        } else {
+            return Err(ParserError::ParserError(
+                "Empty parameters, please send parameters within query".to_string(),
+            ));
+        };
+
+        let placeholder_index = if placeholder.len() > 1 && placeholder[0..1] == *"$" {
+            return Err(ParserError::ParserError(
+                "Named placeholder are not supported, please use ?".to_string(),
+            ));
+        } else {
+            let n = self.placeholder_index;
+
+            self.placeholder_index += 1;
+
+            n
+        };
+
+        if parameters.len() <= placeholder_index {
+            return Err(ParserError::ParserError(format!(
+                "Placeholder index is out of bound, actual: {}, parameters length: {}",
+                placeholder_index,
+                parameters.len()
+            )));
+        }
+
+        if let Some(v) = parameters[placeholder_index].take() {
+            Ok(v)
+        } else {
+            return Err(ParserError::ParserError(
+                "Empty parameters, please send parameters within query".to_string(),
+            ));
+        }
+    }
+
+    fn parse_literal_string(&mut self) -> Result<String, ParserError> {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
+            match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::StringValue(s) => Ok(s),
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: string parameter",
+                    other.get_type()
+                ))),
+            }
+        } else {
+            self.parser.parse_literal_string()
+        }
+    }
+
+    fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
+            match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::StringValue(value) => Ok(Ident {
+                    value,
+                    quote_style: None,
+                    span: Span::empty(),
+                }),
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: string parameter",
+                    other.get_type()
+                ))),
+            }
+        } else {
+            self.parser.parse_identifier()
+        }
+    }
+
+    fn parse_cache(&mut self) -> Result<Statement, ParserError> {
+        let method = match self.parser.next_token().token {
+            Token::Word(w) => w.value.to_ascii_lowercase(),
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Invalid token: {}, expected Word (command)",
+                    other
+                )))
             }
         };
 
-        match command.as_str() {
+        let command = match method.as_str() {
             "set" => {
                 let nx = self.parse_custom_token(&"nx");
                 let ttl = if self.parse_custom_token(&"ttl") {
-                    match self.parser.parse_number_value()? {
-                        Value::Number(ttl, false) => {
-                            let r = ttl.parse::<u32>().map_err(|err| {
-                                ParserError::ParserError(format!(
-                                    "TTL must be a positive integer, error: {}",
-                                    err
-                                ))
-                            })?;
-
-                            Some(r)
-                        }
-                        x => {
-                            return Err(ParserError::ParserError(format!(
-                                "TTL must be a positive integer, actual: {:?}",
-                                x
-                            )))
-                        }
-                    }
+                    Some(self.parse_integer("ttl", false)?)
                 } else {
                     None
                 };
 
-                Ok(Statement::CacheSet {
-                    key: self.parser.parse_identifier()?,
-                    value: self.parser.parse_literal_string()?,
+                CacheCommand::Set {
+                    key: self.parse_identifier()?,
+                    value: self.parse_literal_string()?,
                     ttl,
                     nx,
+                }
+            }
+            "get" => CacheCommand::Get {
+                key: self.parse_identifier()?,
+            },
+            "keys" => CacheCommand::Keys {
+                prefix: self.parse_identifier()?,
+            },
+            "incr" => CacheCommand::Incr {
+                path: self.parse_identifier()?,
+            },
+            "remove" => CacheCommand::Remove {
+                key: self.parse_identifier()?,
+            },
+            "clear" => CacheCommand::Clear {},
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|CLEAR",
+                    other
+                )))
+            }
+        };
+
+        Ok(Statement::Cache(command))
+    }
+
+    fn parse_integer<R: num::Integer + std::str::FromStr>(
+        &mut self,
+        var_name: &str,
+        allow_negative: bool,
+    ) -> Result<R, ParserError>
+    where
+        <R as std::str::FromStr>::Err: std::fmt::Display,
+    {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token().token {
+            self.parser.next_token();
+
+            return match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::Int64Value(value) => {
+                    value.to_string().parse::<R>().map_err(|err| {
+                        ParserError::ParserError(format!(
+                            "{} must be a valid integer, error: {}",
+                            var_name, err
+                        ))
+                    })
+                }
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: int64 parameter",
+                    other.get_type()
+                ))),
+            };
+        }
+
+        let is_negative = match self.parser.peek_token().token {
+            Token::Minus => {
+                self.parser.next_token();
+                true
+            }
+            _ => false,
+        };
+
+        match self.parser.parse_number_value()? {
+            Value::Number(var, false) => {
+                let value = if is_negative {
+                    "-".to_string() + &var
+                } else {
+                    var
+                };
+
+                if is_negative && !allow_negative {
+                    return Err(ParserError::ParserError(format!(
+                        "{} must be a positive integer, actual: {}",
+                        var_name, value
+                    )));
+                }
+
+                value.parse::<R>().map_err(|err| {
+                    ParserError::ParserError(format!(
+                        "{} must be a valid integer, error: {}",
+                        var_name, err
+                    ))
                 })
             }
-            "get" => Ok(Statement::CacheGet {
-                key: self.parser.parse_identifier()?,
-            }),
-            "keys" => Ok(Statement::CacheKeys {
-                prefix: self.parser.parse_identifier()?,
-            }),
-            "incr" => Ok(Statement::CacheIncr {
-                path: self.parser.parse_identifier()?,
-            }),
-            "remove" => Ok(Statement::CacheRemove {
-                key: self.parser.parse_identifier()?,
-            }),
-            "truncate" => Ok(Statement::CacheTruncate {}),
-            command => Err(ParserError::ParserError(format!(
-                "Unknown cache command: {}",
-                command
-            ))),
+            x => {
+                return Err(ParserError::ParserError(format!(
+                    "{} must be a valid integer, actual: {:?}",
+                    var_name, x
+                )))
+            }
         }
+    }
+
+    pub fn parse_drop(&mut self) -> Result<Statement, ParserError> {
+        if self.parse_custom_token("query") && self.parse_custom_token("cache") {
+            Ok(Statement::System(SystemCommand::Drop(
+                DropCommand::DropQueryCache,
+            )))
+        } else if self.parse_custom_token("cache") {
+            Ok(Statement::System(SystemCommand::Drop(
+                DropCommand::DropAllCache,
+            )))
+        } else {
+            Err(ParserError::ParserError("Unknown drop command".to_string()))
+        }
+    }
+
+    pub fn parse_cachestore(&mut self) -> Result<Statement, ParserError> {
+        let command = if self.parse_custom_token("compaction") {
+            CacheStoreCommand::Compaction
+        } else if self.parse_custom_token("persist") {
+            CacheStoreCommand::Persist
+        } else if self.parse_custom_token("eviction") {
+            CacheStoreCommand::Eviction
+        } else if self.parse_custom_token("info") {
+            CacheStoreCommand::Info
+        } else if self.parse_custom_token("healthcheck") {
+            CacheStoreCommand::Healthcheck
+        } else if self.parse_custom_token("wipe") {
+            CacheStoreCommand::Wipe
+        } else if self.parse_custom_token("truncate") {
+            CacheStoreCommand::Truncate
+        } else {
+            return Err(ParserError::ParserError(
+                "Unknown cachestore command".to_string(),
+            ));
+        };
+
+        Ok(Statement::System(SystemCommand::CacheStore(command)))
+    }
+
+    pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
+        let command = if self.parse_custom_token("set_current") {
+            MetaStoreCommand::SetCurrent {
+                id: self.parse_integer("metastore snapshot id", false)?,
+            }
+        } else if self.parse_custom_token("compaction") {
+            MetaStoreCommand::Compaction
+        } else if self.parse_custom_token("healthcheck") {
+            MetaStoreCommand::Healthcheck
+        } else if self.parse_custom_token("truncate") {
+            MetaStoreCommand::Truncate
+        } else {
+            return Err(ParserError::ParserError(
+                "Unknown metastore command".to_string(),
+            ));
+        };
+
+        Ok(Statement::System(SystemCommand::MetaStore(command)))
+    }
+
+    fn parse_queue(&mut self) -> Result<Statement, ParserError> {
+        let method = match self.parser.next_token().token {
+            Token::Word(w) => w.value.to_ascii_lowercase(),
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Invalid token: {}, expected Word (command)",
+                    other
+                )))
+            }
+        };
+
+        let command = match method.as_str() {
+            "add" => {
+                let mut exclusive = false;
+                let mut priority = 0i64;
+                let mut orphaned: Option<u32> = None;
+                let mut external_id: Option<String> = None;
+
+                parse_sql_options!(self, {
+                    "exclusive" => { exclusive = true },
+                    "priority" => { priority = self.parse_integer("priority", true)? },
+                    "orphaned" => { orphaned = Some(self.parse_integer("orphaned", false)?) },
+                    "external_id" => { external_id = Some(self.parser.parse_literal_string()?) },
+                });
+
+                QueueCommand::Add {
+                    exclusive,
+                    priority,
+                    orphaned,
+                    key: self.parse_identifier()?,
+                    value: self.parse_literal_string()?,
+                    external_id,
+                }
+            }
+            "cancel" => QueueCommand::Cancel {
+                key: self.parse_queue_key()?,
+            },
+            "heartbeat" => QueueCommand::Heartbeat {
+                key: self.parse_queue_key()?,
+            },
+            "ack" => {
+                let key = self.parse_queue_key()?;
+                let result = if self.parser.parse_keyword(Keyword::NULL) {
+                    None
+                } else {
+                    Some(self.parse_literal_string()?)
+                };
+
+                QueueCommand::Ack { key, result }
+            }
+            "merge_extra" => QueueCommand::MergeExtra {
+                key: self.parse_queue_key()?,
+                payload: self.parser.parse_literal_string()?,
+            },
+            "get" => QueueCommand::Get {
+                key: self.parse_queue_key()?,
+            },
+            "stalled" => {
+                let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);
+
+                QueueCommand::ToCancel {
+                    prefix: self.parser.parse_identifier()?,
+                    orphaned_timeout: None,
+                    heartbeat_timeout,
+                }
+            }
+            "orphaned" => {
+                let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
+
+                QueueCommand::ToCancel {
+                    prefix: self.parser.parse_identifier()?,
+                    heartbeat_timeout: None,
+                    orphaned_timeout,
+                }
+            }
+            "to_cancel" => {
+                let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);
+                let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
+
+                QueueCommand::ToCancel {
+                    prefix: self.parser.parse_identifier()?,
+                    heartbeat_timeout,
+                    orphaned_timeout,
+                }
+            }
+            "pending" => {
+                let with_payload = self.parse_custom_token(&"with_payload");
+
+                QueueCommand::List {
+                    prefix: self.parser.parse_identifier()?,
+                    with_payload,
+                    status_filter: Some(QueueItemStatus::Pending),
+                    sort_by_priority: true,
+                }
+            }
+            "active" => {
+                let with_payload = self.parse_custom_token(&"with_payload");
+
+                QueueCommand::List {
+                    prefix: self.parser.parse_identifier()?,
+                    with_payload,
+                    status_filter: Some(QueueItemStatus::Active),
+                    sort_by_priority: false,
+                }
+            }
+            "list" => {
+                let with_payload = self.parse_custom_token(&"with_payload");
+
+                QueueCommand::List {
+                    prefix: self.parser.parse_identifier()?,
+                    with_payload,
+                    status_filter: None,
+                    sort_by_priority: true,
+                }
+            }
+            "retrieve" => {
+                // for backward compatibility
+                let extended = self.parse_custom_token("extended");
+                let concurrency = if self.parse_custom_token(&"concurrency") {
+                    self.parse_integer("concurrency", false)?
+                } else {
+                    1
+                };
+
+                QueueCommand::Retrieve {
+                    key: self.parser.parse_identifier()?,
+                    extended,
+                    concurrency,
+                }
+            }
+            "result" => {
+                let external_id = if self.parse_custom_token("external_id") {
+                    Some(self.parser.parse_literal_string()?)
+                } else {
+                    None
+                };
+
+                QueueCommand::Result {
+                    key: self.parse_queue_key()?,
+                    external_id,
+                }
+            }
+            "result_blocking" => {
+                let timeout = self.parse_integer(&"timeout", false)?;
+
+                QueueCommand::ResultBlocking {
+                    timeout,
+                    key: self.parse_queue_key()?,
+                }
+            }
+            "clear" => QueueCommand::Clear {},
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Unknown queue command: {}",
+                    other
+                )))
+            }
+        };
+
+        Ok(Statement::Queue(command))
     }
 
     fn parse_system(&mut self) -> Result<Statement, ParserError> {
@@ -224,38 +810,17 @@ impl<'a> CubeStoreParser<'a> {
         {
             Ok(Statement::System(SystemCommand::KillAllJobs))
         } else if self.parse_custom_token("repartition") {
-            match self.parser.parse_number_value()? {
-                Value::Number(id, _) => Ok(Statement::System(SystemCommand::Repartition {
-                    partition_id: id.parse::<u64>().map_err(|e| {
-                        ParserError::ParserError(format!("Can't parse partition id: {}", e))
-                    })?,
-                })),
-                x => Err(ParserError::ParserError(format!(
-                    "Partition id expected but {:?} found",
-                    x
-                ))),
-            }
+            Ok(Statement::System(SystemCommand::Repartition {
+                partition_id: self.parse_integer("partition id", false)?,
+            }))
+        } else if self.parse_custom_token("drop") {
+            self.parse_drop()
+        } else if self.parse_custom_token("metastore") {
+            self.parse_metastore()
+        } else if self.parse_custom_token("cachestore") {
+            self.parse_cachestore()
         } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
             Ok(Statement::System(SystemCommand::PanicWorker))
-        } else if self.parse_custom_token("compaction") {
-            let store = if let Token::Word(w) = self.parser.peek_token() {
-                if w.value.eq_ignore_ascii_case("cache") {
-                    self.parser.next_token();
-                    Some(RocksStoreName::Cache)
-                } else if w.value.eq_ignore_ascii_case("meta") {
-                    self.parser.next_token();
-                    Some(RocksStoreName::Meta)
-                } else {
-                    return Err(ParserError::ParserError(format!(
-                        "Unknown store name, expected CACHE or META, found: {}",
-                        w
-                    )));
-                }
-            } else {
-                None
-            };
-
-            Ok(Statement::System(SystemCommand::Compaction { store }))
         } else {
             Err(ParserError::ParserError(
                 "Unknown system command".to_string(),
@@ -264,7 +829,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_custom_token(&mut self, token: &str) -> bool {
-        if let Token::Word(w) = self.parser.peek_token() {
+        if let Token::Word(w) = self.parser.peek_token().token {
             if w.value.eq_ignore_ascii_case(token) {
                 self.parser.next_token();
                 true
@@ -277,117 +842,157 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
-        // Note that we disable hive extensions as they clash with `location`.
-        let statement = self.parser.parse_create_table_ext(false, false, false)?;
-        if let SQLStatement::CreateTable {
-            name,
-            columns,
-            constraints,
-            with_options,
-            if_not_exists,
-            file_format,
-            query,
-            without_rowid,
-            or_replace,
-            table_properties,
-            like,
-            ..
-        } = statement
+        let allow_unquoted_hyphen = false;
+        let if_not_exists =
+            self.parser
+                .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
+        let name = self.parser.parse_object_name(allow_unquoted_hyphen)?;
+
+        let like = if self.parser.parse_keyword(Keyword::LIKE)
+            || self.parser.parse_keyword(Keyword::ILIKE)
         {
-            let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
-                self.parser.expect_token(&Token::LParen)?;
-                let res = Some(
-                    self.parser
-                        .parse_comma_separated(|p| p.parse_identifier())?,
-                );
-                self.parser.expect_token(&Token::RParen)?;
-                res
-            } else {
-                None
-            };
-
-            let aggregates = if self.parse_custom_token("aggregations") {
-                self.parser.expect_token(&Token::LParen)?;
-                let res = self.parser.parse_comma_separated(|p| {
-                    let func = p.parse_identifier()?;
-                    p.expect_token(&Token::LParen)?;
-                    let column = p.parse_identifier()?;
-                    p.expect_token(&Token::RParen)?;
-                    Ok((func, column))
-                })?;
-                self.parser.expect_token(&Token::RParen)?;
-                Some(res)
-            } else {
-                None
-            };
-
-            let mut indexes = Vec::new();
-
-            loop {
-                if self.parse_custom_token("aggregate") {
-                    self.parser.expect_keyword(Keyword::INDEX)?;
-                    indexes.push(self.parse_with_index(name.clone(), true)?);
-                } else if self.parser.parse_keyword(Keyword::INDEX) {
-                    indexes.push(self.parse_with_index(name.clone(), false)?);
-                } else {
-                    break;
-                }
-            }
-
-            let partitioned_index = if self.parser.parse_keywords(&[
-                Keyword::ADD,
-                Keyword::TO,
-                Keyword::PARTITIONED,
-                Keyword::INDEX,
-            ]) {
-                let name = self.parser.parse_object_name()?;
-                self.parser.expect_token(&Token::LParen)?;
-                let columns = self
-                    .parser
-                    .parse_comma_separated(Parser::parse_identifier)?;
-                self.parser.expect_token(&Token::RParen)?;
-                Some(PartitionedIndexRef { name, columns })
-            } else {
-                None
-            };
-
-            let locations = if self.parser.parse_keyword(Keyword::LOCATION) {
-                Some(
-                    self.parser
-                        .parse_comma_separated(|p| p.parse_literal_string())?,
-                )
-            } else {
-                None
-            };
-
-            Ok(Statement::CreateTable {
-                create_table: SQLStatement::CreateTable {
-                    or_replace,
-                    name,
-                    columns,
-                    constraints,
-                    hive_distribution: HiveDistributionStyle::NONE,
-                    hive_formats: None,
-                    table_properties,
-                    with_options,
-                    if_not_exists,
-                    external: locations.is_some(),
-                    file_format,
-                    location: None,
-                    query,
-                    without_rowid,
-                    temporary: false,
-                    like,
-                },
-                indexes,
-                aggregates,
-                partitioned_index,
-                locations,
-                unique_key,
-            })
+            self.parser.parse_object_name(allow_unquoted_hyphen).ok()
         } else {
-            Ok(Statement::Statement(statement))
+            None
+        };
+
+        // parse optional column list (schema)
+        let (columns, constraints) = self.parser.parse_columns()?;
+
+        // SQLite supports `WITHOUT ROWID` at the end of `CREATE TABLE`
+        let without_rowid = self
+            .parser
+            .parse_keywords(&[Keyword::WITHOUT, Keyword::ROWID]);
+
+        // PostgreSQL supports `WITH ( options )`, before `AS`
+        let with_options = self.parser.parse_options(Keyword::WITH)?;
+        let table_properties = self.parser.parse_options(Keyword::TBLPROPERTIES)?;
+
+        // Parse optional `AS ( query )`
+        let query = if self.parser.parse_keyword(Keyword::AS) {
+            Some(self.parser.parse_query()?)
+        } else {
+            None
+        };
+
+        let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
+            self.parser.expect_token(&Token::LParen)?;
+            let res = Some(
+                self.parser
+                    .parse_comma_separated(|p| p.parse_identifier())?,
+            );
+            self.parser.expect_token(&Token::RParen)?;
+            res
+        } else {
+            None
+        };
+
+        let aggregates = if self.parse_custom_token("aggregations") {
+            self.parser.expect_token(&Token::LParen)?;
+            let res = self.parser.parse_comma_separated(|p| {
+                let func = p.parse_identifier()?;
+                p.expect_token(&Token::LParen)?;
+                let column = p.parse_identifier()?;
+                p.expect_token(&Token::RParen)?;
+                Ok((func, column))
+            })?;
+            self.parser.expect_token(&Token::RParen)?;
+            Some(res)
+        } else {
+            None
+        };
+
+        let mut indexes = Vec::new();
+
+        loop {
+            if self.parse_custom_token("aggregate") {
+                self.parser.expect_keyword(Keyword::INDEX)?;
+                indexes.push(self.parse_with_index(name.clone(), true)?);
+            } else if self.parser.parse_keyword(Keyword::INDEX) {
+                indexes.push(self.parse_with_index(name.clone(), false)?);
+            } else {
+                break;
+            }
         }
+
+        let partitioned_index = if self.parser.parse_keywords(&[
+            Keyword::ADD,
+            Keyword::TO,
+            Keyword::PARTITIONED,
+            Keyword::INDEX,
+        ]) {
+            let name = self.parser.parse_object_name(true)?;
+            self.parser.expect_token(&Token::LParen)?;
+            let columns = self
+                .parser
+                .parse_comma_separated(|t| Parser::parse_identifier(t))?;
+            self.parser.expect_token(&Token::RParen)?;
+            Some(PartitionedIndexRef { name, columns })
+        } else {
+            None
+        };
+
+        let locations = if self.parser.parse_keyword(Keyword::LOCATION) {
+            Some(
+                self.parser
+                    .parse_comma_separated(|p| p.parse_literal_string())?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Statement::CreateTable {
+            create_table: SQLStatement::CreateTable(CreateTable {
+                or_replace: false,
+                name,
+                columns,
+                constraints,
+                hive_distribution: HiveDistributionStyle::NONE,
+                hive_formats: None,
+                table_properties,
+                with_options,
+                if_not_exists,
+                transient: false,
+                external: locations.is_some(),
+                file_format: None,
+                location: None,
+                query,
+                without_rowid,
+                temporary: false,
+                like,
+                clone: None,
+                engine: None,
+                comment: None,
+                auto_increment_offset: None,
+                default_charset: None,
+                collation: None,
+                on_commit: None,
+                on_cluster: None,
+                primary_key: None,
+                order_by: None,
+                partition_by: None,
+                cluster_by: None,
+                clustered_by: None,
+                options: None,
+                strict: false,
+                copy_grants: false,
+                enable_schema_evolution: None,
+                change_tracking: None,
+                data_retention_time_in_days: None,
+                max_data_extension_time_in_days: None,
+                default_ddl_collation: None,
+                with_aggregation_policy: None,
+                with_row_access_policy: None,
+                global: None,
+                volatile: false,
+                with_tags: None,
+            }),
+            indexes,
+            aggregates,
+            partitioned_index,
+            locations,
+            unique_key,
+        })
     }
 
     pub fn parse_with_index(
@@ -395,27 +1000,33 @@ impl<'a> CubeStoreParser<'a> {
         table_name: ObjectName,
         is_aggregate: bool,
     ) -> Result<SQLStatement, ParserError> {
-        let index_name = self.parser.parse_object_name()?;
+        let index_name = self.parser.parse_object_name(true)?;
         self.parser.expect_token(&Token::LParen)?;
         let columns = self
             .parser
             .parse_comma_separated(Parser::parse_order_by_expr)?;
         self.parser.expect_token(&Token::RParen)?;
         //TODO I use unique flag for aggregate index for reusing CreateIndex struct. When adding another type of index, we will need to parse it into a custom structure
-        Ok(SQLStatement::CreateIndex {
-            name: index_name,
+        Ok(SQLStatement::CreateIndex(CreateIndex {
+            name: Some(index_name),
             table_name,
+            using: None,
             columns,
             unique: is_aggregate,
+            concurrently: false,
             if_not_exists: false,
-        })
+            include: vec![],
+            nulls_distinct: None,
+            with: vec![],
+            predicate: None,
+        }))
     }
 
     fn parse_create_schema(&mut self) -> Result<Statement, ParserError> {
         let if_not_exists =
             self.parser
                 .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
-        let schema_name = self.parser.parse_object_name()?;
+        let schema_name = self.parser.parse_object_name(false)?;
         Ok(Statement::CreateSchema {
             schema_name,
             if_not_exists,
@@ -441,10 +1052,63 @@ impl<'a> CubeStoreParser<'a> {
 mod tests {
 
     use super::*;
+    use crate::CubeError;
     use sqlparser::ast::Statement as SQLStatement;
 
+    fn parse_stmt(query: &str) -> Result<Statement, CubeError> {
+        let mut parser = CubeStoreParser::new(query, None)?;
+        Ok(parser.parse_statement()?)
+    }
+
     #[test]
-    fn parse_aggregate_index() {
+    fn parse_truncate_and_clear_commands() -> Result<(), CubeError> {
+        // New low-level whole-store wipes.
+        match parse_stmt("SYS CACHESTORE TRUNCATE")? {
+            Statement::System(SystemCommand::CacheStore(CacheStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS CACHESTORE TRUNCATE, got {:?}", s),
+        }
+        match parse_stmt("SYS METASTORE TRUNCATE")? {
+            Statement::System(SystemCommand::MetaStore(MetaStoreCommand::Truncate)) => {}
+            s => panic!("Expected SYS METASTORE TRUNCATE, got {:?}", s),
+        }
+
+        // Renamed logical per-table empties (were CACHE/QUEUE TRUNCATE).
+        match parse_stmt("CACHE CLEAR")? {
+            Statement::Cache(CacheCommand::Clear {}) => {}
+            s => panic!("Expected CACHE CLEAR, got {:?}", s),
+        }
+        match parse_stmt("QUEUE CLEAR")? {
+            Statement::Queue(QueueCommand::Clear {}) => {}
+            s => panic!("Expected QUEUE CLEAR, got {:?}", s),
+        }
+
+        // The old keywords must no longer parse.
+        assert!(parse_stmt("CACHE TRUNCATE").is_err());
+        assert!(parse_stmt("QUEUE TRUNCATE").is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_explain_variants() -> Result<(), CubeError> {
+        match parse_stmt("EXPLAIN ANALYZE DETAILED SELECT 1")? {
+            Statement::ExplainAnalyzeDetailed(_) => {}
+            s => panic!("Expected ExplainAnalyzeDetailed, got {:?}", s),
+        }
+        // The DETAILED interception must not affect plain EXPLAIN / EXPLAIN ANALYZE.
+        match parse_stmt("EXPLAIN ANALYZE SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: true, .. }) => {}
+            s => panic!("Expected Explain with analyze, got {:?}", s),
+        }
+        match parse_stmt("EXPLAIN SELECT 1")? {
+            Statement::Statement(SQLStatement::Explain { analyze: false, .. }) => {}
+            s => panic!("Expected Explain without analyze, got {:?}", s),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn parse_aggregate_index() -> Result<(), CubeError> {
         let query = "CREATE TABLE foo.Orders (
             id int,
             platform varchar(255),
@@ -459,47 +1123,185 @@ mod tests {
             AGGREGATE INDEX aggr_index (platform, age)
             INDEX index2 (age, platform )
             ;";
-        let mut parser = CubeStoreParser::new(&query).unwrap();
-        let res = parser.parse_statement().unwrap();
+        let res = parse_stmt(query)?;
         match res {
             Statement::CreateTable {
                 indexes,
                 aggregates,
                 ..
             } => {
-                assert_eq!(aggregates.as_ref().unwrap()[0].0.value, "sum".to_string());
-                assert_eq!(aggregates.as_ref().unwrap()[0].1.value, "count".to_string());
-                assert_eq!(aggregates.as_ref().unwrap()[1].0.value, "max".to_string());
-                assert_eq!(
-                    aggregates.as_ref().unwrap()[1].1.value,
-                    "max_id".to_string()
-                );
+                let aggregates = aggregates.as_ref().expect("aggregates should be present");
+                assert_eq!(aggregates[0].0.value, "sum".to_string());
+                assert_eq!(aggregates[0].1.value, "count".to_string());
+                assert_eq!(aggregates[1].0.value, "max".to_string());
+                assert_eq!(aggregates[1].1.value, "max_id".to_string());
 
                 assert_eq!(indexes.len(), 3);
 
                 let ind = &indexes[0];
-                if let SQLStatement::CreateIndex {
+                if let SQLStatement::CreateIndex(CreateIndex {
                     columns, unique, ..
-                } = ind
+                }) = ind
                 {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &false);
                 } else {
-                    assert!(false);
+                    panic!("Expected CreateIndex");
                 }
 
                 let ind = &indexes[1];
-                if let SQLStatement::CreateIndex {
+                if let SQLStatement::CreateIndex(CreateIndex {
                     columns, unique, ..
-                } = ind
+                }) = ind
                 {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &true);
                 } else {
-                    assert!(false);
+                    panic!("Expected CreateIndex");
                 }
             }
-            _ => {}
+            _ => panic!("Expected CreateTable"),
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_queue_add_options_any_order() -> Result<(), CubeError> {
+        // Original order: EXCLUSIVE PRIORITY ORPHANED
+        let res = parse_stmt("QUEUE ADD EXCLUSIVE PRIORITY 1 ORPHANED 60 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, 1);
+                assert_eq!(orphaned, Some(60));
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        let res = parse_stmt("QUEUE ADD PRIORITY 5 EXCLUSIVE 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(exclusive);
+                assert_eq!(priority, 5);
+                assert_eq!(orphaned, None);
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        let res = parse_stmt("QUEUE ADD ORPHANED 120 PRIORITY -3 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, -3);
+                assert_eq!(orphaned, Some(120));
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        // No options at all
+        let res = parse_stmt("QUEUE ADD 'key' 'value'")?;
+        match res {
+            Statement::Queue(QueueCommand::Add {
+                exclusive,
+                priority,
+                orphaned,
+                ..
+            }) => {
+                assert!(!exclusive);
+                assert_eq!(priority, 0);
+                assert_eq!(orphaned, None);
+            }
+            _ => panic!("Expected QueueCommand::Add"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_queue_add_duplicate_option_error() -> Result<(), CubeError> {
+        let res = parse_stmt("QUEUE ADD PRIORITY 1 PRIORITY 2 'key' 'value'");
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: PRIORITY"));
+
+        let res = parse_stmt("QUEUE ADD EXCLUSIVE EXCLUSIVE 'key' 'value'");
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate option: EXCLUSIVE"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_placeholder_index_out_of_bounds() -> Result<(), CubeError> {
+        // Two placeholders but only one parameter supplied — second placeholder
+        // must return a ParserError, not panic with index-out-of-bounds.
+        {
+            let mut parser = CubeStoreParser::new(
+                "QUEUE ACK ? ?",
+                Some(vec![QueryParameter::StringValue("a".to_string())]),
+            )?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("Placeholder index is out of bound"),
+                "unexpected error: {}",
+                msg
+            );
+        }
+
+        // Zero placeholders consumed but a placeholder is present in SQL with
+        // empty parameters list — must error, not panic.
+        {
+            let mut parser = CubeStoreParser::new("QUEUE ACK ?", Some(vec![]))?;
+
+            let res = parser.parse_statement();
+            assert!(res.is_err(), "expected parse error, got: {:?}", res);
+
+            let msg = res.unwrap_err().to_string();
+            assert!(
+                msg.contains("Placeholder index is out of bound"),
+                "unexpected error: {}",
+                msg
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_metastore_set_current() -> Result<(), CubeError> {
+        let res = parse_stmt("sys MeTasTore SEt_Current 1671235558783")?;
+        match res {
+            Statement::System(SystemCommand::MetaStore(MetaStoreCommand::SetCurrent { id })) => {
+                assert_eq!(id, 1671235558783);
+            }
+            _ => panic!("Expected MetaStore SetCurrent"),
+        }
+
+        Ok(())
     }
 }

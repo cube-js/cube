@@ -1,10 +1,10 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('Extensions', () => {
   const {
     compiler, joinGraph, cubeEvaluator
-  } = prepareCompiler(`
+  } = prepareJsCompiler(`
     const Funnels = require('Funnels');
     import { dynRef } from 'Reflection';
 
@@ -49,7 +49,7 @@ describe('Extensions', () => {
 
     cube(\`FooBar\`, {
       extends: VisitorsFunnel,
-      
+
       measures: {
         conversionsFraction: {
           sql: dynRef('conversions', (c) => \`\${c} / 100.0\`),
@@ -68,7 +68,7 @@ describe('Extensions', () => {
         timeDimensions: [{
           dimension: 'VisitorsFunnel.time',
           granularity: 'day',
-          dateRange: { from: '2017-01-01', to: '2017-01-30' }
+          dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles'
       });
@@ -92,7 +92,7 @@ describe('Extensions', () => {
         timeDimensions: [{
           dimension: 'FooBar.time',
           granularity: 'day',
-          dateRange: { from: '2017-01-01', to: '2017-01-30' }
+          dateRange: ['2017-01-01', '2017-01-30']
         }],
         timezone: 'America/Los_Angeles'
       });

@@ -1,135 +1,46 @@
-use std::sync::Arc;
-
+use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::LogicalPlan;
+use datafusion::logical_expr::{Join, LogicalPlan};
 use datafusion::physical_plan::ExecutionPlan;
+use std::sync::Arc;
 
 /// Recursively applies a transformation on each node and rewrites the plan. The plan is traversed
 /// bottom-up, top-down information can be propagated via context, see [PlanRewriter] for details.
-pub fn rewrite_plan<'a, R: PlanRewriter>(
-    p: &'a LogicalPlan,
+pub fn rewrite_plan<'a, R: crate::queryplanner::optimizations::rewrite_plan::PlanRewriter>(
+    p: LogicalPlan,
     ctx: &'a R::Context,
     f: &'a mut R,
 ) -> Result<LogicalPlan, DataFusionError> {
-    let updated_ctx = f.enter_node(p, ctx);
+    Ok(rewrite_plan_impl(p, ctx, f)?.data)
+}
+
+pub fn rewrite_plan_impl<'a, R: PlanRewriter>(
+    p: LogicalPlan,
+    ctx: &'a R::Context,
+    f: &'a mut R,
+) -> Result<Transformed<LogicalPlan>, DataFusionError> {
+    let updated_ctx = f.enter_node(&p, ctx);
     let ctx = updated_ctx.as_ref().unwrap_or(ctx);
 
-    // First, update children.
-    let updated = match p {
-        LogicalPlan::Projection {
-            expr,
-            input,
-            schema,
-        } => LogicalPlan::Projection {
-            expr: expr.clone(),
-            input: Arc::new(rewrite_plan(input.as_ref(), ctx, f)?),
-            schema: schema.clone(),
-        },
-        LogicalPlan::Filter { predicate, input } => LogicalPlan::Filter {
-            predicate: predicate.clone(),
-            input: Arc::new(rewrite_plan(input.as_ref(), ctx, f)?),
-        },
-        LogicalPlan::Aggregate {
-            input,
-            group_expr,
-            aggr_expr,
-            schema,
-        } => LogicalPlan::Aggregate {
-            input: Arc::new(rewrite_plan(input.as_ref(), ctx, f)?),
-            group_expr: group_expr.clone(),
-            aggr_expr: aggr_expr.clone(),
-            schema: schema.clone(),
-        },
-        LogicalPlan::Sort { expr, input } => LogicalPlan::Sort {
-            expr: expr.clone(),
-            input: Arc::new(rewrite_plan(input.as_ref(), ctx, f)?),
-        },
-        LogicalPlan::Union {
-            inputs,
-            schema,
-            alias,
-        } => LogicalPlan::Union {
-            inputs: {
-                let mut new_inputs = Vec::new();
-                for i in inputs.iter() {
-                    new_inputs.push(rewrite_plan(i, ctx, f)?)
-                }
-                new_inputs
-            },
-            schema: schema.clone(),
-            alias: alias.clone(),
-        },
-        LogicalPlan::Join {
-            left,
-            right,
-            on,
-            join_type,
-            join_constraint,
-            schema,
-        } => LogicalPlan::Join {
-            left: Arc::new(rewrite_plan(
-                left.as_ref(),
-                f.enter_join_left(p, ctx).as_ref().unwrap_or(ctx),
-                f,
-            )?),
-            right: Arc::new(rewrite_plan(
-                right.as_ref(),
-                f.enter_join_right(p, ctx).as_ref().unwrap_or(ctx),
-                f,
-            )?),
-            on: on.clone(),
-            join_type: *join_type,
-            join_constraint: *join_constraint,
-            schema: schema.clone(),
-        },
-        LogicalPlan::Repartition {
-            input,
-            partitioning_scheme,
-        } => LogicalPlan::Repartition {
-            input: Arc::new(rewrite_plan(input, ctx, f)?),
-            partitioning_scheme: partitioning_scheme.clone(),
-        },
-        p @ LogicalPlan::TableScan { .. } => p.clone(),
-        p @ LogicalPlan::EmptyRelation { .. } => p.clone(),
-        LogicalPlan::Limit { n, input } => LogicalPlan::Limit {
-            n: *n,
-            input: Arc::new(rewrite_plan(input, ctx, f)?),
-        },
-        LogicalPlan::Skip { n, input } => LogicalPlan::Skip {
-            n: *n,
-            input: Arc::new(rewrite_plan(input, ctx, f)?),
-        },
-        p @ LogicalPlan::CreateExternalTable { .. } => p.clone(),
-        LogicalPlan::Explain {
-            verbose,
-            plan,
-            stringified_plans,
-            schema,
-        } => LogicalPlan::Explain {
-            verbose: *verbose,
-            plan: Arc::new(rewrite_plan(plan, ctx, f)?),
-            stringified_plans: stringified_plans.clone(),
-            schema: schema.clone(),
-        },
-        LogicalPlan::Extension { node } => LogicalPlan::Extension {
-            node: node.from_template(
-                &node.expressions(),
-                &node
-                    .inputs()
-                    .into_iter()
-                    .map(|p| rewrite_plan(p, ctx, f))
-                    .collect::<Result<Vec<_>, _>>()?,
-            ),
-        },
-        LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
-            return Err(DataFusionError::Internal(
-                "unsupported operation".to_string(),
-            ))
-        }
+    let join_context = match &p {
+        LogicalPlan::Join(Join { left, right, .. }) => vec![
+            (left.clone(), f.enter_join_left(&p, ctx)),
+            (right.clone(), f.enter_join_right(&p, ctx)),
+        ],
+        _ => Vec::new(),
     };
 
-    // Update the resulting plan.
-    f.rewrite(updated, ctx)
+    // TODO upgrade DF: Check callers to see if we want to handle subquery expressions.
+
+    p.map_children(|c| {
+        let next_ctx = join_context
+            .iter()
+            .find(|(n, _)| n.as_ref() == &c)
+            .and_then(|(_, join_ctx)| join_ctx.as_ref())
+            .unwrap_or(ctx);
+        rewrite_plan_impl(c, next_ctx, f)
+    })?
+    .transform_parent(|n| f.rewrite(n, ctx).map(|new| Transformed::yes(new)))
 }
 
 pub trait PlanRewriter {
@@ -164,7 +75,7 @@ pub trait PlanRewriter {
 }
 
 pub fn rewrite_physical_plan<F>(
-    p: &dyn ExecutionPlan,
+    p: Arc<dyn ExecutionPlan>,
     rewriter: &mut F,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError>
 where
@@ -173,7 +84,7 @@ where
     let new_children = p
         .children()
         .into_iter()
-        .map(|c| rewrite_physical_plan(c.as_ref(), rewriter))
+        .map(|c| rewrite_physical_plan(c.clone(), rewriter))
         .collect::<Result<_, DataFusionError>>()?;
     let new_plan = p.with_new_children(new_children)?;
     rewriter(new_plan)

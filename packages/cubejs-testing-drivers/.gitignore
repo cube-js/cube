@@ -1,0 +1,9 @@
+.cubestore
+.temp
+fixtures/*.env
+.env.athena.sh
+.env.bigquery.sh
+.env.postgres.sh
+.env.databricks.sh
+
+dist

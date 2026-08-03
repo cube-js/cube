@@ -1,0 +1,128 @@
+---
+title: Snowflake Semantic Views Integration
+sidebarTitle: Snowflake Semantic Views
+description: Snowflake Semantic Views integration is available in Cube on the Enterprise plan.
+---
+
+<Info>
+
+Snowflake Semantic Views integration is available in Cube on the [Enterprise plan](https://cube.dev/pricing).
+
+</Info>
+
+Cube supports bi-directional integration with Snowflake Semantic Views. This integration enables you to author views in Cube and use them in Snowflake, or work with Snowflake semantic views directly in Cube. This ensures consistency between your Cube definitions and Snowflake's semantic layer, allowing teams to work in their preferred environment.
+
+## Overview
+
+The Snowflake Semantic Views integration provides two-way synchronization between Cube and Snowflake:
+
+- **Pull integration**: Pull semantic views from Snowflake and turn them into cubes and views in Cube
+- **Push integration**: Push Cube views into Snowflake as native semantic views
+
+This bi-directional approach ensures that your semantic layer definitions remain consistent across both platforms, regardless of where they are authored.
+
+## Pull Integration
+
+From the IDE, users can pull semantic views from Snowflake and turn them into cubes and views in Cube. The pull integration generates code files with cube and view definitions in your Cube repository, making it easy to work with existing Snowflake semantic views.
+
+### How it works
+
+1. Connect to your Snowflake account from the Cube IDE
+2. Browse available semantic views in Snowflake
+3. Select the semantic views you want to import
+4. Cube generates the corresponding cube and view definitions
+5. The generated code files are added to your Cube repository
+
+This allows you to leverage existing Snowflake semantic views in Cube without manual conversion, ensuring consistency between your Snowflake and Cube definitions.
+
+## Push Integration
+
+Alternatively, you can push Cube views into Snowflake as native semantic views. The push integration creates DDL from Cube's definitions and executes it in Snowflake, creating Snowflake Semantic Views that match your Cube schema.
+
+### How it works
+
+1. Select Cube views you want to push to Snowflake
+2. Cube generates DDL statements from your Cube view definitions
+3. The DDL is executed in your Snowflake account
+4. Native Snowflake Semantic Views are created matching your Cube schema
+
+This enables you to use Cube-authored views directly in Snowflake, maintaining consistency across both platforms.
+
+### Cubes defined with `sql`
+
+When a cube uses the `sql` property with a plain SQL string, Cube creates a helper
+Snowflake view named `CUBE_SV_SRC_<CUBENAME>` in a configurable schema (defaults to
+`PUBLIC`) and uses that view as the source for the semantic view. For example:
+`sql: "SELECT id, status FROM raw.orders"`.
+
+Note that if you're simply referencing a table, use `sql_table` instead, as it's the
+recommended approach for straightforward table access (e.g., `sql_table: MY_SCHEMA.MY_TABLE`).
+
+### Prerequisites
+
+The push integration uses the SQL Runner to execute DDL statements in Snowflake. To
+successfully create semantic views, ensure the following:
+
+- **Enable DDL operations** for your Cube deployment. In the Cube Cloud UI, go to
+  **Deployment Settings** → **Configuration** and turn on **Enable DDL operations**.
+  Without this setting, the SQL Runner will reject the DDL statements that the push
+  integration generates.
+- The Snowflake role configured for your Cube data source (via [`CUBEJS_DB_SNOWFLAKE_ROLE`](/reference/configuration/environment-variables#cubejs_db_snowflake_role))
+  has privileges to create semantic views in the target database and schema
+  (`CREATE SEMANTIC VIEW` on the schema, plus `USAGE` on the parent database and schema).
+  If any cube uses a plain SQL string in its `sql` property, the role also needs
+  `CREATE VIEW` privileges on the schema where helper views are created (which defaults to `PUBLIC`).
+- The role has `USAGE` on the warehouse specified by [`CUBEJS_DB_SNOWFLAKE_WAREHOUSE`](/reference/configuration/environment-variables#cubejs_db_snowflake_warehouse)
+  and `SELECT` on the underlying tables referenced by the view.
+- [`CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE`](/reference/configuration/environment-variables#cubejs_db_snowflake_quoted_identifiers_ignore_case)
+  is set consistently with how identifiers are defined in your Cube data model. The
+  default value is `false`.
+
+If a push fails with a permissions error, verify that **Enable DDL operations** is
+turned on in your deployment configuration and that the configured role has the
+required privileges listed above. See [Snowflake data source configuration](/admin/connect-to-data/data-sources/snowflake)
+for the full list of relevant environment variables.
+
+### Limitations
+
+Cube's data modeling layer is broader than what can be expressed natively in
+Snowflake Semantic Views today, so not every Cube view can be pushed as-is. Views
+that rely on the features below will continue to work in Cube, and the push
+wizard will flag them during validation so you can adjust them or keep them in
+Cube only.
+
+When pushing a Cube view to Snowflake, the following are currently not supported:
+
+- **Cubes with templated `sql`.** If a cube's `sql` property uses template
+  expressions (e.g., Jinja or dbt `{{ source(...) }}` syntax), it can't be
+  pushed. See [Cubes defined with `sql`](#cubes-defined-with-sql) for details on
+  what SQL patterns are supported.
+- **Cubes without a single-column primary key.** Every cube needs a
+  `primary_key` dimension that resolves to a single physical column. Composite
+  primary keys and primary keys defined as SQL expressions aren't supported.
+- **Non-equi joins and expression-based joins.** Joins must be simple equality
+  joins between columns. Function calls (e.g., `LOWER({CUBE}.user_id) = {users.id}`),
+  inequality operators, `OR` conditions, and other expression-based join
+  conditions can't be translated.
+- **Joins that don't reference a primary key.** The referenced side of every
+  join must be the primary key of the target cube. Snowflake Semantic Views
+  requires referenced columns to be a primary or unique key.
+- **Measure types beyond the basic aggregates.** Snowflake Semantic Views
+  natively supports `count`, `count_distinct`, `sum`, `avg`, `min`, and `max`.
+  Cube measures that combine other measures, apply per-measure filters, or use
+  rolling windows don't have a direct equivalent and can't be pushed.
+- **Advanced Cube features without a Snowflake equivalent.** Segments, access
+  policies, hierarchies, time-dimension granularities, view-level filters, and
+  pre-aggregations are skipped during the push.
+
+We're working closely with Snowflake to expand coverage as Snowflake Semantic
+Views evolves.
+
+## Benefits
+
+The Snowflake Semantic Views integration provides several advantages:
+
+- **Consistency**: Keep your semantic layer definitions synchronized between Cube and Snowflake
+- **Flexibility**: Work in your preferred environment—author in Cube or Snowflake
+- **Efficiency**: Automatically generate definitions without manual conversion
+- **Collaboration**: Enable teams to work in their preferred tools while maintaining consistency

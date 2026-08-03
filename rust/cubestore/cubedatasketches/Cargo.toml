@@ -1,0 +1,12 @@
+[package]
+name = "cubedatasketches"
+version = "0.1.0"
+authors = ["Cube Dev, Inc."]
+edition = "2021"
+license = "Apache-2.0"
+description = "Implementation of HLL from Apache DataSketches"
+
+[dependencies]
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+dsrs = { git = "https://github.com/cube-js/datasketches-rs.git", branch = "cubestore" }

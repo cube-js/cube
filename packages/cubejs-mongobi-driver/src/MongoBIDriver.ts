@@ -7,12 +7,13 @@
 import {
   getEnv,
   assertDataSource,
+  Pool,
 } from '@cubejs-backend/shared';
 import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field } from 'mysql2';
-import genericPool, { Pool } from 'generic-pool';
 import { Readable } from 'stream';
 import {
   BaseDriver,
+  createPoolName,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   DriverInterface,
@@ -44,32 +45,46 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: MongoBIDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
-    const dataSource =
-      config.dataSource ||
-      assertDataSource('default');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { dataSource: configDataSource, maxPoolSize, testConnectionTimeout, ...mongoBIDriverConfiguration } = config;
+    const dataSource = configDataSource || assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
-      authPlugins: {
-        mysql_clear_password: () => async () => {
-          const password =
-            config.password ||
-            getEnv('dbPass', { dataSource }) ||
-            '';
-          return Buffer.from((password).concat('\0')).toString();
-        }
-      },
+      host: getEnv('dbHost', { dataSource, preAggregations }),
+      database: getEnv('dbName', { dataSource, preAggregations }),
+      port: getEnv('dbPort', { dataSource, preAggregations }),
+      user: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      // mysql2 uses own typings for ssl property, which is not correct
+      // Types of property 'pfx' are incompatible. Skipping validation with any cast
+      ssl: this.getSslOptions(dataSource, preAggregations) as any,
       typeCast: (field: Field, next) => {
         if (field.type === 'DATETIME') {
           // Example value 1998-08-02 00:00:00
@@ -80,9 +95,15 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
 
         return next();
       },
-      ...config
+      // mysql2 v3.x uses this flag by default and sends some connection attributes like:
+      // version, app-name. But mongosql which is based on mysql 5.7 is not able to proceed them, resulting in:
+      // Error: recv handshake response error: invalid connection attribute at index 0: EOF
+      flags: ['-CONNECT_ATTRS'],
+      ...mongoBIDriverConfiguration
     };
-    this.pool = genericPool.createPool({
+
+    const poolName = createPoolName('mongobi', dataSource, preAggregations);
+    this.pool = new Pool(poolName, {
       create: async () => {
         const conn: Connection = createConnection(this.config);
 
@@ -113,7 +134,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       min: 0,
       max:
         config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
+        getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,

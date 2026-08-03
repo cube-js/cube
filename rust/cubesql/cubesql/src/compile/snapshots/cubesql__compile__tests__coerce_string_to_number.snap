@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT COS('0')\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++----------------+
+| cos(Utf8("0")) |
++----------------+
+| 1              |
++----------------+

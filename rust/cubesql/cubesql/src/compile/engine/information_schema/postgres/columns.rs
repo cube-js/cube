@@ -1,7 +1,6 @@
 use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringBuilder, UInt32Builder},
@@ -14,7 +13,7 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use crate::transport::{CubeColumn, V1CubeMetaExt};
+use crate::transport::{CubeColumn, CubeMeta, V1CubeMetaExt};
 
 use super::{
     ext::CubeColumnPostgresExt,
@@ -312,7 +311,7 @@ pub struct InfoSchemaColumnsProvider {
 }
 
 impl InfoSchemaColumnsProvider {
-    pub fn new(db_name: &str, cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, cubes: &Vec<CubeMeta>) -> Self {
         let mut builder = InformationSchemaColumnsBuilder::new();
 
         for cube in cubes {

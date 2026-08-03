@@ -44,14 +44,14 @@ export async function event(opts: BaseEvent) {
       ...opts,
       cliVersion: loadCliManifest().version,
     });
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
   }
 }
 
 export const displayError = async (text: string | string[], options = {}) => {
   console.error('');
-  console.error(chalk.cyan('Cube.js Error ---------------------------------------'));
+  console.error(chalk.cyan('Cube Error ---------------------------------------'));
   console.error('');
 
   if (Array.isArray(text)) {
@@ -70,7 +70,7 @@ export const displayError = async (text: string | string[], options = {}) => {
   });
 
   console.error('');
-  console.error(`${chalk.yellow('  Ask this question in Cube.js Slack:')} https://slack.cube.dev`);
+  console.error(`${chalk.yellow('  Ask this question in Cube Slack:')} https://slack.cube.dev`);
   console.error(`${chalk.yellow('  Post an issue:')} https://github.com/cube-js/cube.js/issues`);
   console.error('');
 

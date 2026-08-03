@@ -8,5 +8,6 @@ updates:
     directory: "/examples"
     schedule:
       interval: "monthly"
-    allow:
-      - dependency-type: "production"
+    labels: [ ]
+    ignore:
+      - dependency-name: "*"

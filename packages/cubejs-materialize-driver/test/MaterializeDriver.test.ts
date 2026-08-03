@@ -31,6 +31,8 @@ describe('MaterializeDriver', () => {
       user: 'materialize',
       password: 'materialize',
       database: 'materialize',
+      cluster: 'quickstart',
+      ssl: false,
     });
     await driver.query('CREATE SCHEMA IF NOT EXISTS test;', []);
   });
@@ -71,8 +73,8 @@ describe('MaterializeDriver', () => {
   test('schema detection', async () => {
     await Promise.all([
       driver.query('CREATE TABLE A (a INT, b BIGINT, c TEXT, d DOUBLE, e FLOAT);', []),
-      driver.query('CREATE VIEW V AS SELECT * FROM mz_views;', []),
-      driver.query('CREATE MATERIALIZED VIEW MV AS SELECT * FROM mz_views;', []),
+      driver.query('CREATE VIEW V AS SELECT * FROM A;', []),
+      driver.query('CREATE MATERIALIZED VIEW MV AS SELECT * FROM A;', []),
     ]);
 
     const tablesSchemaData = await driver.tablesSchema();
@@ -143,10 +145,19 @@ describe('MaterializeDriver', () => {
       });
 
       throw new Error('stream must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual(
         'unknown catalog item \'test.random_name_for_table_that_doesnot_exist_sql_must_fail\''
       );
     }
   });
+
+  test('cluster', async () => {
+    const data = await driver.query(`SHOW CLUSTER;`, []);
+    expect(data).toEqual([
+      {
+        'cluster': 'quickstart',
+      }]);
+  });
+
 });

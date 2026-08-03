@@ -1,0 +1,65 @@
+cubes:
+  - name: validate_preaggs
+    sql: SELECT * FROM order_users;
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    pre_aggregations:
+      - name: autoRollupFail
+        type: autoRollup
+        maxPreAggregations: string_instead_of_number
+
+      - name: originalSqlFail
+        type: originalSql
+        partition_granularity: invalid_partition_granularity
+
+      - name: originalSqlFail2
+        type: originalSql
+        partition_granularity: month
+        uniqueKeyColumns: not_an_array
+
+      - name: rollupJoinFail
+        type: rollupJoin
+        partition_granularity: month
+        # no rollups
+
+      - name: rollupLambdaFail
+        type: rollupLambda
+        partition_granularity: month
+        granularity: day
+        time_dimension: created_at
+        rollups: not_a_func
+
+      - name: rollupFail
+        type: rollup
+        measures:
+         - CUBE.count
+        time_dimension: # as array
+          - CUBE.created_at
+        granularity: day
+        partition_granularity: month
+        refresh_key:
+          every: 1 hour
+        scheduled_refresh: true
+
+      - name: rollupFail2
+        type: rollup
+        measures:
+         - CUBE.count
+        time_dimensions: CUBE.created_at # not an array

@@ -10,6 +10,7 @@ import {
 
 import {
   QueryType,
+  ResultType,
 } from './types/enums';
 
 import {
@@ -20,6 +21,7 @@ import {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
+  MemberExpression,
 } from './types/query';
 
 import {
@@ -28,6 +30,7 @@ import {
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  ContextToApiScopesFn,
 } from './types/auth';
 
 import {
@@ -38,11 +41,28 @@ import {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest
 } from './types/request';
 
+import {
+  AliasToMemberMap,
+  TransformDataResponse
+} from './types/responses';
+
+import {
+  ConfigItem,
+  GranularityMeta
+} from './helpers/prepare-annotation';
+
 export {
+  AliasToMemberMap,
+  TransformDataResponse,
+  ConfigItem,
+  GranularityMeta,
   QueryTimeDimensionGranularity,
   QueryType,
+  ResultType,
   QueryFilter,
   LogicalAndFilter,
   LogicalOrFilter,
@@ -50,6 +70,7 @@ export {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
+  MemberExpression,
   JWTOptions,
   CheckAuthFn,
   CheckSQLAuthSuccessResponse,
@@ -62,18 +83,28 @@ export {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest,
+  ContextToApiScopesFn,
 };
 
 /**
- * Auth middleware.
- * @deprecated
+ * Context rejection middleware.
  */
-export type CheckAuthMiddlewareFn =
+export type ContextRejectionMiddlewareFn =
  (
    req: Request,
    res: ExpressResponse,
    next: ExpressNextFunction,
  ) => void;
+
+type ContextAcceptorResult = { accepted: boolean; rejectMessage?: any };
+
+/**
+ * ContextAcceptorFn type that matches the ContextAcceptor.shouldAcceptWs
+ * signature from the server-core package
+ */
+export type ContextAcceptorFn = (context: RequestContext) => Promise<ContextAcceptorResult> | ContextAcceptorResult;
 
 /**
  * Logger middleware.

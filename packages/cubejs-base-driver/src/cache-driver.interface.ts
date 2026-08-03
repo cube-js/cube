@@ -1,8 +1,8 @@
 import { CancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
 
 export interface CacheDriverInterface {
-  get(key: string): Promise<any>;
-  set(key: string, value, expiration): Promise<{
+  get<R = any>(key: string): Promise<R | null>;
+  set(key: string, value: unknown, expiration: number): Promise<{
     key: string;
     bytes: number;
   }>;

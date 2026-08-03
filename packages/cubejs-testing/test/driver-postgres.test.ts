@@ -1,9 +1,14 @@
-import { mainTestSet, preAggsTestSet, productionTestSet } from './driverTests/testSets';
+import { mainTestSet, multiQueryTestSet, preAggsTestSet, productionTestSet } from './driverTests/testSets';
 import { executeTestSuite } from './driver-test-suite';
 
 executeTestSuite({
   type: 'postgres',
   tests: mainTestSet,
+});
+
+executeTestSuite({
+  type: 'postgres',
+  tests: multiQueryTestSet,
 });
 
 executeTestSuite({

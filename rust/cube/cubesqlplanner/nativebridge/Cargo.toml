@@ -1,0 +1,41 @@
+[package]
+name = "nativebridge"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+byteorder = "1.4.2"
+itertools = "0.10.0"
+Inflector = "0.11.4"
+
+[dependencies.proc-macro2]
+version = "1.0"
+
+[dependencies.quote]
+version = "1.0"
+
+[dependencies.syn]
+version = "2.0.98"
+features = ["full"]
+
+[dependencies.async-trait]
+version = "0.1.42"
+
+# Code in cubesqlplanner workspace is not ready for full-blown clippy
+# So we disable some rules to enable per-rule latch in CI, not for a whole clippy run
+# Feel free to remove any rule from here and fix all warnings with it
+# Or to write a comment why rule should stay disabled
+[lints.clippy]
+cmp_owned = "allow"
+collapsible_match = "allow"
+len_zero = "allow"
+let_and_return = "allow"
+needless_borrow = "allow"
+ptr_arg = "allow"
+redundant_closure = "allow"
+single_match = "allow"

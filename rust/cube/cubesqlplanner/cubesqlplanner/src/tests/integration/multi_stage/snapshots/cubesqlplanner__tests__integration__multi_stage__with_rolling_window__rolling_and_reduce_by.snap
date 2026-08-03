@@ -1,0 +1,16 @@
+---
+source: cubesqlplanner/src/tests/integration/multi_stage/with_rolling_window.rs
+expression: result
+---
+orders__category | orders__created_at_month | orders__rolling_sum_7d | orders__amount_reduce_category
+-----------------+--------------------------+------------------------+-------------------------------
+books            | 2024-01-01 00:00:00      | NULL                   | 500.00                        
+books            | 2024-02-01 00:00:00      | 30.00                  | 750.00                        
+books            | 2024-03-01 00:00:00      | NULL                   | 1000.00                       
+clothing         | 2024-01-01 00:00:00      | NULL                   | 500.00                        
+clothing         | 2024-02-01 00:00:00      | NULL                   | 750.00                        
+clothing         | 2024-03-01 00:00:00      | NULL                   | 1000.00                       
+electronics      | 2024-01-01 00:00:00      | NULL                   | 500.00                        
+electronics      | 2024-02-01 00:00:00      | NULL                   | 750.00                        
+electronics      | 2024-03-01 00:00:00      | 50.00                  | 1000.00                       
+NULL             | 2024-01-01 00:00:00      | NULL                   | NULL

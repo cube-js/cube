@@ -1,5 +1,6 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 import { debugLog, logSqlAndParams } from '../../unit/TestUtil';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
@@ -13,18 +14,18 @@ describe('ClickHouse JoinGraph', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
     }
-  
+
     cube(\`visitors\`, {
       sql: \`
-      select * from visitors WHERE \${USER_CONTEXT.source.filter('source')} AND
-      \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
+      select * from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
+      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
-      
+
       refreshKey: {
         sql: 'SELECT 1',
       },
@@ -50,10 +51,6 @@ describe('ClickHouse JoinGraph', () => {
           }]
         },
         per_visitor_revenue: perVisitorRevenueMeasure,
-        revenueRunning: {
-          type: 'runningTotal',
-          sql: 'amount'
-        },
         revenueRolling: {
           type: 'sum',
           sql: 'amount',
@@ -85,14 +82,6 @@ describe('ClickHouse JoinGraph', () => {
             offset: 'start'
           }
         },
-        runningCount: {
-          type: 'runningTotal',
-          sql: '1'
-        },
-        runningRevenuePerCount: {
-          type: 'number',
-          sql: \`round(\${revenueRunning} / \${runningCount})\`
-        },
         averageCheckins: {
           type: 'avg',
           sql: \`\${doubledCheckings}\`
@@ -113,24 +102,24 @@ describe('ClickHouse JoinGraph', () => {
           type: 'time',
           sql: 'created_at'
         },
-        
+
         createdAtSqlUtils: {
           type: 'time',
           sql: SQL_UTILS.convertTz('created_at')
         },
-        
+
         checkins: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true
         },
-        
+
         subQueryFail: {
           sql: '2',
           type: \`number\`,
           subQuery: true
         },
-        
+
         doubledCheckings: {
           sql: \`\${checkins} * 2\`,
           type: 'number'
@@ -210,7 +199,7 @@ describe('ClickHouse JoinGraph', () => {
           subQuery: true
         },
       },
-      
+
       // preAggregations: {
       //   checkinSource: {
       //     type: 'rollup',
@@ -255,19 +244,19 @@ describe('ClickHouse JoinGraph', () => {
         }
       }
     })
-    
+
     cube('ReferenceVisitors', {
       sql: \`
-        select * from \${visitors.sql()} as t 
+        select * from \${visitors.sql()} as t
         WHERE \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter(\`addDays(t.created_at, 28)\`)} AND
         \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter((from, to) => \`(addDays(t.created_at,28)) >= parseDateTimeBestEffort(\${from}) AND (addDays(t.created_at, 28)) <= parseDateTimeBestEffort(\${to})\`)}
       \`,
-      
+
       measures: {
         count: {
           type: 'count'
         },
-        
+
         googleSourcedCount: {
           type: 'count',
           filters: [{
@@ -275,7 +264,7 @@ describe('ClickHouse JoinGraph', () => {
           }]
         },
       },
-      
+
       dimensions: {
         createdAt: {
           type: 'time',
@@ -384,68 +373,6 @@ describe('ClickHouse JoinGraph', () => {
     visitor_checkins__visitor_checkins_count: '6',
     visitors__per_visitor_revenue: '60'
   }]));
-
-  // FAILS - need to finish query to override ::timestamptz
-  it.skip('running total', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.revenueRunning'
-        ],
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-10']
-        }],
-        order: [{
-          id: 'visitors.created_at'
-        }],
-        timezone: 'America/Los_Angeles'
-      });
-
-      logSqlAndParams(query);
-
-      // TODO ordering doesn't work for running total
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
-        expect(res).toEqual(
-          [{
-            visitors__created_at_day: '2017-01-01T00:00:00.000Z',
-            visitors__revenue_running: null
-          }, {
-            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-            visitors__revenue_running: '100'
-          }, {
-            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
-            visitors__revenue_running: '100'
-          }, {
-            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-            visitors__revenue_running: '300'
-          }, {
-            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-            visitors__revenue_running: '600'
-          }, {
-            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-07T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-08T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-09T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-10T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }]
-        );
-      });
-    });
-
-    return result;
-  });
 
   // FAILS - need to finish query to override ::timestamptz
   it.skip('rolling', () => runQueryTest({
@@ -575,51 +502,6 @@ describe('ClickHouse JoinGraph', () => {
     { visitors__created_at_sql_utils_day: '2017-01-04T00:00:00.000', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-05T00:00:00.000', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000', visitors__visitor_count: '2' }
-  ]));
-
-  it('running total total', () => runQueryTest({
-    measures: [
-      'visitors.revenueRunning'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    {
-      visitors__revenue_running: '1500'
-    }
-  ]));
-
-  // FAILS Unmatched parentheses
-  it.skip('running total ratio', () => runQueryTest({
-    measures: [
-      'visitors.runningRevenuePerCount'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      granularity: 'day',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__running_revenue_per_count: null },
-    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__running_revenue_per_count: '150' },
-    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__running_revenue_per_count: '200' },
-    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__running_revenue_per_count: '300' }
   ]));
 
   // FAILS ClickHouse supports multiple approximate aggregators:
@@ -1157,7 +1039,7 @@ describe('ClickHouse JoinGraph', () => {
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
       expect(res).toEqual(
-        [{ visitor_checkins__revenue_per_checkin: '60' }]
+        [{ visitor_checkins__revenue_per_checkin: getEnv('nativeSqlPlanner') ? '50' : '60' }]
       );
     });
   }));

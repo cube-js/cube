@@ -8,6 +8,7 @@ import { configureTokenCommand } from './command/token';
 import { configureTypegenCommand } from './command/typegen';
 import { configureAuthCommand } from './command/auth';
 import { loadCliManifest } from './utils';
+import { configureValidateCommand } from './command/validate';
 
 const packageJson = loadCliManifest();
 
@@ -30,6 +31,7 @@ program
   await configureGenerateCommand(program);
   await configureDeployCommand(program);
   await configureServerCommand(program);
+  await configureValidateCommand(program);
 
   if (!process.argv.slice(2).length) {
     program.help();

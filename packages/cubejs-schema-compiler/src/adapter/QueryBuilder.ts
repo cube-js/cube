@@ -1,0 +1,63 @@
+import { PostgresQuery } from './PostgresQuery';
+import { MysqlQuery } from './MysqlQuery';
+import { MongoBiQuery } from './MongoBiQuery';
+import { MssqlQuery } from './MssqlQuery';
+import { BigqueryQuery } from './BigqueryQuery';
+import { RedshiftQuery } from './RedshiftQuery';
+import { PrestodbQuery } from './PrestodbQuery';
+import { VerticaQuery } from './VerticaQuery';
+import { SnowflakeQuery } from './SnowflakeQuery';
+import { ClickHouseQuery } from './ClickHouseQuery';
+import { CrateQuery } from './CrateQuery';
+import { HiveQuery } from './HiveQuery';
+import { OracleQuery } from './OracleQuery';
+import { SqliteQuery } from './SqliteQuery';
+import { CubeStoreQuery } from './CubeStoreQuery';
+import { AthenaQuery } from './AthenaQuery';
+import { TrinoQuery } from './TrinoQuery';
+
+const ADAPTERS = {
+  postgres: PostgresQuery,
+  redshift: RedshiftQuery,
+  mysql: MysqlQuery,
+  mysqlauroraserverless: MysqlQuery,
+  mongobi: MongoBiQuery,
+  mssql: MssqlQuery,
+  bigquery: BigqueryQuery,
+  prestodb: PrestodbQuery,
+  qubole_prestodb: PrestodbQuery,
+  athena: AthenaQuery,
+  trino: TrinoQuery,
+  vertica: VerticaQuery,
+  snowflake: SnowflakeQuery,
+  clickhouse: ClickHouseQuery,
+  crate: CrateQuery,
+  hive: HiveQuery,
+  oracle: OracleQuery,
+  sqlite: SqliteQuery,
+  materialize: PostgresQuery,
+  cubestore: CubeStoreQuery,
+};
+
+export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];
+
+export const createQuery = (compilers, dbType: string, queryOptions: any) => {
+  if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
+    return null;
+  }
+
+  let externalQueryClass = queryOptions.externalDialectClass;
+
+  if (!externalQueryClass && queryOptions.externalDbType) {
+    if (!ADAPTERS[queryOptions.externalDbType]) {
+      throw new Error(`Dialect for '${queryOptions.externalDbType}' is not found`);
+    }
+
+    externalQueryClass = ADAPTERS[queryOptions.externalDbType];
+  }
+
+  return new (queryClass(dbType, queryOptions.dialectClass))(compilers, {
+    ...queryOptions,
+    externalQueryClass,
+  });
+};

@@ -62,7 +62,7 @@ describe('QuestDriver', () => {
       throw new Error('stream must throw an exception');
     } catch (e) {
       expect((e as Error).message).toEqual(
-        'table does not exist [name=random_name_for_table_that_doesnot_exist_sql_must_fail]'
+        'table does not exist [table=random_name_for_table_that_doesnot_exist_sql_must_fail]'
       );
     }
   });
@@ -71,56 +71,20 @@ describe('QuestDriver', () => {
     const schema = await driver.tablesSchema();
 
     expect(schema['']).toEqual({
-        'query_test': [
-          {
-            name: 'id',
-            type: 'LONG',
-          },
-          {
-            name: 'created',
-            type: 'date',
-          },
-          {
-            name: 'price',
-            type: 'DOUBLE',
-          },
-        ],
-        'telemetry': [
-          {
-            name: 'created',
-            type: 'TIMESTAMP',
-          },
-          {
-            name: 'event',
-            type: 'SHORT',
-          },
-          {
-            name: 'origin',
-            type: 'SHORT',
-          },
-        ],
-        'telemetry_config': [
-          {
-            name: 'id',
-            type: 'LONG256',
-          },
-          {
-            name: 'enabled',
-            type: 'boolean',
-          },
-          {
-            name: 'version',
-            type: 'SYMBOL',
-          },
-          {
-            name: 'os',
-            type: 'SYMBOL',
-          },
-          {
-            name: 'package',
-            type: 'SYMBOL',
-          },
-        ],
+      query_test: [
+        {
+          name: 'id',
+          type: 'LONG',
+        },
+        {
+          name: 'created',
+          type: 'date',
+        },
+        {
+          name: 'price',
+          type: 'DOUBLE',
+        },
+      ],
     });
   });
 });

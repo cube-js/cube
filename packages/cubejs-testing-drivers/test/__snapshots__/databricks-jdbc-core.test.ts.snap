@@ -1,0 +1,29 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Sequence with the @cubejs-backend/databricks-jdbc-driver for the Customers.RollingInternal 1`] = `
+Array [
+  Array [
+    "query",
+    "createSchemaIfNotExists",
+    "loadPreAggregationIntoTable",
+    "query",
+    "query",
+    "query",
+    "query",
+  ],
+  Array [],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/databricks-jdbc-driver for the ECommerce.SimpleAnalysisInternal 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "query",
+    "query",
+    "query",
+    "query",
+  ],
+  Array [],
+]
+`;

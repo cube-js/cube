@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_foreign_table\n            ORDER BY ftrelid\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------+----------+-----------+
+| ftrelid | ftserver | ftoptions |
++---------+----------+-----------+
++---------+----------+-----------+

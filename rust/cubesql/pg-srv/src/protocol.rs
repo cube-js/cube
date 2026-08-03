@@ -3,10 +3,12 @@
 //! Message Data Types: <https://www.postgresql.org/docs/14/protocol-message-types.html>
 
 use std::{
+    any::Any,
     collections::HashMap,
     convert::TryFrom,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     io::{Cursor, Error},
+    sync::Arc,
 };
 
 use async_trait::async_trait;
@@ -14,6 +16,8 @@ use async_trait::async_trait;
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
+#[cfg(feature = "with-chrono")]
+use crate::TimestampValue;
 use crate::{buffer, BindValue, FromProtocolValue, PgType, PgTypeId, ProtocolError};
 
 const DEFAULT_CAPACITY: usize = 64;
@@ -122,8 +126,8 @@ impl Serialize for StartupMessage {
         buffer.put_u16(self.minor);
 
         for (name, value) in &self.parameters {
-            buffer::write_string(&mut buffer, &name);
-            buffer::write_string(&mut buffer, &value);
+            buffer::write_string(&mut buffer, name);
+            buffer::write_string(&mut buffer, value);
         }
 
         buffer.push(0);
@@ -215,6 +219,14 @@ impl ErrorResponse {
             severity: ErrorSeverity::Error,
             code: ErrorCode::QueryCanceled,
             message: "canceling statement due to user request".to_string(),
+        }
+    }
+
+    pub fn admin_shutdown() -> Self {
+        Self {
+            severity: ErrorSeverity::Fatal,
+            code: ErrorCode::AdminShutdown,
+            message: "terminating connection due to shutdown signal".to_string(),
         }
     }
 }
@@ -463,7 +475,7 @@ impl Serialize for CommandComplete {
             CommandComplete::Fetch(rows) => {
                 buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
-            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
+            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, tag),
         }
 
         Some(buffer)
@@ -521,9 +533,9 @@ impl Serialize for ParameterDescription {
     const CODE: u8 = b't';
 
     fn serialize(&self) -> Option<Vec<u8>> {
+        let size = i16::try_from(self.parameters.len()).ok()?;
+
         let mut buffer: Vec<u8> = Vec::with_capacity(6 * self.parameters.len());
-        // FIXME!
-        let size = i16::try_from(self.parameters.len()).unwrap();
         buffer.put_i16(size);
 
         for parameter in &self.parameters {
@@ -543,8 +555,16 @@ impl RowDescription {
     pub fn new(fields: Vec<RowDescriptionField>) -> Self {
         Self { fields }
     }
+
     pub fn len(&self) -> usize {
         self.fields.len()
+    }
+
+    /// Returns the resolved per-column format codes.
+    /// These account for `is_binary_supported()` — if a type doesn't support
+    /// binary encoding, the format is downgraded to Text even if Binary was requested.
+    pub fn get_formats(&self) -> Vec<Format> {
+        self.fields.iter().map(|f| f.format).collect()
     }
 }
 
@@ -552,8 +572,7 @@ impl Serialize for RowDescription {
     const CODE: u8 = b'T';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        // FIXME!
-        let size = u16::try_from(self.fields.len()).unwrap();
+        let size = u16::try_from(self.fields.len()).ok()?;
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
         buffer.extend_from_slice(&size.to_be_bytes());
 
@@ -651,6 +670,14 @@ impl Deserialize for Parse {
         let query = buffer::read_string(&mut buffer).await?;
 
         let total = buffer.read_i16().await?;
+        if total < 0 {
+            return Err(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                format!("Invalid parameter count: {total}"),
+            )
+            .into());
+        }
+
         let mut param_types = Vec::with_capacity(total as usize);
 
         for _ in 0..total {
@@ -773,6 +800,18 @@ impl Bind {
                     PgTypeId::INT8 => {
                         BindValue::Int64(i64::from_protocol(raw_value, param_format)?)
                     }
+                    PgTypeId::FLOAT8 => {
+                        BindValue::Float64(f64::from_protocol(raw_value, param_format)?)
+                    }
+                    #[cfg(feature = "with-chrono")]
+                    PgTypeId::TIMESTAMP => BindValue::Timestamp(TimestampValue::from_protocol(
+                        raw_value,
+                        param_format,
+                    )?),
+                    #[cfg(feature = "with-chrono")]
+                    PgTypeId::DATE => {
+                        BindValue::Date(chrono::NaiveDate::from_protocol(raw_value, param_format)?)
+                    }
                     _ => {
                         return Err(ErrorResponse::error(
                             ErrorCode::FeatureNotSupported,
@@ -815,12 +854,24 @@ impl Deserialize for Bind {
                 let len = buffer.read_i32().await?;
                 if len == -1 {
                     parameter_values.push(None);
+                } else if len < 0 {
+                    return Err(ErrorResponse::error(
+                        ErrorCode::ProtocolViolation,
+                        format!("Invalid bind parameter length: {len}"),
+                    )
+                    .into());
+                } else if len as u32 > buffer::MAX_BIND_PARAMETER_LENGTH {
+                    return Err(ErrorResponse::error(
+                        ErrorCode::ProtocolViolation,
+                        format!(
+                            "Bind parameter length {len} exceeds the maximum allowed size of {} bytes",
+                            buffer::MAX_BIND_PARAMETER_LENGTH
+                        ),
+                    )
+                    .into());
                 } else {
-                    let mut value = Vec::with_capacity(len as usize);
-                    for _ in 0..len {
-                        value.push(buffer.read_u8().await?);
-                    }
-
+                    let mut value = vec![0u8; len as usize];
+                    buffer.read_exact(&mut value).await?;
                     parameter_values.push(Some(value));
                 }
             }
@@ -905,8 +956,12 @@ pub enum Format {
     Binary,
 }
 
+pub trait FrontendMessageExtension: Send + Sync + Debug {
+    fn as_any(&self) -> &dyn Any;
+}
+
 /// All frontend messages (request which client sends to the server).
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum FrontendMessage {
     PasswordMessage(PasswordMessage),
     /// Simple Query
@@ -927,12 +982,16 @@ pub enum FrontendMessage {
     Execute(Execute),
     /// Extended Query. Close Portal/Statement
     Close(Close),
+    /// Extension
+    Extension(Box<dyn FrontendMessageExtension>),
 }
 
 /// <https://www.postgresql.org/docs/14/errcodes-appendix.html>
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum ErrorCode {
+    // Class 03 — SQL Statement Not Yet Complete
+    SqlStatementNotYetComplete,
     // 0A — Feature Not Supported
     FeatureNotSupported,
     // 8 -  Connection Exception
@@ -950,14 +1009,19 @@ pub enum ErrorCode {
     // 34
     InvalidCursorName,
     // Class 42 — Syntax Error or Access Rule Violation
+    SyntaxErrorOrAccessRuleViolation,
     DuplicateCursor,
     SyntaxError,
     // Class 53 — Insufficient Resources
+    TooManyConnections,
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
     // Class 57 - Operator Intervention
     QueryCanceled,
+    AdminShutdown,
+    // Class 58 — System Error (errors external to PostgreSQL itself)
+    SystemError,
     // XX - Internal Error
     InternalError,
 }
@@ -965,6 +1029,7 @@ pub enum ErrorCode {
 impl Display for ErrorCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let string = match self {
+            Self::SqlStatementNotYetComplete => "03000",
             Self::FeatureNotSupported => "0A000",
             Self::ProtocolViolation => "08P01",
             Self::InvalidAuthorizationSpecification => "28000",
@@ -974,11 +1039,15 @@ impl Display for ErrorCode {
             Self::NoActiveSqlTransaction => "25P01",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
+            Self::SyntaxErrorOrAccessRuleViolation => "42000",
             Self::DuplicateCursor => "42P03",
             Self::SyntaxError => "42601",
+            Self::TooManyConnections => "53300",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::QueryCanceled => "57014",
+            Self::AdminShutdown => "57P01",
+            Self::SystemError => "58000",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -1043,9 +1112,17 @@ impl TransactionStatus {
     }
 }
 
+pub trait AuthenticationRequestExtension: Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+
+    fn to_code(&self) -> u32;
+}
+
+#[derive(Clone)]
 pub enum AuthenticationRequest {
     Ok,
     CleartextPassword,
+    Extension(Arc<dyn AuthenticationRequestExtension>),
 }
 
 impl AuthenticationRequest {
@@ -1057,6 +1134,7 @@ impl AuthenticationRequest {
         match self {
             Self::Ok => 0,
             Self::CleartextPassword => 3,
+            Self::Extension(extension) => extension.to_code(),
         }
     }
 }
@@ -1081,7 +1159,9 @@ pub trait Deserialize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{read_message, ProtocolError};
+    use crate::{
+        read_message, MessageTagParserDefaultImpl, ProtocolError, MAX_FRONTEND_MESSAGE_LENGTH,
+    };
 
     use std::io::Cursor;
 
@@ -1123,7 +1203,12 @@ mod tests {
 
         // First step, We write struct to the buffer
         let mut cursor = Cursor::new(vec![]);
-        buffer::write_message(&mut cursor, expected_message.clone()).await?;
+        buffer::write_message(
+            &mut bytes::BytesMut::new(),
+            &mut cursor,
+            expected_message.clone(),
+        )
+        .await?;
 
         // Second step, We read form the buffer and output structure must be the same as original
         let buffer = cursor.get_ref()[..].to_vec();
@@ -1154,7 +1239,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Parse(parse) => {
                 assert_eq!(
@@ -1184,7 +1274,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(bind) => {
                 assert_eq!(
@@ -1219,7 +1314,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1246,6 +1346,139 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_frontend_message_parse_bind_float64() -> Result<(), ProtocolError> {
+        // Test text format float64
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1a 00 73 30 00 00 01 00 00 00 01 00   B.....s0........
+            00 00 05 32 36 2e 31 31 00 00 00 00               ...26.11....
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(
+                    body,
+                    Bind {
+                        portal: "".to_string(),
+                        statement: "s0".to_string(),
+                        parameter_formats: vec![Format::Text],
+                        parameter_values: vec![Some(vec![50, 54, 46, 49, 49])], // "26.11"
+                        result_formats: vec![]
+                    },
+                );
+
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
+                    vec![BindValue::Float64(26.11)]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        // Test binary format float64
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1e 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
+            00 00 08 40 3a 1c 28 f5 c2 8f 5c 00 00 00 00      ...@:.(....\...
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(body.parameter_formats, vec![Format::Binary]);
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
+                    vec![BindValue::Float64(26.11)]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "with-chrono")]
+    #[tokio::test]
+    async fn test_frontend_message_parse_bind_date() -> Result<(), ProtocolError> {
+        use chrono::NaiveDate;
+
+        // Test text format date "2025-08-08"
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1e 00 73 30 00 00 01 00 00 00 01 00   B.....s0........
+            00 00 0a 32 30 32 35 2d 30 38 2d 30 38 00 00 00   ...2025-08-08...
+            00                                                 .
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::DATE]))?,
+                    vec![BindValue::Date(
+                        NaiveDate::from_ymd_opt(2025, 8, 8).unwrap()
+                    )]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        // Test binary format date (9351 days from 2000-01-01 for 2025-08-08)
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1a 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
+            00 00 04 00 00 24 87 00 00 00 00                  .....$......
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(body.parameter_formats, vec![Format::Binary]);
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::DATE]))?,
+                    vec![BindValue::Date(
+                        NaiveDate::from_ymd_opt(2025, 8, 8).unwrap()
+                    )]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_frontend_message_parse_describe() -> Result<(), ProtocolError> {
         let buffer = parse_hex_dump(
             r#"
@@ -1255,7 +1488,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Describe(desc) => {
                 assert_eq!(
@@ -1282,7 +1520,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::PasswordMessage(body) => {
                 assert_eq!(
@@ -1308,7 +1551,12 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
         match message {
             FrontendMessage::Execute(body) => {
                 assert_eq!(
@@ -1338,8 +1586,18 @@ mod tests {
 
         // This test demonstrates that protocol can decode two
         // simple messages without body in sequence
-        read_message(&mut cursor).await?;
-        read_message(&mut cursor).await?;
+        read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
+        read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await?;
 
         Ok(())
     }
@@ -1348,7 +1606,7 @@ mod tests {
     async fn test_frontend_message_write_complete_parse() -> Result<(), ProtocolError> {
         let mut cursor = Cursor::new(vec![]);
 
-        buffer::write_message(&mut cursor, ParseComplete {}).await?;
+        buffer::write_message(&mut bytes::BytesMut::new(), &mut cursor, ParseComplete {}).await?;
 
         assert_eq!(cursor.get_ref()[0..], vec![49, 0, 0, 0, 4]);
 
@@ -1375,7 +1633,7 @@ mod tests {
                 Format::Text,
             ),
         ]);
-        buffer::write_message(&mut cursor, desc).await?;
+        buffer::write_message(&mut bytes::BytesMut::new(), &mut cursor, desc).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
@@ -1388,5 +1646,116 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_bind_rejects_oversized_parameter_length() {
+        // Bind ('B') frame declaring a single parameter whose length is
+        // i32::MAX (~2 GiB) inside a 17-byte frame. Must be rejected before
+        // allocating instead of attempting a giant Vec::with_capacity.
+        let buffer = vec![
+            0x42, // tag 'B'
+            0x00, 0x00, 0x00, 0x10, // length = 16
+            0x00, // portal: ""
+            0x00, // statement: ""
+            0x00, 0x00, // 0 parameter format codes
+            0x00, 0x01, // 1 parameter value
+            0x7F, 0xFF, 0xFF, 0xFF, // value length = i32::MAX
+            0x00, 0x00, // 0 result format codes
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("oversized bind parameter length must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("exceeds the maximum allowed size"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_bind_rejects_negative_parameter_length() {
+        // Bind ('B') frame with a negative, non-NULL (-1) parameter length.
+        // Without a guard, `len as usize` wraps to a huge value and aborts
+        // the task with a capacity overflow.
+        let buffer = vec![
+            0x42, // tag 'B'
+            0x00, 0x00, 0x00, 0x10, // length = 16
+            0x00, // portal: ""
+            0x00, // statement: ""
+            0x00, 0x00, // 0 parameter format codes
+            0x00, 0x01, // 1 parameter value
+            0xFF, 0xFF, 0xFF, 0xFE, // value length = -2
+            0x00, 0x00, // 0 result format codes
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("negative bind parameter length must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("Invalid bind parameter length"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_rejects_negative_parameter_count() {
+        // Parse ('P') frame with a negative parameter-type count. Without a
+        // guard, `total as usize` wraps to usize::MAX and aborts the task
+        // with a capacity overflow.
+        let buffer = vec![
+            0x50, // tag 'P'
+            0x00, 0x00, 0x00, 0x08, // length = 8
+            0x00, // name: ""
+            0x00, // query: ""
+            0xFF, 0xFF, // parameter count = -1
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("negative parse parameter count must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert!(
+                    source.message.contains("Invalid parameter count"),
+                    "unexpected message: {}",
+                    source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
     }
 }

@@ -5,14 +5,17 @@ import { internalExceptions } from './errors';
 
 export type BaseEvent = {
   event: string,
+  // It's possible to fill timestamp at the place of logging, otherwise, it will be filled in automatically
+  timestamp?: string,
   [key: string]: any,
 };
 
-export type Event = BaseEvent & {
+export type Event = {
   id: string,
   clientTimestamp: string,
   anonymousId: string,
   platform: string,
+  arch: string,
   nodeVersion: string,
   sentFrom: 'backend';
 };
@@ -48,7 +51,7 @@ async function flush(toFlush?: Array<Event>, retries: number = 10): Promise<any>
     }
 
     // console.log(await result.json());
-  } catch (e) {
+  } catch (e: any) {
     if (retries > 0) {
       // eslint-disable-next-line consistent-return
       return flush(toFlush, retries - 1);
@@ -62,7 +65,7 @@ let anonymousId: string = 'unknown';
 
 try {
   anonymousId = machineIdSync();
-} catch (e) {
+} catch (e: any) {
   internalExceptions(e);
 }
 
@@ -79,8 +82,8 @@ export async function track(opts: BaseEvent) {
 
   trackEvents.push({
     ...opts,
+    clientTimestamp: opts.timestamp || new Date().toJSON(),
     id: crypto.randomBytes(16).toString('hex'),
-    clientTimestamp: new Date().toJSON(),
     platform: process.platform,
     arch: process.arch,
     nodeVersion: process.version,

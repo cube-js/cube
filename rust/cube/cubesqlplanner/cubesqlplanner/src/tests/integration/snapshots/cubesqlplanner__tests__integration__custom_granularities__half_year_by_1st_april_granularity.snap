@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/src/tests/integration/custom_granularities.rs
+expression: result
+---
+orders__created_at_half_year_by_1st_april | orders__count
+------------------------------------------+--------------
+2023-10-01 00:00:00                       | 3            
+2024-04-01 00:00:00                       | 4            
+2024-10-01 00:00:00                       | 4            
+2025-04-01 00:00:00                       | 3            
+2025-10-01 00:00:00                       | 1

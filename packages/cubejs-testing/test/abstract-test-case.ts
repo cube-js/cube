@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
+import cubejs, { Query, CubeApi } from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 import { BirdBox } from '../src';
 
@@ -40,7 +40,7 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
   ],
   [
     {
-      name: '#3 Events.count with Events.type order by Events.count DESC',
+      name: '#3 Events.count with Events.type order by Events.type DESC, Events.count',
       ws: true,
     },
     {
@@ -49,7 +49,8 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       ],
       timeDimensions: [],
       order: {
-        'Events.count': 'desc'
+        'Events.type': 'desc',
+        'Events.count': 'asc'
       },
       dimensions: [
         'Events.type'
@@ -66,6 +67,32 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       ]
     }
   ],
+  [
+    {
+      name: 'Different column data types'
+    },
+    {
+      dimensions: [
+        'unusualDataTypes.array',
+        'unusualDataTypes.bit_column',
+        'unusualDataTypes.boolean_column',
+        'unusualDataTypes.cidr_column',
+        'unusualDataTypes.id',
+        'unusualDataTypes.inet_column',
+        'unusualDataTypes.json',
+        'unusualDataTypes.jsonb',
+        'unusualDataTypes.mac_address',
+        'unusualDataTypes.point_column',
+        'unusualDataTypes.status',
+        'unusualDataTypes.text_column',
+        'unusualDataTypes.xml_column'
+      ],
+      ungrouped: true,
+      order: {
+        'unusualDataTypes.id': 'asc'
+      }
+    }
+  ],
 ];
 
 // eslint-disable-next-line import/prefer-default-export
@@ -78,8 +105,8 @@ export function createBirdBoxTestCase(
 
     let birdbox: BirdBox;
     let wsTransport: WebSocketTransport;
-    let httpClient: CubejsApi;
-    let wsClient: CubejsApi;
+    let httpClient: CubeApi;
+    let wsClient: CubeApi;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
@@ -149,34 +176,9 @@ export function createBirdBoxTestCase(
 
     describe('responseFormat', () => {
       const responses: unknown[] = [];
-      let transport: WebSocketTransport;
-      let http: CubejsApi;
-      let ws: CubejsApi;
-  
-      beforeAll(async () => {
-        try {
-          transport = new WebSocketTransport({
-            apiUrl: birdbox.configuration.apiUrl,
-          });
-          http = cubejs(async () => 'test', {
-            apiUrl: birdbox.configuration.apiUrl,
-          });
-          ws = cubejs(async () => 'test', {
-            apiUrl: birdbox.configuration.apiUrl,
-            transport,
-          });
-        } catch (e) {
-          console.log(e);
-          process.exit(1);
-        }
-      });
-  
-      afterAll(async () => {
-        await transport.close();
-      });
-  
+
       test('http+responseFormat=default', async () => {
-        const response = await http.load({
+        const response = await httpClient.load({
           dimensions: ['Orders.status'],
           measures: ['Orders.totalAmount'],
           limit: 2,
@@ -184,9 +186,9 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('http+responseFormat=compact option#1', async () => {
-        const response = await http.load({
+        const response = await httpClient.load({
           dimensions: ['Orders.status'],
           measures: ['Orders.totalAmount'],
           limit: 2,
@@ -195,9 +197,9 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('http+responseFormat=compact option#2', async () => {
-        const response = await http.load(
+        const response = await httpClient.load(
           {
             dimensions: ['Orders.status'],
             measures: ['Orders.totalAmount'],
@@ -210,9 +212,9 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('http+responseFormat=compact option#1+2', async () => {
-        const response = await http.load(
+        const response = await httpClient.load(
           {
             dimensions: ['Orders.status'],
             measures: ['Orders.totalAmount'],
@@ -226,9 +228,9 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=default', async () => {
-        const response = await ws.load({
+        const response = await wsClient.load({
           dimensions: ['Orders.status'],
           measures: ['Orders.totalAmount'],
           limit: 2,
@@ -236,9 +238,9 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=compact option#1', async () => {
-        const response = await ws.load({
+        const response = await wsClient.load({
           dimensions: ['Orders.status'],
           measures: ['Orders.totalAmount'],
           limit: 2,
@@ -247,9 +249,9 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=compact option#2', async () => {
-        const response = await ws.load(
+        const response = await wsClient.load(
           {
             dimensions: ['Orders.status'],
             measures: ['Orders.totalAmount'],
@@ -262,9 +264,9 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=compact option#1+2', async () => {
-        const response = await ws.load(
+        const response = await wsClient.load(
           {
             dimensions: ['Orders.status'],
             measures: ['Orders.totalAmount'],
@@ -278,22 +280,96 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
+      test('http+responseFormat=columnar option#1', async () => {
+        const response = await httpClient.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+          responseFormat: 'columnar',
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+
+      test('http+responseFormat=columnar option#2', async () => {
+        const response = await httpClient.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+          },
+          undefined,
+          undefined,
+          'columnar',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+
+      test('http+responseFormat=columnar option#1+2', async () => {
+        const response = await httpClient.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+            responseFormat: 'columnar',
+          },
+          undefined,
+          undefined,
+          'columnar',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+
+      test('ws+responseFormat=columnar option#1', async () => {
+        const response = await wsClient.load({
+          dimensions: ['Orders.status'],
+          measures: ['Orders.totalAmount'],
+          limit: 2,
+          responseFormat: 'columnar',
+        });
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+
+      test('ws+responseFormat=columnar option#2', async () => {
+        const response = await wsClient.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+          },
+          undefined,
+          undefined,
+          'columnar',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+
+      test('ws+responseFormat=columnar option#1+2', async () => {
+        const response = await wsClient.load(
+          {
+            dimensions: ['Orders.status'],
+            measures: ['Orders.totalAmount'],
+            limit: 2,
+            responseFormat: 'columnar',
+          },
+          undefined,
+          undefined,
+          'columnar',
+        );
+        responses.push(response);
+        expect(response.rawData()).toMatchSnapshot('result-type');
+      });
+
       test('responses', () => {
-        // @ts-ignore
-        expect(responses[0].rawData()).toEqual(responses[1].rawData());
-        // @ts-ignore
-        expect(responses[0].rawData()).toEqual(responses[2].rawData());
-        // @ts-ignore
-        expect(responses[0].rawData()).toEqual(responses[3].rawData());
-        // @ts-ignore
-        expect(responses[0].rawData()).toEqual(responses[4].rawData());
-        // @ts-ignore
-        expect(responses[0].rawData()).toEqual(responses[5].rawData());
-        // @ts-ignore
-        expect(responses[0].rawData()).toEqual(responses[6].rawData());
-        // @ts-ignore
-        expect(responses[0].rawData()).toEqual(responses[7].rawData());
+        for (let i = 1; i < responses.length; i++) {
+          // @ts-ignore
+          expect(responses[0].rawData()).toEqual(responses[i].rawData());
+        }
       });
     });
 

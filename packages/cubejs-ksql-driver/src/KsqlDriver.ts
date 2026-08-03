@@ -7,13 +7,13 @@
 import {
   getEnv,
   assertDataSource,
+  formatAnsi,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver, DriverCapabilities,
-  DriverInterface,
+  DriverInterface, TableColumn,
 } from '@cubejs-backend/base-driver';
 import { Kafka } from 'kafkajs';
-import sqlstring, { format as formatSql } from 'sqlstring';
 import axios, { AxiosResponse } from 'axios';
 import { Mutex } from 'async-mutex';
 import { KsqlQuery } from './KsqlQuery';
@@ -64,15 +64,15 @@ type KsqlDescribeResponse = {
   }
 };
 
-/**
- * KSQL driver class.
- */
+type KsqlQueryOptions = {
+  outputColumnTypes?: TableColumn[],
+  streamOffset?: string,
+  selectStatement?: string,
+};
+
 export class KsqlDriver extends BaseDriver implements DriverInterface {
-  /**
-   * Returns default concurrency value.
-   */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 1;
   }
 
   protected readonly config: KsqlDriverOptions;
@@ -81,36 +81,56 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   private readonly kafkaClient?: Kafka;
 
-  /**
-   * Class constructor.
-   */
   public constructor(
     config: Partial<KsqlDriverOptions> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Whether this driver is used for pre-aggregations.
+       */
+      preAggregations?: boolean,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+    const preAggregations = config.preAggregations || false;
 
     this.config = {
-      url: getEnv('dbUrl', { dataSource }),
-      username: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      kafkaHost: getEnv('dbKafkaHost', { dataSource }),
-      kafkaUser: getEnv('dbKafkaUser', { dataSource }),
-      kafkaPassword: getEnv('dbKafkaPass', { dataSource }),
-      kafkaUseSsl: getEnv('dbKafkaUseSsl', { dataSource }),
+      url: getEnv('dbUrl', { dataSource, preAggregations }),
+      username: getEnv('dbUser', { dataSource, preAggregations }),
+      password: getEnv('dbPass', { dataSource, preAggregations }),
+      kafkaHost: getEnv('dbKafkaHost', { dataSource, preAggregations }),
+      kafkaUser: getEnv('dbKafkaUser', { dataSource, preAggregations }),
+      kafkaPassword: getEnv('dbKafkaPass', { dataSource, preAggregations }),
+      kafkaUseSsl: getEnv('dbKafkaUseSsl', { dataSource, preAggregations }),
       ...config,
     };
 
     if (this.config.kafkaHost) {
       this.kafkaClient = new Kafka({
         clientId: 'Cube',
-        brokers: [this.config.kafkaHost],
+        brokers: this.config.kafkaHost
+          .split(',')
+          .map(h => h.trim()),
         // authenticationTimeout: 10000,
         // reauthenticationThreshold: 10000,
         ssl: this.config.kafkaUseSsl,
@@ -146,19 +166,24 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async query<R = unknown>(query: string, values?: unknown[], options: { streamOffset?: string } = {}): Promise<R> {
+  protected prepareQueryWithParams(query: string, values?: unknown[]): string {
+    return formatAnsi(query, values || []);
+  }
+
+  public async query<R = unknown>(query: string, values?: unknown[], options: KsqlQueryOptions = {}): Promise<R> {
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
+
     const { data } = await this.apiQuery('/ksql', {
-      ksql: `${formatSql(query, values)};`,
+      ksql: `${this.prepareQueryWithParams(query, values)};`,
       ...(options.streamOffset ? {
         streamsProperties: {
           'ksql.streams.auto.offset.reset': options.streamOffset
         }
       } : {})
     });
-    
+
     return data[0];
   }
 
@@ -170,8 +195,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async createSchemaIfNotExists(schemaName: string): Promise<any> {
+  public async createSchemaIfNotExists(_schemaName: string): Promise<any> {
     // do nothing as there are no schemas in ksql
   }
 
@@ -246,13 +270,15 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
-    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset: options?.streamOffset });
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: KsqlQueryOptions): Promise<any> {
+    const { streamOffset } = options || {};
+    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadTable(table: string, options: any): Promise<any> {
-    return this.getStreamingTableData(this.tableDashName(table), { streamOffset: options?.streamOffset });
+    const { streamOffset } = options || {};
+    return this.getStreamingTableData(this.tableDashName(table), { streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -262,12 +288,13 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unable to detect a source table for ksql download query. In order to query ksql use "SELECT * FROM <TABLE>"');
     }
 
-    const selectStatement = sqlstring.format(query, params);
-    return this.getStreamingTableData(table, { selectStatement, streamOffset: options?.streamOffset });
+    const selectStatement = this.prepareQueryWithParams(query, params);
+    const { streamOffset, outputColumnTypes } = options || {};
+    return this.getStreamingTableData(table, { selectStatement, streamOffset, outputColumnTypes });
   }
 
-  private async getStreamingTableData(streamingTable: string, options: { selectStatement?: string, streamOffset?: string } = {}) {
-    const { selectStatement, streamOffset } = options;
+  private async getStreamingTableData(streamingTable: string, options: KsqlQueryOptions = {}) {
+    const { selectStatement, streamOffset, outputColumnTypes } = options;
     const describe = await this.describeTable(streamingTable);
     const name = this.config.streamingSourceName || 'default';
     const kafkaDirectDownload = !!this.config.kafkaHost;
@@ -289,13 +316,20 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         url: this.config.url
       }
     };
+    const sourceTableTypes = await this.tableColumnTypes(streamingTable, describe);
+    streamingTable = kafkaDirectDownload ? describe.sourceDescription?.topic : streamingTable;
+
     return {
-      types: await this.tableColumnTypes(streamingTable, describe),
+      types: outputColumnTypes || sourceTableTypes,
       partitions: describe.sourceDescription?.partitions,
-      streamingTable: kafkaDirectDownload ? describe.sourceDescription?.topic : streamingTable,
+      streamingTable,
       streamOffset,
       selectStatement,
-      streamingSource
+      streamingSource,
+      sourceTable: outputColumnTypes ? {
+        types: sourceTableTypes,
+        tableName: streamingTable
+      } : null
     };
   }
 
@@ -305,7 +339,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public dropTable(tableName: string, options: any): Promise<any> {
     return this.dropTableMutex.runExclusive(
-      async () => super.dropTable(this.quoteIdentifier(this.tableDashName(tableName)), options)
+      async () => this.query(`DROP TABLE ${this.quoteIdentifier(this.tableDashName(tableName))} DELETE TOPIC`, [], options)
     );
   }
 
@@ -313,9 +347,12 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return `\`${identifier}\``;
   }
 
+  /**
+   * Returns the configurable driver options
+   * Note: It returns the unprefixed option names.
+   * In case of using multisources options need to be prefixed manually.
+   */
   public static driverEnvVariables() {
-    // TODO (buntarb): check how this method can/must be used with split
-    // names by the data source.
     return [
       'CUBEJS_DB_URL',
       'CUBEJS_DB_USER',
@@ -329,7 +366,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public capabilities(): DriverCapabilities {
     return {
-      streamingSource: true
+      streamingSource: true,
     };
   }
 }

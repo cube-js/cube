@@ -7,21 +7,20 @@ import {
   SecurityContextProps,
   SecurityContextProviderProps,
 } from '../../components/SecurityContext/SecurityContextProvider';
-import { PlaygroundQueryBuilderProps } from '../../components/PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
 import { QueryTabsProps } from '../../components/QueryTabs/QueryTabs';
+import { QueryBuilderProps as QueryBuilderComponentProps } from '../../QueryBuilderV2/types';
 
 type QueryBuilderProps = {
   token: string;
   identifier?: string;
   playgroundContext?: Partial<PlaygroundContext>;
 } & Pick<
-  PlaygroundQueryBuilderProps,
+  QueryBuilderComponentProps,
   | 'apiUrl'
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
-  | 'onVizStateChanged'
   | 'onSchemaChange'
   | 'extra'
 > &

@@ -1,16 +1,16 @@
 use core::mem;
-use core::slice::memchr;
+use memchr;
 use std::convert::TryFrom;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
+use datafusion::arrow::array::{ArrayBuilder, ArrayRef};
 use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
@@ -27,36 +27,35 @@ use cubehll::HllSketch;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::cube_ext::ordfloat::OrdF64;
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
 use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
+use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::streaming::StreamingService;
-use crate::table::data::{append_row, create_array_builders};
+use crate::table::data::{append_value, create_array_builders};
 use crate::table::{Row, TableValue};
-use crate::util::decimal::Decimal;
+use crate::util::batch_memory::columns_vec_buffer_size;
+use crate::util::decimal::{Decimal, Decimal96};
+use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
-use datafusion::cube_ext::ordfloat::OrdF64;
+use cubedatasketches::HLLDataSketch;
+use tokio::time::{sleep, Duration};
 
 pub mod limits;
 
 impl ImportFormat {
-    async fn row_stream(
-        &self,
-        file: File,
-        location: String,
-        columns: Vec<Column>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
-        let reader: Pin<Box<dyn AsyncBufRead + Send>> = if location.contains(".gz") {
+    fn open_reader(file: File, location: &str) -> Pin<Box<dyn AsyncBufRead + Send>> {
+        if location.contains(".gz") {
             Box::pin(BufReader::new(GzipDecoder::new(BufReader::new(file))))
         } else {
             Box::pin(BufReader::new(file))
-        };
-        self.row_stream_from_reader(reader, columns)
+        }
     }
 
     pub fn row_stream_from_reader<'a>(
@@ -65,96 +64,41 @@ impl ImportFormat {
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError>
     {
-        match self {
-            ImportFormat::CSV | ImportFormat::CSVNoHeader => {
-                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
-                    Box::pin(CsvLineStream::new(reader));
-
-                let mut header_mapping = match self {
-                    ImportFormat::CSV => None,
-                    ImportFormat::CSVNoHeader => Some(
-                        columns
-                            .iter()
-                            .enumerate()
-                            .map(|(i, c)| (i, c.clone()))
-                            .collect(),
-                    ),
-                };
-
-                let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
-                    let str = line?;
-
-                    let mut parser = CsvLineParser::new(str.as_str());
-
-                    if header_mapping.is_none() {
-                        let mut mapping = Vec::new();
-                        for _ in 0..columns.len() {
-                            let next_column_buf = parser.next_value()?;
-                            let next_column = next_column_buf.as_ref();
-                            let (insert_pos, to_insert) = columns
-                                .iter()
-                                .find_position(|c| c.get_name() == &next_column)
-                                .map(|(i, c)| (i, c.clone()))
-                                .ok_or(CubeError::user(format!(
-                                    "Column '{}' is not found during import in {:?}",
-                                    next_column, columns
-                                )))?;
-                            mapping.push((insert_pos, to_insert));
-                            parser.advance()?;
-                        }
-                        header_mapping = Some(mapping);
-                        return Ok(None);
-                    }
-
-                    let resolved_mapping = header_mapping.as_ref().ok_or(CubeError::user(
-                        "Header is required for CSV import".to_string(),
-                    ))?;
-
-                    let mut row = vec![TableValue::Null; columns.len()];
-
-                    for (insert_pos, column) in resolved_mapping.iter() {
-                        let value_buf = parser.next_value()?;
-                        let value = value_buf.as_ref();
-
-                        if value == "" || value == "\\N" {
-                            row[*insert_pos] = TableValue::Null;
-                        } else {
-                            let mut value_buf_opt = Some(value_buf);
-                            row[*insert_pos] =
-                                ImportFormat::parse_column_value(column, &mut value_buf_opt)
-                                    .map_err(|e| {
-                                        if let Some(value_buf) = value_buf_opt {
-                                            CubeError::user(format!(
-                                                "Can't parse '{}' column value for '{}' column: {}",
-                                                value_buf.as_ref(),
-                                                column.get_name(),
-                                                e
-                                            ))
-                                        } else {
-                                            CubeError::user(format!(
-                                                "Can't parse column value for '{}' column: {}",
-                                                column.get_name(),
-                                                e
-                                            ))
-                                        }
-                                    })?;
-                        }
-
-                        parser.advance()?;
-                    }
-                    Ok(Some(Row::new(row)))
-                });
-                Ok(rows.boxed())
-            }
-        }
+        let mut parser = CsvImportParser::new(self, columns)?;
+        let disable_quoting = parser.disable_quoting;
+        let num_columns = parser.columns.len();
+        let lines_stream = CsvLineStream::new(reader, disable_quoting);
+        let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
+            let line = line?;
+            let mut row = vec![TableValue::Null; num_columns];
+            let is_data_row = parser.visit_line(line.as_str(), |insert_pos, column, value| {
+                if let Some(value) = value {
+                    row[insert_pos] = ImportFormat::parse_column_value_str(column, value)
+                        .map_err(|e| parse_value_error(value, column, e))?;
+                }
+                Ok(())
+            })?;
+            Ok(if is_data_row {
+                Some(Row::new(row))
+            } else {
+                None
+            })
+        });
+        Ok(rows.boxed())
     }
 
-    fn parse_column_value(
-        column: &Column,
-        value_buf: &mut Option<MaybeOwnedStr>,
-    ) -> Result<TableValue, CubeError> {
-        let value = value_buf.as_ref().unwrap().as_ref();
-        ImportFormat::parse_column_value_str(column, value)
+    /// Estimated in-memory Arrow buffer footprint of a single appended value, used to
+    /// cap a data frame by size during import. Mirrors `columns_vec_buffer_size` accounting
+    /// closely enough to drive the split; exactness is unnecessary for a threshold.
+    fn estimate_arrow_value_size(column_type: &ColumnType, value: Option<&str>) -> usize {
+        match column_type {
+            ColumnType::String | ColumnType::Bytes | ColumnType::HyperLogLog(_) => {
+                value.map_or(0, |v| v.len()) + 4
+            }
+            ColumnType::Int | ColumnType::Timestamp | ColumnType::Float => 8,
+            ColumnType::Int96 | ColumnType::Decimal { .. } | ColumnType::Decimal96 { .. } => 16,
+            ColumnType::Boolean => 1,
+        }
     }
 
     pub fn parse_column_value_str(column: &Column, value: &str) -> Result<TableValue, CubeError> {
@@ -164,7 +108,15 @@ impl ImportFormat {
                 .parse()
                 .map(|v| TableValue::Int(v))
                 .unwrap_or(TableValue::Null),
+            ColumnType::Int96 => value
+                .parse()
+                .map(|v| TableValue::Int96(Int96::new(v)))
+                .unwrap_or(TableValue::Null),
             t @ ColumnType::Decimal { .. } => TableValue::Decimal(parse_decimal(
+                value,
+                u8::try_from(t.target_scale()).unwrap(),
+            )?),
+            t @ ColumnType::Decimal96 { .. } => TableValue::Decimal96(parse_decimal_96(
                 value,
                 u8::try_from(t.target_scale()).unwrap(),
             )?),
@@ -183,9 +135,16 @@ impl ImportFormat {
                 is_valid_plain_binary_hll(&data, *f)?;
                 TableValue::Bytes(data)
             }
+            ColumnType::HyperLogLog(HllFlavour::DataSketches) => {
+                let data = parse_binary_data(value)?;
+                let hll = HLLDataSketch::read(&data)?;
+                TableValue::Bytes(hll.write())
+            }
             ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
             ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),
-            ColumnType::Boolean => TableValue::Boolean(value.to_lowercase() == "true"),
+            ColumnType::Boolean => {
+                TableValue::Boolean(value.to_lowercase() == "true" || value.to_lowercase() == "t")
+            }
         })
     }
 }
@@ -197,7 +156,7 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         .with_scale(scale as i64)
         .into_bigint_and_exponent()
         .0
-        .to_i64()
+        .to_i128()
     {
         Some(d) => d,
         None => {
@@ -208,6 +167,26 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         }
     };
     Ok(Decimal::new(raw_value))
+}
+
+pub(crate) fn parse_decimal_96(value: &str, scale: u8) -> Result<Decimal96, CubeError> {
+    // TODO: parse into Decimal directly.
+    let bd = BigDecimal::from_str_radix(value, 10)?;
+    let raw_value = match bd
+        .with_scale(scale as i64)
+        .into_bigint_and_exponent()
+        .0
+        .to_i128()
+    {
+        Some(d) => d,
+        None => {
+            return Err(CubeError::user(format!(
+                "cannot represent '{}' with scale {} without loosing precision",
+                value, scale
+            )))
+        }
+    };
+    Ok(Decimal96::new(raw_value))
 }
 
 fn decode_byte(s: &str) -> Option<u8> {
@@ -254,20 +233,24 @@ fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
 }
 
 struct CsvLineParser<'a> {
+    delimiter: u8,
+    disable_quoting: bool,
     line: &'a str,
     remaining: &'a str,
 }
 
 impl<'a> CsvLineParser<'a> {
-    fn new(line: &'a str) -> Self {
+    fn new(delimiter: u8, disable_quoting: bool, line: &'a str) -> Self {
         Self {
+            delimiter,
+            disable_quoting,
             line,
             remaining: line,
         }
     }
 
-    fn next_value(&mut self) -> Result<MaybeOwnedStr, CubeError> {
-        Ok(
+    fn next_value(&mut self) -> Result<MaybeOwnedStr<'_>, CubeError> {
+        if !self.disable_quoting {
             if let Some(b'"') = self.remaining.as_bytes().iter().nth(0) {
                 let mut closing_index = None;
                 let mut seen_escapes = false;
@@ -299,24 +282,25 @@ impl<'a> CsvLineParser<'a> {
                     res = MaybeOwnedStr::Borrowed(&self.remaining[0..closing_index])
                 }
                 self.remaining = self.remaining[(closing_index + 1)..].as_ref();
-                res
-            } else {
-                let next_comma = self
-                    .remaining
-                    .as_bytes()
-                    .iter()
-                    .position(|c| *c == b',')
-                    .unwrap_or(self.remaining.len());
-                let res = &self.remaining[0..next_comma];
-                self.remaining = self.remaining[next_comma..].as_ref();
-                MaybeOwnedStr::Borrowed(res)
-            },
-        )
+                return Ok(res);
+            }
+        }
+        let next_comma = self
+            .remaining
+            .as_bytes()
+            .iter()
+            .position(|c| *c == self.delimiter)
+            .unwrap_or(self.remaining.len());
+        let res = &self.remaining[0..next_comma];
+        self.remaining = self.remaining[next_comma..].as_ref();
+        Ok(MaybeOwnedStr::Borrowed(res))
     }
 
     fn advance(&mut self) -> Result<(), CubeError> {
-        if let Some(b',') = self.remaining.as_bytes().iter().nth(0) {
-            self.remaining = self.remaining[1..].as_ref()
+        if let Some(c) = self.remaining.as_bytes().iter().nth(0) {
+            if *c == self.delimiter {
+                self.remaining = self.remaining[1..].as_ref()
+            }
         }
         Ok(())
     }
@@ -326,15 +310,17 @@ pin_project! {
     struct CsvLineStream<R: AsyncBufRead> {
         #[pin]
         reader: R,
+        disable_quoting: bool,
         buf: Vec<u8>,
         in_quotes: bool,
     }
 }
 
 impl<R: AsyncBufRead> CsvLineStream<R> {
-    pub fn new(reader: R) -> Self {
+    pub fn new(reader: R, disable_quoting: bool) -> Self {
         Self {
             reader,
+            disable_quoting,
             buf: Vec::new(),
             in_quotes: false,
         }
@@ -358,38 +344,49 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
                         return Poll::Ready(Some(Err(CubeError::from_error(err))));
                     }
                     Ok(available) => {
-                        if *projected.in_quotes {
-                            let quote_pos = memchr::memchr(b'"', available);
-                            if let Some(i) = quote_pos {
-                                // It consumes every pair of quotes.
-                                // Matching for escapes is unnecessary as it's double "" sequence
-                                *projected.in_quotes = false;
-                                projected.buf.extend_from_slice(&available[..=i]);
-                                (false, i + 1)
-                            } else {
-                                projected.buf.extend_from_slice(available);
-                                (false, available.len())
-                            }
-                        } else {
+                        if *projected.disable_quoting {
                             let new_line_pos = memchr::memchr(b'\n', available);
-                            let quote_pos = memchr::memchr(b'"', available);
-                            let in_quotes = quote_pos.is_some()
-                                && (new_line_pos.is_some() && quote_pos < new_line_pos
-                                    || new_line_pos.is_none());
-                            if in_quotes {
-                                if let Some(i) = quote_pos {
-                                    projected.buf.extend_from_slice(&available[..=i]);
-                                    *projected.in_quotes = in_quotes;
-                                    (false, i + 1)
-                                } else {
-                                    unreachable!()
-                                }
-                            } else if let Some(i) = new_line_pos {
+                            if let Some(i) = new_line_pos {
                                 projected.buf.extend_from_slice(&available[..=i]);
                                 (true, i + 1)
                             } else {
                                 projected.buf.extend_from_slice(available);
                                 (false, available.len())
+                            }
+                        } else {
+                            if *projected.in_quotes {
+                                let quote_pos = memchr::memchr(b'"', available);
+                                if let Some(i) = quote_pos {
+                                    // It consumes every pair of quotes.
+                                    // Matching for escapes is unnecessary as it's double "" sequence
+                                    *projected.in_quotes = false;
+                                    projected.buf.extend_from_slice(&available[..=i]);
+                                    (false, i + 1)
+                                } else {
+                                    projected.buf.extend_from_slice(available);
+                                    (false, available.len())
+                                }
+                            } else {
+                                let new_line_pos = memchr::memchr(b'\n', available);
+                                let quote_pos = memchr::memchr(b'"', available);
+                                let in_quotes = quote_pos.is_some()
+                                    && (new_line_pos.is_some() && quote_pos < new_line_pos
+                                        || new_line_pos.is_none());
+                                if in_quotes {
+                                    if let Some(i) = quote_pos {
+                                        projected.buf.extend_from_slice(&available[..=i]);
+                                        *projected.in_quotes = in_quotes;
+                                        (false, i + 1)
+                                    } else {
+                                        unreachable!()
+                                    }
+                                } else if let Some(i) = new_line_pos {
+                                    projected.buf.extend_from_slice(&available[..=i]);
+                                    (true, i + 1)
+                                } else {
+                                    projected.buf.extend_from_slice(available);
+                                    (false, available.len())
+                                }
                             }
                         }
                     }
@@ -416,14 +413,178 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
     }
 }
 
+/// Splits a CSV line into fields and resolves them to table column positions, lazily consuming
+/// the header row on first call. The destination of each parsed value is left to the visitor, so
+/// both the `Row`-producing path and the direct-to-builder import path share identical mapping,
+/// header and null-marker handling.
+struct CsvImportParser {
+    delimiter: u8,
+    disable_quoting: bool,
+    columns: Vec<Column>,
+    header_mapping: Option<Vec<(usize, Column)>>,
+}
+
+impl CsvImportParser {
+    fn new(format: &ImportFormat, columns: Vec<Column>) -> Result<Self, CubeError> {
+        let (delimiter, disable_quoting) = match format {
+            ImportFormat::CSV | ImportFormat::CSVNoHeader => (',', false),
+            ImportFormat::CSVOptions {
+                delimiter, quote, ..
+            } => (delimiter.unwrap_or(','), quote.is_none()),
+        };
+        if delimiter as u16 > 255 {
+            return Err(CubeError::user(format!(
+                "Non ASCII delimiters are unsupported: '{}'",
+                delimiter
+            )));
+        }
+        let header_mapping = match format {
+            ImportFormat::CSVNoHeader
+            | ImportFormat::CSVOptions {
+                has_header: false, ..
+            } => Some(
+                columns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| (i, c.clone()))
+                    .collect(),
+            ),
+            _ => None,
+        };
+        Ok(Self {
+            delimiter: delimiter as u8,
+            disable_quoting,
+            columns,
+            header_mapping,
+        })
+    }
+
+    /// Returns `false` when the line was consumed as the header, `true` for a data row. The visitor
+    /// is called once per table column (`None` value = null), so every builder advances exactly
+    /// once per row. A header that resolves two fields to the same column is rejected, since that
+    /// would append twice to one column and desync the builder lengths.
+    fn visit_line<F>(&mut self, line: &str, mut visit: F) -> Result<bool, CubeError>
+    where
+        F: FnMut(usize, &Column, Option<&str>) -> Result<(), CubeError>,
+    {
+        let mut parser = CsvLineParser::new(self.delimiter, self.disable_quoting, line);
+        if self.header_mapping.is_none() {
+            let mut mapping = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for _ in 0..self.columns.len() {
+                let next_column_buf = parser.next_value()?;
+                let next_column = next_column_buf.as_ref();
+                let (insert_pos, to_insert) = self
+                    .columns
+                    .iter()
+                    .find_position(|c| c.get_name() == &next_column)
+                    .map(|(i, c)| (i, c.clone()))
+                    .ok_or_else(|| {
+                        CubeError::user(format!(
+                            "Column '{}' is not found during import in {:?}",
+                            next_column, self.columns
+                        ))
+                    })?;
+                if !seen.insert(insert_pos) {
+                    return Err(CubeError::user(format!(
+                        "Duplicate column '{}' in CSV header",
+                        to_insert.get_name()
+                    )));
+                }
+                mapping.push((insert_pos, to_insert));
+                parser.advance()?;
+            }
+            self.header_mapping = Some(mapping);
+            return Ok(false);
+        }
+
+        let mapping = self.header_mapping.as_ref().unwrap();
+        for (insert_pos, column) in mapping.iter() {
+            let value_buf = parser.next_value()?;
+            let value = value_buf.as_ref();
+            let value = if value == "" || value == "\\N" || value == "\\\\N" {
+                None
+            } else {
+                Some(value)
+            };
+            visit(*insert_pos, column, value)?;
+            parser.advance()?;
+        }
+        Ok(true)
+    }
+}
+
+fn parse_value_error(value: &str, column: &Column, e: CubeError) -> CubeError {
+    CubeError::user(format!(
+        "Can't parse '{}' column value for '{}' column: {}",
+        value,
+        column.get_name(),
+        e
+    ))
+}
+
+/// Parses a CSV field and appends it directly into the Arrow builder, bypassing `Row`/`TableValue`.
+/// Strings are appended verbatim (no `TableValue::String` allocation); other types reuse the shared
+/// `parse_column_value_str` + `append_value` logic.
+fn append_csv_value(
+    builder: &mut dyn ArrayBuilder,
+    column: &Column,
+    value: &str,
+) -> Result<(), CubeError> {
+    if matches!(column.get_column_type(), ColumnType::String) {
+        builder
+            .as_any_mut()
+            .downcast_mut::<datafusion::arrow::array::StringBuilder>()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Expected StringBuilder for String column '{}' during CSV import",
+                    column.get_name()
+                ))
+            })?
+            .append_value(value);
+        return Ok(());
+    }
+    let value = ImportFormat::parse_column_value_str(column, value)?;
+    append_value(builder, column.get_column_type(), &value);
+    Ok(())
+}
+
+#[async_trait]
+pub trait LocationsValidator: DIService + Send + Sync {
+    async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
+}
+
+pub struct LocationsValidatorImpl;
+
+#[async_trait]
+impl LocationsValidator for LocationsValidatorImpl {
+    async fn validate(&self, _locations: &Vec<String>) -> Result<(), CubeError> {
+        Ok(())
+    }
+}
+
+impl LocationsValidatorImpl {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {})
+    }
+}
+
+crate::di_service!(LocationsValidatorImpl, [LocationsValidator]);
+
 #[automock]
 #[async_trait]
 pub trait ImportService: DIService + Send + Sync {
     async fn import_table(&self, table_id: u64) -> Result<(), CubeError>;
-    async fn import_table_part(&self, table_id: u64, location: &str) -> Result<(), CubeError>;
+    async fn import_table_part(
+        &self,
+        table_id: u64,
+        location: &str,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
+    ) -> Result<(), CubeError>;
     async fn validate_table_location(&self, table_id: u64, location: &str)
         -> Result<(), CubeError>;
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError>;
+    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockImportService, [ImportService]);
@@ -435,6 +596,7 @@ pub struct ImportServiceImpl {
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
     limits: Arc<ConcurrencyLimits>,
+    validator: Arc<dyn LocationsValidator>,
 }
 
 crate::di_service!(ImportServiceImpl, [ImportService]);
@@ -447,6 +609,7 @@ impl ImportServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
         limits: Arc<ConcurrencyLimits>,
+        validator: Arc<dyn LocationsValidator>,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
@@ -455,6 +618,7 @@ impl ImportServiceImpl {
             remote_fs,
             config_obj,
             limits,
+            validator,
         })
     }
 
@@ -465,31 +629,13 @@ impl ImportServiceImpl {
         temp_dir: &Path,
     ) -> Result<(File, Option<TempPath>), CubeError> {
         if location.starts_with("http") {
-            let (file, path) = tempfile::Builder::new()
-                .prefix(&table_id.to_string())
-                .tempfile_in(temp_dir)
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Open tempfile in {}: {}",
-                        temp_dir.to_str().unwrap_or("<invalid>"),
-                        e
-                    ))
-                })?
-                .into_parts();
-            let mut file = File::from_std(file);
-            let mut stream = reqwest::get(location).await?.bytes_stream();
-            let mut size = 0;
-            while let Some(bytes) = stream.next().await {
-                let bytes = bytes?;
-                let slice = bytes.as_ref();
-                size += slice.len();
-                file.write_all(slice).await?;
-            }
+            let (file, size, path) = self
+                .download_http_location(location, table_id, temp_dir)
+                .await?;
             log::info!("Import downloaded {} ({} bytes)", location, size);
             self.meta_store
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
-            file.seek(SeekFrom::Start(0)).await?;
             Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
             let temp_file = self.download_temp_file(location).await?;
@@ -501,7 +647,7 @@ impl ImportServiceImpl {
             Ok((temp_file, None))
         } else {
             Ok((
-                File::open(location.clone()).await.map_err(|e| {
+                File::open(location).await.map_err(|e| {
                     CubeError::internal(format!("Open location {}: {}", location, e))
                 })?,
                 None,
@@ -509,24 +655,99 @@ impl ImportServiceImpl {
         }
     }
 
+    async fn download_http_location(
+        &self,
+        location: &str,
+        table_id: u64,
+        temp_dir: &Path,
+    ) -> Result<(File, usize, TempPath), CubeError> {
+        let max_retries: i32 = 10;
+        let mut retry_attempts = max_retries;
+        let mut retries_sleep = Duration::from_millis(100);
+        let sleep_multiplier = 2;
+        loop {
+            retry_attempts -= 1;
+            let result = self
+                .try_download_http_location(location, table_id, temp_dir)
+                .await;
+
+            if retry_attempts <= 0 {
+                return result;
+            }
+            match result {
+                Ok(size) => {
+                    return Ok(size);
+                }
+                Err(err) => {
+                    log::error!(
+                        "Import {} download error: {}. Retrying {}/{}...",
+                        location,
+                        err,
+                        retry_attempts,
+                        max_retries
+                    );
+                    sleep(retries_sleep).await;
+                    retries_sleep *= sleep_multiplier;
+                }
+            }
+        }
+    }
+
+    async fn try_download_http_location(
+        &self,
+        location: &str,
+        table_id: u64,
+        temp_dir: &Path,
+    ) -> Result<(File, usize, TempPath), CubeError> {
+        let (file, path) = tempfile::Builder::new()
+            .prefix(&table_id.to_string())
+            .tempfile_in(temp_dir)
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Open tempfile in {}: {}",
+                    temp_dir.to_str().unwrap_or("<invalid>"),
+                    e
+                ))
+            })?
+            .into_parts();
+        let mut file = File::from_std(file);
+
+        let res = reqwest::get(location).await?;
+        if !res.status().is_success() {
+            return Err(CubeError::user(format!(
+                "Unable to import from http location, status code: {}",
+                res.status()
+            )));
+        }
+
+        let mut stream = res.bytes_stream();
+        let mut size = 0;
+        while let Some(bytes) = stream.next().await {
+            let bytes = bytes?;
+            let slice = bytes.as_ref();
+            size += slice.len();
+            file.write_all(slice).await?;
+        }
+
+        file.seek(SeekFrom::Start(0)).await?;
+
+        Ok((file, size, path))
+    }
+
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
-        let to_download = ImportServiceImpl::temp_uploads_path(location);
+        let to_download = LocationHelper::temp_uploads_path(location);
         // TODO check file size
-        let local_file = self.remote_fs.download_file(&to_download, None).await?;
+        let local_file = self.remote_fs.download_file(to_download, None).await?;
         Ok(File::open(local_file.clone())
             .await
             .map_err(|e| CubeError::internal(format!("Open temp_file {}: {}", local_file, e)))?)
-    }
-
-    fn temp_uploads_path(location: &str) -> String {
-        location.replace("temp://", "temp-uploads/")
     }
 
     async fn drop_temp_uploads(&self, location: &str) -> Result<(), CubeError> {
         // TODO There also should be a process which collects orphaned uploads due to failed imports
         if location.starts_with("temp://") {
             self.remote_fs
-                .delete_file(&ImportServiceImpl::temp_uploads_path(location))
+                .delete_file(LocationHelper::temp_uploads_path(location))
                 .await?;
         }
         Ok(())
@@ -537,6 +758,7 @@ impl ImportServiceImpl {
         table: &IdRow<Table>,
         format: ImportFormat,
         location: &str,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(), CubeError> {
         let temp_dir = self.config_obj.data_dir().join("tmp");
         tokio::fs::create_dir_all(temp_dir.clone())
@@ -550,15 +772,12 @@ impl ImportServiceImpl {
             })?;
 
         let (file, tmp_path) = self
-            .resolve_location(location.clone(), table.get_id(), &temp_dir)
+            .resolve_location(location, table.get_id(), &temp_dir)
             .await?;
-        let mut row_stream = format
-            .row_stream(
-                file,
-                location.to_string(),
-                table.get_row().get_columns().clone(),
-            )
-            .await?;
+        let reader = ImportFormat::open_reader(file, location);
+        let mut parser = CsvImportParser::new(&format, table.get_row().get_columns().clone())?;
+        let disable_quoting = parser.disable_quoting;
+        let mut lines = Box::pin(CsvLineStream::new(reader, disable_quoting));
 
         let mut ingestion = Ingestion::new(
             self.meta_store.clone(),
@@ -572,20 +791,52 @@ impl ImportServiceImpl {
         };
 
         let table_cols = table.get_row().get_columns().as_slice();
+        let row_threshold = self.config_obj.wal_split_threshold() as usize;
+        let size_threshold = self
+            .config_obj
+            .wal_split_size_threshold_bytes()
+            .map(|v| v as usize);
         let mut builders = create_array_builders(table_cols);
         let mut num_rows = 0;
-        while let Some(row) = row_stream.next().await {
-            if let Some(row) = row? {
-                append_row(&mut builders, table_cols, &row);
-                num_rows += 1;
-
-                if num_rows >= self.config_obj.wal_split_threshold() as usize {
-                    let mut to_add = create_array_builders(table_cols);
-                    mem::swap(&mut builders, &mut to_add);
-                    num_rows = 0;
-
-                    ingestion.queue_data_frame(finish(to_add)).await?;
+        let mut estimated_bytes = 0;
+        while let Some(line) = lines.next().await {
+            let line = line?;
+            let is_data_row = parser.visit_line(line.as_str(), |insert_pos, column, value| {
+                let builder = builders[insert_pos].as_mut();
+                if size_threshold.is_some() {
+                    estimated_bytes +=
+                        ImportFormat::estimate_arrow_value_size(column.get_column_type(), value);
                 }
+                match value {
+                    None => {
+                        append_value(builder, column.get_column_type(), &TableValue::Null);
+                    }
+                    Some(value) => {
+                        append_csv_value(builder, column, value)
+                            .map_err(|e| parse_value_error(value, column, e))?;
+                    }
+                }
+                Ok(())
+            })?;
+            if !is_data_row {
+                continue;
+            }
+            num_rows += 1;
+
+            let over_size_threshold = size_threshold.map_or(false, |t| estimated_bytes >= t);
+            if num_rows >= row_threshold || over_size_threshold {
+                let mut to_add = create_array_builders(table_cols);
+                mem::swap(&mut builders, &mut to_add);
+                num_rows = 0;
+                estimated_bytes = 0;
+
+                let builded_rows = finish(to_add);
+
+                if let Some(data_loaded_size) = &data_loaded_size {
+                    data_loaded_size.add(columns_vec_buffer_size(&builded_rows));
+                }
+
+                ingestion.queue_data_frame(builded_rows).await?;
             }
         }
 
@@ -630,7 +881,7 @@ impl ImportService for ImportServiceImpl {
                 table
             )))?;
         for location in locations.iter() {
-            self.do_import(&table, *format, location).await?;
+            self.do_import(&table, *format, location, None).await?;
         }
 
         for location in locations.iter() {
@@ -640,7 +891,12 @@ impl ImportService for ImportServiceImpl {
         Ok(())
     }
 
-    async fn import_table_part(&self, table_id: u64, location: &str) -> Result<(), CubeError> {
+    async fn import_table_part(
+        &self,
+        table_id: u64,
+        location: &str,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
+    ) -> Result<(), CubeError> {
         let table = self.meta_store.get_table_by_id(table_id).await?;
         let format = table
             .get_row()
@@ -667,7 +923,8 @@ impl ImportService for ImportServiceImpl {
         if Table::is_stream_location(location) {
             self.streaming_service.stream_table(table, location).await?;
         } else {
-            self.do_import(&table, *format, location).await?;
+            self.do_import(&table, *format, location, data_loaded_size.clone())
+                .await?;
             self.drop_temp_uploads(&location).await?;
         }
 
@@ -689,28 +946,70 @@ impl ImportService for ImportServiceImpl {
     }
 
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
-        if location.starts_with("http") {
+        let file_size =
+            LocationHelper::location_file_size(location, self.remote_fs.clone()).await?;
+        Ok(ImportServiceImpl::estimate_rows(location, file_size))
+    }
+
+    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError> {
+        self.validator.validate(locations).await
+    }
+}
+
+pub struct LocationHelper;
+
+impl LocationHelper {
+    pub async fn location_file_size(
+        location: &str,
+        remote_fs: Arc<dyn RemoteFs>,
+    ) -> Result<Option<u64>, CubeError> {
+        let res = if location.starts_with("http") {
             let client = reqwest::Client::new();
-            let res = client.head(location).send().await?;
+            let req = client.head(location).build()?;
+
+            // S3 doesn't support HEAD for pre signed urls with GetObject command
+            if req
+                .url()
+                .domain()
+                .map(|v| v.contains("amazonaws.com"))
+                .unwrap_or(false)
+            {
+                return Ok(None);
+            }
+
+            let res = client.execute(req).await?;
+
             let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
 
-            let size = if let Some(length) = length {
+            if let Some(length) = length {
                 Some(length.to_str()?.parse::<u64>()?)
             } else {
                 None
-            };
-            Ok(ImportServiceImpl::estimate_rows(location, size))
+            }
         } else if location.starts_with("temp://") {
-            // TODO do the actual estimation
-            Ok(ImportServiceImpl::estimate_rows(location, None))
+            let remote_path = Self::temp_uploads_path(location);
+            match remote_fs.list_with_metadata(remote_path).await {
+                Ok(list) => {
+                    let list_res = list.iter().next().ok_or(CubeError::internal(format!(
+                        "Location {} can't be listed in remote_fs",
+                        location
+                    )));
+                    match list_res {
+                        Ok(file) => Ok(Some(file.file_size)),
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(e) => Err(e),
+            }?
         } else if location.starts_with("stream://") {
-            Ok(ImportServiceImpl::estimate_rows(location, None))
+            None
         } else {
-            Ok(ImportServiceImpl::estimate_rows(
-                location,
-                Some(tokio::fs::metadata(location).await?.len()),
-            ))
-        }
+            Some(tokio::fs::metadata(location).await?.len())
+        };
+        Ok(res)
+    }
+    pub fn temp_uploads_path(location: &str) -> String {
+        location.replace("temp://", "temp-uploads/")
     }
 }
 
@@ -784,14 +1083,77 @@ impl Ingestion {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
-
-    use crate::import::parse_decimal;
-    use crate::metastore::{Column, ColumnType, ImportFormat};
-    use crate::table::{Row, TableValue};
+    use crate::cube_ext::ordfloat::OrdF64;
+    use crate::import::{
+        append_csv_value, parse_binary_data, parse_decimal, CsvImportParser, CsvLineStream,
+    };
+    use crate::metastore::{Column, ColumnType, HllFlavour, ImportFormat};
+    use crate::table::data::{append_value, create_array_builders, rows_to_columns};
+    use crate::table::{Row, TableValue, TimestampValue};
+    use crate::util::decimal::{Decimal, Decimal96};
+    use crate::util::int96::Int96;
+    use cubehll::HllSketch;
+    use datafusion::arrow::array::ArrayRef;
     use indoc::indoc;
-    use tokio::io::BufReader;
+    use std::pin::Pin;
+    use tokio::io::{AsyncBufRead, BufReader};
     use tokio_stream::StreamExt;
+
+    /// Runs the direct-to-builder import path (the one used by `do_import`) over a CSV reader and
+    /// returns the finished Arrow columns, mirroring how `collect_rows` exercises the `Row` path.
+    async fn collect_columns(
+        format: ImportFormat,
+        reader: Pin<Box<dyn AsyncBufRead + Send>>,
+        columns: Vec<Column>,
+    ) -> Vec<ArrayRef> {
+        let mut parser = CsvImportParser::new(&format, columns.clone()).unwrap();
+        let disable_quoting = parser.disable_quoting;
+        let mut builders = create_array_builders(&columns);
+        let mut lines = Box::pin(CsvLineStream::new(reader, disable_quoting));
+        while let Some(line) = lines.next().await {
+            let line = line.unwrap();
+            parser
+                .visit_line(line.as_str(), |insert_pos, column, value| {
+                    let builder = builders[insert_pos].as_mut();
+                    match value {
+                        None => append_value(builder, column.get_column_type(), &TableValue::Null),
+                        Some(value) => append_csv_value(builder, column, value)?,
+                    }
+                    Ok(())
+                })
+                .unwrap();
+        }
+        builders.into_iter().map(|mut b| b.finish()).collect()
+    }
+
+    fn arrays_to_rows(arrays: &[ArrayRef]) -> Vec<Row> {
+        let num_rows = arrays.first().map(|a| a.len()).unwrap_or(0);
+        (0..num_rows)
+            .map(|ri| {
+                Row::new(
+                    arrays
+                        .iter()
+                        .map(|a| TableValue::from_array(a.as_ref(), ri))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    async fn collect_rows(
+        format: ImportFormat,
+        reader: Pin<Box<dyn AsyncBufRead + Send>>,
+        columns: Vec<Column>,
+    ) -> Vec<Row> {
+        let mut row_stream = format.row_stream_from_reader(reader, columns).unwrap();
+        let mut rows = vec![];
+        while let Some(row) = row_stream.next().await {
+            if let Some(row) = row.unwrap() {
+                rows.push(row);
+            }
+        }
+        rows
+    }
 
     #[test]
     fn parse_decimal_test() {
@@ -811,19 +1173,88 @@ mod tests {
             parse_decimal("-200.040000", 5).unwrap().to_string(5),
             "-200.04",
         );
+
+        // A value too large to fit i128 at the target scale is an error, not a silent Null.
+        let huge = format!("1{}", "0".repeat(40));
+        let err = parse_decimal(&huge, 5).unwrap_err().to_string();
+        assert!(err.contains("precision"), "unexpected error: {}", err);
     }
 
     #[tokio::test]
     async fn read_nulls() {
-        let data = indoc! {"
-            one,1
-            ,
-            three,3
+        // Every null marker ("", \N, \\N) must short-circuit to Null *before* type parsing,
+        // including for Decimal/Timestamp where the parser would otherwise raise an error.
+        let data = indoc! {r"
+            real,42,1.50,2020-01-01T00:00:00.000Z
+            ,,,
+            \N,\N,\N,\N
+            \\N,\\N,\\N,\\N
         "};
-        let csv_reader = Box::pin(BufReader::new(data.as_bytes()));
         let columns = vec![
             Column::new("A".to_string(), ColumnType::String, 0),
             Column::new("B".to_string(), ColumnType::Int, 1),
+            Column::new(
+                "C".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                2,
+            ),
+            Column::new("D".to_string(), ColumnType::Timestamp, 3),
+        ];
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns,
+        )
+        .await;
+        let nulls = || Row::new(vec![TableValue::Null; 4]);
+        assert_eq!(
+            rows,
+            vec![
+                Row::new(vec![
+                    TableValue::String("real".to_string()),
+                    TableValue::Int(42),
+                    TableValue::Decimal(Decimal::new(150000)), // 1.50 * 10^5
+                    TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
+                ]),
+                nulls(),
+                nulls(),
+                nulls(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn quoted_empty_is_null() {
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new("\"\",\"\"\n".as_bytes())),
+            vec![
+                Column::new("A".to_string(), ColumnType::String, 0),
+                Column::new("B".to_string(), ColumnType::Int, 1),
+            ],
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![TableValue::Null, TableValue::Null])]
+        );
+    }
+    #[tokio::test]
+    async fn parse_bools() {
+        let data = "ff,gg,f,t,t\
+                    \nf1f1,g1g1,false,false,t\
+                    \nf2f2,g2g2,F,true,T\n";
+
+        let csv_reader = Box::pin(BufReader::new(data.as_bytes()));
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::String, 1),
+            Column::new("C".to_string(), ColumnType::Boolean, 2),
+            Column::new("D".to_string(), ColumnType::Boolean, 3),
+            Column::new("E".to_string(), ColumnType::Boolean, 4),
         ];
         let mut row_stream = ImportFormat::CSVNoHeader
             .row_stream_from_reader(csv_reader, columns)
@@ -838,15 +1269,316 @@ mod tests {
             rows,
             vec![
                 Row::new(vec![
-                    TableValue::String("one".to_string()),
-                    TableValue::Int(1)
+                    TableValue::String("ff".to_string()),
+                    TableValue::String("gg".to_string()),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(true),
+                    TableValue::Boolean(true),
                 ]),
-                Row::new(vec![TableValue::Null, TableValue::Null]),
                 Row::new(vec![
-                    TableValue::String("three".to_string()),
-                    TableValue::Int(3)
+                    TableValue::String("f1f1".to_string()),
+                    TableValue::String("g1g1".to_string()),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(true),
+                ]),
+                Row::new(vec![
+                    TableValue::String("f2f2".to_string()),
+                    TableValue::String("g2g2".to_string()),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(true),
+                    TableValue::Boolean(true),
                 ]),
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_numeric_types() {
+        let data = "123456789012345,3.5,200.35,-200.04\nabc,1.5,,\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Int96, 0),
+            Column::new("B".to_string(), ColumnType::Float, 1),
+            Column::new(
+                "C".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                2,
+            ),
+            Column::new(
+                "D".to_string(),
+                ColumnType::Decimal96 {
+                    scale: 5,
+                    precision: 30,
+                },
+                3,
+            ),
+        ];
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns,
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![
+                Row::new(vec![
+                    TableValue::Int96(Int96::new(123456789012345)),
+                    TableValue::Float(OrdF64(3.5)),
+                    TableValue::Decimal(Decimal::new(20035000)), // 200.35 * 10^5
+                    TableValue::Decimal96(Decimal96::new(-20004000)), // -200.04 * 10^5
+                ]),
+                // Unparseable int -> Null, empty decimal cells -> Null.
+                Row::new(vec![
+                    TableValue::Null,
+                    TableValue::Float(OrdF64(1.5)),
+                    TableValue::Null,
+                    TableValue::Null,
+                ]),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn parse_bytes_and_timestamp() {
+        // "AQID" is base64 for [1, 2, 3]; "01 02 03" is the space-separated hex form.
+        let data = "AQID,01 02 03,2020-01-01T00:00:00.000Z\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Bytes, 0),
+            Column::new("B".to_string(), ColumnType::Bytes, 1),
+            Column::new("C".to_string(), ColumnType::Timestamp, 2),
+        ];
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns,
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![
+                TableValue::Bytes(vec![1, 2, 3]),
+                TableValue::Bytes(vec![1, 2, 3]),
+                TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
+            ])]
+        );
+    }
+
+    fn quoted_columns() -> Vec<Column> {
+        vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::String, 1),
+            Column::new("C".to_string(), ColumnType::String, 2),
+        ]
+    }
+
+    fn quoted_expected() -> Vec<Row> {
+        // Field B carries a quoted newline; field C carries an escaped quote.
+        vec![Row::new(vec![
+            TableValue::String("a,b".to_string()),
+            TableValue::String("line1\nline2".to_string()),
+            TableValue::String("say \"hi\"".to_string()),
+        ])]
+    }
+
+    #[tokio::test]
+    async fn quoted_fields_with_delimiter_newline_and_escapes() {
+        let data = "\"a,b\",\"line1\nline2\",\"say \"\"hi\"\"\"\n";
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            quoted_columns(),
+        )
+        .await;
+        assert_eq!(rows, quoted_expected());
+    }
+
+    #[tokio::test]
+    async fn quoting_survives_chunk_boundaries() {
+        // A 1-byte read buffer forces quotes and newlines to straddle poll_fill_buf calls.
+        let data = "\"a,b\",\"line1\nline2\",\"say \"\"hi\"\"\"\n";
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::with_capacity(1, data.as_bytes())),
+            quoted_columns(),
+        )
+        .await;
+        assert_eq!(rows, quoted_expected());
+    }
+
+    #[tokio::test]
+    async fn parse_failures_are_typed() {
+        // Int/Int96: an unparseable value is silently coerced to Null.
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new("xx,yy\n".as_bytes())),
+            vec![
+                Column::new("A".to_string(), ColumnType::Int, 0),
+                Column::new("B".to_string(), ColumnType::Int96, 1),
+            ],
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![TableValue::Null, TableValue::Null])]
+        );
+
+        // Float/Decimal/Timestamp: an unparseable value is a hard error, not Null.
+        let failing = [
+            ColumnType::Float,
+            ColumnType::Decimal {
+                scale: 5,
+                precision: 18,
+            },
+            ColumnType::Timestamp,
+        ];
+        for col_type in failing {
+            let columns = vec![Column::new("A".to_string(), col_type.clone(), 0)];
+            let mut row_stream = ImportFormat::CSVNoHeader
+                .row_stream_from_reader(Box::pin(BufReader::new("xx\n".as_bytes())), columns)
+                .unwrap();
+            let first = row_stream.next().await.unwrap();
+            assert!(first.is_err(), "expected parse error for {:?}", col_type);
+        }
+    }
+
+    #[tokio::test]
+    async fn parse_hll_flavors_reserialize() {
+        // HLL columns are not raw Bytes: the value is decoded and re-serialized via
+        // HllSketch::write(). Pin the round-trip so a plain-Bytes path would regress.
+        // Airlift/ZetaSketch store the decoded bytes verbatim, so the two re-serializing
+        // flavors are used here: Postgres (binary input) and Snowflake (JSON input).
+        let pg_expected = HllSketch::read_hll_storage_spec(&parse_binary_data("11 8b 7f").unwrap())
+            .unwrap()
+            .write();
+        let sf_expected =
+            HllSketch::read_snowflake(r#"{ "precision": 1, "dense": [0, 0], "version": 4 }"#)
+                .unwrap()
+                .write();
+
+        // Field B is the Snowflake JSON, CSV-quoted with doubled inner quotes.
+        let data = concat!(
+            r#"11 8b 7f,"{ ""precision"": 1, ""dense"": [0, 0], ""version"": 4 }""#,
+            "\n"
+        );
+        let rows = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            vec![
+                Column::new(
+                    "A".to_string(),
+                    ColumnType::HyperLogLog(HllFlavour::Postgres),
+                    0,
+                ),
+                Column::new(
+                    "B".to_string(),
+                    ColumnType::HyperLogLog(HllFlavour::Snowflake),
+                    1,
+                ),
+            ],
+        )
+        .await;
+        assert_eq!(
+            rows,
+            vec![Row::new(vec![
+                TableValue::Bytes(pg_expected),
+                TableValue::Bytes(sf_expected),
+            ])]
+        );
+    }
+
+    // Both paths are compared through identical Arrow reconstruction to neutralize any
+    // representation differences and isolate "does the builder path produce the same data".
+    fn assert_paths_match(columns: &[Column], row_path: Vec<Row>, builder_path: Vec<ArrayRef>) {
+        assert_eq!(
+            arrays_to_rows(&rows_to_columns(columns, &row_path)),
+            arrays_to_rows(&builder_path)
+        );
+    }
+
+    #[tokio::test]
+    async fn builder_path_matches_row_path_no_header() {
+        let data = concat!(
+            "hello,42,1.50,2020-01-01T00:00:00.000Z,true,AQID\n",
+            ",,,,,\n",
+            r#""a,b",bad,2.5,2020-01-01T00:00:00.000Z,f,01 02"#,
+            "\n"
+        );
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+            Column::new(
+                "C".to_string(),
+                ColumnType::Decimal {
+                    scale: 5,
+                    precision: 18,
+                },
+                2,
+            ),
+            Column::new("D".to_string(), ColumnType::Timestamp, 3),
+            Column::new("E".to_string(), ColumnType::Boolean, 4),
+            Column::new("F".to_string(), ColumnType::Bytes, 5),
+        ];
+        let row_path = collect_rows(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        let builder_path = collect_columns(
+            ImportFormat::CSVNoHeader,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        assert_paths_match(&columns, row_path, builder_path);
+    }
+
+    #[tokio::test]
+    async fn builder_path_matches_row_path_with_header() {
+        // Header reorders columns; second data row carries nulls in the reordered positions.
+        let data = "C,A,B\ntrue,hello,42\n,world,\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+            Column::new("C".to_string(), ColumnType::Boolean, 2),
+        ];
+        let row_path = collect_rows(
+            ImportFormat::CSV,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        let builder_path = collect_columns(
+            ImportFormat::CSV,
+            Box::pin(BufReader::new(data.as_bytes())),
+            columns.clone(),
+        )
+        .await;
+        assert_paths_match(&columns, row_path, builder_path);
+    }
+
+    #[tokio::test]
+    async fn duplicate_header_column_is_rejected() {
+        // Two header fields resolving to the same column would append twice to one builder and
+        // desync column lengths, so it must be a hard error rather than silent last-write-wins.
+        let data = "A,A\n1,2\n";
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Int, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+        ];
+        let mut stream = ImportFormat::CSV
+            .row_stream_from_reader(Box::pin(BufReader::new(data.as_bytes())), columns)
+            .unwrap();
+        let first = stream.next().await.unwrap();
+        let err = first.unwrap_err().to_string();
+        assert!(
+            err.contains("Duplicate column"),
+            "unexpected error: {}",
+            err
         );
     }
 }

@@ -1,0 +1,5 @@
+# Please keep in sync this file with packages/cubejs-backend-native!
+
+# If you are going to use local fork, feel free to uncomment
+#paths = ["../../../sqlparser-rs", "../../../arrow-datafusion/datafusion"]
+#paths = ["../../../arrow-datafusion/datafusion"]

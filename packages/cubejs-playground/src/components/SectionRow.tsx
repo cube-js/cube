@@ -8,7 +8,7 @@ const SectionRow = styled.div`
 
   && > * {
     margin-right: 8px !important;
-    margin-bottom: 8px !important;
+    // margin-bottom: 8px !important;
   }
 `;
 

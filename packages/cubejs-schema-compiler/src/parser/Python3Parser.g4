@@ -228,7 +228,7 @@ testlist_comp: (test | star_expr) (
 		comp_for
 		| (COMMA (test | star_expr))* (COMMA)?
 	);
-trailer: '(' (arglist)? ')' | '[' subscriptlist ']' | '.' NAME;
+trailer: callArguments | '[' subscriptlist ']' | '.' NAME;
 subscriptlist: subscript (COMMA subscript)* (COMMA)?;
 subscript: test | (test)? ':' (test)? (sliceop)?;
 sliceop: ':' (test)?;
@@ -250,6 +250,8 @@ dictorsetmaker: (
 	);
 
 classdef: 'class' NAME ('(' (arglist)? ')')? ':' suite;
+
+callArguments: '(' (arglist)? ')';
 
 arglist: argument (COMMA argument)* (COMMA)?;
 

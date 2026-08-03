@@ -32,7 +32,7 @@ describe('DruidQuery', () => {
             type: 'time',
         }
       }
-      
+
     })
     `, {});
 
@@ -54,7 +54,7 @@ describe('DruidQuery', () => {
         },
       );
       const queryAndParams = query.buildSqlAndParams();
-      expect(queryAndParams[0]).toContain('LIKE CONCAT(\'%\', ?, \'%\'))');
+      expect(queryAndParams[0]).toContain('LIKE CONCAT(\'%\', LOWER(?), \'%\'))');
     }));
 
   it('druid query timezone shift test', () => compiler.compile().then(() => {

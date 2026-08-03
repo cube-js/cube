@@ -1,25 +1,26 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
     }
-  
+
     cube(\`visitors\`, {
       sql: \`
-      select * from visitors WHERE \${USER_CONTEXT.source.filter('source')} AND
-      \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
+      select * from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
+      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
-      
+
       rewriteQueries: true,
-      
+
       refreshKey: {
         sql: 'SELECT 1',
       },
@@ -45,10 +46,6 @@ describe('SQL Generation', () => {
           }]
         },
         per_visitor_revenue: perVisitorRevenueMeasure,
-        revenueRunning: {
-          type: 'runningTotal',
-          sql: 'amount'
-        },
         revenueRolling: {
           type: 'sum',
           sql: 'amount',
@@ -80,14 +77,6 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
-        runningCount: {
-          type: 'runningTotal',
-          sql: '1'
-        },
-        runningRevenuePerCount: {
-          type: 'number',
-          sql: \`round(\${revenueRunning} / \${runningCount})\`
-        },
         averageCheckins: {
           type: 'avg',
           sql: \`\${doubledCheckings}\`
@@ -109,31 +98,31 @@ describe('SQL Generation', () => {
           type: 'time',
           sql: 'created_at'
         },
-        
+
         createdAtSqlUtils: {
           type: 'time',
           sql: SQL_UTILS.convertTz('created_at')
         },
-        
+
         checkins: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true
         },
-        
+
         checkinsWithPropagation: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true,
           propagateFiltersToSubQuery: true
         },
-        
+
         subQueryFail: {
           sql: '2',
           type: \`number\`,
           subQuery: true
         },
-        
+
         doubledCheckings: {
           sql: \`\${checkins} * 2\`,
           type: 'number'
@@ -160,7 +149,7 @@ describe('SQL Generation', () => {
       sql: \`
       select * from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')}
       \`,
-      
+
       rewriteQueries: true,
 
       joins: {
@@ -215,7 +204,7 @@ describe('SQL Generation', () => {
           subQuery: true
         },
       },
-      
+
       preAggregations: {
         checkinSource: {
           type: 'rollup',
@@ -260,19 +249,19 @@ describe('SQL Generation', () => {
         }
       }
     })
-    
+
     cube('ReferenceVisitors', {
       sql: \`
-        select * from \${visitors.sql()} as t 
+        select * from \${visitors.sql()} as t
         WHERE \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter(\`(t.created_at + interval '28 day')\`)} AND
         \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter((from, to) => \`(t.created_at + interval '28 day') >= \${from} AND (t.created_at + interval '28 day') <= \${to}\`)}
       \`,
-      
+
       measures: {
         count: {
           type: 'count'
         },
-        
+
         googleSourcedCount: {
           type: 'count',
           filters: [{
@@ -280,7 +269,7 @@ describe('SQL Generation', () => {
           }]
         },
       },
-      
+
       dimensions: {
         createdAt: {
           type: 'time',
@@ -288,14 +277,14 @@ describe('SQL Generation', () => {
         }
       }
     })
-    
+
     cube('CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName', {
       sql: \`
       select * from cards
       \`,
-      
+
       sqlAlias: 'cube_with_long_name',
-      
+
       dataSource: 'oracle',
 
       measures: {
@@ -306,7 +295,7 @@ describe('SQL Generation', () => {
     });
   `);
 
-  const aliasedCubesCompilers = /** @type Compilers */ prepareCompiler(`
+  const aliasedCubesCompilers = /** @type Compilers */ prepareJsCompiler(`
     cube('LeftLongLongLongLongLongLongLongLongLongLongNameCube', {
       sql: 'SELECT * FROM LEFT_TABLE',
       sqlAlias: 'left',
@@ -401,8 +390,6 @@ describe('SQL Generation', () => {
       timezone: 'America/Los_Angeles'
     });
 
-    console.log(query.buildSqlAndParams());
-
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
@@ -492,18 +479,32 @@ describe('SQL Generation', () => {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
+      // Tesseract correctly computes each fact table independently in multi-fact queries.
+      // JS planner computes visitors measures through cards join, biasing to visitors with cards only.
       expect(res).toEqual(
-        [{
-          cards__count: '1',
-          visitors__source: 'google',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '2.0000000000000000'
-        }, {
-          cards__count: '2',
-          visitors__source: 'some',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '6.0000000000000000'
-        }]
+        getEnv('nativeSqlPlanner')
+          ? [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            cards__count: '2',
+            visitors__source: 'some',
+            visitors__visitor_count: '2',
+            visitors__average_checkins: '5.0000000000000000'
+          }]
+          : [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            cards__count: '2',
+            visitors__source: 'some',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '6.0000000000000000'
+          }]
       );
     });
   });
@@ -563,18 +564,28 @@ describe('SQL Generation', () => {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
+      // Tesseract: with correct multi-fact values (avg=5.0 for 'some'), the AND conditions
+      // (count=2 AND avg=6) don't match, so only google is returned.
+      // JS planner: biased avg=6.0 for 'some' matches (count=2 AND avg=6).
       expect(res).toEqual(
-        [{
-          cards__count: '1',
-          visitors__source: 'google',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '2.0000000000000000'
-        }, {
-          cards__count: '2',
-          visitors__source: 'some',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '6.0000000000000000'
-        }]
+        getEnv('nativeSqlPlanner')
+          ? [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }]
+          : [{
+            cards__count: '1',
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            cards__count: '2',
+            visitors__source: 'some',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '6.0000000000000000'
+          }]
       );
     });
   });
@@ -634,18 +645,25 @@ describe('SQL Generation', () => {
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
+      // Same multi-fact issue: Tesseract computes correct values, filter excludes 'some'.
       expect(res).toEqual(
-        [{
-          // "cards__count": "1",
-          visitors__source: 'google',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '2.0000000000000000'
-        }, {
-          // "cards__count": "2",
-          visitors__source: 'some',
-          visitors__visitor_count: '1',
-          visitors__average_checkins: '6.0000000000000000'
-        }]
+        getEnv('nativeSqlPlanner')
+          ? [{
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }]
+          : [{
+            // "cards__count": "1",
+            visitors__source: 'google',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '2.0000000000000000'
+          }, {
+            // "cards__count": "2",
+            visitors__source: 'some',
+            visitors__visitor_count: '1',
+            visitors__average_checkins: '6.0000000000000000'
+          }]
       );
     });
   });

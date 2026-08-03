@@ -1,6 +1,11 @@
 /* eslint-disable no-restricted-syntax */
 import crypto from 'crypto';
-import { asyncMemoizeBackground, asyncRetry, BackgroundMemoizeOptions } from '@cubejs-backend/shared';
+import {
+  asyncMemoizeBackground,
+  asyncRetry,
+  BackgroundMemoizeOptions,
+  getHttpAgentForProxySettings
+} from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
 import jwkToPem from 'jwk-to-pem';
 import { JWTOptions } from './interfaces';
@@ -51,7 +56,7 @@ export type JWKsFetcherOptions = Pick<BackgroundMemoizeOptions<any, any>, 'onBac
 
 export const createJWKsFetcher = (jwtOptions: JWTOptions, options: JWKsFetcherOptions) => {
   const fetchJwkUrl = asyncMemoizeBackground(async (url: string) => {
-    const response = await asyncRetry(() => fetch(url), {
+    const response = await asyncRetry(async () => fetch(url, { agent: await getHttpAgentForProxySettings() }), {
       times: jwtOptions.jwkRetry || 3,
     });
     const json = await response.json();

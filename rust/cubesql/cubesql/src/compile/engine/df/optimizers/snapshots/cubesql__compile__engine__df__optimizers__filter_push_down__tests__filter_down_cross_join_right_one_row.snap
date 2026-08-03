@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/engine/df/optimizers/filter_push_down.rs
+expression: optimize(&plan)
+---
+Filter: #j2.c2 = Int32(10)
+  Filter: #j1.c1 = Int32(5)
+    CrossJoin:
+      Projection: #j1.c1
+        TableScan: j1 projection=None
+      Projection: #COUNT(UInt8(1)) AS c2, alias=j2
+        Aggregate: groupBy=[[]], aggr=[[COUNT(UInt8(1))]]
+          Projection: #j2.c2
+            TableScan: j2 projection=None

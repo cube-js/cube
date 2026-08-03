@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: context.execute_query(query).await.unwrap()
+---
++----------+
+| dim_str0 |
++----------+
+| foo      |
++----------+

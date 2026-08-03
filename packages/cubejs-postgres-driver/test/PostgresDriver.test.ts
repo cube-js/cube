@@ -4,6 +4,10 @@ import { PostgresDriver } from '../src';
 
 const streamToArray = require('stream-to-array');
 
+function largeParams(): Array<string> {
+  return new Array(65536).fill('foo');
+}
+
 describe('PostgresDriver', () => {
   let container: StartedTestContainer;
   let driver: PostgresDriver;
@@ -56,6 +60,14 @@ describe('PostgresDriver', () => {
     ]);
   });
 
+  test('too many params', async () => {
+    await expect(
+      driver.query(`SELECT 'foo'::TEXT;`, largeParams())
+    )
+      .rejects
+      .toThrow('PostgreSQL protocol does not support more than 65535 parameters, but 65536 passed');
+  });
+
   test('stream', async () => {
     await driver.uploadTable(
       'test.streaming_test',
@@ -102,6 +114,39 @@ describe('PostgresDriver', () => {
     }
   });
 
+  test('stream (array-typed columns)', async () => {
+    // Streaming must not fail when a query returns array-typed columns.
+    // Array types are reported as `text` and node-postgres parses them into
+    // JS arrays. See CORE-522.
+    const tableData = await driver.stream(
+      `SELECT
+        ARRAY['oops', 'test']::text[] as text_array,
+        ARRAY[1, 2, 3]::int[] as int_array`,
+      [],
+      {
+        highWaterMark: 1000,
+      }
+    );
+
+    try {
+      expect(await tableData.types).toEqual([
+        {
+          name: 'text_array',
+          type: 'text'
+        },
+        {
+          name: 'int_array',
+          type: 'text'
+        },
+      ]);
+      expect(await streamToArray(tableData.rowStream)).toEqual([
+        { text_array: ['oops', 'test'], int_array: [1, 2, 3] },
+      ]);
+    } finally {
+      await (<any> tableData).release();
+    }
+  });
+
   test('stream (exception)', async () => {
     try {
       await driver.stream('select * from test.random_name_for_table_that_doesnot_exist_sql_must_fail', [], {
@@ -109,9 +154,37 @@ describe('PostgresDriver', () => {
       });
 
       throw new Error('stream must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual(
         'relation "test.random_name_for_table_that_doesnot_exist_sql_must_fail" does not exist'
+      );
+    }
+  });
+
+  test('stream (too many params)', async () => {
+    try {
+      await driver.stream('select * from test.streaming_test', largeParams(), {
+        highWaterMark: 1000,
+      });
+
+      throw new Error('stream must throw an exception');
+    } catch (e: any) {
+      expect(e.message).toEqual(
+        'PostgreSQL protocol does not support more than 65535 parameters, but 65536 passed'
+      );
+    }
+  });
+
+  test('table name check', async () => {
+    const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
+    try {
+      await driver.createTable(tblName, [{ name: 'id', type: 'bigint' }]);
+
+      throw new Error('createTable must throw an exception');
+    } catch (e: any) {
+      expect(e.message).toEqual(
+        'PostgreSQL can not work with table names longer than 63 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${tblName}.`
       );
     }
   });

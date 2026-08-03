@@ -263,7 +263,7 @@ export function Settings({
                         <Typography.Paragraph>
                           <Typography.Link
                             target="_blank"
-                            href="https://cube.dev/docs/schema/reference/cube#supported-cron-formats"
+                            href="https://cube.dev/reference/data-modeling/pre-aggregations#refresh_key"
                           >
                             See how to format your cron expression
                           </Typography.Link>
@@ -374,13 +374,6 @@ export function Settings({
                       </Space>
                     </>
                   )}
-
-                  {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
-                  {/* <Flex direction="column" gap={4}>
-  <BuildRange time="since" />
-
-  <BuildRange time="until" />
-</Flex> */}
                 </>
               ) : null}
             </>

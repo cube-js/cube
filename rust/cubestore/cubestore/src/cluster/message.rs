@@ -1,12 +1,15 @@
 use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::trace::{MainTrace, WorkerTrace};
 use crate::CubeError;
-use arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+
+use crate::cluster::WorkerPlanningParams;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetworkMessage {
@@ -14,16 +17,28 @@ pub enum NetworkMessage {
     RouterSelect(SerializedPlan),
 
     /// Partial select on the worker.
-    Select(SerializedPlan),
+    Select(SerializedPlan, WorkerPlanningParams),
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
     //Perform explain analyze of worker query part and return it pretty printed physical plan
-    ExplainAnalyze(SerializedPlan),
+    ExplainAnalyze(SerializedPlan, WorkerPlanningParams),
     ExplainAnalyzeResult(Result<String, CubeError>),
+
+    /// Detailed-trace mirror of [RouterSelect]: the entry node asks a main worker to
+    /// run the full router plan for real and return the assembled `MainTrace`.
+    RouterSelectDetailed(SerializedPlan),
+    RouterSelectDetailedResult(Result<MainTrace, CubeError>),
+
+    /// Detailed-trace mirror of [Select]: a worker runs its part for real and returns
+    /// both the result rows (for the main to merge) and its `WorkerTrace`.
+    SelectDetailed(SerializedPlan, WorkerPlanningParams),
+    SelectDetailedResult(
+        Result<(SchemaRef, Vec<SerializedRecordBatchStream>, WorkerTrace), CubeError>,
+    ),
 
     /// Select that sends results in batches. The immediate response is [SelectResultSchema],
     /// followed by a stream of [SelectResultBatch].
-    SelectStart(SerializedPlan),
+    SelectStart(SerializedPlan, WorkerPlanningParams),
     /// Response to [SelectStart].
     SelectResultSchema(Result<SchemaRef, CubeError>),
     /// [None] indicates the end of the stream.
@@ -33,15 +48,18 @@ pub enum NetworkMessage {
     WarmupDownloadResult(Result<(), CubeError>),
 
     AddMemoryChunk {
-        chunk_id: u64,
+        chunk_name: String,
         data: SerializedRecordBatchStream,
     },
     AddMemoryChunkResult(Result<(), CubeError>),
 
     FreeMemoryChunk {
-        chunk_id: u64,
+        chunk_name: String,
     },
     FreeMemoryChunkResult(Result<(), CubeError>),
+
+    FreeDeletedMemoryChunks(Vec<String>),
+    FreeDeletedMemoryChunksResult(Result<(), CubeError>),
 
     MetaStoreCall(MetaStoreRpcMethodCall),
     MetaStoreCallResult(MetaStoreRpcMethodResult),

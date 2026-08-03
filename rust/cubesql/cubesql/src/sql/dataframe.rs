@@ -1,39 +1,28 @@
-use chrono::{
-    format::{
-        Fixed, Item,
-        Numeric::{Day, Hour, Minute, Month, Second, Year},
-        Pad::Zero,
-    },
-    prelude::*,
-};
-use chrono_tz::Tz;
+use chrono::prelude::*;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
         Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float16Array,
         Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
         IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
-        ListArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array,
-        UInt32Array, UInt64Array, UInt8Array,
+        ListArray, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+        TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
-    temporal_conversions,
 };
-use pg_srv::IntervalValue;
 use rust_decimal::prelude::*;
-use std::{
-    fmt::{self, Debug, Formatter},
-    io,
-};
+use serde::{Serialize, Serializer};
+use std::fmt::Debug;
 
 use super::{ColumnFlags, ColumnType};
 use crate::CubeError;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Column {
     name: String,
     column_type: ColumnType,
+    #[serde(skip_serializing)]
     column_flags: ColumnFlags,
 }
 
@@ -59,7 +48,7 @@ impl Column {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Row {
     values: Vec<TableValue>,
 }
@@ -77,10 +66,18 @@ impl Row {
         &self.values
     }
 
+    pub fn to_values(self) -> Vec<TableValue> {
+        self.values
+    }
+
     pub fn push(&mut self, val: TableValue) {
         self.values.push(val);
     }
 }
+
+// Type aliases for compatibility - actual implementations are in pg-srv
+pub type IntervalValue = pg_srv::IntervalValue;
+pub type TimestampValue = pg_srv::TimestampValue;
 
 #[derive(Debug)]
 pub enum TableValue {
@@ -97,6 +94,29 @@ pub enum TableValue {
     Date(NaiveDate),
     Timestamp(TimestampValue),
     Interval(IntervalValue),
+}
+
+impl Serialize for TableValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            TableValue::Null => serializer.serialize_none(),
+            TableValue::Boolean(val) => serializer.serialize_bool(val),
+            TableValue::String(ref val) => serializer.serialize_str(val),
+            TableValue::Int16(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Int32(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Int64(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Float32(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Float64(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Decimal128(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Timestamp(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Interval(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Date(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::List(ref val) => serializer.serialize_str(val.to_string().as_str()),
+        }
+    }
 }
 
 impl ToString for TableValue {
@@ -142,6 +162,10 @@ impl DataFrame {
         &self.data
     }
 
+    pub fn to_rows(self) -> Vec<Row> {
+        self.data
+    }
+
     pub fn mut_rows(&mut self) -> &mut Vec<Row> {
         &mut self.data
     }
@@ -171,83 +195,6 @@ impl DataFrame {
         }
 
         table.trim_fmt()
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct TimestampValue {
-    unix_nano: i64,
-    tz: Option<String>,
-}
-
-impl TimestampValue {
-    pub fn new(mut unix_nano: i64, tz: Option<String>) -> TimestampValue {
-        // This is a hack to workaround a mismatch between on-disk and in-memory representations.
-        // We use millisecond precision on-disk.
-        unix_nano -= unix_nano % 1000;
-        TimestampValue { unix_nano, tz }
-    }
-
-    pub fn to_naive_datetime(&self) -> NaiveDateTime {
-        assert!(self.tz.is_none());
-
-        temporal_conversions::timestamp_ns_to_datetime(self.unix_nano)
-    }
-
-    pub fn to_fixed_datetime(&self) -> io::Result<DateTime<Tz>> {
-        assert!(self.tz.is_some());
-
-        let tz = self
-            .tz
-            .as_ref()
-            .unwrap()
-            .parse::<Tz>()
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
-
-        let ndt = temporal_conversions::timestamp_ns_to_datetime(self.unix_nano);
-        Ok(tz.from_utc_datetime(&ndt))
-    }
-
-    pub fn tz_ref(&self) -> &Option<String> {
-        &self.tz
-    }
-
-    pub fn get_time_stamp(&self) -> i64 {
-        self.unix_nano
-    }
-}
-
-impl Debug for TimestampValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TimestampValue")
-            .field("unix_nano", &self.unix_nano)
-            .field("tz", &self.tz)
-            .field("str", &self.to_string())
-            .finish()
-    }
-}
-
-impl ToString for TimestampValue {
-    fn to_string(&self) -> String {
-        Utc.timestamp_nanos(self.unix_nano)
-            .format_with_items(
-                [
-                    Item::Numeric(Year, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Month, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Day, Zero),
-                    Item::Literal("T"),
-                    Item::Numeric(Hour, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Minute, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Second, Zero),
-                    Item::Fixed(Fixed::Nanosecond3),
-                ]
-                .iter(),
-            )
-            .to_string()
     }
 }
 
@@ -371,7 +318,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Date32 => Ok(ColumnType::Date(false)),
         DataType::Date64 => Ok(ColumnType::Date(true)),
-        DataType::Timestamp(_, _) => Ok(ColumnType::String),
+        DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
         DataType::Interval(unit) => Ok(ColumnType::Interval(unit)),
         DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Double),
         DataType::Boolean => Ok(ColumnType::Boolean),
@@ -384,17 +331,19 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt64 => Ok(ColumnType::Int64),
-        x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
+        DataType::Null => Ok(ColumnType::String),
+        x => Err(CubeError::unsupported(format!("unsupported type {:?}", x))),
     }
 }
 
-pub fn batch_to_dataframe(
+pub fn batches_to_dataframe(
     schema: &Schema,
-    batches: &Vec<RecordBatch>,
+    batches: Vec<RecordBatch>,
 ) -> Result<DataFrame, CubeError> {
-    let mut cols = vec![];
+    let mut cols = Vec::with_capacity(schema.fields().len());
     let mut all_rows = vec![];
-    for (_i, field) in schema.fields().iter().enumerate() {
+
+    for field in schema.fields().iter() {
         cols.push(Column::new(
             field.name().clone(),
             arrow_to_column_type(field.data_type().clone())?,
@@ -402,11 +351,12 @@ pub fn batch_to_dataframe(
         ));
     }
 
-    for batch in batches.iter() {
+    for batch in batches.into_iter() {
         if batch.num_rows() == 0 {
             continue;
         }
-        let mut rows = vec![];
+
+        let mut rows = Vec::with_capacity(batch.num_rows());
 
         for _ in 0..batch.num_rows() {
             rows.push(Row::new(Vec::with_capacity(batch.num_columns())));
@@ -465,6 +415,22 @@ pub fn batch_to_dataframe(
                         });
                     }
                 }
+                DataType::Timestamp(TimeUnit::Millisecond, tz) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<TimestampMillisecondArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i) * 1_000_000_i64,
+                                tz.clone(),
+                            ))
+                        });
+                    }
+                }
                 DataType::Timestamp(TimeUnit::Microsecond, tz) => {
                     let a = array
                         .as_any()
@@ -508,6 +474,7 @@ pub fn batch_to_dataframe(
                             let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
 
                             let secs = milliseconds_part / 1000;
+                            let milliseconds_remainder = milliseconds_part % 1000;
                             let mins = secs / 60;
                             let hours = mins / 60;
 
@@ -520,7 +487,7 @@ pub fn batch_to_dataframe(
                                 hours,
                                 mins,
                                 secs,
-                                milliseconds_part % 1000,
+                                milliseconds_remainder * 1000,
                             )));
                         }
                     }
@@ -560,12 +527,29 @@ pub fn batch_to_dataframe(
                             let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
                             let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
 
-                            let secs = nanoseconds_part / 1000000000;
+                            let secs = nanoseconds_part / 1_000_000_000;
+                            let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
+
                             let mins = secs / 60;
                             let hours = mins / 60;
 
                             let secs = secs - (mins * 60);
                             let mins = mins - (hours * 60);
+
+                            let whole_usecs = secs_nano_fraction / 1000;
+                            let nanos_remainder = secs_nano_fraction % 1000;
+
+                            // Postgres supposedly believes in rounding to even.  Supposedly because they
+                            // might also mix up fractional seconds with base-2 floating point, affecting
+                            // microsecond rounding.
+                            let usecs: i32;
+                            if secs_nano_fraction < 0 {
+                                usecs = whole_usecs
+                                    - (nanos_remainder - (whole_usecs & 1) < -500) as i32;
+                            } else {
+                                usecs = whole_usecs
+                                    + (nanos_remainder + (whole_usecs & 1) > 500) as i32;
+                            }
 
                             rows[i].push(TableValue::Interval(IntervalValue::new(
                                 months,
@@ -573,7 +557,7 @@ pub fn batch_to_dataframe(
                                 hours as i32,
                                 mins as i32,
                                 secs as i32,
-                                (nanoseconds_part % 1000000000) as i32,
+                                usecs,
                             )));
                         }
                     }
@@ -597,6 +581,11 @@ pub fn batch_to_dataframe(
                         } else {
                             TableValue::List(ListValue::new(a.value(i)))
                         });
+                    }
+                }
+                DataType::Null => {
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::Null)
                     }
                 }
                 x => panic!("Unsupported data type: {:?}", x),
@@ -631,5 +620,129 @@ mod tests {
             | simple_str |\n\
             +------------+"
         );
+    }
+
+    #[test]
+    fn test_dataframe_tablevalue_serializer() {
+        let frame = DataFrame::new(
+            vec![
+                Column::new(
+                    "null_col".to_string(),
+                    ColumnType::Boolean,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "bool_col".to_string(),
+                    ColumnType::Boolean,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "string_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int16_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int32_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int64_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "float32_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "float64_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "decimal128_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "timestamp_col".to_string(),
+                    ColumnType::Timestamp,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "interval_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "date_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+            ],
+            vec![Row::new(vec![
+                TableValue::Null,
+                TableValue::Boolean(true),
+                TableValue::String("simple_str".to_string()),
+                TableValue::Int16(123),
+                TableValue::Int32(12345),
+                TableValue::Int64(123456789),
+                TableValue::Float32(1.23),
+                TableValue::Float64(1.23456789),
+                TableValue::Decimal128(Decimal128Value::new(123456789, 2)),
+                TableValue::Timestamp(TimestampValue::new(737942400 * 1_000_000_000, None)),
+                TableValue::Interval(IntervalValue::new(1, 2, 3, 4, 5, 6)),
+                TableValue::Date(NaiveDate::from_ymd_opt(1993, 5, 21).unwrap()),
+            ])],
+        );
+
+        insta::assert_snapshot!(
+            "table_value_serializer",
+            serde_json::to_string(&frame.data).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_arrow_to_column_type() {
+        let cases = vec![
+            (DataType::Binary, ColumnType::Blob),
+            (DataType::Utf8, ColumnType::String),
+            (DataType::LargeUtf8, ColumnType::String),
+            (DataType::Date32, ColumnType::Date(false)),
+            (DataType::Date64, ColumnType::Date(true)),
+            (
+                DataType::Timestamp(TimeUnit::Second, None),
+                ColumnType::Timestamp,
+            ),
+            (
+                DataType::Interval(IntervalUnit::YearMonth),
+                ColumnType::Interval(IntervalUnit::YearMonth),
+            ),
+            (DataType::Float16, ColumnType::Double),
+            (DataType::Float32, ColumnType::Double),
+            (DataType::Float64, ColumnType::Double),
+            (DataType::Boolean, ColumnType::Boolean),
+            (DataType::Int32, ColumnType::Int32),
+            (DataType::UInt32, ColumnType::Int32),
+            (DataType::Int8, ColumnType::Int64),
+            (DataType::Int16, ColumnType::Int64),
+            (DataType::Int64, ColumnType::Int64),
+            (DataType::UInt8, ColumnType::Int64),
+            (DataType::UInt16, ColumnType::Int64),
+            (DataType::UInt64, ColumnType::Int64),
+            (DataType::Null, ColumnType::String),
+        ];
+
+        for (arrow_type, expected_column_type) in cases {
+            let result = arrow_to_column_type(arrow_type.clone()).unwrap();
+            assert_eq!(result, expected_column_type, "Failed for {:?}", arrow_type);
+        }
     }
 }

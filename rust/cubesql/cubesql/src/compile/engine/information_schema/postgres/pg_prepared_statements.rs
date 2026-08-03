@@ -44,14 +44,14 @@ impl PgPreparedStatementsBuilder {
     fn add_prepared_statement(&mut self, name: &str, statement: &PreparedStatement) {
         self.name.append_value(name).unwrap();
         self.prepare_time
-            .append_value(statement.get_created().timestamp_nanos())
+            .append_value(statement.get_created().timestamp_nanos_opt().unwrap())
             .unwrap();
 
         if let Some(parameters) = statement.get_parameters() {
             for param in parameters {
                 self.parameter_types
                     .values()
-                    .append_value(param.clone() as i32)
+                    .append_value(*param as i32)
                     .unwrap();
             }
         }
@@ -69,15 +69,15 @@ impl PgPreparedStatementsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.name.finish()));
-        columns.push(Arc::new(self.statement.finish()));
-        columns.push(Arc::new(self.prepare_time.finish()));
-        columns.push(Arc::new(self.parameter_types.finish()));
-        columns.push(Arc::new(self.from_sql.finish()));
-        columns.push(Arc::new(self.generic_plans.finish()));
-        columns.push(Arc::new(self.custom_plans.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.name.finish()),
+            Arc::new(self.statement.finish()),
+            Arc::new(self.prepare_time.finish()),
+            Arc::new(self.parameter_types.finish()),
+            Arc::new(self.from_sql.finish()),
+            Arc::new(self.generic_plans.finish()),
+            Arc::new(self.custom_plans.finish()),
+        ];
 
         columns
     }
@@ -133,7 +133,7 @@ impl TableProvider for PgPreparedStatementsProvider {
         let mut builder = PgPreparedStatementsBuilder::new(statements.len());
 
         for (name, statement) in statements.iter() {
-            builder.add_prepared_statement(&name, statement);
+            builder.add_prepared_statement(name, statement);
         }
 
         let batch = RecordBatch::try_new(self.schema(), builder.finish())?;

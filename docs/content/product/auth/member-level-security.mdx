@@ -1,0 +1,171 @@
+# Member-level security
+
+The data model serves as a facade of your data. With member-level security,
+you can define whether [data model entities][ref-data-modeling-concepts] (cubes, views,
+and their members) are exposed to end users and can be queried via [APIs &
+integrations][ref-apis].
+
+Member-level security in Cube is similar to column-level security in SQL databases.
+Defining whether users have access to [cubes][ref-cubes] and [views][ref-views] is
+similar to defining access to database tables; defining whether they have access
+to dimensions and measures — to columns.
+
+<WarningBox>
+
+Just like in many SQL databases where table-level column policies are not
+inherited by views, member-level access policies defined on cubes are **not**
+applied when querying through views. Only the member-level policies defined on
+the view itself will take effect. Make sure to define access policies on your
+views directly.
+
+</WarningBox>
+
+__By default, all cubes, views, and their members are *public*,__ meaning that they
+can be accessed by any users and they are also visible during data model introspection.
+
+## Managing member-level access
+
+You can use [access policies][ref-dap] to configure member-level access
+for different groups. With the `access_policy` parameter in
+[cubes][ref-ref-cubes] and [views][ref-ref-views], you can define which members
+are accessible to users with specific groups.
+
+Use the `member_level` parameter to specify either:
+- `includes`: a list of allowed members, or
+- `excludes`: a list of disallowed members
+
+You can use `"*"` as a shorthand to include or exclude all members.
+
+<InfoBox>
+
+When you define access policies for specific groups, access is automatically denied to all other groups. You don't need to create a default policy that denies access.
+
+</InfoBox>
+
+In the following example, member-level access is configured for different groups:
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - status
+          - created_at
+          - count
+          - count_7d
+          - count_30d
+    
+    access_policy:
+      # Managers can access all members except for `count`
+      - group: manager
+        member_level:
+          excludes:
+            - count
+      
+      # Observers can access all members except for `count` and `count_7d`
+      - group: observer
+        member_level:
+          excludes:
+            - count
+            - count_7d
+      
+      # Guests can only access the `count_30d` measure
+      - group: guest
+        member_level:
+          includes:
+            - count_30d
+```
+
+```javascript
+view(`orders_view`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: [
+        `status`,
+        `created_at`,
+        `count`,
+        `count_7d`,
+        `count_30d`
+      ]
+    }
+  ],
+
+  access_policy: [
+    {
+      // Managers can access all members except for `count`
+      group: `manager`,
+      member_level: {
+        excludes: [
+          `count`
+        ]
+      }
+    },
+    {
+      // Observers can access all members except for `count` and `count_7d`
+      group: `observer`,
+      member_level: {
+        excludes: [
+          `count`,
+          `count_7d`
+        ]
+      }
+    },
+    {
+      // Guests can only access the `count_30d` measure
+      group: `guest`,
+      member_level: {
+        includes: [
+          `count_30d`
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+This configuration results in the following access:
+
+| Group | Access |
+| --- | --- |
+| `manager` | All members except for `count` |
+| `observer` | All members except for `count` and `count_7d` |
+| `guest` | Only the `count_30d` measure |
+| All other users | No access to this view at all |
+
+Access policies also respect member-level security restrictions configured via
+`public` parameters. For more details, see the [access policies
+reference][ref-dap-ref].
+
+<InfoBox>
+
+If you want to return masked values for restricted members instead of hiding
+them entirely, see [data masking][ref-data-masking] in access policies.
+
+</InfoBox>
+
+
+[ref-data-modeling-concepts]: /product/data-modeling/concepts
+[ref-apis]: /product/apis-integrations
+[ref-cubes]: /product/data-modeling/concepts#cubes
+[ref-views]: /product/data-modeling/concepts#views
+[ref-dap]: /product/auth/data-access-policies
+[ref-ref-cubes]: /product/data-modeling/reference/cube
+[ref-ref-views]: /product/data-modeling/reference/view
+[ref-dev-mode]: /product/configuration#development-mode
+[ref-playground]: /product/workspace/playground
+[ref-dap-ref]: /product/data-modeling/reference/data-access-policies
+[ref-cubes-public]: /product/data-modeling/reference/cube#public
+[ref-views-public]: /product/data-modeling/reference/view#public
+[ref-measures-public]: /product/data-modeling/reference/measures#public
+[ref-dimensions-public]: /product/data-modeling/reference/dimensions#public
+[ref-hierarchies-public]: /product/data-modeling/reference/hierarchies#public
+[ref-segments-public]: /product/data-modeling/reference/segments#public
+[ref-dynamic-data-modeling]: /product/data-modeling/dynamic
+[ref-security-context]: /product/auth/context
+[ref-data-masking]: /product/auth/data-access-policies#data-masking

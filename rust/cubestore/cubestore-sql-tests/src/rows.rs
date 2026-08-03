@@ -67,7 +67,7 @@ impl ToValue for Decimal {
 
 impl ToValue for f64 {
     fn to_val(&self) -> TableValue {
-        TableValue::Float(self.clone().into())
+        TableValue::Float((*self).into())
     }
 }
 

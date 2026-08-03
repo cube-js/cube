@@ -16,7 +16,8 @@ type RequestType =
  */
 type ResultType =
   'default' |
-  'compact';
+  'compact' |
+  'columnar';
 
 /**
  * API type data type.
@@ -25,7 +26,8 @@ type ApiType =
   'sql' |
   'graphql' |
   'rest' |
-  'ws';
+  'ws' |
+  'stream';
 
 /**
  * Parsed query type data type.
@@ -74,7 +76,9 @@ type FilterOperator =
  'notInDateRange' |
  'onTheDate' |
  'beforeDate' |
+ 'beforeOrOnDate' |
  'afterDate' |
+ 'afterOrOnDate' |
  'measureFilter';
 
 /**
@@ -97,6 +101,16 @@ type QueryOrderType =
   'asc' |
   'desc';
 
+/**
+ * ApiScopes data type.
+ */
+type ApiScopes =
+  'graphql' |
+  'meta' |
+  'data' |
+  'sql' |
+  'jobs';
+
 export {
   RequestType,
   ResultType,
@@ -108,4 +122,5 @@ export {
   FilterOperator,
   QueryTimeDimensionGranularity,
   QueryOrderType,
+  ApiScopes,
 };

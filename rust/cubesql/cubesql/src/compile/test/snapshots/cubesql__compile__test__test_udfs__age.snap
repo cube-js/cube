@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(r#\"SELECT AGE('2025-06-09T10:09:45'::timestamp, DATE '2023-08-10') AS age;\"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------------------------------+
+| age                                               |
++---------------------------------------------------+
+| 1 years 9 mons 30 days 10 hours 9 mins 45.00 secs |
++---------------------------------------------------+

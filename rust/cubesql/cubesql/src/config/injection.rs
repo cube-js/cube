@@ -42,7 +42,7 @@ impl Injector {
         T: DIService + 'static,
     {
         self.register_typed::<T, T, F, FF>(factory).await;
-        self.register_typed::<I, T, _, _>(async move |i: Arc<Injector>| {
+        self.register_typed::<I, T, _, _>(|i: Arc<Injector>| async move {
             i.get_service_typed::<T>().await
         })
         .await;

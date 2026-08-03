@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT current_setting('max_index_keys'), current_setting('search_path')\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-----------------------------------------+--------------------------------------+
+| current_setting(Utf8("max_index_keys")) | current_setting(Utf8("search_path")) |
++-----------------------------------------+--------------------------------------+
+| 32                                      | "$user", public                      |
++-----------------------------------------+--------------------------------------+

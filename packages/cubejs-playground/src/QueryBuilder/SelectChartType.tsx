@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Menu } from 'antd';
 import {
   LineChartOutlined,
@@ -7,7 +8,7 @@ import {
   TableOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import ButtonDropdown from './ButtonDropdown';
+import { ButtonDropdown } from './ButtonDropdown';
 
 const ChartTypes = [
   { name: 'line', title: 'Line', icon: <LineChartOutlined /> },
@@ -19,23 +20,31 @@ const ChartTypes = [
 ];
 
 const SelectChartType = ({ chartType, updateChartType }) => {
+  const [shown, setShown] = useState(false);
+
   const menu = (
-    <Menu data-testid="chart-type-dropdown">
-      {ChartTypes.map((m) => (
-        <Menu.Item key={m.title} onClick={() => updateChartType(m.name)}>
-          {m.icon} {m.title}
-        </Menu.Item>
-      ))}
-    </Menu>
+    <div className="test simple-overlay">
+      <Menu data-testid="chart-type-dropdown" className="ant-dropdown-menu ant-dropdown-menu-root">
+        {ChartTypes.map((m) => (
+          <Menu.Item key={m.title} className="ant-dropdown-menu-item" onClick={() => updateChartType(m.name)}>
+            {m.icon} {m.title}
+          </Menu.Item>
+        ))}
+      </Menu>
+    </div>
   );
 
   const foundChartType = ChartTypes.find((t) => t.name === chartType);
   return (
     <ButtonDropdown
+      show={shown}
       data-testid="chart-type-btn"
       overlay={menu}
       icon={foundChartType?.icon}
       style={{ border: 0 }}
+      onOverlayOpen={() => setShown(true)}
+      onOverlayClose={() => setShown(false)}
+      onItemClick={() => setShown(false)}
     >
       {foundChartType?.title || ''}
     </ButtonDropdown>

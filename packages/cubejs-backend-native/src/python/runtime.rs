@@ -1,0 +1,314 @@
+use crate::cross::CLRepr;
+use crate::python::neon_py::*;
+use crate::python::utils::{split_positional_and_kwargs, PyAnyHelpers};
+use crate::tokio_runtime_node;
+use cubesql::CubeError;
+use futures::FutureExt;
+use log::{error, trace};
+use neon::prelude::*;
+use neon::types::Deferred;
+use once_cell::sync::OnceCell;
+use pyo3::prelude::*;
+use pyo3::types::{PyFunction, PyTuple};
+use std::fmt::Formatter;
+use std::future::Future;
+use std::panic;
+use std::pin::Pin;
+
+#[derive(Debug)]
+pub struct PyScheduledFun {
+    fun: Py<PyFunction>,
+    args: Vec<CLRepr>,
+    callback: PyScheduledCallback,
+}
+
+pub enum PyScheduledCallback {
+    NodeDeferred(Deferred),
+    Channel(tokio::sync::oneshot::Sender<Result<CLRepr, CubeError>>),
+}
+
+impl std::fmt::Debug for PyScheduledCallback {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PyScheduledCallback::NodeDeferred(_) => write!(f, "NodeDeferred<hidden>"),
+            PyScheduledCallback::Channel(_) => write!(f, "Channel<hidden>"),
+        }
+    }
+}
+
+impl PyScheduledFun {
+    pub fn split(self) -> (Py<PyFunction>, Vec<CLRepr>, PyScheduledCallback) {
+        (self.fun, self.args, self.callback)
+    }
+}
+
+enum PyScheduledFunResult {
+    Poll(Pin<Box<dyn Future<Output = PyResult<PyObject>> + Send>>),
+    Ready(CLRepr),
+}
+
+pub struct PyRuntime {
+    sender: tokio::sync::mpsc::Sender<PyScheduledFun>,
+    js_channel: neon::event::Channel,
+}
+
+impl PyRuntime {
+    pub fn call_async_with_promise_callback(
+        &self,
+        fun: Py<PyFunction>,
+        args: Vec<CLRepr>,
+        deferred: Deferred,
+    ) {
+        // Try to reserve immediately for the fast path
+        let permit = match self.sender.try_reserve() {
+            Ok(permit) => permit,
+            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                log::warn!("Python channel is full, this may cause performance issues. Consider increasing the channel size for PyRuntime.");
+
+                // Channel is full, use async reserve with blocking for efficiency
+                match futures::executor::block_on(self.sender.reserve()) {
+                    Ok(permit) => permit,
+                    Err(_) => {
+                        // Channel was closed while waiting
+                        deferred.settle_with(
+                            &self.js_channel,
+                            move |mut cx| -> NeonResult<Handle<JsError>> {
+                                cx.throw_error(
+                                    "Unable to schedule python function call: channel is closed",
+                                )
+                            },
+                        );
+                        return;
+                    }
+                }
+            }
+            Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                // Channel is closed, settle deferred with error
+                deferred.settle_with(
+                    &self.js_channel,
+                    move |mut cx| -> NeonResult<Handle<JsError>> {
+                        cx.throw_error("Unable to schedule python function call: channel is closed")
+                    },
+                );
+                return;
+            }
+        };
+
+        let scheduled_fun = PyScheduledFun {
+            fun,
+            args,
+            callback: PyScheduledCallback::NodeDeferred(deferred),
+        };
+
+        // This should never fail since we have a permit
+        permit.send(scheduled_fun);
+    }
+
+    pub async fn call_async(
+        &self,
+        fun: Py<PyFunction>,
+        args: Vec<CLRepr>,
+    ) -> Result<CLRepr, CubeError> {
+        let (rx, tx) = tokio::sync::oneshot::channel();
+
+        self.sender
+            .send(PyScheduledFun {
+                fun,
+                args,
+                callback: PyScheduledCallback::Channel(rx),
+            })
+            .await
+            .map_err(|err| {
+                CubeError::internal(format!("Unable to schedule python function call: {}", err))
+            })?;
+
+        tx.await?
+    }
+
+    fn process_task(
+        task: PyScheduledFun,
+        js_channel: &neon::event::Channel,
+    ) -> Result<(), CubeError> {
+        let (fun, args, callback) = task.split();
+
+        let task_block = panic::AssertUnwindSafe(|| {
+            Python::with_gil(move |py| -> PyResult<PyScheduledFunResult> {
+                let (prep_tuple, kwargs_dict_opt) = split_positional_and_kwargs(py, args)?;
+
+                let py_args = PyTuple::new_bound(py, prep_tuple);
+                let py_kwargs = kwargs_dict_opt.as_ref();
+                let call_res = fun.call_bound(py, py_args, py_kwargs)?;
+
+                if call_res.is_coroutine()? {
+                    let fut = pyo3_async_runtimes::tokio::into_future(call_res.bind(py).clone())?;
+                    Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
+                } else {
+                    Ok(PyScheduledFunResult::Ready(CLRepr::from_python_ref(
+                        call_res.bind(py),
+                    )?))
+                }
+            })
+        });
+
+        let task_result = match panic::catch_unwind(task_block) {
+            Ok(Ok(r)) => Ok(r),
+            Ok(Err(err)) => Err(CubeError::internal(format_python_error(err))),
+            Err(panic_payload) => Err(CubeError::panic_with_message(
+                panic_payload,
+                "Unexpected panic while calling python function",
+            )),
+        };
+
+        let task_result = match task_result {
+            Ok(r) => r,
+            Err(err) => {
+                match callback {
+                    PyScheduledCallback::NodeDeferred(deferred) => {
+                        deferred.settle_with(
+                            js_channel,
+                            move |mut cx| -> NeonResult<Handle<JsError>> {
+                                cx.throw_error(err.to_string())
+                            },
+                        );
+                    }
+                    PyScheduledCallback::Channel(chan) => {
+                        let send_res = chan.send(Err(err));
+                        if send_res.is_err() {
+                            return Err(CubeError::internal(
+                                "Unable to send result back to consumer".to_string(),
+                            ));
+                        }
+                    }
+                };
+
+                return Ok(());
+            }
+        };
+
+        match task_result {
+            PyScheduledFunResult::Poll(fut) => {
+                let js_channel_to_move = js_channel.clone();
+
+                tokio::spawn(async move {
+                    let safe_py_fut_poll = panic::AssertUnwindSafe(async {
+                        let fut_res = fut.await;
+
+                        Python::with_gil(move |py| -> Result<CLRepr, PyErr> {
+                            let res = match fut_res {
+                                Ok(r) => CLRepr::from_python_ref(r.bind(py)),
+                                Err(err) => Err(err),
+                            };
+
+                            res
+                        })
+                    });
+
+                    let fut_res = match safe_py_fut_poll.catch_unwind().await {
+                        Ok(Ok(r)) => Ok(r),
+                        Ok(Err(err)) => Err(CubeError::internal(format_python_error(err))),
+                        Err(panic_payload) => Err(CubeError::panic_with_message(
+                            panic_payload,
+                            "Unexpected panic while polling python future",
+                        )),
+                    };
+
+                    match callback {
+                        PyScheduledCallback::NodeDeferred(deferred) => {
+                            deferred.settle_with(&js_channel_to_move, |mut cx| match fut_res {
+                                Ok(r) => r.into_js(&mut cx),
+                                Err(err) => cx.throw_error(format!("{}", err)),
+                            });
+                        }
+                        PyScheduledCallback::Channel(chan) => {
+                            let _ = chan.send(fut_res);
+                        }
+                    }
+                });
+            }
+            PyScheduledFunResult::Ready(r) => match callback {
+                PyScheduledCallback::NodeDeferred(deferred) => {
+                    deferred.settle_with(js_channel, |mut cx| r.into_js(&mut cx));
+                }
+                PyScheduledCallback::Channel(chan) => {
+                    if chan.send(Ok(r)).is_err() {
+                        return Err(CubeError::internal(
+                            "Unable to send result back to consumer".to_string(),
+                        ));
+                    }
+                }
+            },
+        };
+
+        Ok(())
+    }
+
+    pub fn new(js_channel: neon::event::Channel) -> Self {
+        let (sender, mut receiver) = tokio::sync::mpsc::channel::<PyScheduledFun>(1024);
+
+        trace!("New Python runtime");
+
+        let js_channel_clone = js_channel.clone();
+
+        std::thread::spawn(move || {
+            trace!("Initializing executor in a separate thread");
+
+            std::thread::spawn(|| {
+                pyo3_async_runtimes::tokio::get_runtime()
+                    .block_on(pyo3_async_runtimes::tokio::re_exports::pending::<()>())
+            });
+
+            let res = Python::with_gil(|py| -> Result<(), PyErr> {
+                pyo3_async_runtimes::tokio::run(py, async move {
+                    loop {
+                        if let Some(task) = receiver.recv().await {
+                            trace!("New task");
+
+                            if let Err(err) = Self::process_task(task, &js_channel_clone) {
+                                error!("Error while processing python task: {:?}", err)
+                            };
+                        }
+                    }
+                })
+            });
+            match res {
+                Ok(_) => trace!("Python runtime loop was closed without error"),
+                Err(err) => error!("Critical error while processing python call: {}", err),
+            }
+        });
+
+        Self { sender, js_channel }
+    }
+}
+
+static PY_RUNTIME: OnceCell<PyRuntime> = OnceCell::new();
+
+pub fn py_runtime_init<'a, C: Context<'a>>(
+    cx: &mut C,
+    channel: neon::event::Channel,
+) -> NeonResult<()> {
+    if PY_RUNTIME.get().is_some() {
+        return Ok(());
+    }
+
+    let runtime = tokio_runtime_node(cx)?;
+
+    pyo3::prepare_freethreaded_python();
+    // it's safe to unwrap
+    pyo3_async_runtimes::tokio::init_with_runtime(runtime).unwrap();
+
+    if PY_RUNTIME.set(PyRuntime::new(channel)).is_err() {
+        cx.throw_error("Error on setting PyRuntime")
+    } else {
+        Ok(())
+    }
+}
+
+pub fn py_runtime() -> Result<&'static PyRuntime, CubeError> {
+    if let Some(runtime) = PY_RUNTIME.get() {
+        Ok(runtime)
+    } else {
+        Err(CubeError::internal(
+            "Unable to get PyRuntime: It was not initialized".to_string(),
+        ))
+    }
+}

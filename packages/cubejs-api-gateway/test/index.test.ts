@@ -6,7 +6,8 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import * as console from 'console';
+import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
 import { generateAuthToken } from './utils';
 import {
   preAggregationsResultFactory,
@@ -16,6 +17,8 @@ import {
   DataSourceStorageMock,
   AdapterApiMock
 } from './mocks';
+import { ApiScopesTuple } from '../src/types/auth';
+import { PreAggJob } from '../src/types/request';
 
 const logger = (type, message) => console.log({ type, ...message });
 
@@ -43,14 +46,14 @@ async function requestBothGetAndPost(app, { url, query, body }, assert) {
 }
 
 const API_SECRET = 'secret';
-function createApiGateway(
+async function createApiGateway(
   adapterApi: any = new AdapterApiMock(),
   dataSourceStorage: any = new DataSourceStorageMock(),
   options: Partial<ApiGatewayOptions> = {}
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -60,6 +63,7 @@ function createApiGateway(
 
   process.env.NODE_ENV = 'unknown';
   const app = express();
+  app.use(express.json());
   apiGateway.initApp(app);
 
   return {
@@ -72,7 +76,7 @@ function createApiGateway(
 
 describe('API Gateway', () => {
   test('bad token', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
@@ -82,7 +86,7 @@ describe('API Gateway', () => {
   });
 
   test('bad token with schema', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
@@ -91,15 +95,42 @@ describe('API Gateway', () => {
     expect(res.body && res.body.error).toStrictEqual('Invalid token');
   });
 
+  test('query field is empty', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query=')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body && res.body.error).toStrictEqual(
+      'Query param is required'
+    );
+  });
+
+  test('incorrect json for query field', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query=NOT_A_JSON')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body && res.body.error).toContain(
+      // different JSON.parse errors between Node.js versions
+      'Unable to decode query param as JSON, error: Unexpected token'
+    );
+  });
+
   test('requires auth', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app).get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}').expect(403);
     expect(res.body && res.body.error).toStrictEqual('Authorization header isn\'t set');
   });
 
   test('passes correct token', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={}')
@@ -111,7 +142,7 @@ describe('API Gateway', () => {
   });
 
   test('passes correct token with auth schema', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={}')
@@ -121,6 +152,25 @@ describe('API Gateway', () => {
     expect(res.body && res.body.error).toStrictEqual(
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
     );
+  });
+
+  test('catch error requestContextMiddleware', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        extendContext: (_req) => {
+          throw new Error('Server should not crash');
+        }
+      }
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(500);
+
+    expect(res.body && res.body.error).toStrictEqual('Error: Server should not crash');
   });
 
   test('query transform with checkAuth', async () => {
@@ -140,7 +190,7 @@ describe('API Gateway', () => {
       return query;
     });
 
-    const { app } = createApiGateway(
+    const { app } = await createApiGateway(
       new AdapterApiMock(),
       new DataSourceStorageMock(),
       {
@@ -162,7 +212,7 @@ describe('API Gateway', () => {
       .expect(200);
 
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
 
     expect(queryRewrite.mock.calls.length).toEqual(1);
   });
@@ -180,7 +230,7 @@ describe('API Gateway', () => {
       return query;
     });
 
-    const { app } = createApiGateway(
+    const { app } = await createApiGateway(
       new AdapterApiMock(),
       new DataSourceStorageMock(),
       {
@@ -203,13 +253,61 @@ describe('API Gateway', () => {
       .expect(200);
 
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
+
+    expect(queryRewrite.mock.calls.length).toEqual(1);
+  });
+
+  test('query transform with checkAuth with return', async () => {
+    const queryRewrite = jest.fn(async (query: Query, context) => {
+      expect(context.securityContext).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      expect(context.authInfo).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      return query;
+    });
+
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            return {
+              security_context: jwt.verify(authorization, API_SECRET),
+            };
+          }
+
+          return {};
+        },
+        queryRewrite
+      }
+    );
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
+      )
+      // console.log(generateAuthToken({ uid: 5, }));
+      .set('Authorization', 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(200);
+
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
 
     expect(queryRewrite.mock.calls.length).toEqual(1);
   });
 
   test('null filter values', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get(
@@ -218,11 +316,55 @@ describe('API Gateway', () => {
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
     console.log(res.body);
-    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
+  });
+
+  test('custom granularities in annotation from timeDimensions', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"timeDimensions":[{"dimension":"Foo.timeGranularities","granularity":"half_year_by_1st_april"}]}'
+      )
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
+    expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
+      .toStrictEqual({
+        granularity: {
+          name: 'half_year_by_1st_april',
+          title: 'Half Year By1 St April',
+          interval: '6 months',
+          offset: '3 months',
+        }
+      });
+  });
+
+  test('custom granularities in annotation from dimensions', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"dimensions":["Foo.timeGranularities.half_year_by_1st_april"]}'
+      )
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
+    expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
+      .toStrictEqual({
+        granularity: {
+          name: 'half_year_by_1st_april',
+          title: 'Half Year By1 St April',
+          interval: '6 months',
+          offset: '3 months',
+        }
+      });
   });
 
   test('dry-run', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar']
@@ -236,10 +378,12 @@ describe('API Gateway', () => {
           queryType: 'regularQuery',
           normalizedQueries: [
             {
+              cacheMode: 'stale-if-slow',
               measures: ['Foo.bar'],
               timezone: 'UTC',
-              order: [],
               filters: [],
+              rowLimit: 10000,
+              limit: 10000,
               dimensions: [],
               timeDimensions: [],
               queryType: 'regularQuery'
@@ -247,10 +391,198 @@ describe('API Gateway', () => {
           ],
           queryOrder: [{ id: 'desc' }],
           pivotQuery: {
+            cacheMode: 'stale-if-slow',
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [],
+            rowLimit: 10000,
+            limit: 10000,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          },
+          transformedQueries: [null]
+        });
+      }
+    );
+  });
+
+  test('normalize filter number values', async () => {
+    const { app } = await createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      filters: [{
+        member: 'Foo.bar',
+        operator: 'gte',
+        values: [10.5]
+      }, {
+        member: 'Foo.bar',
+        operator: 'gte',
+        values: [0]
+      }, {
+        or: [{
+          member: 'Foo.bar',
+          operator: 'gte',
+          values: [10.5]
+        }, {
+          member: 'Foo.bar',
+          operator: 'gte',
+          values: [0]
+        }]
+      }]
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body.normalizedQueries).toStrictEqual([
+          {
+            cacheMode: 'stale-if-slow',
+            measures: ['Foo.bar'],
+            timezone: 'UTC',
+            filters: [{
+              member: 'Foo.bar',
+              operator: 'gte',
+              values: ['10.5']
+            }, {
+              member: 'Foo.bar',
+              operator: 'gte',
+              values: ['0']
+            }, {
+              or: [{
+                member: 'Foo.bar',
+                operator: 'gte',
+                values: ['10.5']
+              }, {
+                member: 'Foo.bar',
+                operator: 'gte',
+                values: ['0']
+              }]
+            }],
+            rowLimit: 10000,
+            limit: 10000,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          }
+        ]);
+      }
+    );
+  });
+
+  test('normalize empty filters', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"member":"Foo.bar","operator":"equals","values":[]}]}'
+      )
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+    console.log(res.body);
+    expect(res.body.error).toMatch(/Values required for filter/);
+  });
+
+  test('normalize queryRewrite limit', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, API_SECRET);
+            req.authInfo = authorization;
+          }
+        },
+        queryRewrite: async (query, _context) => {
+          query.limit = 2;
+          return query;
+        },
+      }
+    );
+
+    const query = {
+      measures: ['Foo.bar']
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body).toStrictEqual({
+          queryType: 'regularQuery',
+          normalizedQueries: [
+            {
+              cacheMode: 'stale-if-slow',
+              measures: ['Foo.bar'],
+              timezone: 'UTC',
+              filters: [],
+              rowLimit: 2,
+              limit: 2,
+              dimensions: [],
+              timeDimensions: [],
+              queryType: 'regularQuery'
+            }
+          ],
+          queryOrder: [{ id: 'desc' }],
+          pivotQuery: {
+            cacheMode: 'stale-if-slow',
+            measures: ['Foo.bar'],
+            timezone: 'UTC',
+            filters: [],
+            rowLimit: 2,
+            limit: 2,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          },
+          transformedQueries: [null]
+        });
+      }
+    );
+  });
+
+  test('normalize order', async () => {
+    const { app } = await createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      order: {
+        'Foo.bar': 'desc'
+      }
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body).toStrictEqual({
+          queryType: 'regularQuery',
+          normalizedQueries: [
+            {
+              cacheMode: 'stale-if-slow',
+              measures: ['Foo.bar'],
+              order: [{ id: 'Foo.bar', desc: true }],
+              timezone: 'UTC',
+              filters: [],
+              rowLimit: 10000,
+              limit: 10000,
+              dimensions: [],
+              timeDimensions: [],
+              queryType: 'regularQuery'
+            }
+          ],
+          queryOrder: [{ id: 'desc' }],
+          pivotQuery: {
+            cacheMode: 'stale-if-slow',
+            measures: ['Foo.bar'],
+            order: [{ id: 'Foo.bar', desc: true }],
+            timezone: 'UTC',
+            filters: [],
+            rowLimit: 10000,
+            limit: 10000,
             dimensions: [],
             timeDimensions: [],
             queryType: 'regularQuery'
@@ -262,7 +594,7 @@ describe('API Gateway', () => {
   });
 
   test('date range padding', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get(
@@ -278,7 +610,7 @@ describe('API Gateway', () => {
   });
 
   test('order support object format', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -295,7 +627,7 @@ describe('API Gateway', () => {
   });
 
   test('order support array of tuples', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -316,7 +648,7 @@ describe('API Gateway', () => {
   });
 
   test('post http method for load route', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -340,7 +672,7 @@ describe('API Gateway', () => {
   });
 
   test('meta endpoint to get schema information', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/meta')
@@ -348,19 +680,107 @@ describe('API Gateway', () => {
       .expect(200);
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+  });
+
+  test('meta endpoint returns view groups', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body).toHaveProperty('viewGroups');
+
+    expect(res.body.viewGroups).toHaveLength(1);
+    // The nested `restricted` group references only a hidden view, so it is
+    // pruned from the response.
+    expect(res.body.viewGroups[0]).toEqual({
+      name: 'analytics',
+      title: 'Analytics',
+      description: 'Analytics related views',
+      views: ['FooView'],
+      includes: ['FooView'],
+    });
+
+    const fooView = res.body.cubes.find(c => c.name === 'FooView');
+    expect(fooView).toBeDefined();
+    expect(fooView.viewGroups).toEqual(['analytics']);
+    expect(fooView.type).toBe('view');
+
+    const fooCube = res.body.cubes.find(c => c.name === 'Foo');
+    expect(fooCube).toBeDefined();
+    expect(fooCube.viewGroups).toBeUndefined();
   });
 
   test('meta endpoint extended to get schema information with additional data', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/meta?extended')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
+
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+  });
+
+  test('meta endpoint with onlyViews=true returns only views and their groups', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?onlyViews=true')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes).toHaveLength(1);
+    expect(res.body.cubes[0].name).toBe('FooView');
+    expect(res.body.cubes[0].type).toBe('view');
+    expect(res.body.viewGroups).toEqual([
+      {
+        name: 'analytics',
+        title: 'Analytics',
+        description: 'Analytics related views',
+        views: ['FooView'],
+        includes: ['FooView'],
+      },
+    ]);
+  });
+
+  test('meta endpoint with onlyViews=false returns all cubes and views', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?onlyViews=false')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body.cubes.map(c => c.name).sort()).toEqual(['Foo', 'FooView']);
+  });
+
+  test('meta endpoint extended with onlyViews=true returns only views', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?extended&onlyViews=true')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes).toHaveLength(1);
+    expect(res.body.cubes[0].name).toBe('FooView');
   });
 
   describe('multi query support', () => {
@@ -379,7 +799,7 @@ describe('API Gateway', () => {
     });
 
     test('multi query with a flag', async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       const res = await request(app)
         .get(`/cubejs-api/v1/load?${searchParams.toString()}`)
@@ -397,7 +817,7 @@ describe('API Gateway', () => {
     });
 
     test('multi query without a flag', async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       searchParams.delete('queryType');
 
@@ -409,7 +829,7 @@ describe('API Gateway', () => {
     });
 
     test('regular query', async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       const query = JSON.stringify({
         measures: ['Foo.bar'],
@@ -432,7 +852,118 @@ describe('API Gateway', () => {
           measures: ['Foo.bar'],
           timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }],
         },
-        data: [{ 'Foo.bar': 42 }],
+        data: [{ 'Foo.bar': '42' }],
+      });
+    });
+  });
+
+  describe('sql api member expressions evaluations', () => {
+    const query = {
+      measures: [
+        // eslint-disable-next-line no-template-curly-in-string
+        '{"cubeName":"sales","alias":"sum_sales_line_i","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"SUM(${sales.line_items_price})"},"groupingSet":null}'
+      ],
+      dimensions: [
+        // eslint-disable-next-line no-template-curly-in-string
+        '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
+        // eslint-disable-next-line no-template-curly-in-string
+        '{"cubeName":"sales","alias":"cast_sales_users","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"CAST(${sales.users_first_name} AS TEXT)"},"groupingSet":null}'
+      ],
+      segments: [],
+      order: []
+    };
+
+    test('throw error if expressions are not allowed', async () => {
+      const { apiGateway } = await createApiGateway();
+      const request: QueryRequest = {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        res(message) {
+          const errorMessage = message as { error: string };
+          expect(errorMessage.error).toEqual('Error: Expressions are not allowed in this context');
+        },
+        query,
+        expressionParams: [],
+        exportAnnotatedSql: true,
+        memberExpressions: false,
+        disableExternalPreAggregations: true,
+        queryType: 'multi',
+        disableLimitEnforcing: true,
+        context: {
+          securityContext: {},
+          signedWithPlaygroundAuthSecret: false,
+          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+          protocol: 'postgres',
+          apiType: 'sql',
+          appName: 'NULL'
+        },
+        apiType: 'sql'
+      };
+
+      await apiGateway.sql(request);
+    });
+
+    test('no error if expressions are allowed', async () => {
+      const { apiGateway } = await createApiGateway();
+      const request: QueryRequest = {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        res(message) {
+          expect(message.hasOwnProperty('sql')).toBe(true);
+        },
+        query,
+        expressionParams: [],
+        exportAnnotatedSql: true,
+        memberExpressions: true,
+        disableExternalPreAggregations: true,
+        queryType: 'multi',
+        disableLimitEnforcing: true,
+        context: {
+          securityContext: {},
+          signedWithPlaygroundAuthSecret: false,
+          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+          protocol: 'postgres',
+          apiType: 'sql',
+          appName: 'NULL'
+        },
+        apiType: 'sql'
+      };
+
+      await apiGateway.sql(request);
+    });
+  });
+
+  describe('/v1/sql endpoint dataSource', () => {
+    test('returns dataSource for single query', async () => {
+      const { app } = await createApiGateway();
+      const query = JSON.stringify({ measures: ['Foo.bar'] });
+
+      const res = await request(app)
+        .get(`/cubejs-api/v1/sql?query=${encodeURIComponent(query)}`)
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body).toHaveProperty('sql');
+      expect(res.body).toHaveProperty('dataSource');
+      expect(res.body.dataSource).toBe('default');
+    });
+
+    test('returns dataSource for blending query', async () => {
+      const { app } = await createApiGateway();
+      const query = JSON.stringify([
+        { measures: ['Foo.bar'], timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }] },
+        { measures: ['Foo.bar'], timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }] }
+      ]);
+
+      const res = await request(app)
+        .get(`/cubejs-api/v1/sql?query=${encodeURIComponent(query)}`)
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBe(2);
+      res.body.forEach((item: any) => {
+        expect(item).toHaveProperty('sql');
+        expect(item).toHaveProperty('dataSource');
+        expect(item.dataSource).toBe('default');
       });
     });
   });
@@ -445,9 +976,9 @@ describe('API Gateway', () => {
 
     const scheduledRefreshTimeZonesFactory = () => (['UTC', 'America/Los_Angeles']);
 
-    const appPrepareFactory = () => {
+    const appPrepareFactory = async (scope?: string[]) => {
       const playgroundAuthSecret = 'test12345';
-      const { app } = createApiGateway(
+      const { app } = await createApiGateway(
         new AdapterApiMock(),
         new DataSourceStorageMock(),
         {
@@ -455,24 +986,24 @@ describe('API Gateway', () => {
           playgroundAuthSecret,
           refreshScheduler: () => new RefreshSchedulerMock(),
           scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
-          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
+          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory
         }
       );
-      const token = generateAuthToken({ uid: 5, }, {}, playgroundAuthSecret);
+      const token = generateAuthToken({ uid: 5, scope }, {}, playgroundAuthSecret);
       const tokenUser = generateAuthToken({ uid: 5, }, {}, API_SECRET);
 
       return { app, token, tokenUser };
     };
 
     const notAllowedTestFactory = ({ route, method = 'get' }) => async () => {
-      const { app } = appPrepareFactory();
+      const { app } = await appPrepareFactory();
       return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(403);
     };
 
     const notAllowedWithUserTokenTestFactory = ({ route, method = 'get' }) => async () => {
-      const { app, tokenUser } = appPrepareFactory();
+      const { app, tokenUser } = await appPrepareFactory();
 
       return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
@@ -481,15 +1012,15 @@ describe('API Gateway', () => {
     };
 
     const notExistsTestFactory = ({ route, method = 'get' }) => async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(404);
     };
 
-    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult }) => async () => {
-      const { app, token } = appPrepareFactory();
+    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult, scope = [''] }) => async () => {
+      const { app, token } = await appPrepareFactory(scope);
 
       const req = request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
@@ -501,6 +1032,35 @@ describe('API Gateway', () => {
       const res = await req;
       expect(res.body).toMatchObject(successResult);
     };
+
+    /*
+     Test using this is commented out below
+    const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
+      route: string,
+      method: string,
+      scope?: string[],
+      wrongPayloads: {
+        result: {
+          status: number,
+          error: string
+        },
+        body: {},
+      }[]
+    }) => async () => {
+      const { app, token } = await appPrepareFactory(scope);
+
+      for (const payload of wrongPayloads) {
+        const req = request(app).post(`/cubejs-system/v1/${route}`)
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(payload.result.status);
+
+        req.send(payload.body);
+        const res = await req;
+        expect(res.body.error).toBe(payload.result.error);
+      }
+    };
+    */
 
     const testConfigs = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },
@@ -530,13 +1090,157 @@ describe('API Gateway', () => {
         test('not allowed with user token', notAllowedWithUserTokenTestFactory(config));
         test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(config));
         test('success', successTestFactory(config));
+        /* if (config.method === 'post' && config.wrongPayloads?.length) {
+          test('wrong params', wrongPayloadsTestFactory(config));
+        } */
       });
+    });
+  });
+
+  describe('/v1/pre-aggregations/jobs', () => {
+    const scheduledRefreshContextsFactory = () => ([
+      { securityContext: { foo: 'bar' } },
+      { securityContext: { bar: 'foo' } }
+    ]);
+
+    const scheduledRefreshTimeZonesFactory = () => (['UTC', 'America/Los_Angeles']);
+
+    const appPrepareFactory = async (scope: string[]) => {
+      const playgroundAuthSecret = 'test12345';
+      const { app } = await createApiGateway(
+        new AdapterApiMock(),
+        new DataSourceStorageMock(),
+        {
+          basePath: '/test',
+          playgroundAuthSecret,
+          refreshScheduler: () => new RefreshSchedulerMock(),
+          scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
+          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory,
+          contextToApiScopes: () => Promise.resolve(<ApiScopesTuple>scope)
+        }
+      );
+      const token = generateAuthToken({ uid: 5, scope }, {}, playgroundAuthSecret);
+      const tokenUser = generateAuthToken({ uid: 5, scope }, {}, API_SECRET);
+
+      return { app, token, tokenUser };
+    };
+
+    test('no input', async () => {
+      const { app, tokenUser } = await appPrepareFactory(['graphql', 'data', 'meta', 'jobs']);
+
+      const req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`);
+
+      const res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error).toEqual('No job description provided');
+    });
+
+    test('invalid input action', async () => {
+      const { app, tokenUser } = await appPrepareFactory(['graphql', 'data', 'meta', 'jobs']);
+
+      const req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`)
+        .send({ action: 'patch' });
+
+      const res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error.includes('Invalid Job query format')).toBeTruthy();
+    });
+
+    test('invalid input date range', async () => {
+      const { app, tokenUser } = await appPrepareFactory(['graphql', 'data', 'meta', 'jobs']);
+
+      let req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`)
+        .send({
+          action: 'post',
+          selector: {
+            contexts: [{ securityContext: {} }],
+            timezones: ['UTC', 'America/Los_Angeles'],
+            dateRange: ['invalid string', '2020-02-20']
+          }
+        });
+
+      let res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error.includes('Cannot parse selector date range')).toBeTruthy();
+
+      req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`)
+        .send({
+          action: 'post',
+          selector: {
+            contexts: [{ securityContext: {} }],
+            timezones: ['UTC', 'America/Los_Angeles'],
+            dateRange: ['2020-02-20', 'invalid string']
+          }
+        });
+
+      res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error.includes('Cannot parse selector date range')).toBeTruthy();
+    });
+
+    // https://github.com/cube-js/cube/issues/11313
+    test('job queue status is reported per job data source, not only for the default one', async () => {
+      // Constructed off the prototype (bypassing the constructor, which requires a full
+      // native SQL server) since getPreAggJobQueueStatus doesn't use instance state.
+      const apiGateway = Object.create(ApiGateway.prototype);
+
+      const job: PreAggJob = {
+        request: 'request-id',
+        context: { securityContext: {} },
+        preagg: 'orders_test.main',
+        table: 'orders_test_main',
+        target: 'orders_test_main_20200101',
+        structure: 'structure-version',
+        content: 'content-version',
+        updated: 1,
+        key: [],
+        status: 'scheduled',
+        timezone: 'UTC',
+        dataSource: 'test_ds',
+      };
+
+      // Mimics QueryOrchestrator#getPreAggregationQueueStates, which defaults
+      // its dataSource argument to 'default' and only returns queue entries
+      // that were scheduled on the requested data source's queue.
+      const orchestrator = {
+        getPreAggregationQueueStates: jest.fn((dataSource = 'default') => {
+          if (dataSource !== job.dataSource) {
+            return [];
+          }
+          return [{
+            queryHandler: 'query',
+            query: {
+              requestId: job.request,
+              newVersionEntry: {
+                table_name: job.table,
+                structure_version: job.structure,
+                content_version: job.content,
+                last_updated_at: job.updated,
+              },
+            },
+            status: ['active'],
+          }];
+        }),
+      };
+
+      const status = await (apiGateway as any).getPreAggJobQueueStatus(orchestrator, job);
+
+      expect(orchestrator.getPreAggregationQueueStates).toHaveBeenCalledWith(job.dataSource);
+      expect(status).toEqual('processing');
     });
   });
 
   describe('healtchecks', () => {
     test('readyz (standalone)', async () => {
-      const { app, adapterApi } = createApiGateway();
+      const { app, adapterApi } = await createApiGateway();
 
       const res = await request(app)
         .get('/readyz')
@@ -551,7 +1255,7 @@ describe('API Gateway', () => {
     });
 
     test('readyz (standalone)', async () => {
-      const { app, adapterApi } = createApiGateway();
+      const { app, adapterApi } = await createApiGateway();
 
       const res = await request(app)
         .get('/readyz')
@@ -576,7 +1280,7 @@ describe('API Gateway', () => {
         }
       }
 
-      const { app, adapterApi } = createApiGateway(new AdapterApiUnhealthyMock());
+      const { app, adapterApi } = await createApiGateway(new AdapterApiUnhealthyMock());
 
       const res = await request(app)
         .get('/readyz')
@@ -601,7 +1305,7 @@ describe('API Gateway', () => {
         }
       }
 
-      const { app, dataSourceStorage } = createApiGateway(new AdapterApiMock(), new DataSourceStorageUnhealthyMock());
+      const { app, dataSourceStorage } = await createApiGateway(new AdapterApiMock(), new DataSourceStorageUnhealthyMock());
 
       const res = await request(app)
         .get('/livez')
@@ -612,6 +1316,277 @@ describe('API Gateway', () => {
 
       expect(dataSourceStorage.$testConnectionsDone).toEqual(true);
       expect(dataSourceStorage.$testOrchestratorConnectionsDone).toEqual(false);
+    });
+  });
+
+  describe('/v1/cubesql', () => {
+    test('simple query works', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      // Mock the sqlServer.execSql method
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
+        // Simulate writing schema and data to the stream
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1], [2], [3]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3'
+        })
+        .responseType('text')
+        .expect(200);
+
+      // Verify the mock was called with correct parameters
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+      );
+    });
+
+    test('timezone can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      // Mock the sqlServer.execSql method
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
+        // Simulate writing schema and data to the stream
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'created_at', column_type: 'Timestamp' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [['2025-12-22T16:00:00.000'], ['2025-12-24T16:00:00.000']]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT created_at FROM orders WHERE created_at > \'2025-12-22 13:00:00\'::timestamptz',
+          cache: 'stale-while-revalidate',
+          timezone: 'America/Los_Angeles'
+        })
+        .responseType('text')
+        .expect(200);
+
+      // Verify the mock was called with correct parameters including timezone
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT created_at FROM orders WHERE created_at > \'2025-12-22 13:00:00\'::timestamptz',
+        expect.anything(),
+        {},
+        'stale-while-revalidate',
+        'America/Los_Angeles',
+        undefined,
+        expect.any(String),
+      );
+    });
+
+    test('throwContinueWait can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      // Mock the sqlServer.execSql method
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
+        // Simulate writing error to the stream
+        stream.write(`${JSON.stringify({
+          error: 'Continue wait'
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          throwContinueWait: true,
+        })
+        .responseType('text')
+        .expect(200);
+
+      // Verify the mock was called with correct parameters
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        true,
+        expect.any(String),
+      );
+    });
+
+    test('request id is propagated from x-request-id header', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone, throwContinueWait, requestId) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .set('x-request-id', 'test-request-id-12345')
+        .send({
+          query: 'SELECT id FROM test LIMIT 1'
+        })
+        .responseType('text')
+        .expect(200);
+
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 1',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        'test-request-id-12345',
+      );
+    });
+
+    test('request id is auto-generated when no header is provided', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      const execSqlMock = jest.fn(async (query: any, stream: any, securityContext: any, cacheMode: any, timezone: any, throwContinueWait: any, requestId: any) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 1'
+        })
+        .responseType('text')
+        .expect(200);
+
+      const requestId = execSqlMock.mock.calls[0][6];
+      expect(requestId).toBeDefined();
+      expect(requestId).toMatch(/^[0-9a-f-]+-span-1$/);
+    });
+  });
+
+  describe('external pre-aggregation indicator', () => {
+    // Helper mock that lets a test pretend the query orchestrator served
+    // the result from an external (CubeStore) pre-aggregation, optionally
+    // with the dev-only `usedPreAggregations` object as well.
+    class AdapterApiMockWithFlags extends AdapterApiMock {
+      public constructor(
+        private readonly external: boolean | undefined,
+        private readonly usedPreAggregations?: any,
+      ) {
+        super();
+      }
+
+      public async executeQuery(query: any) {
+        const base = await super.executeQuery(query);
+        return {
+          ...base,
+          external: this.external,
+          usedPreAggregations: this.usedPreAggregations,
+        };
+      }
+    }
+
+    test('external=false when query was not served from CubeStore', async () => {
+      const { app } = await createApiGateway(new AdapterApiMockWithFlags(false));
+
+      const res = await request(app)
+        .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body.external).toBe(false);
+      // Full pre-agg object stays dev/playground-only.
+      expect(res.body.usedPreAggregations).toBeUndefined();
+    });
+
+    test('external=true when query was served from an external pre-aggregation (no leak of names)', async () => {
+      const { app } = await createApiGateway(
+        new AdapterApiMockWithFlags(true, {
+          'Foo.fooMain': {
+            targetTableName: 'stb_pre_aggs.foo_foo_main',
+            type: 'rollup',
+          },
+        }),
+      );
+
+      const res = await request(app)
+        .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body.external).toBe(true);
+      // Pre-aggregation names / table names must NOT be exposed to ordinary
+      // API consumers — only the boolean flag is safe.
+      expect(res.body.usedPreAggregations).toBeUndefined();
+    });
+
+    test('usedPreAggregations is exposed under playground auth alongside external', async () => {
+      const usedPreAggregations = {
+        'Foo.fooMain': {
+          targetTableName: 'stb_pre_aggs.foo_foo_main',
+          type: 'rollup',
+        },
+      };
+      const { app } = await createApiGateway(
+        new AdapterApiMockWithFlags(true, usedPreAggregations),
+        new DataSourceStorageMock(),
+        {
+          checkAuth: (req: Request) => {
+            req.signedWithPlaygroundAuthSecret = true;
+            req.securityContext = {};
+            req.authInfo = {};
+          },
+        },
+      );
+
+      const res = await request(app)
+        .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .expect(200);
+
+      expect(res.body.external).toBe(true);
+      expect(res.body.usedPreAggregations).toEqual(usedPreAggregations);
     });
   });
 });

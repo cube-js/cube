@@ -7,5 +7,5 @@ export function useDeepMemo<T>(
   dependencies: DependencyList
 ) {
   const memoizedDependencies = useDeepDependencies(dependencies);
-  return useMemo<T>(callback, memoizedDependencies);
+  return useMemo<T>(callback, memoizedDependencies ?? []);
 }

@@ -1,11 +1,9 @@
 /* eslint-disable no-underscore-dangle,camelcase */
-import { ANTLRErrorListener, CommonTokenStream, CharStreams } from 'antlr4ts';
-import { RuleNode } from 'antlr4ts/tree';
+import { ErrorListener, CommonTokenStream, CharStream, RuleNode } from 'antlr4';
 import * as t from '@babel/types';
 
-import { Python3Lexer } from './Python3Lexer';
-import {
-  Python3Parser,
+import Python3Lexer from './Python3Lexer';
+import Python3Parser, {
   // eslint-disable-next-line camelcase
   File_inputContext,
   Double_string_template_atomContext,
@@ -18,9 +16,17 @@ import {
   VarargslistContext,
   LambdefContext,
   Single_string_template_atomContext,
+  ArglistContext,
+  CallArgumentsContext,
+  // eslint-disable-next-line camelcase
+  Not_testContext,
+  // eslint-disable-next-line camelcase
+  And_testContext,
+  // eslint-disable-next-line camelcase
+  Or_testContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
-import { Python3ParserVisitor } from './Python3ParserVisitor';
+import Python3ParserVisitor from './Python3ParserVisitor';
 
 const nodeVisitor = <R>(visitor: { visitNode: (node: RuleNode, children: R[]) => R }): Python3ParserVisitor<R> => ({
   // TODO null -- note used?
@@ -33,10 +39,12 @@ const nodeVisitor = <R>(visitor: { visitNode: (node: RuleNode, children: R[]) =>
     }
 
     const result: R[] = [];
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.getChild(i);
-      if (child && child.childCount) {
-        result.push(child.accept(this));
+    if ((node as any).children) {
+      for (let i = 0; i < (node as any).children.length; i++) {
+        const child: any = (node as any).children[i];
+        if (child && child.children && child.children.length > 0) {
+          result.push(child.accept(this));
+        }
       }
     }
     return visitor.visitNode(node, result);
@@ -67,11 +75,8 @@ export class PythonParser {
   protected parse() {
     const { codeString } = this;
 
-    const chars = CharStreams.fromString(codeString);
-    chars.getText = (interval) => {
-      const start = interval.a;
-      let stop = interval.b;
-
+    const chars = new CharStream(codeString);
+    chars.getText = (start, stop) => {
       if (stop >= chars.size) {
         stop = chars.size - 1;
       }
@@ -85,11 +90,23 @@ export class PythonParser {
 
     const { errors } = this;
 
-    class ExprErrorListener implements ANTLRErrorListener<number> {
+    class ExprErrorListener implements ErrorListener<number> {
       public syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
         errors.push({
           msg, column, err, line, recognizer, offendingSymbol
         });
+      }
+
+      public reportAmbiguity(recognizer, dfa, startIndex, stopIndex, exact, ambigAlts, configs) {
+        // Optional: log ambiguity warnings if needed
+      }
+
+      public reportAttemptingFullContext(recognizer, dfa, startIndex, stopIndex, conflictingAlts, configs) {
+        // Optional: log full context attempts if needed
+      }
+
+      public reportContextSensitivity(recognizer, dfa, startIndex, stopIndex, prediction, configs) {
+        // Optional: log context sensitivity if needed
       }
     }
 
@@ -102,21 +119,21 @@ export class PythonParser {
     const parser = new Python3Parser(
       commonTokenStream
     );
-    parser.buildParseTree = true;
+    parser.buildParseTrees = true;
     parser.removeErrorListeners();
     parser.addErrorListener(new ExprErrorListener());
 
     return parser.file_input();
   }
 
-  public transpileToJs() {
+  public transpileToJs(): t.Program {
     return this.ast.accept(nodeVisitor<any>({
       visitNode: (node, children) => {
         const singleNodeReturn = () => {
           if (children.length === 1) {
             return children[0];
           } else {
-            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.getText()}`);
           }
         };
 
@@ -126,7 +143,7 @@ export class PythonParser {
           if (children.length === 1) {
             return t.expressionStatement(children[0]);
           } else {
-            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (
           node instanceof Double_string_template_atomContext ||
@@ -135,7 +152,7 @@ export class PythonParser {
           if ((node.test() || node.star_expr()) && children.length === 1) {
             return children[0];
           }
-          return t.templateElement({ raw: node.text, cooked: node.text });
+          return t.templateElement({ raw: node.getText(), cooked: node.getText() });
         } else if (node instanceof String_templateContext) {
           if (children[children.length - 1].type === 'TemplateElement') {
             children[children.length - 1].tail = true;
@@ -162,39 +179,73 @@ export class PythonParser {
             }
             return expr;
           } else {
-            throw new UserError(`Empty Python atom_expr node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Empty Python atom_expr node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (node instanceof AtomContext) {
           const name = node.NAME();
-          const string = node.STRING();
+          const stringList = node.STRING_list();
+          const number = node.NUMBER();
+
           if (name) {
-            return t.identifier(name.text);
-          } else if (string?.length) {
-            return t.stringLiteral(string.map(s => this.stripQuotes(s.text)).join(''));
+            return t.identifier(name.getText());
+          } else if (stringList && stringList.length) {
+            return t.stringLiteral(stringList.map(s => this.stripQuotes(s.getText())).join(''));
+          } else if (number) {
+            const numText = number.getText();
+            const numValue = parseFloat(numText);
+            return t.numericLiteral(numValue);
           } else {
             return singleNodeReturn();
           }
-        } else if (node instanceof TrailerContext) {
-          const name = node.NAME();
+        } else if (node instanceof CallArgumentsContext) {
           const argsList = node.arglist();
           if (argsList) {
-            return { call: children };
-          } else if (name) {
-            return { identifier: t.identifier(name.text) };
+            // arglist have a single child: arguments _list_
+            const args = children[0];
+            return { call: args };
           } else {
-            throw new UserError(`Unsupported Python Trailer children node: ${node.constructor.name}: ${node.text}`);
+            return { call: [] };
+          }
+        } else if (node instanceof TrailerContext) {
+          const name = node.NAME();
+          const argsList = node.callArguments();
+          if (argsList) {
+            // trailer with callArguments have a single child: CallArgumentsContext
+            // which was already processed (see other if branch)
+            return children[0];
+          } else if (name) {
+            return { identifier: t.identifier(name.getText()) };
+          } else {
+            throw new UserError(`Unsupported Python Trailer children node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (node instanceof VfpdefContext) {
           const name = node.NAME();
           if (name) {
-            return t.identifier(name.text);
+            return t.identifier(name.getText());
           } else {
-            throw new UserError(`Unsupported Python vfpdef children node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Unsupported Python vfpdef children node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (node instanceof VarargslistContext) {
           return { args: children };
         } else if (node instanceof LambdefContext) {
           return t.arrowFunctionExpression(children[0].args, children[1]);
+        } else if (node instanceof Not_testContext) {
+          if (node.getChildCount() === 1) {
+            return children[0];
+          }
+          return t.unaryExpression('!', children[0]);
+        } else if (node instanceof And_testContext) {
+          if (children.length === 1) {
+            return children[0];
+          }
+          return children.reduce((left, right) => t.logicalExpression('&&', left, right));
+        } else if (node instanceof Or_testContext) {
+          if (children.length === 1) {
+            return children[0];
+          }
+          return children.reduce((left, right) => t.logicalExpression('||', left, right));
+        } else if (node instanceof ArglistContext) {
+          return children;
         } else {
           return singleNodeReturn();
         }
