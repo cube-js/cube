@@ -1,0 +1,41 @@
+cubes:
+    - name: cube_a
+      sql_alias: a
+      sql: "SELECT * FROM public.table_a"
+      dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+            public: true
+          - name: label
+            sql: label
+            type: string
+            public: true
+      measures:
+          - name: measure_a
+            sql: value_a
+            type: sum
+
+    - name: cube_b
+      sql_alias: b
+      sql: "SELECT * FROM public.table_b"
+      joins:
+          - name: cube_a
+            relationship: many_to_one
+            sql: "{CUBE.a_id} = {cube_a.id}"
+      dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+          - name: a_id
+            sql: a_id
+            type: number
+          - name: date
+            sql: date
+            type: time
+      measures:
+          - name: measure_b
+            sql: value_b
+            type: sum

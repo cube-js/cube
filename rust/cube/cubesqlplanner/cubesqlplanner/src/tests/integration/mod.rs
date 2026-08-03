@@ -15,6 +15,7 @@ mod multi_fact;
 mod multi_stage;
 mod null_filters;
 mod pre_aggregations;
+mod primary_key_public_multi_source;
 mod propagate_subquery;
 mod rolling_window;
 mod single_cube;
