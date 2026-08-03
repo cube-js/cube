@@ -4,7 +4,7 @@ use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
-use crate::planner::MemberSymbol;
+use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashSet;
@@ -16,7 +16,12 @@ use std::rc::Rc;
 /// original ELSE mask END`. Pass-through for non-masked members.
 pub struct MaskedSqlNode {
     input: Rc<dyn SqlNode>,
-    ungrouped: bool,
+    // Only the node wrapping the final measure chain applies row-level
+    // mask semantics for measures with a render modifier; the node at
+    // the evaluate position always masks with grouped semantics, so a
+    // row-level measure whose mask has dependencies — deferred by the
+    // final-chain node — is still masked when its raw SQL is rendered.
+    row_level_semantics: bool,
     // Full names of the members present in the query GROUP BY. Used to decide
     // whether conditional masking can be applied to an aggregate measure.
     group_by_members: HashSet<String>,
@@ -36,28 +41,14 @@ pub struct MaskedSqlNode {
 impl MaskedSqlNode {
     pub fn new(
         input: Rc<dyn SqlNode>,
+        row_level_semantics: bool,
         group_by_members: HashSet<String>,
         skip_masking: bool,
         unmasked_root: Option<Rc<dyn SqlNode>>,
     ) -> Rc<Self> {
         Rc::new(Self {
             input,
-            ungrouped: false,
-            group_by_members,
-            skip_masking,
-            unmasked_root,
-        })
-    }
-
-    pub fn new_ungrouped(
-        input: Rc<dyn SqlNode>,
-        group_by_members: HashSet<String>,
-        skip_masking: bool,
-        unmasked_root: Option<Rc<dyn SqlNode>>,
-    ) -> Rc<Self> {
-        Rc::new(Self {
-            input,
-            ungrouped: true,
+            row_level_semantics,
             group_by_members,
             skip_masking,
             unmasked_root,
@@ -79,8 +70,19 @@ impl MaskedSqlNode {
 
         let mask_filter = query_tools.member_mask_filter(&full_name);
 
+        // A measure with an ungrouped render modifier is emitted at row
+        // grain, which changes both mask decisions below.
+        let ungrouped = self.row_level_semantics
+            && match node.as_ref() {
+                MemberSymbol::Measure(m) => matches!(
+                    m.render_modifier(),
+                    Some(MeasureRenderModifier::RawValue | MeasureRenderModifier::UngroupedFinal)
+                ),
+                _ => false,
+            };
+
         let masked_sql = if let Some(mask_call) = node.mask_sql() {
-            if self.ungrouped {
+            if ungrouped {
                 if let MemberSymbol::Measure(_) = node.as_ref() {
                     if mask_call.dependencies_count() > 0 {
                         return Ok(None);
@@ -109,7 +111,7 @@ impl MaskedSqlNode {
         // WHERE clause, so we render the mask value directly for such measures. In
         // ungrouped queries the measure is rendered at row grain, so the CASE WHEN
         // is valid and is kept.
-        if !self.ungrouped {
+        if !ungrouped {
             if let MemberSymbol::Measure(_) = node.as_ref() {
                 let filter_members = filter_item.all_member_evaluators();
                 let all_in_group_by = !filter_members.is_empty()

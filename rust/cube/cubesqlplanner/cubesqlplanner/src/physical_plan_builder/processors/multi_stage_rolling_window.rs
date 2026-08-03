@@ -1,5 +1,6 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
+use crate::logical_plan::transforms;
 use crate::logical_plan::{MultiStageRollingWindow, MultiStageRollingWindowType};
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::{
@@ -7,6 +8,7 @@ use crate::physical_plan::{
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::MeasureRenderModifier;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -82,7 +84,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         );
 
         let mut context_factory = context.make_sql_nodes_factory()?;
-        context_factory.set_rolling_window(true);
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from.clone());
@@ -102,14 +103,32 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
         );
 
-        for dim in rolling_window.schema.time_dimensions.iter() {
-            context_factory.add_dimensions_with_ignored_timezone(dim.full_name());
+        // Time dimensions are read from the rolling source input, where they
+        // are already timezone-converted and truncated, so they must render
+        // without the conversion.
+        let schema = transforms::mark_tz_converted_at_source_in_schema(&rolling_window.schema)?;
+        // An ungrouped rolling select emits row-level values: count-like
+        // measures render a not-null indicator over the input column;
+        // otherwise the select merges the window's partial values.
+        let schema = if rolling_window.is_ungrouped {
+            transforms::measures_render_modifier_in_schema(
+                &schema,
+                &MeasureRenderModifier::UngroupedFinal,
+            )?
+        } else {
+            transforms::measures_render_modifier_in_schema(
+                &schema,
+                &MeasureRenderModifier::RollingMerge,
+            )?
+        };
+
+        for dim in schema.time_dimensions.iter() {
             let alias = references_builder
                 .resolve_alias_for_member(&dim, &Some(measure_input_alias.clone()));
             select_builder.add_projection_member(dim, alias);
         }
 
-        for dim in rolling_window.schema.dimensions.iter() {
+        for dim in schema.dimensions.iter() {
             if dim.clone().resolve_reference_chain()
                 != time_dimension.clone().resolve_reference_chain()
             {
@@ -124,7 +143,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             select_builder.add_projection_member(dim, alias);
         }
 
-        for measure in rolling_window.schema.measures.iter() {
+        for measure in schema.measures.iter() {
             let name_in_base_query = measure_input_schema.resolve_member_alias(measure);
             context_factory.add_ungrouped_measure_reference(
                 measure.full_name(),
@@ -135,8 +154,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         }
 
         if !rolling_window.is_ungrouped {
-            let group_by = rolling_window
-                .schema
+            let group_by = schema
                 .all_dimensions()
                 .map(|dim| -> Result<_, CubeError> {
                     Ok(Expr::Member(MemberExpression::new(dim.clone())))
@@ -145,10 +163,8 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             select_builder.set_group_by(group_by);
             select_builder.set_order_by(
                 self.builder
-                    .make_order_by(&rolling_window.schema, &rolling_window.order_by)?,
+                    .make_order_by(&schema, &rolling_window.order_by)?,
             );
-        } else {
-            context_factory.set_ungrouped(true);
         }
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));

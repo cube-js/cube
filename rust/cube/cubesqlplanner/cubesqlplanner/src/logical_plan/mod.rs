@@ -26,6 +26,7 @@ mod query;
 mod query_source;
 mod root_query;
 mod schema;
+pub mod transforms;
 pub mod visitor;
 
 pub use aggregate_multiplied_subquery::*;

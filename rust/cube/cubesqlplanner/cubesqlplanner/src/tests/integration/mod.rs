@@ -22,5 +22,6 @@ mod subquery_dimensions;
 mod subquery_in_join;
 mod time_dimensions;
 mod transitive_joins;
+mod ungrouped_forms;
 mod view_default_filters;
 mod views;

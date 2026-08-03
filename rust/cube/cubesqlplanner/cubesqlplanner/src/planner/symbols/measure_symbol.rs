@@ -1,6 +1,6 @@
 use super::common::{Case, CompiledMemberPath, MultiStageProperties};
 use super::deps::{self, symbol_deps};
-use super::measure_kinds::{CalculatedMeasure, CalculatedMeasureType, MeasureKind};
+use super::measure_kinds::MeasureKind;
 use super::SymbolPath;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -81,23 +81,92 @@ pub enum MeasureTimeShifts {
     Named(String),
 }
 
+/// Render-time modifier of how the measure's value is emitted in its
+/// select.
+///
+/// `None` on the symbol means both "no stamping pass has decided yet"
+/// and "the usual final aggregation" — the two coincide because
+/// stamping only ever fills `None`, so nothing needs to express
+/// "explicitly the default" to defend it against a later pass.
+#[derive(Clone, Debug)]
+pub enum MeasureRenderModifier {
+    /// Raw row-level value without the aggregation wrap, re-aggregated
+    /// by an enclosing select (measure subqueries, ungrouped
+    /// multi-stage leaves).
+    RawValue,
+    /// Final row-level output of an ungrouped query: count-like
+    /// measures render a not-null indicator so an outer count can sum
+    /// each row's contribution.
+    UngroupedFinal,
+    /// Merge of the window's partial values in a rolling-window
+    /// select: mergeable aggregations combine the input column
+    /// (`sum` for sums and counts, `min`/`max`, an HLL merge for
+    /// `count_distinct_approx`); the rest re-aggregate the raw rows.
+    RollingMerge,
+    /// `rank() OVER (PARTITION BY ...)` in the multi-stage select
+    /// that computes a rank measure.
+    MultiStageRank { partition: Vec<Rc<MemberSymbol>> },
+    /// A window aggregation `agg(agg(x)) OVER (PARTITION BY ...)` in
+    /// the multi-stage select whose partition is narrower than the
+    /// full dimension set.
+    MultiStageWindow { partition: Vec<Rc<MemberSymbol>> },
+}
+
+impl MeasureRenderModifier {
+    /// True when the measure can take this form. The single authority
+    /// for the decision: stamping consults it, render nodes assert it.
+    pub fn applies_to(&self, measure: &MeasureSymbol) -> bool {
+        match self {
+            Self::RawValue | Self::UngroupedFinal => true,
+            Self::RollingMerge => measure.is_cumulative(),
+            Self::MultiStageRank { .. } => {
+                measure.is_multi_stage() && matches!(measure.kind(), MeasureKind::Rank)
+            }
+            Self::MultiStageWindow { .. } => measure.is_multi_stage() && !measure.is_calculated(),
+        }
+    }
+
+    /// Render-side check that the measure reaching a form's node really
+    /// carries that form's prerequisites.
+    pub fn ensure_applies_to(&self, measure: &MeasureSymbol) -> Result<(), CubeError> {
+        if self.applies_to(measure) {
+            return Ok(());
+        }
+        Err(CubeError::internal(format!(
+            "{} render modifier on incompatible measure {}",
+            self.name(),
+            measure.full_name()
+        )))
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Self::RawValue => "RawValue",
+            Self::UngroupedFinal => "UngroupedFinal",
+            Self::RollingMerge => "RollingMerge",
+            Self::MultiStageRank { .. } => "MultiStageRank",
+            Self::MultiStageWindow { .. } => "MultiStageWindow",
+        }
+    }
+}
+
 /// `MemberSymbol::Measure` body: Tesseract representation of a
 /// `measure` declared in the data model — an aggregation, count or
 /// calculated value the query exposes.
 #[derive(Clone)]
 pub struct MeasureSymbol {
-    compiled_path: CompiledMemberPath,
-    kind: MeasureKind,
-    rolling_window: Option<RollingWindow>,
-    multi_stage: Option<MultiStageProperties>,
-    is_reference: bool,
-    is_view: bool,
-    case: Option<Case>,
-    measure_filters: Vec<Rc<SqlCall>>,
-    measure_drill_filters: Vec<Rc<SqlCall>>,
-    measure_order_by: Vec<MeasureOrderBy>,
-    is_splitted_source: bool,
-    mask_sql: Option<Rc<SqlCall>>,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) kind: MeasureKind,
+    pub(super) rolling_window: Option<RollingWindow>,
+    pub(super) multi_stage: Option<MultiStageProperties>,
+    pub(super) is_reference: bool,
+    pub(super) is_view: bool,
+    pub(super) case: Option<Case>,
+    pub(super) measure_filters: Vec<Rc<SqlCall>>,
+    pub(super) measure_drill_filters: Vec<Rc<SqlCall>>,
+    pub(super) measure_order_by: Vec<MeasureOrderBy>,
+    pub(super) mask_sql: Option<Rc<SqlCall>>,
+    pub(super) render_modifier: Option<MeasureRenderModifier>,
 }
 
 symbol_deps! {
@@ -113,7 +182,7 @@ symbol_deps! {
         multi_stage: skip,
         is_reference: skip,
         is_view: skip,
-        is_splitted_source: skip,
+        render_modifier: skip,
     }
 }
 
@@ -142,115 +211,17 @@ impl MeasureSymbol {
             measure_drill_filters,
             measure_order_by,
             multi_stage,
-            is_splitted_source: false,
             mask_sql,
+            render_modifier: None,
         })
-    }
-
-    /// Returns a non-rolling copy of the symbol. A rolling-window
-    /// measure carries both the windowing context and the SQL of the
-    /// inner value it operates on; unrolling drops the window and
-    /// yields that inner value. Multi-stage rolling measures collapse
-    /// to a `Calculated` kind so they can be rendered without window-
-    /// function machinery.
-    pub fn new_unrolling(&self) -> Rc<Self> {
-        if self.is_rolling_window() {
-            let kind = if self.is_multi_stage() {
-                if let Some(sql) = self.kind.member_sql() {
-                    MeasureKind::Calculated(CalculatedMeasure::new(
-                        CalculatedMeasureType::Number,
-                        sql.clone(),
-                    ))
-                } else {
-                    MeasureKind::Calculated(CalculatedMeasure::new_without_sql(
-                        CalculatedMeasureType::Number,
-                    ))
-                }
-            } else {
-                self.kind.clone()
-            };
-            Rc::new(Self {
-                compiled_path: self.compiled_path.clone(),
-                kind,
-                rolling_window: None,
-                multi_stage: None,
-                is_reference: false,
-                is_view: self.is_view,
-                case: self.case.clone(),
-                measure_filters: self.measure_filters.clone(),
-                measure_drill_filters: self.measure_drill_filters.clone(),
-                measure_order_by: self.measure_order_by.clone(),
-                is_splitted_source: self.is_splitted_source,
-                mask_sql: self.mask_sql.clone(),
-            })
-        } else {
-            Rc::new(self.clone())
-        }
-    }
-
-    /// Returns a copy of the symbol with the measure type optionally
-    /// replaced (subject to per-kind compatibility checks) and
-    /// additional measure filters merged in.
-    pub fn new_patched(
-        &self,
-        new_measure_type: Option<String>,
-        add_filters: Vec<Rc<SqlCall>>,
-    ) -> Result<Rc<Self>, CubeError> {
-        let result_kind = if let Some(new_measure_type) = new_measure_type {
-            if !self.kind.can_replace_type_with(&new_measure_type) {
-                return Err(CubeError::user(format!(
-                    "Unsupported measure type replacement for {}: {} => {}",
-                    self.compiled_path.name(),
-                    self.kind.measure_type_str(),
-                    new_measure_type
-                )));
-            }
-            self.kind.with_new_type(&new_measure_type)?
-        } else {
-            self.kind.clone()
-        };
-
-        let mut measure_filters = self.measure_filters.clone();
-        if !add_filters.is_empty() {
-            if !result_kind.supports_additional_filters() {
-                return Err(CubeError::user(format!(
-                    "Unsupported additional filters for measure {} type {}",
-                    self.compiled_path.name(),
-                    result_kind.measure_type_str()
-                )));
-            }
-            measure_filters.extend(add_filters);
-        }
-        Ok(Rc::new(Self {
-            compiled_path: self.compiled_path.clone(),
-            kind: result_kind,
-            rolling_window: self.rolling_window.clone(),
-            multi_stage: self.multi_stage.clone(),
-            is_reference: self.is_reference,
-            is_view: self.is_view,
-            case: self.case.clone(),
-            measure_filters,
-            measure_drill_filters: self.measure_drill_filters.clone(),
-            measure_order_by: self.measure_order_by.clone(),
-            is_splitted_source: self.is_splitted_source,
-            mask_sql: self.mask_sql.clone(),
-        }))
-    }
-
-    pub(super) fn replace_case(&self, new_case: Case) -> Rc<MeasureSymbol> {
-        let mut new = self.clone();
-        new.case = Some(new_case);
-        Rc::new(new)
     }
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
     }
 
-    /// Trims the join-chain prefix from `compiled_path` in place so
-    /// the path points only at the owning cube.
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
+    pub fn render_modifier(&self) -> Option<&MeasureRenderModifier> {
+        self.render_modifier.as_ref()
     }
 
     /// Full unique identifier of the symbol: cube path, member name
@@ -263,10 +234,6 @@ impl MeasureSymbol {
     /// path.
     pub fn alias(&self) -> String {
         self.compiled_path.alias().clone()
-    }
-
-    pub fn is_splitted_source(&self) -> bool {
-        self.is_splitted_source
     }
 
     pub fn time_shift(&self) -> Option<&MeasureTimeShifts> {
@@ -313,30 +280,6 @@ impl MeasureSymbol {
             .iter_sql_calls()
             .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
         Box::new(result)
-    }
-
-    /// Render form of this measure when it sits under a row-multiplying
-    /// join: a `count` switches to a distinct `MultipliedCount`, every
-    /// other kind is returned unchanged.
-    pub fn into_multiplied(&self) -> Rc<MemberSymbol> {
-        self.with_kind(self.kind.into_multiplied())
-    }
-
-    /// `Some(render form)` when this measure, under a row-multiplying
-    /// join, can still be computed directly in the main query (it stays
-    /// additive there): a key-based count rolls up as a distinct
-    /// `MultipliedCount`, distinct aggregations are already immune.
-    /// `None` when it must be isolated in a multiplied subquery instead.
-    pub fn convert_multiplied_to_regular(&self) -> Option<Rc<MemberSymbol>> {
-        self.kind
-            .regular_in_multiplied()
-            .map(|kind| self.with_kind(kind))
-    }
-
-    fn with_kind(&self, kind: MeasureKind) -> Rc<MemberSymbol> {
-        let mut new = self.clone();
-        new.kind = kind;
-        MemberSymbol::new_measure(Rc::new(new))
     }
 
     /// True when the cube on the symbol's path is required in the
