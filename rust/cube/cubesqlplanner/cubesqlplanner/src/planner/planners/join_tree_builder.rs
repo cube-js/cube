@@ -26,10 +26,15 @@ impl JoinTreeBuilder {
             let static_data = join_definition.static_data();
             let cube = self.utils.cube_from_path(static_data.original_to.clone())?;
             let on_sql = self.utils.compile_join_condition(join_definition.clone())?;
+            let relationship = join_definition.join()?.static_data().relationship.clone();
             joins.push(JoinTreeItem::new(
                 cube,
                 static_data.original_from.clone(),
                 on_sql,
+                matches!(
+                    relationship.as_str(),
+                    "hasMany" | "one_to_many" | "belongsToMany" | "many_to_many"
+                ),
             ));
         }
         Ok(JoinTree::new(

@@ -87,6 +87,7 @@ impl JoinPlanner {
                 LogicalJoinItem::builder()
                     .cube(Cube::new(item.cube().clone()))
                     .on_sql(item.on_sql().clone())
+                    .splits_rows(item.splits_rows())
                     .build()
             })
             .collect();
