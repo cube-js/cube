@@ -271,17 +271,8 @@ For `string` dimensions:
 | `imageUrl` | Display the value as an image |
 | `link` | Display the value as a hyperlink, using the value itself as the URL |
 
-The `link` format also accepts an object form so the cell shows a label instead of the
-raw URL:
-
-```yaml
-- name: crm_link
-  sql: "'https://na1.salesforce.com/' || id"
-  type: string
-  format:
-    type: link
-    label: View in Salesforce
-```
+The `link` format also accepts an object form — `format: { type: link, label: … }` — so the
+cell shows a label instead of the raw URL (see `crm_link` in the example below).
 
 In [Workbooks][ref-workbooks], a `link`-formatted value renders as a clickable link in
 table cells. Values that aren't `http`, `https`, or `mailto` URLs render as plain text.
