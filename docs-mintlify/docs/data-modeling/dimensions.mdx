@@ -426,12 +426,14 @@ cubes:
         sql: status
         type: string
         links:
-          # External link — opens a URL built from the row's value
+          # External link — opens a URL built from the row's value.
+          # `primary` makes it render inline on the cell value.
           - name: search
             label: Search the web
             url: "CONCAT('https://www.google.com/search?q=order+', {CUBE}.status)"
             icon: brand-google
             target: blank
+            primary: true
 
           # Drill-in link — opens another Cube Cloud dashboard, filtered by the row
           - name: details
