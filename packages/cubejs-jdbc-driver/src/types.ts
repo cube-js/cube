@@ -8,5 +8,9 @@ export type JDBCDriverConfiguration = {
   customClassPath?: string,
   properties: Record<string, any>,
   poolOptions?: PoolOptions;
+  /** @deprecated Use `sqlPreamble`, which takes one string. */
   prepareConnectionQueries?: string[];
+  sqlPreamble?: string;
+  dataSource?: string;
+  preAggregations?: boolean;
 };

@@ -13,6 +13,7 @@ import fs from 'fs';
 
 import { cancelCombinator } from './utils';
 import { detectTypesFromTabular } from './type-detection';
+import { normalizeSqlPreamble } from './sql-preamble';
 import {
   ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
@@ -97,6 +98,8 @@ export abstract class BaseDriver implements DriverInterface {
 
   protected logger?: LoggerFn;
 
+  private readonly sqlPreambleValue?: string;
+
   /**
    * Class constructor.
    */
@@ -106,8 +109,28 @@ export abstract class BaseDriver implements DriverInterface {
      * request before determining it as not valid. Default - 10000 ms.
      */
     testConnectionTimeout?: number,
+    /**
+     * SQL executed in the context of every query on this connection.
+     * One opaque blob — the data source parses it, so no delimiter
+     * convention is imposed.
+     */
+    sqlPreamble?: string,
   } = {}) {
     this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
+    this.sqlPreambleValue = normalizeSqlPreamble(_options.sqlPreamble);
+  }
+
+  /**
+   * The user-configured preamble, or undefined when none is set.
+   *
+   * Drivers apply this at their own connection or query site: once per
+   * connection where one exists, prepended into the query text where the
+   * data source is stateless. What must hold everywhere is that the primary
+   * query executes in the preamble's context — including streamed queries,
+   * whose paths are separate hooks in every driver.
+   */
+  protected sqlPreamble(): string | undefined {
+    return this.sqlPreambleValue;
   }
 
   protected informationSchemaQuery() {

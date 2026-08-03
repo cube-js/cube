@@ -24,6 +24,7 @@ import {
   DatabaseStructure,
   DriverCapabilities,
   DriverInterface,
+  prependSqlPreamble,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
@@ -107,16 +108,22 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * SQL prepended to every query on this connection.
+       */
+      sqlPreamble?: string,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+    });
 
     this.options = {
       scopes: [
@@ -337,8 +344,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     options?: StreamOptions
   ): Promise<StreamTableData> {
     const labels = this.buildQueryLabels(options);
+    // Streaming does not go through runQueryJob, so it needs the preamble too.
     const stream = await this.bigquery.createQueryStream({
-      query,
+      query: prependSqlPreamble(query, this.sqlPreamble()),
       params: values,
       parameterMode: 'positional',
       useLegacySql: false,
@@ -444,15 +452,36 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return { cube_request_id: value };
   }
 
+  /**
+   * BigQuery is stateless — there is no session to carry a preamble — so the
+   * preamble is prepended into the query text and travels in the same job.
+   * That is the only placement under which a `CREATE TEMP FUNCTION` is visible
+   * to the query, since a temporary UDF lives for exactly one query.
+   *
+   * Sessions would be the alternative and are unusable here: BigQuery forbids
+   * concurrent queries within a session, which a BI backend serving concurrent
+   * users cannot accept.
+   */
+  protected withSqlPreamble(bigQueryQuery: Query): Query {
+    const preamble = this.sqlPreamble();
+
+    if (!preamble || typeof bigQueryQuery.query !== 'string') {
+      return bigQueryQuery;
+    }
+
+    return { ...bigQueryQuery, query: prependSqlPreamble(bigQueryQuery.query, preamble) };
+  }
+
   protected async runQueryJob<T = QueryRowsResponse>(
     bigQueryQuery: Query,
     options: any,
     withResults: boolean = true
   ): Promise<T> {
     const labels = this.buildQueryLabels(options);
+    const withPreamble = this.withSqlPreamble(bigQueryQuery);
     const jobRequest: Query = labels
-      ? { ...bigQueryQuery, labels: { ...bigQueryQuery.labels, ...labels } }
-      : bigQueryQuery;
+      ? { ...withPreamble, labels: { ...withPreamble.labels, ...labels } }
+      : withPreamble;
     const [job] = await this.bigquery.createQueryJob(jobRequest);
 
     return <any> this.waitForJobResult(job, options, withResults);

@@ -24,6 +24,7 @@ import {
   DriverCapabilities,
   TableColumn,
   createPoolName,
+  splitSqlPreamble,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -125,18 +126,26 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * SQL executed on each connection before the query.
+       */
+      sqlPreamble?: string,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
 
-    const { pool, readOnly, ...restConfig } = config;
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+    });
+
+    // sqlPreamble is applied per connection in prepareConnection, so it is kept
+    // out of the mysql client config below.
+    const { pool, readOnly, sqlPreamble: _sqlPreamble, ...restConfig } = config;
     this.config = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
       database: getEnv('dbName', { dataSource, preAggregations }),
@@ -290,7 +299,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
   public async query(query: string, values: unknown[]) {
     return this.withConnection(async (conn) => {
-      await this.setTimeZone(conn);
+      await this.prepareConnection(conn);
 
       return conn.execute(query, values);
     });
@@ -298,6 +307,24 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
   protected setTimeZone(conn: MySQLConnection) {
     return conn.execute(`SET time_zone = '${this.config.storeTimezone || '+00:00'}'`, []);
+  }
+
+  /**
+   * Session setup replayed on each connection before the query. Pooled
+   * connections are not guaranteed to be the one a preamble first ran on, so
+   * this runs per query — and per stream, which acquires its own connection.
+   * The preamble runs after the timezone so it can override it deliberately.
+   */
+  protected async prepareConnection(conn: MySQLConnection) {
+    await this.setTimeZone(conn);
+
+    const preamble = this.sqlPreamble();
+
+    if (preamble) {
+      for (const statement of splitSqlPreamble(preamble)) {
+        await conn.execute(statement, []);
+      }
+    }
   }
 
   public async release() {
@@ -333,7 +360,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     const conn: MySQLConnection = await (<any> this.pool)._factory.create();
 
     try {
-      await this.setTimeZone(conn);
+      await this.prepareConnection(conn);
 
       const [rowStream, fields] = await (
         new Promise<[any, mysql.FieldPacket[]]>((resolve, reject) => {
@@ -392,7 +419,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     }
 
     return this.withConnection(async (conn) => {
-      await this.setTimeZone(conn);
+      await this.prepareConnection(conn);
 
       return new Promise((resolve, reject) => {
         conn.query(query, values, (err: any, rows: any, fields: any) => {

@@ -19,6 +19,7 @@ import {
   DriverCapabilities,
   DriverInterface,
   GenericDataBaseType,
+  splitSqlPreamble,
   StreamOptions,
   StreamTableDataWithTypes,
   TableStructure,
@@ -186,16 +187,22 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * SQL executed once on the session before any query.
+       */
+      sqlPreamble?: string,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
     const preAggregations = config.preAggregations || false;
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+    });
 
     let privateKey = getEnv('snowflakePrivateKey', { dataSource, preAggregations });
 
@@ -492,6 +499,19 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         [],
         false,
       );
+
+      // Snowflake keeps one long-lived connection per driver instance, so the
+      // preamble runs once here and every later query inherits its session
+      // state. It runs after the ALTER SESSION so a user preamble can override
+      // those defaults deliberately.
+      const preamble = this.sqlPreamble();
+
+      if (preamble) {
+        for (const statement of splitSqlPreamble(preamble)) {
+          await this.execute(connection, statement, [], false);
+        }
+      }
+
       return connection;
     } catch (e) {
       this.connection = null;

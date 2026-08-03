@@ -7,6 +7,8 @@ import {
   GenericDataBaseType,
   TableStructure,
   TableColumnQueryResult,
+  normalizeSqlPreamble,
+  splitSqlPreamble,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
@@ -21,7 +23,12 @@ const { version } = require('../../package.json');
 export type DuckDBDriverConfiguration = {
   databasePath?: string,
   dataSource?: string,
+  /**
+   * @deprecated Use `sqlPreamble`. Unlike `sqlPreamble`, failures here are
+   * swallowed — kept for existing deployments that rely on that.
+   */
   initSql?: string,
+  sqlPreamble?: string,
   motherDuckToken?: string,
   schema?: string,
   duckdbS3UseCredentialChain?: boolean,
@@ -192,9 +199,40 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     await this.installExtensions(communityExtensions, execAsync, 'community');
     await this.loadExtensions(communityExtensions, execAsync);
 
-    if (this.config.initSql) {
+    await this.applySqlPreamble(execAsync);
+
+    return {
+      defaultConnection,
+      db
+    };
+  }
+
+  private configuredSqlPreamble(): string | undefined {
+    return normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', this.config);
+  }
+
+  /**
+   * Runs the preamble on the connection init() prepared.
+   *
+   * The two option names differ in failure posture on purpose: `initSql` has
+   * always swallowed errors, and existing deployments may depend on that, while
+   * a silently skipped `sqlPreamble` meant to define a UDF surfaces later as a
+   * baffling "function does not exist". So the new name fails loudly and the
+   * deprecated one keeps its old behaviour until it is removed.
+   */
+  private async applySqlPreamble(execAsync: (sql: string, ...params: any[]) => Promise<void>): Promise<void> {
+    const preamble = this.configuredSqlPreamble();
+
+    if (preamble) {
+      await execAsync(preamble);
+      return;
+    }
+
+    const legacy = normalizeSqlPreamble(this.config.initSql);
+
+    if (legacy) {
       try {
-        await execAsync(this.config.initSql);
+        await execAsync(legacy);
       } catch (e) {
         if (this.logger) {
           console.error('DuckDB - error on init sql (skipping)', {
@@ -203,11 +241,31 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
+  }
 
-    return {
-      defaultConnection,
-      db
-    };
+  /**
+   * Replays the preamble on a connection this driver opened outside init().
+   *
+   * Everything a preamble creates in the catalog — macros, tables, secrets — is
+   * shared across connections of the same Database, so those statements have
+   * already taken effect and re-running them raises "already exists". Only
+   * session-scoped settings need replaying, and there is no way to tell the two
+   * apart without parsing SQL. So statements are replayed individually and an
+   * already-applied one is skipped: the session settings land, and the catalog
+   * objects that are already present stay usable.
+   */
+  private async replaySqlPreamble(execAsync: (sql: string, ...params: any[]) => Promise<void>): Promise<void> {
+    const preamble = this.configuredSqlPreamble() ?? normalizeSqlPreamble(this.config.initSql);
+
+    for (const statement of splitSqlPreamble(preamble)) {
+      try {
+        await execAsync(statement);
+      } catch (e) {
+        if (!/already exists/i.test((e as Error)?.message ?? '')) {
+          throw e;
+        }
+      }
+    }
   }
 
   public override informationSchemaQuery(): string {
@@ -274,6 +332,11 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     const closeAsync = promisify(connection.close).bind(connection);
 
     try {
+      // This connection is not the one init() set up, so session-scoped parts of
+      // the preamble have to be replayed or a streamed query would run without
+      // them.
+      await this.replaySqlPreamble(promisify(connection.exec).bind(connection) as any);
+
       const asyncIterator = connection.stream(query, ...(values || []));
       const rowStream = stream.Readable.from(asyncIterator, { highWaterMark }).pipe(new HydrationStream());
 
