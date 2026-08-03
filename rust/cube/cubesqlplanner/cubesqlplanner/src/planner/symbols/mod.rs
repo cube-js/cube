@@ -9,6 +9,7 @@ mod member_expression_symbol;
 mod member_symbol;
 mod symbol_factory;
 mod time_dimension_symbol;
+pub mod transforms;
 
 pub use common::*;
 pub use cube_symbol::{
@@ -21,7 +22,8 @@ pub use measure_kinds::{
     CountSql, MeasureKind,
 };
 pub use measure_symbol::{
-    DimensionTimeShift, MeasureSymbol, MeasureSymbolFactory, MeasureTimeShifts,
+    DimensionTimeShift, MeasureRenderModifier, MeasureSymbol, MeasureSymbolFactory,
+    MeasureTimeShifts,
 };
 pub use member_expression_symbol::{MemberExpressionExpression, MemberExpressionSymbol};
 pub use member_symbol::MemberSymbol;

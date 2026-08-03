@@ -1,4 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::VisitorContext;
@@ -7,6 +8,7 @@ use crate::physical_plan::{
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::MeasureRenderModifier;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -166,7 +168,18 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             &mut context_factory,
         )?;
 
-        for member in aggregate_multiplied_subquery.schema.all_dimensions() {
+        // Under a measure-rendering context (a CTE hoisted out of an
+        // ungrouped multi-stage leaf) measures emit raw row-level values.
+        let schema = if context.render_measure_for_ungrouped {
+            logical_transforms::measures_render_modifier_in_schema(
+                &aggregate_multiplied_subquery.schema,
+                &MeasureRenderModifier::RawValue,
+            )?
+        } else {
+            aggregate_multiplied_subquery.schema.clone()
+        };
+
+        for member in schema.all_dimensions() {
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
@@ -176,10 +189,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             group_by.push(Expr::Member(MemberExpression::new(member.clone())));
             select_builder.add_projection_member(&member, alias);
         }
-        for (measure, exists) in self
-            .builder
-            .measures_for_query(&aggregate_multiplied_subquery.schema.measures, &context)
-        {
+        for (measure, exists) in self.builder.measures_for_query(&schema.measures, &context) {
             if exists {
                 if matches!(
                     &aggregate_multiplied_subquery.source,

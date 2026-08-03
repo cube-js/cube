@@ -1,0 +1,29 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: amount
+            type: number
+            sql: amount
+      measures:
+          - name: count
+            type: count
+          # Mask whose SQL references another member (has symbol
+          # dependencies) — exercises the row-level masking path.
+          - name: masked_total
+            type: sum
+            sql: amount
+            mask:
+                sql: "{CUBE.amount} * 0 - 1"
+          # Constant mask with no dependencies.
+          - name: masked_total_const
+            type: sum
+            sql: amount
+            mask: -1

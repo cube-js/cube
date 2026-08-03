@@ -23,6 +23,7 @@ use super::filter::{BaseSegment, FilterItem};
 use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
 use super::state::State;
+use super::symbols::transforms::patch_measure;
 use super::{
     Compiler, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
     TimeDimensionSymbol,
@@ -355,7 +356,7 @@ impl QueryPropertiesCompiler {
                 let resolved_source = source_measure_compiled.clone().resolve_reference_chain();
                 let symbol = if let Ok(source_measure) = resolved_source.as_measure() {
                     let patched_measure =
-                        source_measure.new_patched(new_measure_type, filters_to_add)?;
+                        patch_measure(&source_measure, new_measure_type, filters_to_add)?;
                     MemberSymbol::new_measure(patched_measure)
                 } else {
                     source_measure_compiled

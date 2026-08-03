@@ -16,13 +16,18 @@ use std::rc::Rc;
 /// top of an existing time dimension.
 #[derive(Clone)]
 pub struct TimeDimensionSymbol {
-    base_symbol: Rc<MemberSymbol>,
-    compiled_path: CompiledMemberPath,
-    granularity: Option<String>,
-    granularity_obj: Option<Granularity>,
-    date_range: Option<(String, String)>,
-    alias_suffix: String,
-    alias_override: Option<String>,
+    pub(super) base_symbol: Rc<MemberSymbol>,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) granularity: Option<String>,
+    pub(super) granularity_obj: Option<Granularity>,
+    pub(super) date_range: Option<(String, String)>,
+    pub(super) alias_suffix: String,
+    pub(super) alias_override: Option<String>,
+    /// The value arrives already timezone-converted from the source
+    /// (a pre-aggregation rollup or an input CTE), so rendering must
+    /// not apply the conversion again. Composes with other forms: a
+    /// symbol may carry this together with future derived forms.
+    pub(super) tz_converted_at_source: bool,
 }
 
 symbol_deps! {
@@ -34,6 +39,7 @@ symbol_deps! {
         date_range: skip,
         alias_suffix: skip,
         alias_override: skip,
+        tz_converted_at_source: skip,
     }
 }
 
@@ -87,11 +93,16 @@ impl TimeDimensionSymbol {
             date_range,
             alias_suffix: name_suffix,
             alias_override,
+            tz_converted_at_source: false,
         })
     }
 
     pub fn base_symbol(&self) -> &Rc<MemberSymbol> {
         &self.base_symbol
+    }
+
+    pub fn tz_converted_at_source(&self) -> bool {
+        self.tz_converted_at_source
     }
 
     pub fn granularity(&self) -> &Option<String> {
@@ -137,23 +148,41 @@ impl TimeDimensionSymbol {
             new_granularity.clone(),
         )?;
         let date_range_tuple = self.date_range.clone();
-        let result = TimeDimensionSymbol::new(
+        Ok(self.derive(
             self.base_symbol.clone(),
             new_granularity.clone(),
             new_granularity_obj.clone(),
             date_range_tuple,
-        );
-        Ok(result)
+            None,
+        ))
+    }
+
+    /// Another form of the same time dimension — a different
+    /// granularity of it, or the member it references. Render marks
+    /// describe where the value comes from, which such a re-wrap does
+    /// not change, so they are carried over.
+    fn derive(
+        &self,
+        base_symbol: Rc<MemberSymbol>,
+        granularity: Option<String>,
+        granularity_obj: Option<Granularity>,
+        date_range: Option<(String, String)>,
+        alias_override: Option<String>,
+    ) -> Rc<Self> {
+        let mut new = (*Self::new_with_alias(
+            base_symbol,
+            granularity,
+            granularity_obj,
+            date_range,
+            alias_override,
+        ))
+        .clone();
+        new.tz_converted_at_source = self.tz_converted_at_source;
+        Rc::new(new)
     }
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
-    }
-
-    /// Trims the join-chain prefix from `compiled_path` in place so
-    /// the path points only at the owning cube.
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
     }
 
     /// Full unique identifier of the symbol: cube path, base
@@ -246,7 +275,7 @@ impl TimeDimensionSymbol {
     /// range. `None` if the base is not a reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         if let Some(base_symbol) = self.base_symbol.clone().reference_member() {
-            let new_time_dim = Self::new_with_alias(
+            let new_time_dim = self.derive(
                 base_symbol,
                 self.granularity.clone(),
                 self.granularity_obj.clone(),

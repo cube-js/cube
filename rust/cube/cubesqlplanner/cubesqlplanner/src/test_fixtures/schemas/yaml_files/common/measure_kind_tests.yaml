@@ -47,6 +47,17 @@ cubes:
             rolling_window:
               trailing: "7 day"
               offset: start
+          - name: multi_stage_rank
+            type: rank
+            multi_stage: true
+          - name: multi_stage_total
+            type: sum
+            sql: "{CUBE.total}"
+            multi_stage: true
+          - name: multi_stage_calculated
+            type: number
+            sql: "{CUBE.multi_stage_total} * 2"
+            multi_stage: true
           - name: filtered_total
             type: sum
             sql: amount
