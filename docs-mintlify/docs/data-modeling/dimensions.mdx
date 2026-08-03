@@ -408,6 +408,7 @@ Dimension `links` require Cube **v1.6.53** or newer.
 | `url` | **Either `url` or `dashboard`** | SQL expression that builds an **external** URL per row. May [reference][ref-references] columns and other dimensions. |
 | `dashboard` | **Either `url` or `dashboard`** | The target Cube Cloud dashboard's **slug** (a **drill-in**). Each link sets exactly one of `url` or `dashboard` — never both — but different links on the same dimension can mix the two. |
 | `icon` | Optional | A [Tabler icon][link-tabler] name (see [Icons](#icons)). Defaults to a generic link icon. |
+| `primary` | Optional | Marks the link that renders **inline** on the cell value (see [Behavior](#behavior)). At most one link per dimension may set it. |
 | `target` | Optional | Where to open the link: `blank` (new tab) or `self` (same tab). The default depends on the link kind — `url:` links default to `blank`, `dashboard:` drill-ins default to `self` (in-app). An explicit `target` is honored for both (on `dashboard:` drill-ins this requires Cube **v1.7.5** or newer; see [Behavior](#behavior)). |
 | `params` | Optional | Extra per-row parameters. For `url:` they are appended as query parameters. For `dashboard:` they become **equality filters** on the target dashboard — each `key` is a member of the target dashboard's view (a cube path such as `orders.status` is auto-resolved to the matching view member), and `value` is the per-row value. |
 
@@ -512,6 +513,12 @@ working as soon as both sides use the same slug.
   every results table (dashboard and workbook table charts, embedded dashboards,
   and Explore / SQL results). A left-click on a cell opens the menu listing the
   dimension's links, alongside **Copy value** and, on measures, **Drill down**.
+- **Inline rendering** — the link marked `primary` also renders **inline**, as a
+  clickable link on the cell value itself, with no chart configuration. The
+  remaining links stay in the cell menu, which still lists every link. In a
+  workbook table chart, the **Style** tab can override which declared link
+  renders inline for a column; see
+  [Links](/docs/explore-analyze/charts/chart-types/table#links).
 - **Drill-in vs external** — a `dashboard:` link navigates **in-app, in the same
   tab** by default; an explicit `target` is honored (`blank` opens a new tab,
   `self` stays in-app), and a Cmd/Ctrl-click always opens a new tab. A `url:`
