@@ -568,4 +568,91 @@ describe('SQLInterface', () => {
       await native.shutdownInterface(instance, 'fast');
     }
   });
+
+  // A calculated projection over MEASURE() (a query-level member expression,
+  // e.g. an "average order value" field) leaves the cube scan wrapped in
+  // DataFusion Projection/Sort nodes. Those build their own output schema and
+  // drop the scan's `lastRefreshTime` / `external` metadata, so the JSONL
+  // header used to come back without them while the same base measures queried
+  // plainly did carry them.
+  //
+  // Both queries carry an explicit LIMIT to pin them to the buffered path.
+  // `CubeScanExecutionPlan::execute` switches to `load_stream` when stream mode
+  // is on and the request has no limit, and that branch never runs `load_data`,
+  // so no freshness metadata is recorded at all — a known gap, and this suite
+  // runs under CUBESQL_STREAM_MODE=true in CI.
+  test.each([
+    [
+      'plain measure projection',
+      'SELECT customer_gender, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10;',
+    ],
+    [
+      'calculated projection over MEASURE()',
+      'SELECT customer_gender, ROUND(MEASURE(maxPrice) / MEASURE(count), 2) AS avg_value, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 3 DESC LIMIT 10;',
+    ],
+  ])(
+    'lastRefreshTime and external survive in /cubesql JSONL header for a %s',
+    async (_name, sql) => {
+      const methods = {
+        ...interfaceMethods(),
+        sqlApiLoad: jest.fn(async ({ streaming, query }: any) => {
+          if (streaming) {
+            return { stream: new FakeRowStream(query) };
+          }
+          return {
+            results: [
+              {
+                annotation: {
+                  measures: {},
+                  dimensions: {},
+                  segments: {},
+                  timeDimensions: {},
+                },
+                data: {
+                  members: [
+                    'KibanaSampleDataEcommerce.customer_gender',
+                    'KibanaSampleDataEcommerce.maxPrice',
+                    'KibanaSampleDataEcommerce.count',
+                  ],
+                  columns: [['female'], [10], [4]],
+                },
+                lastRefreshTime: '2024-01-01T00:00:00.000Z',
+                external: true,
+              },
+            ],
+          };
+        }),
+      };
+
+      const instance = await native.registerInterface({
+        ...methods,
+        canSwitchUserForSession: (_payload: any) => true,
+      });
+
+      let buf = '';
+      const lines: any[] = [];
+      const write = jest.fn((chunk, _enc, callback) => {
+        const raw = (buf + chunk.toString('utf-8')).split('\n');
+        buf = raw.pop() || '';
+        for (const l of raw) {
+          if (l.trim().length) {
+            lines.push(JSON.parse(l));
+          }
+        }
+        callback();
+      });
+      const cubeSqlStream = new Writable({ write });
+
+      try {
+        await native.execSql(instance, sql, cubeSqlStream);
+
+        const schemaLine = lines.find((o) => o.schema);
+        expect(schemaLine).toBeDefined();
+        expect(schemaLine.lastRefreshTime).toBe('2024-01-01T00:00:00.000Z');
+        expect(schemaLine.external).toBe(true);
+      } finally {
+        await native.shutdownInterface(instance, 'fast');
+      }
+    }
+  );
 });
