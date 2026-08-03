@@ -152,12 +152,25 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     ['a bound callback', ((from, to) => `d >= ${from} AND d < ${to}`).bind(null)],
     ['a comment closing the parameter list', (from /* ) */, to) => `d >= ${from} AND d < ${to}`],
     ['a default containing a paren', (from, to = '(') => `d >= ${from} AND d < ${to}`],
+    // `Function.length` is 0 from the first defaulted parameter on, so it can no
+    // longer vouch for the parse — and a `)` in a string default breaks it.
+    ['a first parameter defaulted to a paren', (from = ')', to) => `d >= ${from} AND d < ${to}`],
   ])('leaves %s uncompiled', (_name, column) => {
     const res = compileMemberSql(
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter(column)}`,
       ['FILTER_PARAMS']
     );
     expect(typeof res.filterParams[0].column).toBe('function');
+  });
+
+  // A defaulted parameter only costs `Function.length` its witness; a list with
+  // nothing for the scan to trip over is still read in full.
+  it('compiles a callback whose first parameter has a plain default', () => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from = 1, to) => `d >= ${from} AND d < ${to}`)}`,
+      ['FILTER_PARAMS']
+    );
+    expect(res.filterParams[0].column.template).toBe('d >= {fpv:0} AND d < {fpv:1}');
   });
 
   it('records a security context value referenced from a column callback into the callback', () => {

@@ -241,7 +241,11 @@ impl QueryProperties {
         let dimensions_filters = self.dimensions_filters.clone();
         // A FILTER_PARAMS binding may name any filtered member, not only a
         // dimension, so its activity is read from the whole set.
-        let all_filters = self.all_filter_items();
+        //
+        // A multi-stage stage may then filter more than the query around it. It
+        // builds its own `QueryProperties` from its state, so this runs again for
+        // it and settles activity against the set that stage renders with.
+        let all_filters = transforms::filter_params_activity_filters(&self.all_filter_items());
         for dim in self.dimensions.iter_mut() {
             *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
         }

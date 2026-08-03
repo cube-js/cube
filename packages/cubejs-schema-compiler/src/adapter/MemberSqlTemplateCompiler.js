@@ -111,7 +111,7 @@ function declaredValueParams(fn) {
   const arrow = source.indexOf('=>');
   if (open === -1 || (arrow !== -1 && arrow < open)) {
     // `v => …`, a single parameter without parentheses.
-    return { count: 1, rest: false };
+    return { count: 1, rest: false, inner: '' };
   }
 
   let depth = 0;
@@ -128,7 +128,7 @@ function declaredValueParams(fn) {
     }
   }
   if (close === -1) {
-    return { count: 0, rest: false };
+    return { count: 0, rest: false, inner: source };
   }
 
   const inner = source.slice(open + 1, close);
@@ -146,16 +146,26 @@ function declaredValueParams(fn) {
     }
   }
 
-  return { count: params.length, rest: params.some(p => p.startsWith('...')) };
+  return { count: params.length, rest: params.some(p => p.startsWith('...')), inner };
 }
 
 // Parsing the parameter list can come up short — a bound or native function
 // exposes no list, and a `)` inside a comment or a string default ends it early.
-// Too few placeholders would render the missing values as `undefined`, so only a
-// count that accounts for every parameter is trusted; `Function.length` stops at
-// the first defaulted parameter and so is a lower bound.
-function valueParamsAreCertain(fn, count) {
-  return count >= fn.length && !fn.toString().includes('[native code]');
+// Too few placeholders would render the missing values as `undefined`, so a count
+// is trusted only when something vouches for it.
+//
+// `Function.length` is that witness, being a lower bound on the parameters — but
+// it drops to zero at the first defaulted parameter and can vouch for nothing
+// after that. What is left then is the text itself: a list holding neither a
+// string nor a comment has nothing for the scan to trip over.
+function valueParamsAreCertain(fn, count, inner) {
+  if (fn.toString().includes('[native code]')) {
+    return false;
+  }
+  if (count < fn.length) {
+    return false;
+  }
+  return fn.length > 0 || !/['"`]|\/\*|\/\//.test(inner);
 }
 
 // Compiles a column callback into a template of its own: its filter values
@@ -165,8 +175,8 @@ function valueParamsAreCertain(fn, count) {
 // happens to supply, which a fixed set of placeholders cannot express, so such a
 // callback is left for the caller to invoke at render time.
 function compileColumnCallback(column, state) {
-  const { count, rest } = declaredValueParams(column);
-  if (rest || !valueParamsAreCertain(column, count)) {
+  const { count, rest, inner } = declaredValueParams(column);
+  if (rest || !valueParamsAreCertain(column, count, inner)) {
     return column;
   }
 

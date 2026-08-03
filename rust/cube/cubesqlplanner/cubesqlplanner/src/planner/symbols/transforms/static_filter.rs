@@ -102,16 +102,21 @@ fn replace_dimension_case(dimension: &DimensionSymbol, new_case: Case) -> Rc<Dim
 /// dependencies and pull their cubes into the join.
 pub fn apply_filter_params_activity_to_symbol(
     symbol: &Rc<MemberSymbol>,
-    filters: &[FilterItem],
+    filters: &FilterItem,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
-    let group = FilterItem::Group(Rc::new(FilterGroup {
-        operator: FilterGroupOperator::And,
-        items: filters.to_vec(),
-    }));
-    let mut visitor = ActivityVisitor { filters: &group };
+    let mut visitor = ActivityVisitor { filters };
     let mut result = symbol.as_ref().clone();
     result.visit_deps_mut(&mut visitor)?;
     Ok(Rc::new(result))
+}
+
+/// The filter set as the one item `apply_filter_params_activity_to_symbol`
+/// matches against.
+pub fn filter_params_activity_filters(filters: &[FilterItem]) -> FilterItem {
+    FilterItem::Group(Rc::new(FilterGroup {
+        operator: FilterGroupOperator::And,
+        items: filters.to_vec(),
+    }))
 }
 
 struct ActivityVisitor<'a> {
@@ -148,7 +153,7 @@ impl DepVisitorMut for ActivityVisitor<'_> {
 /// carries.
 pub fn apply_filter_params_activity_to_filter_item(
     filter_item: &FilterItem,
-    filters: &[FilterItem],
+    filters: &FilterItem,
 ) -> Result<FilterItem, CubeError> {
     super::map_filter_item_symbols(filter_item, &|symbol| {
         apply_filter_params_activity_to_symbol(symbol, filters)
