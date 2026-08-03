@@ -265,4 +265,18 @@ describe('hasPreAggregationsEnvVars', () => {
     expect(hasPreAggregationsEnvVars('default')).toBe(false);
     expect(hasPreAggregationsEnvVars('other')).toBe(false);
   });
+
+  // The exclusion has to hold for named data sources too, not just `default` —
+  // otherwise a per-data-source preamble diverts that source's credentials.
+  test('ignores a named datasource pre-agg preamble', () => {
+    process.env.CUBEJS_DATASOURCES = 'default,analytics';
+    process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET a = 1';
+
+    expect(hasPreAggregationsEnvVars('analytics')).toBe(false);
+
+    process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_HOST = 'preagg-host';
+    expect(hasPreAggregationsEnvVars('analytics')).toBe(true);
+
+    delete process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE;
+  });
 });

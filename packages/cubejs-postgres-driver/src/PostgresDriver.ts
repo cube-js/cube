@@ -13,6 +13,7 @@ import {
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
+  applySqlPreambleStatements, resolveSqlPreamble,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
@@ -123,7 +124,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
     super({
       testConnectionTimeout: config.testConnectionTimeout,
-      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations })),
     });
 
     // The preamble is applied per connection in prepareConnection, so it is not
@@ -341,17 +342,25 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
 
-    // Runs on every acquired connection, which is what makes the preamble's
-    // session state visible to the query that follows — pooled connections are
-    // not guaranteed to be the one the preamble first ran on. This hook is
-    // shared by the query and stream paths, so both are covered.
-    const preamble = this.sqlPreamble();
-
-    if (preamble) {
-      await conn.query(preamble);
-    }
+    await this.applySqlPreamble(conn);
 
     await this.loadUserDefinedTypes(conn);
+  }
+
+  /**
+   * Runs the preamble on an acquired connection.
+   *
+   * A pooled connection is not guaranteed to be one the preamble has already run
+   * on, so this runs per acquire — which the query and stream paths both go
+   * through. Because the pool reuses connections, re-execution is normal and
+   * statements already applied here are skipped.
+   *
+   * Its own method so subclasses that replace `prepareConnection` (CrateDB and
+   * Materialize both do, to skip session settings they don't support) still
+   * apply the preamble.
+   */
+  protected async applySqlPreamble(conn: PgClient) {
+    await applySqlPreambleStatements(this.sqlPreamble(), statement => conn.query(statement));
   }
 
   protected mapFields(fields: FieldDef[]) {

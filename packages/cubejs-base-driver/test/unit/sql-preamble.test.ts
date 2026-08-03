@@ -1,4 +1,6 @@
 import {
+  applySqlPreambleStatements,
+  isAlreadyAppliedPreambleError,
   joinSqlPreamble,
   normalizeSqlPreamble,
   prependSqlPreamble,
@@ -76,9 +78,12 @@ describe('splitSqlPreamble', () => {
       .toEqual(['SET a = \'it\'\'s; fine\'', 'SET b = 2']);
   });
 
-  test('honours a backslash-escaped quote', () => {
-    expect(splitSqlPreamble('SET a = \'x\\\'; y\'; SET b = 2'))
-      .toEqual(['SET a = \'x\\\'; y\'', 'SET b = 2']);
+  // Postgres, DuckDB and Snowflake follow standard_conforming_strings, where a
+  // trailing backslash is a literal character and does NOT escape the closing
+  // quote. Consuming it would swallow the terminator and merge two statements.
+  test('treats a trailing backslash as literal, not an escape', () => {
+    expect(splitSqlPreamble('SET a = \'C:\\\'; SET b = 2'))
+      .toEqual(['SET a = \'C:\\\'', 'SET b = 2']);
   });
 
   test('keeps a dollar-quoted function body intact', () => {
@@ -109,8 +114,47 @@ describe('splitSqlPreamble', () => {
       .toEqual(['SET a = 1 /* one; two */', 'SET b = 2']);
   });
 
-  test('tolerates an unterminated literal without dropping the statement', () => {
-    expect(splitSqlPreamble('SET a = \'unterminated')).toEqual(['SET a = \'unterminated']);
+  test('does not split on a semicolon inside a MySQL # line comment', () => {
+    expect(splitSqlPreamble('SET a = 1 # one; two\n; SET b = 2'))
+      .toEqual(['SET a = 1 # one; two', 'SET b = 2']);
+  });
+
+  // Postgres, DuckDB and Snowflake all nest block comments, so the first `*/`
+  // does not necessarily end one.
+  test('honours nested block comments', () => {
+    expect(splitSqlPreamble('/* outer /* inner */ SET a = 1; */ SET b = 2'))
+      .toEqual(['/* outer /* inner */ SET a = 1; */ SET b = 2']);
+  });
+
+  // `$$` is genuinely ambiguous — a quoted-body opener in Postgres, an operator
+  // in MySQL — so it is passed through whole rather than split on a guess.
+  test('does not split a blob containing an ambiguous $$', () => {
+    expect(splitSqlPreamble('SELECT a$$b; SET c = 1'))
+      .toEqual(['SELECT a$$b; SET c = 1']);
+  });
+
+  test('leaves a $ inside an identifier alone', () => {
+    expect(splitSqlPreamble('SET my$var = 1; SET b = 2'))
+      .toEqual(['SET my$var = 1', 'SET b = 2']);
+  });
+
+  // Splitting on a guess would hand the engine a fragment of the user's SQL, so
+  // anything unparseable is passed through whole for the engine to reject.
+  describe('unparseable input is not split', () => {
+    test('an unterminated literal', () => {
+      expect(splitSqlPreamble('SET a = \'unterminated; SET b = 2'))
+        .toEqual(['SET a = \'unterminated; SET b = 2']);
+    });
+
+    test('an unterminated block comment', () => {
+      expect(splitSqlPreamble('SET a = 1; /* never closed'))
+        .toEqual(['SET a = 1; /* never closed']);
+    });
+
+    test('an unterminated dollar-quoted body', () => {
+      expect(splitSqlPreamble('CREATE FUNCTION f() AS $$ SELECT 1; SET b = 2'))
+        .toEqual(['CREATE FUNCTION f() AS $$ SELECT 1; SET b = 2']);
+    });
   });
 
   test('splits a BigQuery temp UDF preamble at the statement boundary only', () => {
@@ -124,6 +168,81 @@ describe('splitSqlPreamble', () => {
     expect(statements).toHaveLength(2);
     expect(statements[0]).toContain('CREATE TEMP FUNCTION median');
     expect(statements[1]).toEqual('SET @@dataset_id = \'analytics\'');
+  });
+});
+
+describe('applySqlPreambleStatements', () => {
+  test('runs each statement in order', async () => {
+    const executed: string[] = [];
+
+    await applySqlPreambleStatements('SET a = 1; SET b = 2', async statement => {
+      executed.push(statement);
+    });
+
+    expect(executed).toEqual(['SET a = 1', 'SET b = 2']);
+  });
+
+  test('runs nothing when no preamble is set', async () => {
+    const execute = jest.fn();
+
+    await applySqlPreambleStatements(undefined, execute);
+    await applySqlPreambleStatements('  ', execute);
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  // Pooled drivers re-run the preamble on each acquired connection, so a
+  // CREATE statement that already took effect must not fail the query.
+  test('skips a statement already applied on this connection', async () => {
+    const executed: string[] = [];
+
+    await applySqlPreambleStatements('CREATE TEMP TABLE t (x int); SET a = 1', async statement => {
+      executed.push(statement);
+
+      if (statement.startsWith('CREATE')) {
+        throw new Error('relation "t" already exists');
+      }
+    });
+
+    expect(executed).toEqual(['CREATE TEMP TABLE t (x int)', 'SET a = 1']);
+  });
+
+  test('still surfaces a genuine error', async () => {
+    await expect(applySqlPreambleStatements('THIS IS NOT SQL', async () => {
+      throw new Error('syntax error at or near "THIS"');
+    })).rejects.toThrow('syntax error');
+  });
+
+  test('surfaces a permission error rather than skipping it', async () => {
+    await expect(applySqlPreambleStatements('CREATE FUNCTION f()', async () => {
+      throw new Error('permission denied for schema public');
+    })).rejects.toThrow('permission denied');
+  });
+});
+
+describe('isAlreadyAppliedPreambleError', () => {
+  test.each([
+    'relation "t" already exists',
+    'Catalog Error: Table with name t already exists!',
+    'Function ALREADY EXISTS',
+    'Duplicate key name \'idx\'',
+    'variable is already defined',
+  ])('treats %s as already applied', message => {
+    expect(isAlreadyAppliedPreambleError(new Error(message))).toBe(true);
+  });
+
+  test.each([
+    'syntax error at or near "SELCT"',
+    'permission denied for schema public',
+    'connection terminated unexpectedly',
+    'relation "t" does not exist',
+  ])('treats %s as a real failure', message => {
+    expect(isAlreadyAppliedPreambleError(new Error(message))).toBe(false);
+  });
+
+  test('tolerates a non-error value', () => {
+    expect(isAlreadyAppliedPreambleError(undefined)).toBe(false);
+    expect(isAlreadyAppliedPreambleError('already exists')).toBe(false);
   });
 });
 
@@ -144,61 +263,31 @@ describe('prependSqlPreamble', () => {
 });
 
 describe('resolveSqlPreamble', () => {
-  test('resolves the new option', () => {
-    expect(resolveSqlPreamble({ sqlPreamble: 'SET a = 1' })).toEqual('SET a = 1');
+  test('prefers the config option over the environment', () => {
+    expect(resolveSqlPreamble({ sqlPreamble: 'SET config = 1' }, 'SET env = 1'))
+      .toEqual('SET config = 1');
   });
 
-  test('resolves the deprecated initSql alias and warns', () => {
-    const logger = jest.fn();
-
-    expect(resolveSqlPreamble({ initSql: 'SET a = 1' }, logger)).toEqual('SET a = 1');
-    expect(logger).toHaveBeenCalledTimes(1);
-    expect(logger.mock.calls[0][1].warning).toContain('initSql');
-    expect(logger.mock.calls[0][1].warning).toContain('sqlPreamble');
+  test('falls back to the environment when the option is unset', () => {
+    expect(resolveSqlPreamble({}, 'SET env = 1')).toEqual('SET env = 1');
+    expect(resolveSqlPreamble({ sqlPreamble: undefined }, 'SET env = 1')).toEqual('SET env = 1');
   });
 
-  test('resolves the deprecated prepareConnectionQueries alias, joining the array shape', () => {
-    const logger = jest.fn();
-
-    expect(resolveSqlPreamble({ prepareConnectionQueries: ['SET a = 1', 'SET b = 2'] }, logger))
-      .toEqual('SET a = 1;\nSET b = 2');
-    expect(logger.mock.calls[0][1].warning).toContain('prepareConnectionQueries');
+  // `sqlPreamble: process.env.MY_PREAMBLE || ''` is easy to template into a
+  // config, and must not silently disable CUBEJS_DB_SQL_PREAMBLE.
+  test('a blank option falls through to the environment rather than suppressing it', () => {
+    expect(resolveSqlPreamble({ sqlPreamble: '' }, 'SET env = 1')).toEqual('SET env = 1');
+    expect(resolveSqlPreamble({ sqlPreamble: '   ' }, 'SET env = 1')).toEqual('SET env = 1');
   });
 
-  test('accepts a string for the legacy array-shaped alias', () => {
-    expect(resolveSqlPreamble({ prepareConnectionQueries: 'SET a = 1' })).toEqual('SET a = 1');
+  test('trims whichever value it resolves', () => {
+    expect(resolveSqlPreamble({ sqlPreamble: '  SET a = 1  ' })).toEqual('SET a = 1');
+    expect(resolveSqlPreamble({}, '  SET a = 1  ')).toEqual('SET a = 1');
   });
 
-  // Precedence is fixed rather than merged: concatenating would run statements
-  // the user never asked to combine, and a leftover legacy value must not
-  // override the name they migrated to.
-  test('prefers the new option over both aliases, without warning', () => {
-    const logger = jest.fn();
-
-    expect(resolveSqlPreamble({
-      sqlPreamble: 'SET new = 1',
-      initSql: 'SET old = 1',
-      prepareConnectionQueries: ['SET older = 1'],
-    }, logger)).toEqual('SET new = 1');
-    expect(logger).not.toHaveBeenCalled();
-  });
-
-  test('prefers initSql over prepareConnectionQueries when both legacy names are set', () => {
-    expect(resolveSqlPreamble({
-      initSql: 'SET old = 1',
-      prepareConnectionQueries: ['SET older = 1'],
-    })).toEqual('SET old = 1');
-  });
-
-  test('returns undefined and does not warn when nothing is configured', () => {
-    const logger = jest.fn();
-
-    expect(resolveSqlPreamble({}, logger)).toBeUndefined();
-    expect(resolveSqlPreamble({ sqlPreamble: '', initSql: '  ' }, logger)).toBeUndefined();
-    expect(logger).not.toHaveBeenCalled();
-  });
-
-  test('works without a logger', () => {
-    expect(resolveSqlPreamble({ initSql: 'SET a = 1' })).toEqual('SET a = 1');
+  test('returns undefined when neither is configured', () => {
+    expect(resolveSqlPreamble({})).toBeUndefined();
+    expect(resolveSqlPreamble({ sqlPreamble: '  ' }, '  ')).toBeUndefined();
+    expect(resolveSqlPreamble({}, undefined)).toBeUndefined();
   });
 });

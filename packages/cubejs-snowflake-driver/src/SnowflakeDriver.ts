@@ -19,6 +19,7 @@ import {
   DriverCapabilities,
   DriverInterface,
   GenericDataBaseType,
+  resolveSqlPreamble,
   splitSqlPreamble,
   StreamOptions,
   StreamTableDataWithTypes,
@@ -201,7 +202,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     super({
       testConnectionTimeout: config.testConnectionTimeout,
-      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations })),
     });
 
     let privateKey = getEnv('snowflakePrivateKey', { dataSource, preAggregations });

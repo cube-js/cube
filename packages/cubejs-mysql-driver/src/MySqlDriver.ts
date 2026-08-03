@@ -24,7 +24,8 @@ import {
   DriverCapabilities,
   TableColumn,
   createPoolName,
-  splitSqlPreamble,
+  applySqlPreambleStatements,
+  resolveSqlPreamble,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -140,7 +141,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
     super({
       testConnectionTimeout: config.testConnectionTimeout,
-      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations })),
     });
 
     // sqlPreamble is applied per connection in prepareConnection, so it is kept
@@ -310,21 +311,16 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Session setup replayed on each connection before the query. Pooled
-   * connections are not guaranteed to be the one a preamble first ran on, so
+   * Session setup replayed on each connection before the query. A pooled
+   * connection is not guaranteed to be one a preamble has already run on, so
    * this runs per query — and per stream, which acquires its own connection.
-   * The preamble runs after the timezone so it can override it deliberately.
+   * The preamble runs after the timezone so it can override it deliberately,
+   * and statements already applied on a reused connection are skipped.
    */
   protected async prepareConnection(conn: MySQLConnection) {
     await this.setTimeZone(conn);
 
-    const preamble = this.sqlPreamble();
-
-    if (preamble) {
-      for (const statement of splitSqlPreamble(preamble)) {
-        await conn.execute(statement, []);
-      }
-    }
+    await applySqlPreambleStatements(this.sqlPreamble(), statement => conn.execute(statement, []));
   }
 
   public async release() {
