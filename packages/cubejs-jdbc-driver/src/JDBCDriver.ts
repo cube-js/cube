@@ -78,6 +78,10 @@ export class JDBCDriver extends BaseDriver {
 
   protected pool: Pool<any>;
 
+  // prepareConnectionQueries() runs per query, so the deprecation notice is
+  // latched to one line per driver instead of one per query.
+  private deprecationWarned = false;
+
   protected jdbcProps: any;
 
   public constructor(
@@ -245,18 +249,24 @@ export class JDBCDriver extends BaseDriver {
     const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
     const builtIn = dbTypeDescription && dbTypeDescription.prepareConnectionQueries || [];
 
-    if (this.config.prepareConnectionQueries?.length && !this.config.sqlPreamble) {
-      this.logger?.('Deprecated driver option', {
-        warning: 'The prepareConnectionQueries driver option is deprecated and will be removed in a future release. Use sqlPreamble instead — note it appends to the built-in connection queries rather than replacing them.',
-      });
-
-      return this.config.prepareConnectionQueries;
-    }
-
     const preamble = normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', {
       dataSource: this.config.dataSource ?? 'default',
       preAggregations: this.config.preAggregations,
     });
+
+    // Only fall back to the deprecated option when no preamble is configured by
+    // either the new option or the env var, so migrating to `sqlPreamble` is
+    // never silently overridden by a value left behind in the old one.
+    if (!preamble && this.config.prepareConnectionQueries?.length) {
+      if (!this.deprecationWarned) {
+        this.deprecationWarned = true;
+        this.logger?.('Deprecated driver option', {
+          warning: 'The prepareConnectionQueries driver option is deprecated and will be removed in a future release. Use sqlPreamble instead — note it appends to the built-in connection queries rather than replacing them.',
+        });
+      }
+
+      return this.config.prepareConnectionQueries;
+    }
 
     return [...builtIn, ...splitSqlPreamble(preamble)];
   }
@@ -279,7 +289,9 @@ export class JDBCDriver extends BaseDriver {
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
     const queryWithParams = this.prepareQueryWithParams(query, values);
     const cancelObj: {cancel?: Function} = {};
-    const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
+    const promise = this.queryPromised(queryWithParams, cancelObj, {
+      prepareConnectionQueries: this.prepareConnectionQueries(),
+    });
     (promise as CancelablePromise<any>).cancel =
       () => cancelObj.cancel && cancelObj.cancel() ||
       Promise.reject(new Error('Statement is not ready'));

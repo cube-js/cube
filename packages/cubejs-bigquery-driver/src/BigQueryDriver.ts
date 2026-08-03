@@ -25,6 +25,8 @@ import {
   DriverCapabilities,
   DriverInterface,
   prependSqlPreamble,
+  resolveSqlPreamble,
+  splitSqlPreamble,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
@@ -122,7 +124,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
     super({
       testConnectionTimeout: config.testConnectionTimeout,
-      sqlPreamble: config.sqlPreamble ?? getEnv('dbSqlPreamble', { dataSource, preAggregations }),
+      sqlPreamble: resolveSqlPreamble(config, getEnv('dbSqlPreamble', { dataSource, preAggregations })),
     });
 
     this.options = {
@@ -461,6 +463,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
    * Sessions would be the alternative and are unusable here: BigQuery forbids
    * concurrent queries within a session, which a BI backend serving concurrent
    * users cannot accept.
+   *
+   * One caveat is enforced rather than documented. A multi-statement request is
+   * a *script*, and a script job ignores `destinationTable` — so prepending onto
+   * a pre-aggregation load would let the build report success while writing
+   * nothing. BigQuery exempts one shape: statements that are all
+   * `CREATE TEMP FUNCTION` followed by a single query. A preamble outside that
+   * shape is therefore refused on destination jobs instead of silently
+   * discarding the result.
    */
   protected withSqlPreamble(bigQueryQuery: Query): Query {
     const preamble = this.sqlPreamble();
@@ -469,7 +479,29 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       return bigQueryQuery;
     }
 
+    if (bigQueryQuery.destination && !BigQueryDriver.isScriptSafePreamble(preamble)) {
+      throw new Error(
+        'CUBEJS_DB_SQL_PREAMBLE cannot be applied to a pre-aggregation build on BigQuery unless it ' +
+        'contains only CREATE TEMP FUNCTION statements. BigQuery runs any other multi-statement ' +
+        'request as a script, and a script job ignores the destination table, so the build would ' +
+        'write no rows. Restrict the preamble to CREATE TEMP FUNCTION, or set a pre-aggregation ' +
+        'specific preamble that does.'
+      );
+    }
+
     return { ...bigQueryQuery, query: prependSqlPreamble(bigQueryQuery.query, preamble) };
+  }
+
+  /**
+   * True when every statement is a `CREATE TEMP FUNCTION`, the one multi-statement
+   * shape BigQuery still runs as a normal query rather than a script.
+   */
+  protected static isScriptSafePreamble(preamble: string): boolean {
+    const statements = splitSqlPreamble(preamble);
+
+    return statements.length > 0 && statements.every(
+      statement => /^create\s+(or\s+replace\s+)?temp(orary)?\s+function\b/i.test(statement)
+    );
   }
 
   protected async runQueryJob<T = QueryRowsResponse>(

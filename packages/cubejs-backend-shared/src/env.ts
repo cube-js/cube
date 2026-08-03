@@ -169,8 +169,15 @@ export function hasPreAggregationsEnvVars(dataSource: string = 'default'): boole
     return false;
   }
 
+  const prefix = `CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`;
+  // Same exclusion as the default data source above: a non-credential var must
+  // not divert credential resolution into the pre-aggregation namespace.
+  const nonCredentialKeys = new Set([
+    `${prefix}DB_SQL_PREAMBLE`,
+  ]);
+
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith(`CUBEJS_DS_${dataSource.toUpperCase()}_PRE_AGGREGATIONS_`)) {
+    if (key.startsWith(prefix) && !nonCredentialKeys.has(key)) {
       return true;
     }
   }

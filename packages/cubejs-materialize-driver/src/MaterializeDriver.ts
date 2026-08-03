@@ -99,6 +99,8 @@ export class MaterializeDriver extends PostgresDriver {
     if (process.env.CUBEJS_DB_MATERIALIZE_CLUSTER) {
       await conn.query(`SET CLUSTER TO ${process.env.CUBEJS_DB_MATERIALIZE_CLUSTER}`);
     }
+
+    await this.applySqlPreamble(conn);
   }
 
   protected async loadUserDefinedTypes(): Promise<void> {

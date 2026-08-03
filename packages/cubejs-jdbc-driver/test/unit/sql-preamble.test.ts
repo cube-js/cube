@@ -96,6 +96,35 @@ describe('JDBC sql preamble', () => {
       expect(driver.logger.mock.calls[0][1].warning).toContain('sqlPreamble');
     });
 
+    // This runs per query, so an unlatched warning would emit thousands of
+    // identical log lines a minute under load.
+    it('warns once per driver instance, not once per query', () => {
+      const driver = driverFor({ dbType: 'mysql', prepareConnectionQueries: ['SET a = 1'] });
+
+      driver.prepareConnectionQueries();
+      driver.prepareConnectionQueries();
+      driver.prepareConnectionQueries();
+
+      expect(driver.logger).toHaveBeenCalledTimes(1);
+    });
+
+    it('is overridden by the env var, which is not silently dropped', () => {
+      process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET from_env = 1';
+      const driver = driverFor({ dbType: 'athena', prepareConnectionQueries: ['SET old = 1'] });
+
+      expect(driver.prepareConnectionQueries()).toEqual(['SET from_env = 1']);
+    });
+
+    it('is kept when sqlPreamble is blank, rather than silently discarded', () => {
+      const driver = driverFor({
+        dbType: 'mysql',
+        sqlPreamble: '   ',
+        prepareConnectionQueries: ['SET time_zone = \'+03:00\''],
+      });
+
+      expect(driver.prepareConnectionQueries()).toEqual(['SET time_zone = \'+03:00\'']);
+    });
+
     it('is overridden by sqlPreamble, which appends as usual', () => {
       const driver = driverFor({
         dbType: 'mysql',
