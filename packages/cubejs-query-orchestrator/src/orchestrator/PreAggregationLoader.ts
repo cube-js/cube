@@ -17,6 +17,7 @@ import { PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './Quer
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
+  getPreAggregationSqlPreamble,
   getStructureVersion,
   InvalidationKeys,
   LoadPreAggregationResult,
@@ -382,6 +383,13 @@ export class PreAggregationLoader {
     }
     if (this.preAggregation.outputColumnTypes) {
       versionArray.push(this.preAggregation.outputColumnTypes);
+    }
+    // Also in the structure version. The content version is what the
+    // non-waitForRenew path compares, so a preamble change that only moved the
+    // structure version would still serve the stale table there.
+    const sqlPreamble = getPreAggregationSqlPreamble(this.preAggregation);
+    if (sqlPreamble) {
+      versionArray.push(sqlPreamble);
     }
     versionArray.push(invalidationKeys);
     return version(versionArray);

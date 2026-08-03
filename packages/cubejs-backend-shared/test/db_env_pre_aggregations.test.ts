@@ -65,16 +65,49 @@ describe('Pre-aggregation env vars (single datasource)', () => {
     delete process.env.CUBEJS_DATASOURCES;
   });
 
-  // Pins the gap behind open question #1: unset means undefined, not inherited.
-  // If inheritance is later added at the call site, this asserts the raw env
-  // layer still has none — the two must not be confused again.
-  test('the pre-agg preamble does not fall back to the default at the env layer', () => {
+  // The preamble is the one non-credential var that inherits: a UDF the model
+  // depends on must reach pre-aggregation builds too. Credentials must not
+  // (see the dbHost cases below) — a half-inherited connection target is worse
+  // than none.
+  test('the pre-agg preamble falls back to the default when unset', () => {
     process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET regular = 1';
 
     expect(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: true }))
-      .toBeUndefined();
+      .toEqual('SET regular = 1');
+  });
 
-    delete process.env.CUBEJS_DB_SQL_PREAMBLE;
+  test('an explicit pre-agg preamble wins over the default rather than merging', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET regular = 1';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET preagg = 1';
+
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: true }))
+      .toEqual('SET preagg = 1');
+  });
+
+  // An empty pre-agg preamble is a deliberate "no preamble for builds", not an
+  // absent value — inheriting the default here would make opting out impossible.
+  test('an empty pre-agg preamble suppresses the default instead of inheriting it', () => {
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET regular = 1';
+    process.env.CUBEJS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = '';
+
+    expect(getEnv('dbSqlPreamble', { dataSource: 'default', preAggregations: true }))
+      .toEqual('');
+  });
+
+  test('the pre-agg preamble inherits per named data source too', () => {
+    process.env.CUBEJS_DATASOURCES = 'default,analytics';
+    process.env.CUBEJS_DS_ANALYTICS_DB_SQL_PREAMBLE = 'SET analytics = 1';
+
+    expect(getEnv('dbSqlPreamble', { dataSource: 'analytics', preAggregations: true }))
+      .toEqual('SET analytics = 1');
+
+    process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE = 'SET analytics_preagg = 1';
+    expect(getEnv('dbSqlPreamble', { dataSource: 'analytics', preAggregations: true }))
+      .toEqual('SET analytics_preagg = 1');
+
+    delete process.env.CUBEJS_DATASOURCES;
+    delete process.env.CUBEJS_DS_ANALYTICS_DB_SQL_PREAMBLE;
+    delete process.env.CUBEJS_DS_ANALYTICS_PRE_AGGREGATIONS_DB_SQL_PREAMBLE;
   });
 
   test('preAggregations: true returns undefined when PRE_AGGREGATIONS variant not set', () => {
