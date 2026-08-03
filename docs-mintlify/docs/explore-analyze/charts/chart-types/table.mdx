@@ -95,6 +95,8 @@ Each card has a **Value** toggle and, next to it, a **Bars** / **Sparkline** pai
 
 These controls appear only on numeric columns.
 
+{/* TODO: screenshot — a numeric column card showing the Value toggle beside the Bars / Sparkline pair */}
+
 Bars and sparklines are the only in-cell visualizations the table draws. To turn a
 column's values into clickable links, define [`links` on the
 dimension](/docs/data-modeling/dimensions#links) in the data model — they appear in
@@ -129,8 +131,6 @@ Removing the dimension is a one-way change — turning the sparkline back off do
 The time dimensions on offer come from the **semantic view the query is built on**, not from the query itself — so **Sparkline** is disabled whenever that view has no time dimension, and equally for a query not built on a view at all, however many time dimensions the query selects.
 
 </Note>
-
-{/* TODO: screenshot — a numeric column card showing the Value toggle beside the Bars / Sparkline pair */}
 
 | Option | Description |
 |---|---|
