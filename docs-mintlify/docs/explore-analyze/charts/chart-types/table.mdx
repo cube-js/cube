@@ -118,7 +118,7 @@ cell menu as usual.
 
 ### Inline bars
 
-Display a numeric column as a proportional in-cell bar by selecting **Bars** on the column's card. Each bar's length reflects the value's magnitude within the column's range.
+Display a numeric column as a proportional in-cell bar by selecting the **inline bars** button on the column's card. Each bar's length reflects the value's magnitude within the column's range.
 
 | Option | Description |
 |---|---|
@@ -134,7 +134,7 @@ When a column contains both positive and negative values, bars are drawn in both
 
 ### Sparklines
 
-Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. Select **Sparkline** on the column's card in the **Columns** section of the **Style** tab.
+Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. Select the **sparkline** button on the column's card in the **Columns** section of the **Style** tab.
 
 A sparkline needs a time dimension to use as its horizontal axis. When you switch a column to **Sparkline** and pick its horizontal axis time dimension, that dimension is **removed from the table query** (if it was there): the table shows one row per remaining dimension, correctly aggregated, while the sparkline plots the measure's value across the time dimension. Values are always correct for any measure type, including counts of distinct values, averages, and custom measures.
 
@@ -142,7 +142,7 @@ Removing the dimension is a one-way change — turning the sparkline back off do
 
 <Note>
 
-The time dimensions on offer come from the **semantic view the query is built on**, not from the query itself — so **Sparkline** is disabled whenever that view has no time dimension, and equally for a query not built on a view at all, however many time dimensions the query selects.
+The time dimensions on offer come from the **semantic view the query is built on**, not from the query itself — so the **sparkline** button is disabled whenever that view has no time dimension, and equally for a query not built on a view at all, however many time dimensions the query selects.
 
 </Note>
 
@@ -153,7 +153,7 @@ The time dimensions on offer come from the **semantic view the query is built on
 | **Type** | **Area** (filled line, the default), **Line**, or **Bar** (mini columns). |
 | **Line color** / **Area color** | Stroke color for line and bar; fill color for area. |
 | **Line width** | Stroke width in pixels (Line and Area types). |
-| **Show value** | The shared **Value** toggle on the column's card — shows the measure's value for the row, the same number the cell would show without a sparkline, as a headline next to it. Turn it off for a chart-only cell. Its setting carries over when you switch between **Bars** and **Sparkline**. |
+| **Show value** | The shared **Value** toggle on the column's card — shows the measure's value for the row, the same number the cell would show without a sparkline, as a headline next to it. Turn it off for a chart-only cell. Its setting carries over when you switch between inline bars and sparkline. |
 
 A row needs at least two data points to draw a sparkline; cells with fewer fall back to the formatted value.
 
