@@ -319,8 +319,8 @@ cubes:
         sql: "'https://na1.salesforce.com/' || id"
         type: string
         format:
-          label: View in Salesforce
           type: link
+          label: View in Salesforce
 
       - name: created_at
         sql: created_at
@@ -355,8 +355,8 @@ cube(`orders`, {
       sql: `'https://na1.salesforce.com/' || id`,
       type: `string`,
       format: {
-        label: `View in Salesforce`,
-        type: `link`
+        type: `link`,
+        label: `View in Salesforce`
       }
     },
 
