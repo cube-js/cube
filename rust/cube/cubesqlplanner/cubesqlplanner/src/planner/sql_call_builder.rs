@@ -7,7 +7,6 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
-use crate::planner::collectors::collect_cube_names;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -103,51 +102,24 @@ impl<'a> SqlCallBuilder<'a> {
         cube_name: &String,
         item: &FilterParamsItem,
     ) -> Result<SqlCallFilterParamsItem, CubeError> {
-        let (compiled_call, foreign_cube) = match &item.column {
-            FilterParamsColumn::Compiled(compiled) => {
-                let call =
-                    self.build_from_template(cube_name, compiled.template.clone(), &compiled.args)?;
-                let foreign_cube = Self::foreign_cube_reference(cube_name, &call)?;
-                (Some(Rc::new(call)), foreign_cube)
-            }
-            _ => (None, None),
+        let compiled_call = match &item.column {
+            FilterParamsColumn::Compiled(compiled) => Some(Rc::new(self.build_from_template(
+                cube_name,
+                compiled.template.clone(),
+                &compiled.args,
+            )?)),
+            _ => None,
         };
 
         Ok(SqlCallFilterParamsItem {
             filter_symbol_name: format!("{}.{}", item.cube_name, item.name),
             column: item.column.clone(),
             compiled_call,
-            foreign_cube,
+            // Turned on per query, and again per subquery, once the filters are
+            // known. Off until then, so a symbol compiled for comparison rather
+            // than for a query carries no dependency the query would not.
+            active: false,
         })
-    }
-
-    // A cube a compiled column reads outside the one owning it. Such a column
-    // renders only when its filter reaches the query, so the members it reads are
-    // not dependencies of the enclosing member and cannot bring a cube into the
-    // join — the qualifier it emits would have no table behind it. A cube's table
-    // expression is exempt: it inlines the whole expression and needs no join.
-    fn foreign_cube_reference(
-        cube_name: &String,
-        call: &SqlCall,
-    ) -> Result<Option<(String, String)>, CubeError> {
-        let mut foreign = call
-            .get_cube_refs()
-            .iter()
-            .filter(|cube_ref| matches!(cube_ref, CubeRef::Name(_)))
-            .map(|cube_ref| cube_ref.cube_name().clone())
-            .collect::<Vec<_>>();
-
-        for dep in call.get_dependencies() {
-            foreign.extend(collect_cube_names(&dep)?);
-        }
-
-        foreign.retain(|referenced| referenced != cube_name);
-        // Reported deterministically: the cube names arrive unordered.
-        foreign.sort();
-        Ok(foreign
-            .into_iter()
-            .next()
-            .map(|referenced| (cube_name.clone(), referenced)))
     }
 
     fn build_filter_group_item(

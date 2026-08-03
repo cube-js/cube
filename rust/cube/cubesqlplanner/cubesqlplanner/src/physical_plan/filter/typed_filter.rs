@@ -86,13 +86,6 @@ impl TypedFilter {
                 dispatch_to_sql(self.operation(), &ctx)
             }
             FilterParamsColumn::Compiled(compiled) => {
-                if let Some((owner, foreign)) = &item.foreign_cube {
-                    return Err(CubeError::user(format!(
-                        "FILTER_PARAMS column for `{}` in cube `{}` reads cube `{}`; a column may \
-                         only read members of the cube it is declared in",
-                        item.filter_symbol_name, owner, foreign
-                    )));
-                }
                 if time_shift.is_some() {
                     return Err(CubeError::user(format!(
                         "FILTER_PARAMS column for `{}` is a callback, which cannot carry the time \

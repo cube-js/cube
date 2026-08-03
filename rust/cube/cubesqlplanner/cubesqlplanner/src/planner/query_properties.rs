@@ -234,10 +234,23 @@ impl QueryProperties {
     }
 
     // Push every entry of `dimensions_filters` into matching `case`
-    // expressions on each member, filter and order item. Run once at
-    // construction; mutators do not re-apply it.
+    // expressions on each member, filter and order item, and mark every
+    // FILTER_PARAMS binding by whether the query filters the member it names.
+    // Run once at construction; mutators do not re-apply it.
     fn apply_static_filters(&mut self) -> Result<(), CubeError> {
         let dimensions_filters = self.dimensions_filters.clone();
+        // A FILTER_PARAMS binding may name any filtered member, not only a
+        // dimension, so its activity is read from the whole set.
+        let all_filters = self.all_filter_items();
+        for dim in self.dimensions.iter_mut() {
+            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+        }
+        for dim in self.time_dimensions.iter_mut() {
+            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+        }
+        for meas in self.measures.iter_mut() {
+            *meas = transforms::apply_filter_params_activity_to_symbol(meas, &all_filters)?;
+        }
         for dim in self.dimensions.iter_mut() {
             *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
         }
@@ -395,14 +408,20 @@ impl QueryProperties {
 
     /// Concatenation of `time_dimensions_filters`, `dimensions_filters`, and
     /// `segments` into a single `Filter`. `measures_filters` are not included.
-    pub fn all_filters(&self) -> Option<Filter> {
-        let items = self
-            .time_dimensions_filters
+    /// `time_dimensions_filters`, `dimensions_filters` and `segments` as a flat
+    /// list. `measures_filters` are HAVING-style and stay out.
+    pub fn all_filter_items(&self) -> Vec<FilterItem> {
+        self.time_dimensions_filters
             .iter()
             .chain(self.dimensions_filters.iter())
             .chain(self.segments.iter())
             .cloned()
-            .collect_vec();
+            .collect_vec()
+    }
+
+    /// The same set as `all_filter_items`, as a single `Filter`.
+    pub fn all_filters(&self) -> Option<Filter> {
+        let items = self.all_filter_items();
         if items.is_empty() {
             None
         } else {

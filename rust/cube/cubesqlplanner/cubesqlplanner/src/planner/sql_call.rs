@@ -132,10 +132,12 @@ pub struct SqlCallFilterParamsItem {
     /// dependencies, so it is rendered on its own rather than spliced
     /// into the enclosing template.
     pub compiled_call: Option<Rc<SqlCall>>,
-    /// The owning cube and a cube the compiled column reads outside it,
-    /// if any. Reported when the column renders, since a column whose
-    /// filter never reaches the query renders nothing at all.
-    pub foreign_cube: Option<(String, String)>,
+    /// Whether the query this call is being planned for filters the
+    /// member this binding names. Only then does the column render, so
+    /// only then do the members it reads belong to the enclosing
+    /// member's dependencies — and only then may they pull a cube into
+    /// the join.
+    pub active: bool,
 }
 
 /// `FILTER_GROUP` binding from the data-model SQL: several
@@ -560,6 +562,25 @@ impl SqlCall {
             .collect()
     }
 
+    fn active_filter_params(&self) -> impl Iterator<Item = &SqlCallFilterParamsItem> {
+        self.filter_params
+            .iter()
+            .chain(
+                self.filter_groups
+                    .iter()
+                    .flat_map(|g| g.filter_params.iter()),
+            )
+            .filter(|item| item.active)
+    }
+
+    fn filter_params_mut(&mut self) -> impl Iterator<Item = &mut SqlCallFilterParamsItem> {
+        self.filter_params.iter_mut().chain(
+            self.filter_groups
+                .iter_mut()
+                .flat_map(|g| g.filter_params.iter_mut()),
+        )
+    }
+
     pub fn struct_eq(&self, other: &Self) -> bool {
         self.template == other.template
             && self.deps.len() == other.deps.len()
@@ -585,6 +606,12 @@ impl SymbolDeps for Rc<SqlCall> {
                 SqlDependency::CubeRef(cr) => visitor.cube_ref(cr)?,
             }
         }
+        // An active column renders, so what it reads is read by this call too.
+        for item in self.active_filter_params() {
+            if let Some(call) = &item.compiled_call {
+                call.visit_deps(visitor)?;
+            }
+        }
         std::ops::ControlFlow::Continue(())
     }
 
@@ -593,6 +620,14 @@ impl SymbolDeps for Rc<SqlCall> {
         for dep in call.deps.iter_mut() {
             if let SqlDependency::Symbol(s) = dep {
                 visitor.symbol(s)?;
+            }
+        }
+        // Reached whatever the activity, so a rewrite never leaves an inactive
+        // column holding a symbol every other reference to it has replaced.
+        for item in call.filter_params_mut() {
+            visitor.filter_params_item(item)?;
+            if let Some(call) = &mut item.compiled_call {
+                call.visit_deps_mut(visitor)?;
             }
         }
         *self = Rc::new(call);

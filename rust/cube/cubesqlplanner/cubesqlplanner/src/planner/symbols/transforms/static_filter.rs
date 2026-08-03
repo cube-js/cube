@@ -2,6 +2,8 @@ use super::super::common::Case;
 use super::super::dimension_kinds::DimensionKind;
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
+use crate::planner::SqlCallFilterParamsItem;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -92,4 +94,43 @@ fn replace_dimension_case(dimension: &DimensionSymbol, new_case: Case) -> Rc<Dim
         new.kind = DimensionKind::Case(c.replace_case(new_case));
     }
     Rc::new(new)
+}
+
+/// Marks every `FILTER_PARAMS` binding in the symbol by whether `filters` reach
+/// the member it names. A binding renders only where its filter does, so only
+/// there do the members its column reads count among the symbol's dependencies
+/// and pull their cubes into the join.
+pub fn apply_filter_params_activity_to_symbol(
+    symbol: &Rc<MemberSymbol>,
+    filters: &[FilterItem],
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    let group = FilterItem::Group(Rc::new(FilterGroup {
+        operator: FilterGroupOperator::And,
+        items: filters.to_vec(),
+    }));
+    let mut visitor = ActivityVisitor { filters: &group };
+    let mut result = symbol.as_ref().clone();
+    result.visit_deps_mut(&mut visitor)?;
+    Ok(Rc::new(result))
+}
+
+struct ActivityVisitor<'a> {
+    filters: &'a FilterItem,
+}
+
+impl DepVisitorMut for ActivityVisitor<'_> {
+    fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError> {
+        let mut symbol = slot.as_ref().clone();
+        symbol.visit_deps_mut(self)?;
+        *slot = Rc::new(symbol);
+        Ok(())
+    }
+
+    fn filter_params_item(&mut self, item: &mut SqlCallFilterParamsItem) -> Result<(), CubeError> {
+        item.active = self
+            .filters
+            .find_subtree_for_members(&[&item.filter_symbol_name])
+            .is_some();
+        Ok(())
+    }
 }

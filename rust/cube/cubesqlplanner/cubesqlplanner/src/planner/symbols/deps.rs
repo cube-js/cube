@@ -38,6 +38,15 @@ pub trait DepVisitor {
 /// member-symbol slot and may replace it.
 pub trait DepVisitorMut {
     fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError>;
+
+    /// Every `FILTER_PARAMS` binding reached on the way, whether or not
+    /// it currently contributes dependencies.
+    fn filter_params_item(
+        &mut self,
+        _item: &mut crate::planner::SqlCallFilterParamsItem,
+    ) -> Result<(), CubeError> {
+        Ok(())
+    }
 }
 
 /// A node whose dependency slots can be walked (read) or rebuilt

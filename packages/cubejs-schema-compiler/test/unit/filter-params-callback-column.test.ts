@@ -139,9 +139,12 @@ describe('FILTER_PARAMS callback column', () => {
       .toThrow(/takes 2 values but the filter on it supplies 1/);
   });
 
-  // A column naming another cube cannot bring it into the join, so the qualifier
-  // it renders would have no table behind it.
-  it('reports a column that names another cube', async () => {
+  // A column renders only where its filter reaches the query, so the cube it
+  // reads is needed exactly there — and nowhere else.
+  describe.each([
+    ['a member of another cube', '${users.city} IS NOT NULL AND ${CUBE.createdAt} >= ${from}'],
+    ['another cube directly', '${users}.city IS NOT NULL AND ${CUBE.createdAt} >= ${from}'],
+  ])('a column reading %s', (_name, callbackBody) => {
     const schema = [
       'cube(\'orders\', {',
       '  sql: `SELECT * FROM orders`,',
@@ -156,7 +159,7 @@ describe('FILTER_PARAMS callback column', () => {
       '      sql: `${CUBE}.amount`,',
       '      type: `sum`,',
       '      filters: [',
-      '        { sql: `${FILTER_PARAMS.orders.createdAt.filter((from, to) => `${users}.city IS NOT NULL AND ${CUBE.createdAt} >= ${from}`)}` }',
+      `        { sql: \`\${FILTER_PARAMS.orders.createdAt.filter((from, to) => \`${callbackBody}\`)}\` }`,
       '      ]',
       '    }',
       '  },',
@@ -188,20 +191,40 @@ describe('FILTER_PARAMS callback column', () => {
       '});',
     ].join('\n');
 
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: ['orders.total'],
-      filters: [{
-        member: 'orders.createdAt',
-        operator: 'inDateRange',
-        values: ['2025-07-01', '2026-06-30'],
-      }],
-      timezone: 'UTC',
-      useNativeSqlPlanner: true,
+    async function sqlFor(useNativeSqlPlanner: boolean, withFilter: boolean) {
+      const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+      await compiler.compile();
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['orders.total'],
+        filters: withFilter
+          ? [{ member: 'orders.createdAt', operator: 'inDateRange', values: ['2025-07-01', '2026-06-30'] }]
+          : [],
+        timezone: 'UTC',
+        useNativeSqlPlanner,
+      });
+
+      return query.buildSqlAndParams()[0];
+    }
+
+    it.each([
+      ['legacy planner', false],
+      ['native planner', true],
+    ])('joins that cube for %s when the filter reaches the query', async (_planner, useNativeSqlPlanner) => {
+      const sql = await sqlFor(useNativeSqlPlanner, true);
+
+      expect(sql).toMatch(/join\s+users/i);
+      expect(sql).toContain('"users".city IS NOT NULL');
     });
 
-    expect(() => query.buildSqlAndParams()).toThrow(/reads cube `users`/);
+    it.each([
+      ['legacy planner', false],
+      ['native planner', true],
+    ])('leaves that cube out for %s when the filter does not', async (_planner, useNativeSqlPlanner) => {
+      const sql = await sqlFor(useNativeSqlPlanner, false);
+
+      expect(sql).not.toMatch(/join\s+users/i);
+      expect(sql).toContain('1 = 1');
+    });
   });
 });
 
