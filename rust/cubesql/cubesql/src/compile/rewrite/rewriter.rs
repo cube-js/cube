@@ -15,7 +15,9 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
-    sql::database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR,
+    sql::database_variables::postgres::session_vars::{
+        CUBESQL_DISABLE_POST_PROCESSING_VAR, CUBESQL_PENALIZE_POST_PROCESSING_VAR,
+    },
     sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
@@ -344,31 +346,62 @@ impl Rewriter {
             .rewrite_rules(cache_entry, true)
             .await?;
 
-        let penalize_post_processing = self
+        let session_bool_var = |name: &str| match self
             .cube_context
             .session_state
-            .get_variable(CUBESQL_PENALIZE_POST_PROCESSING_VAR)
-            .map(|v| v.value);
-        let penalize_post_processing = match penalize_post_processing {
+            .get_variable(name)
+            .map(|v| v.value)
+        {
             Some(ScalarValue::Boolean(val)) => val.unwrap_or(false),
             _ => false,
         };
+        let penalize_post_processing = session_bool_var(CUBESQL_PENALIZE_POST_PROCESSING_VAR);
+        let disable_post_processing = session_bool_var(CUBESQL_DISABLE_POST_PROCESSING_VAR);
+
+        // In streaming mode a limitless scan streams every row instead of being cut off at
+        // `CUBEJS_DB_QUERY_LIMIT`, so there's no truncation for post-processing to be wrong about.
+        //
+        // Nothing clamps the configured limit to a positive number, and casting a negative one
+        // would wrap into `usize::MAX` and quietly turn the guard off. Saturate to zero instead:
+        // a scan truncated to no rows at all bounds nothing, so every plan that post-processes
+        // one is rejected, which is the same answer a limit of zero already gets.
+        let config_obj = &cube_context.sessions.server.config_obj;
+        let max_intermediate_rows = (disable_post_processing && !config_obj.stream_mode())
+            .then(|| config_obj.non_streaming_query_max_row_limit().max(0) as usize);
 
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
             tokio::task::spawn_blocking(move || {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
-                // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
+                let mut top_down_state = CubePlanTopDownState::new();
+                top_down_state.with_max_intermediate_rows(max_intermediate_rows);
+
+                // TODO maybe check replacers right after extraction?
                 let mut extractor = TopDownExtractor::new(
                     &runner.egraph,
                     BestCubePlan::new(cube_context.meta.clone(), penalize_post_processing),
-                    CubePlanTopDownState::new(),
+                    top_down_state,
                 );
                 let Some((best_cost, best)) = extractor.find_best(root) else {
                     return Err(CubeError::rewrite("Unable to find best plan".to_string()));
                 };
                 log::debug!("Best cost: {:#?}", best_cost);
+
+                // Counted only when the caller asked for it, so a non-zero count means the best
+                // plan available still post-processes a result that would be silently truncated.
+                if let Some(max_intermediate_rows) = max_intermediate_rows {
+                    if best_cost.truncated_post_processing_scans() > 0 {
+                        return Err(CubeError::user(format!(
+                            "Query requires post-processing, which is disabled for this request. \
+                            It can not be fully pushed down to the data source, and the \
+                            intermediate result it would be post-processed from is truncated to \
+                            {max_intermediate_rows} rows (CUBEJS_DB_QUERY_LIMIT), which can \
+                            silently produce incorrect results. Rewrite the query so it can be \
+                            pushed down, or limit it to {max_intermediate_rows} rows or fewer."
+                        )));
+                    }
+                }
 
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().to_vec()

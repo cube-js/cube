@@ -4,13 +4,14 @@ use std::{
 
 use crate::{
     compile::rewrite::{
-        rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
-        DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-        TimeDimensionGranularity, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
+        rules::utils::granularity_str_to_int_order, CubeScanLimit, CubeScanUngrouped,
+        CubeScanWrapped, DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
+        TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
+        WrappedSelectUngroupedScan,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
-use egg::{Analysis, EGraph, Id, Language, RecExpr};
+use egg::{Analysis, EClass, EGraph, Id, Language, RecExpr};
 use indexmap::IndexSet;
 
 #[derive(Debug)]
@@ -241,6 +242,8 @@ impl BestCubePlan {
             ast_size: 1,
             ungrouped_nodes,
             unwrapped_subqueries,
+            // Will be filled in finalize
+            truncated_post_processing_scans: 0,
         }
     }
 }
@@ -264,6 +267,10 @@ pub struct CubePlanCostOptions {
 /// - `non_pushed_down_window` > `wrapper_nodes` - prefer to always push down window functions
 /// - `non_pushed_down_limit_sort` > `wrapper_nodes` - prefer to always push down limit-sort expressions
 /// - `wrapped_select_non_push_to_cube` > `wrapped_select_ungrouped_scan` - otherwise cost would prefer any aggregation, even non-push-to-Cube
+/// - `truncated_post_processing_scans` > `wrapper_nodes` - post-processing truncated data is
+///   wrong, not just slow, so it outranks the tiers that trade post-processing against wrappers.
+///   It has to stay *below* `table_scans` and `non_detected_cube_scans` though: a plan that never
+///   detected a cube scan has nothing to truncate and would otherwise win on this tier.
 /// - match errors by priority - optimize for more specific errors
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
@@ -280,6 +287,10 @@ pub struct CubePlanCost {
     non_pushed_down_grouping_sets: i64,
     non_pushed_down_limit_sort: i64,
     joins: usize,
+    /// Pushed-down subtrees whose result is truncated to `CUBEJS_DB_QUERY_LIMIT` rows and then
+    /// post-processed in memory - the plan shape that silently returns wrong results. Counted
+    /// only when the caller asked for it, see [`CubePlanTopDownState::max_intermediate_rows`].
+    truncated_post_processing_scans: usize,
     wrapper_nodes: i64,
     ast_size_outside_wrapper: usize,
     wrapped_select_non_push_to_cube: usize,
@@ -301,6 +312,12 @@ pub struct CubePlanCost {
     ast_size: usize,
     ast_size_inside_wrapper: usize,
     ungrouped_nodes: usize,
+}
+
+impl CubePlanCost {
+    pub fn truncated_post_processing_scans(&self) -> usize {
+        self.truncated_post_processing_scans
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -366,16 +383,19 @@ impl CubePlanCost {
             ast_size_inside_wrapper: self.ast_size_inside_wrapper + other.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes + other.ungrouped_nodes,
             unwrapped_subqueries: self.unwrapped_subqueries + other.unwrapped_subqueries,
+            truncated_post_processing_scans: self.truncated_post_processing_scans
+                + other.truncated_post_processing_scans,
         }
     }
 
     pub fn finalize(
         &self,
-        state: &CubePlanState,
-        sort_state: &SortState,
+        top_down_state: &CubePlanTopDownState,
         enode: &LogicalPlanLanguage,
         options: CubePlanCostOptions,
     ) -> Self {
+        let state = &top_down_state.wrapped;
+        let sort_state = &top_down_state.limit;
         let ast_size_outside_wrapper = match state {
             CubePlanState::Wrapped => 0,
             CubePlanState::Unwrapped(size) => *size,
@@ -390,6 +410,10 @@ impl CubePlanCost {
         Self {
             replacers: self.replacers,
             penalized_ast_size_outside_wrapper,
+            // Only ever set on the root of a pushed-down subtree, so this counts boundaries
+            // rather than every node above one.
+            truncated_post_processing_scans: self.truncated_post_processing_scans
+                + top_down_state.truncated_post_processing as usize,
             table_scans: self.table_scans,
             filters: self.filters,
             non_detected_cube_scans: match state {
@@ -742,6 +766,19 @@ impl TopDownCost for CubePlanCost {
 pub struct CubePlanTopDownState {
     wrapped: CubePlanState,
     limit: SortState,
+    /// Whether any ancestor of the current node post-processes in memory. Reset upon entering a
+    /// pushed-down subtree, where there is no in-memory work left to do.
+    post_processing_above: bool,
+    /// Set when the current node is the root of a pushed-down subtree - a `CubeScanWrapper`, or a
+    /// `CubeScan` that is not wrapped - that feeds post-processing above it and is not bounded by
+    /// a limit fitting into `max_intermediate_rows`. Such a subtree is silently truncated to that
+    /// many rows at execution time (see `CubeScanExecutionPlan::execute` and
+    /// `CubeScanWrapperNode::set_max_limit_for_node`), so the post-processing above it runs on
+    /// partial data and can return a wrong answer with no error.
+    truncated_post_processing: bool,
+    /// Row count a pushed-down subtree is truncated to, i.e. `CUBEJS_DB_QUERY_LIMIT`.
+    /// `None`, the default, turns off `truncated_post_processing` entirely.
+    max_intermediate_rows: Option<usize>,
 }
 
 impl CubePlanTopDownState {
@@ -749,7 +786,18 @@ impl CubePlanTopDownState {
         Self {
             wrapped: CubePlanState::Unwrapped(0),
             limit: SortState::None,
+            post_processing_above: false,
+            truncated_post_processing: false,
+            max_intermediate_rows: None,
         }
+    }
+
+    /// Starts tracking pushed-down subtrees that get truncated to `max_intermediate_rows` before
+    /// being post-processed, which makes [`CubePlanCost::truncated_post_processing_scans`] count
+    /// them. `None` leaves the tracking off, for when nothing asked for the check or streaming
+    /// is on and there is no truncation to detect.
+    pub fn with_max_intermediate_rows(&mut self, max_intermediate_rows: Option<usize>) {
+        self.max_intermediate_rows = max_intermediate_rows;
     }
 
     pub fn is_wrapped<A>(
@@ -774,6 +822,97 @@ impl CubePlanTopDownState {
             }
         }
         return true;
+    }
+
+    /// Whether the pushed-down subtree rooted at `node` returns at most `max_rows` rows.
+    ///
+    /// An eclass can hold several alternatives, and extraction has not picked one yet, so this
+    /// only reports `true` when every alternative is bounded. Anything it can't prove bounded -
+    /// including a wrapper input that isn't a plain `WrappedSelect` - counts as unbounded, which
+    /// biases towards pushing the query down rather than towards post-processing truncated data.
+    fn is_bounded<A>(
+        node: &LogicalPlanLanguage,
+        max_rows: usize,
+        egraph: &EGraph<LogicalPlanLanguage, A>,
+    ) -> bool
+    where
+        A: Analysis<LogicalPlanLanguage>,
+    {
+        match node {
+            LogicalPlanLanguage::CubeScan(cube_scan) => {
+                let limit_id = cube_scan[4];
+                Self::all_nodes(&egraph[limit_id], |node| {
+                    matches!(
+                        node,
+                        LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(limit)))
+                            if *limit <= max_rows
+                    )
+                })
+            }
+            // Whatever tops the wrapped plan decides how many rows come back, which is what
+            // `CubeScanWrapperNode::set_max_limit_for_node` clamps. Usually that's a
+            // `WrappedSelect`, whose limit lands in the generated SQL while the `CubeScan`
+            // beneath it stays limitless - but a wrapper straight over a `CubeScan` is just as
+            // real, and there the scan's own limit is the one that counts.
+            LogicalPlanLanguage::CubeScanWrapper(cube_scan_wrapper) => {
+                let input_id = cube_scan_wrapper[0];
+                Self::all_nodes(&egraph[input_id], |node| match node {
+                    LogicalPlanLanguage::WrappedSelect(wrapped_select) => {
+                        let limit_id = wrapped_select[10];
+                        Self::all_nodes(&egraph[limit_id], |node| {
+                            matches!(
+                                node,
+                                LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(Some(
+                                    limit
+                                ))) if *limit <= max_rows
+                            )
+                        })
+                    }
+                    LogicalPlanLanguage::CubeScan(_) => Self::is_bounded(node, max_rows, egraph),
+                    _ => false,
+                })
+            }
+            _ => true,
+        }
+    }
+
+    fn all_nodes<D>(
+        eclass: &EClass<LogicalPlanLanguage, D>,
+        predicate: impl Fn(&LogicalPlanLanguage) -> bool,
+    ) -> bool {
+        !eclass.nodes.is_empty() && eclass.nodes.iter().all(predicate)
+    }
+
+    /// Whether `node` is an operator that does its work in memory, and therefore post-processes
+    /// whatever is under it when it sits outside a wrapper.
+    ///
+    /// Deliberately not the node list behind `ast_size_outside_wrapper`. That one exists to
+    /// weight a cost, where missing a node only makes a plan look slightly cheaper than it is;
+    /// this one decides whether a query is rejected, where missing a node means accepting a
+    /// query the flag promised to reject and handing back a wrong answer. `Distinct` is the
+    /// case in point: it is absent there, and `Distinct` over a wrapper is exactly the shape
+    /// that would slip through.
+    ///
+    /// Keep in sync with the `LogicalPlan` variants handled in
+    /// [`crate::compile::rewrite::converter`] - anything that survives to execution and is not
+    /// pushed down belongs here.
+    fn is_post_processing(node: &LogicalPlanLanguage) -> bool {
+        matches!(
+            node,
+            LogicalPlanLanguage::Aggregate(_)
+                | LogicalPlanLanguage::CrossJoin(_)
+                | LogicalPlanLanguage::Distinct(_)
+                | LogicalPlanLanguage::Filter(_)
+                | LogicalPlanLanguage::Join(_)
+                | LogicalPlanLanguage::Limit(_)
+                | LogicalPlanLanguage::Projection(_)
+                | LogicalPlanLanguage::Repartition(_)
+                | LogicalPlanLanguage::Sort(_)
+                | LogicalPlanLanguage::Subquery(_)
+                | LogicalPlanLanguage::TableUDFs(_)
+                | LogicalPlanLanguage::Union(_)
+                | LogicalPlanLanguage::Window(_)
+        )
     }
 }
 
@@ -818,7 +957,46 @@ impl TopDownState<LogicalPlanLanguage> for CubePlanTopDownState {
             _ => SortState::None,
         };
 
-        Self { wrapped, limit }
+        // Only in-memory nodes count, so this stops accumulating once inside a pushed-down
+        // subtree.
+        //
+        // Kept pinned to `false` when the tracking is off: this is part of the extractor's cache
+        // key, and a value that varies by position in the plan would split every eclass into
+        // several entries for no gain on the default path.
+        let post_processing_above = self.max_intermediate_rows.is_some()
+            && match wrapped {
+                CubePlanState::Wrapped | CubePlanState::Wrapper => false,
+                CubePlanState::Unwrapped(_) => {
+                    self.post_processing_above || Self::is_post_processing(node)
+                }
+            };
+
+        // Guarded on `self.post_processing_above` rather than the value just computed: what
+        // matters is what sits *above* this node, and the root of a pushed-down subtree never
+        // post-processes anything itself.
+        let truncated_post_processing = match self.max_intermediate_rows {
+            Some(max_rows) if self.post_processing_above => match node {
+                LogicalPlanLanguage::CubeScanWrapper(_) => {
+                    !Self::is_bounded(node, max_rows, egraph)
+                }
+                // A wrapped `CubeScan` is not the root of the pushed-down subtree, the
+                // `CubeScanWrapper` above it is; counting both would report every pushdown plan
+                // as truncated.
+                LogicalPlanLanguage::CubeScan(_) if !self.is_wrapped(node, egraph) => {
+                    !Self::is_bounded(node, max_rows, egraph)
+                }
+                _ => false,
+            },
+            _ => false,
+        };
+
+        Self {
+            wrapped,
+            limit,
+            post_processing_above,
+            truncated_post_processing,
+            max_intermediate_rows: self.max_intermediate_rows,
+        }
     }
 }
 
@@ -835,12 +1013,105 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
     ) -> CubePlanCost {
         CubePlanCost::finalize(
             &cost,
-            &state.wrapped,
-            &state.limit,
+            state,
             node,
             CubePlanCostOptions {
                 penalize_post_processing: self.penalize_post_processing,
             },
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MAX_ROWS: usize = 50_000;
+
+    /// A `CubeScan` with `limit`. Every child slot points at the limit eclass, which is fine
+    /// because [`CubePlanTopDownState::is_bounded`] only ever reads the limit.
+    fn add_cube_scan(egraph: &mut EGraph<LogicalPlanLanguage, ()>, limit: Option<usize>) -> Id {
+        let limit_id = egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(limit)));
+        egraph.add(LogicalPlanLanguage::CubeScan([limit_id; 11]))
+    }
+
+    fn add_wrapped_select(
+        egraph: &mut EGraph<LogicalPlanLanguage, ()>,
+        limit: Option<usize>,
+    ) -> Id {
+        let limit_id = egraph.add(LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(
+            limit,
+        )));
+        let mut children = [limit_id; 17];
+        children[10] = limit_id;
+        egraph.add(LogicalPlanLanguage::WrappedSelect(children))
+    }
+
+    fn add_wrapper(egraph: &mut EGraph<LogicalPlanLanguage, ()>, input: Id) -> Id {
+        egraph.add(LogicalPlanLanguage::CubeScanWrapper([input; 2]))
+    }
+
+    fn is_bounded(egraph: &EGraph<LogicalPlanLanguage, ()>, id: Id) -> bool {
+        let node = egraph[id].nodes[0].clone();
+        CubePlanTopDownState::is_bounded(&node, MAX_ROWS, egraph)
+    }
+
+    #[test]
+    fn test_is_bounded_cube_scan() {
+        let mut egraph = EGraph::<LogicalPlanLanguage, ()>::default();
+
+        let bounded = add_cube_scan(&mut egraph, Some(100));
+        let unbounded = add_cube_scan(&mut egraph, None);
+        let over_limit = add_cube_scan(&mut egraph, Some(MAX_ROWS + 1));
+
+        assert!(is_bounded(&egraph, bounded));
+        assert!(!is_bounded(&egraph, unbounded));
+        // Clamped down to `MAX_ROWS` at execution time, so the rows above it are lost.
+        assert!(!is_bounded(&egraph, over_limit));
+    }
+
+    /// A wrapper can sit straight on a `CubeScan` instead of on a `WrappedSelect` -
+    /// `CubeScanWrapperNode::set_max_limit_for_node` handles both - and then it is the scan's own
+    /// limit that bounds the result. Reporting those as unbounded rejects queries that are
+    /// perfectly safe, purely because of which representation extraction landed on.
+    #[test]
+    fn test_is_bounded_wrapper_over_cube_scan() {
+        let mut egraph = EGraph::<LogicalPlanLanguage, ()>::default();
+
+        let bounded = add_cube_scan(&mut egraph, Some(100));
+        let bounded = add_wrapper(&mut egraph, bounded);
+        let unbounded = add_cube_scan(&mut egraph, None);
+        let unbounded = add_wrapper(&mut egraph, unbounded);
+
+        assert!(is_bounded(&egraph, bounded));
+        assert!(!is_bounded(&egraph, unbounded));
+    }
+
+    #[test]
+    fn test_is_bounded_wrapper_over_wrapped_select() {
+        let mut egraph = EGraph::<LogicalPlanLanguage, ()>::default();
+
+        let bounded = add_wrapped_select(&mut egraph, Some(100));
+        let bounded = add_wrapper(&mut egraph, bounded);
+        let unbounded = add_wrapped_select(&mut egraph, None);
+        let unbounded = add_wrapper(&mut egraph, unbounded);
+
+        assert!(is_bounded(&egraph, bounded));
+        assert!(!is_bounded(&egraph, unbounded));
+    }
+
+    /// Extraction has not picked an alternative yet, so a wrapper input that could still turn
+    /// out to be something unrecognised stays unbounded.
+    #[test]
+    fn test_is_bounded_wrapper_over_unknown_input_is_conservative() {
+        let mut egraph = EGraph::<LogicalPlanLanguage, ()>::default();
+
+        let scan = add_cube_scan(&mut egraph, Some(100));
+        let wrapper = add_wrapper(&mut egraph, scan);
+        let other = egraph.add(LogicalPlanLanguage::EmptyRelation([scan; 3]));
+        egraph.union(scan, other);
+        egraph.rebuild();
+
+        assert!(!is_bounded(&egraph, wrapper));
     }
 }
