@@ -90,7 +90,7 @@ By default, a column displays its value. It can also be drawn as an inline link,
 Each card has a **Value** toggle and, next to it, a group of icon buttons for **inline bars**, **sparkline**, and **link**:
 
 - **Value** shows the formatted value in the cell. It **composes** with a bar or a sparkline rather than excluding it — a cell can show a bar and its value together.
-- The three icon buttons are mutually exclusive with each other: picking one replaces the other. Clicking the active one again clears it, returning the column to a plain value.
+- The three icon buttons are mutually exclusive: picking one replaces whichever was active. Clicking the active one again clears it, returning the column to a plain value.
 - With none of them active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
 - Each button is offered only where it applies: bars and sparklines on **numeric** columns, and **link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)). In link mode the value *is* the link text, so **Value** stays forced on there too.
 
@@ -114,7 +114,7 @@ which of the declared links renders inline (inert when the dimension declares on
 Clicking the link text opens it; clicking elsewhere in the cell selects it and opens the
 cell menu as usual.
 
-{/* TODO screenshot: table with an inline link column and the Style tab's link button selected (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO: screenshot — a table with an inline link column and the Style tab's link button selected */}
 
 ### Inline bars
 

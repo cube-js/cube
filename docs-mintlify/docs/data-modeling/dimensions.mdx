@@ -453,12 +453,15 @@ cube(`orders`, {
       sql: `status`,
       type: `string`,
       links: [
+        // External link — opens a URL built from the row's value.
+        // `primary` makes it render inline on the cell value.
         {
           name: `search`,
           label: `Search the web`,
           url: `CONCAT('https://www.google.com/search?q=order+', ${CUBE}.status)`,
           icon: `brand-google`,
-          target: `blank`
+          target: `blank`,
+          primary: true
         },
         {
           name: `details`,
