@@ -33,17 +33,17 @@ pub struct CalendarDimensionTimeShift {
 /// group, filter or order by, but never aggregate.
 #[derive(Clone)]
 pub struct DimensionSymbol {
-    compiled_path: CompiledMemberPath,
-    kind: DimensionKind,
-    is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
-    is_view: bool,
-    multi_stage: Option<MultiStageProperties>,
-    time_shift: Vec<CalendarDimensionTimeShift>,
-    time_shift_pk_full_name: Option<String>,
-    is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
-    is_sub_query: bool,
-    propagate_filters_to_sub_query: bool,
-    mask_sql: Option<Rc<SqlCall>>,
+    pub(super) compiled_path: CompiledMemberPath,
+    pub(super) kind: DimensionKind,
+    pub(super) is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
+    pub(super) is_view: bool,
+    pub(super) multi_stage: Option<MultiStageProperties>,
+    pub(super) time_shift: Vec<CalendarDimensionTimeShift>,
+    pub(super) time_shift_pk_full_name: Option<String>,
+    pub(super) is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
+    pub(super) is_sub_query: bool,
+    pub(super) propagate_filters_to_sub_query: bool,
+    pub(super) mask_sql: Option<Rc<SqlCall>>,
 }
 
 symbol_deps! {
@@ -104,18 +104,6 @@ impl DimensionSymbol {
         }
     }
 
-    pub(super) fn replace_case(&self, new_case: Case) -> Rc<DimensionSymbol> {
-        let mut new = self.clone();
-        if new_case.is_single_value() {
-            //FIXME - Hack: we don't treat a single-element case as a multi-stage dimension
-            new.multi_stage = None;
-        }
-        if let DimensionKind::Case(ref c) = new.kind {
-            new.kind = DimensionKind::Case(c.replace_case(new_case));
-        }
-        Rc::new(new)
-    }
-
     /// Case-expression body for `DimensionKind::Case`; `None` otherwise.
     pub fn case(&self) -> Option<&Case> {
         match &self.kind {
@@ -144,12 +132,6 @@ impl DimensionSymbol {
 
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
-    }
-
-    /// Trims the join-chain prefix from `compiled_path` in place so the
-    /// path points only at the owning cube.
-    pub fn strip_join_prefix(&mut self) {
-        self.compiled_path = self.compiled_path.strip_join_prefix();
     }
 
     /// Full unique identifier of the symbol: cube path, member name and

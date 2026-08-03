@@ -6,6 +6,7 @@ use crate::planner::collectors::{
 };
 use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
+use crate::planner::symbols::transforms;
 use crate::planner::JoinTree;
 use crate::planner::MemberSymbol;
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
@@ -203,7 +204,7 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube_name: &String,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
-            let owned_measure = measure.with_stripped_join_prefix();
+            let owned_measure = transforms::strip_join_prefix(measure);
             let member_expression_over_dimensions_cubes =
                 if let Ok(member_expression) = owned_measure.as_member_expression() {
                     member_expression.cube_names_if_dimension_only_expression()?

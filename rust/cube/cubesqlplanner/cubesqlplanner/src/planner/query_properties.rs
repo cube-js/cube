@@ -16,10 +16,8 @@ use crate::planner::filter::{Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
-use crate::planner::{
-    apply_static_filter_to_filter_item, apply_static_filter_to_symbol, DimensionTimeShift,
-    JoinTree, MeasureTimeShifts,
-};
+use crate::planner::symbols::transforms;
+use crate::planner::{DimensionTimeShift, JoinTree, MeasureTimeShifts};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cell::OnceCell;
@@ -114,13 +112,7 @@ impl FullKeyAggregateMeasures {
     /// form recorded during classification. Measures with no multiplied
     /// count pass through unchanged.
     pub fn render(&self, measure: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
-        measure.apply_recursive(&|node| {
-            Ok(self
-                .render_forms
-                .get(&node.full_name())
-                .cloned()
-                .unwrap_or_else(|| node.clone()))
-        })
+        transforms::substitute_by_name(measure, &self.render_forms)
     }
 }
 
@@ -214,6 +206,20 @@ impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
             });
         }
         qp.apply_static_filters()?;
+        // A pre-aggregation build stores aggregations for later rollup, so
+        // measures with a mergeable state form must materialize the state,
+        // not the final value.
+        if qp.pre_aggregation_query {
+            for meas in qp.measures.iter_mut() {
+                *meas = transforms::measures_as_state(meas)?;
+            }
+            for filter_item in qp.measures_filters.iter_mut() {
+                *filter_item = transforms::map_filter_item_symbols(
+                    filter_item,
+                    &transforms::measures_as_state,
+                )?;
+            }
+        }
         Ok(Rc::new(qp))
     }
 }
@@ -233,29 +239,35 @@ impl QueryProperties {
     fn apply_static_filters(&mut self) -> Result<(), CubeError> {
         let dimensions_filters = self.dimensions_filters.clone();
         for dim in self.dimensions.iter_mut() {
-            *dim = apply_static_filter_to_symbol(dim, &dimensions_filters)?;
+            *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
         }
         for dim in self.time_dimensions.iter_mut() {
-            *dim = apply_static_filter_to_symbol(dim, &dimensions_filters)?;
+            *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
         }
         for meas in self.measures.iter_mut() {
-            *meas = apply_static_filter_to_symbol(meas, &dimensions_filters)?;
+            *meas = transforms::apply_static_filter_to_symbol(meas, &dimensions_filters)?;
         }
         for filter_item in self.dimensions_filters.iter_mut() {
-            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+            *filter_item =
+                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
         }
         for filter_item in self.measures_filters.iter_mut() {
-            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+            *filter_item =
+                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
         }
         for filter_item in self.time_dimensions_filters.iter_mut() {
-            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+            *filter_item =
+                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
         }
         for filter_item in self.segments.iter_mut() {
-            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+            *filter_item =
+                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
         }
         for order_item in self.order_by.iter_mut().flatten() {
-            order_item.member_evaluator =
-                apply_static_filter_to_symbol(&order_item.member_evaluator, &dimensions_filters)?;
+            order_item.member_evaluator = transforms::apply_static_filter_to_symbol(
+                &order_item.member_evaluator,
+                &dimensions_filters,
+            )?;
         }
         Ok(())
     }
@@ -542,7 +554,7 @@ impl QueryProperties {
                     // main query or moves to a multiplied subquery.
                     let rendered = match measure
                         .as_ref()
-                        .and_then(|m| m.convert_multiplied_to_regular())
+                        .and_then(|m| transforms::regular_in_multiplied(m))
                     {
                         Some(regular) => {
                             result.regular_measures.push(regular.clone());
@@ -550,7 +562,7 @@ impl QueryProperties {
                         }
                         None => {
                             let rendered = measure
-                                .map(|m| m.into_multiplied())
+                                .map(|m| transforms::into_multiplied(&m))
                                 .unwrap_or_else(|| item.measure.clone());
                             result
                                 .multiplied_measures
