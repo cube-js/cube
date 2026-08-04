@@ -1289,6 +1289,13 @@ cube(`orders`, {
 
 </CodeGroup>
 
+When `case` measures span multiple cubes, define the `switch` dimension on a
+single shared cube joined into every fact cube, rather than defining a separate
+one on each cube. All `case` measures then dispatch on the same dimension, so one
+filter resolves every measure. With a `switch` dimension per cube, a single
+filter pins only one of them; the others fall back to their full set of values,
+and each value emits its own row — so the query returns extra rows.
+
 ### `format`
 
 `format` is an optional parameter. It controls how measure values are

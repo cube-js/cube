@@ -269,7 +269,13 @@ For `string` dimensions:
 | Format | Description |
 |--------|-------------|
 | `imageUrl` | Display the value as an image |
-| `link` | Display the value as a hyperlink |
+| `link` | Display the value as a hyperlink, using the value itself as the URL |
+
+The `link` format also accepts an object form — `format: { type: link, label: … }` — so the
+cell shows a label instead of the raw URL (see `crm_link` in the example below).
+
+In [Workbooks][ref-workbooks], a `link`-formatted value renders as a clickable link in
+table cells. Values that aren't `http`, `https`, or `mailto` URLs render as plain text.
 
 For `number` dimensions, you can use the same named formats and custom
 [d3-format][link-d3-format] specifiers as [measures](/reference/data-modeling/measures#format):
@@ -313,8 +319,8 @@ cubes:
         sql: "'https://na1.salesforce.com/' || id"
         type: string
         format:
-          label: View in Salesforce
           type: link
+          label: View in Salesforce
 
       - name: created_at
         sql: created_at
@@ -349,8 +355,8 @@ cube(`orders`, {
       sql: `'https://na1.salesforce.com/' || id`,
       type: `string`,
       format: {
-        label: `View in Salesforce`,
-        type: `link`
+        type: `link`,
+        label: `View in Salesforce`
       }
     },
 
@@ -429,8 +435,9 @@ Using it with other dimension types will result in a validation error.
 ### `links`
 
 The `links` parameter allows you to define **one or more** links associated with a
-dimension (it is a list). They can be rendered as HTML links by supporting tools, e.g.,
-[Workbooks][ref-workbooks].
+dimension (it is a list). In [Workbooks][ref-workbooks], every link is available from the
+table **cell context menu**, and the link marked `primary` also renders inline, as a
+clickable link on the cell value itself.
 
 Links are useful to let users navigate to related external resources (e.g., Google
 search), internal tools (e.g., Salesforce), or other pages in a BI tool.
@@ -452,6 +459,11 @@ icon set][link-tabler] to be displayed alongside the link label. Use the icon's 
 name without any prefix (e.g. `brand-google`, `external-link`, `layout-dashboard`, `send`);
 browse the available names at [tabler.io/icons][link-tabler]. When omitted, a default link
 icon is shown.
+
+Optionally, one link per dimension might set `primary: true`. In [Workbooks][ref-workbooks]
+that link renders inline on the cell value, so it is reachable in one click while the rest
+stay in the cell context menu. A dimension may mark at most one link as primary. Rows whose
+primary link URL resolves to an empty value render the cell as plain text.
 
 Optionally, a link might use the `target` parameter to specify [where to open it][link-target]:
 `blank` to open in a new tab/window or `self` to open in the same tab/window. The default
@@ -475,6 +487,7 @@ cubes:
             url: "CONCAT('https://www.google.com/search?q=', {CUBE}.full_name)"
             icon: brand-google
             target: blank
+            primary: true
           
           - name: salesforce_search
             label: Search in Salesforce
@@ -927,7 +940,7 @@ a dimension. A dimension can only have one type.
 | `string` | Text fields containing letters or special characters. |
 | `number` | Numeric or integer fields. |
 | `boolean` | Boolean fields or data coercible to boolean. |
-| `switch` | Predefined set of allowed values (enum-like). Useful for [`case` measures][ref-case-measures]. Tesseract only. |
+| `switch` | Predefined set of allowed values (enum-like). Takes only a `values` sub-parameter — no `sql`, and no other parameters such as `title` or `public`. Useful for [`case` measures][ref-case-measures]. [Pre-aggregations][ref-matching-switch-dimensions] don't need to include it. Tesseract only. |
 | `geo` | Geographic coordinates. Requires `latitude` and `longitude` sub-parameters instead of `sql`. |
 
 <Warning>
@@ -961,6 +974,13 @@ cubes:
         sql: is_enabled
         type: boolean
 
+      - name: growth_window
+        type: switch
+        values:
+          - 3m
+          - 6m
+          - 12m
+
       - name: location
         type: geo
         latitude:
@@ -992,6 +1012,11 @@ cube(`orders`, {
     is_enabled: {
       sql: `is_enabled`,
       type: `boolean`
+    },
+
+    growth_window: {
+      type: `switch`,
+      values: [`3m`, `6m`, `12m`]
     },
 
     location: {
@@ -1038,6 +1063,18 @@ examples.
 Custom granularities are supported for the following [data sources][ref-data-sources]:
 Amazon Athena, Amazon Redshift, DuckDB, Databricks, Google BigQuery, ClickHouse, Microsoft SQL Server, MySQL, Postgres, and Snowflake.
 Please [file an issue](https://github.com/cube-js/cube/issues) if you need support for another data source.
+
+</Warning>
+
+<Warning>
+
+Custom granularities can be queried by name via the [REST API][ref-rest-api].
+However, neither the [SQL API][ref-sql-api] nor the [GraphQL
+API][ref-graphql-api] can address them by name: the SQL API only supports the
+default granularities in `DATE_TRUNC`, and the GraphQL schema only exposes
+fields for the default granularities. To query a custom granularity via the SQL
+API, the GraphQL API, or a BI tool, use a [proxy
+dimension][ref-proxy-granularity] that references it.
 
 </Warning>
 
@@ -1322,6 +1359,10 @@ cube(`fiscal_calendar`, {
 [ref-time-dimensions]: #type
 [link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
 [ref-custom-granularity-recipe]: /recipes/data-modeling/custom-granularity
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-proxy-granularity]: /docs/data-modeling/dimensions#time-dimension-granularity-references
 [ref-ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-data-sources]: /admin/connect-to-data/data-sources
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
@@ -1335,6 +1376,7 @@ cube(`fiscal_calendar`, {
 [link-d3-time-format]: https://d3js.org/d3-time-format
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-case-measures]: /reference/data-modeling/measures#case
+[ref-matching-switch-dimensions]: /docs/pre-aggregations/matching-pre-aggregations#matching-switch-dimensions
 [ref-meta-api]: /reference/core-data-apis/rest-api/reference#base_path/v1/meta
 [ref-string-time-dims]: /recipes/data-modeling/string-time-dimensions
 [ref-workbooks]: /docs/explore-analyze/workbooks
