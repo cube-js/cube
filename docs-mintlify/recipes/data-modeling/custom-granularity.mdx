@@ -24,9 +24,8 @@ dimension][ref-proxy-granularity]. This is not just a convenience: while the
 [REST API][ref-rest-api] can query custom granularities by name, the [SQL
 API][ref-sql-api] and the [GraphQL API][ref-graphql-api] can only address the
 default granularities, so a proxy dimension is the way to query a custom
-granularity from [Playground][ref-playground] or a BI tool. Proxy dimensions can
-also be used in further calculations, like rendering `fiscal_quarter_label`
-below.
+granularity from those APIs or from a BI tool. Proxy dimensions can also be used
+in further calculations, like rendering `fiscal_quarter_label` below.
 
 <CodeGroup>
 
@@ -168,7 +167,6 @@ Querying this data modal would yield the following result:
 [ref-custom-granularities]: /reference/data-modeling/dimensions#granularities
 [ref-default-granularities]: /docs/data-modeling/dimensions#time-dimensions
 [wiki-fiscal-year]: https://en.wikipedia.org/wiki/Fiscal_year
-[ref-playground]: /docs/explore-analyze/playground
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
