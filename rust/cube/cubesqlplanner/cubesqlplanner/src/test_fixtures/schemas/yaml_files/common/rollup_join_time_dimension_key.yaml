@@ -1,0 +1,65 @@
+# A rollupJoin whose join key is declared as a `time_dimension` on one leg rather than as a
+# plain dimension. Resolving the join must look at every member collection a rollup can
+# declare a key in, not only `dimensions`.
+cubes:
+  - name: td_facts
+    sql: "SELECT 1 as id, '2026-01-01'::timestamp as day, 10 as amount"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: day
+        type: time
+        sql: day
+    measures:
+      - name: total_amount
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: td_facts_rollup
+        type: rollup
+        measures:
+          - total_amount
+        time_dimension: day
+        granularity: day
+
+  - name: td_dates
+    sql: "SELECT '2026-01-01'::timestamp as day, 'Q1' as quarter_label"
+
+    joins:
+      - name: td_facts
+        relationship: one_to_many
+        sql: "{CUBE.day} = {td_facts.day}"
+    dimensions:
+      - name: day
+        type: time
+        sql: day
+        primary_key: true
+      - name: quarter_label
+        type: string
+        sql: quarter_label
+    measures:
+      - name: count
+        type: count
+        sql: "COUNT(*)"
+    pre_aggregations:
+      # `day` is the join key and is declared as the rollup's time_dimension.
+      - name: td_dates_rollup
+        type: rollup
+        dimensions:
+          - quarter_label
+        time_dimension: day
+        granularity: day
+      - name: td_rollup_join
+        type: rollupJoin
+        measures:
+          - td_facts.total_amount
+        dimensions:
+          - quarter_label
+        time_dimension: td_facts.day
+        granularity: day
+        rollups:
+          - td_dates.td_dates_rollup
+          - td_facts.td_facts_rollup
