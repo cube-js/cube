@@ -1,7 +1,7 @@
 import { Socket } from 'net';
 
 import { WebSocketConnection } from '../src/WebSocketConnection';
-import { QueryError } from '../src/errors';
+import { MessageTooLargeError, QueryError } from '../src/errors';
 import { QueryResultFormat } from '../codegen';
 import { answeredBy, buildErrorMessage, MockCubeStoreServer } from './mock-cubestore-server';
 
@@ -118,6 +118,69 @@ describe('WebSocketConnection', () => {
 
     await expectAnsweredBy(query('SELECT 1'), 1);
   }, JEST_TIMEOUT);
+
+  describe('message size limit', () => {
+    const MAX_MESSAGE_SIZE = 1024 * 1024;
+
+    beforeEach(() => {
+      process.env.CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE = String(MAX_MESSAGE_SIZE);
+    });
+
+    afterEach(() => {
+      delete process.env.CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE;
+    });
+
+    it('reports a response that is over the limit instead of retrying it', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        mockConnection.ws.send(Buffer.alloc(MAX_MESSAGE_SIZE * 2));
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(MessageTooLargeError);
+      await expect(promise).rejects.toThrow(
+        'Cube Store response size exceeds the maximum message size of 1 MB. ' +
+        'Reduce the amount of data the query returns, e.g. by adding filters or a limit, ' +
+        'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE.'
+      );
+
+      // Re-running the query would only produce the same oversized response.
+      expect(server.received).toHaveLength(1);
+    }, JEST_TIMEOUT);
+
+    it('reports a request that is over the limit without sending it', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      const promise = query(`SELECT ${'x'.repeat(MAX_MESSAGE_SIZE + 1)}`);
+
+      await expect(promise).rejects.toThrow(MessageTooLargeError);
+      await expect(promise).rejects.toThrow(
+        /Cube Store request size of \d+(\.\d+)? MB exceeds the maximum message size of 1 MB/
+      );
+
+      expect(server.connections).toHaveLength(0);
+    }, JEST_TIMEOUT);
+
+    it('reports a request Cube Store refused as too big instead of retrying it', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        // How Cube Store rejects a message that doesn't fit into its limits.
+        mockConnection.ws.close(1009, 'Message too big');
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(MessageTooLargeError);
+      await expect(promise).rejects.toThrow(
+        'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts'
+      );
+
+      expect(server.received).toHaveLength(1);
+    }, JEST_TIMEOUT);
+  });
 
   it('rejects a query when the connection cannot be re-established', async () => {
     process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES = '2';

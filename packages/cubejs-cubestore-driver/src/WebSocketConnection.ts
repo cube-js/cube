@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { parseCubestoreResultMessage } from '@cubejs-backend/native';
-import { ConnectionError, QueryError } from './errors';
+import { ConnectionError, MessageTooLargeError, QueryError } from './errors';
 import {
   BinaryValue,
   BoolValue,
@@ -21,6 +21,18 @@ import {
   QueryResultFormat,
   StringValue,
 } from '../codegen';
+
+// The WebSocket close code for a message that is too big to be processed: `ws`
+// closes with it when an incoming message is over `maxPayload`, and a peer that
+// refuses a message of ours is expected to close with it as well.
+const MESSAGE_TOO_BIG_CLOSE_CODE = 1009;
+
+// The `ws` error code for an incoming message bigger than `maxPayload`.
+const MAX_PAYLOAD_EXCEEDED_CODE = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
+
+function formatSize(bytes: number): string {
+  return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+}
 
 interface SentMessage {
   resolve: (value: any) => void;
@@ -47,6 +59,9 @@ interface CubeStoreWebSocket extends WebSocket {
   // Set as soon as the 'close' handler has scheduled a re-send of the messages
   // that are still in flight on this socket.
   resendScheduled: boolean;
+  // A failure that killed this socket and that re-sending can't fix, so pending
+  // messages are rejected with it instead of being retried.
+  fatalError: Error | null;
 }
 
 export class WebSocketConnection {
@@ -55,6 +70,8 @@ export class WebSocketConnection {
   protected readonly maxConnectRetries: number;
 
   protected readonly noHeartBeatTimeout: number;
+
+  protected readonly maxMessageSize: number;
 
   protected currentConnectionTry: number;
 
@@ -71,6 +88,7 @@ export class WebSocketConnection {
     this.messageCounter = 1;
     this.maxConnectRetries = getEnv('cubeStoreMaxConnectRetries');
     this.noHeartBeatTimeout = getEnv('cubeStoreNoHeartBeatTimeout');
+    this.maxMessageSize = getEnv('cubeStoreMaxMessageSize');
     this.currentConnectionTry = 0;
     this.connectionId = uuidv4();
   }
@@ -80,7 +98,7 @@ export class WebSocketConnection {
       const headers: Record<string, string> = {};
       headers['x-process-id'] = getProcessUid();
 
-      const webSocket = new WebSocket(this.url, { headers }) as CubeStoreWebSocket;
+      const webSocket = new WebSocket(this.url, { headers, maxPayload: this.maxMessageSize }) as CubeStoreWebSocket;
       webSocket.on('upgrade', (response: any) => {
         this.cubeStoreVersion = response.headers['x-cubestore-version'] || null;
       });
@@ -119,6 +137,28 @@ export class WebSocketConnection {
         });
         webSocket.on('open', () => resolve(webSocket));
         webSocket.on('error', (err) => {
+          if ((err as any).code === MAX_PAYLOAD_EXCEEDED_CODE) {
+            // Cube Store answered with a message bigger than this connection
+            // accepts, and `ws` is tearing the connection down. Neither
+            // reconnecting nor retrying the query helps: the response would be
+            // just as big. Pending messages are rejected by the 'close' handler.
+            webSocket.fatalError = new MessageTooLargeError(
+              `Cube Store response size exceeds the maximum message size of ${formatSize(this.maxMessageSize)}. ` +
+              'Reduce the amount of data the query returns, e.g. by adding filters or a limit, ' +
+              'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE.',
+              err
+            );
+
+            if (webSocket === this.webSocket) {
+              this.webSocket = null;
+            }
+
+            // No-op if the connection was already established.
+            reject(webSocket.fatalError);
+
+            return;
+          }
+
           this.currentConnectionTry += 1;
 
           if (this.currentConnectionTry < this.maxConnectRetries) {
@@ -142,10 +182,32 @@ export class WebSocketConnection {
           }
           webSocket.lastHeartBeat = new Date();
         });
-        webSocket.on('close', () => {
+        webSocket.on('close', (code: number) => {
           clearInterval(pingInterval);
 
           if (Object.keys(webSocket.sentMessages).length) {
+            const fatalError = webSocket.fatalError || (
+              // Cube Store refused a message that didn't fit into its limits.
+              code === MESSAGE_TOO_BIG_CLOSE_CODE ? new MessageTooLargeError(
+                'Cube Store closed the connection: message size exceeds the maximum message size Cube Store accepts. ' +
+                'Reduce the size of the query and of the inline tables it sends, or raise ' +
+                'CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE on the Cube Store side.'
+              ) : null
+            );
+
+            if (fatalError) {
+              // eslint-disable-next-line no-restricted-syntax
+              for (const key of Object.keys(webSocket.sentMessages)) {
+                webSocket.sentMessages[key].reject(fatalError);
+              }
+
+              if (webSocket === this.webSocket) {
+                this.webSocket = null;
+              }
+
+              return;
+            }
+
             webSocket.resendScheduled = true;
 
             setTimeout(async () => {
@@ -205,6 +267,7 @@ export class WebSocketConnection {
 
       webSocket.sentMessages = {};
       webSocket.resendScheduled = false;
+      webSocket.fatalError = null;
       this.webSocket = webSocket;
     }
 
@@ -252,6 +315,17 @@ export class WebSocketConnection {
   }
 
   private async sendMessage(messageId: number, buffer: Uint8Array): Promise<any> {
+    if (buffer.length > this.maxMessageSize) {
+      // Cube Store would close the connection on such a message, which shows up
+      // as an unrelated `write EPIPE`, so report it before sending anything.
+      throw new MessageTooLargeError(
+        `Cube Store request size of ${formatSize(buffer.length)} exceeds the maximum message size of ` +
+        `${formatSize(this.maxMessageSize)}. Reduce the size of the query and of the inline tables it sends, ` +
+        'or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE together with CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE ' +
+        'on the Cube Store side.'
+      );
+    }
+
     const socket = await this.initWebSocket();
     return new Promise((resolve, reject) => {
       socket.sentMessages[messageId] = {
