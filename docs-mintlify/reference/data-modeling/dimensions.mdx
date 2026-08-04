@@ -1066,6 +1066,18 @@ Please [file an issue](https://github.com/cube-js/cube/issues) if you need suppo
 
 </Warning>
 
+<Warning>
+
+Custom granularities can be queried by name via the [REST API][ref-rest-api].
+However, neither the [SQL API][ref-sql-api] nor the [GraphQL
+API][ref-graphql-api] can address them by name: the SQL API only supports the
+default granularities in `DATE_TRUNC`, and the GraphQL schema only exposes
+fields for the default granularities. To query a custom granularity via the SQL
+API, the GraphQL API, or a BI tool, use a [proxy
+dimension][ref-proxy-granularity] that references it.
+
+</Warning>
+
 For each custom granularity, the `interval` parameter is required. It specifies
 the duration of the time interval and has the following format:
 `quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`.
@@ -1347,6 +1359,10 @@ cube(`fiscal_calendar`, {
 [ref-time-dimensions]: #type
 [link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
 [ref-custom-granularity-recipe]: /recipes/data-modeling/custom-granularity
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-proxy-granularity]: /docs/data-modeling/dimensions#time-dimension-granularity-references
 [ref-ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-data-sources]: /admin/connect-to-data/data-sources
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes

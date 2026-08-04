@@ -363,11 +363,31 @@ of the PostgreSQL documentation.
 | Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
 | --- | --- | --- | --- |
 | `DATE_ADD` | Add an interval to a timestamp with time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
-| `DATE_TRUNC` | Truncate a timestamp to specified precision | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `DATE_TRUNC` | Truncate a timestamp to specified precision. Only [default granularities][ref-default-granularities] are supported, see below | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `DATEDIFF` | From [Redshift](https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html). Returns the difference between the date parts of two date or time expressions | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `EXTRACT` | Retrieves subfields such as year or hour from date/time values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `LOCALTIMESTAMP` | Returns the current date and time **without** time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `NOW` | Returns the current date and time **with** time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+<Warning>
+
+`DATE_TRUNC` only accepts the default granularities: `year`, `quarter`, `month`,
+`week`, `day`, `hour`, `minute`, `second`. [Custom
+granularities][ref-granularities] can't be addressed by name via the SQL API,
+even though they are exposed in the [metadata][ref-meta-api] and can be queried
+via the [REST API][ref-rest-api]. (The [GraphQL API][ref-graphql-api] can't
+address them by name either — its schema only exposes fields for the default
+granularities.) Using a custom granularity name results in an error:
+
+```
+Execution error: Unsupported date_trunc granularity: fiscal_quarter
+```
+
+To query a custom granularity via the SQL API, define a [proxy
+dimension][ref-proxy-granularity] that references it. It is exposed as a regular
+time dimension and can be selected directly.
+
+</Warning>
 
 ### Conditional expressions
 
@@ -497,6 +517,12 @@ See the [XIRR recipe](/recipes/data-modeling/xirr) for more details.
 [ref-qpp]: /reference/core-data-apis/sql-api/query-format#query-post-processing
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-sql-api-aggregate-functions]: /reference/core-data-apis/sql-api/query-format#aggregate-functions
+[ref-granularities]: /reference/data-modeling/dimensions#granularities
+[ref-default-granularities]: /docs/data-modeling/dimensions#time-dimensions
+[ref-proxy-granularity]: /docs/data-modeling/dimensions#time-dimension-granularity-references
+[ref-meta-api]: /reference/core-data-apis/rest-api/reference#metadata-api
+[ref-rest-api]: /reference/core-data-apis/rest-api
+[ref-graphql-api]: /reference/core-data-apis/graphql-api
 [link-postgres-funcs]: https://www.postgresql.org/docs/current/functions.html
 [link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
 [link-github-new-sql-api-issue]: https://github.com/cube-js/cube/issues/new?assignees=&labels=&projects=&template=sql_api_query_issue.md&title=
