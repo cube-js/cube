@@ -24,7 +24,7 @@ These options appear once a **Split by** dimension is chosen.
 | Option | What it does |
 |---|---|
 | **Columns** | Panels per row, from 1 to 6. The grid wraps and reflows to fit the chart's width. |
-| **Axis scales** | Whether panels share one set of axes (**Shared**) or each scales to its own data (**Independent**). |
+| **Axis scales** | Whether every panel is drawn against the same scale (**Shared**) or each scales to its own data (**Independent**). |
 | **Sort panels by** | Orders the panels by the dimension's own values (**Value**) or by a measure (**Measure**). |
 | **Sort order** | **Ascending** or **Descending**. |
 | **Show panel titles** | Whether each panel is labelled with its dimension value. |
@@ -32,7 +32,9 @@ These options appear once a **Split by** dimension is chosen.
 
 ### Shared vs. independent axis scales
 
-**Shared** is the default, and it is usually what makes small multiples worth using: every panel is drawn against the same axes, so the panels are directly comparable and a taller bar really does mean a bigger number.
+Every panel is labelled with its own x and y axis either way. What the setting changes is the scale those axes are drawn against.
+
+**Shared** is the default, and it is usually what makes small multiples worth using: every panel is drawn against the same scale, so the panels are directly comparable and a taller bar really does mean a bigger number.
 
 Switch to **Independent** when the question is about the *shape* of each series rather than its magnitude — "what does each warehouse's weekly pattern look like", where one high-volume warehouse would otherwise flatten every other panel to a straight line.
 
