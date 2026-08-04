@@ -410,12 +410,13 @@ As you can see, the sorting operation is done after the regular query and the pr
 
 `ORDER BY` is not the only operation this happens to. Anything left to post-processing
 over a regular query that isn't bounded by a small enough limit behaves the same way, so
-`EXPLAIN` is the reliable way to tell. `CubeScanExecutionPlan` prints the regular query
-it will run: `CubeScanExecutionPlan, Request:` followed by JSON (or
-`CubeScanExecutionPlan, SQL:` when the query is pushed down, in which case there is no
-post-processing to worry about). If that JSON has no `limit` key, or a `limit` larger
-than the number of rows you expect, the row limit is applied when the query runs and
-every operation above the scan sees at most that many rows.
+`EXPLAIN` is the reliable way to tell. `CubeScanExecutionPlan` prints the query it will
+run: `CubeScanExecutionPlan, Request:` followed by JSON, or `CubeScanExecutionPlan, SQL:`
+followed by SQL where the query is pushed down. Pushdown can be partial, so operations
+may still sit above a scan that prints `SQL:`. If the JSON has no `limit` key, or the
+limit in the JSON or the printed SQL is larger than the number of rows you expect, the
+row limit is applied when the query runs and every operation above the scan sees at most
+that many rows.
 
 If a query of yours has that shape, you can:
 
