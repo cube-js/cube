@@ -560,6 +560,12 @@
             ]
           },
           {
+            "group": "Cube Store",
+            "pages": [
+              "reference/cubestore/sql-commands"
+            ]
+          },
+          {
             "group": "CLI",
             "pages": [
               "reference/cli"
