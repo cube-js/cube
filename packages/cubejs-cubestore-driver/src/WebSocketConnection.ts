@@ -26,6 +26,9 @@ interface SentMessage {
   resolve: (value: any) => void;
   reject: (reason?: any) => void;
   buffer: Uint8Array;
+  // How many times this message was re-sent over a freshly established
+  // connection. Used to give up instead of retrying forever.
+  resendCount: number;
 }
 
 export type QueryParameter = null | boolean | number | string | Buffer;
@@ -40,7 +43,10 @@ interface CubeStoreWebSocket extends WebSocket {
   readyPromise: Promise<CubeStoreWebSocket>;
   lastHeartBeat: Date;
   sentMessages: Record<number, SentMessage>;
-  sendAsync: (message: Uint8Array) => Promise<void>;
+  sendAsync: (message: Uint8Array, messageId?: number) => Promise<void>;
+  // Set as soon as the 'close' handler has scheduled a re-send of the messages
+  // that are still in flight on this socket.
+  resendScheduled: boolean;
 }
 
 export class WebSocketConnection {
@@ -91,20 +97,25 @@ export class WebSocketConnection {
           }
         }, 5000);
 
-        webSocket.sendAsync = async (message: Uint8Array) => new Promise<void>((resolveSend, rejectSend) => {
+        webSocket.sendAsync = async (message: Uint8Array, messageId?: number) => new Promise<void>((resolveSend) => {
           // If socket is closing this message should be resent
-          if (webSocket.readyState === WebSocket.OPEN) {
-            webSocket.send(message, (err) => {
-              if (err) {
-                rejectSend(new ConnectionError(
-                  `CubeStore connection error: ${err.message}`,
-                  err
-                ));
-              } else {
-                resolveSend();
-              }
-            });
+          if (webSocket.readyState !== WebSocket.OPEN) {
+            resolveSend();
+            return;
           }
+
+          webSocket.send(message, (err) => {
+            if (err) {
+              // The write failed (EPIPE/ECONNRESET when Cube Store dropped the
+              // connection). The message stays registered in `sentMessages`, so
+              // it's re-sent once this socket is closed and a new one is
+              // established -- failing it here would surface a spurious
+              // `write EPIPE` to the user for a perfectly retryable query.
+              this.handleSendError(webSocket, err, messageId);
+            }
+
+            resolveSend();
+          });
         });
         webSocket.on('open', () => resolve(webSocket));
         webSocket.on('error', (err) => {
@@ -135,13 +146,24 @@ export class WebSocketConnection {
           clearInterval(pingInterval);
 
           if (Object.keys(webSocket.sentMessages).length) {
+            webSocket.resendScheduled = true;
+
             setTimeout(async () => {
               try {
                 const nextWebSocket = await this.initWebSocket();
                 // eslint-disable-next-line no-restricted-syntax
                 for (const key of Object.keys(webSocket.sentMessages)) {
-                  nextWebSocket.sentMessages[key] = webSocket.sentMessages[key];
-                  await nextWebSocket.sendAsync(webSocket.sentMessages[key].buffer);
+                  const sentMessage = webSocket.sentMessages[key];
+
+                  if (sentMessage.resendCount >= this.maxConnectRetries) {
+                    sentMessage.reject(new ConnectionError(
+                      `CubeStore connection lost: message wasn't delivered after ${sentMessage.resendCount} retries`
+                    ));
+                  } else {
+                    sentMessage.resendCount += 1;
+                    nextWebSocket.sentMessages[key] = sentMessage;
+                    await nextWebSocket.sendAsync(sentMessage.buffer, Number(key));
+                  }
                 }
               } catch (e) {
                 // eslint-disable-next-line no-restricted-syntax
@@ -182,6 +204,7 @@ export class WebSocketConnection {
       });
 
       webSocket.sentMessages = {};
+      webSocket.resendScheduled = false;
       this.webSocket = webSocket;
     }
 
@@ -192,26 +215,60 @@ export class WebSocketConnection {
     return 1000 * (this.currentConnectionTry + 1);
   }
 
+  /**
+   * Handles a failed write to an already established socket, e.g. `write EPIPE`
+   * when Cube Store closed the connection between the `readyState` check and the
+   * actual write to the underlying TCP socket.
+   *
+   * Such a message is not lost: it stays registered in `sentMessages` and is
+   * re-sent by the 'close' handler over a freshly established connection, so it
+   * must not be rejected here. The socket is terminated to make sure that
+   * 'close' (and with it the re-send) really happens.
+   */
+  private handleSendError(webSocket: CubeStoreWebSocket, err: Error, messageId?: number) {
+    if (webSocket.readyState !== WebSocket.CLOSED) {
+      if (webSocket.readyState === WebSocket.OPEN) {
+        // The socket is broken, but `ws` doesn't know it yet. Terminating it
+        // emits 'close', which re-sends everything still pending on it.
+        webSocket.terminate();
+      }
+
+      // 'close' is still to come and will re-send pending messages.
+      return;
+    }
+
+    // The socket is already closed and the re-send loop is not going to pick
+    // this message up, so there's nothing left to wait for.
+    if (!webSocket.resendScheduled && messageId !== undefined) {
+      const sentMessage = webSocket.sentMessages[messageId];
+      if (sentMessage) {
+        delete webSocket.sentMessages[messageId];
+        sentMessage.reject(new ConnectionError(
+          `CubeStore connection error: ${err.message}`,
+          err
+        ));
+      }
+    }
+  }
+
   private async sendMessage(messageId: number, buffer: Uint8Array): Promise<any> {
     const socket = await this.initWebSocket();
     return new Promise((resolve, reject) => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(buffer, (err) => {
-          if (err) {
-            delete socket.sentMessages[messageId];
-            reject(new ConnectionError(
-              `CubeStore connection error: ${err.message}`,
-              err
-            ));
-          }
-        });
-      }
-
       socket.sentMessages[messageId] = {
         resolve,
         reject,
-        buffer
+        buffer,
+        resendCount: 0,
       };
+
+      // If socket is closing this message should be resent
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(buffer, (err) => {
+          if (err) {
+            this.handleSendError(socket, err, messageId);
+          }
+        });
+      }
     });
   }
 
