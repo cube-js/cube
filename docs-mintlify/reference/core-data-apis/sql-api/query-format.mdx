@@ -409,9 +409,13 @@ As you can see, the sorting operation is done after the regular query and the pr
 ```
 
 `ORDER BY` is not the only operation this happens to. Anything left to post-processing
-over an unbounded `CubeScanExecutionPlan` behaves the same way, so `EXPLAIN` is the
-reliable way to tell: if an operation appears *above* `CubeScanExecutionPlan` and no limit
-has reached the scan itself, that operation reads at most the row limit.
+over a regular query that isn't bounded by a small enough limit behaves the same way, so
+`EXPLAIN` is the reliable way to tell. `CubeScanExecutionPlan` prints the request it
+sends: `CubeScanExecutionPlan, Request:` followed by JSON that includes a `limit` key
+(or `CubeScanExecutionPlan, SQL:` when the query is pushed down, in which case there is
+no post-processing to worry about). If that `limit` is `null`, or larger than the number
+of rows you expect the regular query to return, every operation above the scan sees at
+most the row limit.
 
 If a query of yours has that shape, you can:
 
@@ -425,10 +429,11 @@ If a query of yours has that shape, you can:
   defaults to `CUBEJS_DB_QUERY_LIMIT` and can't exceed it — if you've set it explicitly,
   raise it too.
 - Enable [`CUBESQL_STREAM_MODE`][ref-env-cubesql-stream-mode]: streamed queries aren't
-  capped, so there is nothing to truncate.
+  capped, so there is nothing to truncate. Note that a query is only streamed if it has
+  no limit of its own or one above the cap, so this doesn't combine with the first
+  workaround — adding an explicit `LIMIT` below the cap turns streaming back off.
 - Restructure the query so it is pushed down in full, e.g. by removing the expression
   that prevents it.
-
 
 [ref-regular-queries]: /reference/core-data-apis/queries#regular-query
 [ref-queries-wpp]: /reference/core-data-apis/queries#query-with-post-processing
