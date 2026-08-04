@@ -1617,7 +1617,124 @@ fn between_expr_normalize(
     }))
 }
 
+const NANOSECONDS_IN_DAY: i64 = 86_400_000_000_000;
+
+/// Whether a date/time literal can be held by an `i64` nanosecond timestamp.
+///
+/// Coercing a date to `Timestamp(Nanosecond)` multiplies it by [`NANOSECONDS_IN_DAY`], which arrow
+/// does with an unchecked `*` and then converts infallibly. Outside ±106_751 days of the epoch
+/// (1677-09-22 to 2262-04-11) that multiplication overflows — trapping in a debug build, wrapping
+/// into a garbage instant that chrono then rejects in a release build — so such a literal must
+/// never reach evaluation.
+fn datetime_literal_is_representable(literal: &ScalarValue) -> bool {
+    match literal {
+        ScalarValue::Date32(Some(days)) => (*days as i64).checked_mul(NANOSECONDS_IN_DAY).is_some(),
+        ScalarValue::Date64(Some(millis)) => millis.checked_mul(1_000_000).is_some(),
+        ScalarValue::TimestampSecond(Some(seconds), _) => {
+            seconds.checked_mul(1_000_000_000).is_some()
+        }
+        ScalarValue::TimestampMillisecond(Some(millis), _) => {
+            millis.checked_mul(1_000_000).is_some()
+        }
+        ScalarValue::TimestampMicrosecond(Some(micros), _) => micros.checked_mul(1_000).is_some(),
+        _ => true,
+    }
+}
+
+/// Whether a date-typed literal is nanosecond-representable, resolving a string literal through
+/// the date cast wrapped around it.
+///
+/// A `date '…'` literal reaches this optimizer as `CAST(Utf8(…) AS Date32)` and only becomes a
+/// `Date32` when the cast is evaluated — which is the evaluation that overflows — so the string
+/// has to be parsed here rather than waited for.
+fn cast_target_is_representable(expr: &Expr, data_type: &DataType) -> bool {
+    if !matches!(
+        data_type,
+        DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _)
+    ) {
+        return true;
+    }
+    match expr {
+        Expr::Literal(ScalarValue::Utf8(Some(value)))
+        | Expr::Literal(ScalarValue::LargeUtf8(Some(value))) => {
+            parse_date_str(value).ok().map_or(true, |parsed| {
+                parsed.and_utc().timestamp_nanos_opt().is_some()
+            })
+        }
+        Expr::Literal(literal) => datetime_literal_is_representable(literal),
+        _ => true,
+    }
+}
+
+/// Whether every date/time literal in the tree is nanosecond-representable.
+fn expr_datetime_literals_are_representable(expr: &Expr) -> bool {
+    let mut representable = true;
+    walk_expr_literals(expr, &mut |ok| {
+        if !ok {
+            representable = false;
+        }
+    });
+    representable
+}
+
+/// Walks the tree, reporting the representability of each date/time literal it finds. A cast is
+/// inspected together with its operand, so a string literal is judged against what it is cast to.
+fn walk_expr_literals(expr: &Expr, report: &mut impl FnMut(bool)) {
+    match expr {
+        Expr::Literal(value) => report(datetime_literal_is_representable(value)),
+        Expr::Cast {
+            expr: inner,
+            data_type,
+        }
+        | Expr::TryCast {
+            expr: inner,
+            data_type,
+        } => {
+            report(cast_target_is_representable(inner, data_type));
+            walk_expr_literals(inner, report);
+        }
+        Expr::Alias(inner, _)
+        | Expr::Not(inner)
+        | Expr::IsNull(inner)
+        | Expr::IsNotNull(inner)
+        | Expr::Negative(inner) => walk_expr_literals(inner, report),
+        Expr::BinaryExpr { left, right, .. } => {
+            walk_expr_literals(left, report);
+            walk_expr_literals(right, report);
+        }
+        Expr::Between {
+            expr, low, high, ..
+        } => {
+            walk_expr_literals(expr, report);
+            walk_expr_literals(low, report);
+            walk_expr_literals(high, report);
+        }
+        Expr::InList { expr, list, .. } => {
+            walk_expr_literals(expr, report);
+            for item in list {
+                walk_expr_literals(item, report);
+            }
+        }
+        Expr::ScalarFunction { args, .. } | Expr::ScalarUDF { args, .. } => {
+            for arg in args {
+                walk_expr_literals(arg, report);
+            }
+        }
+        _ => (),
+    }
+}
+
 fn evaluate_expr_stacked(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> {
+    // Evaluating this would overflow the i64 nanosecond timestamp the cast targets. Erroring out
+    // rather than returning the expression unevaluated is deliberate: left in the plan, the cast
+    // reaches the rewriter and overflows there instead.
+    if !expr_datetime_literals_are_representable(&expr) {
+        return Err(DataFusionError::Plan(format!(
+            "Date/time literal is out of range: only values representable as a nanosecond \
+             timestamp are supported, so between 1677-09-22 and 2262-04-11. Expression: {}",
+            expr
+        )));
+    }
     let execution_props = &optimizer.cube_ctx.state.execution_props;
     let mut const_evaluator = ConstEvaluator::new(execution_props);
     expr.rewrite(&mut const_evaluator)
@@ -1639,6 +1756,45 @@ mod tests {
         arrow::datatypes::{DataType, Field, Schema},
         logical_plan::{col, lit, LogicalPlanBuilder},
     };
+
+    /// The nanosecond-representable window is symmetric at ±106_751 days: 106_751 is 2262-04-11
+    /// and -106_751 is 1677-09-22. One day beyond either end overflows an i64 of nanoseconds.
+    #[test]
+    fn test_date32_representable_boundaries() {
+        for days in [0, 1, -1, 106_751, -106_751] {
+            assert!(
+                datetime_literal_is_representable(&ScalarValue::Date32(Some(days))),
+                "Date32({days}) must be representable"
+            );
+        }
+        for days in [106_752, -106_752, i32::MAX, i32::MIN] {
+            assert!(
+                !datetime_literal_is_representable(&ScalarValue::Date32(Some(days))),
+                "Date32({days}) must be rejected"
+            );
+        }
+    }
+
+    /// A `date '…'` literal is still a string when it reaches this optimizer, so the guard has to
+    /// parse it against the type it is cast to rather than wait for a typed value.
+    #[test]
+    fn test_string_literal_judged_through_its_date_cast() {
+        let cast_to_date = |value: &str| {
+            cast_target_is_representable(
+                &Expr::Literal(ScalarValue::Utf8(Some(value.to_string()))),
+                &DataType::Date32,
+            )
+        };
+        assert!(cast_to_date("2262-04-11"));
+        assert!(!cast_to_date("2262-04-12"));
+        assert!(!cast_to_date("9999-12-31"));
+
+        // A non-temporal cast target must not be second-guessed.
+        assert!(cast_target_is_representable(
+            &Expr::Literal(ScalarValue::Utf8(Some("9999-12-31".to_string()))),
+            &DataType::Utf8,
+        ));
+    }
 
     /// Helper function to create a deeply nested OR expression.
     /// This creates a chain like: col = 1 OR col = 2 OR col = 3 OR ... OR col = depth

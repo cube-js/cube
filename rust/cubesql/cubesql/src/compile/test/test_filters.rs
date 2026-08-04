@@ -5,8 +5,12 @@ use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
 
 use crate::compile::{
+    convert_sql_to_cube_query,
     rewrite::rewriter::Rewriter,
-    test::{convert_select_to_query_plan, init_testing_logger, utils::LogicalPlanTestUtils},
+    test::{
+        convert_select_to_query_plan, get_test_session, get_test_tenant_ctx, init_testing_logger,
+        utils::LogicalPlanTestUtils,
+    },
     DatabaseProtocol,
 };
 
@@ -284,4 +288,129 @@ LIMIT 5000
             ..Default::default()
         }
     );
+}
+
+/// A date literal past 2262-04-11 cannot be held by an i64 nanosecond timestamp. Coercing one to
+/// `Timestamp(Nanosecond)` used to overflow arrow's unchecked multiply and abort the query; now
+/// normalization declines instead, and the filter pushes down with the date intact.
+#[tokio::test]
+async fn test_filter_date_beyond_nanosecond_range_is_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (bound, expected) in [
+        ("2262-04-12", "2262-04-12T00:00:00.000Z"),
+        ("9999-12-31", "9999-12-31T00:00:00.000Z"),
+    ] {
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            format!(
+                r#"
+SELECT dim_str0
+FROM MultiTypeCube
+WHERE dim_date0 <= date '{bound}'
+GROUP BY dim_str0
+"#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        assert_eq!(
+            query_plan
+                .as_logical_plan()
+                .find_cube_scan()
+                .request
+                .filters,
+            Some(vec![V1LoadRequestQueryFilterItem {
+                member: Some("MultiTypeCube.dim_date0".to_string()),
+                operator: Some("beforeOrOnDate".to_string()),
+                values: Some(vec![expected.to_string()]),
+                or: None,
+                and: None,
+            }]),
+            "{bound} must push down with the date preserved"
+        );
+    }
+}
+
+/// The last nanosecond-representable date must still plan and push down normally — the guard
+/// above must reject only what genuinely overflows.
+#[tokio::test]
+async fn test_filter_date_at_nanosecond_range_boundary_is_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT dim_str0
+FROM MultiTypeCube
+WHERE dim_date0 <= date '2262-04-11'
+GROUP BY dim_str0
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let filters = query_plan
+        .as_logical_plan()
+        .find_cube_scan()
+        .request
+        .filters
+        .unwrap_or_default();
+    assert_eq!(
+        filters
+            .iter()
+            .map(|filter| filter.operator.clone().unwrap_or_default())
+            .collect::<Vec<_>>(),
+        vec!["beforeOrOnDate".to_string()],
+        "2262-04-11 must still push down as a date filter"
+    );
+}
+
+/// `BETWEEN` normalizes its bounds through a separate path, so an out-of-range bound must be
+/// handled there too rather than aborting the query.
+#[tokio::test]
+async fn test_filter_between_date_beyond_nanosecond_range() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx();
+    let query = convert_sql_to_cube_query(
+        // language=PostgreSQL
+        &r#"
+SELECT dim_str0
+FROM MultiTypeCube
+WHERE dim_date0 BETWEEN date '2020-01-01' AND date '9999-12-31'
+GROUP BY dim_str0
+"#
+        .to_string(),
+        meta.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+    )
+    .await;
+
+    // Whatever the outcome, it must not be a panic.
+    match query {
+        Ok(plan) => {
+            let rendered = format!("{:?}", plan.as_logical_plan().find_cube_scan().request);
+            assert!(
+                rendered.contains("9999-12-31"),
+                "if it plans, the bound must survive: {rendered}"
+            );
+        }
+        Err(error) => assert!(
+            error.message().contains("out of range"),
+            "expected an out-of-range error, got: {}",
+            error.message()
+        ),
+    }
 }
