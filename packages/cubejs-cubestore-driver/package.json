@@ -22,8 +22,9 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/*.ts",
-    "lint:fix": "eslint --fix src/*.ts"
+    "lint": "eslint src/*.ts test/*.ts",
+    "lint:fix": "eslint --fix src/*.ts test/*.ts",
+    "unit": "jest --coverage"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.7.27",
