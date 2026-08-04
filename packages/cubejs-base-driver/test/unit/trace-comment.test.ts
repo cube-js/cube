@@ -101,6 +101,14 @@ describe('buildTraceComment', () => {
     expect(buildTraceComment(`${traceId}-span-1`)).toBe(`/* trace_id: ${traceId} */`);
   });
 
+  // The export strips the RAW request id, so sanitizing first would let a dropped
+  // character close the gap in a near-marker and synthesize a `-span-` that was
+  // never there — emitting `myid` against an export row of `myid-span%-1`.
+  test('strips the span before sanitizing, so a dropped character cannot synthesize a marker', () => {
+    expect(buildTraceComment('myid-span%-1')).toBe('/* trace_id: myid-span-1 */');
+    expect(toTraceId('myid-span%-1')).toBe('myid-span%-1');
+  });
+
   test('returns null when nothing usable remains', () => {
     expect(buildTraceComment(undefined)).toBeNull();
     expect(buildTraceComment('*/')).toBeNull();
