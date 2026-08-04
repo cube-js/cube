@@ -375,8 +375,9 @@ of the PostgreSQL documentation.
 `week`, `day`, `hour`, `minute`, `second`. [Custom
 granularities][ref-granularities] can't be addressed by name via the SQL API,
 even though they are exposed in the [metadata][ref-meta-api] and can be queried
-via the [REST API][ref-rest-api] and the [GraphQL API][ref-graphql-api]. Using a
-custom granularity name results in an error:
+via the [REST API][ref-rest-api]. (The [GraphQL API][ref-graphql-api] can't
+address them by name either — its schema only exposes fields for the default
+granularities.) Using a custom granularity name results in an error:
 
 ```
 Execution error: Unsupported date_trunc granularity: fiscal_quarter

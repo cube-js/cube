@@ -21,11 +21,12 @@ configure each custom granularity in `granularities`.
 
 Note that each custom granularity is also exposed via a [proxy
 dimension][ref-proxy-granularity]. This is not just a convenience: while the
-[REST API][ref-rest-api] and the [GraphQL API][ref-graphql-api] can query custom
-granularities by name, the [SQL API][ref-sql-api] can only address the default
-granularities, so a proxy dimension is the way to query a custom granularity
-from [Playground][ref-playground] or a BI tool. Proxy dimensions can also be
-used in further calculations, like rendering `fiscal_quarter_label` below.
+[REST API][ref-rest-api] can query custom granularities by name, the [SQL
+API][ref-sql-api] and the [GraphQL API][ref-graphql-api] can only address the
+default granularities, so a proxy dimension is the way to query a custom
+granularity from [Playground][ref-playground] or a BI tool. Proxy dimensions can
+also be used in further calculations, like rendering `fiscal_quarter_label`
+below.
 
 <CodeGroup>
 

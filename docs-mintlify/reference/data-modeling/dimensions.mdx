@@ -1068,12 +1068,13 @@ Please [file an issue](https://github.com/cube-js/cube/issues) if you need suppo
 
 <Warning>
 
-Custom granularities can be queried by name via the [REST API][ref-rest-api] and
-the [GraphQL API][ref-graphql-api]. However, the [SQL API][ref-sql-api] can only
-address the default granularities by name; `DATE_TRUNC` with a custom
-granularity name results in an error. To query a custom granularity via the SQL
-API or a BI tool, use a [proxy dimension][ref-proxy-granularity] that references
-it.
+Custom granularities can be queried by name via the [REST API][ref-rest-api].
+However, neither the [SQL API][ref-sql-api] nor the [GraphQL
+API][ref-graphql-api] can address them by name: the SQL API only supports the
+default granularities in `DATE_TRUNC`, and the GraphQL schema only exposes
+fields for the default granularities. To query a custom granularity via the SQL
+API, the GraphQL API, or a BI tool, use a [proxy
+dimension][ref-proxy-granularity] that references it.
 
 </Warning>
 
