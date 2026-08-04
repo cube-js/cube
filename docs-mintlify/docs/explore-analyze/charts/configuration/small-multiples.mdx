@@ -23,12 +23,10 @@ These options appear once a **Split by** dimension is chosen.
 
 | Option | What it does |
 |---|---|
-| **Columns** | Panels per row, from 1 to 6. The grid wraps and reflows to fit the chart's width. |
+| **Grid** | Columns × rows, up to 5 × 4. Both are preselected from the number of distinct values in the split dimension, so a four-value dimension opens as a 2 × 2 grid. |
 | **Axis scales** | Whether every panel is drawn against the same scale (**Shared**) or each scales to its own data (**Independent**). |
 | **Sort panels by** | Orders the panels by the dimension's own values (**Value**) or by a measure (**Measure**). |
 | **Sort order** | **Ascending** or **Descending**. |
-| **Show panel titles** | Whether each panel is labelled with its dimension value. |
-| **Max panels** | The largest number of panels to draw. Defaults to 12. |
 
 ### Shared vs. independent axis scales
 
@@ -38,13 +36,13 @@ Every panel is labelled with its own x and y axis either way. What the setting c
 
 Switch to **Independent** when the question is about the *shape* of each series rather than its magnitude — "what does each warehouse's weekly pattern look like", where one high-volume warehouse would otherwise flatten every other panel to a straight line.
 
-### Max panels
+### How many panels are drawn
 
-Splitting by a high-cardinality dimension would otherwise draw hundreds of panels, each too small to read. **Max panels** bounds that, defaulting to 12.
+The grid bounds the render: a chart split into 3 × 2 draws at most six panels, so a high-cardinality dimension can never produce hundreds of unreadable ones. The largest grid is 5 × 4, or twenty panels.
 
-When a dimension has more values than the cap, the chart draws the first N in the current sort order and reports how many are hidden. Raising the cap draws more panels; the underlying query is unaffected either way, so no data is lost.
+When a dimension has more values than the grid has tiles, the chart draws the first ones in the current sort order. The underlying query is unaffected, so no data is lost — a bigger grid simply shows more of it.
 
-Sorting interacts with the cap: with **Sort panels by** set to a measure and a descending order, the cap keeps the top N by that measure — which is usually the more useful set than the first N alphabetically.
+Sorting interacts with this: with **Sort panels by** set to a measure and a descending order, the grid keeps the top panels by that measure, which is usually more useful than the first ones alphabetically.
 
 ## Interaction with other settings
 
@@ -54,6 +52,7 @@ A legend is shared across the grid rather than repeated per panel. Clicking a le
 
 ## Limitations
 
-- **One split dimension.** A single grid axis, wrapped into rows by the **Columns** setting. Splitting by two dimensions at once (a row × column matrix) is not supported.
+- **One split dimension.** One dimension fills the grid, wrapping into rows. Splitting by two dimensions at once — one down the rows and another across the columns — is not supported.
 - **Cartesian charts only.** Bar, line, area, and scatter. Pie, table, KPI, heatmap, map, and HTML charts cannot be split.
-- **Panel title styling** is a visibility toggle; font, size, and color are not configurable.
+- **Panel labels are not configurable.** Each panel is labelled with its dimension value; the font, size, and color are fixed.
+- **Single-view charts only.** A chart with data labels, a reference line, or a second y-axis series cannot be split yet.
