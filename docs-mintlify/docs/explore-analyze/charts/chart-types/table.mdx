@@ -288,11 +288,13 @@ Totals are pinned to the bottom of the table rather than being part of the paged
 
 ## Conditional formatting
 
-The **Formatting** tab applies cell or row styling based on conditions you define. Configure:
+The **Formatting** tab applies cell or row styling based on conditions you define. A **rule** picks the field to evaluate, and holds one or more **cases** — each pairing a condition with the styling to apply when it is met. Configure:
 
 1. The field to evaluate
-2. The condition — an operator and, for most operators, a value to compare against (see [Conditions](#conditions))
-3. The styling to apply when the condition is met (background color, text color)
+2. The condition of each case — an operator and, for most operators, a value to compare against (see [Conditions](#conditions))
+3. The styling that case applies (background color, text color, bold/italic/underline, and an [indicator icon](#indicator-icons))
+
+Use **Add case** to give a rule more than one condition — a three-tier indicator, for example, is three cases in one rule. When several could apply to the same cell, the first matching case in the first matching rule wins.
 
 To make a background transparent, open the color picker and clear the hex value.
 
@@ -351,11 +353,42 @@ Under a column pivot, a row spans several values of the same measure (one per pi
 
 {/* TODO screenshot: conditional formatting panel with a condition configured (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
+### Rule presets
+
+Picking an entry from the menu next to **Add rule** adds a ready-made rule you can then adjust. It holds three groups:
+
+- **Indicators** — cases that mark values with an [icon](#indicator-icons) instead of recoloring them.
+- **Conditional formats** — cases that tint the cell: **Above threshold**, **Below threshold**, **2-tier traffic light** (green at or above the threshold, red on the rest), and **3-tier traffic light** (green above the threshold, amber exactly at it, red on the rest).
+- **Color scales** — gradient rules, described under [color scale](#color-scale).
+
+Both indicator and conditional-format presets compare against a single threshold, which starts at `0` — adjust it to the value you're comparing against.
+
+### Indicator icons
+
+A conditional-formatting case can also draw an **icon** beside the cell value — an arrow up, an arrow down, a check mark, a cross, a dash, or a dot. This is how you show a goal comparison: set the condition to the threshold you care about, and the icon marks the cells that meet it.
+
+Each case carries its own icon settings, on the row below its text formatting. Pick a shape from the **Icon** dropdown to turn the icon on; the **No icon** option turns it back off. Once a shape is chosen you can also set:
+
+- **Icon color** — starts from the case's text color and is independent from then on, so changing the text color later leaves the icon as you set it.
+- **Icon placement** — **right** of the value (the default) or **left**.
+
+The icon is drawn next to the value, never instead of it. On a column displayed as [inline bars](#inline-bars) or [sparklines](#sparklines), the icon sits beside the bar or the trend line, and it still appears when that column's value is hidden.
+
+Each case draws one icon, so a three-tier indicator — arrow up above target, dash within tolerance, arrow down below — takes three cases. Totals rows are never given an icon.
+
+To add a ready-made indicator rule, open the [preset menu](#rule-presets) and pick from **Indicators**:
+
+- **Achieved or failed** — a green check mark at or above the threshold, a red cross on every other value.
+- **Above or below** — a green arrow up at or above the threshold, a red arrow down on every other value.
+- **Standout or not** — a dot on the values strictly above the threshold, a muted dash on the rest.
+
+All three are two-case, with their icons already set; add the third case yourself if you want a three-tier indicator.
+
 ### Color scale
 
-A **color scale** (heat map) tints each cell of a numeric column with a gradient based on where its value falls in the column's range. It is a rule type in the **Formatting** tab, alongside conditional formatting — switch a rule between **Conditional formatting** and **Color scale** with the **Type** selector inside the rule.
+A **color scale** (heat map) tints each cell of a numeric column with a gradient based on where its value falls in the column's range. It is a rule type in the **Formatting** tab, alongside conditional formatting — switch a rule between **Conditional** and **Scale** with the **Type** selector inside the rule.
 
-To add one quickly, open the menu next to **Add rule** and pick a color-scale preset:
+To add one quickly, open the [preset menu](#rule-presets) and pick from **Color scales**:
 
 - **Outstanding values** — a two-color scale that highlights the highest values.
 - **Divergent values** — a three-color scale that distinguishes low, middle, and high values.
