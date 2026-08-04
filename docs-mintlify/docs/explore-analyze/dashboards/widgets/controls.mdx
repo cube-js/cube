@@ -108,6 +108,8 @@ Set the visibility from the **Visibility** dropdown when editing the control. **
 
 When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] whose query already uses the same dimension. Charts that don't reference that dimension are left alone, so a dashboard can mix scoped and unscoped views by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
 
+Adding a chart built on a different semantic view is the case where this needs attention, so the dashboard [prompts you to connect the controls](#connecting-controls-to-a-new-chart) as you add it.
+
 ### Incompatible controls
 
 If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Controls of the other type still apply — for example, if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa.
@@ -130,17 +132,30 @@ Open **Controls mapping** from a chart's settings menu to inspect or override th
 - **Toggle the control on or off** for the chart, even when a mapping exists
 - **Pick a different dimension** from the chart's semantic view to remap the control to
 
-Three states show up in the mapping sidebar:
+Four states show up in the mapping sidebar:
 
 | Status | What it means |
 |---|---|
 | **Mapped automatically** | The control's dimension exists on the chart's semantic view, so it's wired up without configuration. |
 | **Manually mapped** | You (or an AI agent) picked a specific dimension for this chart. **Reset** restores the automatic mapping. |
-| **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view. The chart is unaffected by the control until you map it manually. |
+| **Suggested match** | The chart's semantic view has a dimension with the same name and type as the control's. The suggestion is offered, not applied — select it (or use **Accept all**) and save to map the control. |
+| **Can't map automatically** | The control targets a dimension that doesn't exist on the chart's semantic view, and no same-name match was found. The chart is unaffected by the control until you map it manually. |
+
+A suggested match never applies on its own. Two semantic views can share a dimension name and mean different things by it, so a control reaches a chart on another view only once the mapping is saved.
 
 For [time granularity switchers][ref-time-grain], the dimension picker is restricted to time-typed dimensions on the chart's semantic view, since other dimension types can't be resolved by the time granularity pipeline.
 
 Mappings are also configurable by AI agents when they build or edit a dashboard, so an agent can wire controls across charts that use different semantic views without you needing to revisit each chart manually.
+
+### Connecting controls to a new chart
+
+When you add a chart built on a semantic view that some of the dashboard's controls don't reach, a prompt appears naming the chart, its view, and how many controls can be connected to it. It appears whenever at least one control could be connected — including when other controls already apply to the new chart:
+
+- **Connect** maps every control that has a same-name, same-type dimension on the new chart's view, in one action. The confirmation offers **Undo**, which restores the previous mappings without touching anything else you've changed since.
+- **Review…** opens the chart's [Controls mapping](#controls-mapping) with the suggestions staged, so you can accept some and pick dimensions manually for the rest.
+- **Dismiss** leaves the chart unmapped. The chart's controls indicator still shows how many controls apply, so you can connect them later.
+
+Controls with no same-name match are left unmapped rather than guessed at, and a control you'd explicitly turned off for that chart stays off.
 
 [ref-time-grain]: #time-granularity-switcher
 
