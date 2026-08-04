@@ -430,9 +430,11 @@ If a query of yours has that shape, you can:
   defaults to `CUBEJS_DB_QUERY_LIMIT` and can't exceed it — if you've set it explicitly,
   raise it too.
 - Enable [`CUBESQL_STREAM_MODE`][ref-env-cubesql-stream-mode]: streamed queries aren't
-  capped, so there is nothing to truncate. Note that a query is only streamed if it has
-  no limit of its own or one above the cap, so this doesn't combine with the first
-  workaround — adding an explicit `LIMIT` below the cap turns streaming back off.
+  capped, so there is nothing to truncate. Whether a query streams is decided by the
+  limit in the scan's request — the one `EXPLAIN` prints — and not by the `LIMIT` clause
+  in your SQL: it streams when that request has no limit, or one above the cap. So this
+  combines with the first workaround only up to a point: a `LIMIT` that reaches the scan
+  turns streaming back off, while one that doesn't, as in the plan above, leaves it on.
 - Restructure the query so it is pushed down in full, e.g. by removing the expression
   that prevents it.
 
