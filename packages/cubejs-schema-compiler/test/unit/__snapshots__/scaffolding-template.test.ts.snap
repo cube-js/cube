@@ -24,7 +24,8 @@ exports[`ScaffoldingTemplate JavaScript formatter big query nested fields: order
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id]
     }
   },
   
@@ -59,12 +60,14 @@ exports[`ScaffoldingTemplate JavaScript formatter escaping back tick: some_order
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id]
     },
     
     amount: {
       sql: \`amount\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drill_members: [id]
     }
   },
   
@@ -102,7 +105,8 @@ exports[`ScaffoldingTemplate JavaScript formatter should add options if passed: 
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id]
     }
   },
   
@@ -142,12 +146,14 @@ exports[`ScaffoldingTemplate JavaScript formatter template with snake case: acco
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id]
     },
     
     failure_count: {
       sql: \`failure_count\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drill_members: [id]
     }
   },
   
@@ -185,12 +191,14 @@ exports[`ScaffoldingTemplate JavaScript formatter template with snake case: cust
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id, name]
     },
     
     visit_count: {
       sql: \`visit_count\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drill_members: [id, name]
     }
   },
   
@@ -223,12 +231,14 @@ exports[`ScaffoldingTemplate JavaScript formatter template with snake case: orde
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id]
     },
     
     amount: {
       sql: \`amount\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drill_members: [id]
     }
   },
   
@@ -268,12 +278,14 @@ exports[`ScaffoldingTemplate JavaScript formatter template: Accounts.js 1`] = `
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drillMembers: [id]
     },
     
     failureCount: {
       sql: \`failure_count\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drillMembers: [id]
     }
   },
   
@@ -311,12 +323,14 @@ exports[`ScaffoldingTemplate JavaScript formatter template: Customers.js 1`] = `
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drillMembers: [id, name]
     },
     
     visitCount: {
       sql: \`visit_count\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drillMembers: [id, name]
     }
   },
   
@@ -349,12 +363,14 @@ exports[`ScaffoldingTemplate JavaScript formatter template: Orders.js 1`] = `
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drillMembers: [id]
     },
     
     amount: {
       sql: \`amount\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drillMembers: [id]
     }
   },
   
@@ -389,7 +405,8 @@ exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id, name]
     }
   },
   
@@ -433,12 +450,14 @@ exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of
   
   measures: {
     count: {
-      type: \`count\`
+      type: \`count\`,
+      drill_members: [id, test]
     },
     
     amount: {
       sql: \`amount\`,
-      type: \`sum\`
+      type: \`sum\`,
+      drill_members: [id, test]
     }
   },
   
@@ -456,7 +475,6 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for MySQL driver: a
     sql_table: public.accounts
 
     joins: []
-
     dimensions:
       - name: id
         sql: id
@@ -474,10 +492,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for MySQL driver: a
     measures:
       - name: count
         type: count
+        drill_members: [id]
 
       - name: failure_count
         sql: failure_count
         type: sum
+        drill_members: [id]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -492,7 +512,6 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: ac
     sql_table: public.accounts
 
     joins: []
-
     dimensions:
       - name: id
         sql: id
@@ -510,10 +529,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: ac
     measures:
       - name: count
         type: count
+        drill_members: [id]
 
       - name: failure_count
         sql: failure_count
         type: sum
+        drill_members: [id]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -545,10 +566,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: cu
     measures:
       - name: count
         type: count
+        drill_members: [id, name]
 
       - name: visit_count
         sql: visit_count
         type: sum
+        drill_members: [id, name]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -576,10 +599,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: or
     measures:
       - name: count
         type: count
+        drill_members: [id]
 
       - name: amount
         sql: amount
         type: sum
+        drill_members: [id]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -594,7 +619,6 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema with a catalog: acc
     sql_table: hello_catalog.public.accounts
 
     joins: []
-
     dimensions:
       - name: id
         sql: id
@@ -612,10 +636,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema with a catalog: acc
     measures:
       - name: count
         type: count
+        drill_members: [id]
 
       - name: failure_count
         sql: failure_count
         type: sum
+        drill_members: [id]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -630,7 +656,6 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
     sql_table: public.customers
 
     joins: []
-
     dimensions:
       - name: id
         sql: id
@@ -644,6 +669,7 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
     measures:
       - name: count
         type: count
+        drill_members: [id, name]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -680,10 +706,12 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
     measures:
       - name: count
         type: count
+        drill_members: [id, test]
 
       - name: amount
         sql: amount
         type: sum
+        drill_members: [id, test]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
