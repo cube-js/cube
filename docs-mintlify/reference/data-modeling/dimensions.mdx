@@ -269,7 +269,13 @@ For `string` dimensions:
 | Format | Description |
 |--------|-------------|
 | `imageUrl` | Display the value as an image |
-| `link` | Display the value as a hyperlink |
+| `link` | Display the value as a hyperlink, using the value itself as the URL |
+
+The `link` format also accepts an object form — `format: { type: link, label: … }` — so the
+cell shows a label instead of the raw URL (see `crm_link` in the example below).
+
+In [Workbooks][ref-workbooks], a `link`-formatted value renders as a clickable link in
+table cells. Values that aren't `http`, `https`, or `mailto` URLs render as plain text.
 
 For `number` dimensions, you can use the same named formats and custom
 [d3-format][link-d3-format] specifiers as [measures](/reference/data-modeling/measures#format):
@@ -313,8 +319,8 @@ cubes:
         sql: "'https://na1.salesforce.com/' || id"
         type: string
         format:
-          label: View in Salesforce
           type: link
+          label: View in Salesforce
 
       - name: created_at
         sql: created_at
@@ -349,8 +355,8 @@ cube(`orders`, {
       sql: `'https://na1.salesforce.com/' || id`,
       type: `string`,
       format: {
-        label: `View in Salesforce`,
-        type: `link`
+        type: `link`,
+        label: `View in Salesforce`
       }
     },
 
@@ -429,8 +435,9 @@ Using it with other dimension types will result in a validation error.
 ### `links`
 
 The `links` parameter allows you to define **one or more** links associated with a
-dimension (it is a list). They can be rendered as HTML links by supporting tools, e.g.,
-[Workbooks][ref-workbooks].
+dimension (it is a list). In [Workbooks][ref-workbooks], every link is available from the
+table **cell context menu**, and the link marked `primary` also renders inline, as a
+clickable link on the cell value itself.
 
 Links are useful to let users navigate to related external resources (e.g., Google
 search), internal tools (e.g., Salesforce), or other pages in a BI tool.
@@ -452,6 +459,11 @@ icon set][link-tabler] to be displayed alongside the link label. Use the icon's 
 name without any prefix (e.g. `brand-google`, `external-link`, `layout-dashboard`, `send`);
 browse the available names at [tabler.io/icons][link-tabler]. When omitted, a default link
 icon is shown.
+
+Optionally, one link per dimension might set `primary: true`. In [Workbooks][ref-workbooks]
+that link renders inline on the cell value, so it is reachable in one click while the rest
+stay in the cell context menu. A dimension may mark at most one link as primary. Rows whose
+primary link URL resolves to an empty value render the cell as plain text.
 
 Optionally, a link might use the `target` parameter to specify [where to open it][link-target]:
 `blank` to open in a new tab/window or `self` to open in the same tab/window. The default
@@ -475,6 +487,7 @@ cubes:
             url: "CONCAT('https://www.google.com/search?q=', {CUBE}.full_name)"
             icon: brand-google
             target: blank
+            primary: true
           
           - name: salesforce_search
             label: Search in Salesforce
