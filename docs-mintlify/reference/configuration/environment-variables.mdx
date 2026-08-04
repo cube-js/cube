@@ -1517,11 +1517,11 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 ## `CUBESQL_STREAM_MODE`
 
 If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][ref-sql-api].
-When enabled, SQL API queries with an explicit `LIMIT` clause can exceed the
-maximum row limit set by
-[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit)
-and are streamed instead.
-Queries without an explicit `LIMIT` still use [`CUBEJS_DB_QUERY_DEFAULT_LIMIT`](#cubejs_db_query_default_limit).
+When enabled, SQL API queries with no `LIMIT` clause, or with one above the maximum row
+limit set by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit),
+are streamed instead and aren't capped by it.
+Queries with a `LIMIT` at or below that limit are not streamed.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
