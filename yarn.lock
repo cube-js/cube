@@ -22319,18 +22319,18 @@ socket.io-client@2.5.0, socket.io-client@^2.2.0:
     to-array "0.1.4"
 
 socket.io-parser@~3.3.0:
-  version "3.3.5"
-  resolved "https://registry.yarnpkg.com/socket.io-parser/-/socket.io-parser-3.3.5.tgz#f07ca7a170de80837464aee39972acac6189ee9f"
-  integrity sha512-pn+xG/oVnofxqteOawycpHw9QKclpNRa+Z7RW0vZmrIpkgZOVSVzBvY1YGR+p9kIEZXkeAjpHa21wRNLCZ6UAA==
+  version "3.3.6"
+  resolved "https://registry.yarnpkg.com/socket.io-parser/-/socket.io-parser-3.3.6.tgz#ffe4e0aaea71a7e4dc58436c90c33814a3ac7e75"
+  integrity sha512-+VwteZF0qtYVkcO1nhKf6ZUVz5wq6Ya+Lx10y3Y81Sp5+iyGGY2GTcd81W36C/r1tjP+GhXjiXaLKlCMyE+yHQ==
   dependencies:
     component-emitter "~1.3.0"
     debug "~3.1.0"
     isarray "2.0.1"
 
 socket.io-parser@~3.4.0:
-  version "3.4.4"
-  resolved "https://registry.yarnpkg.com/socket.io-parser/-/socket.io-parser-3.4.4.tgz#bf44554a59246bfec27a11297d7277f35fe01817"
-  integrity sha512-9JWZRGFA1aFK5W9yPrHoaZBOuaPE4NO7VZr96uVAsP8zkAYZkzrKeQhNPKkiPJq3qQK5q9c5xKcMysE5PUnPbw==
+  version "3.4.5"
+  resolved "https://registry.yarnpkg.com/socket.io-parser/-/socket.io-parser-3.4.5.tgz#9da1ebad3d7ccc4b7894fad841c4560b91ab88d1"
+  integrity sha512-nrhzTtwpgt8tN+la+9Tpzj2epV7FMtr+9lqcfpwopjoxBfUXvBR7TWwF+/UT7RiTbFcHiEJdvRZ7yptJgZxo1Q==
   dependencies:
     component-emitter "1.2.1"
     debug "~4.1.0"
