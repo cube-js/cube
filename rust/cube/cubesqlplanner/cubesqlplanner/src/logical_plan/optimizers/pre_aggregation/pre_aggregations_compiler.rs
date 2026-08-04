@@ -551,26 +551,18 @@ impl PreAggregationsCompiler {
 
     /// Whether `member` — one side of a join hop — is available in `pre_aggr`.
     ///
-    /// A join key may be declared as any kind of member, so this looks at the same collections
-    /// `build_join_source` uses to derive the target join hints. Time dimensions are stored
-    /// granularity-wrapped (`orders.created_at_day`), while a join key resolves to the bare
-    /// dimension, so they are compared through their base symbol.
+    /// A join key resolves to a dimension, which the rollup may have declared either plainly or
+    /// as its time dimension. Time dimensions are stored granularity-wrapped
+    /// (`orders.created_at_day`), so they are compared through their base symbol.
     fn pre_aggregation_covers_join_member(
         pre_aggr: &CompiledPreAggregation,
         member: &Rc<MemberSymbol>,
     ) -> bool {
-        let matches_directly = pre_aggr
-            .dimensions
-            .iter()
-            .chain(pre_aggr.segments.iter())
-            .any(|pa_m| member == pa_m);
-
-        matches_directly
+        pre_aggr.dimensions.iter().any(|pa_m| member == pa_m)
             || pre_aggr.time_dimensions.iter().any(|pa_m| {
                 pa_m.as_time_dimension()
                     .map(|td| td.base_symbol() == member)
                     .unwrap_or(false)
-                    || member == pa_m
             })
     }
 

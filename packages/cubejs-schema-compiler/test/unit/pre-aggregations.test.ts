@@ -1493,4 +1493,94 @@ describe('pre-aggregations', () => {
         .toThrow(/rollupJoinFourCubes/);
     });
   });
+
+  // A join key can be declared as a rollup's time dimension instead of a plain dimension.
+  // Both planners resolve the hop through it — the legacy JS matcher is still reachable, so it
+  // is asserted explicitly rather than left to the Tesseract path.
+  describe('rollupJoin whose join key is a time dimension', () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(
+      `
+        cube('td_dates', {
+          sql: \`SELECT '2026-01-01'::timestamp as day, 'Q1' as quarter_label\`,
+
+          joins: {
+            td_facts: {
+              relationship: 'one_to_many',
+              sql: \`\${CUBE.day} = \${td_facts.day}\`
+            }
+          },
+
+          dimensions: {
+            day: { sql: 'day', type: 'time', primary_key: true },
+            quarter_label: { sql: 'quarter_label', type: 'string' },
+          },
+
+          pre_aggregations: {
+            // \`day\` is the join key, and it is declared here as the time dimension.
+            td_dates_rollup: {
+              dimensions: [quarter_label],
+              timeDimension: day,
+              granularity: 'day'
+            },
+            td_rollup_join: {
+              type: 'rollupJoin',
+              measures: [td_facts.total_amount],
+              dimensions: [quarter_label],
+              timeDimension: td_facts.day,
+              granularity: 'day',
+              rollups: [td_dates_rollup, td_facts.td_facts_rollup]
+            }
+          }
+        });
+
+        cube('td_facts', {
+          sql: \`SELECT 1 as id, '2026-01-01'::timestamp as day, 10 as amount\`,
+
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            day: { sql: 'day', type: 'time' },
+          },
+
+          measures: {
+            total_amount: { sql: 'amount', type: 'sum' },
+          },
+
+          pre_aggregations: {
+            td_facts_rollup: {
+              measures: [total_amount],
+              timeDimension: day,
+              granularity: 'day'
+            }
+          }
+        });
+      `
+    );
+
+    beforeAll(async () => {
+      await compiler.compile();
+    });
+
+    it.each([
+      ['Tesseract planner', true],
+      ['legacy JS planner', false],
+    ])('resolves the hop through the time dimension (%s)', async (_name, useNativeSqlPlanner) => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['td_facts.total_amount'],
+        dimensions: ['td_dates.quarter_label'],
+        timeDimensions: [{
+          dimension: 'td_facts.day',
+          granularity: 'day',
+        }],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+        useNativeSqlPlanner,
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.map((d: any) => d.preAggregationId).sort()).toEqual(
+        ['td_dates.td_dates_rollup', 'td_facts.td_facts_rollup']
+      );
+      expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('td_rollup_join');
+    });
+  });
 });
