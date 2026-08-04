@@ -56,7 +56,8 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
           (v) => typeof v !== 'object' || v instanceof MemberReference
         )
       ) {
-        return ` [${value.map(this.render).join(', ')}]\n`;
+        // The caller separates keys itself — a newline here doubles the blank line.
+        return ` [${value.map((v) => this.render(v)).join(', ')}]`;
       }
 
       return `\n${value
