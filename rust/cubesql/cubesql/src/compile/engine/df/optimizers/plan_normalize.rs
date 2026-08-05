@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use chrono::{Datelike, NaiveDate};
 use datafusion::{
     arrow::datatypes::{DataType, TimeUnit},
     error::{DataFusionError, Result},
@@ -1427,8 +1428,9 @@ fn binary_expr_normalize(
 }
 
 /// Casts a string literal expression to the given type, evaluating it to a constant.
-/// Timestamp targets are parsed with Cube's date parser, which accepts date-only
-/// strings (e.g. `'2026-06-01'`) that the Arrow cast kernel rejects.
+/// Date and timestamp targets are parsed with Cube's date parser, which accepts date-only
+/// strings (e.g. `'2026-06-01'`) that the Arrow cast kernel rejects — and which, unlike the
+/// kernel, reaches dates outside the nanosecond window without overflowing.
 /// Returns `None` when the literal can't be casted.
 fn cast_string_literal_expr(
     optimizer: &PlanNormalize,
@@ -1436,27 +1438,61 @@ fn cast_string_literal_expr(
     cast_type: &DataType,
     schema: &DFSchema,
 ) -> Option<Box<Expr>> {
-    if let (Expr::Literal(ScalarValue::Utf8(Some(value))), DataType::Timestamp(unit, tz)) =
-        (expr, cast_type)
-    {
-        let parsed = parse_date_str(value).ok()?.and_utc();
-        let scalar = match unit {
-            TimeUnit::Second => ScalarValue::TimestampSecond(Some(parsed.timestamp()), tz.clone()),
-            TimeUnit::Millisecond => {
-                ScalarValue::TimestampMillisecond(Some(parsed.timestamp_millis()), tz.clone())
-            }
-            TimeUnit::Microsecond => {
-                ScalarValue::TimestampMicrosecond(Some(parsed.timestamp_micros()), tz.clone())
-            }
-            TimeUnit::Nanosecond => {
-                ScalarValue::TimestampNanosecond(Some(parsed.timestamp_nanos_opt()?), tz.clone())
-            }
-        };
-        return Some(Box::new(Expr::Literal(scalar)));
+    if let Expr::Literal(ScalarValue::Utf8(Some(value))) = expr {
+        if let Some(scalar) = parse_string_literal_as(value, cast_type) {
+            return Some(Box::new(Expr::Literal(scalar)));
+        }
     }
 
     let casted = expr.clone().cast_to(cast_type, schema).ok()?;
     evaluate_expr(optimizer, casted).ok()
+}
+
+/// Parses a string literal into a date/timestamp scalar of the given type, or `None` for a
+/// non-temporal target or an unparseable string.
+///
+/// `Date32`/`Date64` are built here rather than left to the Arrow cast kernel because that kernel
+/// routes a date through an unchecked nanosecond multiply, so a date beyond 2262-04-11 overflows.
+/// Day and millisecond counts have no such limit, so the parsed value is used directly.
+fn parse_string_literal_as(value: &str, cast_type: &DataType) -> Option<ScalarValue> {
+    // Checked before parsing so a non-temporal target costs nothing.
+    if !matches!(
+        cast_type,
+        DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _)
+    ) {
+        return None;
+    }
+    let parsed = parse_date_str(value).ok()?.and_utc();
+    match cast_type {
+        // chrono's own date range is ±96_465_292 days, so the day count always fits an i32.
+        DataType::Date32 => {
+            let epoch = NaiveDate::from_ymd_opt(1970, 1, 1)?;
+            Some(ScalarValue::Date32(Some(
+                parsed.date_naive().num_days_from_ce() - epoch.num_days_from_ce(),
+            )))
+        }
+        DataType::Date64 => Some(ScalarValue::Date64(Some(parsed.timestamp_millis()))),
+        DataType::Timestamp(TimeUnit::Second, tz) => Some(ScalarValue::TimestampSecond(
+            Some(parsed.timestamp()),
+            tz.clone(),
+        )),
+        DataType::Timestamp(TimeUnit::Millisecond, tz) => Some(ScalarValue::TimestampMillisecond(
+            Some(parsed.timestamp_millis()),
+            tz.clone(),
+        )),
+        DataType::Timestamp(TimeUnit::Microsecond, tz) => Some(ScalarValue::TimestampMicrosecond(
+            Some(parsed.timestamp_micros()),
+            tz.clone(),
+        )),
+        DataType::Timestamp(TimeUnit::Nanosecond, tz) => Some(match parsed.timestamp_nanos_opt() {
+            Some(nanos) => ScalarValue::TimestampNanosecond(Some(nanos), tz.clone()),
+            // The instant is real but no nanosecond timestamp can hold it. Milliseconds reach it
+            // comfortably and the filter is rendered from the scalar, not from this unit, so the
+            // bound survives instead of being dropped back to an un-normalized string.
+            None => ScalarValue::Date64(Some(parsed.timestamp_millis())),
+        }),
+        _ => None,
+    }
 }
 
 /// Returns the type a literal string should be casted to based on the operator
@@ -1667,22 +1703,25 @@ fn cast_target_is_representable(expr: &Expr, data_type: &DataType) -> bool {
     }
 }
 
-/// Whether every date/time literal in the tree is nanosecond-representable.
-fn expr_datetime_literals_are_representable(expr: &Expr) -> bool {
-    let mut representable = true;
-    walk_expr_literals(expr, &mut |ok| {
-        if !ok {
-            representable = false;
-        }
-    });
-    representable
-}
+/// Finds the first date/time literal in the tree that no `i64` nanosecond timestamp can hold,
+/// returning it rendered for the error message. A cast is inspected together with its operand, so
+/// a string literal is judged against what it is cast to.
+///
+/// The match is deliberately exhaustive rather than defaulting: a literal hidden from this walk
+/// reaches the overflowing cast unguarded, so a newly added `Expr` variant must fail to compile
+/// here instead of silently becoming a hiding place. Only leaves that carry no sub-expression of
+/// their own return `None` directly.
+fn find_unrepresentable_datetime_literal(expr: &Expr) -> Option<String> {
+    fn first<'a>(exprs: impl IntoIterator<Item = &'a Expr>) -> Option<String> {
+        exprs
+            .into_iter()
+            .find_map(find_unrepresentable_datetime_literal)
+    }
 
-/// Walks the tree, reporting the representability of each date/time literal it finds. A cast is
-/// inspected together with its operand, so a string literal is judged against what it is cast to.
-fn walk_expr_literals(expr: &Expr, report: &mut impl FnMut(bool)) {
     match expr {
-        Expr::Literal(value) => report(datetime_literal_is_representable(value)),
+        Expr::Literal(value) => {
+            (!datetime_literal_is_representable(value)).then(|| value.to_string())
+        }
         Expr::Cast {
             expr: inner,
             data_type,
@@ -1691,37 +1730,68 @@ fn walk_expr_literals(expr: &Expr, report: &mut impl FnMut(bool)) {
             expr: inner,
             data_type,
         } => {
-            report(cast_target_is_representable(inner, data_type));
-            walk_expr_literals(inner, report);
+            if !cast_target_is_representable(inner, data_type) {
+                return Some(inner.to_string());
+            }
+            find_unrepresentable_datetime_literal(inner)
         }
         Expr::Alias(inner, _)
         | Expr::Not(inner)
         | Expr::IsNull(inner)
         | Expr::IsNotNull(inner)
-        | Expr::Negative(inner) => walk_expr_literals(inner, report),
-        Expr::BinaryExpr { left, right, .. } => {
-            walk_expr_literals(left, report);
-            walk_expr_literals(right, report);
+        | Expr::Negative(inner)
+        | Expr::Sort { expr: inner, .. }
+        | Expr::InSubquery { expr: inner, .. }
+        | Expr::GetIndexedField {
+            expr: inner,
+            key: _,
+        } => find_unrepresentable_datetime_literal(inner),
+        Expr::BinaryExpr { left, right, .. } | Expr::AnyExpr { left, right, .. } => {
+            first([left.as_ref(), right.as_ref()])
+        }
+        Expr::Like(like) | Expr::ILike(like) | Expr::SimilarTo(like) => {
+            first([like.expr.as_ref(), like.pattern.as_ref()])
         }
         Expr::Between {
             expr, low, high, ..
-        } => {
-            walk_expr_literals(expr, report);
-            walk_expr_literals(low, report);
-            walk_expr_literals(high, report);
-        }
-        Expr::InList { expr, list, .. } => {
-            walk_expr_literals(expr, report);
-            for item in list {
-                walk_expr_literals(item, report);
-            }
-        }
-        Expr::ScalarFunction { args, .. } | Expr::ScalarUDF { args, .. } => {
-            for arg in args {
-                walk_expr_literals(arg, report);
-            }
-        }
-        _ => (),
+        } => first([expr.as_ref(), low.as_ref(), high.as_ref()]),
+        Expr::InList { expr, list, .. } => first(std::iter::once(expr.as_ref()).chain(list.iter())),
+        Expr::ScalarFunction { args, .. }
+        | Expr::ScalarUDF { args, .. }
+        | Expr::AggregateUDF { args, .. } => first(args.iter()),
+        Expr::AggregateFunction {
+            args, within_group, ..
+        } => first(args.iter().chain(within_group.iter().flatten())),
+        Expr::WindowFunction {
+            args,
+            partition_by,
+            order_by,
+            ..
+        } => first(args.iter().chain(partition_by).chain(order_by)),
+        Expr::Case {
+            expr: base,
+            when_then_expr,
+            else_expr,
+        } => first(
+            base.iter()
+                .chain(else_expr.iter())
+                .map(|inner| inner.as_ref())
+                .chain(
+                    when_then_expr
+                        .iter()
+                        .flat_map(|(when, then)| [when.as_ref(), then.as_ref()]),
+                ),
+        ),
+        Expr::GroupingSet(grouping_set) => match grouping_set {
+            GroupingSet::Rollup(exprs) | GroupingSet::Cube(exprs) => first(exprs.iter()),
+            GroupingSet::GroupingSets(sets) => first(sets.iter().flatten()),
+        },
+        Expr::TableUDF { args, .. } => first(args.iter()),
+        Expr::Column(_)
+        | Expr::ScalarVariable(_, _)
+        | Expr::QualifiedWildcard { .. }
+        | Expr::Wildcard
+        | Expr::OuterColumn(_, _) => None,
     }
 }
 
@@ -1729,11 +1799,12 @@ fn evaluate_expr_stacked(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> 
     // Evaluating this would overflow the i64 nanosecond timestamp the cast targets. Erroring out
     // rather than returning the expression unevaluated is deliberate: left in the plan, the cast
     // reaches the rewriter and overflows there instead.
-    if !expr_datetime_literals_are_representable(&expr) {
+    if let Some(literal) = find_unrepresentable_datetime_literal(&expr) {
         return Err(DataFusionError::Plan(format!(
-            "Date/time literal is out of range: only values representable as a nanosecond \
-             timestamp are supported, so between 1677-09-22 and 2262-04-11. Expression: {}",
-            expr
+            "Date/time literal {} is out of range: only instants representable as a nanosecond \
+             timestamp are supported, so between 1677-09-22T00:12:43.145Z and \
+             2262-04-11T23:47:16.854Z",
+            literal
         )));
     }
     let execution_props = &optimizer.cube_ctx.state.execution_props;
@@ -1765,13 +1836,15 @@ mod tests {
         for days in [0, 1, -1, 106_751, -106_751] {
             assert!(
                 datetime_literal_is_representable(&ScalarValue::Date32(Some(days))),
-                "Date32({days}) must be representable"
+                "Date32({}) must be representable",
+                days
             );
         }
         for days in [106_752, -106_752, i32::MAX, i32::MIN] {
             assert!(
                 !datetime_literal_is_representable(&ScalarValue::Date32(Some(days))),
-                "Date32({days}) must be rejected"
+                "Date32({}) must be rejected",
+                days
             );
         }
     }
@@ -1795,6 +1868,126 @@ mod tests {
             &Expr::Literal(ScalarValue::Utf8(Some("9999-12-31".to_string()))),
             &DataType::Utf8,
         ));
+    }
+
+    /// Normalizing a string bound must not depend on the target unit being able to hold it: a
+    /// nanosecond target that cannot reach the instant falls back to milliseconds rather than
+    /// giving up, which is what used to leave the bound as an un-normalized string.
+    #[test]
+    fn test_string_literal_normalizes_beyond_the_nanosecond_range() {
+        let nanos = DataType::Timestamp(TimeUnit::Nanosecond, None);
+
+        assert_eq!(
+            parse_string_literal_as("9999-12-31", &nanos),
+            Some(ScalarValue::Date64(Some(253402214400000))),
+            "an unreachable instant must still normalize, via milliseconds"
+        );
+        assert!(
+            matches!(
+                parse_string_literal_as("2020-01-01", &nanos),
+                Some(ScalarValue::TimestampNanosecond(Some(_), None))
+            ),
+            "a reachable instant must still use the requested unit"
+        );
+
+        // Day counts have no nanosecond limit, so a date target needs no fallback.
+        assert_eq!(
+            parse_string_literal_as("9999-12-31", &DataType::Date32),
+            Some(ScalarValue::Date32(Some(2932896))),
+        );
+
+        // A non-temporal target and an unparseable string are both left alone.
+        assert_eq!(parse_string_literal_as("9999-12-31", &DataType::Utf8), None);
+        assert_eq!(parse_string_literal_as("not a date", &nanos), None);
+    }
+
+    /// The walk has no catch-all arm, so a literal cannot hide inside a container expression and
+    /// reach the overflowing cast unguarded. Each case below nests the same out-of-range literal
+    /// one variant deeper.
+    #[test]
+    fn test_unrepresentable_literal_found_inside_containers() {
+        let out_of_range = || Expr::Cast {
+            expr: Box::new(Expr::Literal(ScalarValue::Utf8(Some(
+                "9999-12-31".to_string(),
+            )))),
+            data_type: DataType::Date32,
+        };
+        let in_range = || Expr::Literal(ScalarValue::Date32(Some(0)));
+
+        let containers = [
+            (
+                "case-then",
+                Expr::Case {
+                    expr: None,
+                    when_then_expr: vec![(
+                        Box::new(Expr::Literal(ScalarValue::Boolean(Some(true)))),
+                        Box::new(out_of_range()),
+                    )],
+                    else_expr: Some(Box::new(in_range())),
+                },
+            ),
+            (
+                "case-else",
+                Expr::Case {
+                    expr: None,
+                    when_then_expr: vec![],
+                    else_expr: Some(Box::new(out_of_range())),
+                },
+            ),
+            (
+                "between-high",
+                Expr::Between {
+                    expr: Box::new(in_range()),
+                    negated: false,
+                    low: Box::new(in_range()),
+                    high: Box::new(out_of_range()),
+                },
+            ),
+            (
+                "aggregate-arg",
+                Expr::AggregateFunction {
+                    fun: datafusion::logical_expr::AggregateFunction::Max,
+                    args: vec![out_of_range()],
+                    distinct: false,
+                    within_group: None,
+                },
+            ),
+            (
+                "aggregate-within-group",
+                Expr::AggregateFunction {
+                    fun: datafusion::logical_expr::AggregateFunction::Max,
+                    args: vec![in_range()],
+                    distinct: false,
+                    within_group: Some(vec![out_of_range()]),
+                },
+            ),
+            (
+                "sort-inner",
+                Expr::Sort {
+                    expr: Box::new(out_of_range()),
+                    asc: true,
+                    nulls_first: false,
+                },
+            ),
+            ("alias", out_of_range().alias("a")),
+        ];
+
+        for (label, expr) in containers {
+            assert!(
+                find_unrepresentable_datetime_literal(&expr).is_some(),
+                "{} must not hide an out-of-range literal from the guard",
+                label
+            );
+        }
+
+        // An in-range literal in the same shapes must not be reported.
+        assert!(find_unrepresentable_datetime_literal(&Expr::Between {
+            expr: Box::new(in_range()),
+            negated: false,
+            low: Box::new(in_range()),
+            high: Box::new(in_range()),
+        })
+        .is_none());
     }
 
     /// Helper function to create a deeply nested OR expression.
