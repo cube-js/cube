@@ -146,6 +146,24 @@ export abstract class BaseDriver implements DriverInterface {
     return this.sqlPreambleValue;
   }
 
+  /**
+   * Whether this driver applies `sql_preamble`.
+   *
+   * False here, overridden by the drivers that wire it, so **inheritance carries
+   * the answer**: `RedshiftDriver extends PostgresDriver` and every JDBC-based
+   * driver inherit both the hook and this flag without listing themselves
+   * anywhere. That is the point — a hand-maintained list of supporting dbTypes
+   * would be a second source of truth that goes stale silently every time a
+   * driver is added or subclassed.
+   *
+   * Used to warn when a preamble is configured for a driver that ignores it: the
+   * option is then a no-op that still moves the pre-aggregation version key, so
+   * it costs a full rebuild and changes nothing about how queries run.
+   */
+  public supportsSqlPreamble(): boolean {
+    return false;
+  }
+
   protected informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},

@@ -241,6 +241,16 @@ export class JDBCDriver extends BaseDriver {
    * user-configured value, not the per-dbType built-ins — those are fixed for a
    * driver and would add a constant to every key.
    */
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Inherited by every JDBC-based driver — Databricks among them — which reuse
+   * the replay this class performs on each acquired connection.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
+  }
+
   public override effectiveSqlPreamble(): string | undefined {
     return normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', {
       dataSource: this.config.dataSource ?? 'default',

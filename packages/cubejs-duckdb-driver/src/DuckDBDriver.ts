@@ -378,6 +378,16 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1', []);
   }
 
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Applied on the connection `init()` prepares, plus a replay on the one
+   * `stream()` opens.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
+  }
+
   public readOnly() {
     return false;
   }

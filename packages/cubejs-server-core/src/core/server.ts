@@ -130,6 +130,13 @@ export class CubejsServerCore {
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
+  /**
+   * Data sources already warned about an unapplied SQL preamble. Driver
+   * resolution runs per data source and can retry, so this keeps the warning to
+   * one line rather than one per attempt.
+   */
+  protected readonly sqlPreambleWarnedDataSources: Set<string> = new Set();
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
@@ -668,6 +675,8 @@ export class CubejsServerCore {
                 driver.setLogger(this.logger);
               }
 
+              this.warnUnsupportedSqlPreamble(driver, dataSource);
+
               await driver.testConnection();
 
               return driver;
@@ -902,6 +911,56 @@ export class CubejsServerCore {
       this.driver = driver;
     }
     return this.driver;
+  }
+
+  /**
+   * Warns once per data source when a SQL preamble is configured for a driver
+   * that does not apply it.
+   *
+   * The option is then a no-op for queries, but it still participates in the
+   * pre-aggregation version key, so setting it rebuilds every pre-aggregation on
+   * that data source for no behavioural change. Cost with no effect, and
+   * previously with no signal either.
+   *
+   * Asks the driver rather than consulting a list of dbTypes: `supportsSqlPreamble()`
+   * is inherited, so `RedshiftDriver extends PostgresDriver` and every JDBC-based
+   * driver answer correctly without being enumerated anywhere. It also fires here
+   * rather than in the orchestrator, so a deployment with no pre-aggregations at
+   * all still sees it — the query-path no-op is the part that surprises people.
+   */
+  protected warnUnsupportedSqlPreamble(driver: BaseDriver, dataSource: string) {
+    if (this.sqlPreambleWarnedDataSources.has(dataSource)) {
+      return;
+    }
+
+    // `supportsSqlPreamble` is optional on the interface, so an out-of-tree
+    // driver that predates it is not assumed unsupported — saying nothing beats
+    // telling someone their working config does nothing.
+    if (typeof driver.supportsSqlPreamble !== 'function' || driver.supportsSqlPreamble()) {
+      return;
+    }
+
+    let configured: string | undefined;
+    try {
+      configured = normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource }))
+        ?? normalizeSqlPreamble(getEnv('dbSqlPreamble', { dataSource, preAggregations: true }));
+    } catch (e) {
+      // An undeclared data source is reported elsewhere, with a clearer message.
+      return;
+    }
+
+    if (configured) {
+      this.sqlPreambleWarnedDataSources.add(dataSource);
+      this.logger('SQL preamble not applied', {
+        warning:
+          'A SQL preamble is configured for this data source, but its driver does not apply it, so ' +
+          'it changes nothing about how queries run. It still participates in the pre-aggregation ' +
+          'version key, so setting it rebuilds every pre-aggregation on this data source. Supported ' +
+          'by the BigQuery, Snowflake, Postgres, Redshift, CrateDB, Materialize, MySQL, DuckDB and ' +
+          'JDBC-based drivers.',
+        dataSource,
+      });
+    }
   }
 
   /**

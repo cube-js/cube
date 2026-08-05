@@ -247,6 +247,15 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
         AND tc.constraint_type = 'FOREIGN KEY'${conditionString ? ` AND (${conditionString})` : ''};`;
   }
 
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Applied per connection on all three paths that run user SQL.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
+  }
+
   public readOnly() {
     return !!this.config.readOnly;
   }

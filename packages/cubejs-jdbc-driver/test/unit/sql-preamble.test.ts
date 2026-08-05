@@ -32,6 +32,13 @@ describe('JDBC sql preamble', () => {
     delete process.env.CUBEJS_DB_SQL_PREAMBLE;
   });
 
+  // Read by the unapplied-preamble warning at driver resolution. Declared here
+  // rather than in a list of dbTypes so every JDBC-based driver — Databricks
+  // among them — inherits the right answer without being enumerated.
+  it('declares that it applies the preamble', () => {
+    expect(driverFor({ dbType: 'athena' }).supportsSqlPreamble()).toBe(true);
+  });
+
   it('keeps the per-dbType built-ins when nothing is configured', () => {
     expect(driverFor({ dbType: 'mysql' }).prepareConnectionQueries()).toEqual([MYSQL_BUILT_IN]);
     expect(driverFor({ dbType: 'athena' }).prepareConnectionQueries()).toEqual([]);

@@ -92,65 +92,19 @@ describe('pre-aggregation SQL preamble in the version key', () => {
       .toThrow('something else went wrong entirely');
   });
 
-  // The key participates for every driver, but only eight drivers apply the
-  // option. On any other data source a preamble is a no-op that still rebuilds
-  // every pre-aggregation — cost with no effect, and previously no signal.
-  describe('the unsupported-driver warning', () => {
-    let warn: jest.SpyInstance;
+  // The unapplied-preamble warning deliberately does NOT live here: it belongs
+  // where the resolved driver can be asked (`server.ts`), so it also reaches a
+  // deployment with no pre-aggregations at all. Covered in cubejs-server-core.
+  test('resolving the preamble emits no warning of its own', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => { /* captured */ });
 
-    beforeEach(() => {
-      warn = jest.spyOn(console, 'warn').mockImplementation(() => { /* captured */ });
-      delete process.env.CUBEJS_DB_TYPE;
-    });
-
-    afterEach(() => {
+    try {
+      process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
+      expect(getPreAggregationSqlPreamble(basePreAggregation())).toEqual('SET a = 1');
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
       warn.mockRestore();
-      delete process.env.CUBEJS_DB_TYPE;
-    });
-
-    // Each case needs its own data source: the warning is emitted once per
-    // data source, so reusing one would let an earlier case suppress a later.
-    const forDbType = (dbType: string, dataSource: string) => {
-      process.env.CUBEJS_DB_TYPE = dbType;
-      process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
-
-      return getPreAggregationSqlPreamble({ ...basePreAggregation(), dataSource });
-    };
-
-    test('warns when the driver does not apply the preamble', () => {
-      expect(forDbType('clickhouse', 'ds_clickhouse')).toEqual('SET a = 1');
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain('clickhouse');
-      expect(warn.mock.calls[0][0]).toContain('does not apply it');
-    });
-
-    test('stays quiet for a driver that applies it', () => {
-      expect(forDbType('bigquery', 'ds_bigquery')).toEqual('SET a = 1');
-      expect(warn).not.toHaveBeenCalled();
-    });
-
-    // The version functions run on every query, so an unconditional log floods.
-    test('warns once per data source, not once per call', () => {
-      forDbType('clickhouse', 'ds_repeat');
-      forDbType('clickhouse', 'ds_repeat');
-      forDbType('clickhouse', 'ds_repeat');
-
-      expect(warn).toHaveBeenCalledTimes(1);
-    });
-
-    test('stays quiet when no preamble is configured', () => {
-      process.env.CUBEJS_DB_TYPE = 'clickhouse';
-      getPreAggregationSqlPreamble({ ...basePreAggregation(), dataSource: 'ds_nopreamble' });
-
-      expect(warn).not.toHaveBeenCalled();
-    });
-
-    test('stays quiet when no db type is declared to check against', () => {
-      process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
-      getPreAggregationSqlPreamble({ ...basePreAggregation(), dataSource: 'ds_nodbtype' });
-
-      expect(warn).not.toHaveBeenCalled();
-    });
+    }
   });
 
   test('setting a preamble changes the structure version', () => {
