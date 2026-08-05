@@ -31,20 +31,6 @@ different for multitenant setups.
 | --------------- | ---------------------- | --------------------- |
 | A valid string  | `cubejs`               | `cubejs`              |
 
-## `CUBEJS_AUTO_RUN_MODE`
-
-The deployment-wide default for whether [Explore](/docs/explore-analyze/explore)
-and [Workbooks](/docs/explore-analyze/workbooks/querying-data) tabs run their
-query automatically as it's built, or wait for an explicit **Run query**. Set
-via the **Auto-run** switch in [Model Configuration](/docs/data-modeling/configuration#auto-run).
-A view's `meta.auto_run` setting and a user's per-tab toggle both take
-precedence over this default. Only the literal string `false` turns it off —
-any other value (including unset) is treated as on.
-
-| Possible Values | Default in Development | Default in Production |
-| ---------------- | ----------------------- | ----------------------- |
-| `true`, `false`  | `true`                   | `true`                   |
-
 ## `CUBEJS_AUTO_DRILL_MEMBERS`
 
 If `true`, measures that declare no [`drill_members`][ref-drill-members] get a
@@ -73,11 +59,26 @@ includes them.
 The most drill members
 [`CUBEJS_AUTO_DRILL_MEMBERS`](#cubejs_auto_drill_members) will add to a measure.
 Has no effect unless that variable is enabled. `0` disables the default set
-entirely.
+entirely. With `CUBEJS_AUTO_DRILL_MEMBERS` enabled, a value that isn't a number
+fails data model compilation.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A number        | `10`                   | `10`                  |
+
+## `CUBEJS_AUTO_RUN_MODE`
+
+The deployment-wide default for whether [Explore](/docs/explore-analyze/explore)
+and [Workbooks](/docs/explore-analyze/workbooks/querying-data) tabs run their
+query automatically as it's built, or wait for an explicit **Run query**. Set
+via the **Auto-run** switch in [Model Configuration](/docs/data-modeling/configuration#auto-run).
+A view's `meta.auto_run` setting and a user's per-tab toggle both take
+precedence over this default. Only the literal string `false` turns it off —
+any other value (including unset) is treated as on.
+
+| Possible Values | Default in Development | Default in Production |
+| ---------------- | ----------------------- | ----------------------- |
+| `true`, `false`  | `true`                   | `true`                   |
 
 ## `CUBEJS_AWS_KEY`
 
