@@ -31,12 +31,6 @@ const DRILL_ATTRIBUTE_DICTIONARY = [
   'label',
 ];
 
-/**
- * Drill members are meant to identify one row, not to mirror the whole cube — a long
- * list makes the drill table unreadable and slow.
- */
-const MAX_DRILL_MEMBERS = 5;
-
 const JOIN_RELATIONSHIP_MAP = {
   hasOne: 'one_to_one',
   has_one: 'one_to_one',
@@ -152,8 +146,12 @@ export abstract class BaseSchemaFormatter {
 
   /**
    * Members that identify one source row, in the order a user reads them: the primary
-   * key, then a few describing attributes, then the main time dimension. Mirrors the
+   * key, then the describing attributes, then the main time dimension. Mirrors the
    * shape the AI model generator authors, so both generation paths drill alike.
+   *
+   * The list is not capped — no comparable generator caps one, and the attribute
+   * dictionary already bounds it to columns that describe the row. Truncating instead
+   * drops members the user would then have to add by hand.
    *
    * Derived from the dimensions actually being rendered rather than from the ones
    * ScaffoldingSchema computed: the cube-descriptor path lets the caller drop members,
@@ -162,7 +160,8 @@ export abstract class BaseSchemaFormatter {
   protected drillMembers(dimensions: Dimension[]): Dimension[] {
     const isTime = (d: Dimension) => (d.type ?? d.types?.[0]) === 'time';
 
-    // Deduped up front: a collision resolved after capping would waste the slot it took.
+    // Deduped because dimensions render into an object keyed by member name: two columns
+    // that collapse to one name must not repeat in the drill list.
     const candidates = this.dedupeByMemberName(dimensions);
 
     const primaryKeys = candidates.filter((d) => d.isPrimaryKey);
@@ -173,18 +172,7 @@ export abstract class BaseSchemaFormatter {
     // so the first one is the row's main timestamp.
     const mainTimeDimension = candidates.filter(isTime).slice(0, 1);
 
-    // The timestamp keeps its slot on a wide table — capping the attributes rather than
-    // the whole list is what stops "when" being crowded out by "what". A composite key
-    // can still fill the list on its own, so the total is capped too.
-    const cappedAttributes = attributes.slice(
-      0,
-      Math.max(0, MAX_DRILL_MEMBERS - primaryKeys.length - mainTimeDimension.length)
-    );
-
-    return [...primaryKeys, ...cappedAttributes, ...mainTimeDimension].slice(
-      0,
-      MAX_DRILL_MEMBERS
-    );
+    return [...primaryKeys, ...attributes, ...mainTimeDimension];
   }
 
   /**

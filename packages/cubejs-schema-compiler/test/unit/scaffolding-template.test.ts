@@ -495,7 +495,7 @@ describe('ScaffoldingTemplate', () => {
       expect(content).not.toContain('order_status');
     });
 
-    it('keeps the list short on a wide table', () => {
+    it('keeps every describing attribute on a wide table', () => {
       const wide = {
         public: {
           things: [
@@ -516,14 +516,10 @@ describe('ScaffoldingTemplate', () => {
         snakeCase: true,
       }).generateFilesByTableNames(['public.things'])[0];
 
-      const drillMembers = content
-        .match(/drill_members: \[([^\]]+)\]/)?.[1]
-        .split(', ');
-
-      expect(drillMembers).toHaveLength(5);
-      expect(drillMembers?.[0]).toBe('id');
-      // The timestamp keeps its slot — attributes are what get capped.
-      expect(drillMembers?.[drillMembers.length - 1]).toBe('created_at');
+      // Nothing is truncated: primary key, every dictionary attribute, then the timestamp.
+      expect(content).toContain(
+        'drill_members: [id, name, title, status, category, type, code, created_at]'
+      );
     });
 
     it('lists a member once when two columns render to the same name', () => {
@@ -545,7 +541,7 @@ describe('ScaffoldingTemplate', () => {
       expect(content).toContain('drill_members: [id, user_name]');
     });
 
-    it('does not waste a slot on a name collision', () => {
+    it('collapses a name collision without dropping later members', () => {
       const { content } = new ScaffoldingTemplate(
         {
           public: {
@@ -564,12 +560,14 @@ describe('ScaffoldingTemplate', () => {
         { format: SchemaFormat.Yaml, snakeCase: true }
       ).generateFilesByTableNames(['public.things'])[0];
 
+      // `user name` and `user_name` render to one member, so it appears once — and
+      // collapsing it costs none of the attributes that follow.
       expect(content).toContain(
-        'drill_members: [id, user_name, title, status, created_at]'
+        'drill_members: [id, user_name, title, status, category, created_at]'
       );
     });
 
-    it('caps the list even when the primary key is composite', () => {
+    it('keeps a composite primary key whole, with the timestamp after it', () => {
       const { content } = new ScaffoldingTemplate(
         {
           public: {
@@ -588,11 +586,12 @@ describe('ScaffoldingTemplate', () => {
         { format: SchemaFormat.Yaml, snakeCase: true }
       ).generateFilesByTableNames(['public.things'])[0];
 
-      const drillMembers = content
-        .match(/drill_members: \[([^\]]+)\]/)?.[1]
-        .split(', ');
-
-      expect(drillMembers).toHaveLength(5);
+      // A 6-column key no longer crowds out the attribute or the timestamp. The key
+      // columns follow the order `dimensions` renders them in, whatever that is — the
+      // point here is that all of them survive, plus what comes after.
+      expect(content).toContain(
+        'drill_members: [k6, k5, k4, k3, k2, k1, name, created_at]'
+      );
     });
   });
 });
