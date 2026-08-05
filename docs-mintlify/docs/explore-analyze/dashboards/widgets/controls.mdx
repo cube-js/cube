@@ -108,7 +108,7 @@ Set the visibility from the **Visibility** dropdown when editing the control. **
 
 When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the control's own semantic view. Charts on other views are left alone, so a dashboard can mix scoped and unscoped charts by default. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different dimension.
 
-Adding a chart built on a different semantic view is the case where this needs attention, so the dashboard [prompts you to connect the controls](#connecting-controls-to-a-new-chart) as you add it.
+Adding a chart built on a different semantic view is the case where this needs attention, so the dashboard [prompts you to connect the controls](#connecting-controls-to-a-new-chart) as you add it — when there's something it can connect. If none of the controls has a match on the new chart's view, no prompt appears — the chart's controls indicator is the only signal, and you map a control to it by hand.
 
 ### Incompatible controls
 
