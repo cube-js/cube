@@ -83,6 +83,13 @@ const { version } = require('../../../package.json');
 const DRIVER_REBUILD_WARN_THRESHOLD = 50;
 
 /**
+ * How many times one request will retry after losing the race to rebuild a
+ * driver before settling for whatever is cached. Bounds the work a single
+ * request can be made to do when contexts keep displacing each other's driver.
+ */
+const MAX_DRIVER_REBUILD_ATTEMPTS = 3;
+
+/**
  * What a cached driver was built from. `null` on either field means "cannot
  * tell whether it changed", which is always read as "assume it did not".
  */
@@ -664,7 +671,11 @@ export class CubejsServerCore {
      * Driver factory function `DriverFactoryByDataSource`. Named so the rebuild
      * path can re-enter it when another caller wins the race to replace a key.
      */
-    const resolveDataSourceDriver = async (dataSource = 'default', preAggregations = false): Promise<BaseDriver> => {
+    const resolveDataSourceDriver = async (
+      dataSource = 'default',
+      preAggregations = false,
+      attempt = 0,
+    ): Promise<BaseDriver> => {
       const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
 
       const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
@@ -710,7 +721,24 @@ export class CubejsServerCore {
         // supersedes ours: start over rather than release a driver it has
         // already handed out, or build a second pool alongside it.
         if (driverPromise[factoryKey] !== cached) {
-          return resolveDataSourceDriver(dataSource, preAggregations);
+          const superseding = driverPromise[factoryKey];
+
+          // Retry, so this request ends up on a driver matching its own
+          // context — but bounded. Where contexts keep displacing each other
+          // this request could otherwise lose every round and pay for a
+          // user-supplied factory call each time. Past the bound, take what is
+          // cached: degrading to a reused driver is this design's fallback
+          // everywhere else, and it is strictly better than starving.
+          if (attempt < MAX_DRIVER_REBUILD_ATTEMPTS) {
+            return resolveDataSourceDriver(dataSource, preAggregations, attempt + 1);
+          }
+
+          if (superseding) {
+            return superseding;
+          }
+
+          // Invalidated rather than replaced, so there is nothing to reuse —
+          // fall through and build, which cannot recurse again.
         }
 
         if (!staleness.stale) {
@@ -724,10 +752,16 @@ export class CubejsServerCore {
         driverRebuilds[rebuildKey] = (driverRebuilds[rebuildKey] || 0) + 1;
         const rebuildCount = driverRebuilds[rebuildKey];
 
+        // Carries `warning` so it survives the default log level: a plain-params
+        // message matches no allowlist in `prodLogger`/`devLogger` and is
+        // dropped below `trace`. Tearing down a connection pool is an event an
+        // operator needs to be able to correlate against, and the threshold
+        // message below arrives too late to reconstruct the first rebuilds.
         this.logger('Rebuilding driver on configuration change', {
           dataSource,
           preAggregations,
           rebuildCount,
+          warning: 'Driver configuration changed; replacing the connection.',
         });
 
         // A credential rotation rebuilds a handful of times a day. Rebuilding
