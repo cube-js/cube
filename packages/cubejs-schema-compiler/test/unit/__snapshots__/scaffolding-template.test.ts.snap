@@ -25,7 +25,7 @@ exports[`ScaffoldingTemplate JavaScript formatter big query nested fields: order
   measures: {
     count: {
       type: \`count\`,
-      drill_members: [id]
+      drill_members: [id, some_dimension_inside]
     }
   },
   
@@ -61,13 +61,13 @@ exports[`ScaffoldingTemplate JavaScript formatter escaping back tick: some_order
   measures: {
     count: {
       type: \`count\`,
-      drill_members: [id]
+      drill_members: [id, somedimension]
     },
     
     amount: {
       sql: \`amount\`,
       type: \`sum\`,
-      drill_members: [id]
+      drill_members: [id, somedimension]
     }
   },
   
@@ -106,7 +106,7 @@ exports[`ScaffoldingTemplate JavaScript formatter should add options if passed: 
   measures: {
     count: {
       type: \`count\`,
-      drill_members: [id]
+      drill_members: [id, some_dimension_inside]
     }
   },
   
@@ -147,13 +147,13 @@ exports[`ScaffoldingTemplate JavaScript formatter template with snake case: acco
   measures: {
     count: {
       type: \`count\`,
-      drill_members: [id]
+      drill_members: [id, username, password]
     },
     
     failure_count: {
       sql: \`failure_count\`,
       type: \`sum\`,
-      drill_members: [id]
+      drill_members: [id, username, password]
     }
   },
   
@@ -279,13 +279,13 @@ exports[`ScaffoldingTemplate JavaScript formatter template: Accounts.js 1`] = `
   measures: {
     count: {
       type: \`count\`,
-      drillMembers: [id]
+      drillMembers: [id, username, password]
     },
     
     failureCount: {
       sql: \`failure_count\`,
       type: \`sum\`,
-      drillMembers: [id]
+      drillMembers: [id, username, password]
     }
   },
   
@@ -451,13 +451,13 @@ exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of
   measures: {
     count: {
       type: \`count\`,
-      drill_members: [id, test]
+      drill_members: [id, test, customerkey]
     },
     
     amount: {
       sql: \`amount\`,
       type: \`sum\`,
-      drill_members: [id, test]
+      drill_members: [id, test, customerkey]
     }
   },
   
@@ -492,12 +492,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for MySQL driver: a
     measures:
       - name: count
         type: count
-        drill_members: [id]
+        drill_members: [id, username, password]
 
       - name: failure_count
         sql: failure_count
         type: sum
-        drill_members: [id]
+        drill_members: [id, username, password]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -529,12 +529,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: ac
     measures:
       - name: count
         type: count
-        drill_members: [id]
+        drill_members: [id, username, password]
 
       - name: failure_count
         sql: failure_count
         type: sum
-        drill_members: [id]
+        drill_members: [id, username, password]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -636,12 +636,12 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema with a catalog: acc
     measures:
       - name: count
         type: count
-        drill_members: [id]
+        drill_members: [id, username, password]
 
       - name: failure_count
         sql: failure_count
         type: sum
-        drill_members: [id]
+        drill_members: [id, username, password]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
@@ -706,12 +706,12 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
     measures:
       - name: count
         type: count
-        drill_members: [id, test]
+        drill_members: [id, test, customerkey]
 
       - name: amount
         sql: amount
         type: sum
-        drill_members: [id, test]
+        drill_members: [id, test, customerkey]
 
     pre_aggregations:
       # Pre-aggregation definitions go here.
