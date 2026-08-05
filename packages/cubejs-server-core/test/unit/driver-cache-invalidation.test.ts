@@ -18,6 +18,9 @@ type FakeDriver = BaseDriver & {
 class TestServerCore extends CubejsServerCore {
   public builtDrivers: FakeDriver[] = [];
 
+  /** Set to fail the next driver construction, as a bad credential would. */
+  public failNextBuild = false;
+
   protected async createDriverFromFactoryResult(
     val: any,
     context: any,
@@ -27,6 +30,12 @@ class TestServerCore extends CubejsServerCore {
     // branch is exactly what one of these tests is about.
     if (val instanceof BaseDriver) {
       return super.createDriverFromFactoryResult(val, context, options);
+    }
+
+    if (this.failNextBuild) {
+      this.failNextBuild = false;
+
+      throw new Error('driver construction failed');
     }
 
     const driver = {
@@ -212,28 +221,115 @@ describe('driver cache invalidation', () => {
   });
 
   test('a failed rebuild does not leave a poisoned cache entry', async () => {
-    let token = 'token-a';
-    let shouldFail = false;
-    const { driverFactory, request } = await createCore({
-      driverFactory: () => {
-        if (shouldFail) {
-          throw new Error('factory blew up');
-        }
-
-        return <any>{ type: 'postgres', password: token };
-      },
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
     }, { token: 'token-a' });
 
     await driverFactory('default');
 
-    token = 'token-b';
-    shouldFail = true;
+    // The rotation is detected, but building the replacement fails.
+    core.failNextBuild = true;
     await request({ token: 'token-b' });
-    await expect(driverFactory('default')).rejects.toThrow('factory blew up');
+    await expect(driverFactory('default')).rejects.toThrow('driver construction failed');
 
     // The next attempt resolves from scratch rather than serving the failure.
-    shouldFail = false;
     const recovered = <FakeDriver> await driverFactory('default');
     expect(recovered.builtFrom).toMatchObject({ password: 'token-b' });
+  });
+
+  // The staleness check calls the factory speculatively, on a path that used to
+  // be a pure cache hit. A factory that reads a secret store can fail
+  // transiently, and that must not fail a query the cached driver can serve.
+  test('reuses the cached driver when the staleness probe throws', async () => {
+    let shouldFail = false;
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => {
+        if (shouldFail) {
+          throw new Error('secret store unreachable');
+        }
+
+        return <any>{ type: 'postgres', password: ctx.securityContext.token };
+      },
+    }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    shouldFail = true;
+    await request({ token: 'token-b' });
+
+    expect(await driverFactory('default')).toBe(first);
+    expect(core.builtDrivers).toHaveLength(1);
+
+    // Once the factory recovers, the rotation is picked up as usual.
+    shouldFail = false;
+    const rebuilt = <FakeDriver> await driverFactory('default');
+    expect(rebuilt).not.toBe(first);
+    expect(rebuilt.builtFrom).toMatchObject({ password: 'token-b' });
+  });
+
+  // Two queries in flight when a rotation lands both see the cached driver as
+  // stale. Only one may rebuild: the loser must not release the driver the
+  // winner has already handed to its caller, nor stand up a second pool.
+  test('concurrent callers rebuild once and release once', async () => {
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    }, { token: 'token-a' });
+
+    const first = <FakeDriver> await driverFactory('default');
+
+    await request({ token: 'token-b' });
+
+    const [a, b] = <FakeDriver[]> await Promise.all([
+      driverFactory('default'),
+      driverFactory('default'),
+    ]);
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(a).toBe(b);
+    expect(a.builtFrom).toMatchObject({ password: 'token-b' });
+    expect(core.builtDrivers).toHaveLength(2);
+    expect(first.release).toHaveBeenCalledTimes(1);
+    // The driver handed back is usable — not one whose pool is being drained.
+    expect(a.release).not.toHaveBeenCalled();
+  });
+
+  test('reuses the driver when the security context cannot be fingerprinted', async () => {
+    const circular: any = { token: 'token-a' };
+    circular.self = circular;
+
+    const factory = jest.fn((ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }));
+    const { core, driverFactory, request } = await createCore({ driverFactory: factory }, { token: 'token-a' });
+
+    const first = await driverFactory('default');
+
+    // A circular security context fingerprints as null, which every caller must
+    // read as "assume unchanged" rather than rebuilding blindly.
+    await request(circular);
+
+    expect(await driverFactory('default')).toBe(first);
+    expect(core.builtDrivers).toHaveLength(1);
+  });
+
+  // The refresh scheduler's default context carries no security context at all,
+  // so it shares an orchestrator with API traffic on a deployment that does not
+  // partition by user.
+  test('treats an absent security context as a change in both directions', async () => {
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => (<any>{
+        type: 'postgres',
+        password: ctx.securityContext?.token ?? 'service-account',
+      }),
+    }, { token: 'token-a' });
+
+    const user = <FakeDriver> await driverFactory('default');
+    expect(user.builtFrom).toMatchObject({ password: 'token-a' });
+
+    await request(undefined);
+    const scheduler = <FakeDriver> await driverFactory('default');
+
+    expect(scheduler).not.toBe(user);
+    expect(scheduler.builtFrom).toMatchObject({ password: 'service-account' });
+    expect(core.builtDrivers).toHaveLength(2);
   });
 });
