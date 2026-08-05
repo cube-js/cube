@@ -46,15 +46,15 @@ Sorting interacts with this: with **Sort panels by** set to a measure and a desc
 
 ## Interaction with other settings
 
-Chart settings apply to all panels at once — axis titles and formats, colors and palettes, and tooltips are configured once and take effect in every panel.
+Chart settings apply to all panels at once — axis titles and formats, colors and palettes, data labels, reference lines, and tooltips are configured once and take effect in every panel. A reference line is drawn once inside each panel, against that panel's own scale when the scales are independent.
 
-Data labels and reference lines are the exception: a chart using either cannot be split, so the two are never combined. See the limitations below.
+Data labels and reference lines have to be switched on *after* the split, not before — see the limitations below.
 
 A legend is shared across the grid rather than repeated per panel. Clicking a legend entry hides that series in every panel.
 
 ## Limitations
 
-- **One split dimension.** One dimension fills the grid, wrapping into rows. Splitting by two dimensions at once — one down the rows and another across the columns — is not supported.
+- **One split dimension.** One dimension fills the grid, panel by panel. Splitting by two dimensions at once — one down the rows and another across the columns — is not supported.
 - **Cartesian charts only.** Bar, line, area, and scatter. Pie, table, KPI, heatmap, boxplot, map, and HTML charts cannot be split.
 - **Panel labels are not configurable.** Each panel is labeled with its dimension value; the font, size, and color are fixed.
-- **Single-view charts only.** A chart with data labels, a reference line, or a second Y axis series cannot be split yet.
+- **The split is enabled on a single-view chart.** A chart that already carries data labels, a reference line, or a second Y axis series cannot be split — turn the split on first. The order is the only constraint: once a chart is split, data labels and reference lines can be added freely and are drawn in every panel.
