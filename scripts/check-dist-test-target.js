@@ -12,7 +12,49 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.join(__dirname, '..');
-const PACKAGES_DIR = path.join(REPO_ROOT, 'packages');
+
+/**
+ * `packages/` is where the drift happened, but it is not the only place a
+ * workspace runs jest: `rust/cubestore` does too. Read off the root manifest
+ * rather than transcribed, so a workspace added there is covered without
+ * anyone remembering to widen this.
+ *
+ * Losing a tree here is the one failure the `inspected` guard below cannot
+ * catch — the walk would still resolve plenty of configs from the trees it does
+ * visit — so the pattern handling errs toward keeping a tree, and refuses
+ * outright rather than returning a set it is not sure of.
+ */
+function workspaceDirs(
+  // eslint-disable-next-line import/no-dynamic-require, global-require
+  workspaces = require(path.join(REPO_ROOT, 'package.json')).workspaces
+) {
+  // Both spellings are valid: a bare array, or an object with `packages` (which
+  // is what this repo uses, only because it also needs `nohoist`).
+  const patterns = Array.isArray(workspaces) ? workspaces : (workspaces || {}).packages;
+
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    throw new Error('root package.json declares no workspaces — nothing to check');
+  }
+
+  // Everything up to the first glob segment, so `packages/**` keeps its tree
+  // rather than being dropped for not ending in a literal `/*`.
+  const dirs = patterns.map(pattern => {
+    const segments = pattern.split('/');
+    const glob = segments.findIndex(segment => segment.includes('*'));
+    return path.join(REPO_ROOT, ...(glob === -1 ? segments : segments.slice(0, glob)));
+  });
+
+  return [...new Set(dirs)];
+}
+
+/**
+ * `<workspace>/<package>` — the same label whether the walk root is this repo's
+ * `packages/` or a fixture tree, so the checker can be exercised against
+ * fixtures without its reporting reading as paths outside the repo.
+ */
+function label(pkg) {
+  return path.join(path.basename(path.dirname(pkg)), path.basename(pkg));
+}
 
 /**
  * Constraining collection to `dist/` has two spellings in this repo, and both
@@ -51,12 +93,21 @@ function targetsDist(value) {
  * packages that still break. The patterns are tested against a representative
  * filename, which is how jest itself decides.
  */
-function transformsTypeScript(config) {
+function transformsTypeScript(config, sources = []) {
   if (typeof config.preset === 'string' && /ts-jest|typescript/i.test(config.preset)) return true;
+
+  // Probed against the extensions this package's suites actually use. A
+  // `\.ts$`-only transform beside a `.tsx` suite covers nothing that is really
+  // there, so the exemption has to mean "every test here can run", not "some
+  // test could have". With no sources yet known, probe both.
+  const extensions = sources.length > 0
+    ? [...new Set(sources.map(file => path.extname(file).slice(1)))]
+    : ['ts', 'tsx'];
 
   return Object.keys(config.transform || {}).some(pattern => {
     try {
-      return new RegExp(pattern).test('example.test.ts');
+      const matcher = new RegExp(pattern);
+      return extensions.every(extension => matcher.test(`example.test.${extension}`));
     } catch (error) {
       // An unparseable pattern is jest's problem to report, not this check's
       // reason to exempt a package.
@@ -65,7 +116,10 @@ function transformsTypeScript(config) {
   });
 }
 
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage', '__snapshots__']);
+// `target` is Cargo build output — 7.5 GB of it under `cubejs-backend-native`
+// alone, and it can hold no TypeScript test source this guard cares about.
+// Walking it costs more than the entire rest of the check put together.
+const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage', '__snapshots__', 'target']);
 
 /**
  * TypeScript test sources anywhere in the package — `.tsx` as well as `.ts`,
@@ -97,9 +151,11 @@ function typescriptTestSources(dir) {
  *
  * The extensions jest resolves beyond `.js` are listed so an unreadable one is
  * reported rather than silently skipped: being unable to inspect a config is a
- * different thing from a config being fine.
+ * different thing from a config being fine. Ordered as jest's own
+ * `JEST_CONFIG_EXT_ORDER`, so a package carrying two of them has the same one
+ * inspected here that jest would actually load.
  */
-const CONFIG_EXTENSIONS = ['js', 'cjs', 'mjs', 'ts', 'json'];
+const CONFIG_EXTENSIONS = ['js', 'ts', 'mjs', 'cjs', 'json'];
 
 function resolveConfig(pkg) {
   const configFile = CONFIG_EXTENSIONS
@@ -111,21 +167,36 @@ function resolveConfig(pkg) {
       // `require` cannot load these without a loader, and guessing would be
       // worse than saying so.
       throw new Error(
-        `${path.relative(REPO_ROOT, pkg)}: ${path.basename(configFile)} cannot be inspected by this check`
+        `${label(pkg)}: ${path.basename(configFile)} cannot be inspected by this check`
       );
     }
 
+    let loaded;
     try {
       // eslint-disable-next-line import/no-dynamic-require, global-require
-      return require(configFile);
+      loaded = require(configFile);
     } catch (error) {
       // A config that cannot even be loaded is a worse problem than the one
       // this guard is for, and jest would fail on it too — so say which
       // package it is rather than dying on a bare stack trace.
       throw new Error(
-        `${path.relative(REPO_ROOT, pkg)}: ${path.basename(configFile)} could not be loaded — ${error.message}`
+        `${label(pkg)}: ${path.basename(configFile)} could not be loaded — ${error.message}`
       );
     }
+
+    // Jest also accepts a config that exports a (possibly async) function.
+    // Reading one as a plain object finds no `preset`, no `transform` and no
+    // constraint key, so a package that is entirely correct would be reported
+    // as an offender — the false-positive mode that gets a guard deleted rather
+    // than fixed. Refuse to guess instead.
+    if (typeof loaded === 'function') {
+      throw new Error(
+        `${label(pkg)}: ${path.basename(configFile)} exports a function, `
+        + 'which this check cannot resolve without running jest'
+      );
+    }
+
+    return loaded;
   }
 
   const packageJson = path.join(pkg, 'package.json');
@@ -136,48 +207,111 @@ function resolveConfig(pkg) {
 }
 
 /**
+ * A package with no config at all is only out of scope if it never runs jest.
+ * `cubejs-trino-driver` does run it — `jest dist/test/unit` — with nothing but
+ * that path argument standing between it and jest's default `testMatch`, which
+ * is precisely the defect. Treating config absence as "not a jest package"
+ * would let the guard exit clean over it.
+ *
+ * Read off the `scripts` strings deliberately. A `jest` devDependency looks
+ * like the deeper signal and is a trap: thirteen packages here invoke jest
+ * while relying on the hoisted root copy, and two declare it without ever
+ * running it — so that signal trades zero errors for thirteen false negatives.
+ */
+function invokesJest(pkg) {
+  const packageJson = path.join(pkg, 'package.json');
+  if (!fs.existsSync(packageJson)) return false;
+
+  // eslint-disable-next-line import/no-dynamic-require, global-require
+  const scripts = require(packageJson).scripts || {};
+
+  return Object.values(scripts).some(script =>
+    typeof script === 'string' && /(^|[\s;&|])jest(\s|$)/.test(script));
+}
+
+/**
  * Reads the resolved config rather than the file's `require` target. That
  * distinction is what keeps `jest.base-ts.config.js` out of scope: it extends
  * the base config too, but adds `preset: 'ts-jest'` and a `transform`, so its
  * consumers run from source deliberately. Asking the resolved object whether a
  * transform exists answers "can this execute TypeScript" directly, instead of
  * inferring it from which base file was required.
+ *
+ * Returns the offenders alongside what was inspected and what could not be, so
+ * the caller can tell an empty offender list apart from a walk that saw nothing.
  */
-function violations(inspected) {
-  return fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .map(entry => path.join(PACKAGES_DIR, entry.name))
-    .flatMap(pkg => {
-      const config = resolveConfig(pkg);
+function violations(roots = workspaceDirs()) {
+  const inspected = [];
+  const uninspectable = [];
 
-      // No jest config at all: the package does not run jest, so there is no
-      // collection to constrain.
-      if (!config) return [];
+  const offenders = roots
+    .filter(dir => fs.existsSync(dir))
+    .flatMap(dir => fs.readdirSync(dir, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => path.join(dir, entry.name)))
+    .flatMap(pkg => {
+      let config;
+      try {
+        config = resolveConfig(pkg);
+      } catch (error) {
+        // One config this check cannot read must not cost it the offenders it
+        // has already found: on a tree with two dozen of them, aborting the
+        // walk turns a useful list into a one-line message and hides the drift.
+        // Collected here and reported alongside, still non-zero either way.
+        uninspectable.push(error.message);
+        return [];
+      }
+
+      // No jest config at all. That only means "nothing to constrain" if the
+      // package never runs jest; if it does, its collection is governed by
+      // jest's defaults — which constrain nothing, so the empty object below
+      // runs it through the same predicate rather than a parallel copy of it.
+      if (!config) {
+        if (!invokesJest(pkg)) return [];
+        config = {};
+      }
 
       inspected.push(pkg);
-
-      // A package that can actually compile TypeScript may test its sources
-      // deliberately, so the dist-only convention does not apply to it.
-      if (transformsTypeScript(config)) return [];
 
       // With no TypeScript test sources there is nothing untransformable for
       // jest's default to pick up — a package testing plain `.js`, or with no
       // tests at all, is collectible exactly as it stands.
-      if (typescriptTestSources(pkg).length === 0) return [];
+      const sources = typescriptTestSources(pkg);
+      if (sources.length === 0) return [];
 
-      const constrained = CONSTRAINT_KEYS
-        .filter(key => config[key] !== undefined)
-        .some(key => targetsDist(config[key]));
+      // A package that can actually compile the tests it has may test its
+      // sources deliberately, so the dist-only convention does not apply to it.
+      if (transformsTypeScript(config, sources)) return [];
+
+      // `some`, not `every`. Jest ANDs the constraint keys — `SearchSource`
+      // pushes `roots` and `testMatch` as separate cases a path must satisfy
+      // both of — so one key naming `dist/` confines the intersection whatever
+      // the other says. `roots: ['<rootDir>/dist/test/']` beside a default-ish
+      // `testMatch: ['**/*.test.js']` is a *correct* package, and demanding
+      // both would report it as an offender: the false-positive mode that gets
+      // a guard deleted rather than fixed.
+      const present = CONSTRAINT_KEYS.filter(key => config[key] !== undefined);
+      const constrained = present.some(key => targetsDist(config[key]));
 
       if (constrained) return [];
 
-      return [path.relative(REPO_ROOT, pkg)];
+      return [label(pkg)];
     });
+
+  return { offenders, inspected, uninspectable };
 }
 
 function main() {
-  const inspected = [];
-  const offenders = violations(inspected);
+  const { offenders, inspected, uninspectable } = violations();
+
+  // Reported before the vacuous-pass guard below: when every config in the
+  // tree is uninspectable, that guard is what fires, and exiting on it first
+  // would swallow the per-package errors saying why.
+  if (uninspectable.length > 0) {
+    console.error('These jest configs could not be inspected, so their packages are unchecked:\n');
+    uninspectable.forEach(message => console.error(`  ${message}`));
+    console.error('');
+  }
 
   // Guards the guard. Counting the configs actually read, rather than the
   // directories walked, is what makes this meaningful: if jest configs ever
@@ -191,9 +325,9 @@ function main() {
 
   if (offenders.length > 0) {
     console.error(
-      'These packages have TypeScript tests and a jest config that cannot transform them,\n' +
-      'but do not confine collection to dist/. A bare `jest` in them collects the\n' +
-      'untransformable sources and fails on `import`:\n'
+      'These packages have TypeScript tests and no jest config that confines collection\n' +
+      'to dist/, so a bare `jest` in them collects the untransformable sources and fails\n' +
+      'on `import`:\n'
     );
     offenders.forEach(pkg => console.error(`  ${pkg}`));
     console.error(
@@ -201,15 +335,23 @@ function main() {
       "  testMatch: ['<rootDir>/dist/test/**/*.{test,spec}.{ts,js}']\n" +
       "  roots: ['<rootDir>/dist/test/']"
     );
-    process.exit(1);
   }
+
+  if (offenders.length > 0 || uninspectable.length > 0) process.exit(1);
 
   console.log(`check-dist-test-target: ${inspected.length} jest configs checked, no drift.`);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`check-dist-test-target: ${error.message}`);
-  process.exit(1);
+// Exported so the checker can be exercised against fixture trees. This file is
+// the assertion for the whole convention, so it needs one of its own — nothing
+// else fails if `targetsDist` or the three-part predicate quietly changes shape.
+module.exports = { violations, targetsDist, transformsTypeScript, workspaceDirs };
+
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`check-dist-test-target: ${error.message}`);
+    process.exit(1);
+  }
 }
