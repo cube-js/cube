@@ -1,4 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// Real behaviour throughout, except that `getEnv` can be made to fail once — the
+// only way to exercise a non-`assertDataSource` failure inside the env lookup.
+jest.mock('@cubejs-backend/shared', () => {
+  const actual = jest.requireActual('@cubejs-backend/shared');
+
+  return { ...actual, getEnv: jest.fn(actual.getEnv) };
+});
+
+// eslint-disable-next-line import/first
 import {
   getPreAggregationSqlPreamble,
   getStructureVersion,
@@ -64,6 +73,84 @@ describe('pre-aggregation SQL preamble in the version key', () => {
     expect(() => getPreAggregationSqlPreamble(undeclared)).not.toThrow();
     expect(getPreAggregationSqlPreamble(undeclared)).toBeUndefined();
     expect(() => getStructureVersion(undeclared)).not.toThrow();
+  });
+
+  // Swallowing every failure would drop the preamble from the key for reasons
+  // that are not the undeclared-data-source case, and a key without it serves
+  // tables built under a different preamble — the wrongness the key prevents.
+  test('a failure other than an undeclared data source propagates', () => {
+    // Any failure inside the env lookup that is NOT `assertDataSource` rejecting
+    // an undeclared data source. Swallowing it would drop the preamble from the
+    // key and serve tables built under a different one.
+    process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
+    const shared = jest.requireMock('@cubejs-backend/shared');
+    shared.getEnv.mockImplementationOnce(() => {
+      throw new Error('something else went wrong entirely');
+    });
+
+    expect(() => getPreAggregationSqlPreamble({ ...basePreAggregation(), dataSource: 'default' }))
+      .toThrow('something else went wrong entirely');
+  });
+
+  // The key participates for every driver, but only eight drivers apply the
+  // option. On any other data source a preamble is a no-op that still rebuilds
+  // every pre-aggregation — cost with no effect, and previously no signal.
+  describe('the unsupported-driver warning', () => {
+    let warn: jest.SpyInstance;
+
+    beforeEach(() => {
+      warn = jest.spyOn(console, 'warn').mockImplementation(() => { /* captured */ });
+      delete process.env.CUBEJS_DB_TYPE;
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+      delete process.env.CUBEJS_DB_TYPE;
+    });
+
+    // Each case needs its own data source: the warning is emitted once per
+    // data source, so reusing one would let an earlier case suppress a later.
+    const forDbType = (dbType: string, dataSource: string) => {
+      process.env.CUBEJS_DB_TYPE = dbType;
+      process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
+
+      return getPreAggregationSqlPreamble({ ...basePreAggregation(), dataSource });
+    };
+
+    test('warns when the driver does not apply the preamble', () => {
+      expect(forDbType('clickhouse', 'ds_clickhouse')).toEqual('SET a = 1');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('clickhouse');
+      expect(warn.mock.calls[0][0]).toContain('does not apply it');
+    });
+
+    test('stays quiet for a driver that applies it', () => {
+      expect(forDbType('bigquery', 'ds_bigquery')).toEqual('SET a = 1');
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    // The version functions run on every query, so an unconditional log floods.
+    test('warns once per data source, not once per call', () => {
+      forDbType('clickhouse', 'ds_repeat');
+      forDbType('clickhouse', 'ds_repeat');
+      forDbType('clickhouse', 'ds_repeat');
+
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    test('stays quiet when no preamble is configured', () => {
+      process.env.CUBEJS_DB_TYPE = 'clickhouse';
+      getPreAggregationSqlPreamble({ ...basePreAggregation(), dataSource: 'ds_nopreamble' });
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    test('stays quiet when no db type is declared to check against', () => {
+      process.env.CUBEJS_DB_SQL_PREAMBLE = 'SET a = 1';
+      getPreAggregationSqlPreamble({ ...basePreAggregation(), dataSource: 'ds_nodbtype' });
+
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 
   test('setting a preamble changes the structure version', () => {

@@ -6,6 +6,7 @@ import {
   prependSqlPreamble,
   resolveSqlPreamble,
   splitSqlPreamble,
+  trySplitSqlPreamble,
 } from '../../src/sql-preamble';
 
 describe('normalizeSqlPreamble', () => {
@@ -78,12 +79,19 @@ describe('splitSqlPreamble', () => {
       .toEqual(['SET a = \'it\'\'s; fine\'', 'SET b = 2']);
   });
 
-  // Postgres, DuckDB and Snowflake follow standard_conforming_strings, where a
-  // trailing backslash is a literal character and does NOT escape the closing
-  // quote. Consuming it would swallow the terminator and merge two statements.
-  test('treats a trailing backslash as literal, not an escape', () => {
+  // Whether the backslash escapes the closing quote decides where the literal
+  // ends: Postgres, DuckDB and Snowflake say no (standard_conforming_strings),
+  // MySQL and BigQuery say yes. Reading it either way would tear a statement on
+  // the other, so the blob goes to the engine whole.
+  test('does not pick a dialect for a trailing backslash before a quote', () => {
     expect(splitSqlPreamble('SET a = \'C:\\\'; SET b = 2'))
-      .toEqual(['SET a = \'C:\\\'', 'SET b = 2']);
+      .toEqual(['SET a = \'C:\\\'; SET b = 2']);
+  });
+
+  // A backslash the dialects read the same way still splits normally.
+  test('a backslash away from the closing quote does not block the split', () => {
+    expect(splitSqlPreamble('SET a = \'C:\\path\'; SET b = 2'))
+      .toEqual(['SET a = \'C:\\path\'', 'SET b = 2']);
   });
 
   test('keeps a dollar-quoted function body intact', () => {
@@ -114,9 +122,17 @@ describe('splitSqlPreamble', () => {
       .toEqual(['SET a = 1 /* one; two */', 'SET b = 2']);
   });
 
-  test('does not split on a semicolon inside a MySQL # line comment', () => {
+  // `#` is MySQL's line comment but a Postgres operator (bitwise XOR), so a `;`
+  // after it is inside a comment on one and a separator on the other.
+  test('does not pick a dialect for a semicolon after a #', () => {
     expect(splitSqlPreamble('SET a = 1 # one; two\n; SET b = 2'))
-      .toEqual(['SET a = 1 # one; two', 'SET b = 2']);
+      .toEqual(['SET a = 1 # one; two\n; SET b = 2']);
+  });
+
+  // With no `;` in the disputed span the dialects agree, so the split stands.
+  test('a # with no semicolon after it does not block the split', () => {
+    expect(splitSqlPreamble('SET a = 1 # note\n; SET b = 2'))
+      .toEqual(['SET a = 1 # note', 'SET b = 2']);
   });
 
   // Postgres, DuckDB and Snowflake all nest block comments, so the first `*/`
@@ -155,6 +171,48 @@ describe('splitSqlPreamble', () => {
       expect(splitSqlPreamble('CREATE FUNCTION f() AS $$ SELECT 1; SET b = 2'))
         .toEqual(['CREATE FUNCTION f() AS $$ SELECT 1; SET b = 2']);
     });
+
+    // The two readings of a backslash-escaped quote disagree about where the
+    // literal ends, which is real ambiguity rather than a failure to parse.
+    test('a dialect-dependent quote escape', () => {
+      expect(splitSqlPreamble('SET a = \'a\\\'; SET b = \'c\''))
+        .toEqual(['SET a = \'a\\\'; SET b = \'c\'']);
+      expect(splitSqlPreamble('SET a = \'it\\\'s; fine\'; SET b = 2'))
+        .toEqual(['SET a = \'it\\\'s; fine\'; SET b = 2']);
+    });
+
+    test('a dialect-dependent # before a separator', () => {
+      expect(splitSqlPreamble('SET a = 5 # 3; SET b = 1'))
+        .toEqual(['SET a = 5 # 3; SET b = 1']);
+    });
+  });
+
+  // A segment holding only a comment has no executable token. Snowflake rejects
+  // an empty statement, and BigQuery's script-safety guard would refuse a
+  // legitimate UDF preamble that simply ends with a comment.
+  describe('a segment with no executable token is not a statement', () => {
+    test('a trailing line comment', () => {
+      expect(splitSqlPreamble('SET a = 1;\n-- note')).toEqual(['SET a = 1']);
+    });
+
+    test('a trailing block comment', () => {
+      expect(splitSqlPreamble('SET a = 1;\n/* note */')).toEqual(['SET a = 1']);
+    });
+
+    test('a comment between two statements', () => {
+      expect(splitSqlPreamble('SET a = 1;\n-- note\n;\nSET b = 2'))
+        .toEqual(['SET a = 1', 'SET b = 2']);
+    });
+
+    test('a comment-only preamble yields no statements', () => {
+      expect(splitSqlPreamble('-- nothing to do')).toEqual([]);
+      expect(splitSqlPreamble('/* nothing to do */')).toEqual([]);
+    });
+
+    // The comment still travels with the statement it documents.
+    test('a leading comment stays part of its statement', () => {
+      expect(splitSqlPreamble('-- why\nSET a = 1')).toEqual(['-- why\nSET a = 1']);
+    });
   });
 
   test('splits a BigQuery temp UDF preamble at the statement boundary only', () => {
@@ -171,7 +229,70 @@ describe('splitSqlPreamble', () => {
   });
 });
 
+// The flag exists so a caller deciding whether a blob is *shaped* a certain way
+// cannot mistake "one unparsed blob" for "one statement".
+describe('trySplitSqlPreamble', () => {
+  test('reports a confident split', () => {
+    expect(trySplitSqlPreamble('SET a = 1; SET b = 2'))
+      .toEqual({ statements: ['SET a = 1', 'SET b = 2'], ambiguous: false });
+  });
+
+  test('reports ambiguity and returns the blob whole', () => {
+    expect(trySplitSqlPreamble('SET a = 1; /* never closed'))
+      .toEqual({ statements: ['SET a = 1; /* never closed'], ambiguous: true });
+  });
+
+  test('an empty preamble is not ambiguous', () => {
+    expect(trySplitSqlPreamble(undefined)).toEqual({ statements: [], ambiguous: false });
+    expect(trySplitSqlPreamble('  ')).toEqual({ statements: [], ambiguous: false });
+  });
+
+  test('splitSqlPreamble returns exactly its statements', () => {
+    for (const preamble of ['SET a = 1; SET b = 2', 'SET a = 1; /* never closed', '  ']) {
+      expect(splitSqlPreamble(preamble)).toEqual(trySplitSqlPreamble(preamble).statements);
+    }
+  });
+});
+
 describe('applySqlPreambleStatements', () => {
+  // A caller that has already separated the preamble from other statements must
+  // not have to re-join and re-parse it — re-parsing could go ambiguous and
+  // collapse the list back into one blob.
+  test('accepts an already-split statement list', async () => {
+    const executed: string[] = [];
+
+    await applySqlPreambleStatements(['SET a = 1', 'SET b = 2'], async statement => {
+      executed.push(statement);
+    });
+
+    expect(executed).toEqual(['SET a = 1', 'SET b = 2']);
+  });
+
+  test('a statement list is executed verbatim, not re-split', async () => {
+    const executed: string[] = [];
+
+    // Re-joining and re-splitting this would go ambiguous and run it as one.
+    await applySqlPreambleStatements(['SET a = \'a\\\'', 'SET b = \'c\''], async statement => {
+      executed.push(statement);
+    });
+
+    expect(executed).toEqual(['SET a = \'a\\\'', 'SET b = \'c\'']);
+  });
+
+  test('tolerates an already-applied statement from a list too', async () => {
+    const executed: string[] = [];
+
+    await applySqlPreambleStatements(['CREATE MACRO m(x) AS x', 'SET a = 1'], async statement => {
+      executed.push(statement);
+
+      if (statement.startsWith('CREATE')) {
+        throw new Error('Catalog Error: Function with name "m" already exists!');
+      }
+    });
+
+    expect(executed).toEqual(['CREATE MACRO m(x) AS x', 'SET a = 1']);
+  });
+
   test('runs each statement in order', async () => {
     const executed: string[] = [];
 

@@ -19,6 +19,7 @@ import {
   StreamOptions,
   normalizeSqlPreamble,
   splitSqlPreamble,
+  applySqlPreambleStatements,
 } from '@cubejs-backend/base-driver';
 import { promisify } from 'util';
 import path from 'path';
@@ -286,6 +287,49 @@ export class JDBCDriver extends BaseDriver {
     return [...builtIn, ...splitSqlPreamble(preamble)];
   }
 
+  /**
+   * The same statements as `prepareConnectionQueries`, split by origin.
+   *
+   * The two halves need different failure postures. This driver pools
+   * connections, so the preamble is replayed on every acquire and a `CREATE …` —
+   * the feature's headline use case — raises "already exists" the second time a
+   * connection is reused; that has to be tolerated. The per-dbType built-ins are
+   * only `SET`s, are idempotent, and stay raw so a genuine failure in them still
+   * surfaces. Same for the deprecated `prepareConnectionQueries`, whose contents
+   * are the user's own and whose semantics must not change.
+   */
+  protected splitConnectionQueries(): { builtIn: string[], preamble: string[] } {
+    const all = this.prepareConnectionQueries();
+    const preamble = splitSqlPreamble(this.effectiveSqlPreamble());
+    // A preamble is only appended, never mixed in, so the last N entries are it —
+    // but only when the merged list actually ends with them: the deprecated
+    // option replaces the built-ins instead of appending, and then no entry is a
+    // `sqlPreamble` statement.
+    const appended = preamble.length > 0
+      && all.length >= preamble.length
+      && all.slice(all.length - preamble.length).every((statement, i) => statement === preamble[i]);
+
+    return appended
+      ? { builtIn: all.slice(0, all.length - preamble.length), preamble }
+      : { builtIn: all, preamble: [] };
+  }
+
+  /**
+   * Replays the connection queries on a freshly acquired connection.
+   */
+  protected async applyConnectionQueries(conn: any): Promise<void> {
+    const { builtIn, preamble } = this.splitConnectionQueries();
+
+    for (const statementSql of builtIn) {
+      await this.executeStatement(conn, statementSql);
+    }
+
+    await applySqlPreambleStatements(
+      preamble,
+      statement => this.executeStatement(conn, statement),
+    );
+  }
+
   protected escapeDialect(): EscapeDialect {
     const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
     if (dbTypeDescription?.escapeDialect) {
@@ -304,9 +348,10 @@ export class JDBCDriver extends BaseDriver {
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
     const queryWithParams = this.prepareQueryWithParams(query, values);
     const cancelObj: {cancel?: Function} = {};
-    const promise = this.queryPromised(queryWithParams, cancelObj, {
-      prepareConnectionQueries: this.prepareConnectionQueries(),
-    });
+    // No `prepareConnectionQueries` override: `queryPromised` replays them
+    // itself, splitting the user preamble from the built-ins so a pooled
+    // connection tolerates an already-applied `CREATE …`.
+    const promise = this.queryPromised(queryWithParams, cancelObj, {});
     (promise as CancelablePromise<any>).cancel =
       () => cancelObj.cancel && cancelObj.cancel() ||
       Promise.reject(new Error('Statement is not ready'));
@@ -329,9 +374,16 @@ export class JDBCDriver extends BaseDriver {
     try {
       const conn = await this.pool.acquire();
       try {
-        const prepareConnectionQueries = options.prepareConnectionQueries || [];
-        for (let i = 0; i < prepareConnectionQueries.length; i++) {
-          await this.executeStatement(conn, prepareConnectionQueries[i]);
+        // `options.prepareConnectionQueries` stays honoured for callers that pass
+        // their own list, but it is a flat merged list with no way to tell a
+        // built-in from user preamble, so only the default path gets the
+        // already-applied tolerance the pool requires.
+        if (options.prepareConnectionQueries) {
+          for (const statementSql of options.prepareConnectionQueries) {
+            await this.executeStatement(conn, statementSql);
+          }
+        } else {
+          await this.applyConnectionQueries(conn);
         }
         return await this.executeStatement(conn, query, cancelObj);
       } finally {
@@ -355,9 +407,7 @@ export class JDBCDriver extends BaseDriver {
 
       // A streamed query has to run in the preamble's context too; this path
       // used to skip the connection queries the query path replays.
-      for (const statementSql of this.prepareConnectionQueries()) {
-        await this.executeStatement(conn, statementSql);
-      }
+      await this.applyConnectionQueries(conn);
 
       const createStatement = promisify(conn.createStatement.bind(conn));
       const statement = await createStatement();

@@ -1039,11 +1039,24 @@ source][ref-preagg-data-source].
 
 </Warning>
 
+Supported by the BigQuery, Snowflake, Postgres, CrateDB, Materialize, MySQL,
+DuckDB and JDBC-based (including Databricks) drivers.
+
+<Warning>
+
+Any other driver ignores this variable, so setting it there changes nothing about
+how queries run — while still moving the pre-aggregation cache key and rebuilding
+every pre-aggregation on that data source. Cube logs a warning when it detects
+this.
+
+</Warning>
+
 When the preamble runs depends on how the data source handles connections. On
 Snowflake it runs once on the session, so every later query inherits it. On
-Postgres, MySQL and the JDBC-based drivers it runs on each pooled connection, and
-on BigQuery it is prepended to the query itself. In every case the query executes
-in the preamble's context, streamed queries included.
+Postgres, CrateDB, Materialize, MySQL, DuckDB and the JDBC-based drivers it runs
+on each pooled connection, and on BigQuery it is prepended to the query itself.
+In every case the query executes in the preamble's context, streamed queries
+included.
 
 Because pooled connections are reused, a statement the preamble has already
 applied to a connection is skipped rather than treated as an error — so a

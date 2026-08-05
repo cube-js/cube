@@ -26,7 +26,7 @@ import {
   DriverInterface,
   prependSqlPreamble,
   resolveSqlPreamble,
-  splitSqlPreamble,
+  trySplitSqlPreamble,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
@@ -488,10 +488,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     if (bigQueryQuery.destination && !BigQueryDriver.isScriptSafePreamble(preamble)) {
       throw new Error(
         'CUBEJS_DB_SQL_PREAMBLE cannot be applied to a pre-aggregation build on BigQuery unless it ' +
-        'contains only CREATE TEMP FUNCTION statements. BigQuery runs any other multi-statement ' +
-        'request as a script, and a script job ignores the destination table, so the build would ' +
-        'write no rows. Restrict the preamble to CREATE TEMP FUNCTION, or set a pre-aggregation ' +
-        'specific preamble that does.'
+        'contains only CREATE TEMP FUNCTION statements whose boundaries are unambiguous. BigQuery ' +
+        'runs any other multi-statement request as a script, and a script job ignores the ' +
+        'destination table, so the build would write no rows. Restrict the preamble to CREATE TEMP ' +
+        'FUNCTION — avoiding nested block comments and unterminated literals, which make the ' +
+        'statement boundaries undecidable — or set a pre-aggregation specific preamble that does.'
       );
     }
 
@@ -501,9 +502,19 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   /**
    * True when every statement is a `CREATE TEMP FUNCTION`, the one multi-statement
    * shape BigQuery still runs as a normal query rather than a script.
+   *
+   * Fails closed on an ambiguous blob. The splitter hands back the whole blob as
+   * one entry when it cannot find the boundaries confidently, and that entry may
+   * still contain several statements — judging it script-safe because it *starts*
+   * with `CREATE TEMP FUNCTION` would let a script onto a destination job, which
+   * is the silent-empty-table case this guard exists to prevent.
    */
   protected static isScriptSafePreamble(preamble: string): boolean {
-    const statements = splitSqlPreamble(preamble);
+    const { statements, ambiguous } = trySplitSqlPreamble(preamble);
+
+    if (ambiguous) {
+      return false;
+    }
 
     return statements.length > 0 && statements.every(
       statement => /^create\s+(or\s+replace\s+)?temp(orary)?\s+function\b/i

@@ -125,6 +125,36 @@ describe('DuckDBDriver sql preamble', () => {
       expect(await streamToArray(result.rowStream as any)).toEqual([{ v: '1' }]);
     });
 
+    // The stream replay must decide "already applied" with the shared
+    // `isAlreadyAppliedPreambleError`, not a local regex, so a spelling added to
+    // the shared predicate reaches this path too. DuckDB's own duplicate message
+    // says "already exists", which a narrower local copy also matched — so the
+    // guard is a spelling only the shared predicate knows.
+    test('the stream replay defers to the shared already-applied predicate', async () => {
+      const driver = driverWith({ sqlPreamble: 'CREATE MACRO shared_pred() AS 4' });
+
+      // Fail the replay with a spelling the shared predicate covers and a
+      // local /already exists/i would not.
+      const replayed: string[] = [];
+      (driver as any).replaySqlPreambleExec = async (sql: string) => {
+        replayed.push(sql);
+        throw new Error('Catalog Error: Macro Function with name "shared_pred" is already defined!');
+      };
+
+      await expect((driver as any).replaySqlPreamble(
+        (driver as any).replaySqlPreambleExec,
+      )).resolves.toBeUndefined();
+      expect(replayed).toEqual(['CREATE MACRO shared_pred() AS 4']);
+    });
+
+    test('the stream replay still surfaces a genuine failure', async () => {
+      const driver = driverWith({ sqlPreamble: 'CREATE MACRO genuine() AS 1' });
+
+      await expect((driver as any).replaySqlPreamble(async () => {
+        throw new Error('Parser Error: syntax error at or near "THIS"');
+      })).rejects.toThrow('syntax error');
+    });
+
     test('sqlPreamble takes precedence over legacy initSql', async () => {
       const driver = driverWith({
         sqlPreamble: 'CREATE MACRO pick() AS 2',

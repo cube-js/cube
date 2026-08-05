@@ -211,4 +211,120 @@ describe('JDBC sql preamble', () => {
       expect(streamDriver.executed).toEqual([]);
     });
   });
+
+  // This driver pools connections, so the preamble is replayed on every acquire.
+  // A `CREATE …` — the feature's headline use case — therefore hits "already
+  // exists" as soon as a connection is reused, and that has to be tolerated the
+  // way the Postgres and MySQL drivers tolerate it.
+  describe('a reused pooled connection', () => {
+    const CREATE = 'CREATE FUNCTION median(x INT) RETURNS INT RETURN x';
+
+    // Fails the CREATE the way an engine does on a connection that already ran
+    // it, and records everything attempted.
+    const reusedConnectionDriverFor = (config: Record<string, any>) => {
+      const driver = driverFor(config);
+      const conn = {
+        createStatement: (cb: Function) => cb(null, {
+          cancel: (cb2: Function) => cb2(null),
+          execute: (_sql: string, cb2: Function) => cb2(null, {
+            toObjectIter: (cb3: Function) => cb3(null, {
+              labels: [],
+              types: [],
+              rows: { next: () => ({ done: true }) },
+            }),
+          }),
+        }),
+      };
+
+      driver.pool = {
+        acquire: async () => conn,
+        release: async () => { /* nothing to release in the harness */ },
+      };
+      driver.executed = [];
+      driver.executeStatement = jest.fn(async (_conn: unknown, sql: string) => {
+        driver.executed.push(sql);
+
+        if (sql === CREATE) {
+          throw new Error('function "median" already exists with same argument types');
+        }
+
+        return [];
+      });
+
+      return driver;
+    };
+
+    it('tolerates an already-applied preamble statement on the query path', async () => {
+      const driver = reusedConnectionDriverFor({ dbType: 'athena', sqlPreamble: `${CREATE}; SET a = 1` });
+
+      await expect(driver.query('SELECT median(1)', [])).resolves.toEqual([]);
+      // The later statements still run, and so does the primary query.
+      expect(driver.executed).toEqual([CREATE, 'SET a = 1', 'SELECT median(1)']);
+    });
+
+    it('tolerates an already-applied preamble statement on the stream path', async () => {
+      const driver = reusedConnectionDriverFor({ dbType: 'athena', sqlPreamble: `${CREATE}; SET a = 1` });
+
+      await expect(driver.stream('SELECT median(1)', [], { highWaterMark: 100 })).resolves.toBeDefined();
+      expect(driver.executed).toEqual([CREATE, 'SET a = 1']);
+    });
+
+    it('still surfaces a genuine preamble failure', async () => {
+      const driver = driverFor({ dbType: 'athena', sqlPreamble: 'THIS IS NOT SQL' });
+      driver.pool = {
+        acquire: async () => ({}),
+        release: async () => { /* nothing to release in the harness */ },
+      };
+      driver.executeStatement = jest.fn(async () => {
+        throw new Error('syntax error at or near "THIS"');
+      });
+
+      await expect(driver.query('SELECT 1', [])).rejects.toThrow('syntax error');
+    });
+
+    // The built-ins are idempotent `SET`s, and the deprecated option's contents
+    // are the user's own with semantics that must not change — so a failure in
+    // either still surfaces rather than being swallowed as "already applied".
+    it('does not extend the tolerance to the built-in connection queries', async () => {
+      const driver = driverFor({ dbType: 'mysql', sqlPreamble: 'SET a = 1' });
+      driver.pool = {
+        acquire: async () => ({}),
+        release: async () => { /* nothing to release in the harness */ },
+      };
+      driver.executeStatement = jest.fn(async (_conn: unknown, sql: string) => {
+        if (sql === MYSQL_BUILT_IN) {
+          throw new Error('time_zone already exists');
+        }
+        return [];
+      });
+
+      await expect(driver.query('SELECT 1', [])).rejects.toThrow('already exists');
+    });
+
+    // The split is positional (the trailing N entries), so it stays correct even
+    // when a preamble statement is textually identical to a built-in: both still
+    // run, in order, and only the preamble copy gets the tolerance.
+    it('splits by position when the preamble repeats a built-in verbatim', async () => {
+      const driver = reusedConnectionDriverFor({ dbType: 'mysql', sqlPreamble: MYSQL_BUILT_IN });
+
+      await expect(driver.query('SELECT 1', [])).resolves.toEqual([]);
+      expect(driver.executed).toEqual([MYSQL_BUILT_IN, MYSQL_BUILT_IN, 'SELECT 1']);
+    });
+
+    it('does not extend the tolerance to the deprecated option', async () => {
+      const driver = driverFor({ dbType: 'athena', prepareConnectionQueries: ['SET legacy = 1'] });
+      driver.pool = {
+        acquire: async () => ({}),
+        release: async () => { /* nothing to release in the harness */ },
+      };
+      driver.executeStatement = jest.fn(async (_conn: unknown, sql: string) => {
+        if (sql === 'SET legacy = 1') {
+          throw new Error('legacy already exists');
+        }
+        return [];
+      });
+
+      await expect(driver.query('SELECT 1', [])).rejects.toThrow('already exists');
+    });
+  });
 });

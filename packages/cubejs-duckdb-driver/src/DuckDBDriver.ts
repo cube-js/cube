@@ -9,6 +9,7 @@ import {
   TableColumnQueryResult,
   normalizeSqlPreamble,
   splitSqlPreamble,
+  isAlreadyAppliedPreambleError,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
@@ -281,7 +282,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
           if (this.logger) {
             console.error('DuckDB - error on init sql (skipping)', { e });
           }
-        } else if (!/already exists/i.test((e as Error)?.message ?? '')) {
+        } else if (!isAlreadyAppliedPreambleError(e)) {
           throw e;
         }
       }
