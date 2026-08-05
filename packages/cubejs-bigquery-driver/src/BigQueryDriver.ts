@@ -201,6 +201,15 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     await this.bigquery.getDatasets();
   }
 
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Prepended into the query text, since BigQuery is stateless.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
+  }
+
   public readOnly() {
     return !!this.options.readOnly;
   }

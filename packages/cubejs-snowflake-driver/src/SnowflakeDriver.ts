@@ -270,6 +270,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Driver read-only flag.
    */
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Applied once on the long-lived session.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
+  }
+
   public readOnly(): boolean {
     return !!this.config.readOnly;
   }

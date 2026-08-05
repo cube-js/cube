@@ -494,6 +494,16 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return PostgresToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType, precision, scale);
   }
 
+  /**
+   * This driver applies `sql_preamble`.
+   *
+   * Inherited by RedshiftDriver, CrateDriver and MaterializeDriver, which all
+   * reuse the `prepareConnection` hook that applies the preamble.
+   */
+  public override supportsSqlPreamble(): boolean {
+    return true;
+  }
+
   public readOnly() {
     return !!this.config.readOnly;
   }
