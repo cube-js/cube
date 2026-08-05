@@ -401,19 +401,93 @@ describe('ScaffoldingTemplate', () => {
       }).generateFilesByTableNames(['public.orders'])[0].content;
     }
 
-    it('lists the primary key first, then attributes, then the main time dimension', () => {
-      // created_at, not updated_at: ScaffoldingSchema sorts time columns by timeColumnIndex.
+    it('lists the primary key first, then the rest, then the time dimensions', () => {
       expect(generate(SchemaFormat.Yaml)).toContain(
-        'drill_members: [id, order_status, created_at]'
+        'drill_members: [id, order_status, notes, created_at, updated_at]'
       );
     });
 
-    it('leaves out dimensions that do not identify a row', () => {
+    it('keeps every time dimension rather than ranking them by name', () => {
+      const { content } = new ScaffoldingTemplate(
+        {
+          public: {
+            things: [
+              { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              { name: 'deleted_at', type: 'timestamp', attributes: [] },
+              { name: 'created_at', type: 'timestamp', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByTableNames(['public.things'])[0];
+
+      // Which timestamp is the row's "when" isn't derivable from its name, so none is
+      // dropped. (They render created-first because ScaffoldingSchema sorts time columns
+      // that way — an ordering detail, not a decision about which one matters.)
+      expect(content).toContain('drill_members: [id, created_at, deleted_at]');
+    });
+
+    it('does not repeat a primary key that is also a time column', () => {
+      // Only reachable via descriptors: ScaffoldingSchema never marks a time column as a
+      // primary key, but a caller can. Without the guard it would be listed twice — once
+      // as the key, once among the timestamps.
+      const { content } = new ScaffoldingTemplate(
+        {
+          public: {
+            snapshots: [
+              { name: 'captured_at', type: 'timestamp', attributes: [] },
+              { name: 'label', type: 'character varying', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByCubeDescriptors([
+        {
+          cube: 'snapshots',
+          tableName: 'public.snapshots',
+          table: 'snapshots',
+          schema: 'public',
+          joins: [],
+          members: [
+            {
+              name: 'captured_at',
+              title: 'Captured At',
+              memberType: MemberType.Dimension,
+              types: ['time'],
+              isPrimaryKey: true,
+            },
+            {
+              name: 'label',
+              title: 'Label',
+              memberType: MemberType.Dimension,
+              types: ['string'],
+            },
+          ],
+        },
+      ])[0];
+
+      expect(content).toContain('drill_members: [captured_at, label]');
+    });
+
+    it('drills into every dimension the cube defines, and only those', () => {
       const content = generate(SchemaFormat.Yaml);
 
-      // `notes` is still a dimension — it just isn't worth drilling into.
-      expect(content).toContain('- name: notes');
-      expect(content).not.toMatch(/drill_members: \[[^\]]*notes/);
+      const dimensions = [
+        ...content
+          .split('dimensions:')[1]
+          .split('measures:')[0]
+          .matchAll(/- name: (\w+)/g),
+      ].map((m) => m[1]);
+      const drillMembers = content
+        .match(/drill_members: \[([^\]]+)\]/)?.[1]
+        .split(', ');
+
+      // Exactly the dimension set — `notes` included, though no dictionary would have
+      // called it meaningful. Ordering differs, so compare as sets.
+      expect(dimensions).toContain('notes');
+      expect([...(drillMembers ?? [])].sort()).toEqual([...dimensions].sort());
     });
 
     it('renders drill members on every measure, including the generated count', () => {
@@ -495,17 +569,66 @@ describe('ScaffoldingTemplate', () => {
       expect(content).not.toContain('order_status');
     });
 
-    it('keeps every describing attribute on a wide table', () => {
+    it('keeps the caller\'s members and order on the descriptor path', () => {
+      const template = new ScaffoldingTemplate(drillSchema, driver, {
+        format: SchemaFormat.Yaml,
+        snakeCase: true,
+      });
+
+      // ScaffoldingSchema's type filter and time-column sort don't reach this path — the
+      // descriptor's members are passed through as sent, numeric dimensions included.
+      // They're dimensions of the cube, so they drill.
+      const { content } = template.generateFilesByCubeDescriptors([
+        {
+          cube: 'orders',
+          tableName: 'public.orders',
+          table: 'orders',
+          schema: 'public',
+          joins: [],
+          members: [
+            {
+              name: 'id',
+              title: 'Id',
+              memberType: MemberType.Dimension,
+              types: ['number'],
+              isPrimaryKey: true,
+            },
+            {
+              name: 'lat',
+              title: 'Lat',
+              memberType: MemberType.Dimension,
+              types: ['number'],
+            },
+            {
+              name: 'deleted_at',
+              title: 'Deleted At',
+              memberType: MemberType.Dimension,
+              types: ['time'],
+            },
+            {
+              name: 'created_at',
+              title: 'Created At',
+              memberType: MemberType.Dimension,
+              types: ['time'],
+            },
+          ],
+        },
+      ])[0];
+
+      expect(content).toContain('drill_members: [id, lat, deleted_at, created_at]');
+    });
+
+    it('keeps every dimension on a wide table, whatever its columns are called', () => {
       const wide = {
         public: {
           things: [
             { name: 'id', type: 'integer', attributes: ['primaryKey'] },
             { name: 'name', type: 'character varying', attributes: [] },
-            { name: 'title', type: 'character varying', attributes: [] },
-            { name: 'status', type: 'character varying', attributes: [] },
-            { name: 'category', type: 'character varying', attributes: [] },
-            { name: 'type', type: 'character varying', attributes: [] },
-            { name: 'code', type: 'character varying', attributes: [] },
+            // Deliberately opaque names: selection must not depend on recognising them.
+            { name: 'zzz_top', type: 'character varying', attributes: [] },
+            { name: 'qux', type: 'character varying', attributes: [] },
+            { name: 'blorb', type: 'character varying', attributes: [] },
+            { name: 'is_active', type: 'boolean', attributes: [] },
             { name: 'created_at', type: 'timestamp', attributes: [] },
           ],
         },
@@ -516,9 +639,36 @@ describe('ScaffoldingTemplate', () => {
         snakeCase: true,
       }).generateFilesByTableNames(['public.things'])[0];
 
-      // Nothing is truncated: primary key, every dictionary attribute, then the timestamp.
+      // Nothing is truncated and nothing is judged by its name: primary key, every other
+      // dimension in rendered order, then the timestamp.
       expect(content).toContain(
-        'drill_members: [id, name, title, status, category, type, code, created_at]'
+        'drill_members: [id, name, zzz_top, qux, blorb, is_active, created_at]'
+      );
+    });
+
+    it('drills into non-scalar columns, which the type filter treats as strings', () => {
+      const { content } = new ScaffoldingTemplate(
+        {
+          public: {
+            events: [
+              { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              { name: 'payload', type: 'jsonb', attributes: [] },
+              { name: 'blob_data', type: 'bytea', attributes: [] },
+              { name: 'tags', type: 'text[]', attributes: [] },
+              { name: 'created_at', type: 'timestamp', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByTableNames(['public.events'])[0];
+
+      // `columnType` recognises numbers, booleans and times and calls everything else a
+      // string, so JSON and binary columns are dimensions — and therefore drill members.
+      // Documented rather than special-cased: excluding them means deciding a JSON column
+      // can't be worth drilling into, which is the same guess as reading its name.
+      expect(content).toContain(
+        'drill_members: [id, payload, blob_data, tags, created_at]'
       );
     });
 
@@ -561,10 +711,39 @@ describe('ScaffoldingTemplate', () => {
       ).generateFilesByTableNames(['public.things'])[0];
 
       // `user name` and `user_name` render to one member, so it appears once — and
-      // collapsing it costs none of the attributes that follow.
+      // collapsing it costs none of the members that follow.
       expect(content).toContain(
         'drill_members: [id, user_name, title, status, category, created_at]'
       );
+    });
+
+    it('classifies a collapsed member off the definition the cube keeps', () => {
+      const { content } = new ScaffoldingTemplate(
+        {
+          public: {
+            things: [
+              { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              { name: 'user_name', type: 'character varying', attributes: [] },
+              // Same member name, different type. The rendered `dimensions` object is a
+              // spread-reduce, so the cube defines `user_name` as the *later* one — time.
+              { name: 'USER NAME', type: 'timestamp', attributes: [] },
+              // A plain attribute after the collision, so the two dedupe strategies are
+              // told apart by where `user_name` lands relative to it.
+              { name: 'zebra', type: 'character varying', attributes: [] },
+              { name: 'created_at', type: 'timestamp', attributes: [] },
+              { name: 'amount', type: 'integer', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByTableNames(['public.things'])[0];
+
+      // The cube defines it as time, so the drill set must classify it as time too —
+      // grouped after `zebra` with the other timestamps. Reading the discarded varchar
+      // definition would file it as an attribute, putting it ahead of `zebra` instead.
+      expect(content).toMatch(/- name: user_name\n\s+sql: .*USER NAME.*\n\s+type: time/);
+      expect(content).toContain('drill_members: [id, zebra, user_name, created_at]');
     });
 
     it('keeps a composite primary key whole, with the timestamp after it', () => {
@@ -587,11 +766,15 @@ describe('ScaffoldingTemplate', () => {
       ).generateFilesByTableNames(['public.things'])[0];
 
       // A 6-column key no longer crowds out the attribute or the timestamp. The key
-      // columns follow the order `dimensions` renders them in, whatever that is — the
-      // point here is that all of them survive, plus what comes after.
-      expect(content).toContain(
-        'drill_members: [k6, k5, k4, k3, k2, k1, name, created_at]'
-      );
+      // columns' relative order isn't a contract — `dimensions.sort((a) => …)` ignores
+      // its second argument, so the permutation is implementation-defined — assert the
+      // set and what follows it, not the order within the key.
+      const drillMembers = content
+        .match(/drill_members: \[([^\]]+)\]/)?.[1]
+        .split(', ');
+
+      expect(drillMembers?.slice(0, 6).sort()).toEqual(['k1', 'k2', 'k3', 'k4', 'k5', 'k6']);
+      expect(drillMembers?.slice(6)).toEqual(['name', 'created_at']);
     });
   });
 });

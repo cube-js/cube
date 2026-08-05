@@ -13,24 +13,6 @@ import { MemberReference } from '../descriptors/MemberReference';
 import { ValueWithComments } from '../descriptors/ValueWithComments';
 import { toSnakeCase } from '../utils';
 
-/**
- * Dimension names that identify or describe a single source row well enough to be
- * worth showing when drilling into a measure. Matched as a whole word against the
- * member name, so `status` matches `order_status` but not `statusless`.
- */
-const DRILL_ATTRIBUTE_DICTIONARY = [
-  'name',
-  'title',
-  'status',
-  'state',
-  'type',
-  'category',
-  'code',
-  'email',
-  'description',
-  'label',
-];
-
 const JOIN_RELATIONSHIP_MAP = {
   hasOne: 'one_to_one',
   has_one: 'one_to_one',
@@ -145,13 +127,17 @@ export abstract class BaseSchemaFormatter {
   }
 
   /**
-   * Members that identify one source row, in the order a user reads them: the primary
-   * key, then the describing attributes, then the main time dimension. Mirrors the
-   * shape the AI model generator authors, so both generation paths drill alike.
+   * The members that identify one source row: every dimension the cube defines, with the
+   * primary key first and the time dimensions last.
    *
-   * The list is not capped — no comparable generator caps one, and the attribute
-   * dictionary already bounds it to columns that describe the row. Truncating instead
-   * drops members the user would then have to add by hand.
+   * Every dimension, deliberately. Which columns are meaningful to drill into is not
+   * recoverable from a warehouse schema — the generator would have to guess from column
+   * names, and a name is not evidence of meaning. So the set isn't narrowed at all: a
+   * member the user doesn't want is one they delete from generated output they were
+   * going to review anyway, whereas one that was never emitted is one they must know to
+   * add. Ordering is the only editorial judgement here, and it costs nothing to be wrong
+   * about — key first because it identifies the row, time last because it reads as
+   * "when".
    *
    * Derived from the dimensions actually being rendered rather than from the ones
    * ScaffoldingSchema computed: the cube-descriptor path lets the caller drop members,
@@ -165,40 +151,32 @@ export abstract class BaseSchemaFormatter {
     const candidates = this.dedupeByMemberName(dimensions);
 
     const primaryKeys = candidates.filter((d) => d.isPrimaryKey);
-    const attributes = candidates.filter(
-      (d) => !d.isPrimaryKey && !isTime(d) && this.isDrillAttribute(d)
-    );
-    // Already sorted by ScaffoldingSchema (created, then updated, then the rest),
-    // so the first one is the row's main timestamp.
-    const mainTimeDimension = candidates.filter(isTime).slice(0, 1);
+    const attributes = candidates.filter((d) => !d.isPrimaryKey && !isTime(d));
+    // All of them, in the order they render. Picking one "main" timestamp would mean
+    // ranking `created_at` above `deleted_at` by what the names suggest.
+    const timeDimensions = candidates.filter((d) => !d.isPrimaryKey && isTime(d));
 
-    return [...primaryKeys, ...attributes, ...mainTimeDimension];
+    return [...primaryKeys, ...attributes, ...timeDimensions];
   }
 
   /**
    * Dimensions are rendered into an object keyed by member name, so columns that
    * collapse to the same name yield one dimension — the drill list must collapse too,
    * or the drill-down repeats a column.
+   *
+   * Last-wins, matching the spread-reduce that renders `dimensions`: on a collision the
+   * cube keeps the later definition, so classifying off the earlier one would read
+   * `isPrimaryKey` / `isTime` from a definition the cube discarded.
    */
   private dedupeByMemberName(dimensions: Dimension[]): Dimension[] {
-    const seen = new Set<string>();
-
-    return dimensions.filter((d) => {
-      const name = this.memberName(d);
-      if (seen.has(name)) {
-        return false;
-      }
-      seen.add(name);
-      return true;
-    });
-  }
-
-  private isDrillAttribute(dimension: Dimension): boolean {
-    const name = toSnakeCase(this.memberName(dimension));
-
-    return DRILL_ATTRIBUTE_DICTIONARY.some(
-      (word) => name === word || name.startsWith(`${word}_`) || name.endsWith(`_${word}`)
-    );
+    return [
+      ...dimensions
+        .reduce(
+          (memo, d) => memo.set(this.memberName(d), d),
+          new Map<string, Dimension>()
+        )
+        .values(),
+    ];
   }
 
   protected schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
