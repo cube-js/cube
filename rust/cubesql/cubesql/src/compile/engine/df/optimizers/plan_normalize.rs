@@ -1657,9 +1657,10 @@ fn cast_target_is_representable(expr: &Expr, data_type: &DataType) -> bool {
     match expr {
         Expr::Literal(ScalarValue::Utf8(Some(value)))
         | Expr::Literal(ScalarValue::LargeUtf8(Some(value))) => {
-            parse_date_str(value).ok().map_or(true, |parsed| {
-                parsed.and_utc().timestamp_nanos_opt().is_some()
-            })
+            // An unparseable string is left to fail wherever it normally would.
+            parse_date_str(value)
+                .ok()
+                .is_none_or(|parsed| parsed.and_utc().timestamp_nanos_opt().is_some())
         }
         Expr::Literal(literal) => datetime_literal_is_representable(literal),
         _ => true,
