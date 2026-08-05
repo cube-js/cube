@@ -129,7 +129,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
 
   it('counts a defaulted parameter as a filter value', () => {
     const res = compileMemberSql(
-      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from, to = 'x') => `d BETWEEN ${from} AND ${to}`)}`,
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from, to = 1) => `d BETWEEN ${from} AND ${to}`)}`,
       ['FILTER_PARAMS']
     );
     expect(res.filterParams[0].column.template).toBe('d BETWEEN {fpv:0} AND {fpv:1}');
@@ -151,10 +151,15 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     // eslint-disable-next-line no-extra-bind
     ['a bound callback', ((from, to) => `d >= ${from} AND d < ${to}`).bind(null)],
     ['a comment closing the parameter list', (from /* ) */, to) => `d >= ${from} AND d < ${to}`],
+    // `Function.length` counts the parameters before the first default, so it
+    // cannot speak for the parse past that point — whichever parameter carries
+    // the string that breaks the scan.
     ['a default containing a paren', (from, to = '(') => `d >= ${from} AND d < ${to}`],
-    // `Function.length` is 0 from the first defaulted parameter on, so it can no
-    // longer vouch for the parse — and a `)` in a string default breaks it.
     ['a first parameter defaulted to a paren', (from = ')', to) => `d >= ${from} AND d < ${to}`],
+    ['a paren in a default with a parameter behind it', (from, to = ')', third) => `d >= ${from} AND d < ${to} AND x = ${third}`],
+    // A quote alone is enough to hold the callback back: whether it hides a paren
+    // is exactly what the scan cannot tell.
+    ['a default containing a quoted string', (from, to = 'x') => `d >= ${from} AND d < ${to}`],
   ])('leaves %s uncompiled', (_name, column) => {
     const res = compileMemberSql(
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter(column)}`,

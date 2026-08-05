@@ -150,14 +150,15 @@ function declaredValueParams(fn) {
 }
 
 // Parsing the parameter list can come up short — a bound or native function
-// exposes no list, and a `)` inside a comment or a string default ends it early.
-// Too few placeholders would render the missing values as `undefined`, so a count
-// is trusted only when something vouches for it.
+// exposes no list, and a `)` inside a comment or a string default ends the scan
+// early. Too few placeholders would render the missing values as `undefined`, so
+// a count is trusted only when nothing could have thrown the scan off.
 //
-// `Function.length` is that witness, being a lower bound on the parameters — but
-// it drops to zero at the first defaulted parameter and can vouch for nothing
-// after that. What is left then is the text itself: a list holding neither a
-// string nor a comment has nothing for the scan to trip over.
+// `Function.length` counts the parameters before the first defaulted one, so it
+// catches a scan that stopped short of that point and nothing after it. Past
+// there only the text can vouch: a list holding neither a string nor a comment
+// has nothing for the scan to trip over. A list that does holds a callback back
+// to the render-time path, where every unreadable list already goes.
 function valueParamsAreCertain(fn, count, inner) {
   if (fn.toString().includes('[native code]')) {
     return false;
@@ -165,7 +166,7 @@ function valueParamsAreCertain(fn, count, inner) {
   if (count < fn.length) {
     return false;
   }
-  return fn.length > 0 || !/['"`]|\/\*|\/\//.test(inner);
+  return !/['"`]|\/\*|\/\//.test(inner);
 }
 
 // Compiles a column callback into a template of its own: its filter values
