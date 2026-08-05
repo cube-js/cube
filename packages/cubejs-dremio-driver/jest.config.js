@@ -10,6 +10,7 @@ module.exports = {
     '<rootDir>/dist/test/**/*.{test,spec}.{ts,js}'
   ],
   setupFiles: [
+    ...base.setupFiles,
     './test/test-env.js'
   ],
   transformIgnorePatterns: [
