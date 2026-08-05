@@ -41,6 +41,28 @@ function targetsDist(value) {
   });
 }
 
+/**
+ * Whether the config can actually compile a TypeScript test — not merely
+ * whether it mentions a transform. `transform: {}` is jest's idiom for turning
+ * transformation *off*, and a `'^.+\\.js$': 'babel-jest'` entry covers no `.ts`
+ * at all; both are truthy, so a presence check would exempt exactly the
+ * packages that still break. The patterns are tested against a representative
+ * filename, which is how jest itself decides.
+ */
+function transformsTypeScript(config) {
+  if (typeof config.preset === 'string' && /ts-jest|typescript/i.test(config.preset)) return true;
+
+  return Object.keys(config.transform || {}).some(pattern => {
+    try {
+      return new RegExp(pattern).test('example.test.ts');
+    } catch (error) {
+      // An unparseable pattern is jest's problem to report, not this check's
+      // reason to exempt a package.
+      return false;
+    }
+  });
+}
+
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage', '__snapshots__']);
 
 /**
@@ -65,6 +87,53 @@ function typescriptTestSources(dir) {
 }
 
 /**
+ * Jest reads its config from a `jest.config.*` file or from a `jest` key in
+ * package.json, and the drift this guards against is indifferent to which. A
+ * check that only opened `jest.config.js` would miss the driver packages that
+ * carry a package.json block instead — several of which have TypeScript tests
+ * kept alive purely by the path argument in their `unit` script.
+ *
+ * The extensions jest resolves beyond `.js` are listed so an unreadable one is
+ * reported rather than silently skipped: being unable to inspect a config is a
+ * different thing from a config being fine.
+ */
+const CONFIG_EXTENSIONS = ['js', 'cjs', 'mjs', 'ts', 'json'];
+
+function resolveConfig(pkg) {
+  const configFile = CONFIG_EXTENSIONS
+    .map(extension => path.join(pkg, `jest.config.${extension}`))
+    .find(candidate => fs.existsSync(candidate));
+
+  if (configFile) {
+    if (!configFile.endsWith('.js') && !configFile.endsWith('.cjs') && !configFile.endsWith('.json')) {
+      // `require` cannot load these without a loader, and guessing would be
+      // worse than saying so.
+      throw new Error(
+        `${path.relative(REPO_ROOT, pkg)}: ${path.basename(configFile)} cannot be inspected by this check`
+      );
+    }
+
+    try {
+      // eslint-disable-next-line import/no-dynamic-require, global-require
+      return require(configFile);
+    } catch (error) {
+      // A config that cannot even be loaded is a worse problem than the one
+      // this guard is for, and jest would fail on it too — so say which
+      // package it is rather than dying on a bare stack trace.
+      throw new Error(
+        `${path.relative(REPO_ROOT, pkg)}: ${path.basename(configFile)} could not be loaded — ${error.message}`
+      );
+    }
+  }
+
+  const packageJson = path.join(pkg, 'package.json');
+  if (!fs.existsSync(packageJson)) return null;
+
+  // eslint-disable-next-line import/no-dynamic-require, global-require
+  return require(packageJson).jest || null;
+}
+
+/**
  * Reads the resolved config rather than the file's `require` target. That
  * distinction is what keeps `jest.base-ts.config.js` out of scope: it extends
  * the base config too, but adds `preset: 'ts-jest'` and a `transform`, so its
@@ -76,24 +145,16 @@ function violations() {
   return fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .map(entry => path.join(PACKAGES_DIR, entry.name))
-    .filter(pkg => fs.existsSync(path.join(pkg, 'jest.config.js')))
     .flatMap(pkg => {
-      let config;
-      try {
-        // eslint-disable-next-line import/no-dynamic-require, global-require
-        config = require(path.join(pkg, 'jest.config.js'));
-      } catch (error) {
-        // A config that cannot even be loaded is a worse problem than the one
-        // this guard is for, and jest would fail on it too — so say which
-        // package it is rather than dying on a bare stack trace.
-        throw new Error(
-          `${path.relative(REPO_ROOT, pkg)}: jest.config.js could not be loaded — ${error.message}`
-        );
-      }
+      const config = resolveConfig(pkg);
 
-      // A package that brings its own transform (or a preset that implies one)
-      // can execute its sources, so the dist-only convention does not apply.
-      if (config.transform || config.preset) return [];
+      // No jest config at all: the package does not run jest, so there is no
+      // collection to constrain.
+      if (!config) return [];
+
+      // A package that can actually compile TypeScript may test its sources
+      // deliberately, so the dist-only convention does not apply to it.
+      if (transformsTypeScript(config)) return [];
 
       // With no TypeScript test sources there is nothing untransformable for
       // jest's default to pick up — a package testing plain `.js`, or with no
