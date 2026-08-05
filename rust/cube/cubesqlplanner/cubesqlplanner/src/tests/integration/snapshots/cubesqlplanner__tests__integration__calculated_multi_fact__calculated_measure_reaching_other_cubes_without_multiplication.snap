@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calculated_multi_fact.rs
+expression: result
+---
+payments__status | payments__gold_share | payments__total_amount
+-----------------+----------------------+-----------------------
+DECLINED         | NULL                 | 300.00                
+SUCCESS          | 42.8571428571428571  | 1200.00
