@@ -61,9 +61,16 @@ export interface RetainedResult {
  * Kept apart from `resultPromises` deliberately: that map doubles as "a query is
  * in flight on this key", so holding a resolved promise there would hand the next
  * query on the same key an instantly-resolved stale result.
+ *
+ * The cap bounds the entry *count*, and entries here are whole query results —
+ * this driver backs the query queue as well as the pre-aggregation queue — so the
+ * worst-case memory is `MAX × result size`, not `MAX × something small`. Anyone
+ * tuning these numbers is trading heap against how late a straggler may arrive;
+ * the coalescing race it exists for resolves in milliseconds, so the window is
+ * kept far below the continue-wait timeout rather than near it.
  */
-const RETAINED_RESULT_MS = 15 * 1000;
-const RETAINED_RESULT_MAX = 1000;
+const RETAINED_RESULT_MS = 5 * 1000;
+const RETAINED_RESULT_MAX = 100;
 
 export class LocalQueueDriverConnectionState {
   public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
@@ -143,7 +150,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     if (!this.state.queryDef[queryKeyHash] && !this.state.resultPromises[resultListKey]) {
       // Nothing in flight — but a waiter that coalesced onto this key may have
       // arrived after the result was consumed, so check what's still retained.
-      return this.takeRetainedResult(resultListKey);
+      return this.readRetainedResult(resultListKey);
     }
     const timeoutPromise = (timeout: number) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
@@ -160,9 +167,17 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   }
 
   private retainResult(resultListKey: string, result: any): void {
-    const { retainedResults } = this.state;
-    retainedResults[resultListKey] = { result, at: Date.now() };
+    this.state.retainedResults[resultListKey] = { result, at: Date.now() };
+    this.sweepRetainedResults();
+  }
 
+  /**
+   * Drops expired entries and enforces the size cap. Runs from every completion
+   * as well as every retain, so a queue that goes quiet right after one does not
+   * hold that result past its window waiting for a reader that never comes.
+   */
+  private sweepRetainedResults(): void {
+    const { retainedResults } = this.state;
     const deadline = Date.now() - RETAINED_RESULT_MS;
     const live = Object.keys(retainedResults).filter(key => {
       if (retainedResults[key].at <= deadline) {
@@ -183,7 +198,12 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
   }
 
-  private takeRetainedResult(resultListKey: string): any {
+  /**
+   * Reads without removing: several stragglers can coalesce onto one key, so each
+   * must be able to read the same retained result. Expiry and the size cap are
+   * what remove it — hence `read`, not `take`.
+   */
+  private readRetainedResult(resultListKey: string): any {
     const retained = this.state.retainedResults[resultListKey];
     if (!retained) {
       return null;
@@ -195,6 +215,12 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return retained.result;
   }
 
+  /**
+   * Deliberately does not consult `retainedResults`: this is the non-blocking
+   * probe used to decide whether a query is already done, and the retained map
+   * exists for waiters that missed a result on a key they coalesced onto. Serving
+   * from it here would report "done" to callers that never joined that flow.
+   */
   public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
     const resultListKey = this.resultListKey(queryKey);
     if (this.state.resultPromises[resultListKey] && this.state.resultPromises[resultListKey].resolved) {
@@ -313,6 +339,11 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     if (promise.resolve) {
       promise.resolve(executionResult);
     }
+
+    // A completion is the other moment the retained map can be pruned; without
+    // it a queue going idle right after one leaves that entry until someone
+    // happens to read or retain that exact key.
+    this.sweepRetainedResults();
 
     return true;
   }
