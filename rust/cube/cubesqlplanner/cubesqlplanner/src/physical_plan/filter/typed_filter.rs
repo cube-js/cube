@@ -95,22 +95,15 @@ impl TypedFilter {
                 }
                 let values =
                     self.filter_param_values(query_tools, plan_templates, use_db_time_zone)?;
-                // A filter carrying no values applies nothing, which is what a
-                // `set` or `notSet` operator on the filtered member amounts to.
-                if values.is_empty() {
-                    return plan_templates.always_true();
-                }
-                // Fewer values than the column takes leaves its trailing
-                // placeholders with nothing to bind. Inventing a bound would
-                // silently widen the predicate, so say so instead.
+                // A column applies what its filter supplies, and nothing when the
+                // filter cannot supply what the column takes — a `set` or `notSet`
+                // operator carries no values at all, and a one-sided date operator
+                // carries one where the column takes both bounds. The filter still
+                // reaches the query on its own; only its restatement inside this
+                // SQL is dropped, which is narrower than binding a bound the
+                // filter never gave.
                 if values.len() < compiled.value_params_count {
-                    return Err(CubeError::user(format!(
-                        "FILTER_PARAMS column for `{}` takes {} values but the filter on it \
-                         supplies {}",
-                        item.filter_symbol_name,
-                        compiled.value_params_count,
-                        values.len()
-                    )));
+                    return plan_templates.always_true();
                 }
                 let Some(call) = &item.compiled_call else {
                     return Err(CubeError::internal(format!(

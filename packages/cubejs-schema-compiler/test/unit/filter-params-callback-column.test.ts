@@ -106,8 +106,8 @@ describe('FILTER_PARAMS callback column', () => {
       expect(loadSql).toMatch(PUSHED_DOWN_PREDICATE);
     });
 
-    // The column applies only what its filter supplies, so an operator carrying
-    // no values leaves nothing to apply.
+    // The column applies what its filter supplies, so an operator carrying no
+    // values leaves nothing to apply.
     it('applies nothing when the filter on the column carries no values', async () => {
       const query = await queryFor(useNativeSqlPlanner, {
         dimensions: ['commission.partner', 'commission.pricingDuration'],
@@ -121,10 +121,15 @@ describe('FILTER_PARAMS callback column', () => {
     });
   });
 
-  // Fewer values than the column takes would leave its trailing bound unbound.
-  // The legacy planner fills that bound in with the current time, quietly
-  // widening the predicate to a range the filter never asked for.
-  it('reports a filter that supplies fewer values than the column takes', async () => {
+  // A one-sided date operator carries one bound where this column takes both, so
+  // there is nothing to bind its second placeholder to and the column applies
+  // nothing. The filter still reaches the query on its own.
+  //
+  // The legacy planner instead fills the missing bound in with the current time,
+  // which for `beforeDate` lands the given value on the opposite side of the
+  // range and leaves the measure empty for every row the query keeps — so this
+  // is a divergence on purpose.
+  it('applies nothing for a filter carrying fewer values than the column takes', async () => {
     const query = await queryFor(true, {
       dimensions: ['commission.partner', 'commission.pricingDuration'],
       timeDimensions: [],
@@ -134,9 +139,10 @@ describe('FILTER_PARAMS callback column', () => {
         values: ['2025-07-01'],
       }],
     });
+    const [sql] = query.buildSqlAndParams();
 
-    expect(() => query.buildSqlAndParams())
-      .toThrow(/takes 2 values but the filter on it supplies 1/);
+    expect(sql).not.toMatch(PUSHED_DOWN_PREDICATE);
+    expect(sql).toContain('1 = 1');
   });
 
   // A column renders only where its filter reaches the query, so the cube it
