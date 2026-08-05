@@ -5,12 +5,8 @@ use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
 
 use crate::compile::{
-    convert_sql_to_cube_query,
     rewrite::rewriter::Rewriter,
-    test::{
-        convert_select_to_query_plan, get_test_session, get_test_tenant_ctx, init_testing_logger,
-        utils::LogicalPlanTestUtils,
-    },
+    test::{convert_select_to_query_plan, init_testing_logger, utils::LogicalPlanTestUtils},
     DatabaseProtocol,
 };
 
@@ -383,34 +379,75 @@ async fn test_filter_between_date_beyond_nanosecond_range() {
     }
     init_testing_logger();
 
-    let meta = get_test_tenant_ctx();
-    let query = convert_sql_to_cube_query(
+    let query_plan = convert_select_to_query_plan(
         // language=PostgreSQL
-        &r#"
+        r#"
 SELECT dim_str0
 FROM MultiTypeCube
 WHERE dim_date0 BETWEEN date '2020-01-01' AND date '9999-12-31'
 GROUP BY dim_str0
 "#
         .to_string(),
-        meta.clone(),
-        get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        DatabaseProtocol::PostgreSQL,
     )
     .await;
 
-    // Whatever the outcome, it must not be a panic.
-    match query {
-        Ok(plan) => {
-            let rendered = format!("{:?}", plan.as_logical_plan().find_cube_scan().request);
-            assert!(
-                rendered.contains("9999-12-31"),
-                "if it plans, the bound must survive: {rendered}"
-            );
-        }
-        Err(error) => assert!(
-            error.message().contains("out of range"),
-            "expected an out-of-range error, got: {}",
-            error.message()
-        ),
+    // A two-sided range on a time dimension pushes down as a dateRange rather than two filters.
+    assert_eq!(
+        query_plan
+            .as_logical_plan()
+            .find_cube_scan()
+            .request
+            .time_dimensions,
+        Some(vec![V1LoadRequestQueryTimeDimension {
+            dimension: "MultiTypeCube.dim_date0".to_string(),
+            granularity: None,
+            date_range: Some(serde_json::json!(vec![
+                "2020-01-01T00:00:00.000Z".to_string(),
+                "9999-12-31T00:00:00.000Z".to_string(),
+            ])),
+        }]),
+        "both BETWEEN bounds must push down with the out-of-range one intact"
+    );
+}
+
+/// The same filter written without a `date` prefix is a bare string normalized against the
+/// column's `Timestamp(Nanosecond)` type. That normalization used to give up on a date this far
+/// out and leave the bound as a raw string, so the filter pushed down as `9999-12-31` while every
+/// other date filter pushes down an ISO instant; it now normalizes like the rest.
+#[tokio::test]
+async fn test_filter_string_date_beyond_nanosecond_range_is_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
     }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT dim_str0
+FROM MultiTypeCube
+WHERE dim_date0 <= '9999-12-31'
+GROUP BY dim_str0
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    assert_eq!(
+        query_plan
+            .as_logical_plan()
+            .find_cube_scan()
+            .request
+            .filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("MultiTypeCube.dim_date0".to_string()),
+            operator: Some("beforeOrOnDate".to_string()),
+            values: Some(vec!["9999-12-31T00:00:00.000Z".to_string()]),
+            or: None,
+            and: None,
+        }]),
+        "the string form must still normalize and push down"
+    );
 }
