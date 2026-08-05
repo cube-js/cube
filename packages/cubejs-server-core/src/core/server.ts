@@ -718,11 +718,12 @@ export class CubejsServerCore {
 
         // `resolveDriverStaleness` awaits the user's factory, so another caller
         // may have replaced or invalidated this key in the meantime. Its work
-        // supersedes ours: start over rather than release a driver it has
-        // already handed out, or build a second pool alongside it.
-        if (driverPromise[factoryKey] !== cached) {
-          const superseding = driverPromise[factoryKey];
+        // supersedes ours, and `cached` is no longer ours to reuse or release:
+        // it has either been handed to that caller's requests or already
+        // released by it.
+        const superseding = driverPromise[factoryKey];
 
+        if (superseding !== cached) {
           // Retry, so this request ends up on a driver matching its own
           // context — but bounded. Where contexts keep displacing each other
           // this request could otherwise lose every round and pay for a
@@ -737,71 +738,73 @@ export class CubejsServerCore {
             return superseding;
           }
 
-          // Invalidated rather than replaced, so there is nothing to reuse —
-          // fall through and build, which cannot recurse again.
-        }
-
-        if (!staleness.stale) {
+          // Invalidated rather than replaced — the winning caller's own build
+          // failed, so it released `cached` and left nothing to reuse. Build
+          // below, which cannot recurse again, carrying the probe's result when
+          // it already resolved one so the factory is not asked twice.
+          resolvedFactoryResult = staleness.stale ? staleness.factoryResult : undefined;
+        } else if (!staleness.stale) {
           return cached;
-        }
+        } else {
+          // Counted per alias set, not per key: a rotation seen first through
+          // `default@pre_agg` and then through `default` is one rebuild of one
+          // shared driver, and must not read as two counters at 1.
+          const rebuildKey = aliasedKeys[0];
+          driverRebuilds[rebuildKey] = (driverRebuilds[rebuildKey] || 0) + 1;
+          const rebuildCount = driverRebuilds[rebuildKey];
 
-        // Counted per alias set, not per key: a rotation seen first through
-        // `default@pre_agg` and then through `default` is one rebuild of one
-        // shared driver, and must not read as two counters at 1.
-        const rebuildKey = aliasedKeys[0];
-        driverRebuilds[rebuildKey] = (driverRebuilds[rebuildKey] || 0) + 1;
-        const rebuildCount = driverRebuilds[rebuildKey];
-
-        // Carries `warning` so it survives the default log level: a plain-params
-        // message matches no allowlist in `prodLogger`/`devLogger` and is
-        // dropped below `trace`. Tearing down a connection pool is an event an
-        // operator needs to be able to correlate against, and the threshold
-        // message below arrives too late to reconstruct the first rebuilds.
-        this.logger('Rebuilding driver on configuration change', {
-          dataSource,
-          preAggregations,
-          rebuildCount,
-          warning: 'Driver configuration changed; replacing the connection.',
-        });
-
-        // A credential rotation rebuilds a handful of times a day. Rebuilding
-        // this often means the orchestrator id does not partition by whatever
-        // the factory reads, so contexts that need different connections keep
-        // displacing each other's driver.
-        if (rebuildCount === DRIVER_REBUILD_WARN_THRESHOLD) {
-          this.logger('Driver rebuilt repeatedly', {
+          // Carries `warning` so it survives the default log level: a
+          // plain-params message matches no allowlist in
+          // `prodLogger`/`devLogger` and is dropped below `trace`. Tearing down
+          // a connection pool is an event an operator needs to be able to
+          // correlate against, and the threshold message below arrives too late
+          // to reconstruct the first rebuilds.
+          this.logger('Rebuilding driver on configuration change', {
             dataSource,
+            preAggregations,
             rebuildCount,
-            warning: 'Driver configuration keeps changing for one orchestrator. '
-              + 'contextToOrchestratorId likely does not distinguish the contexts '
-              + 'driverFactory returns different connections for.',
+            warning: 'Driver configuration changed; replacing the connection.',
           });
+
+          // A credential rotation rebuilds a handful of times a day. Rebuilding
+          // this often means the orchestrator id does not partition by whatever
+          // the factory reads, so contexts that need different connections keep
+          // displacing each other's driver.
+          if (rebuildCount === DRIVER_REBUILD_WARN_THRESHOLD) {
+            this.logger('Driver rebuilt repeatedly', {
+              dataSource,
+              rebuildCount,
+              warning: 'Driver configuration keeps changing for one orchestrator. '
+                + 'contextToOrchestratorId likely does not distinguish the contexts '
+                + 'driverFactory returns different connections for.',
+            });
+          }
+
+          // Clear every key pointing at the replaced driver, not just the one
+          // asked for: a surviving alias would keep handing out a driver whose
+          // pool is being drained, and would release it a second time when it
+          // was itself found stale.
+          Object.keys(driverPromise)
+            .filter((key) => driverPromise[key] === cached)
+            .forEach((key) => {
+              driverPromise[key] = null;
+              delete driverOrigin[key];
+            });
+
+          // Graceful: `release` drains the pool, so queries already running on
+          // the replaced driver finish before its connections are closed. It is
+          // deliberately not awaited — this request should not wait on the
+          // previous driver's in-flight work — and its failure must not fail
+          // this request.
+          cached
+            .then((driver) => driver.release())
+            .catch((error) => this.logger('Driver release error', {
+              dataSource,
+              error: (error as Error).stack || (error as Error).toString(),
+            }));
+
+          resolvedFactoryResult = staleness.factoryResult;
         }
-
-        // Clear every key pointing at the replaced driver, not just the one
-        // asked for: a surviving alias would keep handing out a driver whose
-        // pool is being drained, and would release it a second time when it
-        // was itself found stale.
-        Object.keys(driverPromise)
-          .filter((key) => driverPromise[key] === cached)
-          .forEach((key) => {
-            driverPromise[key] = null;
-            delete driverOrigin[key];
-          });
-
-        // Graceful: `release` drains the pool, so queries already running on
-        // the replaced driver finish before its connections are closed. It is
-        // deliberately not awaited — this request should not wait on the
-        // previous driver's in-flight work — and its failure must not fail
-        // this request.
-        cached
-          .then((driver) => driver.release())
-          .catch((error) => this.logger('Driver release error', {
-            dataSource,
-            error: (error as Error).stack || (error as Error).toString(),
-          }));
-
-        resolvedFactoryResult = staleness.factoryResult;
       }
 
       if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
