@@ -26,6 +26,24 @@ const PACKAGES_DIR = path.join(REPO_ROOT, 'packages');
  */
 const CONSTRAINT_KEYS = ['testMatch', 'roots'];
 
+/**
+ * Presence of the key is not the property that matters — where it points is.
+ * `testMatch: ['<rootDir>/test/**\/*.test.ts']` is a declared `testMatch` that
+ * still aims at the untransformable sources, so checking only that the key
+ * exists would wave through exactly the drift this guard is for. Every entry
+ * must target `dist/`.
+ */
+function targetsDist(value) {
+  const entries = Array.isArray(value) ? value : [value];
+
+  return entries.length > 0 && entries.every(entry => {
+    if (typeof entry !== 'string') return false;
+    // Normalized so a Windows-style separator in a hand-written config reads the
+    // same as a posix one.
+    return /(^|\/)dist(\/|$)/.test(entry.replace(/\\/g, '/').replace('<rootDir>/', ''));
+  });
+}
+
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage', '__snapshots__']);
 
 /** Test sources jest would collect, by extension, anywhere under `dir`. */
@@ -69,7 +87,11 @@ function violations() {
       // tests at all, is collectible exactly as it stands.
       if (testSources(path.join(pkg, 'test'), 'ts').length === 0) return [];
 
-      if (CONSTRAINT_KEYS.some(key => config[key] !== undefined)) return [];
+      const constrained = CONSTRAINT_KEYS
+        .filter(key => config[key] !== undefined)
+        .some(key => targetsDist(config[key]));
+
+      if (constrained) return [];
 
       return [path.relative(REPO_ROOT, pkg)];
     });
