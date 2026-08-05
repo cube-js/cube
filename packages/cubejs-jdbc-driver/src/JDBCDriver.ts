@@ -236,12 +236,6 @@ export class JDBCDriver extends BaseDriver {
   }
 
   /**
-   * Resolved here rather than in BaseDriver, so the base accessor would
-   * otherwise report no preamble to the pre-aggregation version key. Only the
-   * user-configured value, not the per-dbType built-ins — those are fixed for a
-   * driver and would add a constant to every key.
-   */
-  /**
    * This driver applies `sql_preamble`.
    *
    * Inherited by every JDBC-based driver — Databricks among them — which reuse
@@ -251,6 +245,12 @@ export class JDBCDriver extends BaseDriver {
     return true;
   }
 
+  /**
+   * Resolved here rather than in BaseDriver, so the base accessor would
+   * otherwise report no preamble to the pre-aggregation version key. Only the
+   * user-configured value, not the per-dbType built-ins — those are fixed for a
+   * driver and would add a constant to every key.
+   */
   public override effectiveSqlPreamble(): string | undefined {
     return normalizeSqlPreamble(this.config.sqlPreamble) ?? getEnv('dbSqlPreamble', {
       dataSource: this.config.dataSource ?? 'default',
