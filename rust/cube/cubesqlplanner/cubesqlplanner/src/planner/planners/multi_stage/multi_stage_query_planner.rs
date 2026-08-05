@@ -560,21 +560,17 @@ impl MultiStageQueryPlanner {
                 filtered_state
             };
 
-            // Step 1 can drop a filter the query restricts the grid by, and the
-            // window path cannot honour that. A window has a single row set
-            // serving both roles: the rows it reports and the rows it
-            // aggregates over. Dropping the filter widens the aggregation
-            // input, which is the point of the directive — but on the window
-            // path it widens the reported rows with it, so values the query
-            // filtered out come back as result rows. The JOIN-model can hold
-            // the two apart, so hand the inode to it.
-            //
-            // Handing it over restores the row set only for inodes that also
-            // reshape the grain: the keys side below is gated on the grain
-            // losing a dimension, and it is the keys side that carries the
-            // query's rows. An inode that drops a filter while keeping the
-            // parent grain gets no keys side and still reports the wider set.
-            if query_filters_dropped(self.root_state(), &state, &filtered_state) {
+            // Step 1 can drop a filter the query restricts the grid by. That is
+            // the point of the directive — the aggregation input widens — but
+            // the rows the inode *reports* must stay the query's, and only the
+            // JOIN-model can hold the two apart: its keys side enumerates the
+            // grid while its measure side spans the widened set. A window
+            // expression has one row set serving both roles, so it reports the
+            // widened rows too and values the query filtered out come back as
+            // result rows. Hand such an inode to the JOIN-model.
+            let query_filter_dropped =
+                query_filters_dropped(self.root_state(), &state, &filtered_state);
+            if query_filter_dropped {
                 multi_stage_member = multi_stage_member.with_use_window_path(false);
             }
 
@@ -616,14 +612,15 @@ impl MultiStageQueryPlanner {
                 scope,
             )?;
 
-            // JOIN-model: when new_state misses any dim that was on the
-            // parent's `state`, this inode shrinks the parent grain. We
-            // build keys-side descriptions per child on the parent state
-            // so the FullKeyAggregate can broadcast measure values back
-            // to the full query grain. Window-path Aggregate inodes
-            // (sum-of-sum / sum-of-count with no leaf-extending `include`)
-            // handle broadcast via the window expression instead and don't
-            // need keys_input.
+            // JOIN-model: when the measure side no longer enumerates the rows
+            // this inode has to report — because new_state misses a dim that
+            // was on the parent's `state`, or because a dropped query filter
+            // widened it — we build keys-side descriptions per child on the
+            // parent state, so the FullKeyAggregate broadcasts measure values
+            // onto the query grain and only onto it. Window-path Aggregate
+            // inodes (sum-of-sum / sum-of-count with no leaf-extending
+            // `include`) handle broadcast via the window expression instead and
+            // don't need keys_input.
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
             if !use_window_path {
                 let new_state_has = |sym: &Rc<MemberSymbol>| {
@@ -639,7 +636,17 @@ impl MultiStageQueryPlanner {
                     .iter()
                     .chain(state.time_dimensions().iter())
                     .any(|d| !new_state_has(d));
-                if any_missing {
+                // A dropped query filter needs the keys side for the same
+                // reason a shrunk grain does — the measure side no longer
+                // enumerates the query's rows — except here the grid keeps
+                // every dimension and only the row count within it grows.
+                //
+                // A parent state with no dimensions is exempt: its grid is a
+                // single row that no filter change can widen, and a keys side
+                // with no key dimensions is not a shape the assembly renders.
+                let grid_has_dimensions =
+                    !state.dimensions().is_empty() || !state.time_dimensions().is_empty();
+                if any_missing || (query_filter_dropped && grid_has_dimensions) {
                     self.make_childs(
                         member.clone(),
                         state.clone(),

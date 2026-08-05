@@ -346,3 +346,34 @@ async fn test_grain_exclude_keeps_null_dimension_key() {
         insta::assert_snapshot!(result);
     }
 }
+
+// The dropped filter's dimension is not one the query groups by, so the grain
+// reshape has nothing to remove and the measure side keeps the full grid — yet
+// the rows within that grid still widen. Grouping by the primary key makes it
+// visible: only the six completed orders may appear.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_exclude_keeps_row_set_when_member_not_grouped() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_exclude_status
+          - orders.amount_grain_and_filter_exclude_status
+        dimensions:
+          - orders.id
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders.id
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
