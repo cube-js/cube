@@ -12,7 +12,10 @@ const PACKAGE_ROOT = path.join(__dirname, '..', '..');
 // eslint-disable-next-line import/no-dynamic-require, global-require
 const jestConfig = require(path.join(PACKAGE_ROOT, 'jest.config.js'));
 
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage']);
+// `__snapshots__` is listed rather than left to the filename filter below: a
+// snapshot always carries two extensions (`foo.test.ts.snap`), so it happens not
+// to match today, but that is an accident of naming rather than an intent.
+const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage', '__snapshots__']);
 
 /**
  * Every test file in the package must have a compiled counterpart that
@@ -40,6 +43,10 @@ function sourceTestFiles(dir: string): string[] {
 
 const SOURCE_TEST_FILES = sourceTestFiles(PACKAGE_ROOT);
 
+const relativeToPackage = (file: string) => path.relative(PACKAGE_ROOT, file);
+
+const toPosix = (p: string) => p.split(path.sep).join('/');
+
 /**
  * Matches a path against the real `testMatch`, via the same glob library jest
  * uses. Deriving from the config rather than restating the pattern keeps this
@@ -50,7 +57,16 @@ const SOURCE_TEST_FILES = sourceTestFiles(PACKAGE_ROOT);
  */
 function isCollected(file: string): boolean {
   const patterns: string[] = jestConfig.testMatch;
-  return micromatch.isMatch(file, patterns.map(p => p.replace('<rootDir>', PACKAGE_ROOT)));
+  // Matched package-relative with posix separators, never as absolute paths.
+  // micromatch reads `\` as an escape, so on win32 an absolute path would match
+  // nothing at all — which fails asymmetrically: the "no source is collected"
+  // assertion would pass vacuously while the counterpart one named every file.
+  // Staying relative also keeps a glob metacharacter in the checkout path
+  // (`/Users/me/cube (fork)/…`) from turning the pattern into a choice group.
+  return micromatch.isMatch(
+    toPosix(relativeToPackage(file)),
+    patterns.map(p => toPosix(p.replace('<rootDir>/', '')))
+  );
 }
 
 /** `test/foo/bar.test.ts` -> `dist/test/foo/bar.test.js` */
@@ -58,8 +74,6 @@ function compiledCounterpart(sourceFile: string): string {
   const relative = path.relative(PACKAGE_ROOT, sourceFile);
   return path.join(PACKAGE_ROOT, 'dist', relative).replace(/\.[^.]+$/, '.js');
 }
-
-const relativeToPackage = (file: string) => path.relative(PACKAGE_ROOT, file);
 
 describe('test collection', () => {
   test('testMatch is configured', () => {
@@ -69,13 +83,21 @@ describe('test collection', () => {
     expect(Array.isArray(jestConfig.testMatch)).toBe(true);
   });
 
-  test('nothing narrows collection behind testMatch', () => {
+  test('no config key narrows collection behind testMatch', () => {
     // The assertions below reason from `testMatch` alone, so a key that skips a
     // file jest would otherwise collect — the usual "temporarily ignore the
     // flaky suite" edit — would slip a silently-inert test past them.
-    expect(jestConfig.testPathIgnorePatterns).toBeUndefined();
-    expect(jestConfig.modulePathIgnorePatterns).toBeUndefined();
-    expect(jestConfig.roots).toBeUndefined();
+    // `testRegex` is included because it is mutually exclusive with `testMatch`:
+    // setting it makes jest throw rather than narrow, which is a different
+    // failure to reason about and better named here than discovered.
+    //
+    // This reaches config only. A positional `testPathPattern` on the command
+    // line narrows collection the same way and is invisible from here — see the
+    // `unit` script — so this guard bounds the config, not every route in.
+    const narrowingKeys = ['testPathIgnorePatterns', 'modulePathIgnorePatterns', 'roots', 'testRegex']
+      .filter(key => jestConfig[key] !== undefined);
+
+    expect(narrowingKeys).toEqual([]);
   });
 
   test('testMatch targets the compiled output, not the sources', () => {
@@ -97,5 +119,19 @@ describe('test collection', () => {
       .map(relativeToPackage);
 
     expect(uncollected).toEqual([]);
+  });
+
+  test('no collected test has lost its source', () => {
+    // The reverse direction, and the likelier one day to day: `tsc` is
+    // incremental and only `build` does `rm -rf dist`, so renaming or deleting a
+    // test leaves its old compiled copy behind, collected forever, running code
+    // whose source no longer exists. That is this file's own subject mirrored —
+    // a test running that nobody can see.
+    const expected = new Set(SOURCE_TEST_FILES.map(compiledCounterpart));
+    const orphans = sourceTestFiles(path.join(PACKAGE_ROOT, 'dist'))
+      .filter(file => isCollected(file) && !expected.has(file))
+      .map(relativeToPackage);
+
+    expect(orphans).toEqual([]);
   });
 });
