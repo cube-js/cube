@@ -1029,10 +1029,21 @@ export class QueryCache {
       // A continue-wait retry re-runs the *same* query, so the entry's query
       // must match too. Entries written before `queryHash` existed carry none;
       // accept those rather than force a revalidation storm on deploy.
-      const isSameQuery = !parsedResult.queryHash ||
+      //
+      // `query` here is post-`replacePreAggregationTableNames`, which is what
+      // makes this work — the resolved table names are the only thing telling
+      // the colliding queries apart. It also means a rebuilt pre-aggregation
+      // counts as a different query, on purpose: the new table version yields
+      // different SQL, so the retry falls through to the renewal branch below
+      // and blocks on fresh data rather than serving the pre-rebuild result.
+      const isSameQuery = () => !parsedResult.queryHash ||
         parsedResult.queryHash === getCacheHash([query, values]);
-      const isSameRequest = options.requestId && parsedResult.requestId && isSameQuery &&
-        QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId);
+      // Hashing is deferred past the two `requestId` checks: without a
+      // requestId on either side the short-circuit cannot apply, and md5 over
+      // the full SQL and params would be paid on every cache hit for nothing.
+      const isSameRequest = options.requestId && parsedResult.requestId &&
+        QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId) &&
+        isSameQuery();
 
       // Continue-wait cycle: result was produced by our request,
       // refreshKey changed during execution — return cached, refresh in background.

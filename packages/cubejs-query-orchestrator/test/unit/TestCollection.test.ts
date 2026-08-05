@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 
+// No @types/micromatch in the tree, so require it rather than import.
+// eslint-disable-next-line global-require
+const micromatch = require('micromatch');
+
 // eslint-disable-next-line import/no-dynamic-require
 const jestConfig = require('../../jest.config');
 
@@ -20,23 +24,17 @@ function testFilesOnDisk(dir: string): string[] {
 }
 
 /**
- * Translates a jest `testMatch` glob into a RegExp. Only the constructs the
- * patterns in this repo actually use are supported (`**`, `*`, `<rootDir>`),
- * so an unrecognised pattern fails loudly rather than silently matching
- * nothing — a guard that quietly passes is worse than no guard.
+ * Matches a path against the real `testMatch`, via the same glob library jest
+ * uses. A hand-rolled translation gets this wrong in a way that is worse than
+ * useless: rendering `/**\/` as `/.*\/` demands an intervening directory, so
+ * `test/Smoke.test.ts` — which jest *does* collect, since micromatch's `**`
+ * matches zero segments — would be reported as uncollected and fail CI with a
+ * misleading message. Deriving from the config rather than restating the
+ * pattern also keeps this honest when someone edits it.
  */
-function globToRegExp(pattern: string): RegExp {
-  const withRoot = pattern.replace('<rootDir>', PACKAGE_ROOT);
-  if (/[?[\]{}()!+@]/.test(withRoot)) {
-    throw new Error(`Unsupported glob construct in testMatch pattern: ${pattern}`);
-  }
-
-  const source = withRoot
-    .split('**')
-    .map(segment => segment.split('*').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*'))
-    .join('.*');
-
-  return new RegExp(`^${source}$`);
+function isCollected(file: string): boolean {
+  const patterns: string[] = jestConfig.testMatch;
+  return micromatch.isMatch(file, patterns.map(p => p.replace('<rootDir>', PACKAGE_ROOT)));
 }
 
 describe('test collection', () => {
@@ -44,10 +42,8 @@ describe('test collection', () => {
   // the shared ts-jest base matches `*.test.ts` only. Assert the config collects
   // every test file on disk, so dropping one fails CI instead of going unnoticed.
   test('every test file on disk is matched by testMatch', () => {
-    const patterns: string[] = jestConfig.testMatch;
-    expect(patterns).toBeDefined();
+    expect(Array.isArray(jestConfig.testMatch)).toBe(true);
 
-    const matchers = patterns.map(globToRegExp);
     const onDisk = testFilesOnDisk(TEST_ROOT);
 
     // Guards the guard: if the walk finds nothing, the assertion below is
@@ -55,9 +51,22 @@ describe('test collection', () => {
     expect(onDisk.length).toBeGreaterThan(0);
 
     const uncollected = onDisk
-      .filter(file => !matchers.some(matcher => matcher.test(file)))
+      .filter(file => !isCollected(file))
       .map(file => path.relative(PACKAGE_ROOT, file));
 
     expect(uncollected).toEqual([]);
+  });
+
+  // Pins the matcher against the hand-rolled translation this guard used to
+  // carry: a test added directly under `test/` is collected by jest, so the
+  // guard must agree rather than fail CI naming a file that does run.
+  test.each([
+    ['test/unit/QueryOrchestrator.test.js', true],
+    ['test/unit/QueryCache.test.ts', true],
+    ['test/Smoke.test.ts', true],
+    ['test/unit/QueryCache.abstract.ts', false],
+    ['src/orchestrator/QueryCache.ts', false],
+  ])('%s is collected: %s', (relative, expected) => {
+    expect(isCollected(path.join(PACKAGE_ROOT, relative))).toBe(expected);
   });
 });
