@@ -38,9 +38,6 @@
   "eslintConfig": {
     "extends": "../cubejs-linter"
   },
-  "jest": {
-    "testEnvironment": "node"
-  },
   "devDependencies": {
     "@cubejs-backend/linter": "1.7.19",
     "@types/node": "^22",
