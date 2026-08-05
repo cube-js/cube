@@ -45,8 +45,30 @@ export interface ProcessingCounter {
   counter: number;
 }
 
+export interface RetainedResult {
+  result: any;
+  at: number;
+}
+
+/**
+ * How long a completed result stays readable after the first waiter consumes it,
+ * and how many are kept. Requests coalesce onto one queue key, but a waiter that
+ * joins an already-active key registers no interest of its own until it calls
+ * `getResultBlocking` — by then the first waiter may already have consumed the
+ * result, leaving the straggler nothing to wait on. Retaining the value briefly
+ * lets it read the result instead of being told to continue waiting.
+ *
+ * Kept apart from `resultPromises` deliberately: that map doubles as "a query is
+ * in flight on this key", so holding a resolved promise there would hand the next
+ * query on the same key an instantly-resolved stale result.
+ */
+const RETAINED_RESULT_MS = 15 * 1000;
+const RETAINED_RESULT_MAX = 1000;
+
 export class LocalQueueDriverConnectionState {
   public resultPromises: Record<QueryKeyHash, PromiseWithResolve> = {};
+
+  public retainedResults: Record<string, RetainedResult> = {};
 
   public queryDef: Record<QueryKeyHash, QueryDefObject> = {};
 
@@ -119,7 +141,9 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   public async getResultBlocking(queryKeyHash: QueryKeyHash, _queueId?: QueueId): Promise<any> {
     const resultListKey = this.resultListKey(queryKeyHash);
     if (!this.state.queryDef[queryKeyHash] && !this.state.resultPromises[resultListKey]) {
-      return null;
+      // Nothing in flight — but a waiter that coalesced onto this key may have
+      // arrived after the result was consumed, so check what's still retained.
+      return this.takeRetainedResult(resultListKey);
     }
     const timeoutPromise = (timeout: number) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
@@ -130,8 +154,45 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     if (res) {
       delete this.state.resultPromises[resultListKey];
+      this.retainResult(resultListKey, res);
     }
     return res;
+  }
+
+  private retainResult(resultListKey: string, result: any): void {
+    const { retainedResults } = this.state;
+    retainedResults[resultListKey] = { result, at: Date.now() };
+
+    const deadline = Date.now() - RETAINED_RESULT_MS;
+    const live = Object.keys(retainedResults).filter(key => {
+      if (retainedResults[key].at <= deadline) {
+        delete retainedResults[key];
+        return false;
+      }
+      return true;
+    });
+
+    // Size cap backstops a queue busy enough that nothing ages out.
+    if (live.length > RETAINED_RESULT_MAX) {
+      live
+        .sort((a, b) => retainedResults[a].at - retainedResults[b].at)
+        .slice(0, live.length - RETAINED_RESULT_MAX)
+        .forEach(key => {
+          delete retainedResults[key];
+        });
+    }
+  }
+
+  private takeRetainedResult(resultListKey: string): any {
+    const retained = this.state.retainedResults[resultListKey];
+    if (!retained) {
+      return null;
+    }
+    if (retained.at <= Date.now() - RETAINED_RESULT_MS) {
+      delete this.state.retainedResults[resultListKey];
+      return null;
+    }
+    return retained.result;
   }
 
   public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
@@ -216,6 +277,9 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
   public async getQueryAndRemove(queryKeyHash: QueryKeyHash, _queueId?: QueueId | null): Promise<[QueryDef]> {
     const query = this.state.queryDef[queryKeyHash];
 
+    // A cancelled/orphaned query must not leave a result behind for a late
+    // waiter to pick up.
+    delete this.state.retainedResults[this.resultListKey(queryKeyHash)];
     delete this.state.active[queryKeyHash];
     delete this.state.heartBeat[queryKeyHash];
     delete this.state.toProcess[queryKeyHash];

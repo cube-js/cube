@@ -125,6 +125,11 @@ type CacheEntry = {
   result: any;
   renewalKey: string;
   requestId?: string;
+  // Identifies the query that produced this entry. The cache key omits things
+  // that change the resolved pre-aggregation tables (indexesSql, the matched
+  // time-dimension range), so `requestId` alone cannot tell "my own
+  // continue-wait retry" from "a different query in the same request flow".
+  queryHash?: string;
 };
 
 export interface QueryCacheOptions {
@@ -918,6 +923,7 @@ export class QueryCache {
           result: res,
           renewalKey,
           requestId: options.requestId,
+          queryHash: getCacheHash([query, values]) as string,
         };
         return this
           .cacheDriver
@@ -1020,7 +1026,12 @@ export class QueryCache {
 
       const isExpired = !renewalThreshold || !parsedResult.time || renewedAgo > renewalThreshold * 1000;
       const isKeyMismatch = renewalKey && parsedResult.renewalKey !== renewalKey;
-      const isSameRequest = options.requestId && parsedResult.requestId &&
+      // A continue-wait retry re-runs the *same* query, so the entry's query
+      // must match too. Entries written before `queryHash` existed carry none;
+      // accept those rather than force a revalidation storm on deploy.
+      const isSameQuery = !parsedResult.queryHash ||
+        parsedResult.queryHash === getCacheHash([query, values]);
+      const isSameRequest = options.requestId && parsedResult.requestId && isSameQuery &&
         QueryCache.extractRequestUUID(parsedResult.requestId) === QueryCache.extractRequestUUID(options.requestId);
 
       // Continue-wait cycle: result was produced by our request,

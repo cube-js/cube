@@ -332,6 +332,32 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
       });
 
+      it('same request + different query: must block on fetchNew (not return the other query\'s cache)', async () => {
+        const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-other-query', values: [] });
+        const entry = {
+          time: Date.now() - 700 * 1000,
+          result: 'other-query-data',
+          renewalKey: renewalKeyOld,
+          requestId: 'abc-123-span-1',
+          // The cache key omits indexesSql and the matched time-dimension range,
+          // so one request flow can hit this entry with a different resolved
+          // query. The harness runs 'SELECT 1', so this hash cannot match.
+          queryHash: crypto.createHash('md5').update(JSON.stringify(['SELECT 2', []])).digest('hex'),
+        };
+
+        const { result, fetchNewCalled, blocked } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          requestId: 'abc-123-span-2',
+        });
+
+        expect(blocked).toBe(true);
+        expect(result).toBe('new-result');
+        expect(fetchNewCalled).toBe(true);
+        expect(cache.logger.mock.calls.map(c => c[0])).not.toContain('Same request cache hit (background refresh)');
+      });
+
       it('same request + renewCycle + expired: must block on fetchNew', async () => {
         const cacheKey = QueryCache.queryCacheKey({ query: 'same-req-renew-cycle-expired', values: [] });
         const entry = {

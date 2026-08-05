@@ -2,6 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "CommonJS",
+    // The .js test suite uses ESM imports, so ts-jest must transform it too.
+    "allowJs": true,
+    "checkJs": false,
     "paths": {
       "@cubejs-backend/shared": ["../cubejs-backend-shared/src"],
       "@cubejs-backend/base-driver": ["../cubejs-base-driver/src"]
