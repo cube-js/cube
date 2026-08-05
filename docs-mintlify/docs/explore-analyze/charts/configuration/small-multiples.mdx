@@ -30,7 +30,7 @@ These options appear once a **Split by** dimension is chosen.
 
 ### Shared vs. independent axis scales
 
-Every panel is labelled with its own x and y axis either way. What the setting changes is the scale those axes are drawn against.
+Every panel is labeled with its own X and Y axes either way. What the setting changes is the scale those axes are drawn against.
 
 **Shared** is the default, and it is usually what makes small multiples worth using: every panel is drawn against the same scale, so the panels are directly comparable and a taller bar really does mean a bigger number.
 
@@ -46,13 +46,15 @@ Sorting interacts with this: with **Sort panels by** set to a measure and a desc
 
 ## Interaction with other settings
 
-Every other chart setting continues to apply, and applies to all panels at once — axis titles and formats, colors and palettes, data labels, tooltips, and reference lines are configured once and drawn in each panel.
+Chart settings apply to all panels at once — axis titles and formats, colors and palettes, and tooltips are configured once and take effect in every panel.
+
+Data labels and reference lines are the exception: a chart using either cannot be split, so the two are never combined. See the limitations below.
 
 A legend is shared across the grid rather than repeated per panel. Clicking a legend entry hides that series in every panel.
 
 ## Limitations
 
 - **One split dimension.** One dimension fills the grid, wrapping into rows. Splitting by two dimensions at once — one down the rows and another across the columns — is not supported.
-- **Cartesian charts only.** Bar, line, area, and scatter. Pie, table, KPI, heatmap, map, and HTML charts cannot be split.
-- **Panel labels are not configurable.** Each panel is labelled with its dimension value; the font, size, and color are fixed.
-- **Single-view charts only.** A chart with data labels, a reference line, or a second y-axis series cannot be split yet.
+- **Cartesian charts only.** Bar, line, area, and scatter. Pie, table, KPI, heatmap, boxplot, map, and HTML charts cannot be split.
+- **Panel labels are not configurable.** Each panel is labeled with its dimension value; the font, size, and color are fixed.
+- **Single-view charts only.** A chart with data labels, a reference line, or a second Y axis series cannot be split yet.

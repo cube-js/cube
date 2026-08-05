@@ -86,7 +86,8 @@
                     "pages": [
                       "docs/explore-analyze/charts/configuration/series-mapping",
                       "docs/explore-analyze/charts/configuration/series-configuration",
-                      "docs/explore-analyze/charts/configuration/color-and-stacking", "docs/explore-analyze/charts/configuration/small-multiples",
+                      "docs/explore-analyze/charts/configuration/color-and-stacking",
+                      "docs/explore-analyze/charts/configuration/small-multiples",
                       "docs/explore-analyze/charts/configuration/axes",
                       "docs/explore-analyze/charts/configuration/tooltips",
                       "docs/explore-analyze/charts/configuration/data-labels"
