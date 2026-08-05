@@ -29,13 +29,17 @@ connection could leak to another.
 <Warning>
 
 Cube caches one database connection per
-[`context_to_orchestrator_id`][ref-context-to-orchestrator-id] for the
-lifetime of the process. **Every input your `driver_factory` reads must
-therefore also appear in the orchestrator ID.** OAuth access tokens rotate
-(typically hourly), so an ID built from the username alone leaves the
-cached connection pinned to the token it was first built with — new
-database sessions then fail to authenticate until the next deploy. The
-configuration below derives both from one helper so they cannot drift.
+[`context_to_orchestrator_id`][ref-context-to-orchestrator-id]. **The
+orchestrator ID must therefore distinguish every user your
+`driver_factory` can return a different connection for** — otherwise two
+users share one pool and one user's credential is reused for another's
+queries.
+
+Do not add the token itself to the ID. When the token rotates, Cube
+notices that `driver_factory` now resolves a different configuration and
+rebuilds the connection in place, so a username is enough. Keying on the
+token instead creates a new orchestrator — with its own pool, queues and
+pre-aggregation cache — on every rotation.
 
 </Warning>
 
@@ -169,15 +173,19 @@ from datetime import datetime, timezone
 import os
 import time
 
-# Don't hand the driver a token that is about to expire. Drivers cache their
-# connection settings, and the connection pool opens new sessions long after
-# the driver was built, so "valid right now" is not enough.
+# A token is handed to the driver once, but the pool keeps opening new sessions
+# with it afterwards. Reject one that is too close to expiry to survive that
+# gap, rather than one that is merely still valid at this instant.
 EXPIRY_SKEW_SECONDS = 120
 
 
 def _parse_expiry(value):
+    """Seconds since the epoch, or None if the value is absent or unparseable."""
     if not value:
         return None
+    if isinstance(value, (int, float)):
+        # Epoch milliseconds if the value is far too large to be seconds.
+        return value / 1000 if value > 1e11 else float(value)
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
@@ -187,12 +195,8 @@ def _parse_expiry(value):
     return parsed.timestamp()
 
 
-def _credential(ctx: dict):
-    """Resolve the credential for this request, plus the key identifying it.
-
-    driver_factory and context_to_orchestrator_id both call this, so the cached
-    connection can never drift from the token it was built with.
-    """
+def _access_token(ctx: dict):
+    """The user's OAuth token, or None to fall back to the service account."""
     # For other data sources, swap "databricks" for "snowflake", etc.
     cube_cloud = (ctx.get("securityContext") or {}).get("cubeCloud") or {}
     creds = (cube_cloud.get("userCredentials") or {}).get("databricks") or {}
@@ -205,21 +209,19 @@ def _credential(ctx: dict):
     # treating that as fatal drops the user onto the service account for no
     # reason.
     if access_token and expires_at and expires_at > time.time() + EXPIRY_SKEW_SECONDS:
-        # Key on the expiry, never on the token itself — the orchestrator ID is
-        # used as a cache prefix and appears in logs.
-        return access_token, f"u{int(expires_at)}"
+        return access_token
 
-    return os.environ["CUBEJS_DB_DATABRICKS_TOKEN"], "service-account"
+    return None
 
 
 @config("driver_factory")
 def driver_factory(ctx: dict) -> dict:
-    token, _ = _credential(ctx)
-
+    # Cube rebuilds this connection whenever the returned configuration
+    # changes, so returning a rotated token here is enough to replace it.
     return {
         "type": "databricks-jdbc",
         "url": os.environ["CUBEJS_DB_DATABRICKS_URL"],
-        "token": token,
+        "token": _access_token(ctx) or os.environ["CUBEJS_DB_DATABRICKS_TOKEN"],
         "acceptPolicy": True,
         "catalog": os.environ.get("CUBEJS_DB_DATABRICKS_CATALOG"),
     }
@@ -227,14 +229,13 @@ def driver_factory(ctx: dict) -> dict:
 
 @config("context_to_orchestrator_id")
 def context_to_orchestrator_id(ctx: dict) -> str:
-    # One orchestrator per (user, credential): separate DB connections,
-    # execution queues and pre-aggregation caches, and a cache key that changes
-    # when the token rotates.
+    # One orchestrator per user: separate DB connections, execution queues and
+    # pre-aggregation caches. Deliberately not keyed on the token — see the
+    # warning above.
     cube_cloud = (ctx.get("securityContext") or {}).get("cubeCloud") or {}
     username = cube_cloud.get("username") or "default"
-    _, cache_key = _credential(ctx)
 
-    return f"CUBE_APP_{username}_{cache_key}"
+    return f"CUBE_APP_{username}"
 ```
 
 </Tab>
@@ -242,56 +243,46 @@ def context_to_orchestrator_id(ctx: dict) -> str:
 <Tab title="JavaScript">
 
 ```javascript cube.js
-// Don't hand the driver a token that is about to expire. Drivers cache their
-// connection settings, and the connection pool opens new sessions long after
-// the driver was built, so "valid right now" is not enough.
+// A token is handed to the driver once, but the pool keeps opening new sessions
+// with it afterwards. Reject one that is too close to expiry to survive that
+// gap, rather than one that is merely still valid at this instant.
 const EXPIRY_SKEW_MS = 120 * 1000;
 
-/**
- * Resolve the credential for this request, plus the key identifying it.
- *
- * driverFactory and contextToOrchestratorId both call this, so the cached
- * connection can never drift from the token it was built with.
- */
-function resolveCredential(securityContext) {
+/** The user's OAuth token, or undefined to fall back to the service account. */
+function accessToken(securityContext) {
   // For other data sources, swap `databricks` for `snowflake`, etc.
   const creds = securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
-  const expiresAt = Date.parse(creds.accessTokenExpiresAt ?? "");
+  const raw = creds.accessTokenExpiresAt;
+  const expiresAt = typeof raw === "number" ? raw : Date.parse(raw ?? "");
 
   // Gate on the expiry rather than on `status`: a failed background refresh can
   // flag the record while the token already in hand is still valid, and
   // treating that as fatal drops the user onto the service account for no
-  // reason.
+  // reason. NaN fails this comparison, so an unparseable expiry falls back too.
   if (creds.accessToken && expiresAt > Date.now() + EXPIRY_SKEW_MS) {
-    // Key on the expiry, never on the token itself — the orchestrator ID is
-    // used as a cache prefix and appears in logs.
-    return { token: creds.accessToken, cacheKey: `u${expiresAt}` };
+    return creds.accessToken;
   }
 
-  return {
-    token: process.env.CUBEJS_DB_DATABRICKS_TOKEN,
-    cacheKey: "service-account",
-  };
+  return undefined;
 }
 
 module.exports = {
+  // Cube rebuilds this connection whenever the returned configuration changes,
+  // so returning a rotated token here is enough to replace it.
   driverFactory: ({ securityContext }) => ({
     type: "databricks-jdbc",
     url: process.env.CUBEJS_DB_DATABRICKS_URL,
-    token: resolveCredential(securityContext).token,
+    token:
+      accessToken(securityContext) ?? process.env.CUBEJS_DB_DATABRICKS_TOKEN,
     acceptPolicy: true,
     catalog: process.env.CUBEJS_DB_DATABRICKS_CATALOG,
   }),
 
-  // One orchestrator per (user, credential): separate DB connections, execution
-  // queues and pre-aggregation caches, and a cache key that changes when the
-  // token rotates.
-  contextToOrchestratorId: ({ securityContext }) => {
-    const username = securityContext?.cubeCloud?.username ?? "default";
-    const { cacheKey } = resolveCredential(securityContext);
-
-    return `CUBE_APP_${username}_${cacheKey}`;
-  },
+  // One orchestrator per user: separate DB connections, execution queues and
+  // pre-aggregation caches. Deliberately not keyed on the token — see the
+  // warning above.
+  contextToOrchestratorId: ({ securityContext }) =>
+    `CUBE_APP_${securityContext?.cubeCloud?.username ?? "default"}`,
 };
 ```
 
@@ -309,22 +300,25 @@ module.exports = {
    that has not expired, it is used. Otherwise, Cube falls back to the
    service account credential stored in environment variables.
 
-3. **Per-user, per-credential orchestrator** —
+3. **Per-user orchestrator** —
    [`context_to_orchestrator_id`][ref-context-to-orchestrator-id] returns a
-   key derived from both the username and the credential in use, so each
-   user gets their own database connection pool, execution queues, and
-   pre-aggregation table cache — and a rotated token produces a fresh
-   connection instead of reusing one built from the previous token. Keying
-   on the username alone would share a single cached connection across
-   token rotations; omitting the username would share one across users.
+   key derived from the username, so each user gets their own database
+   connection pool, execution queues, and pre-aggregation table cache.
+   Without it, every user shares one cached connection and the first
+   user's credential is reused for everyone else's queries.
+
+4. **Rotation replaces the connection** — on the next request after a
+   rotation, Cube compares what `driver_factory` now resolves against what
+   the cached connection was built from. When they differ it builds a
+   replacement and drains the old pool, so in-flight queries finish on the
+   connection they started on.
 
 ## Operational notes
 
-- **Expect one orchestrator per token rotation.** Each distinct
-  orchestrator ID holds its own connection pool, queues and
-  pre-aggregation table cache, and tokens typically rotate hourly. Watch
-  memory on deployments with many concurrent users, and note that the
-  first query after a rotation runs against a cold pre-aggregation cache.
+- **One orchestrator per user, not per token.** The orchestrator survives
+  rotations, so pre-aggregation caches and queues stay warm and the
+  orchestrator count tracks your concurrent user count rather than growing
+  with every rotation.
 - **Don't make [`context_to_app_id`][ref-context-to-appid] per-user.** The
   data model is identical for every user — only the connection differs —
   so a per-user app ID forces a full data-model recompile per user on
@@ -334,6 +328,11 @@ module.exports = {
   check.** If it has no access at all, liveness checks and any query that
   falls back to it fail with an opaque authorization error from the driver
   rather than something diagnosable.
+- **Falling back is silent.** A missing or near-expired token sends the
+  query to the service account instead of failing, so results reflect the
+  service account's permissions rather than the user's. If that is not
+  acceptable for your deployment, raise an error in `driver_factory`
+  instead of returning the fallback credential.
 
 [ref-config]: /reference/configuration/config
 [ref-driver-factory]: /reference/configuration/config#driver_factory

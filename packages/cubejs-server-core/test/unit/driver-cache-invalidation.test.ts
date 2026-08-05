@@ -184,6 +184,33 @@ describe('driver cache invalidation', () => {
     expect(preAgg.builtFrom).toMatchObject({ password: 'token-b' });
   });
 
+  // The `default` and `default@pre_agg` keys share one driver when the data
+  // source has no separate pre-aggregation credentials. A pre-aggregation build
+  // can be the first caller to observe a rotation, so invalidation has to clear
+  // both keys whichever one asked: clearing only the requested key left the
+  // other serving the drained driver, released it twice, and then built a
+  // second pool for what should be a single shared driver.
+  test('rebuilds once when a pre-aggregation build observes the rotation first', async () => {
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    }, { token: 'token-a' });
+
+    const first = <FakeDriver> await driverFactory('default');
+
+    await request({ token: 'token-b' });
+
+    const preAgg = <FakeDriver> await driverFactory('default', true);
+    const regular = <FakeDriver> await driverFactory('default');
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(preAgg).toBe(regular);
+    expect(regular.builtFrom).toMatchObject({ password: 'token-b' });
+    expect(core.builtDrivers).toHaveLength(2);
+    // Exactly once — a second release would run against an already-drained pool.
+    expect(first.release).toHaveBeenCalledTimes(1);
+  });
+
   test('a failed rebuild does not leave a poisoned cache entry', async () => {
     let token = 'token-a';
     let shouldFail = false;

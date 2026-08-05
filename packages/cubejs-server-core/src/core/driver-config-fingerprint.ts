@@ -85,6 +85,9 @@ export function fingerprint(value: unknown): string | null {
     return crypto
       .createHash('sha256')
       .update(stableStringify(value, new Set()))
+      // 32 hex chars = 128 bits, which is far more than an equality check over
+      // the handful of configurations one process resolves needs, and keeps the
+      // digest short enough to sit in a log line.
       .digest('hex')
       .slice(0, 32);
   } catch (e) {
