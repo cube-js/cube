@@ -1,6 +1,14 @@
 import { dateParser } from '../src/date-parser';
 
 describe('dateParser', () => {
+  // Restoring inside each test body only runs when the assertion passes, so one
+  // genuine failure would leave `Date.now` mocked for every test after it — and
+  // this file interleaves clock-mocking tests with ones that read the real
+  // clock, so a single red test would cascade into unrelated ones.
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test('custom daily ranges returns day aligned dateRange', () => {
     expect(dateParser('from 1 days ago to now', 'UTC')).toStrictEqual(
       [dateParser('yesterday', 'UTC')[0], dateParser('today', 'UTC')[1]]
@@ -58,9 +66,7 @@ describe('dateParser', () => {
 
   test('from 1 hour ago to now LA', () => {
     // 'Z' stands for Zulu time, which is also GMT and UTC.
-    // `now` reaches the parser only as `moment(now)`, which takes a string as
-    // readily as a Date; the cast states that, since the source is untyped JS.
-    const now = '2020-09-22T13:03:20.518Z' as unknown as Date;
+    const now = new Date('2020-09-22T13:03:20.518Z');
     // LA is GMT-0700, 7 hours diff
     const tz = 'America/Los_Angeles';
 
@@ -79,8 +85,6 @@ describe('dateParser', () => {
     expect(dateParser('from 1 quarter ago to now', 'UTC', now)).toStrictEqual(
       ['2021-02-03T00:00:00.000', '2021-05-03T23:59:59.999']
     );
-
-    jest.restoreAllMocks();
   });
 
   test('from 7 days ago to now', () => {
@@ -109,8 +113,6 @@ describe('dateParser', () => {
       '2020-07-01T00:00:00.000',
       '2020-12-31T23:59:59.999',
     ]);
-
-    jest.restoreAllMocks();
   });
 
   test('last 6 months from month with less days than previous month', () => {
@@ -120,8 +122,6 @@ describe('dateParser', () => {
       '2020-08-01T00:00:00.000',
       '2021-01-31T23:59:59.999',
     ]);
-
-    jest.restoreAllMocks();
   });
 
   test('last 6 months from month with more days than previous month', () => {
@@ -131,8 +131,6 @@ describe('dateParser', () => {
       '2020-09-01T00:00:00.000',
       '2021-02-28T23:59:59.999',
     ]);
-
-    jest.restoreAllMocks();
   });
 
   test('next 6 months', () => {
@@ -141,8 +139,6 @@ describe('dateParser', () => {
       '2021-03-01T00:00:00.000',
       '2021-08-31T23:59:59.999',
     ]);
-
-    jest.restoreAllMocks();
   });
 
   test('next month', () => {
@@ -153,8 +149,6 @@ describe('dateParser', () => {
         '2021-04-30T23:59:59.999'
       ]
     );
-
-    jest.restoreAllMocks();
   });
 
   test('next 5 days', () => {
@@ -165,8 +159,6 @@ describe('dateParser', () => {
         '2021-03-10T23:59:59.999'
       ]
     );
-
-    jest.restoreAllMocks();
   });
 
   test('throws error on from invalid date to date', () => {
@@ -189,7 +181,5 @@ describe('dateParser', () => {
         '2021-02-19T13:59:59.999'
       ]
     );
-
-    jest.restoreAllMocks();
   });
 });
