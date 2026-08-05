@@ -31,11 +31,22 @@ function testFilesOnDisk(dir: string): string[] {
  * matches zero segments — would be reported as uncollected and fail CI with a
  * misleading message. Deriving from the config rather than restating the
  * pattern also keeps this honest when someone edits it.
+ *
+ * Both sides are forced to forward slashes first: micromatch is a glob matcher,
+ * so it reads `\` as an escape rather than a separator, and on Windows every
+ * path would come back uncollected — a false red on the one guard that must not
+ * cry wolf.
  */
-function isCollected(file: string): boolean {
+function isCollectedIn(sep: string, file: string): boolean {
+  const toPosix = (p: string) => p.split(sep).join('/');
   const patterns: string[] = jestConfig.testMatch;
-  return micromatch.isMatch(file, patterns.map(p => p.replace('<rootDir>', PACKAGE_ROOT)));
+  return micromatch.isMatch(
+    toPosix(file),
+    patterns.map(p => toPosix(p.replace('<rootDir>', PACKAGE_ROOT))),
+  );
 }
+
+const isCollected = (file: string) => isCollectedIn(path.sep, file);
 
 describe('test collection', () => {
   // `QueryOrchestrator.test.js` silently stopped running for ~10 months because
@@ -68,5 +79,14 @@ describe('test collection', () => {
     ['src/orchestrator/QueryCache.ts', false],
   ])('%s is collected: %s', (relative, expected) => {
     expect(isCollected(path.join(PACKAGE_ROOT, relative))).toBe(expected);
+  });
+
+  // micromatch reads `\` as an escape, not a separator, so a Windows checkout
+  // would report every file uncollected and fail this guard on a correct tree.
+  // `isCollectedIn` runs the same matching with the separator injected, so the
+  // Windows path is covered wherever this suite happens to run.
+  test('matches paths using backslash separators', () => {
+    expect(isCollectedIn('\\', `${PACKAGE_ROOT}\\test\\unit\\QueryOrchestrator.test.js`)).toBe(true);
+    expect(isCollectedIn('\\', `${PACKAGE_ROOT}\\test\\unit\\QueryCache.abstract.ts`)).toBe(false);
   });
 });
