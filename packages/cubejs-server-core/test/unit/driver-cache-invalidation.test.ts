@@ -57,8 +57,10 @@ class TestServerCore extends CubejsServerCore {
  * calls for every query.
  */
 async function createCore(options: CreateOptions, securityContext: unknown) {
+  const logger = jest.fn();
   const core = new TestServerCore(<any>{
     contextToOrchestratorId: () => 'ORCHESTRATOR',
+    logger,
     ...options,
   });
   const spy = jest.spyOn(<any>core, 'createOrchestratorApi');
@@ -70,6 +72,9 @@ async function createCore(options: CreateOptions, securityContext: unknown) {
   return {
     core,
     driverFactory,
+    logger,
+    /** Log messages, with the params each was reported with. */
+    logged: (message: string) => logger.mock.calls.filter(([msg]) => msg === message).map(([, params]) => params),
     /** Serve another request through the cached orchestrator. */
     request: (nextSecurityContext: unknown, requestId = 'req-n') => core.getOrchestratorApi(<any>{ requestId, securityContext: nextSecurityContext }),
   };
@@ -292,6 +297,39 @@ describe('driver cache invalidation', () => {
     expect(first.release).toHaveBeenCalledTimes(1);
     // The driver handed back is usable — not one whose pool is being drained.
     expect(a.release).not.toHaveBeenCalled();
+  });
+
+  // Both rebuild logs have to survive the default log level, which drops any
+  // message carrying neither `error` nor `warning`. Without that param the
+  // rebuild — a connection pool being torn down — is invisible in production.
+  test('reports every rebuild, and escalates once it looks like a misconfiguration', async () => {
+    const { driverFactory, request, logged } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    }, { token: 'token-0' });
+
+    await driverFactory('default');
+
+    for (let i = 1; i <= 50; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await request({ token: `token-${i}` }, `req-${i}`);
+      // eslint-disable-next-line no-await-in-loop
+      await driverFactory('default');
+    }
+
+    const rebuilds = logged('Rebuilding driver on configuration change');
+
+    expect(rebuilds).toHaveLength(50);
+    expect(rebuilds.every((params) => params.warning)).toBe(true);
+    expect(rebuilds[0]).toMatchObject({ dataSource: 'default', rebuildCount: 1 });
+    // Counted per alias set, so the 50th rotation reads as 50, not as a pair of
+    // separate counters for `default` and `default@pre_agg`.
+    expect(rebuilds[49]).toMatchObject({ rebuildCount: 50 });
+
+    const escalations = logged('Driver rebuilt repeatedly');
+
+    expect(escalations).toHaveLength(1);
+    expect(escalations[0]).toMatchObject({ rebuildCount: 50 });
+    expect(escalations[0].warning).toContain('contextToOrchestratorId');
   });
 
   test('reuses the driver when the security context cannot be fingerprinted', async () => {
