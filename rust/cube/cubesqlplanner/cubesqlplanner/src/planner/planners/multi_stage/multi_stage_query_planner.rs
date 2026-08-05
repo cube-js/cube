@@ -10,6 +10,7 @@ use crate::planner::apply_static_filter_to_symbol;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::collectors::member_childs;
 use crate::planner::filter::base_filter::FilterType;
+use crate::planner::filter::tree_ops;
 use crate::planner::filter::BaseFilter;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOperator;
@@ -641,12 +642,26 @@ impl MultiStageQueryPlanner {
                 // enumerates the query's rows — except here the grid keeps
                 // every dimension and only the row count within it grows.
                 //
-                // A parent state with no dimensions is exempt: its grid is a
-                // single row that no filter change can widen, and a keys side
-                // with no key dimensions is not a shape the assembly renders.
+                // Three shapes are exempt. A parent state with no dimensions is
+                // a single-row grid that no filter change can widen, and an
+                // empty key-dimension list degenerates into a cross join rather
+                // than being rejected. A Dimension inode never reads
+                // `keys_input`, so building one leaves unreferenced CTEs
+                // behind. And a Rank inode ranks within whatever its source
+                // carries: handing it the keys side would shrink the ranked
+                // population to the grid and collapse the ranks, trading a
+                // widened row set for wrong values. Rank needs the rows
+                // restricted *after* the window, which this assembly cannot
+                // express.
                 let grid_has_dimensions =
                     !state.dimensions().is_empty() || !state.time_dimensions().is_empty();
-                if any_missing || (query_filter_dropped && grid_has_dimensions) {
+                let inode_can_hold_grid = !matches!(
+                    multi_stage_member.inode_type(),
+                    MultiStageInodeMemberType::Dimension | MultiStageInodeMemberType::Rank
+                );
+                if any_missing
+                    || (query_filter_dropped && grid_has_dimensions && inode_can_hold_grid)
+                {
                     self.make_childs(
                         member.clone(),
                         state.clone(),
@@ -1137,35 +1152,11 @@ fn query_filters_dropped(
     base: &QueryProperties,
     narrowed: &QueryProperties,
 ) -> bool {
-    // `FilterItem`'s own equality compares a filter's type, operator and
-    // values but not the member it targets, so two filters differing only in
-    // their member count as equal. Left alone, a dropped filter would be
-    // cancelled out by an unrelated look-alike that survived, hiding the
-    // widening. Segments carry their member in `full_name` and compare as-is.
-    fn same_filter(a: &FilterItem, b: &FilterItem) -> bool {
-        match (a, b) {
-            (FilterItem::Item(a), FilterItem::Item(b)) => {
-                a.member_name() == b.member_name() && a == b
-            }
-            (FilterItem::Group(a), FilterItem::Group(b)) => {
-                a.operator == b.operator
-                    && a.items.len() == b.items.len()
-                    && a.items
-                        .iter()
-                        .zip(b.items.iter())
-                        .all(|(a, b)| same_filter(a, b))
-            }
-            _ => a == b,
-        }
-    }
-
-    fn has(items: &[FilterItem], item: &FilterItem) -> bool {
-        items.iter().any(|candidate| same_filter(item, candidate))
-    }
-
     fn any_dropped(root: &[FilterItem], base: &[FilterItem], narrowed: &[FilterItem]) -> bool {
-        base.iter()
-            .any(|item| has(root, item) && !has(narrowed, item))
+        base.iter().any(|item| {
+            tree_ops::contains_with_member(root, item)
+                && !tree_ops::contains_with_member(narrowed, item)
+        })
     }
 
     any_dropped(

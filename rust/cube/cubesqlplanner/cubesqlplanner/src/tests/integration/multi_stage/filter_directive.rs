@@ -303,8 +303,9 @@ async fn test_share_of_grand_total_keeps_query_row_set() {
     "#};
 
     let sql = ctx.build_sql(query).unwrap();
-    // Whitespace-stripped so the check survives a dialect rendering `OVER(`
-    // or breaking the window expression across lines.
+    // The window text comes from a `format!` in the physical plan, not from a
+    // dialect template, so `OVER (` is stable; whitespace is stripped only so
+    // the check does not depend on how the expression is laid out.
     let dense: String = sql.chars().filter(|c| !c.is_whitespace()).collect();
     assert!(
         !dense.contains("OVER("),
@@ -338,6 +339,7 @@ async fn test_grain_exclude_keeps_null_dimension_key() {
               - completed
         order:
           - id: orders.status
+          - id: orders.category_nullable
     "#};
 
     ctx.build_sql(query).unwrap();
@@ -369,6 +371,38 @@ async fn test_filter_exclude_keeps_row_set_when_member_not_grouped() {
               - completed
         order:
           - id: orders.id
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// `keep_only` on a segment, with the dropped filter's dimension outside the
+// query grid so the value differs from the plain measure: the segment still
+// restricts to completed orders while the category filter is gone, so the
+// measure spans every category and the plain measure only books.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_keep_only_segment_value_ignores_dropped_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_keep_only_segment
+        dimensions:
+          - orders.status
+        segments:
+          - orders.completed_orders
+        filters:
+          - dimension: orders.category
+            operator: equals
+            values:
+              - books
+        order:
+          - id: orders.status
     "#};
 
     ctx.build_sql(query).unwrap();
