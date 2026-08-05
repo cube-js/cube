@@ -158,4 +158,53 @@ describe('the script-exempt shape tolerates comments', () => {
     expect(() => driverWith(preamble).withSqlPreamble(destinationJobFor('CREATE TABLE t AS SELECT 1')))
       .toThrow(/cannot be applied to a pre-aggregation build/);
   });
+
+  // A trailing comment must not cost a legitimate UDF preamble its exemption:
+  // the splitter used to emit the comment as its own statement, which reduced to
+  // an empty one and failed the CREATE TEMP FUNCTION test.
+  test('a temp function followed by a comment keeps its exemption', () => {
+    const preamble = 'CREATE TEMP FUNCTION median(x INT64) AS (x);\n-- keep in sync with the data model';
+
+    expect(() => driverWith(preamble).withSqlPreamble(destinationJobFor('CREATE TABLE t AS SELECT 1')))
+      .not.toThrow();
+  });
+});
+
+// The splitter hands back the whole blob as one entry when it cannot find the
+// boundaries, and that entry may contain several statements. Judging it exempt
+// because it merely STARTS with CREATE TEMP FUNCTION would let a script onto a
+// destination job — which BigQuery runs as a script, ignoring the destination
+// table, so the build reports success having written no rows.
+describe('the script-exempt shape fails closed on an ambiguous preamble', () => {
+  const destinationJobFor = (query: string) => ({
+    query,
+    destination: { id: 'stb_pre_aggregations.orders' } as any,
+  });
+
+  test.each([
+    [
+      'a nested block comment',
+      'CREATE TEMP FUNCTION f(x INT64) AS (x); /* uses /* nested */ SET @@dataset_id = \'analytics\'',
+    ],
+    [
+      'an unterminated literal',
+      'CREATE TEMP FUNCTION f(x INT64) AS (x); SET @@dataset_id = \'unterminated',
+    ],
+    [
+      'a dialect-dependent quote escape',
+      'CREATE TEMP FUNCTION f(x STRING) AS (x); SET @@dataset_id = \'a\\\'; SET @@x = \'b\'',
+    ],
+  ])('refuses %s on a destination job', (_name, preamble) => {
+    expect(() => driverWith(preamble).withSqlPreamble(destinationJobFor('CREATE TABLE t AS SELECT 1')))
+      .toThrow(/cannot be applied to a pre-aggregation build/);
+  });
+
+  // An ambiguous preamble is still fine on a normal query: no destination table
+  // is at stake, and BigQuery's own parser is authoritative.
+  test('still applies an ambiguous preamble to a non-destination query', () => {
+    const preamble = 'CREATE TEMP FUNCTION f(x INT64) AS (x); /* uses /* nested */ SET @@x = 1';
+
+    expect(driverWith(preamble).withSqlPreamble({ query: 'SELECT f(1)' }).query)
+      .toEqual(`${preamble};\nSELECT f(1)`);
+  });
 });

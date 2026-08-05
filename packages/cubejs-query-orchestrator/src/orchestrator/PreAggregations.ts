@@ -101,12 +101,61 @@ export function getLastUpdatedAtTimestamp(
  *   has it and an API instance that does not compute different versions, and the
  *   API then finds no matching table.
  */
+/**
+ * Drivers that apply `sql_preamble`. Any other driver ignores the option, so a
+ * preamble configured for one changes nothing about how queries run — while
+ * still moving the version key below and rebuilding every pre-aggregation. That
+ * combination (cost, no effect) is worth one warning per data source.
+ *
+ * `sqlPreambleWarnedDataSources` keeps it to one: the version functions are
+ * called on every query, so an unconditional log would flood.
+ */
+const SQL_PREAMBLE_DB_TYPES = new Set([
+  'bigquery',
+  'snowflake',
+  'postgres',
+  'crate',
+  'materialize',
+  'mysql',
+  'duckdb',
+  // Every JDBC-based driver, which resolves its dbType through the JDBC driver.
+  'databricks-jdbc',
+]);
+
+const sqlPreambleWarnedDataSources = new Set<string>();
+
+function warnUnsupportedSqlPreamble(dataSource: string, preamble: string | undefined) {
+  if (!preamble || sqlPreambleWarnedDataSources.has(dataSource)) {
+    return;
+  }
+
+  let dbType: string | undefined;
+  try {
+    dbType = getEnv('dbType', { dataSource });
+  } catch (e) {
+    // No declared type to check against — say nothing rather than guess.
+    return;
+  }
+
+  if (dbType && !SQL_PREAMBLE_DB_TYPES.has(dbType)) {
+    sqlPreambleWarnedDataSources.add(dataSource);
+    console.warn(
+      `Cube - a SQL preamble is configured for the ${dataSource} data source, but the ${dbType} ` +
+      'driver does not apply it, so it changes nothing about how queries run. It still ' +
+      'participates in the pre-aggregation version key, so setting it rebuilds every ' +
+      'pre-aggregation on this data source. Supported: ' +
+      `${[...SQL_PREAMBLE_DB_TYPES].join(', ')} and the JDBC-based drivers.`
+    );
+  }
+}
+
 export function getPreAggregationSqlPreamble(preAggregation): string | undefined {
   let fromEnv: string | undefined;
+  const dataSource = preAggregation.dataSource || 'default';
 
   try {
     fromEnv = getEnv('dbSqlPreamble', {
-      dataSource: preAggregation.dataSource || 'default',
+      dataSource,
       preAggregations: true,
     });
   } catch (e) {
@@ -115,7 +164,15 @@ export function getPreAggregationSqlPreamble(preAggregation): string | undefined
     // builder for the "no partitions were built" message, so throwing here would
     // replace an actionable error with a confusing one. A key without the
     // preamble is the pre-feature behavior, which is the safe fallback.
-    return undefined;
+    //
+    // Narrow to that one case on purpose: silently dropping the preamble for any
+    // other reason would serve tables built under a different preamble, which is
+    // the wrongness the key exists to prevent. Anything else propagates.
+    if (/is missing in the declared CUBEJS_DATASOURCES/.test((e as Error)?.message ?? '')) {
+      return undefined;
+    }
+
+    throw e;
   }
 
   // Normalized the same way the drivers normalize it, so the version reflects
@@ -123,7 +180,11 @@ export function getPreAggregationSqlPreamble(preAggregation): string | undefined
   // setting a whitespace-only one, which the drivers treat as none at all —
   // would change the key and rebuild every pre-aggregation for no behavior
   // difference.
-  return normalizeSqlPreamble(fromEnv);
+  const normalized = normalizeSqlPreamble(fromEnv);
+
+  warnUnsupportedSqlPreamble(dataSource, normalized);
+
+  return normalized;
 }
 
 export function getStructureVersion(preAggregation) {

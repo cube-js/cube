@@ -45,25 +45,55 @@ export function joinSqlPreamble(preamble?: string | string[] | null): string | u
 }
 
 /**
- * Splits a preamble blob back into statements for drivers whose execution API
- * takes one statement at a time (JDBC).
+ * The outcome of scanning a preamble blob for statement boundaries.
  *
- * Semicolons inside string literals, dollar-quoted bodies and comments do not
- * separate statements, so this is a real scan rather than a `split(';')` —
- * splitting naively would tear apart any preamble defining a UDF, which is the
- * feature's main use case.
+ * `ambiguous` is the load-bearing field: callers that only need to execute the
+ * statements can treat the whole blob as one and let the engine parse it, but a
+ * caller deciding whether the blob is *shaped* a certain way — BigQuery's
+ * script-safety guard — must fail closed instead, because a single returned
+ * "statement" may in fact contain several.
  */
-export function splitSqlPreamble(preamble?: string | null): string[] {
-  const normalized = normalizeSqlPreamble(preamble);
+export type SplitSqlPreambleResult = {
+  statements: string[],
+  ambiguous: boolean,
+};
 
-  if (!normalized) {
-    return [];
-  }
+/**
+ * The two dialect rules that change where a statement ends.
+ *
+ * Neither is knowable from the blob alone, and the drivers that split share this
+ * one function, so the scan is run under both and only disagreement counts as
+ * ambiguity — see `trySplitSqlPreamble`.
+ */
+type SqlDialectAssumptions = {
+  // MySQL (`NO_BACKSLASH_ESCAPES` off) and BigQuery escape quotes with a
+  // backslash; Postgres, DuckDB and Snowflake follow the standard
+  // (`standard_conforming_strings`), where a trailing backslash is literal.
+  backslashEscapesQuotes: boolean,
+  // `#` starts a line comment in MySQL, but is an operator in Postgres (bitwise
+  // XOR, geometric ops).
+  hashStartsLineComment: boolean,
+};
 
+const SQL_DIALECT_ASSUMPTIONS: SqlDialectAssumptions[] = [
+  { backslashEscapesQuotes: false, hashStartsLineComment: true },
+  { backslashEscapesQuotes: true, hashStartsLineComment: false },
+  { backslashEscapesQuotes: true, hashStartsLineComment: true },
+  { backslashEscapesQuotes: false, hashStartsLineComment: false },
+];
+
+function scanSqlPreamble(normalized: string, dialect: SqlDialectAssumptions): SplitSqlPreambleResult {
   const statements: string[] = [];
   let current = '';
   let index = 0;
-  // Set when the scan meets something it cannot interpret confidently — an
+  // Tracks whether anything executable — not whitespace, not a comment — has
+  // been consumed since the last separator. Comments are kept in the statement
+  // text (a driver may rely on a hint inside one), but a segment holding nothing
+  // else is not a statement: Snowflake rejects an empty statement outright, and
+  // BigQuery's script-safety guard would refuse a legitimate preamble that
+  // simply ends with a comment.
+  let executable = false;
+  // Set when the scan meets something it cannot interpret at all — an
   // unterminated literal, comment or dollar-quoted body. Splitting on a guess
   // would hand a data source a fragment of the user's SQL, so the whole blob is
   // returned as one statement instead and the engine's own parser decides.
@@ -71,11 +101,8 @@ export function splitSqlPreamble(preamble?: string | null): string[] {
 
   // Finds the end of a quoted string or identifier, or -1 when it never closes.
   //
-  // A doubled quote is an escaped quote in every dialect here. A backslash is
-  // NOT treated as an escape: Postgres, DuckDB and Snowflake follow the standard
-  // (`standard_conforming_strings`), where a trailing backslash is a literal
-  // character, so consuming the following quote would swallow the terminator and
-  // merge two statements.
+  // A doubled quote is an escaped quote in every dialect here; whether a
+  // backslash is one depends on the dialect.
   const endOfQuoted = (start: number, quote: string): number => {
     let cursor = start + 1;
 
@@ -84,6 +111,8 @@ export function splitSqlPreamble(preamble?: string | null): string[] {
         cursor += 1;
       } else if (normalized[cursor + 1] === quote) {
         cursor += 2;
+      } else if (dialect.backslashEscapesQuotes && normalized[cursor - 1] === '\\') {
+        cursor += 1;
       } else {
         return cursor + 1;
       }
@@ -124,8 +153,8 @@ export function splitSqlPreamble(preamble?: string | null): string[] {
     const dollarTag = /^\$[A-Za-z_0-9]*\$/.exec(normalized.slice(index));
     let end: number;
 
-    if (normalized.startsWith('--', index) || char === '#') {
-      // Line comment — runs to the end of the line. `#` is MySQL's spelling.
+    if (normalized.startsWith('--', index) || (char === '#' && dialect.hashStartsLineComment)) {
+      // Line comment — runs to the end of the line.
       const newline = normalized.indexOf('\n', index);
       end = newline === -1 ? normalized.length : newline;
     } else if (normalized.startsWith('/*', index)) {
@@ -136,16 +165,19 @@ export function splitSqlPreamble(preamble?: string | null): string[] {
       end = close === -1 ? -1 : close + tag.length;
     } else if (char === '\'' || char === '"' || char === '`') {
       end = endOfQuoted(index, char);
+      executable = true;
     } else if (char === ';') {
       const statement = normalizeSqlPreamble(current);
-      if (statement) {
+      if (statement && executable) {
         statements.push(statement);
       }
       current = '';
+      executable = false;
       index += 1;
       end = -2;
     } else {
       current += char;
+      executable = executable || !/\s/.test(char);
       index += 1;
       end = -2;
     }
@@ -159,15 +191,68 @@ export function splitSqlPreamble(preamble?: string | null): string[] {
   }
 
   if (ambiguous) {
-    return [normalized];
+    return { statements: [normalized], ambiguous: true };
   }
 
   const last = normalizeSqlPreamble(current);
-  if (last) {
+  if (last && executable) {
     statements.push(last);
   }
 
-  return statements;
+  return { statements, ambiguous: false };
+}
+
+function sameStatements(a: SplitSqlPreambleResult, b: SplitSqlPreambleResult): boolean {
+  return !a.ambiguous
+    && a.statements.length === b.statements.length
+    && a.statements.every((statement, i) => statement === b.statements[i]);
+}
+
+/**
+ * Splits a preamble blob back into statements, reporting whether the boundaries
+ * could be determined confidently.
+ *
+ * Semicolons inside string literals, dollar-quoted bodies and comments do not
+ * separate statements, so this is a real scan rather than a `split(';')` —
+ * splitting naively would tear apart any preamble defining a UDF, which is the
+ * feature's main use case.
+ *
+ * Two of the rules the scan needs are dialect-dependent (see
+ * `SqlDialectAssumptions`) and the drivers that split share this one function, so
+ * the blob is scanned under each combination. Agreement means the dialect does
+ * not matter for this input, which is the overwhelmingly common case; a
+ * disagreement is real ambiguity and yields the blob whole.
+ *
+ * Prefer `splitSqlPreamble` when you just need statements to execute; use this
+ * when ambiguity must change the decision.
+ */
+export function trySplitSqlPreamble(preamble?: string | null): SplitSqlPreambleResult {
+  const normalized = normalizeSqlPreamble(preamble);
+
+  if (!normalized) {
+    return { statements: [], ambiguous: false };
+  }
+
+  const [first, ...rest] = SQL_DIALECT_ASSUMPTIONS.map(dialect => scanSqlPreamble(normalized, dialect));
+
+  if (first.ambiguous || rest.some(other => !sameStatements(other, first))) {
+    return { statements: [normalized], ambiguous: true };
+  }
+
+  return first;
+}
+
+/**
+ * Splits a preamble blob into statements for drivers whose execution API takes
+ * one statement at a time (JDBC, Snowflake, DuckDB).
+ *
+ * An ambiguous blob comes back as a single entry, which is the conservative
+ * choice for execution: the data source's own parser is authoritative. Callers
+ * that must not treat an unparsed blob as one statement should use
+ * `trySplitSqlPreamble` and check `ambiguous`.
+ */
+export function splitSqlPreamble(preamble?: string | null): string[] {
+  return trySplitSqlPreamble(preamble).statements;
 }
 
 /**
@@ -193,12 +278,18 @@ export function isAlreadyAppliedPreambleError(e: unknown): boolean {
 /**
  * Runs the preamble one statement at a time, skipping statements that a
  * previous run on this connection has already applied.
+ *
+ * Takes either a blob to split or an already-split statement list, so a caller
+ * that has separated the preamble from other statements does not have to re-join
+ * and re-parse it.
  */
 export async function applySqlPreambleStatements(
-  preamble: string | undefined | null,
+  preamble: string | string[] | undefined | null,
   execute: (statement: string) => Promise<unknown>,
 ): Promise<void> {
-  for (const statement of splitSqlPreamble(preamble)) {
+  const statements = Array.isArray(preamble) ? preamble : splitSqlPreamble(preamble);
+
+  for (const statement of statements) {
     try {
       await execute(statement);
     } catch (e) {
