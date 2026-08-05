@@ -100,7 +100,14 @@ const measure = (metaTransformer: any, cubeName: string, measureName: string) =>
   .find((it: any) => it.config.name === cubeName)
   ?.config.measures.find((it: any) => it.name === `${cubeName}.${measureName}`);
 
-const withEnv = async (env: Record<string, string>, fn: (metaTransformer: any) => void | Promise<void>) => {
+// Restoring the environment is what keeps one test's flags from leaking into
+// the next, so it lives in exactly one place. Only the model and the compiler
+// factory vary between callers.
+const withCompiled = async (
+  prepare: () => { compiler: any; metaTransformer: any },
+  env: Record<string, string>,
+  fn: (metaTransformer: any) => void | Promise<void>
+) => {
   const originals: Record<string, string | undefined> = {};
   Object.keys(env).forEach((key) => {
     originals[key] = process.env[key];
@@ -110,7 +117,7 @@ const withEnv = async (env: Record<string, string>, fn: (metaTransformer: any) =
   try {
     // The compiler must be prepared *after* the env is set — meta is computed
     // during compile() and cached on the instance.
-    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+    const { compiler, metaTransformer } = prepare();
     await compiler.compile();
     await fn(metaTransformer);
   } finally {
@@ -123,6 +130,8 @@ const withEnv = async (env: Record<string, string>, fn: (metaTransformer: any) =
     });
   }
 };
+
+const withEnv = (env: Record<string, string>, fn: (metaTransformer: any) => void | Promise<void>) => withCompiled(() => prepareYamlCompiler(modelContent), env, fn);
 
 describe('Auto drill members', () => {
   describe('flag off (default)', () => {
@@ -264,27 +273,7 @@ cubes:
         type: time
 `;
 
-    const withModel = async (model: string, env: Record<string, string>, fn: (m: any) => void) => {
-      const originals: Record<string, string | undefined> = {};
-      Object.keys(env).forEach((key) => {
-        originals[key] = process.env[key];
-        process.env[key] = env[key];
-      });
-
-      try {
-        const { compiler, metaTransformer } = prepareYamlCompiler(model);
-        await compiler.compile();
-        fn(metaTransformer);
-      } finally {
-        Object.keys(env).forEach((key) => {
-          if (originals[key] === undefined) {
-            delete process.env[key];
-          } else {
-            process.env[key] = originals[key];
-          }
-        });
-      }
-    };
+    const withModel = (model: string, env: Record<string, string>, fn: (m: any) => void) => withCompiled(() => prepareYamlCompiler(model), env, fn);
 
     it('puts every part of a compound primary key ahead of the rest', async () => {
       await withModel(compoundPkModel, { CUBEJS_AUTO_DRILL_MEMBERS: 'true' }, (metaTransformer) => {
@@ -408,27 +397,7 @@ cubes:
   });
 
   describe('legacy and irregular declaration shapes', () => {
-    const withLegacyEnv = async (env: Record<string, string>, fn: (m: any) => void) => {
-      const originals: Record<string, string | undefined> = {};
-      Object.keys(env).forEach((key) => {
-        originals[key] = process.env[key];
-        process.env[key] = env[key];
-      });
-
-      try {
-        const { compiler, metaTransformer } = prepareJsCompiler(legacyModelContent);
-        await compiler.compile();
-        fn(metaTransformer);
-      } finally {
-        Object.keys(env).forEach((key) => {
-          if (originals[key] === undefined) {
-            delete process.env[key];
-          } else {
-            process.env[key] = originals[key];
-          }
-        });
-      }
-    };
+    const withLegacyEnv = (env: Record<string, string>, fn: (m: any) => void) => withCompiled(() => prepareJsCompiler(legacyModelContent), env, fn);
 
     it('treats the legacy drillMemberReferences key as a declaration', async () => {
       await withLegacyEnv({ CUBEJS_AUTO_DRILL_MEMBERS: 'true' }, (metaTransformer) => {
