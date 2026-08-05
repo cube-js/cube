@@ -32,6 +32,12 @@ function stableStringify(value: unknown, seen: Set<unknown>): string {
   // contributes a constant. Two configs differing only in a function body are
   // therefore treated as equal — deliberately conservative: it can only lead to
   // reusing a connection, never to swapping one out unnecessarily.
+  //
+  // The practical consequence is that a config carrying its credential as a
+  // provider callback rather than a resolved value fingerprints identically
+  // however the credential rotates, so such a driver is never rebuilt. A
+  // `driverFactory` that needs rotation to be noticed has to return the
+  // resolved value.
   if (type === 'function' || type === 'symbol') {
     return JSON.stringify(`[${type}]`);
   }
@@ -51,6 +57,9 @@ function stableStringify(value: unknown, seen: Set<unknown>): string {
       return `[${value.map((item) => stableStringify(item, seen)).join(',')}]`;
     }
 
+    // Own enumerable keys only, so a class instance holding its values behind
+    // prototype accessors fingerprints as `{}` — constant, and therefore another
+    // shape whose rotation goes unnoticed. Plain configs are unaffected.
     const entries = Object.keys(value as Record<string, unknown>)
       .sort()
       .reduce<string[]>((acc, key) => {
