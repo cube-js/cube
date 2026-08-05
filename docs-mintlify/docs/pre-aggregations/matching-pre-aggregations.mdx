@@ -98,10 +98,19 @@ granularity (e.g., `day` or `month`).
 There are extra considerations that apply to matching [ungrouped
 queries][ref-ungrouped-queries]:
 
-- The pre-aggregation should include [primary keys][ref-primary-key] of all
-cubes involved in the query.
-- If multiple cubes are referenced in the query, the pre-aggregation should
-include only members of these cubes.
+An ungrouped query returns raw rows, so a pre-aggregation can only serve one if
+each of its rows is one row of that query's join:
+
+- The pre-aggregation should include the [primary key][ref-primary-key] of the
+first cube in the query's join, and of every cube joined to it through a
+`one_to_many` relationship. Cubes joined through `many_to_one` or `one_to_one`
+cannot multiply rows, so their primary keys are not required.
+- The pre-aggregation should not group by a member of a cube that the query does
+not join. Its `segments` count here as well, since they group its rows just like
+its `dimensions` do.
+- Measures stored in a mergeable form rather than as a final value, such as
+[`count_distinct_approx`][ref-count-distinct-approx], cannot be read row by row,
+so a pre-aggregation containing one is not used.
 
 ## Matching multi-fact and multi-stage queries
 
@@ -155,6 +164,7 @@ configuration option.
 [ref-conf-scheduled-refresh-time-zones]: /reference/configuration/config#scheduled_refresh_time_zones
 [ref-ungrouped-queries]: /reference/core-data-apis/queries#ungrouped-query
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
+[ref-count-distinct-approx]: /reference/data-modeling/measures#type
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-views]: /docs/data-modeling/views
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
