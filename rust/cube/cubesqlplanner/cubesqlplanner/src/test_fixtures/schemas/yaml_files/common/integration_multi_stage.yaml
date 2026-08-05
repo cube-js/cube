@@ -677,6 +677,25 @@ cubes:
             multi_stage: true
             sql: "coalesce(100 * {CUBE.total_amount} / nullif({CUBE.amount_grand_total_unfiltered}, 0), 0)"
 
+          # A rolling window rewrites the query date range for its base state
+          # (extending it backwards by the trailing interval). The inner measure
+          # below drops that date filter, so detecting the drop must not depend
+          # on the filter still carrying the query's own bounds.
+          - name: amount_no_date_bound
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.created_at
+
+          - name: rolling_amount_no_date_bound
+            type: sum
+            sql: "{CUBE.amount_no_date_bound}"
+            multi_stage: true
+            rolling_window:
+                trailing: 3 month
+
           - name: amount_only_completed
             type: sum
             sql: "{CUBE.total_amount}"

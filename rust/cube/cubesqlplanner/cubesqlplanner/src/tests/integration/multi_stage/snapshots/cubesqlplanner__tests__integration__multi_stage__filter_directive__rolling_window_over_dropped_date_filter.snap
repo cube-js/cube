@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
+assertion_line: 442
+expression: result
+---
+orders__created_at_month | orders__total_amount | orders__rolling_amount_no_date_bound
+-------------------------+----------------------+-------------------------------------
+2024-03-01 00:00:00      | 1000.00              | 2250.00

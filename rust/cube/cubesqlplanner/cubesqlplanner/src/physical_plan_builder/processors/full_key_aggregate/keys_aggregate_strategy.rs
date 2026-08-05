@@ -175,13 +175,22 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // Dimension values include NULL, and a plain `=` never matches
-            // NULL to NULL — the key row would keep its place in the grid but
-            // lose the measure. Both shapes need the null-safe comparison; it
-            // costs the planner's ability to hash- or merge-join these keys on
-            // engines that treat the null-safe operator as unhashable, which is
-            // the same cost the keys-derived-from-measure-refs shape has always
-            // paid.
+            // Both shapes join on the null-safe comparison, unconditionally.
+            // A plain `=` never matches NULL to NULL, so a key row whose
+            // dimension is NULL would keep its place in the grid and lose the
+            // measure.
+            //
+            // It has to be unconditional because nothing here can rule NULL
+            // out. The data model carries no nullability information, and even
+            // a column declared NOT NULL reaches this join as NULL once the
+            // dimension is read through an outer join in the cube's join
+            // graph — so the grid can hold a NULL key whatever the source
+            // table says.
+            //
+            // The cost is the planner's ability to hash- or merge-join these
+            // keys on engines that treat the null-safe operator as unhashable.
+            // Correctness is not tradeable against it: the alternative drops a
+            // measure value silently, on a row that is still returned.
             join_builder.left_join_subselect(
                 query,
                 query_alias,

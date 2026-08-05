@@ -411,3 +411,64 @@ async fn test_keep_only_segment_value_ignores_dropped_filter() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A rolling window rewrites the date range it hands to its base state, so the
+// filter the inner measure drops no longer carries the query's own bounds. The
+// row set survives that regardless: a rolling window takes its rows from the
+// time series built out of the query's `dateRange`, and its values through the
+// frame condition derived from the same range — neither depends on the leaf
+// keeping its date filter.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_over_dropped_date_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.rolling_amount_no_date_bound
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-03-01"
+              - "2024-03-31"
+        order:
+          - id: orders.created_at
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The same shape with a dimension and a range narrow enough that the trailing
+// window reaches months the leaf can see but the query did not ask for.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_over_dropped_date_filter_by_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.rolling_amount_no_date_bound
+        dimensions:
+          - orders.category
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
+        order:
+          - id: orders.created_at
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
