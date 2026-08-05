@@ -15,6 +15,39 @@ fn create_multi_fact_context() -> TestContext {
 const BASIC_SEED: &str = "integration_basic_tables.sql";
 const MULTI_FACT_SEED: &str = "integration_multi_fact_tables.sql";
 
+/// Body of the first `<name> AS ( ... )` block, in text order, whose text
+/// contains `marker`, so an assertion can be aimed at one CTE instead of the
+/// whole statement. `marker` must be lower-case.
+fn cte_body_containing(sql: &str, marker: &str) -> Option<String> {
+    let lower = sql.to_lowercase();
+    let mut from = 0;
+    while let Some(rel) = lower[from..].find(" as (") {
+        let open = from + rel + " as (".len() - 1;
+        let mut depth = 0;
+        let mut close = None;
+        for (offset, ch) in sql[open..].char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(open + offset + 1);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let close = close?;
+        let body = &sql[open..close];
+        if body.to_lowercase().contains(marker) {
+            return Some(body.to_string());
+        }
+        from = open + 1;
+    }
+    None
+}
+
 // 9.1: ORDER BY dimension ASC, measure DESC
 #[tokio::test(flavor = "multi_thread")]
 async fn test_order_by_dimension_and_measure() {
@@ -341,9 +374,14 @@ async fn test_ungrouped_request_keeps_group_by_in_hoisted_multi_stage_leaf() {
 
     let sql = ctx.build_sql(query).unwrap();
 
+    // The hoisted leaf is the CTE holding the multiplied-measure keys subquery.
+    let leaf = cte_body_containing(&sql, "as \"keys\"").unwrap_or_else(|| {
+        panic!("expected a hoisted keys subquery, got:\n{sql}");
+    });
+
     assert!(
-        sql.to_lowercase().contains("group by"),
+        leaf.to_lowercase().contains("group by"),
         "the hoisted leaf feeds a stage that re-aggregates it, so it must stay \
-         grouped, got:\n{sql}"
+         grouped, got:\n{leaf}"
     );
 }

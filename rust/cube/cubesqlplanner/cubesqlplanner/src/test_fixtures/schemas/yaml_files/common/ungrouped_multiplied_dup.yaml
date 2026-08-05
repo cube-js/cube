@@ -17,9 +17,6 @@ cubes:
         type: string
         sql: name
     measures:
-      - name: ltv_sum
-        type: sum
-        sql: ltv
       # The aggregate lives inside the measure's own sql, so nothing may wrap it
       # and the select it lands in has to group.
       - name: ltv_agg_number

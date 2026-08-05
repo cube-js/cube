@@ -677,7 +677,7 @@ impl PreAggregationOptimizer {
         // The pre-aggregation must not be stored at a finer grain than the node
         // reads either: a cube it groups by but the node never joins splits its
         // rows further, so the same row would come back more than once.
-        for cube_name in Self::pre_aggregation_cubes(pre_aggregation)? {
+        for cube_name in Self::pre_aggregation_grain_cubes(pre_aggregation)? {
             if !joined_cubes.contains(&cube_name) {
                 return Ok(false);
             }
@@ -704,14 +704,18 @@ impl PreAggregationOptimizer {
         Ok(true)
     }
 
-    /// Cubes the pre-aggregation's own members span.
-    fn pre_aggregation_cubes(
+    /// Cubes that set the grain the pre-aggregation stores its rows at, which is
+    /// what it groups by: its dimensions and time dimensions, plus its segments,
+    /// which are appended to the dimension list when the table is materialized
+    /// and so group the stored rows too. Measures are excluded — a measure joins
+    /// whatever its own SQL references, but that join is aggregated away inside
+    /// the rollup and leaves its row count untouched.
+    fn pre_aggregation_grain_cubes(
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<Vec<String>, CubeError> {
         let members = pre_aggregation
-            .measures
+            .dimensions
             .iter()
-            .chain(pre_aggregation.dimensions.iter())
             .chain(pre_aggregation.time_dimensions.iter())
             .chain(pre_aggregation.segments.iter())
             .cloned()

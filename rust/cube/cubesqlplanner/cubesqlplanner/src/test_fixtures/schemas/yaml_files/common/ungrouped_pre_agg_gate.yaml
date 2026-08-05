@@ -158,7 +158,8 @@ cubes:
           - own_ref
           - star_visitors.source
 
-      # 1:1 with raw rows; the cross-cube segment only filters.
+      # 1:1 with raw rows: the segment groups the stored rows, but it reaches
+      # star_visitors over a many_to_one edge that cannot split a fact row.
       - name: seg_rollup
         type: rollup
         measures:
@@ -282,7 +283,21 @@ cubes:
     measures:
       - name: count
         type: count
+      # Joins mult_orders inside its own sql; the rollup aggregates that away.
+      - name: orders_total
+        type: sum
+        sql: "{mult_orders.cnt}"
     pre_aggregations:
+      # Grouped by the primary key, and carrying a measure whose sql reaches
+      # another cube without that cube touching the stored grain.
+      - name: mult_keyed
+        type: rollup
+        measures:
+          - orders_total
+        dimensions:
+          - id
+          - name
+
       - name: mult_collapsing
         type: rollup
         measures:
@@ -304,6 +319,9 @@ cubes:
       - name: status
         type: string
         sql: status
+    measures:
+      - name: cnt
+        type: count
 
   # Non-additive rolling measure: its leaf stage is planned ungrouped for
   # rendering reasons even though the user query is grouped.

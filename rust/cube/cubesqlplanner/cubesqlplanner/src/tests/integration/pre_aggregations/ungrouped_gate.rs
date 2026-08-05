@@ -458,3 +458,60 @@ async fn test_ungrouped_accepts_rollup_across_a_many_to_one_bridge() -> Result<(
 
     Ok(())
 }
+
+// A measure joins whatever its own sql references, but the rollup aggregates
+// that join away, so the referenced cube is no part of the stored grain and must
+// not make the rollup ineligible.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_accepts_rollup_with_a_measure_reaching_another_cube(
+) -> Result<(), CubeError> {
+    let ctx = ctx_with(&["mult_keyed"])?;
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - mult_customers.id
+          - mult_customers.name
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(
+        pre_aggrs.len(),
+        1,
+        "`mult_keyed` is grouped by the primary key, so it should be used. \
+         Generated SQL:\n{sql}"
+    );
+    assert_eq!(pre_aggrs[0].name(), "mult_keyed");
+
+    Ok(())
+}
+
+// A rollup's segments are appended to its dimension list when the table is
+// materialized, so a segment groups the stored rows just like a dimension. One
+// reaching across a row-splitting join therefore stores a row per (entity,
+// segment value) even though the query never asks for the segment.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_rejects_rollup_whose_unrequested_segment_splits_rows(
+) -> Result<(), CubeError> {
+    let ctx = ctx_with(&["root_key_seg_rollup"])?;
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - chain_visitors.id
+          - chain_visitors.source
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "`{}` groups by a segment of `chain_cities`, reached over the fan-out to \
+         `chain_checkins`, so it holds more than one row per visitor. Generated \
+         SQL:\n{sql}",
+        used_names(&pre_aggrs)
+    );
+
+    Ok(())
+}
