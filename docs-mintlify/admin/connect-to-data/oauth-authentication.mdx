@@ -43,6 +43,15 @@ pre-aggregation cache — on every rotation.
 
 </Warning>
 
+<Note>
+
+Return the resolved credential from `driver_factory`, not a function that
+fetches one. Cube compares the configuration values the factory returns,
+and a function compares as unchanged however the credential behind it
+rotates — the connection would never be rebuilt.
+
+</Note>
+
 ## Prerequisites
 
 - A [Cube Cloud][ref-cube-cloud] deployment connected to an
@@ -253,7 +262,12 @@ function accessToken(securityContext) {
   // For other data sources, swap `databricks` for `snowflake`, etc.
   const creds = securityContext?.cubeCloud?.userCredentials?.databricks ?? {};
   const raw = creds.accessTokenExpiresAt;
-  const expiresAt = typeof raw === "number" ? raw : Date.parse(raw ?? "");
+  // Epoch milliseconds if the value is far too large to be seconds. Reading
+  // seconds as milliseconds would land in 1970 and reject every token.
+  const expiresAt =
+    typeof raw === "number"
+      ? (raw > 1e11 ? raw : raw * 1000)
+      : Date.parse(raw ?? "");
 
   // Gate on the expiry rather than on `status`: a failed background refresh can
   // flag the record while the token already in hand is still valid, and
