@@ -1,6 +1,5 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
-assertion_line: 343
 expression: result
 ---
 orders__status | orders__category_nullable | orders__total_amount | orders__amount_grain_and_filter_exclude_status

@@ -696,6 +696,37 @@ cubes:
             rolling_window:
                 trailing: 3 month
 
+          # The `include` predicate matches the dropped query filter on
+          # operator and values while naming a different member, so the CTE
+          # dedup key has to compare members to keep the two states apart.
+          - name: amount_exclude_status_include_lookalike
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+                include:
+                    - member: orders.category
+                      operator: notEquals
+                      values: [pending]
+
+          # A rank whose ordering ignores the query filter on `status` and whose
+          # partition drops it. Rank is deliberately left out of the keys side,
+          # so the ranks span the whole universe and the rows do too.
+          - name: category_rank_all_statuses
+            type: rank
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.status
+            filter:
+                exclude:
+                    - orders.status
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+
           - name: amount_only_completed
             type: sum
             sql: "{CUBE.total_amount}"

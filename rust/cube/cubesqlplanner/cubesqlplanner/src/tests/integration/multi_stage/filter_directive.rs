@@ -472,3 +472,67 @@ async fn test_rolling_window_over_dropped_date_filter_by_dimension() {
         insta::assert_snapshot!(result);
     }
 }
+
+// The directive's `include` predicate shares operator and values with the query
+// filter it drops but names a different member. The keys side is planned on the
+// inherited state, so a member-blind CTE dedup key would hand back the widened
+// measure CTE and leave the row set widened.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_exclude_with_lookalike_include_keeps_query_row_set() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_exclude_status_include_lookalike
+        dimensions:
+          - orders.status
+          - orders.category
+        filters:
+          - dimension: orders.status
+            operator: notEquals
+            values:
+              - pending
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Rank is out of the keys side on purpose: ranking within the query grid would
+// leave one row per partition and collapse every rank to 1. The cost is that the
+// statuses the query filtered out stay in the result, carrying a NULL for every
+// measure that does honour the filter. Pins that trade rather than endorsing it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rank_with_filter_exclude_ranks_over_whole_universe() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.category_rank_all_statuses
+        dimensions:
+          - orders.status
+          - orders.category
+        filters:
+          - dimension: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

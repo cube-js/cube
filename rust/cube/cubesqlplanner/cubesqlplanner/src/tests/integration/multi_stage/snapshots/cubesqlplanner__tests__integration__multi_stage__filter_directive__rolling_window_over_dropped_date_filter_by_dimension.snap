@@ -1,6 +1,5 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/filter_directive.rs
-assertion_line: 472
 expression: result
 ---
 orders__category | orders__created_at_month | orders__total_amount | orders__rolling_amount_no_date_bound

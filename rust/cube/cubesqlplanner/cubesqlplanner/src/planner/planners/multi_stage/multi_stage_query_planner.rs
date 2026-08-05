@@ -575,6 +575,26 @@ impl MultiStageQueryPlanner {
                 multi_stage_member = multi_stage_member.with_use_window_path(false);
             }
 
+            // Whether this inode can actually act on that, decided here so both
+            // halves of the decision stay together — the keys side that carries
+            // the query's rows is requested further down.
+            //
+            // A parent state with no dimensions is a single-row grid that no
+            // filter change can widen, and an empty key-dimension list
+            // degenerates into a cross join rather than being rejected. A
+            // Dimension inode never reads `keys_input`, so building one leaves
+            // unreferenced CTEs behind. And a Rank inode ranks within whatever
+            // its source carries: handing it the keys side would shrink the
+            // ranked population to the grid and collapse the ranks, trading a
+            // widened row set for wrong values. Rank needs its rows restricted
+            // *after* the window, which this assembly cannot express.
+            let needs_query_grid = query_filter_dropped
+                && (!state.dimensions().is_empty() || !state.time_dimensions().is_empty())
+                && !matches!(
+                    multi_stage_member.inode_type(),
+                    MultiStageInodeMemberType::Dimension | MultiStageInodeMemberType::Rank
+                );
+
             let use_window_path = multi_stage_member.use_window_path();
             let new_state = {
                 let mut new_state = filtered_state;
@@ -641,27 +661,7 @@ impl MultiStageQueryPlanner {
                 // reason a shrunk grain does — the measure side no longer
                 // enumerates the query's rows — except here the grid keeps
                 // every dimension and only the row count within it grows.
-                //
-                // Three shapes are exempt. A parent state with no dimensions is
-                // a single-row grid that no filter change can widen, and an
-                // empty key-dimension list degenerates into a cross join rather
-                // than being rejected. A Dimension inode never reads
-                // `keys_input`, so building one leaves unreferenced CTEs
-                // behind. And a Rank inode ranks within whatever its source
-                // carries: handing it the keys side would shrink the ranked
-                // population to the grid and collapse the ranks, trading a
-                // widened row set for wrong values. Rank needs the rows
-                // restricted *after* the window, which this assembly cannot
-                // express.
-                let grid_has_dimensions =
-                    !state.dimensions().is_empty() || !state.time_dimensions().is_empty();
-                let inode_can_hold_grid = !matches!(
-                    multi_stage_member.inode_type(),
-                    MultiStageInodeMemberType::Dimension | MultiStageInodeMemberType::Rank
-                );
-                if any_missing
-                    || (query_filter_dropped && grid_has_dimensions && inode_can_hold_grid)
-                {
+                if any_missing || needs_query_grid {
                     self.make_childs(
                         member.clone(),
                         state.clone(),
@@ -1147,6 +1147,15 @@ fn filter_directive_match_names(symbol: &Rc<MemberSymbol>) -> Vec<String> {
 // CTE state to begin with — `build_root_state` drops them — so there is no
 // query-level measure filter for a directive to lose. Filters added on top of
 // `base` don't count either: they shrink the grid, which is safe.
+//
+// The query-membership check compares whole filters, so a filter whose values
+// were rewritten between the root state and `base` reads as one the query never
+// asked for, and the drop goes undetected. That is deliberately out of scope: a
+// path that rewrites filter values on the way down has to bound the row set by
+// other means. The rolling-window date-range rewrite is the one such path, and
+// it does — its rows come from the time series and its values through the frame
+// condition, both built from the query's own range. A new rewriting path has to
+// establish the same, or anchor this check on the member instead of the value.
 fn query_filters_dropped(
     root: &QueryProperties,
     base: &QueryProperties,
