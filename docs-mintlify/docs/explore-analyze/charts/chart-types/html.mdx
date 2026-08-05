@@ -73,12 +73,14 @@ In addition to the [built-in Handlebars helpers](https://handlebarsjs.com/guide/
 | `concat a b …` | Join values into a single string |
 | `coalesce value fallback` | Use `fallback` when `value` is null or undefined |
 | `eq`, `ne`, `and`, `or` | Comparison and boolean logic for `{{#if}}` blocks |
-| `now` | The current date |
+| `now` | The current date. Wrap it in parentheses when passing it to another helper: `(now)` |
 
 ```html
 <p>{{formatNumber data.0.count ",.0f"}} orders</p>
-<p>as of {{formatDate now "yyyy-LL-dd"}}</p>
+<p>as of {{formatDate (now) "yyyy-LL-dd"}}</p>
 ```
+
+A helper used as an argument to another helper has to be a parenthesized [subexpression](https://handlebarsjs.com/guide/expressions.html#subexpressions). A bare `{{formatDate now "yyyy-LL-dd"}}` reads `now` as a context lookup rather than the helper, so it passes nothing to `formatDate` and renders an empty string.
 
 ## Sandboxing
 
