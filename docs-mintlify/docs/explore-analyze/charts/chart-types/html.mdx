@@ -36,7 +36,7 @@ Query result rows are available as a flat `data` array. Each row is keyed by the
 </ul>
 ```
 
-Templates are compiled in strict mode, so referencing a property that doesn't exist raises an error instead of rendering an empty string. If a chart fails to render, check that every path in the template matches a column of the current query.
+Templates are compiled in strict mode, so referencing a property that doesn't exist raises an error instead of rendering an empty string. Helper arguments are the one exception — a path that misses there is passed to the helper as `undefined`. If a chart fails to render, check that every path in the template matches a column of the current query.
 
 <Warning>
 A qualified column name must be wrapped in square brackets: `{{data.0.[order_items.count]}}`, and `{{this.[order_items.count]}}` inside a loop. Rows are keyed by literal strings, so without brackets Handlebars reads the dot as a path and looks for a `count` property on a non-existent `order_items` object, which fails in strict mode. Unqualified names never need brackets.
@@ -80,7 +80,7 @@ In addition to the [built-in Handlebars helpers](https://handlebarsjs.com/guide/
 <p>as of {{formatDate (now) "yyyy-LL-dd"}}</p>
 ```
 
-A helper used as an argument to another helper has to be a parenthesized [subexpression](https://handlebarsjs.com/guide/expressions.html#subexpressions). A bare `{{formatDate now "yyyy-LL-dd"}}` reads `now` as a context lookup rather than the helper, so it passes nothing to `formatDate` and renders an empty string.
+A helper used as an argument to another helper has to be a parenthesized [subexpression](https://handlebarsjs.com/guide/expressions.html#subexpressions). A bare `{{formatDate now "yyyy-LL-dd"}}` reads `now` as a context lookup rather than the helper, so `formatDate` never receives the current date.
 
 ## Sandboxing
 
