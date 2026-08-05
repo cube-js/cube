@@ -21,6 +21,29 @@ class TestServerCore extends CubejsServerCore {
   /** Set to fail the next driver construction, as a bad credential would. */
   public failNextBuild = false;
 
+  /**
+   * Runs before each staleness probe, standing in for another caller that wins
+   * the race while this one is awaiting the factory. Re-entrant probes skip it,
+   * so the hook can drive the driver factory itself.
+   */
+  public onStalenessProbe: (() => Promise<void>) | undefined;
+
+  private inStalenessHook = false;
+
+  protected async resolveDriverStaleness(origin: any, context: any): Promise<any> {
+    if (this.onStalenessProbe && !this.inStalenessHook) {
+      this.inStalenessHook = true;
+
+      try {
+        await this.onStalenessProbe();
+      } finally {
+        this.inStalenessHook = false;
+      }
+    }
+
+    return super.resolveDriverStaleness(origin, context);
+  }
+
   protected async createDriverFromFactoryResult(
     val: any,
     context: any,
@@ -330,6 +353,50 @@ describe('driver cache invalidation', () => {
     expect(escalations).toHaveLength(1);
     expect(escalations[0]).toMatchObject({ rebuildCount: 50 });
     expect(escalations[0].warning).toContain('contextToOrchestratorId');
+  });
+
+  // Losing the race enough times to exhaust the retry bound, where the winner's
+  // own build then failed, leaves the key invalidated rather than replaced. The
+  // driver this caller started from has already been released by that winner, so
+  // it can be neither handed back nor released again — the only safe move is to
+  // build. Reaching it needs four lost races and a failed build, hence the hook.
+  test('builds instead of reusing a released driver when the retry bound is exhausted', async () => {
+    const { core, driverFactory, request, logged } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    }, { token: 'token-a' });
+
+    const first = <FakeDriver> await driverFactory('default');
+
+    let round = 0;
+
+    core.onStalenessProbe = async () => {
+      round += 1;
+
+      // A different context takes the orchestrator over, then rebuilds — which
+      // replaces the key for the first three rounds. On the fourth that rebuild
+      // fails, so it invalidates the key and releases what it replaced.
+      await request({ token: `concurrent-${round}` }, `req-${round}`);
+
+      if (round === 4) {
+        core.failNextBuild = true;
+      }
+
+      await Promise.resolve(driverFactory('default')).catch(() => {});
+    };
+
+    const resolved = <FakeDriver> await driverFactory('default');
+
+    core.onStalenessProbe = undefined;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Four rounds, so the bound was genuinely exhausted rather than short-circuited.
+    expect(round).toBe(4);
+    expect(resolved).not.toBe(first);
+    // The returned driver is usable: not one some other caller already drained.
+    expect(resolved.release).not.toHaveBeenCalled();
+    // And nothing was released twice on the way there.
+    expect(core.builtDrivers.every((driver) => driver.release.mock.calls.length <= 1)).toBe(true);
+    expect(logged('Driver release error')).toHaveLength(0);
   });
 
   test('reuses the driver when the security context cannot be fingerprinted', async () => {
