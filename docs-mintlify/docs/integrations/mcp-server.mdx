@@ -211,7 +211,7 @@ neither `listDeployments` nor the `chat` selection can reach an excluded deploym
 
 ## Available actions
 
-The MCP server exposes 16 tools, grouped below.
+The MCP server exposes 20 tools, grouped below.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
@@ -277,6 +277,8 @@ default. Users without it never see them.
 | `writeDataModelFile` | Creates or overwrites a model source file on the dev branch (whole-file replacement). Recompiles the model and reports `valid` plus any `validationError`. | Destructive — prompts |
 | `deleteDataModelFile` | Deletes a model source file on the dev branch. | Destructive — prompts |
 | `getDataModelChanges` | Shows the diff of the dev branch against its parent — the pending changes, for review before committing. | Read-only |
+| `getBranchDiff` | Diffs any branch against a base (the deploy branch by default), returning the changed files with insertion/deletion counts and the unified diff. Unlike `getDataModelChanges`, this works for any branch, not just a dev branch versus its immediate parent. | Read-only |
+| `getDeploymentEnv` | Lists the deployment's environment variables, with secret-looking values redacted. Useful for confirming configuration — an export bucket setting, say — when a pre-aggregation build fails. | Read-only |
 
 #### How model edits stay safe
 
@@ -293,10 +295,22 @@ into the MCP server:
   from the Cube UI, as described in [Development mode][ref-dev-mode]. The MCP server
   deliberately exposes no commit tool — an AI client can prepare changes, but only a
   person can ship them.
-- **Registration is permission-gated.** The six tools above are only offered to users
+- **Registration is permission-gated.** The eight tools above are only offered to users
   whose role allows editing the semantic model.
 
 Review pending work with `getDataModelChanges` before you commit.
+
+### Pre-aggregations
+
+Gated by the same permission as data model editing. A query alone can't prove a
+[pre-aggregation][ref-pre-aggs] rollup was actually used, and an external pre-aggregation
+can fail in configuration-specific ways — a missing export bucket, denied permissions —
+that only a build surfaces.
+
+| Tool | Description | Access |
+| --- | --- | --- |
+| `getPreAggregationStatus` | Lists pre-aggregations with their partition counts, how many have built, the newest build time, and the exact error if a build failed. | Read-only |
+| `buildPreAggregation` | Queues an on-demand build of one pre-aggregation and returns once it's accepted. The build runs asynchronously — poll `getPreAggregationStatus` afterwards for the result. | Write |
 
 ## Example workflows
 
@@ -362,3 +376,4 @@ publish it.
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-pre-aggs]: /admin/monitoring/pre-aggregations
