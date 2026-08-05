@@ -1,4 +1,5 @@
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import * as sharedEnv from '@cubejs-backend/shared';
 
 import { CubejsServerCore } from '../../src/core/server';
 import { OrchestratorApi } from '../../src/core/OrchestratorApi';
@@ -263,6 +264,30 @@ describe('driver lifecycle', () => {
       expect(api.requestedDrivers.size).toEqual(1);
       expect(created).toHaveLength(1);
     });
+
+    // The pre-aggregation env-var check feeds the cache key, so it sits ahead of
+    // the cache-hit early return. It allocates and scans all of `process.env`,
+    // and the factory runs per query and per pre-aggregation check — so left
+    // unmemoized it moved from once per data source onto the hot path.
+    test('the pre-aggregation env-var scan runs once per data source', async () => {
+      const spy = jest.spyOn(sharedEnv, 'hasPreAggregationsEnvVars');
+
+      try {
+        const api = await getApi(createCore());
+
+        for (let i = 0; i < 10; i += 1) {
+          await api.driverFactory('default');
+          await api.driverFactory('default', true);
+          await api.driverFactory('analytics');
+        }
+
+        // Two data sources requested, so two scans — not one per request, which
+        // is 30 here.
+        expect(spy.mock.calls.map(([dataSource]) => dataSource).sort()).toEqual(['analytics', 'default']);
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   describe('release does not build drivers', () => {
@@ -317,6 +342,152 @@ describe('driver lifecycle', () => {
       await expect(api.release()).rejects.toThrow('release failed');
 
       expect(created[1].released).toEqual(1);
+    });
+
+    // `release()` empties the record, which is what makes the api spent — and
+    // what the callers' `finally` blocks depend on: a spent api must not stay
+    // reachable, because a second `release()` on it closes nothing.
+    test('the record is emptied, so a second release is a no-op', async () => {
+      process.env.CUBEJS_PRE_AGGREGATIONS_DB_HOST = 'preagg-host';
+
+      const api = await getApi(createCore());
+
+      await requestQueryAndPreAggDrivers(api);
+      expect(api.requestedDrivers.size).toEqual(2);
+
+      await api.release();
+
+      expect(api.requestedDrivers.size).toEqual(0);
+      expect(created.map(driver => driver.released)).toEqual([1, 1]);
+
+      await api.release();
+
+      expect(created.map(driver => driver.released)).toEqual([1, 1]);
+      expect(created).toHaveLength(2);
+    });
+
+    // The external driver used to be released through its factory — the pattern
+    // this fix removes for internal drivers. The external closure in `server.ts`
+    // caches its promise, so with no pre-aggregation traffic there is nothing
+    // cached and the factory would build an external driver, connection-test it,
+    // and immediately close it: a connection opened purely to be shut down.
+    test('an external driver that was never used is not constructed', async () => {
+      let externalBuilds = 0;
+
+      const api = new OrchestratorApi(
+        (async () => new TestDriver('internal')) as any,
+        noop,
+        <any>{
+          externalDriverFactory: async () => {
+            externalBuilds += 1;
+            return new TestDriver('external');
+          },
+          contextToDbType: async () => 'postgres',
+          contextToExternalDbType: () => 'cubestore',
+        },
+      );
+
+      await api.release();
+
+      expect(externalBuilds).toEqual(0);
+    });
+
+    test('an external driver that was used is released, exactly once', async () => {
+      const externalDriver = new TestDriver('external');
+      let externalBuilds = 0;
+
+      const api = new OrchestratorApi(
+        (async () => new TestDriver('internal')) as any,
+        noop,
+        <any>{
+          externalDriverFactory: async () => {
+            externalBuilds += 1;
+            return externalDriver;
+          },
+          contextToDbType: async () => 'postgres',
+          contextToExternalDbType: () => 'cubestore',
+        },
+      );
+
+      // What the readiness probe does: it legitimately resolves the external
+      // driver to test it, and that resolution is what makes it releasable.
+      await api.testConnection();
+      expect(externalBuilds).toEqual(1);
+
+      await api.release();
+
+      expect(externalDriver.released).toEqual(1);
+      // Released from the recorded instance, not by asking the factory again.
+      expect(externalBuilds).toEqual(1);
+    });
+  });
+
+  // `release()` can now realistically reject — before this fix it iterated
+  // `seenDataSources`, which only the readiness probe populates, so on an
+  // ordinary deployment it touched no internal driver and effectively could not
+  // fail. Every caller finishes its own teardown before reporting that failure:
+  // an api is spent the moment `release()` is entered, so leaving it reachable,
+  // or leaving a timer live, is worse than the failure itself.
+  describe('a failing release does not strand its callers', () => {
+    const failOnRelease = (api: any) => {
+      // eslint-disable-next-line no-param-reassign
+      api.release = async () => { throw new Error('release failed'); };
+    };
+
+    test('OrchestratorStorage empties itself, so a spent api is not handed back out', async () => {
+      const core = createCore();
+      const api = await getApi(core);
+      const storage = (core as any).orchestratorStorage;
+
+      failOnRelease(api);
+
+      await expect(storage.releaseConnections()).rejects.toThrow('release failed');
+
+      expect([...storage.storage.values()]).toHaveLength(0);
+    });
+
+    // `Promise.all` rejects on the first failure while the siblings are still
+    // releasing, so it returns — and the map is cleared — mid-teardown. The
+    // caller then believes teardown is over while a pool is still closing.
+    test('OrchestratorStorage waits for every api before reporting the failure', async () => {
+      const storage = (createCore() as any).orchestratorStorage;
+      let slowFinished = false;
+
+      storage.set('fast', <any>{ release: async () => { throw new Error('release failed'); } });
+      storage.set('slow', <any>{
+        release: async () => {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          slowFinished = true;
+        },
+      });
+
+      await expect(storage.releaseConnections()).rejects.toThrow('release failed');
+
+      expect(slowFinished).toEqual(true);
+    });
+
+    test('releaseConnections still cancels the timers', async () => {
+      const core = createCore();
+      let cancelled = false;
+
+      failOnRelease(await getApi(core));
+      (core as any).scheduledRefreshTimerInterval = { cancel: async () => { cancelled = true; } };
+
+      await expect(core.releaseConnections()).rejects.toThrow('release failed');
+
+      expect(cancelled).toEqual(true);
+    });
+
+    test('resetInstanceState still rebuilds, so the dev server keeps a refresh timer', async () => {
+      const core = createCore();
+      let restarted = 0;
+
+      failOnRelease(await getApi(core));
+      (core as any).startScheduledRefreshTimer = () => { restarted += 1; };
+
+      await expect(core.resetInstanceState()).rejects.toThrow('release failed');
+
+      expect(restarted).toEqual(1);
     });
   });
 

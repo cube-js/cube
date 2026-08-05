@@ -556,18 +556,27 @@ export class CubejsServerCore {
     return compilerApi;
   }
 
+  /**
+   * The rebuild runs even when releasing threw, then the failure is reported.
+   * `release()` is not atomic — it stops tracking and closes what it can before
+   * failing — so returning early would leave the dev server with the old
+   * orchestrators discarded and no refresh timer at all, which is worse than
+   * reloading over one pool that refused to close.
+   */
   public async resetInstanceState() {
-    await this.orchestratorStorage.releaseConnections();
+    try {
+      await this.orchestratorStorage.releaseConnections();
+    } finally {
+      this.orchestratorStorage.clear();
+      this.compilerCache.clear();
 
-    this.orchestratorStorage.clear();
-    this.compilerCache.clear();
+      this.reloadEnvVariables();
 
-    this.reloadEnvVariables();
+      this.repository = new FileRepository(this.options.schemaPath);
+      this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
-    this.repository = new FileRepository(this.options.schemaPath);
-    this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
-
-    this.startScheduledRefreshTimer();
+      this.startScheduledRefreshTimer();
+    }
   }
 
   public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
@@ -586,6 +595,15 @@ export class CubejsServerCore {
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
+    /**
+     * `hasPreAggregationsEnvVars` allocates and scans all of `process.env`, and it
+     * now feeds the cache key, so it sits ahead of the cache-hit early return and
+     * would otherwise run on every query and every pre-aggregation check rather
+     * than once per data source. Safe to memoize for this orchestrator's lifetime:
+     * env vars only change under `reloadEnvVariables()`, which discards it.
+     */
+    const preAggregationsEnvVars: Record<string, boolean> = {};
+
     const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
 
@@ -602,7 +620,11 @@ export class CubejsServerCore {
        * Driver factory function `DriverFactoryByDataSource`.
        */
       async (dataSource = 'default', preAggregations = false) => {
-        const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
+        if (!(dataSource in preAggregationsEnvVars)) {
+          preAggregationsEnvVars[dataSource] = hasPreAggregationsEnvVars(dataSource);
+        }
+
+        const hasSeparatePreAggEnv = preAggregationsEnvVars[dataSource];
         const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
 
         // Keyed on the credentials the driver is actually built with, not on the
@@ -897,17 +919,24 @@ export class CubejsServerCore {
     return this.orchestratorStorage.testConnections();
   }
 
+  /**
+   * The timers are cancelled even when releasing threw, then the failure is
+   * reported. A pool that refuses to close must not leave the process held open
+   * by a live interval — that turns a reported shutdown failure into a hang.
+   */
   public async releaseConnections() {
-    await this.orchestratorStorage.releaseConnections();
+    try {
+      await this.orchestratorStorage.releaseConnections();
+    } finally {
+      if (this.maxCompilerCacheKeep) {
+        clearInterval(this.maxCompilerCacheKeep);
+      }
 
-    if (this.maxCompilerCacheKeep) {
-      clearInterval(this.maxCompilerCacheKeep);
-    }
+      this.compilerCache.clear();
 
-    this.compilerCache.clear();
-
-    if (this.scheduledRefreshTimerInterval) {
-      await this.scheduledRefreshTimerInterval.cancel();
+      if (this.scheduledRefreshTimerInterval) {
+        await this.scheduledRefreshTimerInterval.cancel();
+      }
     }
   }
 

@@ -4,6 +4,7 @@ import pt from 'promise-timeout';
 import {
   BaseDriver,
   ContinueWaitError,
+  DriverFactory,
   DriverFactoryByDataSource,
   DriverType,
   QueryBody,
@@ -12,6 +13,7 @@ import {
 } from '@cubejs-backend/query-orchestrator';
 
 import { DatabaseType, RequestContext } from './types';
+import { driverCacheKey } from './utils';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
@@ -56,20 +58,51 @@ export class OrchestratorApi {
    */
   protected readonly driverFactory: DriverFactoryByDataSource;
 
+  /**
+   * The external pre-aggregation driver, recorded when something resolves one.
+   * Tracked apart from `requestedDrivers` because its factory takes no data
+   * source and lives in `options`, which `QueryOrchestrator` reads directly — but
+   * released under the same rule: close what was built, never build to close.
+   */
+  private requestedExternalDriver: Promise<BaseDriver> | null = null;
+
+  /**
+   * The external factory with recording attached, or `undefined` when none is
+   * configured. It replaces the one in `options` before the orchestrator is
+   * constructed, so `QueryCache` and `PreAggregations` record through it too —
+   * wrapping only this class's own reads would leave the orchestrator's external
+   * driver unreleasable, which is the gap being closed, one layer down.
+   */
+  protected readonly externalDriverFactory?: DriverFactory;
+
+  /**
+   * A copy of the constructor's options, with the external driver factory swapped
+   * for the recording wrapper. Copied rather than mutated so the caller's object
+   * is left alone.
+   */
+  protected readonly options: OrchestratorApiOptions;
+
   public constructor(
     driverFactory: DriverFactoryByDataSource,
     protected readonly logger,
-    protected readonly options: OrchestratorApiOptions
+    options: OrchestratorApiOptions
   ) {
+    this.driverFactory = this.recordingDriverFactory(driverFactory);
+    this.externalDriverFactory = this.recordingExternalDriverFactory(options.externalDriverFactory);
+
+    // The orchestrator and everything under it read the external factory from
+    // `options`, so the recording wrapper has to be in there rather than only in
+    // this class's own field — otherwise the driver `QueryCache` resolves is not
+    // one `release()` can close.
+    this.options = { ...options, externalDriverFactory: this.externalDriverFactory };
+
     this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
 
-    this.driverFactory = this.recordingDriverFactory(driverFactory);
-
     this.orchestrator = new QueryOrchestrator(
-      options.redisPrefix || 'STANDALONE',
+      this.options.redisPrefix || 'STANDALONE',
       this.driverFactory,
       logger,
-      options
+      this.options
     );
   }
 
@@ -80,11 +113,33 @@ export class OrchestratorApi {
       // One entry per distinct request, overwriting the previous promise for the
       // same one: a re-request returns the same connection, and the factory owns
       // its cache, so the latest promise is the one worth holding.
-      this.requestedDrivers.set(`${dataSource}${preAggregations ? '@pre_agg' : ''}`, {
+      //
+      // Keyed on the *request*, where the factory's own cache keys on the
+      // credentials it resolves to — so without a dedicated pre-aggregation
+      // connection this holds two entries for one driver. Harmless by design:
+      // identity dedup settles release, and the `tested` set settles the probe.
+      // Keying on the credentials instead would mean re-deriving the decision
+      // here, which is exactly the disagreement `driverCacheKey` exists to
+      // prevent.
+      this.requestedDrivers.set(driverCacheKey(dataSource, preAggregations), {
         dataSource,
         preAggregations,
         driver: Promise.resolve(driver),
       });
+
+      return driver;
+    };
+  }
+
+  private recordingExternalDriverFactory(driverFactory?: DriverFactory): DriverFactory | undefined {
+    if (!driverFactory) {
+      return undefined;
+    }
+
+    return () => {
+      const driver = driverFactory();
+
+      this.requestedExternalDriver = Promise.resolve(driver);
 
       return driver;
     };
@@ -231,7 +286,7 @@ export class OrchestratorApi {
    */
   public async testConnection() {
     if (this.options.rollupOnlyMode) {
-      return this.testDriverConnection(this.options.externalDriverFactory, DriverType.External);
+      return this.testDriverConnection(this.externalDriverFactory, DriverType.External);
     } else {
       // Requests that share a connection must not each cost a round-trip, and
       // only the resolved driver reveals which those are — the factory answers
@@ -248,7 +303,7 @@ export class OrchestratorApi {
             tested,
           ),
         ),
-        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
+        this.testDriverConnection(this.externalDriverFactory, DriverType.External),
       ]);
     }
   }
@@ -345,11 +400,13 @@ export class OrchestratorApi {
 
   public async release() {
     const requested = [...this.requestedDrivers.values()];
+    const requestedExternal = this.requestedExternalDriver;
 
     // The api is spent once released, so stop tracking immediately; holding
     // closed drivers would keep their captured scope alive for as long as
     // anything references the api.
     this.requestedDrivers.clear();
+    this.requestedExternalDriver = null;
 
     // Each driver is released as soon as it resolves, so one whose connection
     // never settles cannot hold up the others, the external driver, or the
@@ -363,22 +420,14 @@ export class OrchestratorApi {
     const released = new Set<BaseDriver>();
 
     const results = await Promise.allSettled([
-      ...requested.map(async ({ driver }) => {
-        // A driver that never resolved was never built, so there is nothing to
-        // close and nothing leaked — whatever failed the resolution was already
-        // reported to whoever requested it.
-        const resolved = await driver.catch(() => null);
-
-        // A data source and its pre-aggregation request resolve to one driver
-        // unless a dedicated connection is configured; close it once.
-        if (!resolved || released.has(resolved)) {
-          return;
-        }
-        released.add(resolved);
-
-        await this.releaseDriverInstance(resolved);
-      }),
-      this.releaseDriver(this.options.externalDriverFactory),
+      ...requested.map(({ driver }) => this.releaseRequestedDriver(driver, released)),
+      // Same rule as the internal drivers, for the same reason: the external
+      // closure in `server.ts` nulls its cached promise on a failed resolution,
+      // so going back through the factory here would construct an external
+      // driver — and connection-test it — purely in order to close it. A
+      // deployment with an external store but no pre-aggregation traffic never
+      // built one, and now never builds one at shutdown either.
+      this.releaseRequestedDriver(requestedExternal, released),
       this.orchestrator.cleanup()
     ]);
 
@@ -401,11 +450,35 @@ export class OrchestratorApi {
     }
   }
 
+  /**
+   * @deprecated Resolves through the factory, which builds a driver whenever the
+   * cached one is gone — so it can open a connection in order to close it. Nothing
+   * in this class uses it any more; kept for out-of-tree subclasses.
+   */
   protected async releaseDriver(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
     if (driverFn) {
       const driver = await driverFn(dataSource);
       await this.releaseDriverInstance(driver);
     }
+  }
+
+  /**
+   * Closes a driver this api recorded, once. A promise that never resolved means
+   * the driver was never built, so there is nothing to close and nothing leaked —
+   * whatever failed the resolution was already reported to whoever requested it.
+   * The `released` set is what settles sharing: a data source and its
+   * pre-aggregation request resolve to one instance unless dedicated credentials
+   * are configured, and only the instance knows which case it is.
+   */
+  private async releaseRequestedDriver(driver: Promise<BaseDriver> | null, released: Set<BaseDriver>) {
+    const resolved = driver && await driver.catch(() => null);
+
+    if (!resolved || released.has(resolved)) {
+      return;
+    }
+    released.add(resolved);
+
+    await this.releaseDriverInstance(resolved);
   }
 
   private async releaseDriverInstance(driver: BaseDriver) {
