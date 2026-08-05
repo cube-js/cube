@@ -31,14 +31,16 @@ const CONSTRAINT_KEYS = ['testMatch', 'roots'];
  * must target `dist/`.
  */
 function targetsDist(value) {
-  const entries = Array.isArray(value) ? value : [value];
+  const entries = (Array.isArray(value) ? value : [value])
+    .filter(entry => typeof entry === 'string')
+    // A `!`-negated entry subtracts from the set rather than widening it, so it
+    // cannot break the constraint and should not have to name `dist/`.
+    .filter(entry => !entry.startsWith('!'));
 
-  return entries.length > 0 && entries.every(entry => {
-    if (typeof entry !== 'string') return false;
+  return entries.length > 0 && entries.every(entry =>
     // Normalized so a Windows-style separator in a hand-written config reads the
     // same as a posix one.
-    return /(^|\/)dist(\/|$)/.test(entry.replace(/\\/g, '/').replace('<rootDir>/', ''));
-  });
+    /(^|\/)dist(\/|$)/.test(entry.replace(/\\/g, '/').replace('<rootDir>/', '')));
 }
 
 /**
@@ -141,7 +143,7 @@ function resolveConfig(pkg) {
  * transform exists answers "can this execute TypeScript" directly, instead of
  * inferring it from which base file was required.
  */
-function violations() {
+function violations(inspected) {
   return fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .map(entry => path.join(PACKAGES_DIR, entry.name))
@@ -151,6 +153,8 @@ function violations() {
       // No jest config at all: the package does not run jest, so there is no
       // collection to constrain.
       if (!config) return [];
+
+      inspected.push(pkg);
 
       // A package that can actually compile TypeScript may test its sources
       // deliberately, so the dist-only convention does not apply to it.
@@ -172,17 +176,18 @@ function violations() {
 }
 
 function main() {
-  const packages = fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })
-    .filter(entry => entry.isDirectory()).length;
+  const inspected = [];
+  const offenders = violations(inspected);
 
-  // Guards the guard: a moved directory or a bad glob would otherwise make
-  // every assertion below vacuous and keep passing forever.
-  if (packages === 0) {
-    console.error('check-dist-test-target: found no packages — the walk is broken, not the tree.');
+  // Guards the guard. Counting the configs actually read, rather than the
+  // directories walked, is what makes this meaningful: if jest configs ever
+  // move to a filename this check does not resolve, the walk still finds a
+  // healthy number of package directories while inspecting none of them, and
+  // the run would pass vacuously.
+  if (inspected.length === 0) {
+    console.error('check-dist-test-target: inspected no jest configs — the walk is broken, not the tree.');
     process.exit(1);
   }
-
-  const offenders = violations();
 
   if (offenders.length > 0) {
     console.error(
@@ -199,7 +204,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`check-dist-test-target: ${packages} packages checked, no drift.`);
+  console.log(`check-dist-test-target: ${inspected.length} jest configs checked, no drift.`);
 }
 
 try {
