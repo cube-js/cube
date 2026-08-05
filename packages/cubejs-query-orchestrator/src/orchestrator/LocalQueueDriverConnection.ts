@@ -173,8 +173,10 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   /**
    * Drops expired entries and enforces the size cap. Runs from every completion
-   * as well as every retain, so a queue that goes quiet right after one does not
-   * hold that result past its window waiting for a reader that never comes.
+   * as well as every retain, so a result is pruned by the next queue activity
+   * rather than only by a retain on some other key. A fully idle queue does keep
+   * its last entry past the window — nothing depends on hard expiry, and the map
+   * is capped, so that is bounded rather than a leak.
    */
   private sweepRetainedResults(): void {
     const { retainedResults } = this.state;
