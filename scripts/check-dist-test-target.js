@@ -46,18 +46,24 @@ function targetsDist(value) {
 
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage', '__snapshots__']);
 
-/** Test sources jest would collect, by extension, anywhere under `dir`. */
-function testSources(dir, extension) {
+/**
+ * TypeScript test sources anywhere in the package — `.tsx` as well as `.ts`,
+ * and `.spec.` as well as `.test.`, since jest's default collects all of them
+ * and every one fails the same way without a transform.
+ *
+ * The walk covers the whole package rather than just `test/`: a suite added
+ * under `src/` is collected by jest's default just as readily, and would
+ * otherwise be a test the guard cannot see.
+ */
+function typescriptTestSources(dir) {
   if (!fs.existsSync(dir)) return [];
 
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      return IGNORED_DIRS.has(entry.name) ? [] : testSources(full, extension);
+      return IGNORED_DIRS.has(entry.name) ? [] : typescriptTestSources(full);
     }
-    // `.spec.` as well as `.test.`: jest's default collects both, so a spec file
-    // is just as capable of failing to parse.
-    return new RegExp(`\\.(test|spec)\\.${extension}$`).test(entry.name) ? [full] : [];
+    return /\.(test|spec)\.tsx?$/.test(entry.name) ? [full] : [];
   });
 }
 
@@ -85,7 +91,7 @@ function violations() {
       // With no TypeScript test sources there is nothing untransformable for
       // jest's default to pick up — a package testing plain `.js`, or with no
       // tests at all, is collectible exactly as it stands.
-      if (testSources(path.join(pkg, 'test'), 'ts').length === 0) return [];
+      if (typescriptTestSources(pkg).length === 0) return [];
 
       const constrained = CONSTRAINT_KEYS
         .filter(key => config[key] !== undefined)
