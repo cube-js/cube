@@ -149,21 +149,31 @@ function typescriptTestSources(dir) {
  * carry a package.json block instead — several of which have TypeScript tests
  * kept alive purely by the path argument in their `unit` script.
  *
- * The extensions jest resolves beyond `.js` are listed so an unreadable one is
- * reported rather than silently skipped: being unable to inspect a config is a
- * different thing from a config being fine. Ordered as jest's own
- * `JEST_CONFIG_EXT_ORDER`, so a package carrying two of them has the same one
- * inspected here that jest would actually load.
+ * Resolution follows jest's own `JEST_CONFIG_EXT_ORDER`, so a package carrying
+ * two configs has the one inspected here that jest would actually load.
+ *
+ * Anything else named `jest.config.*` is picked up too, and reported as
+ * uninspectable. Matching only a fixed list would let a spelling this check
+ * does not know — `jest.config.mts`, or whatever a later jest adds — fall
+ * through to the package.json branch, find nothing, and get reported as a
+ * *dist-target offender*: the wrong defect, with a fix suggestion that would
+ * not help. Naming a config we cannot read is the honest failure.
  */
 const CONFIG_EXTENSIONS = ['js', 'ts', 'mjs', 'cjs', 'json'];
+const LOADABLE_EXTENSIONS = ['.js', '.cjs', '.json'];
 
 function resolveConfig(pkg) {
-  const configFile = CONFIG_EXTENSIONS
+  const known = CONFIG_EXTENSIONS
     .map(extension => path.join(pkg, `jest.config.${extension}`))
     .find(candidate => fs.existsSync(candidate));
 
+  const configFile = known || fs.readdirSync(pkg)
+    .filter(entry => entry.startsWith('jest.config.'))
+    .map(entry => path.join(pkg, entry))
+    .find(candidate => fs.statSync(candidate).isFile());
+
   if (configFile) {
-    if (!configFile.endsWith('.js') && !configFile.endsWith('.cjs') && !configFile.endsWith('.json')) {
+    if (!LOADABLE_EXTENSIONS.includes(path.extname(configFile))) {
       // `require` cannot load these without a loader, and guessing would be
       // worse than saying so.
       throw new Error(

@@ -317,6 +317,22 @@ test('an uninspectable extension is reported by package name', () => {
   assert.match(uninspectable[0], /cannot be inspected/);
 });
 
+test('an unknown jest.config.* spelling is reported, not called a dist offender', () => {
+  // Falling through to the package.json branch would find nothing and blame
+  // the dist target — the wrong defect, with a fix that would not help.
+  const { offenders, uninspectable } = check({
+    mts: {
+      rawConfig: 'export default {};',
+      configExt: 'mts',
+      scripts: { unit: 'jest dist/test' },
+      sources: [TS_TEST],
+    },
+  });
+  assert.deepStrictEqual(offenders, []);
+  assert.strictEqual(uninspectable.length, 1);
+  assert.match(uninspectable[0], /jest\.config\.mts cannot be inspected/);
+});
+
 // --- packages with no config at all -------------------------------------------
 
 test('flags no config at all when the package still invokes jest', () => {
