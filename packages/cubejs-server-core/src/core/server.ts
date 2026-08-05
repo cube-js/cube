@@ -631,6 +631,15 @@ export class CubejsServerCore {
      */
     const driverOrigin: Record<string, DriverOrigin> = {};
 
+    /**
+     * How many times each key has been rebuilt. Reported with the rebuild so a
+     * deployment whose `contextToOrchestratorId` does not partition by whatever
+     * `driverFactory` reads — every user sharing one orchestrator, say — is
+     * diagnosable: it rebuilds on request after request rather than once per
+     * credential rotation.
+     */
+    const driverRebuilds: Record<string, number> = {};
+
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
     const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
@@ -660,6 +669,23 @@ export class CubejsServerCore {
           preAggregations: usePreAgg || false,
         });
 
+        /**
+         * Every key that resolves to the one driver built here. Without separate
+         * pre-aggregation credentials `usePreAgg` is false whichever key was
+         * asked for, so both describe an identically configured driver and share
+         * a single instance — they must therefore be written, and invalidated,
+         * together. Doing it per requested key instead lets the two diverge into
+         * two pools where the deployment expects one.
+         */
+        const aliasedKeys = hasSeparatePreAggEnv
+          ? [factoryKey]
+          : [dataSource, `${dataSource}@pre_agg`];
+
+        const invalidate = () => aliasedKeys.forEach((key) => {
+          driverPromise[key] = null;
+          delete driverOrigin[key];
+        });
+
         // Already resolved by the staleness check below, so the factory is not
         // asked twice for the same rebuild.
         let resolvedFactoryResult: DriverFactoryResult | undefined;
@@ -674,17 +700,26 @@ export class CubejsServerCore {
             return driverPromise[factoryKey];
           }
 
+          driverRebuilds[factoryKey] = (driverRebuilds[factoryKey] || 0) + 1;
+
           this.logger('Rebuilding driver on configuration change', {
             dataSource,
             preAggregations,
+            rebuildCount: driverRebuilds[factoryKey],
           });
 
           const replaced = driverPromise[factoryKey];
 
-          driverPromise[factoryKey] = null;
-          if (!preAggregations && !hasSeparatePreAggEnv) {
-            driverPromise[`${dataSource}@pre_agg`] = null;
-          }
+          // Clear every key pointing at the replaced driver, not just the one
+          // asked for: a surviving alias would keep handing out a driver whose
+          // pool is being drained, and would release it a second time when it
+          // was itself found stale.
+          Object.keys(driverPromise)
+            .filter((key) => driverPromise[key] === replaced)
+            .forEach((key) => {
+              driverPromise[key] = null;
+              delete driverOrigin[key];
+            });
 
           // Graceful: `release` drains the pool, so queries already running on
           // the replaced driver finish before its connections are closed. It is
@@ -708,19 +743,18 @@ export class CubejsServerCore {
           });
         }
 
-        // Shared by reference with the `@pre_agg` alias below, so both keys
-        // describe the one driver they both resolve to. Starts empty: until the
-        // factory has been called there is nothing to compare against, and
+        // Shared by reference across `aliasedKeys`, so every key describes the
+        // one driver they all resolve to. Starts empty: until the factory has
+        // been called there is nothing to compare against, and
         // `resolveDriverStaleness` reads that as "reuse".
         const origin: DriverOrigin = {
           securityContextFingerprint: null,
           configFingerprint: null,
         };
 
-        driverOrigin[factoryKey] = origin;
-        if (!preAggregations && !hasSeparatePreAggEnv) {
-          driverOrigin[`${dataSource}@pre_agg`] = origin;
-        }
+        aliasedKeys.forEach((key) => {
+          driverOrigin[key] = origin;
+        });
 
         driverPromise[factoryKey] = (async () => {
           let driver: BaseDriver | null = null;
@@ -757,13 +791,7 @@ export class CubejsServerCore {
               `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
             );
           } catch (e) {
-            driverPromise[factoryKey] = null;
-            delete driverOrigin[factoryKey];
-
-            if (!preAggregations && !hasSeparatePreAggEnv) {
-              driverPromise[`${dataSource}@pre_agg`] = null;
-              delete driverOrigin[`${dataSource}@pre_agg`];
-            }
+            invalidate();
 
             if (driver) {
               await driver.release();
@@ -773,12 +801,14 @@ export class CubejsServerCore {
           }
         })();
 
-        // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
-          driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
-        }
+        const pending = driverPromise[factoryKey];
 
-        return driverPromise[factoryKey];
+        // No separate pre-agg driver needed — share the same promise across keys
+        aliasedKeys.forEach((key) => {
+          driverPromise[key] = pending;
+        });
+
+        return pending;
       },
       {
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
