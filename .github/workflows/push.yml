@@ -17,6 +17,8 @@ on:
       - 'lerna.json'
       - 'rollup.config.js'
       - 'jest.base.config.js'
+      - 'jest.base-ts.config.js'
+      - 'scripts/check-dist-test-target.js'
       - 'yarn.lock'
     branches:
       - 'master'
@@ -36,6 +38,8 @@ on:
       - 'lerna.json'
       - 'rollup.config.js'
       - 'jest.base.config.js'
+      - 'jest.base-ts.config.js'
+      - 'scripts/check-dist-test-target.js'
       - 'yarn.lock'
 
 env:
@@ -198,6 +202,8 @@ jobs:
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: NPM lint
         run: yarn lint:npm
+      - name: Check dist-only test target
+        run: yarn lint:dist-test-target
       - name: Lerna lint
         run: yarn lerna run --concurrency 1 lint
       - name: Cargo fmt cube workspace
