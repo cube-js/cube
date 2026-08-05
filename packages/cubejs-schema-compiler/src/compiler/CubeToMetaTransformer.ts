@@ -509,11 +509,15 @@ export class CubeToMetaTransformer implements CompilerInterface {
     // (a reference without an array literal evaluates to a bare string, which
     // this field has always passed through). Normalizing it here would change
     // emitted meta for models that never enabled the automatic set.
+    //
+    // The computed set is copied per measure: it is built once per cube and
+    // `metaConfig` is cached, so sharing the instance would let one consumer
+    // sorting in place reorder every other measure's list, for every request.
     const drillMembersArray: string[] = drillMembers
       ? ((this.cubeEvaluator.evaluateReferences(
         cubeName, drillMembers, { originalSorting: true }
       ) as string[]) || [])
-      : autoDrillMembers;
+      : autoDrillMembers.slice();
 
     const type = CubeSymbols.toMemberDataType(extendedMetricDef.type || 'number');
     const isCumulative = extendedMetricDef.cumulative || BaseMeasure.isCumulative(extendedMetricDef);

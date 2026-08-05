@@ -36,6 +36,10 @@ cubes:
       - name: city
         sql: city
         type: string
+        links:
+          - name: city_page
+            label: Open the city page
+            url: "{city}"
       - name: secret
         sql: secret
         type: string
@@ -198,6 +202,121 @@ describe('Auto drill members', () => {
         ]);
       });
     });
+
+    it('excludes generated link dimensions', async () => {
+      await withEnv({ CUBEJS_AUTO_DRILL_MEMBERS: 'true' }, (metaTransformer) => {
+        // `city` declares a link, so a public `synthetic` dimension is minted
+        // alongside it. It is a URL helper, not an attribute worth a cap slot.
+        expect(measure(metaTransformer, 'orders', 'count').drillMembers)
+          .not.toContain('orders.city___link_city_page_url');
+      });
+    });
+
+    it('hands each measure its own copy of the computed set', async () => {
+      await withEnv({ CUBEJS_AUTO_DRILL_MEMBERS: 'true' }, (metaTransformer) => {
+        const count = measure(metaTransformer, 'orders', 'count');
+        const total = measure(metaTransformer, 'orders', 'total');
+
+        // The set is computed once per cube and meta is cached, so sharing the
+        // instance would let one consumer's in-place sort reorder every other
+        // measure's list for every later request.
+        expect(count.drillMembers).not.toBe(total.drillMembers);
+        count.drillMembers.reverse();
+        expect(total.drillMembers[0]).toBe('orders.id');
+      });
+    });
+  });
+
+  describe('primary key shapes', () => {
+    const compoundPkModel = `
+cubes:
+  - name: shipments
+    sql: SELECT * FROM shipments
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: order_id
+        sql: order_id
+        type: number
+        primary_key: true
+      - name: line_no
+        sql: line_no
+        type: number
+        primary_key: true
+      - name: carrier
+        sql: carrier
+        type: string
+
+  - name: events
+    sql: SELECT * FROM events
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: name
+        sql: name
+        type: string
+      - name: happened_at
+        sql: happened_at
+        type: time
+`;
+
+    const withModel = async (model: string, env: Record<string, string>, fn: (m: any) => void) => {
+      const originals: Record<string, string | undefined> = {};
+      Object.keys(env).forEach((key) => {
+        originals[key] = process.env[key];
+        process.env[key] = env[key];
+      });
+
+      try {
+        const { compiler, metaTransformer } = prepareYamlCompiler(model);
+        await compiler.compile();
+        fn(metaTransformer);
+      } finally {
+        Object.keys(env).forEach((key) => {
+          if (originals[key] === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = originals[key];
+          }
+        });
+      }
+    };
+
+    it('puts every part of a compound primary key ahead of the rest', async () => {
+      await withModel(compoundPkModel, { CUBEJS_AUTO_DRILL_MEMBERS: 'true' }, (metaTransformer) => {
+        expect(measure(metaTransformer, 'shipments', 'count').drillMembers).toEqual([
+          'shipments.order_id',
+          'shipments.line_no',
+          'shipments.carrier',
+        ]);
+      });
+    });
+
+    it('counts the compound key against the cap', async () => {
+      await withModel(
+        compoundPkModel,
+        { CUBEJS_AUTO_DRILL_MEMBERS: 'true', CUBEJS_AUTO_DRILL_MEMBERS_LIMIT: '2' },
+        (metaTransformer) => {
+          expect(measure(metaTransformer, 'shipments', 'count').drillMembers).toEqual([
+            'shipments.order_id',
+            'shipments.line_no',
+          ]);
+        }
+      );
+    });
+
+    it('falls back to the public dimensions when a cube has no primary key', async () => {
+      await withModel(compoundPkModel, { CUBEJS_AUTO_DRILL_MEMBERS: 'true' }, (metaTransformer) => {
+        expect(measure(metaTransformer, 'events', 'count').drillMembers).toEqual([
+          'events.name',
+          'events.happened_at',
+        ]);
+      });
+    });
   });
 
   describe('declared always wins', () => {
@@ -257,6 +376,16 @@ describe('Auto drill members', () => {
         expect(drillMembers).not.toContain('orders_view.created_at');
         expect(drillMembers).not.toContain('orders_view.secret');
         expect(drillMembers).not.toContain('orders_view.city');
+      });
+    });
+
+    it('excludes generated link dimensions reached through the view', async () => {
+      await withEnv({ CUBEJS_AUTO_DRILL_MEMBERS: 'true' }, (metaTransformer) => {
+        // A view's included members do carry `synthetic`, and the link helper
+        // for an included dimension is auto-included alongside it — so an
+        // unfiltered view set would pick URL helpers up here too.
+        const { drillMembers } = measure(metaTransformer, 'orders_view', 'count');
+        expect(drillMembers.filter((m: string) => m.includes('___link_'))).toEqual([]);
       });
     });
 
