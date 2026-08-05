@@ -317,6 +317,21 @@ test('an uninspectable extension is reported by package name', () => {
   assert.match(uninspectable[0], /cannot be inspected/);
 });
 
+test('ignores a --config variant jest would not load by default', () => {
+  // Reading `jest.config.unit.js` as *the* config would exempt this package on
+  // a config that is not in play — and with several variants, on whichever the
+  // directory happened to yield first.
+  const { offenders } = check({
+    variant: {
+      rawConfig: 'module.exports = { testMatch: ["<rootDir>/dist/test/**"] };',
+      configExt: 'unit.js',
+      scripts: { unit: 'jest --config jest.config.unit.js' },
+      sources: [TS_TEST],
+    },
+  });
+  assert.deepStrictEqual(offenders, ['variant']);
+});
+
 test('an unknown jest.config.* spelling is reported, not called a dist offender', () => {
   // Falling through to the package.json branch would find nothing and blame
   // the dist target — the wrong defect, with a fix that would not help.

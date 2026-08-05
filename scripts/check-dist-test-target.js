@@ -152,12 +152,17 @@ function typescriptTestSources(dir) {
  * Resolution follows jest's own `JEST_CONFIG_EXT_ORDER`, so a package carrying
  * two configs has the one inspected here that jest would actually load.
  *
- * Anything else named `jest.config.*` is picked up too, and reported as
- * uninspectable. Matching only a fixed list would let a spelling this check
- * does not know — `jest.config.mts`, or whatever a later jest adds — fall
- * through to the package.json branch, find nothing, and get reported as a
- * *dist-target offender*: the wrong defect, with a fix suggestion that would
+ * Any *other* single-extension `jest.config.<ext>` is picked up too, and
+ * reported as uninspectable. Matching only a fixed list would let a spelling
+ * this check does not know — `jest.config.mts`, or whatever a later jest adds
+ * — fall through to the package.json branch, find nothing, and get reported as
+ * a *dist-target offender*: the wrong defect, with a fix suggestion that would
  * not help. Naming a config we cannot read is the honest failure.
+ *
+ * Single-extension is the load-bearing part. `jest.config.unit.js` and friends
+ * are `--config` targets that jest does not load by default, so reading one as
+ * *the* config would exempt a package on a config that is not in play — and
+ * with several of them, on whichever the directory happened to yield first.
  */
 const CONFIG_EXTENSIONS = ['js', 'ts', 'mjs', 'cjs', 'json'];
 const LOADABLE_EXTENSIONS = ['.js', '.cjs', '.json'];
@@ -168,7 +173,7 @@ function resolveConfig(pkg) {
     .find(candidate => fs.existsSync(candidate));
 
   const configFile = known || fs.readdirSync(pkg)
-    .filter(entry => entry.startsWith('jest.config.'))
+    .filter(entry => /^jest\.config\.[^.]+$/.test(entry))
     .map(entry => path.join(pkg, entry))
     .find(candidate => fs.statSync(candidate).isFile());
 
