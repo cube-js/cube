@@ -268,9 +268,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Driver read-only flag.
-   */
-  /**
    * This driver applies `sql_preamble`.
    *
    * Applied once on the long-lived session.
@@ -279,6 +276,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return true;
   }
 
+  /**
+   * Driver read-only flag.
+   */
   public readOnly(): boolean {
     return !!this.config.readOnly;
   }

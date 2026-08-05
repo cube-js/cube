@@ -933,9 +933,10 @@ export class CubejsServerCore {
       return;
     }
 
-    // `supportsSqlPreamble` is optional on the interface, so an out-of-tree
-    // driver that predates it is not assumed unsupported — saying nothing beats
-    // telling someone their working config does nothing.
+    // Optional on `DriverInterface`, so a driver that does not extend
+    // `BaseDriver` — or was compiled against an older one — is not assumed
+    // unsupported. Saying nothing beats telling someone their working config
+    // does nothing.
     if (typeof driver.supportsSqlPreamble !== 'function' || driver.supportsSqlPreamble()) {
       return;
     }
