@@ -6,9 +6,6 @@
  * the untransformable sources alongside the compiled output and a bare `jest`
  * dies on `import` — leaving the path argument in the `unit` script as the only
  * thing keeping the suite runnable.
- *
- * Sixteen packages had drifted that way before anything checked. This is the
- * check.
  */
 
 const fs = require('fs');
@@ -81,8 +78,18 @@ function violations() {
     .map(entry => path.join(PACKAGES_DIR, entry.name))
     .filter(pkg => fs.existsSync(path.join(pkg, 'jest.config.js')))
     .flatMap(pkg => {
-      // eslint-disable-next-line import/no-dynamic-require, global-require
-      const config = require(path.join(pkg, 'jest.config.js'));
+      let config;
+      try {
+        // eslint-disable-next-line import/no-dynamic-require, global-require
+        config = require(path.join(pkg, 'jest.config.js'));
+      } catch (error) {
+        // A config that cannot even be loaded is a worse problem than the one
+        // this guard is for, and jest would fail on it too — so say which
+        // package it is rather than dying on a bare stack trace.
+        throw new Error(
+          `${path.relative(REPO_ROOT, pkg)}: jest.config.js could not be loaded — ${error.message}`
+        );
+      }
 
       // A package that brings its own transform (or a preset that implies one)
       // can execute its sources, so the dist-only convention does not apply.
@@ -118,9 +125,9 @@ function main() {
 
   if (offenders.length > 0) {
     console.error(
-      'These packages extend jest.base.config.js and compile TypeScript tests into dist/,\n' +
-      'but constrain collection to neither testMatch nor roots. A bare `jest` in them\n' +
-      'collects the untransformable sources and fails on `import`:\n'
+      'These packages have TypeScript tests and a jest config that cannot transform them,\n' +
+      'but do not confine collection to dist/. A bare `jest` in them collects the\n' +
+      'untransformable sources and fails on `import`:\n'
     );
     offenders.forEach(pkg => console.error(`  ${pkg}`));
     console.error(
@@ -134,4 +141,9 @@ function main() {
   console.log(`check-dist-test-target: ${packages} packages checked, no drift.`);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  console.error(`check-dist-test-target: ${error.message}`);
+  process.exit(1);
+}
