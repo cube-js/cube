@@ -45,6 +45,40 @@ any other value (including unset) is treated as on.
 | ---------------- | ----------------------- | ----------------------- |
 | `true`, `false`  | `true`                   | `true`                   |
 
+## `CUBEJS_AUTO_DRILL_MEMBERS`
+
+If `true`, measures that declare no [`drill_members`][ref-drill-members] get a
+default set computed when the data model is compiled: the cube's own dimensions,
+primary key first, capped by
+[`CUBEJS_AUTO_DRILL_MEMBERS_LIMIT`](#cubejs_auto_drill_members_limit). Without
+this, a measure with no `drill_members` offers no [drill down][ref-drilldowns]
+at all.
+
+A measure that declares `drill_members` is never touched — including
+`drill_members: []`, which is how you suppress the default for one measure.
+Non-public dimensions are excluded, except the primary key; sub-query dimensions
+are excluded too, since each one costs a join per drill.
+
+For a view, the default names the view's own members, so a drill from a view
+measure resolves rather than dead-ending. A view has no primary key of its own,
+so there the set is simply the dimensions the view includes, in the order it
+includes them.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+## `CUBEJS_AUTO_DRILL_MEMBERS_LIMIT`
+
+The most drill members
+[`CUBEJS_AUTO_DRILL_MEMBERS`](#cubejs_auto_drill_members) will add to a measure.
+Has no effect unless that variable is enabled. `0` disables the default set
+entirely.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A number        | `10`                   | `10`                  |
+
 ## `CUBEJS_AWS_KEY`
 
 The AWS Access Key ID to use for database connections.
@@ -2229,6 +2263,8 @@ The port for a Cube deployment to listen to API connections on.
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage-calculations]: /docs/data-modeling/measures#multi-stage-measures
 [ref-folders]: /reference/data-modeling/view#folders
+[ref-drill-members]: /reference/data-modeling/measures#drill_members
+[ref-drilldowns]: /recipes/core-data-api/drilldowns
 [ref-dataviz-tools]: /admin/connect-to-data/visualization-tools
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
 [ref-environments]: /admin/deployment/environments

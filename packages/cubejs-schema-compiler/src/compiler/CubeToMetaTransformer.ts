@@ -61,6 +61,7 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
     params?: Array<{ key: string; value: (...args: any[]) => string }>;
   }>;
   synthetic?: boolean;
+  subQuery?: boolean;
 }
 
 interface ExtendedCubeDefinition extends CubeDefinitionExtended {
@@ -236,6 +237,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
     const flatFolderSeparator = getEnv('nestedFoldersDelimiter');
     const flatFolders: FlatFolder[] = [];
 
+    const autoDrillMembers = this.defaultDrillMembers(cubeName, extendedCube);
+
     const processFolder = (folder: Folder, path: string[] = [], mergedMembers: string[] = []): NestedFolder => {
       const flatMembers: string[] = [];
       // After evaluation in CubeEvaluator, folder.includes contains resolved FolderMember items
@@ -290,7 +293,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
           const metricDef = nameToMetric[1] as ExtendedCubeSymbolDefinition;
           const measureVisibility = isCubeVisible ? this.isVisible(metricDef, true) : false;
           return {
-            ...this.measureConfig(cubeName, cubeTitle, nameToMetric),
+            ...this.measureConfig(cubeName, cubeTitle, nameToMetric, autoDrillMembers),
             isVisible: measureVisibility,
             public: measureVisibility,
           };
@@ -419,7 +422,78 @@ export class CubeToMetaTransformer implements CompilerInterface {
     return dimensionType === 'switch' ? 'string' : dimensionType;
   }
 
-  private measureConfig(cubeName: string, cubeTitle: string, nameToMetric: [string, any]): Omit<MeasureConfig, 'isVisible' | 'public'> {
+  /**
+   * A view's included members don't carry `subQuery`, so a dimension reached
+   * through a view is resolved back to its source definition to classify it.
+   */
+  private isSubQuery(extendedDimDef: ExtendedCubeSymbolDefinition): boolean {
+    if (extendedDimDef.subQuery) {
+      return true;
+    }
+
+    if (!extendedDimDef.aliasMember) {
+      return false;
+    }
+
+    try {
+      return !!this.cubeEvaluator.dimensionByPath(extendedDimDef.aliasMember)?.subQuery;
+    } catch (e) {
+      // An alias that no longer resolves is not this method's problem to report.
+      return false;
+    }
+  }
+
+  /**
+   * Drill members for measures that declare none: the cube's own dimensions,
+   * primary key first, capped.
+   *
+   * The primary key is included whatever its visibility — it is hidden by
+   * default, yet it is the member that identifies a row, and hand-written
+   * `drillMembers` name it routinely. Visibility governs the member picker,
+   * not what a drill query may reference. Everything else must be public.
+   *
+   * Views have no primary key (it is not propagated onto included members) and
+   * their dimensions span every source cube, so there the set is simply the
+   * view's own dimensions in include order.
+   */
+  private defaultDrillMembers(cubeName: string, extendedCube: ExtendedCubeDefinition): string[] {
+    // The flag is checked before the limit is parsed: a malformed limit must not
+    // fail compilation for deployments that never enabled the feature.
+    if (!getEnv('autoDrillMembers')) {
+      return [];
+    }
+
+    const limit = getEnv('autoDrillMembersLimit');
+    if (limit <= 0) {
+      return [];
+    }
+
+    const primaryKeys: string[] = [];
+    const rest: string[] = [];
+
+    for (const [dimensionName, dimDef] of Object.entries(extendedCube.dimensions || {})) {
+      const extendedDimDef = dimDef as ExtendedCubeSymbolDefinition;
+
+      // Link helpers are generated, not authored — they would crowd out real
+      // attributes under the cap. Sub-query dimensions cost a join per drill.
+      const eligible = !extendedDimDef.synthetic && !this.isSubQuery(extendedDimDef);
+
+      if (eligible && extendedDimDef.primaryKey) {
+        primaryKeys.push(`${cubeName}.${dimensionName}`);
+      } else if (eligible && this.isVisible(extendedDimDef, true)) {
+        rest.push(`${cubeName}.${dimensionName}`);
+      }
+    }
+
+    return primaryKeys.concat(rest).slice(0, limit);
+  }
+
+  private measureConfig(
+    cubeName: string,
+    cubeTitle: string,
+    nameToMetric: [string, any],
+    autoDrillMembers: string[]
+  ): Omit<MeasureConfig, 'isVisible' | 'public'> {
     const [metricName, metricDef] = nameToMetric;
     const extendedMetricDef = metricDef as ExtendedCubeSymbolDefinition;
     const name = `${cubeName}.${metricName}`;
@@ -427,9 +501,19 @@ export class CubeToMetaTransformer implements CompilerInterface {
     // Support both old 'drillMemberReferences' and new 'drillMembers' keys
     const drillMembers = extendedMetricDef.drillMembers || extendedMetricDef.drillMemberReferences;
 
-    const drillMembersArray: string[] = (drillMembers && this.cubeEvaluator.evaluateReferences(
-      cubeName, drillMembers, { originalSorting: true }
-    )) || [];
+    // Keyed on whether drill members were declared at all, never on how many
+    // survive evaluation: `drill_members: []` is a deliberate opt-out, and a
+    // view including none of a declared set still evaluates to empty.
+    //
+    // The declared branch keeps its established shape verbatim, quirks included
+    // (a reference without an array literal evaluates to a bare string, which
+    // this field has always passed through). Normalizing it here would change
+    // emitted meta for models that never enabled the automatic set.
+    const drillMembersArray: string[] = drillMembers
+      ? ((this.cubeEvaluator.evaluateReferences(
+        cubeName, drillMembers, { originalSorting: true }
+      ) as string[]) || [])
+      : autoDrillMembers;
 
     const type = CubeSymbols.toMemberDataType(extendedMetricDef.type || 'number');
     const isCumulative = extendedMetricDef.cumulative || BaseMeasure.isCumulative(extendedMetricDef);

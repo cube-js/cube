@@ -79,6 +79,7 @@ export type DimensionDefinition = {
   type: string;
   sql(): string;
   primaryKey?: true;
+  subQuery?: boolean;
   ownedByCube: boolean;
   fieldType?: string;
   multiStage?: boolean;
