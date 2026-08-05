@@ -218,8 +218,22 @@ impl WrapperRules {
                 };
                 sql_generator
             }
-            // TODO is it correct?
-            DataSource::Unrestricted => return true,
+            // Data source is not pinned down at rewrite time, but SQL generation will
+            // resolve a specific one. Admit the template only when every registered
+            // generator supports it, so the rewrite can't commit to a shape the
+            // resolved generator is unable to render.
+            DataSource::Unrestricted => {
+                return !meta.data_source_to_sql_generator.is_empty()
+                    && meta
+                        .data_source_to_sql_generator
+                        .values()
+                        .all(|sql_generator| {
+                            sql_generator
+                                .get_sql_templates()
+                                .templates
+                                .contains_key(template)
+                        });
+            }
         };
 
         sql_generator
