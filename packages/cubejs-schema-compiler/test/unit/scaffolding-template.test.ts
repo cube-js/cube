@@ -507,6 +507,30 @@ describe('ScaffoldingTemplate', () => {
       expect(content).toMatch(/\n\s+joins: \[\]\n\n\s+dimensions:/);
     });
 
+    it('renders an array-valued context prop without padding its elements', () => {
+      // `SchemaContext` only declares `dataSource`, so this shape can't arrive
+      // through the typed API today — the cast is the point. Drill members are all
+      // MemberReferences and return early; a plain scalar reaches the value branch,
+      // where a missing parent reads as "value after a key" and earns a leading
+      // space: `[ alpha,  beta]`. Pinned so widening the type can't reintroduce it.
+      const { content } = new ScaffoldingTemplate(
+        {
+          public: {
+            orders: [
+              { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              { name: 'amount', type: 'integer', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByTableNames(['public.orders'], {
+        tags: ['alpha', 'beta'],
+      } as any)[0];
+
+      expect(content).toContain('tags: [alpha, beta]');
+    });
+
     it('uses the camelCase key and member names when snakeCase is off', () => {
       const { content } = new ScaffoldingTemplate(
         {

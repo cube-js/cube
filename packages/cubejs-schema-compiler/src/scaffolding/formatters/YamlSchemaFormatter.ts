@@ -57,7 +57,11 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
         )
       ) {
         // The caller separates keys itself — a newline here doubles the blank line.
-        return ` [${value.map((v) => this.render(v)).join(', ')}]`;
+        // Pass the array as parent so scalar elements skip the leading-space branch
+        // that indents a value after its key.
+        return ` [${value
+          .map((v) => this.render(v, level + 1, value))
+          .join(', ')}]`;
       }
 
       return `\n${value
