@@ -86,18 +86,24 @@ describe('JDBC connection queries', () => {
   // `stream()` acquires its own connection, so the replay the query path does
   // buys it nothing — it has to run them itself.
   describe('stream()', () => {
+    // The primary query runs through createStatement -> statement.execute, not
+    // executeStatement, so it has to land in the same array — otherwise the
+    // ordering assertions below would hold with the replay moved after it.
     const streamDriverFor = (config: Record<string, any>) => {
       const built = driverFor(config);
       const statement = {
         cancel: (cb: Function) => cb(null),
-        execute: (_sql: string, cb: Function) => cb(null, {
-          _types: { 12: 'string' },
-          toObjectIter: (cb2: Function) => cb2(null, {
-            labels: ['a'],
-            types: [12],
-            rows: { next: () => { /* no rows */ } },
-          }),
-        }),
+        execute: (sql: string, cb: Function) => {
+          built.executed.push(sql);
+          cb(null, {
+            _types: { 12: 'string' },
+            toObjectIter: (cb2: Function) => cb2(null, {
+              labels: ['a'],
+              types: [12],
+              rows: { next: () => { /* no rows */ } },
+            }),
+          });
+        },
       };
       built.conn.createStatement = (cb: Function) => cb(null, statement);
       return built;
@@ -108,7 +114,7 @@ describe('JDBC connection queries', () => {
 
       await driver.stream('SELECT 1', [], { highWaterMark: 1 });
 
-      expect(executed).toEqual([MYSQL_TIME_ZONE]);
+      expect(executed).toEqual([MYSQL_TIME_ZONE, 'SELECT 1']);
     });
 
     it('replays connection queries passed explicitly in the driver config', async () => {
@@ -119,7 +125,7 @@ describe('JDBC connection queries', () => {
 
       await driver.stream('SELECT 1', [], { highWaterMark: 1 });
 
-      expect(executed).toEqual(['SET a = 1', 'SET b = 2']);
+      expect(executed).toEqual(['SET a = 1', 'SET b = 2', 'SELECT 1']);
     });
 
     it('runs no connection queries for a dbType that declares none', async () => {
@@ -127,7 +133,7 @@ describe('JDBC connection queries', () => {
 
       await driver.stream('SELECT 1', [], { highWaterMark: 1 });
 
-      expect(executed).toEqual([]);
+      expect(executed).toEqual(['SELECT 1']);
     });
 
     it('releases the connection when a connection query fails', async () => {
