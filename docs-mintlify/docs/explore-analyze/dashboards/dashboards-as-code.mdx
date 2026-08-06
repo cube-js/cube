@@ -1,0 +1,359 @@
+---
+title: Dashboards as code
+description: Define dashboards and charts as versioned YAML in your Cube project — deployed with your data model, reviewed in Git, and rendered read-only in the workspace.
+---
+
+<Note>
+
+Dashboards as code is in **preview**. Contact your Cube representative to enable
+it for a deployment.
+
+</Note>
+
+**Dashboards as code** lets you define dashboards and their charts as YAML files
+that live in your Cube project's source tree, right next to your data model.
+They are versioned in Git, reviewed through pull requests, and deployed with the
+rest of your project — so the same dashboard definition can be promoted across
+environments (staging → production) or reused across deployments the same way
+your data model is.
+
+This is the source-owned counterpart to building dashboards interactively in the
+[dashboard builder][ref-dashboards]. A deployment with dashboards as code enabled
+reads its dashboards from the source tree and renders them **read-only** in the
+[workspace][ref-workbooks]: the repository is the owner, so there are no
+create, move, or edit affordances in the UI — you change a dashboard by editing
+its file and deploying.
+
+## When to use it
+
+Reach for dashboards as code when you want to:
+
+- **Review dashboard changes in Git** — treat a dashboard edit like any other
+  code change, with diffs, pull requests, and approvals.
+- **Promote across environments** — apply the same definitions to staging and
+  production, or to many deployments, from one CI/CD pipeline.
+- **Keep dashboards reproducible** — the definition is the source of truth, not
+  a database row, so a deployment rebuilt from the repository has the same
+  dashboards.
+
+If you instead want business users to create and edit dashboards interactively,
+use the [dashboard builder][ref-dashboards] — the two models are independent.
+
+## How it works
+
+Dashboards as code builds on [Git-based continuous
+deployment][ref-continuous-deployment]. You add a `dashboards/` directory to your
+project (alongside `model/`), commit dashboard and chart YAML files to it, and
+deploy your project as usual. Cube Cloud reads that directory at build time and
+serves the dashboards to the workspace.
+
+- **Folders come from the directory structure.** A file at
+  `dashboards/finance/emea/revenue.yaml` places its dashboard in the
+  `finance → emea` folder of the workspace. You organize dashboards by moving
+  files between directories.
+- **Nothing is persisted separately.** The definitions are read live from the
+  deployed source and are versioned and redeployed with your model — there is no
+  separate database copy to keep in sync.
+- **Everything is read-only in the UI.** Source-owned dashboards render through
+  the same viewer as published dashboards, but the workspace exposes no editing
+  for them. Charts still run their queries live, so the data is current.
+
+The directory Cube reads defaults to `dashboards/` at the project root. To use a
+different location, set the `CUBE_CLOUD_DASHBOARDS_CONFIG_PATH` environment
+variable to the path you want.
+
+## Project layout
+
+```
+my-cube-project/
+├── model/
+│   └── ...                          # your data model
+└── dashboards/
+    ├── revenue-overview.yaml        # a dashboard (root folder)
+    ├── charts/
+    │   ├── revenue_by_month.yaml    # a chart referenced by a dashboard widget
+    │   └── revenue_by_status.yaml
+    └── finance/
+        └── emea/
+            └── emea-revenue.yaml     # a dashboard in the finance → emea folder
+```
+
+There are two kinds of file, distinguished by their `apiVersion`:
+
+| File | `apiVersion` | Purpose |
+| --- | --- | --- |
+| **Dashboard** | `cube.dev/dashboard/v1` | Layout: which widgets appear, where, and which chart each one shows |
+| **Chart** | `cube.dev/chart/v1` | A chart's query and visualization spec, referenced by dashboards via its `publicId` |
+
+Both kinds can live anywhere under `dashboards/`; Cube routes each file by its
+`apiVersion`. Only a dashboard file's directory affects the folder tree — chart
+files are referenced by id, so their location is up to you (grouping them under
+`charts/` is a convention, not a requirement).
+
+## Dashboard files
+
+A dashboard file describes the layout and the widgets on the canvas.
+
+```yaml title="dashboards/revenue-overview.yaml"
+apiVersion: cube.dev/dashboard/v1
+slug: revenue-overview
+name: Revenue Overview
+widgets:
+  - id: w1
+    type: CHART
+    position: { x: 0, y: 0, w: 6, h: 8 }
+    chart: revqZ1x8Kp0a          # references a chart file by its publicId
+  - id: w2
+    type: CHART
+    position: { x: 6, y: 0, w: 6, h: 8 }
+    chart: statP4hQ2mN7
+  - id: w3
+    type: TEXT
+    position: { x: 0, y: 8, w: 12, h: 2 }
+    config:
+      content: "## Notes\nRevenue excludes refunds."
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `apiVersion` | yes | Must be `cube.dev/dashboard/v1`. |
+| `slug` | yes | Stable, human-readable identifier, unique across the deployment. Used to address the dashboard and as the target of [drill-in links][ref-dashboard-slug]. |
+| `name` | no | Display name shown in the workspace. Defaults to the slug. |
+| `widgets` | no | The widgets on the canvas (see below). |
+
+### Widgets
+
+Each widget is an object with an `id`, a `type`, and a `position`:
+
+| Field | Description |
+| --- | --- |
+| `id` | Stable identifier for the widget, unique within the dashboard. |
+| `type` | One of `CHART`, `TEXT`, `FILTER`, `TIME_GRAIN`, `AI_SUMMARY`, `TABS_CONTAINER`. |
+| `position` | Grid placement: `{ x, y, w, h }` in grid units (columns run 0–11). |
+| `chart` | For `CHART` widgets: the `publicId` of the chart file this widget renders. |
+| `config` | Type-specific configuration (for example, `content` holds the Markdown of a `TEXT` widget). Carried through as authored. |
+| `tabs` | For `TABS_CONTAINER` widgets: nested tabs, each with its own child widgets (see below). |
+
+The widget types mirror the ones in the [dashboard builder][ref-widgets]: charts
+visualize a report, text adds Markdown, controls (`FILTER` / `TIME_GRAIN`) let
+viewers filter or change the time granularity, and AI summaries generate
+narrative text.
+
+#### Tabbed widgets
+
+A `TABS_CONTAINER` groups widgets into tabs. Each tab has an `id`, a `title`, and
+its own `children` — which are ordinary widgets, including nested charts:
+
+```yaml
+- id: w4
+  type: TABS_CONTAINER
+  position: { x: 0, y: 10, w: 12, h: 10 }
+  tabs:
+    - id: t1
+      title: By month
+      children:
+        - id: w4a
+          type: CHART
+          position: { x: 0, y: 0, w: 12, h: 8 }
+          chart: revqZ1x8Kp0a
+    - id: t2
+      title: By status
+      children:
+        - id: w4b
+          type: CHART
+          position: { x: 0, y: 0, w: 12, h: 8 }
+          chart: statP4hQ2mN7
+```
+
+## Chart files
+
+A chart file holds a chart's query and its visualization spec. It is referenced
+by dashboard widgets through its `publicId`, so the same chart can appear on more
+than one dashboard.
+
+```yaml title="dashboards/charts/revenue_by_month.yaml"
+apiVersion: cube.dev/chart/v1
+publicId: revqZ1x8Kp0a
+name: Revenue by month
+query:
+  sql: >
+    SELECT MEASURE(orders.revenue), orders.created_at
+    FROM orders
+    GROUP BY 2
+chart:
+  chartCategory: table
+  tableChartSpec:
+    columns:
+      - orders.created_at
+      - orders.revenue
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `apiVersion` | yes | Must be `cube.dev/chart/v1`. |
+| `publicId` | yes | Stable identifier, unique across the deployment. Widgets reference the chart by this value. |
+| `name` | no | Display name for the chart. |
+| `query.sql` | no | The chart's query, written against the [Cube SQL API][ref-sql-api]. Datasets are referenced by cube or view name in the `FROM` clause, so a query is portable across deployments that share the same data model. |
+| `pivot` | no | Pivot configuration (`rows`, `columns`, `measures`, `filters`). |
+| `chart` | no | The visualization spec (see below). |
+
+### Chart `publicId`
+
+The `publicId` is the chart's portable identity: dashboards reference it, and it
+is what keeps a reference stable across deployments and edits. Choose a
+12-character alphanumeric id (`[0-9A-Za-z]`) and keep it fixed for the life of the
+chart. It must be unique within the deployment — two chart files with the same
+`publicId` fail the build.
+
+### Visualization spec
+
+The `chart` block holds the visualization spec. Its shape mirrors what the
+[dashboard builder][ref-charts] produces:
+
+- `chartCategory` names the chart type.
+- The spec itself lives in a matching field: `tableChartSpec`, `vegaSpec`,
+  `kpiChartSpec`, `htmlChartSpec`, or `mapChartSpec`. The render type is one of
+  `table`, `vega`, `kpi`, `html`, or `map`.
+
+A table chart (above) is the simplest to author by hand — it just lists the
+columns to show. Richer visualizations (Vega-Lite charts, KPIs, maps) carry a
+correspondingly richer spec; the easiest way to get one right is to model it on a
+chart built in the UI. Any additional fields you include are preserved, so a
+chart definition is not silently truncated.
+
+<Note>
+
+`query.sql` is the source of truth for a chart's query. The chart is rendered by
+running that SQL live in the browser, so the data is always current — the file
+stores the definition, never a cached result.
+
+</Note>
+
+## Referencing charts from widgets
+
+A `CHART` widget names the chart it renders with `chart: <publicId>`:
+
+```yaml
+- id: w1
+  type: CHART
+  position: { x: 0, y: 0, w: 6, h: 8 }
+  chart: revqZ1x8Kp0a       # must match a chart file's publicId
+```
+
+Because widgets reference charts by `publicId` (not by a per-deployment numeric
+id), a dashboard and its charts move together across environments unchanged. A
+widget whose `chart` id has no matching chart file simply renders nothing.
+
+## Folders
+
+The directory a dashboard file lives in becomes its folder in the workspace, and
+the directory tree becomes the folder tree. A dashboard at the root of
+`dashboards/` appears at the top level; one at `dashboards/finance/emea/` appears
+under `finance → emea`. Ancestor folders (`finance`) are created automatically
+even if they contain no dashboard file of their own.
+
+## A complete example
+
+```
+dashboards/
+├── revenue-overview.yaml
+└── charts/
+    ├── revenue_by_month.yaml
+    └── revenue_by_status.yaml
+```
+
+```yaml title="dashboards/revenue-overview.yaml"
+apiVersion: cube.dev/dashboard/v1
+slug: revenue-overview
+name: Revenue Overview
+widgets:
+  - id: w1
+    type: CHART
+    position: { x: 0, y: 0, w: 6, h: 8 }
+    chart: revqZ1x8Kp0a
+  - id: w2
+    type: CHART
+    position: { x: 6, y: 0, w: 6, h: 8 }
+    chart: statP4hQ2mN7
+```
+
+```yaml title="dashboards/charts/revenue_by_month.yaml"
+apiVersion: cube.dev/chart/v1
+publicId: revqZ1x8Kp0a
+name: Revenue by month
+query:
+  sql: >
+    SELECT MEASURE(orders.revenue), orders.created_at
+    FROM orders
+    GROUP BY 2
+chart:
+  chartCategory: table
+  tableChartSpec:
+    columns:
+      - orders.created_at
+      - orders.revenue
+```
+
+```yaml title="dashboards/charts/revenue_by_status.yaml"
+apiVersion: cube.dev/chart/v1
+publicId: statP4hQ2mN7
+name: Revenue by status
+query:
+  sql: >
+    SELECT MEASURE(orders.revenue), orders.status
+    FROM orders
+    GROUP BY 2
+chart:
+  chartCategory: table
+  tableChartSpec:
+    columns:
+      - orders.status
+      - orders.revenue
+```
+
+Committing these files and deploying makes a **Revenue Overview** dashboard
+appear at the top level of the workspace, with two table charts side by side.
+
+## Deploying
+
+Dashboards as code is deployed like the rest of your project:
+
+1. Add the dashboard and chart files under `dashboards/` in your repository.
+2. Open a pull request and review the change like any other code change.
+3. Merge and deploy — with [Git-based deployment][ref-continuous-deployment], the
+   production branch builds automatically; with CLI deployment, run your usual
+   deploy command.
+
+After the build, the dashboards appear in the workspace, read-only. To change a
+dashboard, edit its file and deploy again.
+
+## Validation and rules
+
+Cube validates the source tree at build time. A problem fails the load with a
+message naming the file, so you catch it in your build rather than at runtime:
+
+- **`apiVersion` is required and must match.** Files without a recognized
+  `apiVersion` are ignored; a recognized one with an invalid body fails
+  validation.
+- **Slugs are unique.** Two dashboards with the same `slug` are rejected.
+- **Chart `publicId`s are unique.** Two chart files with the same `publicId` are
+  rejected.
+- **YAML must parse.** A malformed file fails with a parse error naming the file.
+- **Unknown fields are preserved.** Fields beyond the documented ones round-trip
+  untouched, so a newer authoring field is never dropped by the runtime.
+
+## Relationship to builder-authored dashboards
+
+Source-owned dashboards and dashboards created in the [builder][ref-dashboards]
+are independent. When dashboards as code is enabled, the workspace shows the
+source-owned dashboards and treats them as read-only — the repository owns them.
+Manage those dashboards through your Git workflow; use the builder for
+dashboards you want business users to create and edit interactively.
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-widgets]: /docs/explore-analyze/dashboards/widgets
+[ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
+[ref-dashboard-slug]: /docs/explore-analyze/dashboards#dashboard-slug
+[ref-continuous-deployment]: /admin/deployment/continuous-deployment
+[ref-sql-api]: /reference/core-data-apis/sql-api
