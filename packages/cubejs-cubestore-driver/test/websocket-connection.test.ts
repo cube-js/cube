@@ -3,7 +3,16 @@ import { Socket } from 'net';
 import { WebSocketConnection } from '../src/WebSocketConnection';
 import { MessageTooLargeError, QueryError } from '../src/errors';
 import { QueryResultFormat } from '../codegen';
-import { answeredBy, buildErrorMessage, MockCubeStoreServer } from './mock-cubestore-server';
+import { answeredBy, buildErrorMessage, buildResultMessage, MockCubeStoreServer } from './mock-cubestore-server';
+
+const QUERY_RESULT = [{ answer: 42 }];
+
+// Decoding a result set is a native addon and is orthogonal to the transport
+// under test, so only that step is stubbed: the socket, the WebSocket framing
+// and the flatbuffers protocol stay real.
+jest.mock('@cubejs-backend/native', () => ({
+  parseCubestoreResultMessage: jest.fn(async () => [{ answer: 42 }]),
+}));
 
 const JEST_TIMEOUT = 60 * 1000;
 
@@ -17,7 +26,21 @@ const epipe = () => Object.assign(new Error('write EPIPE'), {
   syscall: 'write',
 });
 
-const nextTurn = () => new Promise((resolve) => { setImmediate(resolve); });
+/**
+ * Waits until the frame the driver just handed to `ws` has reached the socket
+ * write buffer, where a corked socket holds it.
+ */
+const waitForBufferedWrite = async (socket: Socket) => {
+  const deadline = Date.now() + 5000;
+
+  while (!socket.writableLength) {
+    if (Date.now() > deadline) {
+      throw new Error('Timed out waiting for a buffered write');
+    }
+
+    await new Promise((resolve) => { setImmediate(resolve); });
+  }
+};
 
 describe('WebSocketConnection', () => {
   let server: MockCubeStoreServer;
@@ -49,6 +72,26 @@ describe('WebSocketConnection', () => {
   // The socket the driver is writing to right now.
   const clientSocket = (): Socket => (connection as any).webSocket._socket;
 
+  it('resolves a query with the result Cube Store sent', async () => {
+    connection = new WebSocketConnection(server.url);
+
+    server.handler = (message, mockConnection) => {
+      mockConnection.ws.send(buildResultMessage(message.messageId));
+    };
+
+    await expect(query('SELECT 1')).resolves.toEqual(QUERY_RESULT);
+
+    // And the same after the connection had to be re-established mid-query.
+    const socket = clientSocket();
+    socket.cork();
+    const promise = query('SELECT 2');
+    await waitForBufferedWrite(socket);
+    socket.destroy(epipe());
+
+    await expect(promise).resolves.toEqual(QUERY_RESULT);
+    expect(server.received.map((message) => message.query)).toEqual(['SELECT 1', 'SELECT 2']);
+  }, JEST_TIMEOUT);
+
   it('resends a query when the write fails with EPIPE', async () => {
     connection = new WebSocketConnection(server.url);
 
@@ -61,7 +104,7 @@ describe('WebSocketConnection', () => {
     const socket = clientSocket();
     socket.cork();
     const promise = query('SELECT 2');
-    await nextTurn();
+    await waitForBufferedWrite(socket);
     socket.destroy(epipe());
 
     // The query never reached Cube Store, so it has to be resent over a new
@@ -82,7 +125,7 @@ describe('WebSocketConnection', () => {
     const socket = clientSocket();
     socket.cork();
     const promises = [query('SELECT 2'), query('SELECT 3'), query('SELECT 4')];
-    await nextTurn();
+    await waitForBufferedWrite(socket);
     socket.destroy(epipe());
 
     await Promise.all(promises.map((promise) => expectAnsweredBy(promise, 1)));
@@ -148,6 +191,42 @@ describe('WebSocketConnection', () => {
 
       // Re-running the query would only produce the same oversized response.
       expect(server.received).toHaveLength(1);
+    }, JEST_TIMEOUT);
+
+    it('resends the other queries in flight and attributes the limit to the offender', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        if (message.query === 'SELECT big') {
+          // A big result takes longer to produce than a small one.
+          setTimeout(() => mockConnection.ws.send(Buffer.alloc(MAX_MESSAGE_SIZE * 2)), 50);
+          return;
+        }
+
+        if (mockConnection.index > 0) {
+          mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+        }
+        // On the first connection the small query is left in flight, so that
+        // the oversized response kills it along with the query it belongs to.
+      };
+
+      const big = query('SELECT big');
+      // Asserted below, handled here so that a rejection arriving earlier than
+      // expected is reported as a failed assertion and not as an unhandled one.
+      big.catch(() => {
+        // noop
+      });
+      const small = query('SELECT small');
+
+      // The small query is unrelated to the size limit: it gets resent and
+      // answered rather than failing with an error about a limit it never
+      // approached.
+      await expectAnsweredBy(small, 1);
+
+      // Which leaves the offending query alone on the connection, where the
+      // oversized response can be attributed to it.
+      await expect(big).rejects.toThrow(MessageTooLargeError);
+      await expect(big).rejects.toThrow('Cube Store response size exceeds the maximum message size of 1 MB');
     }, JEST_TIMEOUT);
 
     it('reports a request that is over the limit without sending it', async () => {
