@@ -685,6 +685,8 @@ describe('ScaffoldingTemplate', () => {
         ['\x9f'],
         ['\ud800'],
         ['\udc00'],
+        ['\ufffe'],
+        ['\uffff'],
       ])('emits a file that parses around the non-printable %j', (char) => {
         expect(() => YAML.load(renderColumn(`pri${char}ce`))).not.toThrow();
       });
