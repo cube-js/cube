@@ -5,6 +5,29 @@ import {
 } from '../ScaffoldingTemplate';
 import { BaseSchemaFormatter } from './BaseSchemaFormatter';
 
+/**
+ * Plain scalars that a YAML loader resolves to something other than a string — null, a
+ * boolean, a number or a timestamp — so a title or member name of this shape has to be
+ * quoted to stay a string. Includes the YAML 1.1 integer forms loaders still accept
+ * (binary, octal), since resolution is what matters here, not which spec version
+ * nominally applies. `yes`/`on`/`off` are strings and stay unquoted.
+ */
+const YAML_TYPE_SHAPED = new RegExp(
+  [
+    '^(?:',
+    '|~|null|Null|NULL|true|True|TRUE|false|False|FALSE',
+    // Decimal, with an optional fraction and exponent.
+    '|[-+]?(?:\\d[\\d_]*(?:\\.[\\d_]*)?|\\.[\\d_]+)(?:[eE][-+]?\\d+)?',
+    // Hex, octal (both spellings) and binary.
+    '|[-+]?0[xX][0-9a-fA-F_]+|[-+]?0o?[0-7_]+|[-+]?0[bB][01_]+',
+    // Infinity and not-a-number.
+    '|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN)',
+    // A date or date-time resolves to a Date, not to a string.
+    '|\\d{4}-\\d{1,2}-\\d{1,2}(?:[Tt\\s].*)?',
+    ')$',
+  ].join('')
+);
+
 function isPlainObject(value) {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -128,10 +151,41 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       return value;
     }
 
-    // `,` and `]` end an item inside a flow sequence, so a value carrying either
-    // has to be quoted there even though it is harmless in a block scalar.
-    const needsQuotes = flow ? /[{}",[\]]/ : /[{}"]/;
+    return this.needsQuotes(value, flow)
+      ? `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+      : value;
+  }
 
-    return value.match(needsQuotes) ? `"${value.replace(/"/g, '\\"')}"` : value;
+  /**
+   * Whether a plain scalar has to be quoted to survive a YAML round-trip.
+   *
+   * Values reach here from the warehouse — `title` is the titleized column name — so
+   * a column named `revenue: usd` must not be allowed to turn the generated file into
+   * something YAML parses differently, or fails to parse at all.
+   *
+   * Each test below is a case that demonstrably does not round-trip; anything else stays
+   * unquoted, so ordinary member names and SQL expressions are unaffected.
+   */
+  private needsQuotes(value: string, flow: boolean): boolean {
+    return (
+      // An indicator character only has meaning in the first position: it would start a
+      // sequence entry, an alias, a tag, a block scalar, a quoted string or a comment.
+      // `-` also covers the bare `-`, which is an empty sequence entry.
+      /^[-?:,[\]{}#&*!|>'"%@`]/.test(value) ||
+      // `key: value` inside a scalar makes it a mapping; a trailing colon does the same.
+      /:(?:\s|$)/.test(value) ||
+      // A `#` after whitespace starts a comment and truncates the rest of the line.
+      // A bare `a#b` is a legal plain scalar, so it stays unquoted.
+      /\s#/.test(value) ||
+      // Surrounding whitespace is stripped from a plain scalar, and a tab or newline
+      // cannot appear in one at all.
+      /^\s|\s$|[\n\t]/.test(value) ||
+      // A plain scalar matching a YAML type resolves to that type, not to a string.
+      YAML_TYPE_SHAPED.test(value) ||
+      // `{` opens a flow mapping, and a `"` would be read as a quoted scalar.
+      /[{}"]/.test(value) ||
+      // Inside a flow sequence these end the item; in a block scalar they are literal.
+      (flow && /[,[\]]/.test(value))
+    );
   }
 }
