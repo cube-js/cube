@@ -8,13 +8,15 @@ import { BaseSchemaFormatter } from './BaseSchemaFormatter';
 /**
  * Plain scalars that a YAML loader resolves to something other than a string — null, a
  * boolean, a number or a timestamp — so a title or member name of this shape has to be
- * quoted to stay a string. Includes the YAML 1.1 integer forms loaders still accept
- * (binary, octal), since resolution is what matters here, not which spec version
- * nominally applies. `yes`/`on`/`off` are strings and stay unquoted.
+ * quoted to stay a string. Covers the YAML 1.1 binary and octal integers loaders still
+ * accept, since resolution is what matters here, not which spec version nominally
+ * applies; sexagesimal (`1:30`) is left out because js-yaml 4 — the loader
+ * `YamlCompiler` uses — dropped it. `yes`/`on`/`off` are strings and stay unquoted.
  */
 const YAML_TYPE_SHAPED = new RegExp(
   [
     '^(?:',
+    // The empty alternative is deliberate: a bare empty scalar loads as null.
     '|~|null|Null|NULL|true|True|TRUE|false|False|FALSE',
     // Decimal, with an optional fraction and exponent.
     '|[-+]?(?:\\d[\\d_]*(?:\\.[\\d_]*)?|\\.[\\d_]+)(?:[eE][-+]?\\d+)?',
@@ -47,7 +49,13 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
   protected renderFile(fileDescriptor: Record<string, unknown>): string {
     const { cube, sql, preAggregations: _, ...descriptor } = fileDescriptor;
 
-    return `cubes:\n  - name: ${cube}${this.render(
+    // The cube name is interpolated rather than rendered, so it needs the predicate
+    // applied by hand — it comes from the table name the same way a member name comes
+    // from a column, and a cube that names itself `2024` (a number) is not the cube
+    // another file's join refers to as `"2024"` (a string).
+    return `cubes:\n  - name: ${this.escapedValue(
+      cube as string
+    )}${this.render(
       {
         ...(sql ? { sql } : null),
         ...descriptor,
@@ -67,7 +75,10 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       .reduce((memo) => `${memo} `, '');
 
     if (value instanceof MemberReference) {
-      return value.member;
+      // Quote on the same rule as the member name this points at, or the two stop
+      // denoting the same member — see the drill-member cases in
+      // `scaffolding-template.test.ts`.
+      return this.escapedValue(value.member, flow);
     } else if (value instanceof ValueWithComments) {
       const comments = `\n${value.comments
         .map((comment) => `${indent}# ${comment}`)
@@ -151,9 +162,13 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       return value;
     }
 
-    return this.needsQuotes(value, flow)
-      ? `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
-      : value;
+    // YAML's double-quoted style is a superset of JSON's string escaping, so
+    // `JSON.stringify` is exactly the escaper this needs — including the quotes. Quoting
+    // alone would not be enough: a raw line break inside the quotes is folded to a space
+    // (so the value does not come back as the string that went in) and the other C0
+    // controls make js-yaml reject the file outright. Escaping is what keeps a value one
+    // line and one string.
+    return this.needsQuotes(value, flow) ? JSON.stringify(value) : value;
   }
 
   /**
@@ -163,8 +178,10 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
    * a column named `revenue: usd` must not be allowed to turn the generated file into
    * something YAML parses differently, or fails to parse at all.
    *
-   * Each test below is a case that demonstrably does not round-trip; anything else stays
-   * unquoted, so ordinary member names and SQL expressions are unaffected.
+   * Each test below is a case that does not round-trip, except the first-position set,
+   * which over-quotes on purpose: `-abc` and `?abc` are legal plain scalars in YAML 1.2,
+   * but quoting is the safe direction and the rule stays one character wide. Anything
+   * else stays unquoted, so ordinary member names and SQL expressions are unaffected.
    */
   private needsQuotes(value: string, flow: boolean): boolean {
     return (
@@ -177,9 +194,13 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       // A `#` after whitespace starts a comment and truncates the rest of the line.
       // A bare `a#b` is a legal plain scalar, so it stays unquoted.
       /\s#/.test(value) ||
-      // Surrounding whitespace is stripped from a plain scalar, and a tab or newline
-      // cannot appear in one at all.
-      /^\s|\s$|[\n\t]/.test(value) ||
+      // Surrounding whitespace is stripped from a plain scalar. A control character has
+      // to be escaped rather than merely quoted: a line break — a lone CR is one — would
+      // otherwise fold to a space, and the C0/C1 controls and an unpaired surrogate are
+      // rejected outright by the loader as non-printable. The surrogate range also
+      // matches a well-formed astral pair, which only costs that value a pair of quotes.
+      // eslint-disable-next-line no-control-regex
+      /^\s|\s$|[\x00-\x1f\x7f-\x9f]|[\uD800-\uDFFF]/.test(value) ||
       // A plain scalar matching a YAML type resolves to that type, not to a string.
       YAML_TYPE_SHAPED.test(value) ||
       // `{` opens a flow mapping, and a `"` would be read as a quoted scalar.
