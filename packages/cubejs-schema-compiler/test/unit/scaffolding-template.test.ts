@@ -531,6 +531,34 @@ describe('ScaffoldingTemplate', () => {
       expect(content).toContain('tags: [alpha, beta]');
     });
 
+    it('quotes flow-sequence elements that would otherwise end an item', () => {
+      // `escapedValue` quotes on `{}"`, which is enough for a block scalar. In a
+      // flow sequence `,` and `]` are structural, so an unquoted element carrying
+      // one silently splits the list or truncates it.
+      const render = (tags: string[]) => {
+        const template = new ScaffoldingTemplate(
+          {
+            public: {
+              orders: [
+                { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              ],
+            },
+          },
+          driver,
+          { format: SchemaFormat.Yaml, snakeCase: true }
+        );
+
+        return template.generateFilesByTableNames(['public.orders'], {
+          tags,
+        } as any)[0].content;
+      };
+
+      expect(render(['a, b', 'c'])).toContain('tags: ["a, b", c]');
+      expect(render(['a]'])).toContain('tags: ["a]"]');
+      // Nothing structural: still unquoted.
+      expect(render(['plain', 'ok'])).toContain('tags: [plain, ok]');
+    });
+
     it('uses the camelCase key and member names when snakeCase is off', () => {
       const { content } = new ScaffoldingTemplate(
         {
