@@ -194,13 +194,19 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       // A `#` after whitespace starts a comment and truncates the rest of the line.
       // A bare `a#b` is a legal plain scalar, so it stays unquoted.
       /\s#/.test(value) ||
-      // Surrounding whitespace is stripped from a plain scalar. A control character has
-      // to be escaped rather than merely quoted: a line break — a lone CR is one — would
-      // otherwise fold to a space, and the C0/C1 controls and an unpaired surrogate are
-      // rejected outright by the loader as non-printable. The surrogate range also
-      // matches a well-formed astral pair, which only costs that value a pair of quotes.
+      // Surrounding whitespace is stripped from a plain scalar, and the loader rejects
+      // the whole stream — not just the one value — over a non-printable character.
+      //
+      // The two halves of the fix do different work here, so neither collapses into the
+      // other. Below `\x20`, `JSON.stringify` escapes, which is what a line break needs:
+      // quoting alone would leave a real break that YAML folds back to a space. From
+      // `\x7f` up it does not escape, so those survive on the *quoting* — js-yaml admits
+      // them inside a double-quoted scalar but not in a plain one. Hence the wide class:
+      // C0, C1, the U+FFFE/U+FFFF noncharacters and unpaired surrogates all reach here.
+      // The surrogate range also matches a well-formed astral pair, which only costs
+      // that value a pair of quotes.
       // eslint-disable-next-line no-control-regex
-      /^\s|\s$|[\x00-\x1f\x7f-\x9f]|[\uD800-\uDFFF]/.test(value) ||
+      /^\s|\s$|[\x00-\x1f\x7f-\x9f\ufffe\uffff]|[\uD800-\uDFFF]/.test(value) ||
       // A plain scalar matching a YAML type resolves to that type, not to a string.
       YAML_TYPE_SHAPED.test(value) ||
       // `{` opens a flow mapping, and a `"` would be read as a quoted scalar.
