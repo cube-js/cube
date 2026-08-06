@@ -3,7 +3,13 @@ import { Socket } from 'net';
 import { WebSocketConnection } from '../src/WebSocketConnection';
 import { MessageTooLargeError, QueryError } from '../src/errors';
 import { QueryResultFormat } from '../codegen';
-import { answeredBy, buildErrorMessage, buildResultMessage, MockCubeStoreServer } from './mock-cubestore-server';
+import {
+  answeredBy,
+  buildErrorMessage,
+  buildResultMessage,
+  MockConnection,
+  MockCubeStoreServer,
+} from './mock-cubestore-server';
 
 const QUERY_RESULT = [{ answer: 42 }];
 
@@ -41,6 +47,34 @@ const waitForBufferedWrite = async (socket: Socket) => {
     await new Promise((resolve) => { setImmediate(resolve); });
   }
 };
+
+/**
+ * Records which messages were registered on a socket when the re-send loop
+ * wrote the first message of a batch. `sendAsync` is only used to re-send, so
+ * its first call is that write.
+ */
+class ObservableConnection extends WebSocketConnection {
+  public registeredAtFirstResend: string[] | null = null;
+
+  protected async initWebSocket(): Promise<any> {
+    const socket: any = await super.initWebSocket();
+
+    if (!socket.sendAsyncObserved) {
+      socket.sendAsyncObserved = true;
+
+      const { sendAsync } = socket;
+      socket.sendAsync = async (message: Uint8Array, messageId?: number) => {
+        if (this.registeredAtFirstResend === null) {
+          this.registeredAtFirstResend = Object.keys(socket.sentMessages);
+        }
+
+        return sendAsync(message, messageId);
+      };
+    }
+
+    return socket;
+  }
+}
 
 describe('WebSocketConnection', () => {
   let server: MockCubeStoreServer;
@@ -135,6 +169,26 @@ describe('WebSocketConnection', () => {
     ).toEqual(['SELECT 2', 'SELECT 3', 'SELECT 4']);
   }, JEST_TIMEOUT);
 
+  it('registers the whole re-sent batch before writing any of it', async () => {
+    const observed = new ObservableConnection(server.url);
+    connection = observed;
+
+    await expectAnsweredBy(query('SELECT 1'), 0);
+
+    const socket = clientSocket();
+    socket.cork();
+    const promises = [query('SELECT 2'), query('SELECT 3'), query('SELECT 4')];
+    await waitForBufferedWrite(socket);
+    socket.destroy(epipe());
+
+    await Promise.all(promises.map((promise) => expectAnsweredBy(promise, 1)));
+
+    // Writing yields, so the rest of the batch has to be registered before the
+    // first message of it is written: a connection dying in between would
+    // otherwise never see them, and they would never settle.
+    expect(observed.registeredAtFirstResend).toEqual(['2', '3', '4']);
+  }, JEST_TIMEOUT);
+
   it('resends a query when the socket is no longer writable', async () => {
     connection = new WebSocketConnection(server.url);
 
@@ -196,18 +250,40 @@ describe('WebSocketConnection', () => {
     it('resends the other queries in flight and attributes the limit to the offender', async () => {
       connection = new WebSocketConnection(server.url);
 
+      // Cube Store answers the small query before it is done producing the big
+      // one. Ordering the two sends rather than spacing them apart in time
+      // keeps the test independent of how fast the driver is scheduled: the
+      // answer to the small query is on the wire, and therefore processed,
+      // before the oversized frame that tears the connection down.
+      const answeredSmall = new Set<number>();
+      const deferredBig = new Map<number, MockConnection>();
+      const sendOversized = (mockConnection: MockConnection) => {
+        mockConnection.ws.send(Buffer.alloc(MAX_MESSAGE_SIZE * 2));
+      };
+
       server.handler = (message, mockConnection) => {
         if (message.query === 'SELECT big') {
-          // A big result takes longer to produce than a small one.
-          setTimeout(() => mockConnection.ws.send(Buffer.alloc(MAX_MESSAGE_SIZE * 2)), 50);
+          // On the first connection the small query is left in flight, so that
+          // the oversized response kills it along with the query it belongs to.
+          if (mockConnection.index === 0 || answeredSmall.has(mockConnection.index)) {
+            sendOversized(mockConnection);
+          } else {
+            deferredBig.set(mockConnection.index, mockConnection);
+          }
+
           return;
         }
 
         if (mockConnection.index > 0) {
           mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+          answeredSmall.add(mockConnection.index);
+
+          const deferred = deferredBig.get(mockConnection.index);
+          if (deferred) {
+            deferredBig.delete(mockConnection.index);
+            sendOversized(deferred);
+          }
         }
-        // On the first connection the small query is left in flight, so that
-        // the oversized response kills it along with the query it belongs to.
       };
 
       const big = query('SELECT big');
