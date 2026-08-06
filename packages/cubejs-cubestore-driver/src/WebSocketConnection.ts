@@ -243,6 +243,13 @@ export class WebSocketConnection {
             setTimeout(async () => {
               try {
                 const nextWebSocket = await this.openSocket();
+                const resent: [string, SentMessage][] = [];
+
+                // Register the whole batch before writing any of it. Writing
+                // yields, and a socket that closes mid-batch must find every
+                // message of it in `sentMessages`: the ones not registered yet
+                // would end up on a socket whose 'close' has already been
+                // handled, with nobody left to write or to re-send them.
                 // eslint-disable-next-line no-restricted-syntax
                 for (const key of Object.keys(webSocket.sentMessages)) {
                   const sentMessage = webSocket.sentMessages[key];
@@ -254,6 +261,15 @@ export class WebSocketConnection {
                   } else {
                     sentMessage.resendCount += 1;
                     nextWebSocket.sentMessages[key] = sentMessage;
+                    resent.push([key, sentMessage]);
+                  }
+                }
+
+                // eslint-disable-next-line no-restricted-syntax
+                for (const [key, sentMessage] of resent) {
+                  // Skip what was answered, or failed, while the batch was
+                  // being written.
+                  if (nextWebSocket.sentMessages[key] === sentMessage) {
                     await nextWebSocket.sendAsync(sentMessage.buffer, Number(key));
                   }
                 }
