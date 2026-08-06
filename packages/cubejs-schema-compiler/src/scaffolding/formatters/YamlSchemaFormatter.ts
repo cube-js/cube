@@ -86,8 +86,13 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
             )}${newLine}`;
           }
 
+          const entries = Object.entries(value[key] || {});
+
+          // An empty object renders inline as `[]`, which the array branch leaves
+          // unseparated; a non-empty one ends in its own newline. Keep both apart
+          // from the next key.
           return `${indent}${key}:${this.render(
-            Object.entries(value[key] || {}).map(([ok, ov]) => ({
+            entries.map(([ok, ov]) => ({
               name: ok,
               // @ts-ignore
               ...Object.entries(ov)
@@ -96,7 +101,7 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
             })),
             level + 1,
             value
-          )}`;
+          )}${entries.length ? '' : '\n'}`;
         })
         .join('\n');
 

@@ -475,6 +475,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for MySQL driver: a
     sql_table: public.accounts
 
     joins: []
+
     dimensions:
       - name: id
         sql: id
@@ -512,6 +513,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: ac
     sql_table: public.accounts
 
     joins: []
+
     dimensions:
       - name: id
         sql: id
@@ -619,6 +621,7 @@ exports[`ScaffoldingTemplate Yaml formatter generates schema with a catalog: acc
     sql_table: hello_catalog.public.accounts
 
     joins: []
+
     dimensions:
       - name: id
         sql: id
@@ -656,6 +659,7 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
     sql_table: public.customers
 
     joins: []
+
     dimensions:
       - name: id
         sql: id
