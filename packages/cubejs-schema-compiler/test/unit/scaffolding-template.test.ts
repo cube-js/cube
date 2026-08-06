@@ -499,6 +499,14 @@ describe('ScaffoldingTemplate', () => {
       expect(content).toMatch(/- name: count\n\s+type: count\n\s+drill_members:/);
     });
 
+    it('keeps a blank line after an empty joins block, like a non-empty one', () => {
+      // `drill_members` and an empty `joins` share the inline-array branch, so a
+      // separator added there for one silently doubles up for the other.
+      const content = generate(SchemaFormat.Yaml);
+
+      expect(content).toMatch(/\n\s+joins: \[\]\n\n\s+dimensions:/);
+    });
+
     it('uses the camelCase key and member names when snakeCase is off', () => {
       const { content } = new ScaffoldingTemplate(
         {
