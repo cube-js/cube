@@ -37,6 +37,16 @@ impl PreAggregationUsage {
     }
 }
 
+/// What a query does with the rows underneath it, which decides whether a
+/// pre-aggregation's grain has to match those rows one for one.
+enum RowGrain {
+    /// The query aggregates, so a coarser stored grain is still usable.
+    Aggregated,
+    /// The query returns raw rows over the given join. `None` when the node is
+    /// not a plain cube join, leaving nothing to establish row identity against.
+    RawRows(Option<Rc<LogicalJoin>>),
+}
+
 pub struct PreAggregationOptimizer {
     query_tools: Rc<State>,
     allow_multi_stage: bool,
@@ -150,19 +160,19 @@ impl PreAggregationOptimizer {
         // Row identity for an ungrouped read is judged against the join this
         // very node will render, taken from the node itself rather than
         // re-resolved, so the two can never disagree.
-        let raw_rows_join = if is_user_query && query.modifers().ungrouped {
-            Some(match query.source() {
+        let row_grain = if is_user_query && query.modifers().ungrouped {
+            RowGrain::RawRows(match query.source() {
                 QuerySource::LogicalJoin(join) => Some(join.clone()),
                 _ => None,
             })
         } else {
-            None
+            RowGrain::Aggregated
         };
         if let Some(matched_measures) = self.is_schema_and_filters_match(
             &query.schema(),
             &query.filter(),
             pre_aggregation,
-            raw_rows_join,
+            row_grain,
         )? {
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, date_range)?;
@@ -195,9 +205,16 @@ impl PreAggregationOptimizer {
                 &TimeShiftState::default(),
                 external,
             );
-            if let Some(matched_measures) =
-                self.is_schema_and_filters_match(schema, filter, pre_aggregation, None)?
-            {
+            // This node holds no `Query` of its own, so its `ungrouped` flag is
+            // not reachable here and no join is available to judge row identity
+            // against. An ungrouped request routed through here can still be
+            // served by a pre-aggregation that collapses its rows.
+            if let Some(matched_measures) = self.is_schema_and_filters_match(
+                schema,
+                filter,
+                pre_aggregation,
+                RowGrain::Aggregated,
+            )? {
                 let source = self.make_pre_aggregation_source(
                     pre_aggregation,
                     &matched_measures,
@@ -508,10 +525,7 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
-        // `Some` when the query returns raw rows: the inner option carries the
-        // node's own join, or `None` when the node is not a plain cube join and
-        // its row grain cannot be established.
-        raw_rows_join: Option<Option<Rc<LogicalJoin>>>,
+        row_grain: RowGrain,
     ) -> Result<Option<HashSet<String>>, CubeError> {
         let helper = OptimizerHelper::new();
 
@@ -529,15 +543,15 @@ impl PreAggregationOptimizer {
             return Ok(None);
         }
 
-        // The query's join groups answer both the multiplicativity gate
-        // and the join-path comparison below, so build them once.
-        let query_groups = self.query_join_groups(schema, &all_measures)?;
-
-        if let Some(node_join) = &raw_rows_join {
+        if let RowGrain::RawRows(node_join) = &row_grain {
             if !self.is_raw_rows_match(node_join.as_ref(), pre_aggregation)? {
                 return Ok(None);
             }
         }
+
+        // The query's join groups answer both the multiplicativity gate
+        // and the join-path comparison below, so build them once.
+        let query_groups = self.query_join_groups(schema, &all_measures)?;
 
         // A measure sitting under a row-multiplying join can't be rolled
         // up from a partially matching pre-aggregation.
@@ -557,15 +571,13 @@ impl PreAggregationOptimizer {
         // An ungrouped read projects stored columns as they are, with no
         // aggregate around them, so a measure kept as a mergeable sketch would
         // reach the client as the sketch instead of a number.
-        if raw_rows_join.is_some() {
-            for measure in pre_aggregation.measures.iter() {
-                if !matched_measures.contains(&measure.full_name()) {
+        if matches!(row_grain, RowGrain::RawRows(_)) {
+            for symbol in pre_aggregation.measures.iter() {
+                if !matched_measures.contains(symbol.full_name().as_str()) {
                     continue;
                 }
-                if let Ok(measure) = measure.as_measure() {
-                    if measure.kind().is_stored_as_state() {
-                        return Ok(None);
-                    }
+                if symbol.as_measure()?.kind().is_stored_as_state() {
+                    return Ok(None);
                 }
             }
         }

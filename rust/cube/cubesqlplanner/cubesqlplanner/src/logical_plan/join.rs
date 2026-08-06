@@ -11,7 +11,9 @@ use typed_builder::TypedBuilder;
 pub struct LogicalJoinItem {
     cube: Rc<Cube>,
     on_sql: Rc<SqlCall>,
-    #[builder(default)]
+    /// Required, with no default: `false` is the answer that lets a rollup
+    /// collapsing this edge's rows serve a raw-row query, so a construction site
+    /// must not be able to omit it.
     splits_rows: bool,
 }
 

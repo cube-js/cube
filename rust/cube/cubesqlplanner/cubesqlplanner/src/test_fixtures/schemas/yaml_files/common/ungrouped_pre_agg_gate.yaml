@@ -137,10 +137,24 @@ cubes:
       - name: own_ref
         type: number
         sql: "{id}"
+      - name: created_at
+        type: time
+        sql: created_at
     measures:
       - name: cnt
         type: count
     pre_aggregations:
+      # Keyed on the primary key, so 1:1 with raw rows, but it stores the time
+      # dimension truncated to the day.
+      - name: star_day_rollup
+        type: rollup
+        measures:
+          - cnt
+        dimensions:
+          - id
+        time_dimension: created_at
+        granularity: day
+
       - name: star_rollup
         type: rollup
         measures:

@@ -95,14 +95,13 @@ granularity (e.g., `day` or `month`).
 
 ### Matching ungrouped queries
 
-There are extra considerations that apply to matching [ungrouped
-queries][ref-ungrouped-queries]:
-
-An ungrouped query returns raw rows, so a pre-aggregation can only serve one if
-each of its rows is one row of that query's join:
+An [ungrouped query][ref-ungrouped-queries] returns raw rows, so a
+pre-aggregation can only serve one if each of its rows is one row of that query's
+join:
 
 - The pre-aggregation should include the [primary key][ref-primary-key] of the
-first cube in the query's join, and of every cube joined to it through a
+cube the join starts from — the cube whose members the query requests, or the
+cube a queried view joins from — and of every cube joined to it through a
 `one_to_many` relationship. Cubes joined through `many_to_one` or `one_to_one`
 cannot multiply rows, so their primary keys are not required.
 - The pre-aggregation should not group by a member of a cube that the query does
@@ -111,6 +110,15 @@ its `dimensions` do.
 - Measures stored in a mergeable form rather than as a final value, such as
 [`count_distinct_approx`][ref-count-distinct-approx], cannot be read row by row,
 so a pre-aggregation containing one is not used.
+
+<Warning>
+
+These criteria are applied by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. A deployment that opts out of it with
+[`CUBEJS_TESSERACT_SQL_PLANNER`][ref-env-tesseract]`=false` matches ungrouped
+queries by different criteria.
+
+</Warning>
 
 ## Matching multi-fact and multi-stage queries
 
@@ -165,6 +173,7 @@ configuration option.
 [ref-ungrouped-queries]: /reference/core-data-apis/queries#ungrouped-query
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-count-distinct-approx]: /reference/data-modeling/measures#type
+[ref-env-tesseract]: /reference/configuration/environment-variables#cubejs_tesseract_sql_planner
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-views]: /docs/data-modeling/views
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views

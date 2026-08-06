@@ -515,3 +515,53 @@ async fn test_ungrouped_rejects_rollup_whose_unrequested_segment_splits_rows(
 
     Ok(())
 }
+
+// A rollup stores its time dimension truncated to `granularity`, so that column
+// must never reach a raw-row result. It cannot: a time dimension requested
+// without a granularity is a filter, not an output member, and one requested
+// with a granularity only matches a rollup storing that same granularity.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_never_reads_a_truncated_time_dimension() -> Result<(), CubeError> {
+    let ctx = ctx_with(&["star_day_rollup"])?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - star_checkins.cnt
+        dimensions:
+          - star_checkins.id
+        time_dimensions:
+          - dimension: star_checkins.created_at
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(
+        pre_aggrs.len(),
+        1,
+        "`star_day_rollup` is grouped by the primary key, so it holds one row per          checkin and may serve raw rows. Generated SQL:\n{sql}"
+    );
+    assert!(
+        !sql.contains("created_at"),
+        "the stored time dimension is truncated to the day, so no raw-row result          may read it. Generated SQL:\n{sql}"
+    );
+
+    // Asking for the raw value as a plain dimension finds no match at all: the
+    // rollup groups by `id` alone and stores no untruncated timestamp.
+    let raw_value_query = indoc! {"
+        dimensions:
+          - star_checkins.id
+          - star_checkins.created_at
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(raw_value_query)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "`{}` stores no untruncated timestamp. Generated SQL:\n{sql}",
+        used_names(&pre_aggrs)
+    );
+
+    Ok(())
+}
