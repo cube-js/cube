@@ -1,3 +1,4 @@
+import YAML from 'js-yaml';
 import {
   ScaffoldingTemplate,
   SchemaFormat,
@@ -557,6 +558,95 @@ describe('ScaffoldingTemplate', () => {
       expect(render(['a]'])).toContain('tags: ["a]"]');
       // Nothing structural: still unquoted.
       expect(render(['plain', 'ok'])).toContain('tags: [plain, ok]');
+    });
+
+    describe('quoting values that are structural in YAML', () => {
+      // Titles come from the warehouse — `title` is the titleized column name — so a
+      // column name decides whether the generated file parses. Assertions read the
+      // PARSED document rather than the rendered text: the defect is that the output
+      // parses as something other than the string that went in, which a text
+      // assertion cannot see.
+      const renderColumn = (columnName: string) => new ScaffoldingTemplate(
+        {
+          public: {
+            orders: [
+              { name: 'id', type: 'integer', attributes: ['primaryKey'] },
+              { name: columnName, type: 'character varying', attributes: [] },
+            ],
+          },
+        },
+        driver,
+        { format: SchemaFormat.Yaml, snakeCase: true }
+      ).generateFilesByTableNames(['public.orders'])[0].content;
+
+      // The non-`id` dimension, read back from the parsed document.
+      const dimensionOf = (columnName: string) => {
+        const parsed: any = YAML.load(renderColumn(columnName));
+
+        return parsed.cubes[0].dimensions.find((d: any) => d.name !== 'id');
+      };
+
+      it.each([
+        // A colon-space makes the scalar a mapping; in a block context it fails to parse.
+        ['revenue: usd', 'Revenue: Usd'],
+        // A space-hash starts a comment and truncates the rest of the line.
+        ['price # net', 'Price # Net'],
+        // An indicator character only bites in first position.
+        ['*starred', '*starred'],
+        ['- leading dash', '- Leading Dash'],
+        // Everything structural at once.
+        ['weird: name # with [everything]', 'Weird: Name # with [everything]'],
+      ])(
+        'keeps the title a string for a column named %p',
+        (columnName, title) => {
+          expect(dimensionOf(columnName).title).toBe(title);
+        }
+      );
+
+      it.each([
+        // A type-shaped member name resolves to null or a number rather than to a
+        // string, leaving the cube with a dimension that has no usable name.
+        ['null'],
+        ['0x1f'],
+        ['123'],
+        ['0b101'],
+      ])('keeps the member name a string for a column named %p', (columnName) => {
+        expect(dimensionOf(columnName).name).toBe(columnName);
+      });
+
+      it('keeps a date-shaped title a string rather than a Date', () => {
+        // The member name loses the dashes to snake_case, but the title keeps them and
+        // would otherwise resolve to a Date.
+        expect(dimensionOf('2026-08-06').title).toBe('2026-08-06');
+      });
+
+      it.each([
+        // Only a `#` after whitespace starts a comment, and a colon binds as a mapping
+        // only before whitespace or end-of-scalar, so these need no quotes. Quoting
+        // them would be noise.
+        ['order#status', 'Order#status'],
+        ['a:b', 'A:b'],
+      ])('leaves %p unquoted, needing no escape', (columnName, title) => {
+        expect(renderColumn(columnName)).toContain(`title: ${title}`);
+      });
+
+      it('leaves a name YAML 1.2 reads as a string unquoted', () => {
+        // `yes`/`on`/`off` are booleans only under YAML 1.1.
+        expect(renderColumn('yes')).toContain('name: yes');
+      });
+
+      it('emits a file that parses whatever the column name is', () => {
+        for (const columnName of [
+          'revenue: usd',
+          'price # net',
+          'null',
+          '*starred',
+          'c:\\path',
+          'weird: name # with [everything]',
+        ]) {
+          expect(() => YAML.load(renderColumn(columnName))).not.toThrow();
+        }
+      });
     });
 
     it('uses the camelCase key and member names when snakeCase is off', () => {
