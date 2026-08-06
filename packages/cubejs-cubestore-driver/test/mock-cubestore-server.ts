@@ -2,7 +2,15 @@ import { AddressInfo, Socket } from 'net';
 import * as flatbuffers from 'flatbuffers';
 import WebSocket from 'ws';
 
-import { HttpCommand, HttpError, HttpMessage, HttpQuery } from '../codegen';
+import {
+  HttpCommand,
+  HttpError,
+  HttpMessage,
+  HttpQuery,
+  HttpQueryResult,
+  HttpQueryResultArrow,
+  HttpQueryResultData,
+} from '../codegen';
 
 export interface ReceivedMessage {
   connectionIndex: number;
@@ -29,6 +37,25 @@ export function buildErrorMessage(messageId: number, error: string): Buffer {
   const errorOffset = builder.createString(error);
   const commandOffset = HttpError.createHttpError(builder, errorOffset);
   const message = HttpMessage.createHttpMessage(builder, messageId, HttpCommand.HttpError, commandOffset, 0);
+  builder.finish(message);
+
+  return Buffer.from(builder.asUint8Array());
+}
+
+/**
+ * A successful answer. Its payload is decoded by the native result parser, so
+ * tests that use it stub that parser out.
+ */
+export function buildResultMessage(messageId: number, data: Buffer = Buffer.alloc(0)): Buffer {
+  const builder = new flatbuffers.Builder(1024);
+  const dataOffset = HttpQueryResultArrow.createDataVector(builder, data);
+  const arrowOffset = HttpQueryResultArrow.createHttpQueryResultArrow(builder, dataOffset, true);
+  const commandOffset = HttpQueryResult.createHttpQueryResult(
+    builder,
+    HttpQueryResultData.HttpQueryResultArrow,
+    arrowOffset
+  );
+  const message = HttpMessage.createHttpMessage(builder, messageId, HttpCommand.HttpQueryResult, commandOffset, 0);
   builder.finish(message);
 
   return Buffer.from(builder.asUint8Array());
