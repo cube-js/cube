@@ -128,6 +128,29 @@ spaces:
 
 Each agent must reference exactly one space via its `space` property. Multiple agents can share the same space and inherit its rules, certified queries, and memories.
 
+## Space scope
+
+Spaces live at the account level, so one space can be used by agents in more than one deployment. When a space is created, you choose its scope:
+
+- **Global** — one space that agents in every deployment can use.
+- **A specific deployment** — the space is available to that deployment only.
+
+You pick the scope when you create a space in the UI (**Agents** → **Spaces** → **Create space**), and when you create the spaces declared in `agents/config.yml` from the reconcile panel — the **Create Spaces** control there offers **Global** and **Per deployment**. Spaces created per deployment are named after it, for example `Product (production)` and `Product (staging)`. You can change the scope of an existing space later on the space's page.
+
+Choose per-deployment scope when the same `spaces:` entry is declared in several deployments — typically development, staging, and production fed from branches of one data model — and you don't want them sharing what the space stores.
+
+<Warning>
+  Reconciling again does not split a space that was created as global: a global space counts as reconciled for every deployment, so no new space is created. To split one, re-scope it to a deployment on its space page, then reconcile the other deployments.
+</Warning>
+
+Spaces created before this option existed have no scope stored. Cube infers the deployment they belong to from the agents linked to them, and the Spaces list shows them as **Not scoped**. Set the scope explicitly on the space page to replace that guess with an answer.
+
+### Scope affects storage, not configuration
+
+Scope never changes where configuration comes from. Agents always belong to a single deployment, and the `spaces:` and `agents:` entries, rules, and certified queries that shape an agent are read from the `agents/` directory of the data model of that deployment, on that deployment's branch. A global space does not merge the configuration of the deployments that use it.
+
+What a global space shares is storage: the space itself and the data held against it — memories in particular. Two deployments using the same global space read and write the same memories, while each of them still applies its own `agents/` configuration. Scope a space to a deployment when that shared storage is what you want to avoid.
+
 ## Attaching rules and certified queries to a space
 
 In the single-agent setup, [rules](/admin/ai/rules) and [certified queries](/admin/ai/certified-queries) belong to the implicit `auto` space. In a multi-agent setup, you must attach each rule and certified query to a specific space using the `space` property in the Markdown frontmatter:
