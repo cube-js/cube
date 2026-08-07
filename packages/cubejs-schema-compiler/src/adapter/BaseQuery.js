@@ -523,17 +523,33 @@ export class BaseQuery {
    * @return { string[][] }
    */
   enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
-    const joinsMap = {};
+    // A Map rather than an object literal: cube names are only constrained by
+    // `identifierRegex`, so a cube may legally be called `constructor` or
+    // `toString` and shadow a key inherited from Object.prototype.
+    const joinsMap = new Map();
 
+    // A view can expose the same cube through more than one join path, so the join
+    // tree is a union of the resolved paths rather than a strict tree and can hold
+    // a back edge (both A -> B and B -> A). Joins are ordered outwards from the
+    // root, so the first edge reaching a cube is the one that attached it: a later
+    // back edge must not replace it, or the walk below would report a path that is
+    // missing its root prefix.
     for (const j of joinTree.joins) {
-      joinsMap[j.to] = j.from;
+      if (!joinsMap.has(j.to)) {
+        joinsMap.set(j.to, j.from);
+      }
     }
 
     return joinHints.map(jh => {
       let cubeName = jh;
       const path = [cubeName];
-      while (joinsMap[cubeName]) {
-        cubeName = joinsMap[cubeName];
+      // Keeping only the first edge per cube already breaks the back edges seen in
+      // practice, `visited` is a backstop: an unguarded walk over a cyclic map
+      // never terminates and grows path past the maximum array length.
+      const visited = new Set(path);
+      while (joinsMap.has(cubeName) && !visited.has(joinsMap.get(cubeName))) {
+        cubeName = joinsMap.get(cubeName);
+        visited.add(cubeName);
         path.push(cubeName);
       }
 
