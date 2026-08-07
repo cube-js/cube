@@ -26,6 +26,11 @@ import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import type { ErrorReporter } from './ErrorReporter';
+import {
+  type GlobalGranularitiesConfig,
+  type GranularitiesOption,
+  resolveGlobalGranularities,
+} from './GlobalGranularitiesConfig';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -40,10 +45,19 @@ export type PrepareCompilerOptions = {
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
   compiledJinjaCache?: LRUCache<string, string>;
+  // `config.granularities` as authored (env / static list / function). Resolved once at the start
+  // of compile and applied by CubeSymbols.
+  granularities?: GranularitiesOption;
+  // An already-resolved config, when the caller had to resolve it anyway (CompilerApi folds its
+  // hash into compilerVersion). Takes precedence over `granularities`, so a function form is
+  // invoked once per compile rather than once here and once there.
+  resolvedGranularities?: GlobalGranularitiesConfig;
 };
 
 export interface CompilerInterface {
-  compile: (cubes: any[], errorReporter: ErrorReporter) => void;
+  // The phase driver chains each compile() through `.then()`, so a compiler may return a promise;
+  // any other return value is ignored.
+  compile: (cubes: any[], errorReporter: ErrorReporter) => unknown;
 }
 
 export type Compiler = {
@@ -61,11 +75,23 @@ export type Compiler = {
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
   const cubeDictionary = new CubeDictionary();
-  const cubeSymbols = new CubeSymbols();
-  const viewCompiler = new CubeSymbols(true);
+  // One resolve shared by every compiler below, so a `config.granularities` function is invoked
+  // once per compile rather than once per compiler instance.
+  let granularitiesPromise: Promise<GlobalGranularitiesConfig> | undefined;
+  const resolveGranularities = () => {
+    if (!granularitiesPromise) {
+      granularitiesPromise = options.resolvedGranularities
+        ? Promise.resolve(options.resolvedGranularities)
+        : resolveGlobalGranularities(options.granularities, options.compileContext);
+    }
+    return granularitiesPromise;
+  };
+
+  const cubeSymbols = new CubeSymbols(false, resolveGranularities);
+  const viewCompiler = new CubeSymbols(true, resolveGranularities);
   const viewCompilationGate = new ViewCompilationGate();
   const cubeValidator = new CubeValidator(cubeSymbols);
-  const cubeEvaluator = new CubeEvaluator(cubeValidator);
+  const cubeEvaluator = new CubeEvaluator(cubeValidator, resolveGranularities);
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator, cubeValidator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);

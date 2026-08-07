@@ -7,8 +7,12 @@ import {
   compile,
   Compiler,
   createQuery,
+  buildGranularitiesCatalog,
   CubeDefinition,
   EvaluatedCube,
+  GlobalGranularitiesConfig,
+  GranularitiesOption,
+  granularityConfigHash,
   PreAggregationFilters,
   PreAggregationInfo,
   PreAggregationReferences,
@@ -16,6 +20,7 @@ import {
   prepareCompiler,
   queryClass,
   QueryFactory,
+  resolveGlobalGranularities,
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
@@ -51,6 +56,7 @@ export interface CompilerApiOptions {
   devServer?: boolean;
   fastReload?: boolean;
   allowNodeRequire?: boolean;
+  granularities?: GranularitiesOption;
 }
 
 export interface GetSqlOptions {
@@ -133,6 +139,10 @@ export class CompilerApi {
 
   protected compilerVersion?: string;
 
+  protected readonly granularities?: GranularitiesOption;
+
+  private resolvedGranularitiesPromise?: Promise<GlobalGranularitiesConfig>;
+
   protected queryFactory?: QueryFactory;
 
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
@@ -152,6 +162,7 @@ export class CompilerApi {
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
+    this.granularities = options.granularities;
     this.nativeInstance = this.createNativeInstance();
 
     // Caching stuff
@@ -224,8 +235,14 @@ export class CompilerApi {
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }
 
+    // Global custom granularities are merged into the compiled model (they take part in
+    // pre-aggregation matching), so a config change must force a recompile. The resolved config is
+    // handed to the compiler so a `config.granularities` function runs once per compile.
+    const resolvedGranularities = await this.resolveGranularities();
+    compilerVersion += `_gran_${granularityConfigHash(resolvedGranularities)}`;
+
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      this.compilers = this.compileSchema(compilerVersion, options.requestId).catch(e => {
+      this.compilers = this.compileSchema(compilerVersion, resolvedGranularities, options.requestId).catch(e => {
         this.compilers = undefined;
         throw e;
       });
@@ -233,6 +250,25 @@ export class CompilerApi {
     }
 
     return this.compilers;
+  }
+
+  /**
+   * The resolved global granularities config. Memoized for the static/function forms — both are
+   * fixed for the instance, and a `config.granularities` function must not run per request. The env
+   * form re-resolves (a cheap parse) so a runtime CUBEJS_GRANULARITIES change still forces a recompile.
+   */
+  private resolveGranularities(): Promise<GlobalGranularitiesConfig> {
+    if (this.granularities === undefined) {
+      return resolveGlobalGranularities(undefined, this.compileContext);
+    }
+    if (!this.resolvedGranularitiesPromise) {
+      this.resolvedGranularitiesPromise = resolveGlobalGranularities(this.granularities, this.compileContext);
+      // Let a failed resolve (e.g. a throwing function form) be retried.
+      this.resolvedGranularitiesPromise.catch(() => {
+        this.resolvedGranularitiesPromise = undefined;
+      });
+    }
+    return this.resolvedGranularitiesPromise;
   }
 
   /**
@@ -250,7 +286,11 @@ export class CompilerApi {
     });
   }
 
-  public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
+  public async compileSchema(
+    compilerVersion: string,
+    resolvedGranularities: GlobalGranularitiesConfig,
+    requestId?: string,
+  ): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
@@ -267,6 +307,7 @@ export class CompilerApi {
         compiledScriptCache: this.compiledScriptCache,
         compiledJinjaCache: this.compiledJinjaCache,
         compiledYamlCache: this.compiledYamlCache,
+        resolvedGranularities,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
@@ -315,6 +356,8 @@ export class CompilerApi {
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
     const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
+    // Custom granularities (local + baked-in globals) resolve from the compiled symbols, so no
+    // per-request granularity threading is needed here.
     let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
 
     if (!sqlGenerator) {
@@ -371,7 +414,10 @@ export class CompilerApi {
     if (this.sqlCache) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { requestId, ...keyOptions } = query;
-      const key = { query: keyOptions, options };
+      const key = {
+        query: keyOptions,
+        options,
+      };
       return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
     } else {
       return getSqlFn();
@@ -1064,11 +1110,23 @@ export class CompilerApi {
     };
   }
 
-  protected mixInVisibilityMaskHash(compilerId: string, visibilityMaskHash: string): string {
+  protected mixInMaskHash(compilerId: string, maskHash: string): string {
     const uuidBytes = Buffer.from(uuidParse(compilerId));
-    const hashBytes = Buffer.from(visibilityMaskHash, 'hex');
+    const hashBytes = Buffer.from(maskHash, 'hex');
     return uuidv4({ random: crypto.createHash('sha256').update(uuidBytes).update(hashBytes).digest()
       .subarray(0, 16) as any });
+  }
+
+  protected mixInVisibilityMaskHash(compilerId: string, visibilityMaskHash: string): string {
+    return this.mixInMaskHash(compilerId, visibilityMaskHash);
+  }
+
+  /**
+   * The `/v1/granularities` catalog for this model — built-ins plus global customs.
+   */
+  public async getGranularities(options: { requestId?: string } = {}): Promise<any[]> {
+    const compilers = await this.getCompilers(options);
+    return buildGranularitiesCatalog(compilers.cubeEvaluator.globalGranularitiesConfig);
   }
 
   public async metaConfig(
@@ -1077,11 +1135,26 @@ export class CompilerApi {
   ): Promise<any> {
     const { includeCompilerId, includeViewGroups, skipVisibilityPatch, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
+    // Granularities are baked into the compiled model, so the base meta cubes are served directly.
     const { cubes } = compilers.metaTransformer;
+
+    // Fixed composition order: base compilerId, then visibility mask. Only computed when the caller
+    // actually wants the id — the hashing is skipped when a caller asks for view groups alone (the
+    // gateway always requests view groups).
+    const composeCompilerId = (visibilityMaskHash: string | null) => {
+      let id = compilers.compilerId;
+      if (visibilityMaskHash) {
+        id = this.mixInMaskHash(id, visibilityMaskHash);
+      }
+      return id;
+    };
 
     if (skipVisibilityPatch) {
       if (includeCompilerId || includeViewGroups) {
-        const result: any = { cubes, compilerId: compilers.compilerId };
+        const result: any = { cubes };
+        if (includeCompilerId) {
+          result.compilerId = composeCompilerId(null);
+        }
         if (includeViewGroups) {
           result.viewGroups = compilers.metaTransformer.viewGroups;
         }
@@ -1096,10 +1169,10 @@ export class CompilerApi {
       cubes
     );
     if (includeCompilerId || includeViewGroups) {
-      const result: any = {
-        cubes: patchedCubes,
-        compilerId: visibilityMaskHash ? this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) : compilers.compilerId,
-      };
+      const result: any = { cubes: patchedCubes };
+      if (includeCompilerId) {
+        result.compilerId = composeCompilerId(visibilityMaskHash);
+      }
       if (includeViewGroups) {
         result.viewGroups = compilers.metaTransformer.viewGroups;
       }
@@ -1113,10 +1186,11 @@ export class CompilerApi {
     options?: { requestId?: string }
   ): Promise<{ metaConfig: any; cubeDefinitions: Record<string, CubeDefinition> }> {
     const compilers = await this.getCompilers(options);
+    // Granularities are baked into the compiled model, so the base meta cubes are used directly.
     const { cubes: patchedCubes } = await this.patchVisibilityByAccessPolicy(
       compilers,
       requestContext,
-      compilers.metaTransformer?.cubes
+      compilers.metaTransformer.cubes
     );
     return {
       metaConfig: patchedCubes,

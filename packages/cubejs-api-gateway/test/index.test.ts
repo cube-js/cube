@@ -332,8 +332,10 @@ describe('API Gateway', () => {
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
     expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
       .toStrictEqual({
+        type: 'time',
         granularity: {
           name: 'half_year_by_1st_april',
+          type: 'custom',
           title: 'Half Year By1 St April',
           interval: '6 months',
           offset: '3 months',
@@ -354,8 +356,10 @@ describe('API Gateway', () => {
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': '42' }]);
     expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
       .toStrictEqual({
+        type: 'time',
         granularity: {
           name: 'half_year_by_1st_april',
+          type: 'custom',
           title: 'Half Year By1 St April',
           interval: '6 months',
           offset: '3 months',
@@ -685,6 +689,58 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
     expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+  });
+
+  test('meta endpoint passes through effectiveGranularities from CompilerApi', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    const dim = res.body.cubes[0]?.dimensions.find(d => d.name === 'Foo.timeGranularities');
+    expect(dim.effectiveGranularities).toEqual([
+      { name: 'year', type: 'built-in', title: 'Year', interval: '1 year', format: '%Y' },
+      {
+        name: 'half_year_by_1st_april',
+        type: 'custom',
+        title: 'Half Year By1 St April',
+        interval: '6 months',
+        offset: '3 months',
+      },
+    ]);
+    // The deprecated legacy array is preserved unchanged, and the internal block never leaks.
+    expect(dim.granularities).toEqual([
+      {
+        name: 'half_year_by_1st_april',
+        title: 'Half Year By1 St April',
+        interval: '6 months',
+        offset: '3 months',
+      },
+    ]);
+    expect(dim.granularitiesBlock).toBeUndefined();
+  });
+
+  test('granularities endpoint returns the per-appId catalog baked into the compiled model', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/granularities')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+
+    expect(res.body.data.granularities).toEqual([
+      { type: 'built-in', name: 'year', title: 'Year', format: '%Y', interval: '1 year' },
+      { type: 'built-in', name: 'month', title: 'Month', format: '%b %Y', interval: '1 month' },
+      {
+        type: 'custom',
+        name: 'fiscal_year',
+        title: 'Fiscal Year',
+        interval: '1 year',
+        origin: '2024-02-01',
+      },
+    ]);
   });
 
   test('meta endpoint returns view groups', async () => {

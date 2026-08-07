@@ -139,11 +139,11 @@ export class BaseQuery {
    */
   constructor(compilers, options) {
     this.compilers = compilers;
+    this.options = options || {};
     /** @type {import('../compiler/CubeEvaluator').CubeEvaluator} */
     this.cubeEvaluator = compilers.cubeEvaluator;
     /** @type {import('../compiler/JoinGraph').JoinGraph} */
     this.joinGraph = compilers.joinGraph;
-    this.options = options || {};
 
     this.orderHashToString = this.orderHashToString.bind(this);
     this.defaultOrder = this.defaultOrder.bind(this);
@@ -4364,7 +4364,9 @@ export class BaseQuery {
         if (path.length === 3 && this.cubeEvaluator.isDimension(path.slice(0, 2))) {
           const dimensionDef = this.cubeEvaluator.dimensionByPath(path.slice(0, 2));
           if (dimensionDef.type === 'time' &&
-            this.cubeEvaluator.resolveGranularity([path[0], path[1], 'granularities', path[2]])) {
+            this.cubeEvaluator.resolveGranularity(
+              [path[0], path[1], 'granularities', path[2]]
+            )) {
             const td = this.newTimeDimension({
               dimension: `${path[0]}.${path[1]}`,
               granularity: path[2],

@@ -182,6 +182,7 @@ describe('prepareAnnotation helpers', () => {
       }).timeDimensions
     ).toEqual({
       'cube_name.member': {
+        currency: undefined,
         description: undefined,
         format: undefined,
         meta: undefined,
@@ -190,6 +191,7 @@ describe('prepareAnnotation helpers', () => {
         type: undefined,
       },
       'cube_name.member.day': {
+        currency: undefined,
         description: undefined,
         format: undefined,
         meta: undefined,
@@ -198,8 +200,10 @@ describe('prepareAnnotation helpers', () => {
         type: undefined,
         granularity: {
           name: 'day',
-          title: 'day',
+          type: 'built-in',
+          title: 'Day',
           interval: '1 day',
+          format: '%Y-%m-%d',
         }
       },
     });
@@ -238,5 +242,71 @@ describe('prepareAnnotation helpers', () => {
         }],
       }).timeDimensions
     ).toEqual({});
+  });
+
+  describe('granularity resolution from effectiveGranularities', () => {
+    const metaConfig = (effectiveGranularities?: any[]) => [{
+      config: ({
+        name: 'cube_name',
+        title: 'cube name',
+        dimensions: [{
+          name: 'cube_name.member',
+          type: 'time',
+          ...(effectiveGranularities ? { effectiveGranularities } : {}),
+        }],
+      }) as { name: string; title: string; },
+    }];
+
+    const tdQuery = (granularity: string) => ({
+      dimensions: ['cube_name.member'],
+      timeDimensions: [{ dimension: 'cube_name.member', granularity }],
+    });
+
+    test('reads the queried granularity from the effective set (global override honored)', () => {
+      const result = prepareAnnotation(
+        metaConfig([
+          { name: 'day', type: 'built-in', title: 'Tag', interval: '1 day', format: '%d.%m.%Y' },
+          { name: 'fiscal_year', type: 'custom', title: 'Fiscal Year', interval: '1 year', origin: '2024-02-01' },
+        ]),
+        tdQuery('day'),
+      );
+      expect((result.timeDimensions['cube_name.member.day'] as any).granularity).toEqual({
+        name: 'day', type: 'built-in', title: 'Tag', interval: '1 day', format: '%d.%m.%Y',
+      });
+    });
+
+    test('resolves a custom granularity from the effective set', () => {
+      const result = prepareAnnotation(
+        metaConfig([
+          { name: 'fiscal_year', type: 'custom', title: 'Fiscal Year', interval: '1 year', origin: '2024-02-01' },
+        ]),
+        tdQuery('fiscal_year'),
+      );
+      expect((result.timeDimensions['cube_name.member.fiscal_year'] as any).granularity).toEqual({
+        name: 'fiscal_year', type: 'custom', title: 'Fiscal Year', interval: '1 year', origin: '2024-02-01',
+      });
+    });
+
+    test('synthesizes a config-disabled built-in from defaults', () => {
+      const result = prepareAnnotation(
+        metaConfig([
+          { name: 'year', type: 'built-in', title: 'Year', interval: '1 year', format: '%Y' },
+        ]),
+        tdQuery('day'),
+      );
+      expect((result.timeDimensions['cube_name.member.day'] as any).granularity).toEqual({
+        name: 'day', type: 'built-in', title: 'Day', interval: '1 day', format: '%Y-%m-%d',
+      });
+    });
+
+    test('unknown custom granularity yields undefined, never the legacy array', () => {
+      const result = prepareAnnotation(
+        metaConfig([
+          { name: 'day', type: 'built-in', title: 'Day', interval: '1 day', format: '%Y-%m-%d' },
+        ]),
+        tdQuery('some_custom'),
+      );
+      expect((result.timeDimensions['cube_name.member.some_custom'] as any).granularity).toBeUndefined();
+    });
   });
 });

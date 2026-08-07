@@ -224,7 +224,7 @@ export class DataSchemaCompiler {
     try {
       return compileServices
         .map((compileService) => (() => compileService.compile(objects, errorsReport)))
-        .reduce((p, fn) => p.then(fn), Promise.resolve())
+        .reduce<Promise<void>>((p, fn) => p.then(() => fn()).then(() => undefined), Promise.resolve())
         .catch((error) => {
           errorsReport.error(error);
         });
