@@ -1599,7 +1599,13 @@ fn in_list_expr_normalize(
                 return Ok(list_expr_normalized);
             }
 
-            evaluate_expr_stacked(optimizer, list_expr_normalized.cast_to(&expr_type, schema)?)
+            // Decline the added cast rather than erroring out of the rule — see the note in
+            // `binary_expr_normalize`. The element's own type is unchanged by dropping it.
+            let casted = list_expr_normalized.clone().cast_to(&expr_type, schema)?;
+            if find_unrepresentable_datetime_literal(&casted).is_some() {
+                return Ok(list_expr_normalized);
+            }
+            evaluate_expr_stacked(optimizer, casted)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -1660,6 +1666,14 @@ fn between_expr_normalize(
             expr: Box::new(bound),
             data_type: expr_type.clone(),
         };
+        // Decline the added cast rather than erroring out of the rule — see the note in
+        // `binary_expr_normalize`. Unwrapping it leaves the bound exactly as it arrived.
+        if find_unrepresentable_datetime_literal(&casted).is_some() {
+            let Expr::Cast { expr: bound, .. } = casted else {
+                unreachable!("just constructed as a Cast");
+            };
+            return Ok(bound);
+        }
         Ok(Box::new(evaluate_expr_stacked(optimizer, casted)?))
     };
 
