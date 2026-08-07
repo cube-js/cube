@@ -854,9 +854,362 @@ impl CastReplacer {
             _ => None,
         }
     }
+
+    /// True for the `regtype` OID alias type, with or without a `pg_catalog.` qualifier.
+    fn is_regtype(data_type: &ast::DataType) -> bool {
+        match data_type {
+            ast::DataType::Custom(name, _) => {
+                let name = name.to_string().to_lowercase();
+                let name = name.strip_prefix("pg_catalog.").unwrap_or(&name);
+
+                name == "regtype"
+            }
+            _ => false,
+        }
+    }
+
+    /// Resolves a Postgres type name as accepted on `regtype` input to its `pg_type.oid`.
+    /// Understands `pg_type.typname` (`int4`), the canonical regtype spelling (`integer`),
+    /// SQL standard aliases (`int`), a `pg_catalog.` qualifier, a trailing type modifier and a
+    /// trailing `[]`. A modifier is discarded, as Postgres does for the types that accept one
+    /// (`varchar(10)`), except for `float(p)` where it selects the type. This is the one place
+    /// where accepting more than Postgres is deliberate: it also takes a modifier on a type
+    /// that cannot carry one (`int4(5)`, which Postgres rejects) rather than fail a cast a BI
+    /// tool would not have emitted in the first place.
+    fn regtype_name_to_oid(name: &str) -> Option<u32> {
+        /// Names accepted by the Postgres type name parser that are neither a `typname`
+        /// nor a canonical regtype spelling.
+        const ALIASES: &[(&str, &str)] = &[
+            ("int", "int4"),
+            ("decimal", "numeric"),
+            ("char", "bpchar"),
+            ("float", "float8"),
+        ];
+
+        let name = name.trim().to_lowercase();
+        let name = name.strip_prefix("pg_catalog.").unwrap_or(&name);
+        // A type modifier does not affect the resolved type: `varchar(10)::regtype` is `varchar`
+        let (name, typmod) = match (name.find('('), name.rfind(')')) {
+            (Some(open), Some(close)) if open < close => (
+                format!("{}{}", &name[..open], &name[close + 1..]),
+                Some(name[open + 1..close].trim().to_string()),
+            ),
+            _ => (name.to_string(), None),
+        };
+        let name = name.trim();
+        if name.is_empty() {
+            return None;
+        }
+
+        // `float(p)` is the one modifier that picks the type rather than the precision within
+        // it: `real` up to 24 bits of mantissa, `double precision` above, and Postgres rejects
+        // anything wider
+        if let (Some(typmod), "float") = (&typmod, name.trim_end_matches("[]")) {
+            let element = match typmod.parse::<u32>().ok()? {
+                1..=24 => "float4",
+                25..=53 => "float8",
+                _ => return None,
+            };
+
+            return Self::regtype_name_to_oid(&name.replace("float", element));
+        }
+
+        let canonical = ALIASES
+            .iter()
+            .find_map(|(alias, typname)| (*alias == name).then_some(*typname))
+            .unwrap_or(name);
+
+        if let Some(typ) = PgType::get_all()
+            .iter()
+            .find(|typ| typ.typname == canonical || typ.regtype == canonical)
+        {
+            return Some(typ.oid);
+        }
+
+        // `int4[]` is spelled `_int4` as a typname; the canonical regtype spelling
+        // (`integer[]`) is matched above. Postgres does not model the number of dimensions
+        // in the type either, so `int4[][]` resolves to the same array type
+        let elem = canonical.trim_end_matches("[]");
+        if elem == canonical {
+            return None;
+        }
+
+        let elem_oid = Self::regtype_name_to_oid(elem)?;
+        let elem_typ = PgType::get_all().iter().find(|typ| typ.oid == elem_oid)?;
+
+        (elem_typ.typarray != 0).then_some(elem_typ.typarray)
+    }
+
+    /// Splits a one dimensional Postgres array literal (`{a,b,"c,d"}`) into its elements.
+    /// `None` for anything this does not model: multi dimensional literals, an explicit
+    /// dimension prefix or an unterminated quote. Callers are expected to leave the cast
+    /// alone in that case rather than to substitute a partial array.
+    ///
+    /// One deviation from Postgres: whitespace surrounding a quoted element is kept
+    /// (`{ "int4" }` yields `" int4 "`), which is harmless as long as callers treat the
+    /// elements as type names, since name resolution trims.
+    fn parse_array_literal(input: &str) -> Option<Vec<Option<String>>> {
+        let input = input.trim();
+        let input = input.strip_prefix('{')?.strip_suffix('}')?;
+        // An empty literal is a usable result, not a failure: `x = ANY (ARRAY[])` plans and is
+        // false, which is what Postgres answers for an empty array. Covered end to end by the
+        // `empty_regtype_array_comparison` test
+        if input.trim().is_empty() {
+            return Some(vec![]);
+        }
+
+        let mut elements = vec![];
+        let mut current = String::new();
+        let mut quoted = false;
+        // Quoting and escaping both make an element a string, so that `NULL` and `"NULL"`
+        // (or `\N\U\L\L`) stay distinguishable
+        let mut escaped = false;
+        let mut chars = input.chars();
+
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' => {
+                    current.push(chars.next()?);
+                    escaped = true;
+                }
+                '"' => {
+                    quoted = !quoted;
+                    escaped = true;
+                }
+                '{' | '}' if !quoted => return None,
+                ',' if !quoted => {
+                    elements.push(Self::finish_array_element(current, escaped));
+                    current = String::new();
+                    escaped = false;
+                }
+                c => current.push(c),
+            }
+        }
+
+        if quoted {
+            return None;
+        }
+
+        elements.push(Self::finish_array_element(current, escaped));
+
+        Some(elements)
+    }
+
+    /// An unquoted `NULL` inside an array literal is the null element; a quoted or escaped
+    /// one is the string `NULL`.
+    fn finish_array_element(element: String, escaped: bool) -> Option<String> {
+        if escaped {
+            return Some(element);
+        }
+
+        let element = element.trim();
+        if element.eq_ignore_ascii_case("null") {
+            return None;
+        }
+
+        Some(element.to_string())
+    }
+
+    /// Expands `'{int,int8}'::regtype[]` to `ARRAY[23, 20]`. BI tools use this shape to
+    /// test an OID column against a set of types, and neither the `regtype` element type
+    /// nor an array cast of a string literal is understood downstream.
+    fn replace_regtype_array_cast(cast_expr: &Expr) -> Option<Expr> {
+        let Expr::Value(value) = cast_expr else {
+            return None;
+        };
+        let (Value::SingleQuotedString(str_val) | Value::DoubleQuotedString(str_val)) =
+            &value.value
+        else {
+            return None;
+        };
+
+        let mut elements = vec![];
+        for element in Self::parse_array_literal(str_val)? {
+            let element = match element {
+                None => Expr::Value(Value::Null.into()),
+                Some(name) => match Self::regtype_name_to_oid(&name) {
+                    Some(oid) => Expr::Value(Value::Number(oid.to_string(), false).into()),
+                    None => {
+                        trace!(
+                            r#"Unable to cast string to RegType[] via CastReplacer, type "{}" is not defined"#,
+                            name
+                        );
+
+                        return None;
+                    }
+                },
+            };
+
+            elements.push(element);
+        }
+
+        Some(Expr::Array(ast::Array {
+            elem: elements,
+            named: true,
+        }))
+    }
+
+    /// Operand of a `::regtype` or `::regtype[]` cast, ignoring parentheses.
+    fn regtype_cast_operand(expr: &Expr) -> Option<&Expr> {
+        match expr {
+            Expr::Nested(inner) => Self::regtype_cast_operand(inner),
+            Expr::Cast {
+                expr, data_type, ..
+            } => match data_type {
+                ast::DataType::Array(ast::ArrayElemTypeDef::SquareBracket(elem_type, _)) => {
+                    Self::is_regtype(elem_type).then_some(&**expr)
+                }
+                data_type => Self::is_regtype(data_type).then_some(&**expr),
+            },
+            _ => None,
+        }
+    }
+
+    /// True for a `::regtype` or `::regtype[]` cast of a literal that resolves to OIDs, and
+    /// for an array of such casts (`ARRAY['int4'::regtype]`). Parentheses are ignored.
+    /// A literal that does not resolve is not one, so that a comparison against it is left
+    /// untouched as a whole instead of half rewritten.
+    fn is_resolvable_regtype_literal(expr: &Expr) -> bool {
+        match expr {
+            Expr::Nested(inner) => Self::is_resolvable_regtype_literal(inner),
+            // An empty `ARRAY[]` carries no regtype to recognize, unlike the empty cast form
+            // `'{}'::regtype[]`. Either way the comparison is false, with or without the cast
+            // on the column side, as `empty_regtype_array_comparison` shows
+            Expr::Array(array) => {
+                !array.elem.is_empty() && array.elem.iter().all(Self::is_resolvable_regtype_literal)
+            }
+            Expr::Cast {
+                expr, data_type, ..
+            } => match data_type {
+                ast::DataType::Array(ast::ArrayElemTypeDef::SquareBracket(elem_type, _))
+                    if Self::is_regtype(elem_type) =>
+                {
+                    Self::replace_regtype_array_cast(expr).is_some()
+                }
+                data_type if Self::is_regtype(data_type) => match &**expr {
+                    Expr::Value(value) => match &value.value {
+                        Value::SingleQuotedString(str_val) | Value::DoubleQuotedString(str_val) => {
+                            Self::regtype_name_to_oid(str_val).is_some()
+                        }
+                        _ => false,
+                    },
+                    _ => false,
+                },
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    /// Drops the `::regtype` cast of a column compared against a regtype literal, as in
+    /// `a.atttypid::regtype = 'int4'::regtype`. Comparing two regtypes compares OIDs in
+    /// Postgres, and the literal side is rewritten to an OID; keeping the cast on the
+    /// column would instead compare the type name `format_type` renders with that OID,
+    /// which silently matches nothing.
+    ///
+    /// Only a cast on both sides is stripped: `a.atttypid::regtype = 'integer'` compares
+    /// against a plain string, so there the type name is the wanted shape.
+    ///
+    /// Callers cover the comparison contexts a BI tool is known to emit: a comparison
+    /// operator, `ANY`/`ALL`, `IN`, `BETWEEN` and a `CASE` operand. Anything else (say
+    /// `IS NOT DISTINCT FROM`) keeps the type name on the column side and so fails the same
+    /// way it did before regtype literals resolved at all.
+    fn strip_regtype_cast_for_oid_comparison(column_side: &mut Expr, literal_side: &Expr) {
+        if !Self::is_resolvable_regtype_literal(literal_side) {
+            return;
+        }
+
+        let column = Self::regtype_cast_operand(column_side)
+            .filter(|operand| matches!(operand, Expr::Identifier(_) | Expr::CompoundIdentifier(_)));
+        let Some(column) = column.cloned() else {
+            return;
+        };
+
+        *column_side = column;
+    }
 }
 
 impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
+    fn transform_expr(&mut self, expr: &mut Expr) -> Result<(), ConnectionError> {
+        // Runs before the casts below are rewritten, so both sides are still visible as casts
+        match expr {
+            // Only the operators a regtype orders OIDs by, which is what makes stripping the
+            // cast on the column side equivalent to what Postgres compares
+            Expr::BinaryOp {
+                left,
+                op:
+                    ast::BinaryOperator::Eq
+                    | ast::BinaryOperator::NotEq
+                    | ast::BinaryOperator::Lt
+                    | ast::BinaryOperator::LtEq
+                    | ast::BinaryOperator::Gt
+                    | ast::BinaryOperator::GtEq,
+                right,
+            } => {
+                Self::strip_regtype_cast_for_oid_comparison(left, right);
+                Self::strip_regtype_cast_for_oid_comparison(right, left);
+            }
+            Expr::AnyOp {
+                left,
+                compare_op:
+                    ast::BinaryOperator::Eq
+                    | ast::BinaryOperator::NotEq
+                    | ast::BinaryOperator::Lt
+                    | ast::BinaryOperator::LtEq
+                    | ast::BinaryOperator::Gt
+                    | ast::BinaryOperator::GtEq,
+                right,
+                ..
+            }
+            | Expr::AllOp {
+                left,
+                compare_op:
+                    ast::BinaryOperator::Eq
+                    | ast::BinaryOperator::NotEq
+                    | ast::BinaryOperator::Lt
+                    | ast::BinaryOperator::LtEq
+                    | ast::BinaryOperator::Gt
+                    | ast::BinaryOperator::GtEq,
+                right,
+            } => {
+                Self::strip_regtype_cast_for_oid_comparison(left, right);
+            }
+            Expr::Between {
+                expr, low, high, ..
+            } => {
+                if Self::is_resolvable_regtype_literal(high) {
+                    Self::strip_regtype_cast_for_oid_comparison(expr, low);
+                }
+            }
+            Expr::InList { expr, list, .. } => {
+                if let Some(first) = list.first() {
+                    if list.iter().all(Self::is_resolvable_regtype_literal) {
+                        Self::strip_regtype_cast_for_oid_comparison(expr, first);
+                    }
+                }
+            }
+            // `CASE a.atttypid::regtype WHEN 'int4'::regtype THEN ... END` compares the operand
+            // against every condition
+            Expr::Case {
+                operand: Some(operand),
+                conditions,
+                ..
+            } => {
+                if let Some(first) = conditions.first() {
+                    if conditions
+                        .iter()
+                        .all(|when| Self::is_resolvable_regtype_literal(&when.condition))
+                    {
+                        Self::strip_regtype_cast_for_oid_comparison(operand, &first.condition);
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        Ok(())
+    }
+
     fn visit_cast(&mut self, expr: &mut Expr) -> Result<(), ConnectionError> {
         if let Expr::Cast {
             expr: cast_expr,
@@ -865,6 +1218,47 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
         } = expr
         {
             match data_type {
+                // Matched ahead of the `Custom` arm below so that the qualified spelling
+                // (`pg_catalog.regtype`) takes the same path as the bare one
+                _ if Self::is_regtype(data_type) => {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    match &**cast_expr {
+                        // A regtype renders as the type's name. Comparisons against a regtype
+                        // literal are rewritten to compare OIDs instead, see
+                        // `strip_regtype_cast_for_oid_comparison`
+                        Expr::Identifier(_) | Expr::CompoundIdentifier(_) => {
+                            *expr = Expr::Function(new_function(
+                                "format_type",
+                                vec![
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(*cast_expr.clone())),
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                                        Value::Null.into(),
+                                    ))),
+                                ],
+                            ))
+                        }
+                        // A regtype from a type name is that type's OID, which is what
+                        // introspection queries compare against `pg_attribute.atttypid`
+                        Expr::Value(val) => {
+                            let Some(str_val) = self.parse_value_to_str(&val.value) else {
+                                return Ok(());
+                            };
+
+                            match Self::regtype_name_to_oid(str_val) {
+                                Some(oid) => {
+                                    *expr =
+                                        Expr::Value(Value::Number(oid.to_string(), false).into());
+                                }
+                                None => trace!(
+                                    r#"Unable to cast string to RegType via CastReplacer, type "{}" is not defined"#,
+                                    str_val
+                                ),
+                            }
+                        }
+                        _ => (),
+                    }
+                }
                 ast::DataType::Custom(name, _) => match name.to_string().to_lowercase().as_str() {
                     "name" | "oid" | "information_schema.cardinal_number" | "regproc" => {
                         self.visit_expr(&mut *cast_expr)?;
@@ -905,21 +1299,6 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                         self.visit_expr(&mut *cast_expr)?;
 
                         *data_type = ast::DataType::Timestamp(None, ast::TimezoneInfo::None);
-                    }
-                    "regtype" => {
-                        self.visit_expr(&mut *cast_expr)?;
-
-                        if let Expr::Identifier(_) = &**cast_expr {
-                            *expr = Expr::Function(new_function(
-                                "format_type",
-                                vec![
-                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(*cast_expr.clone())),
-                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
-                                        Value::Null.into(),
-                                    ))),
-                                ],
-                            ))
-                        }
                     }
                     "\"char\"" => {
                         self.visit_expr(&mut *cast_expr)?;
@@ -988,6 +1367,15 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                     self.visit_expr(&mut *cast_expr)?;
 
                     *data_type = ast::DataType::Varchar(len);
+                }
+                ast::DataType::Array(ast::ArrayElemTypeDef::SquareBracket(elem_type, _))
+                    if Self::is_regtype(elem_type) =>
+                {
+                    self.visit_expr(&mut *cast_expr)?;
+
+                    if let Some(array) = Self::replace_regtype_array_cast(cast_expr) {
+                        *expr = array;
+                    }
                 }
                 ast::DataType::Regclass => match &**cast_expr {
                     Expr::Value(val) => {
@@ -1398,6 +1786,128 @@ mod tests {
         run_cast_replacer(
             "SELECT CAST(1 as INT8 UNSIGNED)",
             "SELECT CAST(1 AS BIGINT UNSIGNED)",
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cast_replacer_regtype() -> Result<(), CubeError> {
+        // a type name cast to regtype resolves to that type's OID
+        run_cast_replacer("SELECT 'int4'::regtype", "SELECT 23")?;
+        run_cast_replacer("SELECT 'integer'::regtype", "SELECT 23")?;
+        run_cast_replacer("SELECT 'int'::regtype", "SELECT 23")?;
+        run_cast_replacer("SELECT 'pg_catalog.int8'::regtype", "SELECT 20")?;
+        run_cast_replacer("SELECT 'int8'::pg_catalog.regtype", "SELECT 20")?;
+        run_cast_replacer("SELECT 'character varying'::regtype", "SELECT 1043")?;
+        run_cast_replacer("SELECT 'varchar(10)'::regtype", "SELECT 1043")?;
+        // `float(p)` picks the type: real up to 24 bits of mantissa, double precision above
+        run_cast_replacer("SELECT 'float'::regtype", "SELECT 701")?;
+        run_cast_replacer("SELECT 'float(24)'::regtype", "SELECT 700")?;
+        run_cast_replacer("SELECT 'float(53)'::regtype", "SELECT 701")?;
+        run_cast_replacer("SELECT 'float(24)[]'::regtype", "SELECT 1021")?;
+        // Postgres rejects a wider mantissa, so no type resolves
+        run_cast_replacer("SELECT 'float(54)'::regtype", "SELECT 'float(54)'::regtype")?;
+        run_cast_replacer("SELECT 'int4[]'::regtype", "SELECT 1007")?;
+        run_cast_replacer("SELECT 'integer[]'::regtype", "SELECT 1007")?;
+        // Postgres does not track the number of dimensions in an array type
+        run_cast_replacer("SELECT 'int4[][]'::regtype", "SELECT 1007")?;
+        // an identifier keeps the display semantics of regtype
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype",
+            "SELECT format_type(a.atttypid, NULL)",
+        )?;
+        // an unknown type name is left alone
+        run_cast_replacer(
+            "SELECT 'unknown_type'::regtype",
+            "SELECT 'unknown_type'::regtype",
+        )?;
+
+        // array literals expand to an ARRAY of OIDs
+        run_cast_replacer(
+            "SELECT '{int,int8,int2}'::regtype[]",
+            "SELECT ARRAY[23, 20, 21]",
+        )?;
+        run_cast_replacer(
+            "SELECT '{ int4 , \"character varying\" }'::regtype[]",
+            "SELECT ARRAY[23, 1043]",
+        )?;
+        run_cast_replacer("SELECT '{int4,NULL}'::regtype[]", "SELECT ARRAY[23, NULL]")?;
+        // an empty array is a usable result: the comparison is false, as in Postgres
+        run_cast_replacer("SELECT '{}'::regtype[]", "SELECT ARRAY[]")?;
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype = ANY ('{}'::regtype[])",
+            "SELECT a.atttypid = ANY(ARRAY[])",
+        )?;
+        run_cast_replacer("SELECT '{int4}'::pg_catalog.regtype[]", "SELECT ARRAY[23]")?;
+        // an unknown element leaves the whole cast alone
+        run_cast_replacer(
+            "SELECT '{int4,unknown_type}'::regtype[]",
+            "SELECT '{int4,unknown_type}'::regtype[]",
+        )?;
+        // an escaped element is the string `NULL`, not the NULL element, and no type resolves
+        // from it, so the cast is left alone
+        run_cast_replacer(
+            r#"SELECT '{\N\U\L\L}'::regtype[]"#,
+            r#"SELECT '{\N\U\L\L}'::regtype[]"#,
+        )?;
+        // a literal this does not model leaves the cast alone rather than dropping elements
+        run_cast_replacer(
+            "SELECT '{{int4},{int8}}'::regtype[]",
+            "SELECT '{{int4},{int8}}'::regtype[]",
+        )?;
+        run_cast_replacer(
+            r#"SELECT '{"int4}'::regtype[]"#,
+            r#"SELECT '{"int4}'::regtype[]"#,
+        )?;
+
+        // comparing two regtypes compares OIDs, so the column keeps its OID here
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype = 'int8'::regtype",
+            "SELECT a.atttypid = 20",
+        )?;
+        run_cast_replacer(
+            "SELECT 'int8'::regtype = a.atttypid::regtype",
+            "SELECT 20 = a.atttypid",
+        )?;
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype = ANY ('{int8,int2}'::regtype[])",
+            "SELECT a.atttypid = ANY(ARRAY[20, 21])",
+        )?;
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype IN ('int8'::regtype, 'int2'::regtype)",
+            "SELECT a.atttypid IN (20, 21)",
+        )?;
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype = ANY (ARRAY['int8'::regtype, 'int2'::regtype])",
+            "SELECT a.atttypid = ANY(ARRAY[20, 21])",
+        )?;
+        // an operator a regtype does not order OIDs by keeps the type name on the column side
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype ~ ANY ('{int8}'::regtype[])",
+            "SELECT format_type(a.atttypid, NULL) ~ ANY(ARRAY[20])",
+        )?;
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype BETWEEN 'int2'::regtype AND 'int8'::regtype",
+            "SELECT a.atttypid BETWEEN 21 AND 20",
+        )?;
+        run_cast_replacer(
+            "SELECT CASE a.atttypid::regtype WHEN 'int8'::regtype THEN 1 END",
+            "SELECT CASE a.atttypid WHEN 20 THEN 1 END",
+        )?;
+        // a comparison against a plain string wants the type name instead
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype = 'bigint'",
+            "SELECT format_type(a.atttypid, NULL) = 'bigint'",
+        )?;
+        // a literal that resolves to no type leaves both sides of the comparison alone
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype = 'unknown_type'::regtype",
+            "SELECT format_type(a.atttypid, NULL) = 'unknown_type'::regtype",
+        )?;
+        run_cast_replacer(
+            "SELECT a.atttypid::regtype = ANY ('{int8,unknown_type}'::regtype[])",
+            "SELECT format_type(a.atttypid, NULL) = ANY('{int8,unknown_type}'::regtype[])",
         )?;
 
         Ok(())
