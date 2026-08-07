@@ -451,3 +451,53 @@ GROUP BY dim_str0
         "the string form must still normalize and push down"
     );
 }
+
+/// An out-of-range bound must not cost the rest of the query its normalization.
+///
+/// `PlanNormalize` is run as `optimize(..).unwrap_or(plan)`, so an `Err` anywhere in the rule
+/// silently reverts the *whole* plan. The bound is therefore declined at the coercion site instead.
+/// Without that, the `DATE - DATE` → `DATEDIFF` rewrite below disappears — and on dialects where
+/// `DATE - DATE` yields an INTERVAL, comparing it against `3` is wrong SQL, which is precisely why
+/// the rewrite exists.
+#[tokio::test]
+async fn test_out_of_range_bound_keeps_other_normalizations() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (label, predicate) in [
+        ("control", "(dim_date1::date - dim_date2::date) > 3"),
+        (
+            "with an out-of-range bound",
+            "(dim_date1::date - dim_date2::date) > 3 AND dim_date0 <= date '9999-12-31'",
+        ),
+    ] {
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            format!(
+                r#"
+SELECT dim_str0
+FROM MultiTypeCube
+WHERE {predicate}
+GROUP BY dim_str0
+"#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let sql = query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+
+        assert!(
+            sql.contains("DATEDIFF(day,"),
+            "the DATE - DATE rewrite must survive {}, got: {}",
+            label,
+            sql
+        );
+    }
+}

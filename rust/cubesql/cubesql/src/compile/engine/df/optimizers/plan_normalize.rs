@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use chrono::{Datelike, NaiveDate};
+use chrono::Datelike;
 use datafusion::{
     arrow::datatypes::{DataType, TimeUnit},
     error::{DataFusionError, Result},
@@ -1383,20 +1383,35 @@ fn binary_expr_normalize(
 
     // Check if the expression is `TIMESTAMP <op> DATE` or `DATE <op> TIMESTAMP`
     // and cast the `DATE` to `TIMESTAMP` to match the types.
+    // The coercion is declined side-locally when the bound can't survive it, rather than letting
+    // `evaluate_expr` error: an `Err` here aborts the whole rule (`query_engine.rs` runs it as
+    // `optimize(..).unwrap_or(plan)`), which would silently drop every other normalization in the
+    // query — including the `DATE - DATE` → `DATEDIFF` rewrite above, whose absence is wrong SQL on
+    // dialects that return INTERVAL. The un-coerced comparison still pushes down with the date
+    // intact, and the guard inside `evaluate_expr_stacked` remains the backstop for shapes that
+    // cannot avoid the cast.
     match (&left_type, &right_type) {
         (DataType::Timestamp(_, _), DataType::Date32) => {
-            return Ok(Box::new(Expr::BinaryExpr {
-                left,
-                op,
-                right: evaluate_expr(optimizer, right.cast_to(&left_type, schema)?)?,
-            }));
+            let casted = right.clone().cast_to(&left_type, schema)?;
+            if find_unrepresentable_datetime_literal(&casted).is_none() {
+                return Ok(Box::new(Expr::BinaryExpr {
+                    left,
+                    op,
+                    right: evaluate_expr(optimizer, casted)?,
+                }));
+            }
+            return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
         }
         (DataType::Date32, DataType::Timestamp(_, _)) => {
-            return Ok(Box::new(Expr::BinaryExpr {
-                left: evaluate_expr(optimizer, left.cast_to(&right_type, schema)?)?,
-                op,
-                right,
-            }));
+            let casted = left.clone().cast_to(&right_type, schema)?;
+            if find_unrepresentable_datetime_literal(&casted).is_none() {
+                return Ok(Box::new(Expr::BinaryExpr {
+                    left: evaluate_expr(optimizer, casted)?,
+                    op,
+                    right,
+                }));
+            }
+            return Ok(Box::new(Expr::BinaryExpr { left, op, right }));
         }
         _ => (),
     };
@@ -1454,6 +1469,10 @@ fn cast_string_literal_expr(
 /// `Date32`/`Date64` are built here rather than left to the Arrow cast kernel because that kernel
 /// routes a date through an unchecked nanosecond multiply, so a date beyond 2262-04-11 overflows.
 /// Day and millisecond counts have no such limit, so the parsed value is used directly.
+///
+/// Parsing with `parse_date_str` also accepts date strings the Arrow kernel rejects, and a
+/// `Date32` target drops any time component (`'2020-01-01 15:30:00'` → `2020-01-01`), matching
+/// Postgres' `::date`. Those comparisons previously stayed un-normalized.
 fn parse_string_literal_as(value: &str, cast_type: &DataType) -> Option<ScalarValue> {
     // Checked before parsing so a non-temporal target costs nothing.
     if !matches!(
@@ -1465,12 +1484,9 @@ fn parse_string_literal_as(value: &str, cast_type: &DataType) -> Option<ScalarVa
     let parsed = parse_date_str(value).ok()?.and_utc();
     match cast_type {
         // chrono's own date range is ±96_465_292 days, so the day count always fits an i32.
-        DataType::Date32 => {
-            let epoch = NaiveDate::from_ymd_opt(1970, 1, 1)?;
-            Some(ScalarValue::Date32(Some(
-                parsed.date_naive().num_days_from_ce() - epoch.num_days_from_ce(),
-            )))
-        }
+        DataType::Date32 => Some(ScalarValue::Date32(Some(
+            parsed.date_naive().num_days_from_ce() - EPOCH_DAYS_FROM_CE,
+        ))),
         DataType::Date64 => Some(ScalarValue::Date64(Some(parsed.timestamp_millis()))),
         DataType::Timestamp(TimeUnit::Second, tz) => Some(ScalarValue::TimestampSecond(
             Some(parsed.timestamp()),
@@ -1489,6 +1505,11 @@ fn parse_string_literal_as(value: &str, cast_type: &DataType) -> Option<ScalarVa
             // The instant is real but no nanosecond timestamp can hold it. Milliseconds reach it
             // comfortably and the filter is rendered from the scalar, not from this unit, so the
             // bound survives instead of being dropped back to an un-normalized string.
+            //
+            // `Date64` specifically, not `TimestampMillisecond`: filter pushdown converts only
+            // `TimestampNanosecond | Date32 | Date64` (`rules/filters.rs`,
+            // `scalar_to_native_datetime`), so a millisecond timestamp is an "Unsupported filter
+            // scalar" and the bound is dropped instead of pushed down.
             None => ScalarValue::Date64(Some(parsed.timestamp_millis())),
         }),
         _ => None,
@@ -1654,6 +1675,9 @@ fn between_expr_normalize(
 }
 
 const NANOSECONDS_IN_DAY: i64 = 86_400_000_000_000;
+
+/// Days from the CE epoch to 1970-01-01, i.e. `NaiveDate::from_ymd(1970, 1, 1).num_days_from_ce()`.
+const EPOCH_DAYS_FROM_CE: i32 = 719_163;
 
 /// Whether a date/time literal can be held by an `i64` nanosecond timestamp.
 ///
