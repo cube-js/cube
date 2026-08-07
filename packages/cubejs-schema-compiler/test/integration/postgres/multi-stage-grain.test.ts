@@ -133,6 +133,22 @@ cubes:
             - orders.status
           include:
             - orders.id
+
+      # ── grain.exclude + filter.exclude on the same dim ────────────
+      # "Share of the whole universe" denominator: the value ignores both
+      # the query filter on status and the status partition. The result row
+      # set must stay the query's — dropping the filter may not resurrect
+      # rows the query filtered out.
+      - name: amount_grain_and_filter_exclude_status
+        sql: "{CUBE.total_amount}"
+        type: sum
+        multi_stage: true
+        grain:
+          exclude:
+            - orders.status
+        filter:
+          exclude:
+            - orders.status
     `);
 
   if (getEnv('nativeSqlPlanner')) {
@@ -257,6 +273,23 @@ cubes:
       { orders__status: 'pending', orders__category: 'books', orders__total_amount: '50', orders__amount_grain_keep_status_include_id: '125' },
       { orders__status: 'pending', orders__category: 'electronics', orders__total_amount: '75', orders__amount_grain_keep_status_include_id: '125' },
     ], { joinGraph, cubeEvaluator, compiler }));
+
+    // ── grain.exclude + filter.exclude on the same dim ────────────
+    it('grain.exclude + filter.exclude: keeps the query row set', async () => dbRunner.runQueryTest({
+      measures: ['orders.total_amount', 'orders.amount_grain_and_filter_exclude_status'],
+      dimensions: ['orders.status', 'orders.category'],
+      filters: [
+        { member: 'orders.status', operator: 'equals', values: ['completed'] },
+      ],
+      order: [{ id: 'orders.status' }, { id: 'orders.category' }],
+      timezone: 'UTC',
+    }, [
+      // The denominator is the per-category total over every status (books=250,
+      // electronics=275), while the rows stay the filtered ones — no pending or
+      // cancelled row may come back through the join.
+      { orders__status: 'completed', orders__category: 'books', orders__total_amount: '170', orders__amount_grain_and_filter_exclude_status: '250' },
+      { orders__status: 'completed', orders__category: 'electronics', orders__total_amount: '200', orders__amount_grain_and_filter_exclude_status: '275' },
+    ], { joinGraph, cubeEvaluator, compiler }));
   } else {
     // These tests rely on Tesseract; v1 planner does not implement the directive.
     test.skip('exclude: drops a dim from the partition', () => { expect(1).toBe(1); });
@@ -267,5 +300,6 @@ cubes:
     test.skip('keep_only: two-element array narrows to the (status, category) cell', () => { expect(1).toBe(1); });
     test.skip('include: two-element array extends the leaf grain', () => { expect(1).toBe(1); });
     test.skip('keep_only + include: keep narrows, include extends', () => { expect(1).toBe(1); });
+    test.skip('grain.exclude + filter.exclude: keeps the query row set', () => { expect(1).toBe(1); });
   }
 });

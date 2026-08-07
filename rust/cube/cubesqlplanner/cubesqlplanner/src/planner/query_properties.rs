@@ -1152,14 +1152,30 @@ impl QueryProperties {
     /// Equality over members (chain-resolved), the three filter slots,
     /// segments and time-shifts. Excludes ordering, limits, planner flags
     /// and join hints; for those fields use the full [`PartialEq`].
+    ///
+    /// Filters are compared with [`tree_ops::eq_with_member`] rather than with
+    /// `FilterItem`'s own equality, which looks at a filter's operator and
+    /// values but not at the member it restricts. Two states filtering
+    /// different dimensions to the same value are different states, and
+    /// conflating them makes a CTE serve a filter it was never built for.
     pub fn eq_as_state(&self, other: &Self) -> bool {
         Self::members_equivalent(&self.dimensions, &other.dimensions)
+            && Self::filters_equivalent(&self.dimensions_filters, &other.dimensions_filters)
             && Self::members_equivalent(&self.time_dimensions, &other.time_dimensions)
-            && self.dimensions_filters == other.dimensions_filters
-            && self.time_dimensions_filters == other.time_dimensions_filters
-            && self.measures_filters == other.measures_filters
-            && self.segments == other.segments
+            && Self::filters_equivalent(
+                &self.time_dimensions_filters,
+                &other.time_dimensions_filters,
+            )
+            && Self::filters_equivalent(&self.measures_filters, &other.measures_filters)
+            && Self::filters_equivalent(&self.segments, &other.segments)
             && self.time_shifts == other.time_shifts
+    }
+
+    fn filters_equivalent(a: &[FilterItem], b: &[FilterItem]) -> bool {
+        a.len() == b.len()
+            && a.iter()
+                .zip(b.iter())
+                .all(|(a, b)| tree_ops::eq_with_member(a, b))
     }
 }
 

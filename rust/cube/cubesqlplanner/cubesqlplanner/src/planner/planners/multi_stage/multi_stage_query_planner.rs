@@ -9,6 +9,7 @@ use crate::logical_plan::*;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::collectors::member_childs;
 use crate::planner::filter::base_filter::FilterType;
+use crate::planner::filter::tree_ops;
 use crate::planner::filter::BaseFilter;
 use crate::planner::filter::FilterItem;
 use crate::planner::filter::FilterOperator;
@@ -177,12 +178,16 @@ impl MultiStageQueryPlanner {
                 .multi_stage()
                 .map(|ms| ms.grain.clone())
                 .unwrap_or_default();
-            // Window-path eligibility intentionally checks only `include`:
-            // `exclude` and `keep_only` are realised through the window's
-            // PARTITION BY at render time, so they don't disqualify the
-            // path. `include` extends the leaf grain, which the JOIN-model
-            // is required for. Revisit if window-path expands to cases
-            // where exclude/keep_only affect render correctness.
+            // Of the `grain` lists only `include` disqualifies the window path
+            // here: `exclude` and `keep_only` are realised through the window's
+            // PARTITION BY at render time, while `include` extends the leaf
+            // grain, which the JOIN-model is required for.
+            //
+            // Grain is not the only disqualifier. A `filter` directive that
+            // drops a filter the query restricts the grid by also rules the
+            // window path out. Detecting that needs the inherited state, which
+            // only exists further down in `make_queries_descriptions` — the
+            // flag is revoked there.
             let has_include = grain.include.as_ref().is_some_and(|v| !v.is_empty());
             let use_window_path = matches!(member_type, MultiStageInodeMemberType::Aggregate)
                 && !has_include
@@ -525,7 +530,7 @@ impl MultiStageQueryPlanner {
                 alias.clone(),
             )
         } else {
-            let (multi_stage_member, is_ungrupped) = self
+            let (mut multi_stage_member, is_ungrupped) = self
                 .create_multi_stage_inode_member(member.clone(), resolved_multi_stage_dimensions)?;
 
             let mut dimensions_to_add = multi_stage_member
@@ -557,16 +562,55 @@ impl MultiStageQueryPlanner {
             // The window-path Aggregate inode skips step 2: the leaf stays
             // at the parent state plus any `include` extension, and the
             // window function does the `exclude` collapse at outer level.
-            let use_window_path = multi_stage_member.use_window_path();
-            let new_state = {
-                let mut new_state = match directive_filter.as_ref().map(|f| &f.mode) {
+            let filtered_state = {
+                let mut filtered_state = match directive_filter.as_ref().map(|f| &f.mode) {
                     Some(MultiStageFilterMode::Fixed) => self.root_state().as_ref().clone(),
                     Some(MultiStageFilterMode::Relative) | None => state.as_ref().clone(),
                 };
 
                 if let Some(filter) = &directive_filter {
-                    apply_filter_directive_to_state(filter, &mut new_state);
+                    apply_filter_directive_to_state(filter, &mut filtered_state);
                 }
+                filtered_state
+            };
+
+            // Step 1 can drop a filter the query restricts the grid by. That is
+            // the point of the directive — the aggregation input widens — but
+            // the rows the inode *reports* must stay the query's, and only the
+            // JOIN-model can hold the two apart: its keys side enumerates the
+            // grid while its measure side spans the widened set. A window
+            // expression has one row set serving both roles, so it reports the
+            // widened rows too and values the query filtered out come back as
+            // result rows. Hand such an inode to the JOIN-model.
+            let query_filter_dropped =
+                query_filters_dropped(self.root_state(), &state, &filtered_state);
+            if query_filter_dropped {
+                multi_stage_member = multi_stage_member.with_use_window_path(false);
+            }
+
+            // Whether this inode can actually act on that, decided here so both
+            // halves of the decision stay together — the keys side that carries
+            // the query's rows is requested further down.
+            //
+            // A parent state with no dimensions is a single-row grid that no
+            // filter change can widen, and an empty key-dimension list
+            // degenerates into a cross join rather than being rejected. A
+            // Dimension inode never reads `keys_input`, so building one leaves
+            // unreferenced CTEs behind. And a Rank inode ranks within whatever
+            // its source carries: handing it the keys side would shrink the
+            // ranked population to the grid and collapse the ranks, trading a
+            // widened row set for wrong values. Rank needs its rows restricted
+            // *after* the window, which this assembly cannot express.
+            let needs_query_grid = query_filter_dropped
+                && (!state.dimensions().is_empty() || !state.time_dimensions().is_empty())
+                && !matches!(
+                    multi_stage_member.inode_type(),
+                    MultiStageInodeMemberType::Dimension | MultiStageInodeMemberType::Rank
+                );
+
+            let use_window_path = multi_stage_member.use_window_path();
+            let new_state = {
+                let mut new_state = filtered_state;
 
                 if !use_window_path
                     && matches!(
@@ -602,14 +646,15 @@ impl MultiStageQueryPlanner {
                 scope,
             )?;
 
-            // JOIN-model: when new_state misses any dim that was on the
-            // parent's `state`, this inode shrinks the parent grain. We
-            // build keys-side descriptions per child on the parent state
-            // so the FullKeyAggregate can broadcast measure values back
-            // to the full query grain. Window-path Aggregate inodes
-            // (sum-of-sum / sum-of-count with no leaf-extending `include`)
-            // handle broadcast via the window expression instead and don't
-            // need keys_input.
+            // JOIN-model: when the measure side no longer enumerates the rows
+            // this inode has to report — because new_state misses a dim that
+            // was on the parent's `state`, or because a dropped query filter
+            // widened it — we build keys-side descriptions per child on the
+            // parent state, so the FullKeyAggregate broadcasts measure values
+            // onto the query grain and only onto it. Window-path Aggregate
+            // inodes (sum-of-sum / sum-of-count with no leaf-extending
+            // `include`) handle broadcast via the window expression instead and
+            // don't need keys_input.
             let mut keys_input: Vec<Rc<MultiStageQueryDescription>> = vec![];
             if !use_window_path {
                 let new_state_has = |sym: &Rc<MemberSymbol>| {
@@ -625,7 +670,11 @@ impl MultiStageQueryPlanner {
                     .iter()
                     .chain(state.time_dimensions().iter())
                     .any(|d| !new_state_has(d));
-                if any_missing {
+                // A dropped query filter needs the keys side for the same
+                // reason a shrunk grain does — the measure side no longer
+                // enumerates the query's rows — except here the grid keeps
+                // every dimension and only the row count within it grows.
+                if any_missing || needs_query_grid {
                     self.make_childs(
                         member.clone(),
                         state.clone(),
@@ -1095,6 +1144,52 @@ fn filter_directive_match_names(symbol: &Rc<MemberSymbol>) -> Vec<String> {
     } else {
         vec![full]
     }
+}
+
+// True when `narrowed` lost a *query-level* filter that `base` restricts the
+// grid by. Three conditions per filter: `base` has it, the query asked for it,
+// and `narrowed` doesn't have it.
+//
+// The query membership check is what keeps the notion anchored to the result
+// grid. A filter a parent multi-stage member introduced through its own
+// `filter: include` narrows that parent's view, not the grid the query asked
+// for; a child dropping it (`mode: fixed`) therefore cannot widen the grid
+// past the query, and needs no keys side.
+//
+// Measure filters are absent from the comparison because they never reach a
+// CTE state to begin with — `build_root_state` drops them — so there is no
+// query-level measure filter for a directive to lose. Filters added on top of
+// `base` don't count either: they shrink the grid, which is safe.
+//
+// The query-membership check compares whole filters, so a filter whose values
+// were rewritten between the root state and `base` reads as one the query never
+// asked for, and the drop goes undetected. That is deliberately out of scope: a
+// path that rewrites filter values on the way down has to bound the row set by
+// other means. The rolling-window date-range rewrite is the one such path, and
+// it does — its rows come from the time series and its values through the frame
+// condition, both built from the query's own range. A new rewriting path has to
+// establish the same, or anchor this check on the member instead of the value.
+fn query_filters_dropped(
+    root: &QueryProperties,
+    base: &QueryProperties,
+    narrowed: &QueryProperties,
+) -> bool {
+    fn any_dropped(root: &[FilterItem], base: &[FilterItem], narrowed: &[FilterItem]) -> bool {
+        base.iter().any(|item| {
+            tree_ops::contains_with_member(root, item)
+                && !tree_ops::contains_with_member(narrowed, item)
+        })
+    }
+
+    any_dropped(
+        root.dimensions_filters(),
+        base.dimensions_filters(),
+        narrowed.dimensions_filters(),
+    ) || any_dropped(
+        root.time_dimensions_filters(),
+        base.time_dimensions_filters(),
+        narrowed.time_dimensions_filters(),
+    ) || any_dropped(root.segments(), base.segments(), narrowed.segments())
 }
 
 fn apply_filter_directive_to_state(filter: &MultiStageFilter, state: &mut QueryProperties) {
