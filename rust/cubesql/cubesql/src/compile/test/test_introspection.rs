@@ -3437,3 +3437,47 @@ async fn test_pg_user_mapping() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+/// Domo's live Postgres connection issues this to inspect the columns of a table picked in
+/// its UI. It tests `atttypid` against a set of types spelled as a `regtype[]` literal.
+#[tokio::test]
+async fn domo_column_inspection_query() -> Result<(), CubeError> {
+    insta::assert_snapshot!(
+        "domo_column_inspection_query",
+        execute_query(
+            r#"
+            SELECT
+              a.attname AS column_name,
+              format_type(a.atttypid, NULL) AS data_type,
+              CASE
+                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL
+                ELSE CASE
+                  WHEN a.atttypmod = -1 THEN NULL
+                  ELSE (a.atttypmod - 4) >> 16
+                END
+              END AS numeric_precision,
+              CASE
+                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL
+                ELSE CASE
+                  WHEN a.atttypmod = -1 THEN NULL
+                  ELSE (a.atttypmod - 4) & 65535
+                END
+              END AS numeric_scale
+            FROM pg_catalog.pg_attribute a
+              JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+              JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+            WHERE c.relname = 'KibanaSampleDataEcommerce'
+              AND n.nspname = 'public'
+              AND a.attnum > 0
+              AND NOT a.attisdropped
+              AND c.relkind IN ('r', 'v', 'm')
+            ORDER BY a.attnum
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
