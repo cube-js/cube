@@ -472,6 +472,16 @@ async fn test_out_of_range_bound_keeps_other_normalizations() {
             "with an out-of-range bound",
             "(dim_date1::date - dim_date2::date) > 3 AND dim_date0 <= date '9999-12-31'",
         ),
+        (
+            "with an out-of-range BETWEEN bound",
+            "(dim_date1::date - dim_date2::date) > 3 \
+             AND dim_date0 BETWEEN date '2020-01-01' AND date '9999-12-31'",
+        ),
+        (
+            "with an out-of-range IN element",
+            "(dim_date1::date - dim_date2::date) > 3 \
+             AND dim_date0 IN (date '2020-01-01', date '9999-12-31')",
+        ),
     ] {
         let query_plan = convert_select_to_query_plan(
             // language=PostgreSQL
