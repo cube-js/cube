@@ -1,0 +1,25 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT\n              a.attname AS column_name,\n              format_type(a.atttypid, NULL) AS data_type,\n              CASE\n                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL\n                ELSE CASE\n                  WHEN a.atttypmod = -1 THEN NULL\n                  ELSE (a.atttypmod - 4) >> 16\n                END\n              END AS numeric_precision,\n              CASE\n                WHEN a.atttypid = ANY ('{int,int8,int2}'::regtype[]) THEN NULL\n                ELSE CASE\n                  WHEN a.atttypmod = -1 THEN NULL\n                  ELSE (a.atttypmod - 4) & 65535\n                END\n              END AS numeric_scale\n            FROM pg_catalog.pg_attribute a\n              JOIN pg_catalog.pg_class c ON a.attrelid = c.oid\n              JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid\n            WHERE c.relname = 'KibanaSampleDataEcommerce'\n              AND n.nspname = 'public'\n              AND a.attnum > 0\n              AND NOT a.attisdropped\n              AND c.relkind IN ('r', 'v', 'm')\n            ORDER BY a.attnum\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+-----------------------------+-------------------+---------------+
+| column_name        | data_type                   | numeric_precision | numeric_scale |
++--------------------+-----------------------------+-------------------+---------------+
+| count              | bigint                      | NULL              | NULL          |
+| maxPrice           | numeric                     | NULL              | NULL          |
+| sumPrice           | numeric                     | NULL              | NULL          |
+| minPrice           | numeric                     | NULL              | NULL          |
+| avgPrice           | numeric                     | NULL              | NULL          |
+| countDistinct      | bigint                      | NULL              | NULL          |
+| id                 | numeric                     | NULL              | NULL          |
+| order_date         | timestamp without time zone | NULL              | NULL          |
+| last_mod           | timestamp without time zone | NULL              | NULL          |
+| customer_gender    | text                        | NULL              | NULL          |
+| notes              | text                        | NULL              | NULL          |
+| taxful_total_price | numeric                     | NULL              | NULL          |
+| has_subscription   | boolean                     | NULL              | NULL          |
+| is_male            | boolean                     | NULL              | NULL          |
+| is_female          | boolean                     | NULL              | NULL          |
+| __user             | text                        | NULL              | NULL          |
+| __cubeJoinField    | text                        | NULL              | NULL          |
++--------------------+-----------------------------+-------------------+---------------+
