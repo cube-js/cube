@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+### Bug Fixes
+
+- **cubesql:** Preserve `lastRefreshTime` with post-processing and SQL pushdown ([#11394](https://github.com/cube-js/cube/issues/11394)) ([3728d62](https://github.com/cube-js/cube/commit/3728d62b260c5d4481c12c918fe260c533a7f47d))
+- **cubestore:** advertise INCR, not INC, in the CACHE unknown-command error ([#11434](https://github.com/cube-js/cube/issues/11434)) ([a6fbbb4](https://github.com/cube-js/cube/commit/a6fbbb48b93e54a8dcb63cba6c838c3174b56724))
+- **cubestore:** GCS - list_prefix infinite collection causing OOM, thanks @Xuxiaotuan ([#11381](https://github.com/cube-js/cube/issues/11381)) ([bf6a069](https://github.com/cube-js/cube/commit/bf6a0699e62b375ccff95faae98d1b86fd69c798))
+- **docs:** drop trailing slashes from three redirect sources so they resolve ([#11439](https://github.com/cube-js/cube/issues/11439)) ([f0006ef](https://github.com/cube-js/cube/commit/f0006efd3b2b4a10e9561332a3db24dbc14ef541))
+- **tesseract:** don't serve ungrouped queries from collapsing rollups ([#11485](https://github.com/cube-js/cube/issues/11485)) ([259188d](https://github.com/cube-js/cube/commit/259188d9cd511c9ccf5f4cf18c92719f5d9e5e07))
+- **tesseract:** keep the query row set when a multi-stage filter directive drops a filter ([#11483](https://github.com/cube-js/cube/issues/11483)) ([d479434](https://github.com/cube-js/cube/commit/d47943417ef1f93bed376c406271e7e7ca11b465))
+- **tesseract:** plan multiplied measures per cube and join tree ([#11436](https://github.com/cube-js/cube/issues/11436)) ([f7ff67a](https://github.com/cube-js/cube/commit/f7ff67aa508d0b6e6512d503ece7f7516567b906))
+- **tesseract:** resolve FILTER_PARAMS column callback references ([#11460](https://github.com/cube-js/cube/issues/11460)) ([f5b2533](https://github.com/cube-js/cube/commit/f5b2533d4b58274c353ffcda6494a5037f742375))
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 ### Features

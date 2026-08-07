@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+### Bug Fixes
+
+- **cubestore:** advertise INCR, not INC, in the CACHE unknown-command error ([#11434](https://github.com/cube-js/cube/issues/11434)) ([a6fbbb4](https://github.com/cube-js/cube/commit/a6fbbb48b93e54a8dcb63cba6c838c3174b56724))
+- **cubestore:** GCS - list_prefix infinite collection causing OOM, thanks @Xuxiaotuan ([#11381](https://github.com/cube-js/cube/issues/11381)) ([bf6a069](https://github.com/cube-js/cube/commit/bf6a0699e62b375ccff95faae98d1b86fd69c798))
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

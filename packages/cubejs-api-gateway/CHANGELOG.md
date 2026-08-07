@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+### Bug Fixes
+
+- **cubesql:** Preserve `lastRefreshTime` with post-processing and SQL pushdown ([#11394](https://github.com/cube-js/cube/issues/11394)) ([3728d62](https://github.com/cube-js/cube/commit/3728d62b260c5d4481c12c918fe260c533a7f47d))
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

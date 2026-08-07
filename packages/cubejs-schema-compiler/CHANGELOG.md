@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.17](https://github.com/cube-js/cube/compare/v1.7.16...v1.7.17) (2026-08-07)
+
+### Bug Fixes
+
+- **tesseract:** don't serve ungrouped queries from collapsing rollups ([#11485](https://github.com/cube-js/cube/issues/11485)) ([259188d](https://github.com/cube-js/cube/commit/259188d9cd511c9ccf5f4cf18c92719f5d9e5e07))
+- **tesseract:** keep the query row set when a multi-stage filter directive drops a filter ([#11483](https://github.com/cube-js/cube/issues/11483)) ([d479434](https://github.com/cube-js/cube/commit/d47943417ef1f93bed376c406271e7e7ca11b465))
+- **tesseract:** plan multiplied measures per cube and join tree ([#11436](https://github.com/cube-js/cube/issues/11436)) ([f7ff67a](https://github.com/cube-js/cube/commit/f7ff67aa508d0b6e6512d503ece7f7516567b906))
+- **tesseract:** resolve FILTER_PARAMS column callback references ([#11460](https://github.com/cube-js/cube/issues/11460)) ([f5b2533](https://github.com/cube-js/cube/commit/f5b2533d4b58274c353ffcda6494a5037f742375))
+
 ## [1.7.16](https://github.com/cube-js/cube/compare/v1.7.15...v1.7.16) (2026-07-31)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
