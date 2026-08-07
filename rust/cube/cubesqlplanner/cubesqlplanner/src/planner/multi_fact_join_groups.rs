@@ -57,7 +57,7 @@ impl MeasuresJoinHintsBuilder {
             base_hints.extend(&collect_join_hints(sym)?);
         }
 
-        MeasuresJoinHints::from_base_hints(base_hints, measures)
+        MeasuresJoinHints::from_base_hints(base_hints, measures, None)
     }
 }
 
@@ -68,10 +68,25 @@ impl MeasuresJoinHintsBuilder {
 /// - `measure_hints` — per-measure incremental hints, one entry per
 ///   non-multi-stage measure. Multi-stage measures plan their joins
 ///   separately and are skipped here.
+/// - `hints_by_cube` — the hints the measures of the whole query collected,
+///   grouped by the cube the measure itself belongs to, which for a measure of a
+///   view is that view. Multi-stage measures are included. Only used to resolve a
+///   measure that carries no hints of its own and sits on a view (see
+///   `MultiFactJoinGroups::fallback_hints_for_measure`), which is why the
+///   grouping matters: such a measure may only borrow from members of its own
+///   view. It is inherited as-is when regrouping over a measure subset, so the
+///   measure stays in the join tree of the query it came from.
+///
+///   Dimensions, filters and query-level join hints are deliberately absent: they
+///   land in `base_hints`, so a measure of a query that has any of them never
+///   reaches the fallback in the first place. That also means the view grouping
+///   only guards the case where `base_hints` is empty - a dimension of an
+///   unrelated view still pulls a hint-less member expression into its join.
 #[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
     measure_hints: Vec<MeasureJoinHints>,
+    hints_by_cube: HashMap<String, JoinHints>,
 }
 
 impl MeasuresJoinHints {
@@ -85,37 +100,59 @@ impl MeasuresJoinHints {
     }
 
     /// Reuse the existing `base_hints` to produce a new
-    /// `MeasuresJoinHints` over a different measure subset.
+    /// `MeasuresJoinHints` over a different measure subset. `hints_by_cube`
+    /// keeps describing the whole query, not the subset.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
-        Self::from_base_hints(self.base_hints.clone(), measures)
+        Self::from_base_hints(
+            self.base_hints.clone(),
+            measures,
+            Some(self.hints_by_cube.clone()),
+        )
     }
 
+    /// `inherited_hints_by_cube` describes the whole query these measures were
+    /// taken from, so the measures add nothing to it; without it they are grouped
+    /// from scratch.
     fn from_base_hints(
         base_hints: JoinHints,
         measures: &[Rc<MemberSymbol>],
+        inherited_hints_by_cube: Option<HashMap<String, JoinHints>>,
     ) -> Result<Self, CubeError> {
-        let mut filtered_measures = Vec::new();
-        for m in measures {
-            if !has_multi_stage_members(m, true)? {
-                filtered_measures.push(m.clone());
-            }
-        }
+        let inherited = inherited_hints_by_cube.is_some();
+        let mut hints_by_cube = inherited_hints_by_cube.unwrap_or_default();
 
-        let measure_hints: Vec<MeasureJoinHints> = filtered_measures
-            .iter()
-            .map(|m| -> Result<_, CubeError> {
-                let mut hints = base_hints.clone();
-                hints.extend(&collect_join_hints(m)?);
-                Ok(MeasureJoinHints {
-                    measure: m.clone(),
-                    hints,
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut measure_hints: Vec<MeasureJoinHints> = Vec::new();
+        for m in measures {
+            // Multi-stage measures plan their joins separately, so they get no
+            // entry of their own - but their hints still count towards their
+            // cube's. With inherited hints there is nothing left to collect
+            // them for.
+            let is_multi_stage = has_multi_stage_members(m, true)?;
+            if is_multi_stage && inherited {
+                continue;
+            }
+            let own_hints = collect_join_hints(m)?;
+            if !inherited {
+                hints_by_cube
+                    .entry(m.cube_name())
+                    .or_insert_with(JoinHints::new)
+                    .extend(&own_hints);
+            }
+            if is_multi_stage {
+                continue;
+            }
+            let mut hints = base_hints.clone();
+            hints.extend(&own_hints);
+            measure_hints.push(MeasureJoinHints {
+                measure: m.clone(),
+                hints,
+            });
+        }
 
         Ok(Self {
             base_hints,
             measure_hints,
+            hints_by_cube,
         })
     }
 
@@ -209,10 +246,20 @@ impl MultiFactJoinGroups {
                 .iter()
                 .map(|mh| -> Result<_, CubeError> {
                     let measure_hints = if mh.hints.is_empty() {
-                        Self::fallback_hints_for_measure(query_tools, &mh.measure)?
+                        Self::fallback_hints_for_measure(query_tools, &mh.measure, hints)?
                     } else {
                         mh.hints.clone()
                     };
+                    if measure_hints.is_empty() {
+                        return Err(CubeError::user(format!(
+                            "Can't resolve the cube to query for '{}': the member references no \
+                             members of '{}', and neither the rest of the query nor the join map \
+                             of '{}' gives a cube to join from",
+                            mh.measure.full_name(),
+                            mh.measure.cube_name(),
+                            mh.measure.cube_name()
+                        )));
+                    }
                     let (key, join_tree) = resolve(&measure_hints)?;
                     Ok((vec![mh.measure.clone()], key, join_tree))
                 })
@@ -237,23 +284,117 @@ impl MultiFactJoinGroups {
     }
 
     /// Hints to use for a measure whose own hint set resolved to empty.
-    /// Seeds the measure's owning cube when it is a real, joinable cube;
-    /// returns empty for views (resolved via the query's other members).
+    /// Seeds the measure's owning cube when it is a real, joinable cube.
+    ///
+    /// A view is not a joinable cube, so it can't seed anything. Such a measure
+    /// borrows the hints of the other members **of that same view** instead, and
+    /// lands in the same join group as the members it borrowed from. Members of
+    /// another view or of a bare cube are not borrowed from: their cubes need not
+    /// appear in this view at all, and counting rows of a join tree the view is
+    /// not built on would answer a different question than the one asked.
+    ///
+    /// Borrowing at all is what the legacy planner does, but it borrows wider: it
+    /// unions the join hints of every query member into one join tree, with no
+    /// notion of which view a member came from. Narrowing that union to the
+    /// measure's own view is the difference here.
+    ///
+    /// When there is nothing to borrow from either, the view's own join map is
+    /// the last resort: its paths start at the cube the view is rooted at, so
+    /// that cube is the one to query. This is what makes a query built only from
+    /// such member expressions, like `COUNT(*)` over a view, resolvable. It only
+    /// covers views that have a join map at all: a view over a single directly
+    /// joinable cube records no path, and such a query is rejected - see
+    /// `test_expr_measure_count_star_only_member_on_view`.
+    ///
+    /// Note that borrowing makes the meaning of such a measure depend on the rest
+    /// of the query: `COUNT(*)` over a view with two facts counts the rows of the
+    /// cube the view is rooted at when selected alone, and the rows of the fanned
+    /// out join tree when selected together with measures from both facts. The
+    /// legacy planner behaves the same way, since it pools the hints of all query
+    /// members into one join tree.
+    ///
+    /// Known hole, kept for legacy parity: the same-view rule only reaches
+    /// measures. Dimensions, filters and query-level hints land in `base_hints`,
+    /// which is not view-scoped, and a measure whose `base_hints` are non-empty
+    /// never gets here at all. So a dimension of an *unrelated* view still drags a
+    /// hint-less member expression into that view's join and yields a number for a
+    /// join tree its own view is not built on - see
+    /// `test_expr_measure_count_star_no_hints_beside_other_view_dimension`, which
+    /// pins that behaviour. Closing it means resolving from the view bucket
+    /// whenever the measure's *own* hints are empty, which would also make the
+    /// ordinary shape - a view dimension next to `COUNT(*)` on the same view -
+    /// depend on that bucket carrying dimensions, so it is a larger change than
+    /// this fix.
     fn fallback_hints_for_measure(
         query_tools: &Rc<State>,
         measure: &Rc<MemberSymbol>,
+        all_hints: &MeasuresJoinHints,
     ) -> Result<JoinHints, CubeError> {
         let cube_name = measure.cube_name();
-        let is_view = query_tools
+        let cube_definition = query_tools
             .cube_evaluator()
             .cube_from_path(cube_name.clone())
-            .ok()
+            .ok();
+        let is_view = cube_definition
+            .as_ref()
             .and_then(|cube| cube.static_data().is_view)
             .unwrap_or(false);
-        if is_view {
-            Ok(JoinHints::new())
-        } else {
-            Ok(JoinHints::from_items(vec![JoinHintItem::Single(cube_name)]))
+        if !is_view {
+            return Ok(JoinHints::from_items(vec![JoinHintItem::Single(cube_name)]));
+        }
+
+        match all_hints.hints_by_cube.get(&cube_name) {
+            Some(hints) if !hints.is_empty() => return Ok(hints.clone()),
+            _ => {}
+        }
+
+        let join_map = cube_definition
+            .and_then(|cube| cube.static_data().join_map.clone())
+            .unwrap_or_default();
+        if join_map.is_empty() {
+            return Ok(JoinHints::new());
+        }
+        // A cube that heads one path but is reached from another one is not a
+        // root of the view - the path it heads is just the tail of a longer walk.
+        // Only the heads that nothing else reaches are candidates.
+        let reached = join_map
+            .iter()
+            .flat_map(|path| path.iter().skip(1))
+            .collect::<HashSet<_>>();
+        let roots = join_map
+            .iter()
+            .filter_map(|path| path.first())
+            .filter(|head| !reached.contains(*head))
+            .unique()
+            .collect_vec();
+
+        let no_single_root = |detail: String| {
+            CubeError::user(format!(
+                "Can't resolve the cube to query for '{}': the member references no members of \
+                 '{}', and {detail}",
+                measure.full_name(),
+                cube_name,
+            ))
+        };
+
+        match roots.as_slice() {
+            [root_cube] => Ok(JoinHints::from_items(vec![JoinHintItem::Single(
+                (*root_cube).clone(),
+            )])),
+            // Every path of the join map is headed by a cube some other path
+            // reaches, so the paths lead in a circle and none of them starts at
+            // the view's root.
+            [] => Err(no_single_root(format!(
+                "the join paths of that view are cyclic: {}",
+                join_map.iter().map(|path| path.join(".")).join(", ")
+            ))),
+            // The join map is ordered by the order the view lists its cubes, so
+            // picking one root out of several would make the answer depend on
+            // that order with nothing to hint at it.
+            _ => Err(no_single_root(format!(
+                "that view is built on cubes that don't share a single root: {}",
+                roots.iter().join(", ")
+            ))),
         }
     }
 
