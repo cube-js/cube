@@ -37,6 +37,7 @@ import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
 import { createLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
+import { fingerprint } from './driver-config-fingerprint';
 import {
   driverDependencies,
   lookupDriverClass,
@@ -73,6 +74,35 @@ import {
 } from './types';
 
 const { version } = require('../../../package.json');
+
+/**
+ * Rebuilds of one data source's driver before the log escalates to naming a
+ * likely misconfiguration. A rotating credential rebuilds a few times a day, so
+ * reaching this within a process means contexts are displacing each other.
+ */
+const DRIVER_REBUILD_WARN_THRESHOLD = 50;
+
+/**
+ * How many times one request will retry after losing the race to rebuild a
+ * driver before settling for whatever is cached. Bounds the work a single
+ * request can be made to do when contexts keep displacing each other's driver.
+ */
+const MAX_DRIVER_REBUILD_ATTEMPTS = 3;
+
+/**
+ * What a cached driver was built from. `null` on either field means "cannot
+ * tell whether it changed", which is always read as "assume it did not".
+ */
+type DriverOrigin = {
+  securityContextFingerprint: string | null;
+  configFingerprint: string | null;
+};
+
+/** A `driverFactory` result together with the context that produced it. */
+type DriverFactoryResult = {
+  value: DriverConfig | BaseDriver;
+  securityContextFingerprint: string | null;
+};
 
 function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   if (typeof possibleFn === 'function') {
@@ -129,6 +159,19 @@ export class CubejsServerCore {
   protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
+
+  /**
+   * The request context each cached orchestrator most recently served.
+   *
+   * An orchestrator's driver factory closes over the context of the request
+   * that created it, and the driver it resolves is then cached for the life of
+   * the process. When that driver's configuration is derived from the context —
+   * a per-user OAuth token, say — it goes stale the moment the credential
+   * rotates. Tracking the latest context lets the factory notice. Keyed by the
+   * api instance so an entry disappears with the orchestrator it belongs to.
+   */
+  protected readonly orchestratorRequestContexts =
+    new WeakMap<OrchestratorApi, { current: RequestContext }>();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
@@ -573,8 +616,21 @@ export class CubejsServerCore {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
-      return this.orchestratorStorage.get(orchestratorId);
+      const cachedOrchestratorApi = this.orchestratorStorage.get(orchestratorId);
+      const cachedContextRef = this.orchestratorRequestContexts.get(cachedOrchestratorApi);
+
+      // Keep the driver factory's view of the request context current. Without
+      // this it stays pinned to whichever request happened to create the
+      // orchestrator, and a driver built from context-derived credentials can
+      // never be rebuilt when they rotate.
+      if (cachedContextRef) {
+        cachedContextRef.current = context;
+      }
+
+      return cachedOrchestratorApi;
     }
+
+    const requestContextRef: { current: RequestContext } = { current: context };
 
     /**
      * Hash table to store promises which will be resolved with the
@@ -582,6 +638,21 @@ export class CubejsServerCore {
      * this constant.
      */
     const driverPromise: Record<string, Promise<BaseDriver>> = {};
+
+    /**
+     * What each cached driver in `driverPromise` was built from, so a changed
+     * configuration can be detected. Keyed identically to `driverPromise`.
+     */
+    const driverOrigin: Record<string, DriverOrigin> = {};
+
+    /**
+     * How many times each key has been rebuilt. Reported with the rebuild so a
+     * deployment whose `contextToOrchestratorId` does not partition by whatever
+     * `driverFactory` reads — every user sharing one orchestrator, say — is
+     * diagnosable: it rebuilds on request after request rather than once per
+     * credential rotation.
+     */
+    const driverRebuilds: Record<string, number> = {};
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
@@ -596,74 +667,226 @@ export class CubejsServerCore {
         (await this.orchestratorOptions(context)) || {},
       );
 
-    const orchestratorApi = this.createOrchestratorApi(
+    /**
+     * Driver factory function `DriverFactoryByDataSource`. Named so the rebuild
+     * path can re-enter it when another caller wins the race to replace a key.
+     */
+    const resolveDataSourceDriver = async (
+      dataSource = 'default',
+      preAggregations = false,
+      attempt = 0,
+    ): Promise<BaseDriver> => {
+      const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
+
+      const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
+      const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
+
+      const driverContext = (): DriverContext => ({
+        ...requestContextRef.current,
+        dataSource,
+        preAggregations: usePreAgg || false,
+      });
+
       /**
-       * Driver factory function `DriverFactoryByDataSource`.
+       * Every key that resolves to the one driver built here. Without separate
+       * pre-aggregation credentials `usePreAgg` is false whichever key was
+       * asked for, so both describe an identically configured driver and share
+       * a single instance — they must therefore be written, and invalidated,
+       * together. Doing it per requested key instead lets the two diverge into
+       * two pools where the deployment expects one.
        */
-      async (dataSource = 'default', preAggregations = false) => {
-        const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
-        if (driverPromise[factoryKey]) {
-          return driverPromise[factoryKey];
-        }
+      const aliasedKeys = hasSeparatePreAggEnv
+        ? [factoryKey]
+        : [dataSource, `${dataSource}@pre_agg`];
 
-        const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
-        const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
+      const invalidate = () => aliasedKeys.forEach((key) => {
+        driverPromise[key] = null;
+        delete driverOrigin[key];
+      });
 
-        if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
-          this.logger('Pre-aggregation driver conflict', {
-            error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
-            dataSource,
-          });
-        }
+      // Already resolved by the staleness check below, so the factory is not
+      // asked twice for the same rebuild.
+      let resolvedFactoryResult: DriverFactoryResult | undefined;
 
-        driverPromise[factoryKey] = (async () => {
-          let driver: BaseDriver | null = null;
+      const cached = driverPromise[factoryKey];
 
-          try {
-            driver = await this.resolveDriver(
-              {
-                ...context,
-                dataSource,
-                preAggregations: usePreAgg || false,
-              },
-              orchestratorOptions,
-            );
+      if (cached) {
+        const staleness = await this.resolveDriverStaleness(
+          driverOrigin[factoryKey],
+          driverContext(),
+        );
 
-            if (typeof driver === 'object' && driver != null) {
-              if (driver.setLogger) {
-                driver.setLogger(this.logger);
-              }
+        // `resolveDriverStaleness` awaits the user's factory, so another caller
+        // may have replaced or invalidated this key in the meantime. Its work
+        // supersedes ours, and `cached` is no longer ours to reuse or release:
+        // it has either been handed to that caller's requests or already
+        // released by it.
+        const superseding = driverPromise[factoryKey];
 
-              await driver.testConnection();
-
-              return driver;
-            }
-
-            throw new Error(
-              `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
-            );
-          } catch (e) {
-            driverPromise[factoryKey] = null;
-
-            if (!preAggregations && !hasSeparatePreAggEnv) {
-              driverPromise[`${dataSource}@pre_agg`] = null;
-            }
-
-            if (driver) {
-              await driver.release();
-            }
-
-            throw e;
+        if (superseding !== cached) {
+          // Retry, so this request ends up on a driver matching its own
+          // context — but bounded. Where contexts keep displacing each other
+          // this request could otherwise lose every round and pay for a
+          // user-supplied factory call each time. Past the bound, take what is
+          // cached: degrading to a reused driver is this design's fallback
+          // everywhere else, and it is strictly better than starving.
+          if (attempt < MAX_DRIVER_REBUILD_ATTEMPTS) {
+            return resolveDataSourceDriver(dataSource, preAggregations, attempt + 1);
           }
-        })();
 
-        // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
-          driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
+          if (superseding) {
+            return superseding;
+          }
+
+          // Invalidated rather than replaced — the winning caller's own build
+          // failed, so it released `cached` and left nothing to reuse. Build
+          // below, which cannot recurse again, carrying the probe's result when
+          // it already resolved one so the factory is not asked twice.
+          resolvedFactoryResult = staleness.stale ? staleness.factoryResult : undefined;
+        } else if (!staleness.stale) {
+          return cached;
+        } else {
+          // Counted per alias set, not per key: a rotation seen first through
+          // `default@pre_agg` and then through `default` is one rebuild of one
+          // shared driver, and must not read as two counters at 1.
+          const rebuildKey = aliasedKeys[0];
+          driverRebuilds[rebuildKey] = (driverRebuilds[rebuildKey] || 0) + 1;
+          const rebuildCount = driverRebuilds[rebuildKey];
+
+          // Carries `warning` so it survives the default log level: a
+          // plain-params message matches no allowlist in
+          // `prodLogger`/`devLogger` and is dropped below `trace`. Tearing down
+          // a connection pool is an event an operator needs to be able to
+          // correlate against, and the threshold message below arrives too late
+          // to reconstruct the first rebuilds.
+          this.logger('Rebuilding driver on configuration change', {
+            dataSource,
+            preAggregations,
+            rebuildCount,
+            warning: 'Driver configuration changed; replacing the connection.',
+          });
+
+          // A credential rotation rebuilds a handful of times a day. Rebuilding
+          // this often means the orchestrator id does not partition by whatever
+          // the factory reads, so contexts that need different connections keep
+          // displacing each other's driver.
+          if (rebuildCount === DRIVER_REBUILD_WARN_THRESHOLD) {
+            this.logger('Driver rebuilt repeatedly', {
+              dataSource,
+              rebuildCount,
+              warning: 'Driver configuration keeps changing for one orchestrator. '
+                + 'contextToOrchestratorId likely does not distinguish the contexts '
+                + 'driverFactory returns different connections for.',
+            });
+          }
+
+          // Clear every key pointing at the replaced driver, not just the one
+          // asked for: a surviving alias would keep handing out a driver whose
+          // pool is being drained, and would release it a second time when it
+          // was itself found stale.
+          Object.keys(driverPromise)
+            .filter((key) => driverPromise[key] === cached)
+            .forEach((key) => {
+              driverPromise[key] = null;
+              delete driverOrigin[key];
+            });
+
+          // Graceful: `release` drains the pool, so queries already running on
+          // the replaced driver finish before its connections are closed. It is
+          // deliberately not awaited — this request should not wait on the
+          // previous driver's in-flight work — and its failure must not fail
+          // this request.
+          cached
+            .then((driver) => driver.release())
+            .catch((error) => this.logger('Driver release error', {
+              dataSource,
+              error: (error as Error).stack || (error as Error).toString(),
+            }));
+
+          resolvedFactoryResult = staleness.factoryResult;
         }
+      }
 
-        return driverPromise[factoryKey];
-      },
+      if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
+        this.logger('Pre-aggregation driver conflict', {
+          error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
+          dataSource,
+        });
+      }
+
+      // Shared by reference across `aliasedKeys`, so every key describes the
+      // one driver they all resolve to. Starts empty: until the factory has
+      // been called there is nothing to compare against, and
+      // `resolveDriverStaleness` reads that as "reuse".
+      const origin: DriverOrigin = {
+        securityContextFingerprint: null,
+        configFingerprint: null,
+      };
+
+      aliasedKeys.forEach((key) => {
+        driverOrigin[key] = origin;
+      });
+
+      const pending = (async () => {
+        let driver: BaseDriver | null = null;
+
+        try {
+          const currentDriverContext = driverContext();
+          const factoryResult = resolvedFactoryResult ?? {
+            value: await this.options.driverFactory(currentDriverContext),
+            securityContextFingerprint: fingerprint(currentDriverContext.securityContext),
+          };
+
+          origin.securityContextFingerprint = factoryResult.securityContextFingerprint;
+          origin.configFingerprint = isDriver(factoryResult.value)
+            ? null
+            : fingerprint(factoryResult.value);
+
+          driver = await this.createDriverFromFactoryResult(
+            factoryResult.value,
+            currentDriverContext,
+            orchestratorOptions,
+          );
+
+          if (typeof driver === 'object' && driver != null) {
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
+            }
+
+            await driver.testConnection();
+
+            return driver;
+          }
+
+          throw new Error(
+            `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
+          );
+        } catch (e) {
+          // Only if this build still owns the keys. A concurrent rebuild
+          // installs its own `origin`, and its driver must not be evicted
+          // because ours failed.
+          if (driverOrigin[factoryKey] === origin) {
+            invalidate();
+          }
+
+          if (driver) {
+            await driver.release();
+          }
+
+          throw e;
+        }
+      })();
+
+      // No separate pre-agg driver needed — share the same promise across keys
+      aliasedKeys.forEach((key) => {
+        driverPromise[key] = pending;
+      });
+
+      return pending;
+    };
+
+    const orchestratorApi = this.createOrchestratorApi(
+      resolveDataSourceDriver,
       {
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
           if (externalPreAggregationsDriverPromise) {
@@ -713,6 +936,7 @@ export class CubejsServerCore {
       }
     );
 
+    this.orchestratorRequestContexts.set(orchestratorApi, requestContextRef);
     this.orchestratorStorage.set(orchestratorId, orchestratorApi);
 
     return orchestratorApi;
@@ -877,7 +1101,24 @@ export class CubejsServerCore {
     context: DriverContext,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
-    const val = await this.options.driverFactory(context);
+    return this.createDriverFromFactoryResult(
+      await this.options.driverFactory(context),
+      context,
+      options,
+    );
+  }
+
+  /**
+   * Build a driver from whatever `driverFactory` returned. Split out of
+   * `resolveDriver` so a caller that has already invoked the factory — to
+   * compare its result against the cached driver's — can build from that same
+   * result instead of invoking a user-supplied function a second time.
+   */
+  protected async createDriverFromFactoryResult(
+    val: DriverConfig | BaseDriver,
+    context: DriverContext,
+    options?: OrchestratorInitedOptions,
+  ): Promise<BaseDriver> {
     if (isDriver(val)) {
       return <BaseDriver>val;
     } else {
@@ -893,6 +1134,97 @@ export class CubejsServerCore {
       opts.preAggregations = context.preAggregations || false;
       return CubejsServerCore.createDriver(type, opts);
     }
+  }
+
+  /**
+   * Decide whether a cached driver still reflects what `driverFactory` would
+   * resolve for the current request context.
+   *
+   * The check is deliberately layered so that deployments which cannot be
+   * affected never leave the fast path, and no user-supplied function is called
+   * more often than it has to be:
+   *
+   *  1. No custom `driverFactory`, or one that hands back a constructed driver
+   *     rather than a config — nothing context-derived to compare. Reuse.
+   *  2. The security context is byte-for-byte what the cached driver was built
+   *     from. Reuse, without calling the factory at all. This is the common
+   *     case: `requestId` changes per request, credentials do not.
+   *  3. The security context changed, so ask the factory. Most factories ignore
+   *     it and return an identical config — reuse, and remember the new context
+   *     so step 2 short-circuits next time.
+   *  4. The config genuinely changed. Rebuild.
+   *
+   * Step 4 is what fixes a rotated per-user credential: previously the driver
+   * built from the first request's token was reused for the life of the
+   * process, so every new connection it opened failed to authenticate.
+   *
+   * Note this follows the documented contract of `contextToOrchestratorId` —
+   * that it is the cache key for database connections. Two contexts that
+   * resolve to different connections but share an orchestrator id are a
+   * misconfiguration; they were already sharing one user's connection before
+   * this change.
+   */
+  protected async resolveDriverStaleness(
+    origin: DriverOrigin | undefined,
+    context: DriverContext,
+  ): Promise<{ stale: false } | { stale: true, factoryResult: DriverFactoryResult }> {
+    if (
+      !origin ||
+      origin.configFingerprint === null ||
+      !this.optsHandler.isCustomDriverFactory()
+    ) {
+      return { stale: false };
+    }
+
+    const securityContextFingerprint = fingerprint(context.securityContext);
+
+    if (
+      securityContextFingerprint === null ||
+      securityContextFingerprint === origin.securityContextFingerprint
+    ) {
+      return { stale: false };
+    }
+
+    let value: DriverConfig | BaseDriver;
+
+    try {
+      value = await this.options.driverFactory(context);
+    } catch (error) {
+      // This call is a probe, not the request's own resolution: a cache hit
+      // never used to invoke the factory at all, so letting a transient failure
+      // here propagate would fail a query the cached driver could have served.
+      // Degrade to reuse, as with anything else that cannot be compared.
+      this.logger('Driver staleness check error', {
+        dataSource: context.dataSource,
+        error: (error as Error).stack || (error as Error).toString(),
+      });
+
+      return { stale: false };
+    }
+
+    const configFingerprint = isDriver(value) ? null : fingerprint(value);
+
+    if (configFingerprint === null || configFingerprint === origin.configFingerprint) {
+      // A driver the factory constructed for this probe is about to be dropped,
+      // so hand back whatever it opened rather than leaking it. Only reachable
+      // for a factory that returns a config sometimes and a driver other times.
+      if (isDriver(value)) {
+        try {
+          await (<BaseDriver>value).release();
+        } catch (error) {
+          this.logger('Driver release error', {
+            dataSource: context.dataSource,
+            error: (error as Error).stack || (error as Error).toString(),
+          });
+        }
+      }
+
+      origin.securityContextFingerprint = securityContextFingerprint;
+
+      return { stale: false };
+    }
+
+    return { stale: true, factoryResult: { value, securityContextFingerprint } };
   }
 
   public async testConnections() {
