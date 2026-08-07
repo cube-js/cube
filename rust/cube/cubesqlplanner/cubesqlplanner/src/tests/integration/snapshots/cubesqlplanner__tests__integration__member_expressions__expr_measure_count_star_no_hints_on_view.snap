@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+distinct_status | total_count
+----------------+------------
+2               | 8

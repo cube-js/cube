@@ -105,6 +105,17 @@ views:
                 - city
                 - ny_customers
 
+    # Join paths under two different roots, so the join map alone does not say
+    # which cube a member expression with no hints of its own should query.
+    - name: two_roots_view
+      cubes:
+          - join_path: orders.customers
+            includes:
+                - city
+          - join_path: returns.customers
+            includes:
+                - name
+
     - name: customer_overview
       cubes:
           - join_path: customers
