@@ -114,6 +114,30 @@ Formats a date value for a given time dimension `granularity` (e.g. `'day'`, `'m
 
 Main class for accessing Cube API
 
+### `cubeSql`
+
+>  **cubeSql**(**sqlQuery**: string, **options?**: [CubeSqlOptions](#cubesqloptions)): *Promise‹[CubeSqlResult](#cubesqlresult)›*
+
+>  **cubeSql**(**sqlQuery**: string, **options?**: [CubeSqlOptions](#cubesqloptions), **callback?**: [LoadMethodCallback](#loadmethodcallback)‹[CubeSqlResult](#cubesqlresult)›): *void*
+
+Run a SQL query via the [`/v1/cubesql`][ref-cubesql-endpoint] endpoint of the
+[SQL API][ref-sql-api] and get the results.
+
+```js
+const result = await cubeApi.cubeSql(
+  'SELECT status, MEASURE(count) FROM orders GROUP BY 1',
+  { timezone: 'America/Los_Angeles' }
+);
+```
+
+**Parameters:**
+
+Name | Type | Description |
+------ | ------ | ------ |
+sqlQuery | string | The SQL query to run |
+options? | [CubeSqlOptions](#cubesqloptions) | - |
+callback? | [LoadMethodCallback](#loadmethodcallback)‹[CubeSqlResult](#cubesqlresult)› | - |
+
 ### `dryRun`
 
 > **dryRun**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[TDryRunResponse](#tdryrunresponse)›*
@@ -857,6 +881,24 @@ pollInterval? | number | - |
 transport? | [ITransport](#itransport) | Transport implementation to use. [HttpTransport](#httptransport) will be used by default. |
 signal? | AbortSignal | AbortSignal to cancel requests |
 
+### `CubeSqlOptions`
+
+Extends [`LoadMethodOptions`](#loadmethodoptions) with the options accepted by
+[`cubeSql`](#cubesql).
+
+Name | Type | Optional? | Description |
+------ | ------ | ------ | --- |
+`timeout` | `number` | ✅ Yes | Query timeout in milliseconds. |
+`timezone` | `string` | ✅ Yes | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` — same as `query.timezone` in the REST (JSON) API's [`/v1/load`][ref-query-format]. When omitted, the query runs in the deployment's default time zone. |
+
+### `CubeSqlResult`
+
+Name | Type |
+------ | ------ |
+schema | `{ name: string, column_type: string }[]` |
+data | `(string \| number \| boolean \| null)[][]` |
+lastRefreshTime? | string |
+
 ### `DateRange`
 
 > **DateRange**: *string | [string, string]*
@@ -1197,3 +1239,7 @@ values? | never |
 [ref-query-format]: /reference/core-data-apis/rest-api/query-format
 [ref-security]: /docs/data-modeling/access-control
 [ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
+[ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-cubesql-endpoint]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
+[ref-time-zone]: /reference/core-data-apis/queries#time-zone
+[link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
