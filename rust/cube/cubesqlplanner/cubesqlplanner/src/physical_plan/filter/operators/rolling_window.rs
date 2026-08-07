@@ -11,7 +11,7 @@ impl FilterOperationSql for RegularRollingWindowOp {
         let from = ctx.extend_date_range_bound(from, &self.trailing, true)?;
         let to = ctx.extend_date_range_bound(to, &self.leading, false)?;
 
-        let date_field = ctx.convert_tz(ctx.member_sql)?;
+        let date_field = ctx.convert_tz(ctx.member_sql())?;
 
         match (&from, &to) {
             (Some(from), Some(to)) => {
@@ -28,7 +28,7 @@ impl FilterOperationSql for RegularRollingWindowOp {
 impl FilterOperationSql for RollingWindowOffsetOp {
     fn to_sql(&self, ctx: &FilterSqlContext) -> Result<String, CubeError> {
         let from_start = self.offset == "start";
-        let member = ctx.member_sql.to_string();
+        let member = ctx.member_sql().to_string();
 
         // Anchor: range start (formatted to start-of-day) for offset 'start',
         // range end (formatted to end-of-day) for 'end'. Both bounds share it.

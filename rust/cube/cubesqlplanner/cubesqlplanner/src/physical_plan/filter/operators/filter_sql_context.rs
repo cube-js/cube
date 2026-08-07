@@ -2,6 +2,7 @@ use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
 use crate::planner::QueryDateTimeHelper;
+use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_compound};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -15,7 +16,7 @@ enum DateBound {
 }
 
 pub struct FilterSqlContext<'a> {
-    pub member_sql: &'a str,
+    member_sql: String,
     pub query_tools: &'a Rc<QueryTools>,
     pub plan_templates: &'a PlanSqlTemplates,
     pub use_db_time_zone: bool,
@@ -23,6 +24,47 @@ pub struct FilterSqlContext<'a> {
 }
 
 impl<'a> FilterSqlContext<'a> {
+    pub fn new(
+        member_sql: &str,
+        query_tools: &'a Rc<QueryTools>,
+        plan_templates: &'a PlanSqlTemplates,
+        use_db_time_zone: bool,
+        use_raw_values: bool,
+    ) -> Self {
+        Self {
+            member_sql: Self::as_operand(member_sql),
+            query_tools,
+            plan_templates,
+            use_db_time_zone,
+            use_raw_values,
+        }
+    }
+
+    /// The member's SQL as a single operand: safe to place next to an operator
+    /// of any precedence.
+    pub fn member_sql(&self) -> &str {
+        &self.member_sql
+    }
+
+    // A member's SQL is an expression of unknown shape. When its own top-level
+    // operator binds weaker than the operator a filter template puts beside it,
+    // the bare splice re-associates and that operator captures only the tail of
+    // the member expression — a syntax error on some dialects, a silently
+    // different predicate on the rest. Parentheses pin the whole expression as
+    // one operand; an atomic expression needs none and keeps its shape.
+    fn as_operand(member_sql: &str) -> String {
+        if !is_top_level_compound(member_sql) {
+            return member_sql.to_string();
+        }
+        // An expression ending in a line comment would swallow the closing
+        // parenthesis, so that one gets a line of its own.
+        if ends_in_line_comment(member_sql) {
+            format!("({}\n)", member_sql)
+        } else {
+            format!("({})", member_sql)
+        }
+    }
+
     pub fn allocate_param(&self, value: &str) -> String {
         self.query_tools.allocate_param(value)
     }
