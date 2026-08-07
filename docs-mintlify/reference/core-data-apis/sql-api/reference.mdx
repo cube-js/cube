@@ -254,6 +254,16 @@ of the PostgreSQL documentation.
 | `SIGN` | Sign of the argument (`-1`, `0`, or `+1`) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `SQRT` | Square root | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `TRUNC` | Truncates to integer (towards zero) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `WIDTH_BUCKET` | Assigns a value to a bucket in an equal-width histogram | ✅ Yes | ❌ No |
+
+<Note>
+
+`WIDTH_BUCKET` pushdown is only available on data sources whose SQL dialect
+supports it. It is not supported with Apache Pinot, BigQuery, CrateDB, Cube Store,
+Dremio, Druid, DuckDB, Firebolt, Hive, ksqlDB, Microsoft SQL Server, MySQL,
+QuestDB, or SQLite.
+
+</Note>
 
 ### Trigonometric functions
 

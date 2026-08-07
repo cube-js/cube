@@ -15127,6 +15127,64 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_width_bucket_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        // The bucket count is an Int64 literal here, while Postgres types it as int4:
+        // the stub signature has to accept both, otherwise planning fails on coercion.
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT WIDTH_BUCKET(k.taxful_total_price, -301, 2200, 36) AS b, COUNT(1)
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql
+            .contains(
+                "WIDTH_BUCKET(${KibanaSampleDataEcommerce.taxful_total_price}, -301, 2200, 36)"
+            ));
+
+        // Same call with an Int32 bucket count, which matches the other arm of the
+        // stub signature. It has to render identically.
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT WIDTH_BUCKET(k.taxful_total_price, -301, 2200, CAST(36 AS INT)) AS b, COUNT(1)
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        assert!(query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql
+            .contains(
+                "WIDTH_BUCKET(${KibanaSampleDataEcommerce.taxful_total_price}, -301, 2200, 36)"
+            ));
+    }
+
+    #[tokio::test]
     async fn test_datetrunc_push_down() {
         if !Rewriter::sql_push_down_enabled() {
             return;

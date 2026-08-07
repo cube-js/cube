@@ -335,6 +335,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP()';
     delete templates.functions.TO_CHAR;
     delete templates.functions.PERCENTILECONT;
+    delete templates.functions.WIDTH_BUCKET;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     // BigQuery `/` on INT64 operands returns FLOAT64; DIV() is integer division

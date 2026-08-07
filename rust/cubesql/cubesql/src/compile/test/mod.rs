@@ -704,6 +704,7 @@ pub fn sql_generator(
                     ("functions/LOWER".to_string(), "LOWER({{ args_concat }})".to_string()),
                     ("functions/UPPER".to_string(), "UPPER({{ args_concat }})".to_string()),
                     ("functions/PERCENTILECONT".to_string(), "PERCENTILE_CONT({{ args_concat }})".to_string()),
+                    ("functions/WIDTH_BUCKET".to_string(), "WIDTH_BUCKET({{ args_concat }})".to_string()),
                     ("expressions/query_aliased".to_string(), "{{ query }} AS {{ quoted_alias }}".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (

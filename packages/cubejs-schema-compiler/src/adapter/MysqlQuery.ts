@@ -189,6 +189,7 @@ export class MysqlQuery extends BaseQuery {
     templates.functions.UTCTIMESTAMP = 'UTC_TIMESTAMP()';
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
+    delete templates.functions.WIDTH_BUCKET;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     // NOTE: this template contains a comma; two order expressions are being generated
