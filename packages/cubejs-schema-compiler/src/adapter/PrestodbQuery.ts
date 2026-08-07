@@ -49,11 +49,27 @@ export class PrestodbQuery extends BaseQuery {
     return `from_iso8601_timestamp(${value})`;
   }
 
+  /**
+   * Lifts a DATE expression to a timestamp so that timezone arithmetic accepts
+   * it. `COALESCE` with a NULL timestamp resolves to the common supertype,
+   * which triggers the implicit DATE -> TIMESTAMP coercion while leaving both
+   * timestamp types intact. An explicit `CAST(... AS TIMESTAMP)` would instead
+   * strip the zone off a `timestamp with time zone` expression, so the
+   * subsequent `AT TIME ZONE` would reinterpret its wall clock in the session
+   * timezone and shift the result.
+   */
+  protected coerceToTimestamp(field: string): string {
+    return `COALESCE(${field}, CAST(NULL AS TIMESTAMP))`;
+  }
+
   public override convertTz(field) {
-    const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
-    return this.timezone ?
-      `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
-      field;
+    if (!this.timezone) {
+      return field;
+    }
+
+    const timestampField = this.coerceToTimestamp(field);
+    const atTimezone = `${timestampField} AT TIME ZONE '${this.timezone}'`;
+    return `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${timestampField})) AS TIMESTAMP)`;
   }
 
   /**
