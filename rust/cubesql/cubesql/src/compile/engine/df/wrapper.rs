@@ -2984,7 +2984,17 @@ impl WrappedSelectNode {
                     )
                 }
             }
-            // ScalarValue::Date64(_) => {}
+            // A `Date64` bound reaches here from `PlanNormalize`'s out-of-nanosecond-range
+            // fallback, so it has to render rather than fall to the catch-all error below.
+            ScalarValue::Date64(ms) => {
+                generate_sql_for_timestamp!(
+                    literal,
+                    ms,
+                    timestamp_millis_opt,
+                    sql_generator,
+                    sql_query
+                )
+            }
 
             // generate_sql_for_timestamp will call Utc constructors, so only support UTC zone for now
             // DataFusion can return "UTC" for stuff like `NOW()` during constant folding
