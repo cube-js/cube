@@ -294,7 +294,7 @@ can change their values, switch operators, or remove them entirely.
 
 Each entry has a `member` (a dimension or measure exposed by the view), an
 `operator`, and a list of `values` — or a single `value`, which is natural for
-single-value operators. Null-check operators take no value.
+single-value operators. Null-check and empty-check operators take no value.
 
 <Info>
 
@@ -369,7 +369,7 @@ Operators use the same labels data consumers see in the workbook filter bar —
 what you see in the filter bar is what you type: `is`, `is not`, `after date`,
 `after or on date`, `before date`, `before or on date`, `between`, `contains`,
 `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`,
-`is null`, `is not null`.
+`is null`, `is not null`, `is empty`, `is not empty`.
 
 Operators are case-insensitive and whitespace-tolerant. Internal type names and
 REST API aliases (e.g. `equals`, `gte`, `inDateRange`) are also accepted.

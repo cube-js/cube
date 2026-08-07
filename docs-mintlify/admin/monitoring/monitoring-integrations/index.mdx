@@ -340,6 +340,14 @@ Query History export.
 
 </Note>
 
+### Redacting exported query values
+
+To keep filter values and SQL literals from leaving through Query History export,
+enable **Redact filter values in Query History Export** under **Settings →
+Monitoring Integrations** (shown once log export is on). With this toggle on, the
+exported `api_query` field has filter values and SQL literals stripped; it's off
+by default.
+
 
 [ref-autosuspend]: /admin/deployment/auto-suspension#effects-on-experience
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
