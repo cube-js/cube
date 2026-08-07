@@ -87,7 +87,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterParams).toEqual([{ cube_name: 'orders', name: 'status', column: 't.status' }]);
   });
 
-  it('keeps the column callback as a function (deferred) and records {fp:N}', () => {
+  it('compiles a column callback into a template of its own and records {fp:N}', () => {
     const res = compileMemberSql(
       (FILTER_PARAMS) => `${FILTER_PARAMS.orders.status.filter((c) => `${c} > 0`)}`,
       ['FILTER_PARAMS']
@@ -96,9 +96,97 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterParams).toHaveLength(1);
     expect(res.filterParams[0].cube_name).toBe('orders');
     expect(res.filterParams[0].name).toBe('status');
+    // The filter value it takes becomes a placeholder of its own.
+    expect(res.filterParams[0].column.template).toBe('{fpv:0} > 0');
+    expect(res.filterParams[0].column.valueParamsCount).toBe(1);
+    expect(res.filterParams[0].column.symbolPaths).toEqual([]);
+  });
+
+  // What a callback references belongs to the callback, not to the member whose
+  // sql declared it: the placeholders it emits index its own dependency list.
+  it('records a callback reference into the callback, not the enclosing member', () => {
+    const res = compileMemberSql(
+      (CUBE, FILTER_PARAMS) => `${FILTER_PARAMS.orders.createdAt.filter((from, to) => `${CUBE.createdAt} >= ${from} AND ${CUBE.createdAt} < ${to}`)}`,
+      ['CUBE', 'FILTER_PARAMS']
+    );
+    expect(res.template).toBe('{fp:0}');
+    expect(res.symbolPaths).toEqual([]);
+    expect(res.filterParams[0].column.template)
+      .toBe('{arg:0} >= {fpv:0} AND {arg:0} < {fpv:1}');
+    expect(res.filterParams[0].column.symbolPaths).toEqual([['CUBE', 'createdAt']]);
+  });
+
+  it('numbers callback references separately from the enclosing template', () => {
+    const res = compileMemberSql(
+      (CUBE, FILTER_PARAMS) => `${CUBE.a} AND ${FILTER_PARAMS.orders.b.filter((v) => `${CUBE.b} = ${v}`)}`,
+      ['CUBE', 'FILTER_PARAMS']
+    );
+    expect(res.template).toBe('{arg:0} AND {fp:0}');
+    expect(res.symbolPaths).toEqual([['CUBE', 'a']]);
+    expect(res.filterParams[0].column.template).toBe('{arg:0} = {fpv:0}');
+    expect(res.filterParams[0].column.symbolPaths).toEqual([['CUBE', 'b']]);
+  });
+
+  it('counts a defaulted parameter as a filter value', () => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from, to = 1) => `d BETWEEN ${from} AND ${to}`)}`,
+      ['FILTER_PARAMS']
+    );
+    expect(res.filterParams[0].column.template).toBe('d BETWEEN {fpv:0} AND {fpv:1}');
+  });
+
+  // A rest parameter takes as many values as the query supplies, which a fixed
+  // set of placeholders cannot express.
+  it('leaves a rest-parameter column callback uncompiled', () => {
+    const res = compileMemberSql(
+      (CUBE, FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((...vals) => vals.map(v => `${CUBE.a} = ${v}`).join(' OR '))}`,
+      ['CUBE', 'FILTER_PARAMS']
+    );
     expect(typeof res.filterParams[0].column).toBe('function');
-    const captured = res.filterParams[0].column;
-    expect(captured('X')).toBe('X > 0');
+  });
+
+  // Too few placeholders would render the missing values as `undefined`, so a
+  // parameter list that cannot be read in full is left to render time.
+  it.each([
+    // eslint-disable-next-line no-extra-bind
+    ['a bound callback', ((from, to) => `d >= ${from} AND d < ${to}`).bind(null)],
+    ['a comment closing the parameter list', (from /* ) */, to) => `d >= ${from} AND d < ${to}`],
+    // `Function.length` counts the parameters before the first default, so it
+    // cannot speak for the parse past that point — whichever parameter carries
+    // the string that breaks the scan.
+    ['a default containing a paren', (from, to = '(') => `d >= ${from} AND d < ${to}`],
+    ['a first parameter defaulted to a paren', (from = ')', to) => `d >= ${from} AND d < ${to}`],
+    ['a paren in a default with a parameter behind it', (from, to = ')', third) => `d >= ${from} AND d < ${to} AND x = ${third}`],
+    // A quote alone is enough to hold the callback back: whether it hides a paren
+    // is exactly what the scan cannot tell.
+    ['a default containing a quoted string', (from, to = 'x') => `d >= ${from} AND d < ${to}`],
+  ])('leaves %s uncompiled', (_name, column) => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter(column)}`,
+      ['FILTER_PARAMS']
+    );
+    expect(typeof res.filterParams[0].column).toBe('function');
+  });
+
+  // A defaulted parameter only costs `Function.length` its witness; a list with
+  // nothing for the scan to trip over is still read in full.
+  it('compiles a callback whose first parameter has a plain default', () => {
+    const res = compileMemberSql(
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from = 1, to) => `d >= ${from} AND d < ${to}`)}`,
+      ['FILTER_PARAMS']
+    );
+    expect(res.filterParams[0].column.template).toBe('d >= {fpv:0} AND d < {fpv:1}');
+  });
+
+  it('records a security context value referenced from a column callback into the callback', () => {
+    const res = compileMemberSql(
+      (SECURITY_CONTEXT, FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((v) => `t = ${SECURITY_CONTEXT.tenantId} AND a = ${v}`)}`,
+      ['SECURITY_CONTEXT', 'FILTER_PARAMS'],
+      { tenantId: 'acme' }
+    );
+    expect(res.securityContextValues).toEqual([]);
+    expect(res.filterParams[0].column.template).toBe('t = {sv:0} AND a = {fpv:0}');
+    expect(res.filterParams[0].column.securityContextValues).toEqual(['acme']);
   });
 
   it('records a filter group from filter-param args and yields {fg:0}', () => {

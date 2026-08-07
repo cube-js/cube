@@ -234,10 +234,51 @@ impl QueryProperties {
     }
 
     // Push every entry of `dimensions_filters` into matching `case`
-    // expressions on each member, filter and order item. Run once at
-    // construction; mutators do not re-apply it.
+    // expressions, and mark every FILTER_PARAMS binding by whether the query
+    // filters the members it renders from. Both cover each member, filter and
+    // order item. Run once at construction; mutators do not re-apply it.
     fn apply_static_filters(&mut self) -> Result<(), CubeError> {
         let dimensions_filters = self.dimensions_filters.clone();
+        // A FILTER_PARAMS binding may name any filtered member, not only a
+        // dimension, so its activity is read from the whole set.
+        //
+        // A multi-stage stage may then filter more than the query around it. It
+        // builds its own `QueryProperties` from its state, so this runs again for
+        // it and settles activity against the set that stage renders with.
+        let all_filters = transforms::filter_params_activity_filters(&self.all_filter_items());
+        for dim in self.dimensions.iter_mut() {
+            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+        }
+        for dim in self.time_dimensions.iter_mut() {
+            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+        }
+        for meas in self.measures.iter_mut() {
+            *meas = transforms::apply_filter_params_activity_to_symbol(meas, &all_filters)?;
+        }
+        // A column renders wherever its symbol does, which includes the symbols
+        // a query reaches only through a filter, a segment or an order item.
+        for filter_item in self.dimensions_filters.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for filter_item in self.measures_filters.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for filter_item in self.time_dimensions_filters.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for filter_item in self.segments.iter_mut() {
+            *filter_item =
+                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+        }
+        for order_item in self.order_by.iter_mut().flatten() {
+            order_item.member_evaluator = transforms::apply_filter_params_activity_to_symbol(
+                &order_item.member_evaluator,
+                &all_filters,
+            )?;
+        }
         for dim in self.dimensions.iter_mut() {
             *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
         }
@@ -395,14 +436,20 @@ impl QueryProperties {
 
     /// Concatenation of `time_dimensions_filters`, `dimensions_filters`, and
     /// `segments` into a single `Filter`. `measures_filters` are not included.
-    pub fn all_filters(&self) -> Option<Filter> {
-        let items = self
-            .time_dimensions_filters
+    /// `time_dimensions_filters`, `dimensions_filters` and `segments` as a flat
+    /// list. `measures_filters` are HAVING-style and stay out.
+    pub fn all_filter_items(&self) -> Vec<FilterItem> {
+        self.time_dimensions_filters
             .iter()
             .chain(self.dimensions_filters.iter())
             .chain(self.segments.iter())
             .cloned()
-            .collect_vec();
+            .collect_vec()
+    }
+
+    /// The same set as `all_filter_items`, as a single `Filter`.
+    pub fn all_filters(&self) -> Option<Filter> {
+        let items = self.all_filter_items();
         if items.is_empty() {
             None
         } else {

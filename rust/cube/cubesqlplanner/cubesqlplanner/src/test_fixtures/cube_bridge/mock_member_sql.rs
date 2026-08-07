@@ -1,6 +1,8 @@
 use crate::cube_bridge::member_sql::{
-    CompiledMemberTemplate, MemberSql, SqlTemplate, SqlTemplateArgs,
+    CompiledMemberTemplate, FilterParamsColumn, FilterParamsItem, MemberSql, SqlTemplate,
+    SqlTemplateArgs,
 };
+use crate::test_fixtures::cube_bridge::MockFilterParamsCallback;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -148,6 +150,47 @@ impl MockMemberSql {
                     continue;
                 }
 
+                // `{FILTER_PARAMS:<cube>.<member>:<column>}` records a FILTER_PARAMS
+                // binding with a callback column and yields `{fp:N}`. Inside
+                // `<column>`, `[path]` is a member reference — recorded into this
+                // template's own args, so the callback's output indexes the same
+                // dependency list — and `%N` stands for the Nth filter value the
+                // planner passes at render time.
+                if let Some(body) = path.strip_prefix("FILTER_PARAMS:") {
+                    let (member, column) = body.split_once(':').ok_or_else(|| {
+                        CubeError::user(format!(
+                            "FILTER_PARAMS needs a `<cube>.<member>:<column>` body: {}",
+                            body
+                        ))
+                    })?;
+                    // The scanner above stops at the first `}`, so a column carrying
+                    // one would have been cut short here.
+                    if column.is_empty() || column.contains('{') {
+                        return Err(CubeError::user(format!(
+                            "FILTER_PARAMS column must be non-empty and reference members as `[path]`: {}",
+                            column
+                        )));
+                    }
+                    let member_parts = member.split('.').collect::<Vec<_>>();
+                    if member_parts.len() != 2 || member_parts.iter().any(|p| p.is_empty()) {
+                        return Err(CubeError::user(format!(
+                            "FILTER_PARAMS member must be `<cube>.<member>`: {}",
+                            member
+                        )));
+                    }
+                    let (cube_name, name) = (member_parts[0], member_parts[1]);
+                    let column = Self::parse_column_references(column, &mut args, &mut args_names)?;
+                    let index = args.insert_filter_params(FilterParamsItem {
+                        cube_name: cube_name.to_string(),
+                        name: name.to_string(),
+                        column: FilterParamsColumn::Callback(Rc::new(
+                            MockFilterParamsCallback::new(column),
+                        )),
+                    });
+                    result.push_str(&format!("{{fp:{}}}", index));
+                    continue;
+                }
+
                 // Parse the path and add to symbol_paths
                 let path_parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
 
@@ -180,6 +223,46 @@ impl MockMemberSql {
         }
 
         Ok((result, args, args_names))
+    }
+
+    // Replaces every `[path.to.member]` in a callback column with the `{arg:N}`
+    // placeholder of its recorded path.
+    fn parse_column_references(
+        column: &str,
+        args: &mut SqlTemplateArgs,
+        args_names: &mut Vec<String>,
+    ) -> Result<String, CubeError> {
+        let mut result = String::new();
+        let mut rest = column;
+
+        while let Some(open) = rest.find('[') {
+            result.push_str(&rest[..open]);
+            let after = &rest[open + 1..];
+            let close = after.find(']').ok_or_else(|| {
+                CubeError::user(format!("Unclosed member reference in column: {}", column))
+            })?;
+
+            let path_parts: Vec<String> =
+                after[..close].split('.').map(|s| s.to_string()).collect();
+            if path_parts.iter().any(|p| p.is_empty()) {
+                return Err(CubeError::user(format!(
+                    "Invalid member reference in column: {}",
+                    column
+                )));
+            }
+
+            let arg_name = path_parts[0].clone();
+            if !args_names.contains(&arg_name) {
+                args_names.push(arg_name);
+            }
+            let index = args.insert_symbol_path(path_parts);
+            result.push_str(&format!("{{arg:{}}}", index));
+
+            rest = &after[close + 1..];
+        }
+        result.push_str(rest);
+
+        Ok(result)
     }
 }
 

@@ -38,6 +38,17 @@ pub trait DepVisitor {
 /// member-symbol slot and may replace it.
 pub trait DepVisitorMut {
     fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError>;
+
+    /// The `FILTER_PARAMS` bindings reached on the way, grouped the way
+    /// they are rendered: a `FILTER_GROUP` arrives as one slice, a
+    /// standalone binding as a slice of one. Bindings that contribute no
+    /// dependencies are handed over all the same.
+    fn filter_params_group(
+        &mut self,
+        _items: &mut [crate::planner::SqlCallFilterParamsItem],
+    ) -> Result<(), CubeError> {
+        Ok(())
+    }
 }
 
 /// A node whose dependency slots can be walked (read) or rebuilt

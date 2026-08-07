@@ -19,6 +19,11 @@ pub struct SqlCallBuilder<'a> {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
+    /// Set while compiling a cube's own `sql`. That sql builds the table the
+    /// query reads from, so no member is in scope inside it — a member
+    /// reference there is rejected instead of resolved, wherever in the sql or
+    /// in one of its `FILTER_PARAMS` columns it appears.
+    is_cube_sql: bool,
 }
 
 impl<'a> SqlCallBuilder<'a> {
@@ -33,7 +38,13 @@ impl<'a> SqlCallBuilder<'a> {
             cube_evaluator,
             base_tools,
             security_context,
+            is_cube_sql: false,
         }
+    }
+
+    pub fn for_cube_sql(mut self) -> Self {
+        self.is_cube_sql = true;
+        self
     }
 
     pub fn build(
@@ -46,54 +57,80 @@ impl<'a> SqlCallBuilder<'a> {
             self.security_context.clone(),
             member_sql.args_names().clone(),
         )?;
-        let (template, template_args) = (compiled.template, compiled.args);
+        self.build_from_template(cube_name, compiled.template, &compiled.args)
+    }
 
-        let deps = template_args
+    // Assembles a `SqlCall` from an already-compiled template and the
+    // dependencies it recorded. Recurses for a `FILTER_PARAMS` column that came
+    // back compiled, since such a column is a call of its own with its own
+    // dependency list.
+    fn build_from_template(
+        &mut self,
+        cube_name: &String,
+        template: SqlTemplate,
+        args: &SqlTemplateArgs,
+    ) -> Result<SqlCall, CubeError> {
+        let deps = args
             .symbol_paths
             .iter()
             .map(|path| self.build_dependency(cube_name, path))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let filter_params = template_args
+        let filter_params = args
             .filter_params
             .iter()
-            .map(|itm| self.build_filter_params_item(itm))
+            .map(|itm| self.build_filter_params_item(cube_name, itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let filter_groups = template_args
+        let filter_groups = args
             .filter_groups
             .iter()
-            .map(|itm| self.build_filter_group_item(itm))
+            .map(|itm| self.build_filter_group_item(cube_name, itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = SqlCall::new(
-            template.clone(),
+        Ok(SqlCall::new(
+            template,
             deps,
             filter_params,
             filter_groups,
-            template_args.security_context.clone(),
-        );
-        Ok(result)
+            args.security_context.clone(),
+        ))
     }
 
     fn build_filter_params_item(
         &mut self,
+        cube_name: &String,
         item: &FilterParamsItem,
     ) -> Result<SqlCallFilterParamsItem, CubeError> {
+        let compiled_call = match &item.column {
+            FilterParamsColumn::Compiled(compiled) => Some(Rc::new(self.build_from_template(
+                cube_name,
+                compiled.template.clone(),
+                &compiled.args,
+            )?)),
+            _ => None,
+        };
+
         Ok(SqlCallFilterParamsItem {
             filter_symbol_name: format!("{}.{}", item.cube_name, item.name),
             column: item.column.clone(),
+            compiled_call,
+            // Turned on per query, and again per subquery, once the filters are
+            // known. Off until then, so a symbol compiled for comparison rather
+            // than for a query carries no dependency the query would not.
+            active: false,
         })
     }
 
     fn build_filter_group_item(
         &mut self,
+        cube_name: &String,
         item: &FilterGroupItem,
     ) -> Result<SqlCallFilterGroupItem, CubeError> {
         let filter_params = item
             .filter_params
             .iter()
-            .map(|itm| self.build_filter_params_item(itm))
+            .map(|itm| self.build_filter_params_item(cube_name, itm))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(SqlCallFilterGroupItem { filter_params })
     }
@@ -111,6 +148,20 @@ impl<'a> SqlCallBuilder<'a> {
             dep_path,
         )
         .map_err(|e| CubeError::user(format!("Error in `{}`: {}", dep_path.join("."), e)))?;
+
+        if self.is_cube_sql {
+            if let SymbolPathType::Dimension | SymbolPathType::Measure | SymbolPathType::Segment =
+                symbol_path.path_type()
+            {
+                return Err(CubeError::user(format!(
+                    "`sql` of cube `{}` references member `{}`. A cube's sql builds the table the \
+                     query reads from, so no member is in scope there — reference the underlying \
+                     column instead",
+                    current_cube_name,
+                    symbol_path.full_name()
+                )));
+            }
+        }
 
         let path = symbol_path.path().clone();
 

@@ -2,6 +2,8 @@ use super::super::common::Case;
 use super::super::dimension_kinds::DimensionKind;
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
+use crate::planner::SqlCallFilterParamsItem;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -92,4 +94,68 @@ fn replace_dimension_case(dimension: &DimensionSymbol, new_case: Case) -> Rc<Dim
         new.kind = DimensionKind::Case(c.replace_case(new_case));
     }
     Rc::new(new)
+}
+
+/// Marks every `FILTER_PARAMS` binding in the symbol by whether `filters` reach
+/// the members it renders from. A binding renders only where its filters do, so
+/// only there do the members its column reads count among the symbol's
+/// dependencies and pull their cubes into the join.
+pub fn apply_filter_params_activity_to_symbol(
+    symbol: &Rc<MemberSymbol>,
+    filters: &FilterItem,
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    let mut visitor = ActivityVisitor { filters };
+    let mut result = symbol.as_ref().clone();
+    result.visit_deps_mut(&mut visitor)?;
+    Ok(Rc::new(result))
+}
+
+/// The filter set as the one item `apply_filter_params_activity_to_symbol`
+/// matches against.
+pub fn filter_params_activity_filters(filters: &[FilterItem]) -> FilterItem {
+    FilterItem::Group(Rc::new(FilterGroup {
+        operator: FilterGroupOperator::And,
+        items: filters.to_vec(),
+    }))
+}
+
+struct ActivityVisitor<'a> {
+    filters: &'a FilterItem,
+}
+
+impl DepVisitorMut for ActivityVisitor<'_> {
+    fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError> {
+        let mut symbol = slot.as_ref().clone();
+        symbol.visit_deps_mut(self)?;
+        *slot = Rc::new(symbol);
+        Ok(())
+    }
+
+    fn filter_params_group(
+        &mut self,
+        items: &mut [SqlCallFilterParamsItem],
+    ) -> Result<(), CubeError> {
+        // Matched against the whole group, since that is the predicate the group
+        // renders: an OR group survives only when every member of it matches.
+        let members = items
+            .iter()
+            .map(|item| &item.filter_symbol_name)
+            .collect::<Vec<_>>();
+        let active = self.filters.find_subtree_for_members(&members).is_some();
+        for item in items.iter_mut() {
+            item.active = active;
+        }
+        Ok(())
+    }
+}
+
+/// `apply_filter_params_activity_to_symbol` over every symbol a filter item
+/// carries.
+pub fn apply_filter_params_activity_to_filter_item(
+    filter_item: &FilterItem,
+    filters: &FilterItem,
+) -> Result<FilterItem, CubeError> {
+    super::map_filter_item_symbols(filter_item, &|symbol| {
+        apply_filter_params_activity_to_symbol(symbol, filters)
+    })
 }
