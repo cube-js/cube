@@ -81,4 +81,10 @@ export class SqliteQuery extends BaseQuery {
     // eslint-disable-next-line quotes
     return `strftime('%s','now')`;
   }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    delete templates.functions.WIDTH_BUCKET;
+    return templates;
+  }
 }

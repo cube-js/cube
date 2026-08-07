@@ -109,4 +109,10 @@ export class HiveQuery extends BaseQuery {
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    delete templates.functions.WIDTH_BUCKET;
+    return templates;
+  }
 }

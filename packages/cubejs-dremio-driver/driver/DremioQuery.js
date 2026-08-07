@@ -167,6 +167,7 @@ class DremioQuery extends BaseQuery {
     templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
+    delete templates.functions.WIDTH_BUCKET;
     templates.quotes.identifiers = '"';
     return templates;
   }
