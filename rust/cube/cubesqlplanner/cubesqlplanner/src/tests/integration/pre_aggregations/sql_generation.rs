@@ -1438,25 +1438,25 @@ async fn test_order_by_only_measure_dropped_from_pre_agg() -> Result<(), CubeErr
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ungrouped_pre_agg_measure_reads_rollup_column() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
-        .only_pre_aggregations(&["main_rollup"]);
+        .only_pre_aggregations(&["primary_key_rollup"]);
     let ctx = TestContext::new(schema)?;
 
     let query_yaml = indoc! {"
         measures:
           - orders.total_amount
         dimensions:
+          - orders.id
           - orders.status
           - orders.city
         ungrouped: true
         order:
-          - id: orders.status
-          - id: orders.city
+          - id: orders.id
     "};
 
     let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
     assert_eq!(pre_aggrs.len(), 1);
-    assert_eq!(pre_aggrs[0].name(), "main_rollup");
+    assert_eq!(pre_aggrs[0].name(), "primary_key_rollup");
     assert!(
         sql.contains("\"orders__total_amount\" \"orders__total_amount\""),
         "ungrouped measure should project the rollup column, got:\n{sql}"
@@ -1516,6 +1516,178 @@ async fn test_rollup_lambda_cross_cube_union_aliases() -> Result<(), CubeError> 
         .await
     {
         insta::assert_snapshot!("rollup_lambda_cross_cube_union_cubestore_result", result);
+    }
+
+    Ok(())
+}
+
+// `joined_rollup` is a rollup on the fact cube `visitor_checkins` that includes
+// a cross-cube dimension from the many_to_one joined `visitors` cube, plus a
+// `time_dimension`. An ungrouped query with no measures and no time dimension
+// requests raw rows, so it may only use a pre-aggregation whose dimensions
+// cover the primary keys of every cube in the query. Here they don't, so
+// reading flat rollup columns would silently drop the join between the two
+// cubes: the query must fall back to base SQL.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_no_measures_cross_cube_query_should_not_match_rollup(
+) -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml")
+        .only_pre_aggregations(&["joined_rollup"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - visitor_checkins.visitor_id
+          - visitors.source
+        filters:
+          - dimension: visitors.source
+            operator: equals
+            values:
+              - google
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "expected no pre-aggregation, got `{}`. Generated SQL:\n{sql}",
+        pre_aggrs
+            .iter()
+            .map(|p| p.name().clone())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    assert!(
+        sql.to_lowercase().contains("join"),
+        "expected base SQL with a JOIN between visitor_checkins and visitors, got:\n{sql}"
+    );
+
+    Ok(())
+}
+
+// Same rejection as above, reached through a view. The view renames every
+// member, so the ungrouped gate must compare the cubes and primary keys the
+// view members resolve to rather than the names the query spells them with.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_cross_cube_view_query_should_not_match_rollup() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml")
+        .only_pre_aggregations(&["joined_rollup"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - visitors_view.visitor_checkins_visitor_id
+          - visitors_view.visitors_source
+        filters:
+          - dimension: visitors_view.visitors_source
+            operator: equals
+            values:
+              - google
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "expected no pre-aggregation, got `{}`. Generated SQL:\n{sql}",
+        pre_aggrs
+            .iter()
+            .map(|p| p.name().clone())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    assert!(
+        sql.to_lowercase().contains("join"),
+        "expected base SQL with a JOIN between visitor_checkins and visitors, got:\n{sql}"
+    );
+
+    Ok(())
+}
+
+// The mirror case: `for_join` covers the primary key of the only cube the query
+// resolves to, so an ungrouped view query must still match it. Guards the gate
+// against reading the view itself as a separate cube, which would make the cube
+// sets differ and reject every ungrouped query issued through a view.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_view_query_matches_rollup_covering_primary_key() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml")
+        .only_pre_aggregations(&["for_join"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - visitors_view.visitors_id
+          - visitors_view.visitors_source
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(
+        pre_aggrs.len(),
+        1,
+        "expected `visitors.for_join` to be used, got SQL:\n{sql}"
+    );
+    assert_eq!(pre_aggrs[0].name(), "for_join");
+    assert_eq!(pre_aggrs[0].cube_name(), "visitors");
+
+    // The rows are the claim: one per raw visitor, not per (id, source) group.
+    if let Some(result) = ctx
+        .try_execute(query_yaml, "pre_aggregation_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!("ungrouped_view_query_for_join_cubestore_result", result);
+    }
+
+    Ok(())
+}
+
+// `joined_keys_rollup` has the same cross-cube shape as `joined_rollup` but is
+// grouped by the primary keys of both cubes, so it does hold one row per raw
+// joined row and an ungrouped view query spanning both cubes may use it. The
+// contrast with the rejected `joined_rollup` is what the gate is discriminating.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_cross_cube_view_query_matches_rollup_covering_both_primary_keys(
+) -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregations_test.yaml")
+        .only_pre_aggregations(&["joined_keys_rollup"]);
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        dimensions:
+          - visitors_view.visitors_source
+          - visitors_view.visitor_checkins_visitor_id
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(
+        pre_aggrs.len(),
+        1,
+        "expected `joined_keys_rollup` to be used, got SQL:\n{sql}"
+    );
+    assert_eq!(pre_aggrs[0].name(), "joined_keys_rollup");
+    // Tokenized so the check is immune to line breaks and to `join` appearing
+    // inside the rollup's own table name.
+    assert!(
+        !sql.to_lowercase().split_whitespace().any(|t| t == "join"),
+        "reading the rollup should not re-join the cubes, got:\n{sql}"
+    );
+
+    // The rows are the claim the gate rests on: one per raw joined row.
+    if let Some(result) = ctx
+        .try_execute(query_yaml, "pre_aggregation_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(
+            "ungrouped_cross_cube_view_joined_keys_rollup_cubestore_result",
+            result
+        );
     }
 
     Ok(())

@@ -170,3 +170,14 @@ cubes:
           - high_priority
         time_dimension: created_at
         granularity: day
+
+      # Groups by the primary key, so every stored row is a single order —
+      # the only shape a rollup may serve an ungrouped query from.
+      - name: primary_key_rollup
+        type: rollup
+        measures:
+          - total_amount
+        dimensions:
+          - id
+          - status
+          - city

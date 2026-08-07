@@ -120,6 +120,14 @@ impl MeasureKind {
         }
     }
 
+    /// True if a rollup stores this kind as a mergeable sketch rather than the
+    /// final value — either it already is that state form, or it is the kind
+    /// that has one. Derived from [`Self::as_state`] so both answers cannot
+    /// drift apart.
+    pub fn is_stored_as_state(&self) -> bool {
+        matches!(self, Self::AggregatedState(_)) || self.as_state().is_some()
+    }
+
     pub fn measure_type_str(&self) -> &str {
         match self {
             Self::Count(_) | Self::MultipliedCount(_) => "count",
