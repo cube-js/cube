@@ -145,7 +145,7 @@ Spaces created per deployment are named after it, for example `Product (producti
 Choose per-deployment scope when the same `spaces:` entry is declared in several deployments — typically development, staging, and production fed from branches of one data model — and you don't want them sharing what the space stores.
 
 <Warning>
-  Reconciling again does not split a space that was created as global: a global space counts as reconciled for every deployment, so no new space is created. To split one, re-scope it to a deployment on its space page, then reconcile the other deployments.
+  Creating the spaces again does not split a space that was created as global: it already counts as created for every deployment, so **Create All** creates nothing new. To split one, re-scope it to a deployment on its space page, then run **Create All** for the other deployments.
 </Warning>
 
 Spaces created before this option existed have no scope stored. Cube infers the deployment they belong to from the agents linked to them, and the Spaces list shows them as **Not scoped**. Set the scope explicitly on the space page to make it definite.
