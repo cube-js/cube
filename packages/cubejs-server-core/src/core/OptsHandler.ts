@@ -455,6 +455,20 @@ export class OptsHandler {
       });
     }
 
+    if (
+      opts.contextToAppId &&
+      !opts.contextToOrchestratorId &&
+      this.isCustomDriverFactory()
+    ) {
+      this.core.logger('Multitenancy Without ContextToOrchestratorId', {
+        warning: (
+          'You are using multitenancy with a custom driverFactory but without ' +
+          'configuring contextToOrchestratorId: ' +
+          'https://cube.dev/docs/reference/configuration/config#context_to_orchestrator_id'
+        ),
+      });
+    }
+
     if (options.devServer && !options.apiSecret) {
       options.apiSecret = crypto.randomBytes(16).toString('hex');
       displayCLIWarning(
