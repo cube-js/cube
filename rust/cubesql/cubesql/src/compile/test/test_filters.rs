@@ -511,3 +511,47 @@ GROUP BY dim_str0
         );
     }
 }
+
+/// The `IN`-list decline leaves a heterogeneous list — the in-range element folds to a
+/// `Timestamp(ns)` literal while the out-of-range one stays an un-evaluated `CAST(Utf8 AS Date32)`.
+/// Assert the filter still pushes down with both dates intact, so a partial decline can't silently
+/// leave the comparison on the DataFusion side.
+#[tokio::test]
+async fn test_filter_in_list_date_beyond_nanosecond_range_is_pushed_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT dim_str0
+FROM MultiTypeCube
+WHERE dim_date0 IN (date '2020-01-01', date '9999-12-31')
+GROUP BY dim_str0
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    assert_eq!(
+        query_plan
+            .as_logical_plan()
+            .find_cube_scan()
+            .request
+            .filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("MultiTypeCube.dim_date0".to_string()),
+            operator: Some("equals".to_string()),
+            values: Some(vec![
+                "2020-01-01T00:00:00.000Z".to_string(),
+                "9999-12-31T00:00:00.000Z".to_string(),
+            ]),
+            or: None,
+            and: None,
+        }]),
+        "the IN list must push down with both dates intact"
+    );
+}
