@@ -19,7 +19,7 @@ Multi-agent is useful when:
 
 A multi-agent setup introduces one new concept on top of the single-agent model: **spaces**.
 
-- A **deployment** can contain one or more **spaces**.
+- A **space** belongs to the account and is used by one or more **deployments** — see [Space scope](#space-scope).
 - A **space** is an isolated context. It owns its **rules**, **certified queries**, and **memories** — they are not shared across spaces.
 - Each **agent** belongs to exactly one space and inherits everything that space owns. Multiple agents can live in the same space and share the same rules, certified queries, and memories.
 
@@ -48,8 +48,8 @@ flowchart LR
     SMM[Memories]:::resource
     A3[Agent<br/>marketing-analyst]:::agent
 
-    D --> SA
-    D --> SM
+    D -->|uses| SA
+    D -->|uses| SM
 
     SA --- SAR
     SA --- SAC
@@ -127,6 +127,34 @@ spaces:
 | `description` | string | No       | Human-readable description.                |
 
 Each agent must reference exactly one space via its `space` property. Multiple agents can share the same space and inherit its rules, certified queries, and memories.
+
+## Space scope
+
+Spaces live at the account level, so one space can be used by agents in more than one deployment. When a space is created, you choose its scope:
+
+- **Global** — one space that agents in every deployment can use.
+- **Per deployment** — the space is available to a single deployment only.
+
+You pick the scope on the **Agents** → **Spaces** page, in two places:
+
+- **Create space**, when you create a space by hand.
+- The **Create All** panel, shown for spaces and agents declared in `agents/config.yml` that don't exist yet. Its **Create Spaces** control offers **Global** and **Per deployment**.
+
+Spaces created per deployment are named after the deployment, for example `Product (production)` and `Product (staging)`. Only the displayed name changes — the space stays linked to the space `name` declared in `agents/config.yml`, so the YAML entry keeps matching. You can change the scope of an existing space later on the space's page.
+
+Choose per-deployment scope when the same `spaces:` entry is declared in several deployments — typically development, staging, and production fed from branches of one data model — and you don't want them sharing what the space stores.
+
+<Warning>
+  Creating the spaces again does not split a space that was created as global: it already counts as created for every deployment, so **Create All** creates nothing new. To split one, re-scope it to a deployment on its space page, then run **Create All** for the other deployments.
+</Warning>
+
+Spaces created before this option existed have no scope stored. Cube infers the deployment they belong to from the agents linked to them, and the Spaces list shows them as **Not scoped**. Set the scope explicitly on the space page to make it definite.
+
+### Scope affects storage, not configuration
+
+Scope never changes where configuration comes from. Agents always belong to a single deployment, and the `spaces:` and `agents:` entries, rules, and certified queries that shape an agent are read from the `agents/` directory of the data model of that deployment, on that deployment's branch. A global space does not merge the configuration of the deployments that use it.
+
+What a global space shares is storage: the space itself and the data held against it — memories in particular. Two deployments using the same global space read and write the same memories, while each of them still applies its own `agents/` configuration.
 
 ## Attaching rules and certified queries to a space
 
