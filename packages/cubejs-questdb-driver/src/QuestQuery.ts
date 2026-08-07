@@ -309,6 +309,8 @@ export class QuestQuery extends BaseQuery {
       '{% elif offset is not none %}\nLIMIT {{ offset }}, 2147483647' +
       '{% elif limit is not none %}\nLIMIT {{ limit }}{% endif %}';
 
+    delete templates.functions.WIDTH_BUCKET;
+
     return templates;
   }
 }
