@@ -2986,14 +2986,38 @@ impl WrappedSelectNode {
             }
             // A `Date64` bound reaches here from `PlanNormalize`'s out-of-nanosecond-range
             // fallback, so it has to render rather than fall to the catch-all error below.
+            // Written out rather than via `generate_sql_for_timestamp!` because that macro
+            // `unwrap`s the `LocalResult`: this whole change exists to turn an overflow panic into
+            // an error, so it must not add a new one for a millisecond value chrono can't hold.
             ScalarValue::Date64(ms) => {
-                generate_sql_for_timestamp!(
-                    literal,
-                    ms,
-                    timestamp_millis_opt,
-                    sql_generator,
-                    sql_query
-                )
+                if let Some(ms) = ms {
+                    let chrono::LocalResult::Single(timestamp) = Utc.timestamp_millis_opt(ms)
+                    else {
+                        return Err(DataFusionError::Internal(format!(
+                            "Can't generate SQL for date: millisecond value out of range ({})",
+                            ms
+                        )));
+                    };
+                    (
+                        sql_generator
+                            .get_sql_templates()
+                            .timestamp_literal_expr(
+                                timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+                            )
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for timestamp: {}",
+                                    e
+                                ))
+                            })?,
+                        sql_query,
+                    )
+                } else {
+                    (
+                        Self::generate_null_for_literal(sql_generator, &literal)?,
+                        sql_query,
+                    )
+                }
             }
 
             // generate_sql_for_timestamp will call Utc constructors, so only support UTC zone for now
