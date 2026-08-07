@@ -3564,12 +3564,22 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
                     .iter()
                     .map(|date| {
                         date.map(|date| {
-                            let nanoseconds_in_day = 86_400_000_000_000_i64;
-                            let timestamp = date as i64 * nanoseconds_in_day;
-                            timestamp
+                            const NANOSECONDS_IN_DAY: i64 = 86_400_000_000_000;
+                            // Beyond ±106_751 days from the epoch this doesn't fit an i64 of
+                            // nanoseconds; wrapping would yield a garbage instant.
+                            (date as i64)
+                                .checked_mul(NANOSECONDS_IN_DAY)
+                                .ok_or_else(|| {
+                                    DataFusionError::Execution(format!(
+                                        "Date is out of range for a nanosecond timestamp: {} days \
+                                     from 1970-01-01",
+                                        date
+                                    ))
+                                })
                         })
+                        .transpose()
                     })
-                    .collect::<PrimitiveArray<TimestampNanosecondType>>();
+                    .collect::<Result<PrimitiveArray<TimestampNanosecondType>>>()?;
 
                 Ok(Arc::new(result) as ArrayRef)
             }
