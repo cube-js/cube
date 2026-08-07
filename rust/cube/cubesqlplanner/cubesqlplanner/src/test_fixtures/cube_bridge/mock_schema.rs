@@ -645,9 +645,33 @@ impl MockViewBuilder {
             }
         }
 
+        // Like the schema compiler, only multi-hop join paths land in the join
+        // map: a direct cube needs no path to be reached. Note this is what makes
+        // a root cube member of a view carry `Vector([cube])` rather than
+        // `Single(cube)` - `collect_join_hints` enriches a hint into the prefix of
+        // the path it sits on - and both forms are distinct join tree cache keys.
+        //
+        // The schema compiler builds this while walking dimensions, so it emits one
+        // entry per included cube that contributes a dimension; this walks the view
+        // cubes directly. Same result for every fixture here, but they would diverge
+        // for a fixture with a cube that includes no dimensions.
+        let join_map = self
+            .view_cubes
+            .iter()
+            .map(|view_cube| {
+                view_cube
+                    .join_path
+                    .split('.')
+                    .map(|part| part.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|path| path.len() > 1)
+            .collect::<Vec<_>>();
+
         let view_def = MockCubeDefinition::builder()
             .name(self.view_name.clone())
             .is_view(Some(true))
+            .join_map(Some(join_map))
             .default_filters(self.default_filters)
             .build();
 

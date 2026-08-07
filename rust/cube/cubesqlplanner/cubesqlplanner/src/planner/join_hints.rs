@@ -1,9 +1,13 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
 
 /// Ordered list of cube-join hints. Adjacent redundant entries are
-/// silently dropped on `push` / `extend` — a `Single` is skipped when
-/// it duplicates either the previous `Single` or the tail of the
-/// previous `Vector`.
+/// silently dropped on `push` / `extend` — an item is skipped when it
+/// repeats the previous one verbatim, and a `Single` is skipped when it
+/// duplicates either the previous `Single` or the tail of the previous
+/// `Vector`.
+///
+/// Keeping the list free of adjacent repeats keeps it canonical, which
+/// matters because `JoinHints` is used as a join tree cache key.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct JoinHints {
     items: Vec<JoinHintItem>,
@@ -19,13 +23,12 @@ impl JoinHints {
     }
 
     pub fn push(&mut self, item: JoinHintItem) {
-        if let JoinHintItem::Single(ref name) = item {
-            if let Some(last) = self.items.last() {
-                let redundant = match last {
-                    JoinHintItem::Single(s) => s == name,
-                    JoinHintItem::Vector(v) => v.last() == Some(name),
-                };
-                if redundant {
+        if let Some(last) = self.items.last() {
+            if last == &item {
+                return;
+            }
+            if let (JoinHintItem::Single(name), JoinHintItem::Vector(v)) = (&item, last) {
+                if v.last() == Some(name) {
                     return;
                 }
             }
@@ -159,6 +162,28 @@ mod tests {
 
         hints.push(s("abc"));
         assert_eq!(hints.len(), 3, "Different Single is added");
+    }
+
+    #[test]
+    fn test_push_skips_repeated_vector() {
+        let mut hints = JoinHints::new();
+        hints.push(v(&["customers", "orders"]));
+        hints.push(v(&["customers", "orders"]));
+        assert_eq!(
+            hints.len(),
+            1,
+            "Vector repeating the previous one is skipped"
+        );
+
+        hints.push(v(&["customers", "returns"]));
+        assert_eq!(hints.len(), 2, "Different Vector is added");
+
+        hints.push(v(&["customers", "orders"]));
+        assert_eq!(
+            hints.len(),
+            3,
+            "Only adjacent repeats are dropped, not every earlier occurrence"
+        );
     }
 
     #[test]
