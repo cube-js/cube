@@ -133,14 +133,14 @@ Each agent must reference exactly one space via its `space` property. Multiple a
 Spaces live at the account level, so one space can be used by agents in more than one deployment. When a space is created, you choose its scope:
 
 - **Global** — one space that agents in every deployment can use.
-- **A specific deployment** — the space is available to that deployment only.
+- **Per deployment** — the space is available to a single deployment only.
 
 You pick the scope on the **Agents** → **Spaces** page, in two places:
 
 - **Create space**, when you create a space by hand.
 - The **Create All** panel, shown for spaces and agents declared in `agents/config.yml` that don't exist yet. Its **Create Spaces** control offers **Global** and **Per deployment**.
 
-Spaces created per deployment are named after it, for example `Product (production)` and `Product (staging)`. Only the displayed name changes — the space stays linked to the space `name` declared in `agents/config.yml`, so the YAML entry keeps matching. You can change the scope of an existing space later on the space's page.
+Spaces created per deployment are named after the deployment, for example `Product (production)` and `Product (staging)`. Only the displayed name changes — the space stays linked to the space `name` declared in `agents/config.yml`, so the YAML entry keeps matching. You can change the scope of an existing space later on the space's page.
 
 Choose per-deployment scope when the same `spaces:` entry is declared in several deployments — typically development, staging, and production fed from branches of one data model — and you don't want them sharing what the space stores.
 
